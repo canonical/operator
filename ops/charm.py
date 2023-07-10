@@ -22,9 +22,11 @@ from typing import (
     Any,
     Dict,
     List,
+    Literal,
     Mapping,
     Optional,
     TextIO,
+    Tuple,
     Union,
     cast,
 )
@@ -34,7 +36,7 @@ from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal, Required, TypedDict
+    from typing_extensions import Required, TypedDict
 
     from ops.framework import Handle
     from ops.model import Container, Relation, Storage
@@ -50,7 +52,7 @@ if TYPE_CHECKING:
     _MultipleRange = TypedDict('_MultipleRange', {'range': str})
     _StorageMetaDict = TypedDict('_StorageMetaDict', {
         'type': Required[str],
-        'description': int,
+        'description': str,
         'shared': bool,
         'read-only': bool,
         'minimum-size': str,
@@ -103,13 +105,13 @@ class ActionEvent(EventBase):
     To respond with the result of the action, call :meth:`set_results`. To add
     progress messages that are visible as the action is progressing use
     :meth:`log`.
-
-    Attributes:
-        params: The parameters passed to the action.
     """
 
-    def defer(self):
-        """Action events are not deferable like other events.
+    params: Dict[str, Any]
+    """The parameters passed to the action."""
+
+    def defer(self) -> None:
+        """Action events are not deferrable like other events.
 
         This is because an action runs synchronously and the administrator
         is waiting for the result.
@@ -155,11 +157,11 @@ class ActionEvent(EventBase):
         results object. Thus, the results object might contain the following keys,
         additionally to those specified by the charm code:
 
-         - Stdout
-         - Stderr
-         - Stdout-encoding
-         - Stderr-encoding
-         - ReturnCode
+        - Stdout
+        - Stderr
+        - Stdout-encoding
+        - Stderr-encoding
+        - ReturnCode
 
         Args:
             results: The result of the action as a Dict
@@ -225,21 +227,21 @@ class RemoveEvent(HookEvent):
 class ConfigChangedEvent(HookEvent):
     """Event triggered when a configuration change occurs.
 
-    This event can fire in several situations:
+    This event will fire in several situations:
 
-    - Right after the unit starts up for the first time.
-      This event notifies the charm of its initial configuration.
-      Typically, this event will fire between a :class:`install <InstallEvent>`
-      and a :class:`starts <StartEvent>` during the startup sequence
-      (when you first deploy a unit), but more in general it will fire whenever
-      the unit is (re)started, e.g. after pod churn on kubernetes, on unit
-      rescheduling, on unit upgrade/refresh, etc...
-    - As a specific instance of the above point: when networking changes
-      (if the machine reboots and comes up with a different IP).
-    - When the cloud admin reconfigures the charm via the Juju CLI, i.e.
-      `juju config my-charm foo=bar`. This event notifies the charm of
+    - When the admin reconfigures the charm using the Juju CLI, for example
+      ``juju config mycharm foo=bar``. This event notifies the charm of
       its new configuration. (The event itself, however, is not aware of *what*
       specifically has changed in the config).
+    - Right after the unit starts up for the first time.
+      This event notifies the charm of its initial configuration.
+      Typically, this event will fire between an :class:`install <InstallEvent>`
+      and a :class:`start <StartEvent>` during the startup sequence
+      (when you first deploy a unit), but in general it will fire whenever
+      the unit is (re)started, for example after pod churn on Kubernetes, on unit
+      rescheduling, on unit upgrade or refresh, and so on.
+    - As a specific instance of the above point: when networking changes
+      (if the machine reboots and comes up with a different IP).
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -279,8 +281,8 @@ class UpgradeCharmEvent(HookEvent):
 class PreSeriesUpgradeEvent(HookEvent):
     """Event triggered to prepare a unit for series upgrade.
 
-    This event triggers when an administrator executes ``juju upgrade-series
-    MACHINE prepare``. The event will fire for each unit that is running on the
+    This event triggers when an administrator executes ``juju upgrade-machine
+    <machine> prepare``. The event will fire for each unit that is running on the
     specified machine. Any callback method bound to this event must prepare the
     charm for an upgrade to the series. This may include things like exporting
     database content to a version neutral format, or evacuating running
@@ -298,7 +300,7 @@ class PostSeriesUpgradeEvent(HookEvent):
 
     This event is triggered after the administrator has done a distribution
     upgrade (or rolled back and kept the same series). It is called in response
-    to ``juju upgrade-series MACHINE complete``. Associated charm callback
+    to ``juju upgrade-machine <machine> complete``. Associated charm callback
     methods are expected to do whatever steps are necessary to reconfigure their
     applications for the new series. This may include things like populating the
     upgraded version of a database. Note however charms are expected to check if
@@ -321,9 +323,7 @@ class LeaderElectedEvent(HookEvent):
 
 
 class LeaderSettingsChangedEvent(HookEvent):
-    """Event triggered when leader changes any settings.
-
-    DEPRECATED NOTICE
+    """DEPRECATED. Event triggered when leader changes any settings.
 
     This event has been deprecated in favor of using a Peer relation,
     and having the leader set a value in the Application data bag for
@@ -347,10 +347,8 @@ class CollectMetricsEvent(HookEvent):
         """Record metrics that have been gathered by the charm for this unit.
 
         Args:
-            metrics: A collection of {key: float} pairs that contains the
-              metrics that have been gathered
-            labels: {key:value} strings that can be applied to the
-                metrics that are being gathered
+            metrics: Key-value mapping of metrics that have been gathered.
+            labels: Key-value labels applied to the metrics.
         """
         self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
 
@@ -364,15 +362,20 @@ class RelationEvent(HookEvent):
     "stopped". Within that time window, the unit may participate in
     several different relations at a time, including multiple
     relations with the same name.
+    """
 
-    Attributes:
-        relation: The :class:`~ops.model.Relation` involved in this event
-        app: The remote :class:`~ops.model.Application` that has triggered this
-             event
-        unit: The remote :class:`~ops.model.Unit` that has triggered this event. This may be
-              ``None`` if the relation event was triggered as an
-              :class:`~ops.model.Application` level event
+    relation: 'Relation'
+    """The relation involved in this event."""
 
+    # TODO(benhoyt): I *think* app should never be None, but confirm and update type
+    app: Optional[model.Application]
+    """The remote application that has triggered this event."""
+
+    unit: Optional[model.Unit]
+    """The remote unit that has triggered this event.
+
+    This will be ``None`` if the relation event was triggered as an
+    :class:`Application <model.Application>`-level event.
     """
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
@@ -553,10 +556,10 @@ class StorageEvent(HookEvent):
     charms can define several different types of storage that are
     allocated from Juju. Changes in state of storage trigger sub-types
     of :class:`StorageEvent`.
-
-    Attributes:
-        storage: The :class:`~ops.model.Storage` instance this event is about.
     """
+
+    storage: 'Storage'
+    """Storage instance this event refers to."""
 
     def __init__(self, handle: 'Handle', storage: 'Storage'):
         super().__init__(handle)
@@ -585,7 +588,7 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None,)
+            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore # noqa
             if self.storage is None:
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
@@ -634,13 +637,15 @@ class WorkloadEvent(HookEvent):
 
     Workload events are generated for all containers that the charm
     expects in metadata. Workload containers currently only trigger
-    a PebbleReadyEvent.
+    a :class:`PebbleReadyEvent`.
+    """
 
-    Attributes:
-        workload: The :class:`~ops.model.Container` involved in this event.
-                  Workload currently only can be a Container but in future may
-                  be other types that represent the specific workload type e.g.
-                  a Machine.
+    workload: 'Container'
+    """The workload involved in this event.
+
+    Workload currently only can be a :class:`Container <model.Container>`, but
+    in future may be other types that represent the specific workload type,
+    for example a machine.
     """
 
     def __init__(self, handle: 'Handle', workload: 'Container'):
@@ -667,7 +672,7 @@ class WorkloadEvent(HookEvent):
         if container_name:
             self.workload = self.framework.model.unit.get_container(container_name)
         else:
-            self.workload = None
+            self.workload = None  # type: ignore
 
 
 class PebbleReadyEvent(WorkloadEvent):
@@ -714,27 +719,27 @@ class SecretEvent(HookEvent):
 
 
 class SecretChangedEvent(SecretEvent):
-    """Event raised by Juju on the observer when the secret owner changes its contents.
+    """Event triggered on the secret observer charm when the secret owner changes its contents.
 
     When the owner of a secret changes the secret's contents, Juju will create
     a new secret revision, and all applications or units that are tracking this
     secret will be notified via this event that a new revision is available.
 
     Typically, you will want to fetch the new content by calling
-    :meth:`ops.Secret.get_content` with :code:`refresh=True` to tell Juju to
-    start tracking the new revision.
+    :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
+    to tell Juju to start tracking the new revision.
     """
 
 
 class SecretRotateEvent(SecretEvent):
-    """Event raised by Juju on the owner when the secret's rotation policy elapses.
+    """Event triggered on the secret owner charm when the secret's rotation policy elapses.
 
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
-    revision by calling :meth:`ops.Secret.set_content`.
+    revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
-    def defer(self):
+    def defer(self) -> None:
         """Secret rotation events are not deferrable (Juju handles re-invocation)."""
         raise RuntimeError(
             'Cannot defer secret rotation events. Juju will keep firing this '
@@ -742,13 +747,14 @@ class SecretRotateEvent(SecretEvent):
 
 
 class SecretRemoveEvent(SecretEvent):
-    """Event raised by Juju on the owner when a secret revision can be removed.
+    """Event triggered on the secret owner charm when a secret revision can be removed.
 
     When the owner of a secret creates a new revision, and after all
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call :meth:`ops.Secret.remove_revision` to
+    Typically, you will want to call
+    :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision.
     """
 
@@ -780,11 +786,11 @@ class SecretRemoveEvent(SecretEvent):
 
 
 class SecretExpiredEvent(SecretEvent):
-    """Event raised by Juju on the owner when a secret's expiration time elapses.
+    """Event triggered on the secret owner charm when a secret's expiration time elapses.
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`ops.Secret.remove_revision()`.
+    revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -813,7 +819,7 @@ class SecretExpiredEvent(SecretEvent):
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
 
-    def defer(self):
+    def defer(self) -> None:
         """Secret expiration events are not deferrable (Juju handles re-invocation)."""
         raise RuntimeError(
             'Cannot defer secret expiration events. Juju will keep firing '
@@ -823,77 +829,102 @@ class SecretExpiredEvent(SecretEvent):
 class CharmEvents(ObjectEvents):
     """Events generated by Juju pertaining to application lifecycle.
 
-    This class is used to create an event descriptor (``self.on``) attribute for
-    a charm class that inherits from :class:`CharmBase`. The event descriptor
-    may be used to set up event handlers for corresponding events.
+    By default, the events listed as attributes of this class will be
+    provided via the :attr:`CharmBase.on` attribute. For example::
 
-    By default the following events will be provided through
-    :class:`CharmBase`::
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.on.install
-        self.on.start
-        self.on.remove
-        self.on.update_status
-        self.on.config_changed
-        self.on.upgrade_charm
-        self.on.pre_series_upgrade
-        self.on.post_series_upgrade
-        self.on.leader_elected
-        self.on.collect_metrics
+    In addition to the events listed as attributes of this class,
+    dynamically-named events will also be defined based on the charm's
+    metadata (``metadata.yaml``) for relations, storage, actions, and
+    containers. These named events may be accessed as
+    ``self.on[<name>].<event>`` or using a prefix like
+    ``self.on.<name>_<event>``, for example::
 
-
-    In addition to these, depending on the charm's metadata (``metadata.yaml``),
-    named relation and storage events may also be defined.  These named events
-    are created by :class:`CharmBase` using charm metadata.  The named events may be
-    accessed as ``self.on[<name>].<relation_or_storage_event>``
+        self.framework.observe(self.on["db"].relation_created, self._on_db_relation_created)
+        self.framework.observe(self.on.workload_pebble_ready, self._on_workload_pebble_ready)
     """
 
+    # NOTE: The one-line docstrings below are copied from the first line of
+    #       each event class's docstring. Please keep in sync.
+
     install = EventSource(InstallEvent)
+    """Triggered when a charm is installed (see :class:`InstallEvent`)."""
+
     start = EventSource(StartEvent)
+    """Triggered immediately after first configuration change (see :class:`StartEvent`)."""
+
     stop = EventSource(StopEvent)
+    """Triggered when a charm is shut down (see :class:`StopEvent`)."""
+
     remove = EventSource(RemoveEvent)
+    """Triggered when a unit is about to be terminated (see :class:`RemoveEvent`)."""
+
     update_status = EventSource(UpdateStatusEvent)
+    """Triggered periodically by a status update request from Juju (see
+    :class:`UpdateStatusEvent`).
+    """
+
     config_changed = EventSource(ConfigChangedEvent)
+    """Triggered when a configuration change occurs (see :class:`ConfigChangedEvent`)."""
+
     upgrade_charm = EventSource(UpgradeCharmEvent)
+    """Triggered by request to upgrade the charm (see :class:`UpgradeCharmEvent`)."""
+
     pre_series_upgrade = EventSource(PreSeriesUpgradeEvent)
+    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`)."""
+
     post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
+    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`)."""
+
     leader_elected = EventSource(LeaderElectedEvent)
+    """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
+
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
+    """DEPRECATED. Triggered when leader changes any settings (see
+    :class:`LeaderSettingsChangedEvent`)."""
+
     collect_metrics = EventSource(CollectMetricsEvent)
+    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`)."""
 
     secret_changed = EventSource(SecretChangedEvent)
+    """Triggered by Juju on the observer when the secret owner changes its contents (see
+    :class:`SecretChangedEvent`)."""
+
     secret_expired = EventSource(SecretExpiredEvent)
+    """Triggered by Juju on the owner when a secret's expiration time elapses (see
+    :class:`SecretExpiredEvent`)."""
+
     secret_rotate = EventSource(SecretRotateEvent)
+    """Triggered by Juju on the owner when the secret's rotation policy elapses (see
+    :class:`SecretRotateEvent`)."""
+
     secret_remove = EventSource(SecretRemoveEvent)
+    """Triggered by Juju on the owner when a secret revision can be removed (see
+    :class:`SecretRemoveEvent`)."""
 
 
 class CharmBase(Object):
     """Base class that represents the charm overall.
 
-    :class:`CharmBase` is used to create a charm. This is done by inheriting
-    from :class:`CharmBase` and customising the sub class as required. So to
+    :code:`CharmBase` is used to create a charm. This is done by inheriting
+    from :code:`CharmBase` and customising the subclass as required. So to
     create your own charm, say ``MyCharm``, define a charm class and set up the
     required event handlers (“hooks”) in its constructor::
 
         import logging
 
-        from ops.charm import CharmBase
-        from ops.main import main
+        import ops
 
-        logger = logging.getLogger(__name__)
-
-        def MyCharm(CharmBase):
+        def MyCharm(ops.CharmBase):
             def __init__(self, *args):
-                logger.debug('Initializing Charm')
-
                 super().__init__(*args)
-
                 self.framework.observe(self.on.config_changed, self._on_config_changed)
                 self.framework.observe(self.on.stop, self._on_stop)
                 # ...
 
         if __name__ == "__main__":
-            main(MyCharm)
+            ops.main(MyCharm)
 
     As shown in the example above, a charm class is instantiated by
     :code:`ops.main` rather than charm authors directly instantiating a
@@ -904,10 +935,11 @@ class CharmBase(Object):
             charm.
     """
 
-    # note that without the #: below, sphinx will copy the whole of CharmEvents
-    # docstring inline which is less than ideal.
-    # Used to set up event handlers; see :class:`CharmEvents`.
-    on = CharmEvents()  # type: ignore
+    on: CharmEvents = CharmEvents()  # type: ignore
+    """This property is used to create an event handler using :meth:`Framework.observe`,
+    and can be one of the events listed at :class:`CharmEvents`.
+    """
+
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
@@ -966,56 +998,80 @@ class CharmBase(Object):
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from ``metadata.yaml`` and/or ``actions.yaml``. Generally
+    This is read from ``metadata.yaml`` and ``actions.yaml``. Generally
     charms will define this information, rather than reading it at runtime. This
     class is mostly for the framework to understand what the charm has defined.
 
-    The :attr:`maintainers`, :attr:`tags`, :attr:`terms`, :attr:`series`, and
-    :attr:`extra_bindings` attributes are all lists of strings.  The :attr:`containers`,
-    :attr:`requires`, :attr:`provides`, :attr:`peers`, :attr:`relations`,
-    :attr:`storages`, :attr:`resources`, and :attr:`payloads` attributes are all
-    mappings of names to instances of the respective :class:`RelationMeta`,
-    :class:`StorageMeta`, :class:`ResourceMeta`, or :class:`PayloadMeta`.
-
-    The :attr:`relations` attribute is a convenience accessor which includes all
-    of the ``requires``, ``provides``, and ``peers`` :class:`RelationMeta`
-    items.  If needed, the role of the relation definition can be obtained from
-    its :attr:`role <RelationMeta.role>` attribute.
-
-    Attributes:
-        name: The name of this charm
-        summary: Short description of what this charm does
-        description: Long description for this charm
-        maintainers: A list of strings of the email addresses of the maintainers
-                     of this charm.
-        tags: Charm store tag metadata for categories associated with this charm.
-        terms: Charm store terms that should be agreed to before this charm can
-               be deployed. (Used for things like licensing issues.)
-        series: The list of supported OS series that this charm can support.
-                The first entry in the list is the default series that will be
-                used by deploy if no other series is requested by the user.
-        subordinate: True/False whether this charm is intended to be used as a
-                     subordinate charm.
-        min_juju_version: If supplied, indicates this charm needs features that
-                          are not available in older versions of Juju.
-        containers: A dict of {name: :class:`ContainerMeta` } for each of the 'containers'
-                   declared by this charm in the `matadata.yaml` file.
-        requires: A dict of {name: :class:`RelationMeta` } for each 'requires' relation.
-        provides: A dict of {name: :class:`RelationMeta` } for each 'provides' relation.
-        peers: A dict of {name: :class:`RelationMeta` } for each 'peer' relation.
-        relations: A dict containing all :class:`RelationMeta` attributes (merged from other
-                   sections)
-        storages: A dict of {name: :class:`StorageMeta`} for each defined storage.
-        resources: A dict of {name: :class:`ResourceMeta`} for each defined resource.
-        payloads: A dict of {name: :class:`PayloadMeta`} for each defined payload.
-        extra_bindings: A dict of additional named bindings that a charm can use
-                        for network configuration.
-        actions: A dict of {name: :class:`ActionMeta`} for actions that the charm has defined.
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
-
     """
+
+    name: str
+    """Name of this charm."""
+
+    summary: str
+    """Short description of what this charm does."""
+
+    description: str
+    """Long description for this charm."""
+
+    maintainers: List[str]
+    """List of email addresses of charm maintainers."""
+
+    tags: List[str]
+    """Charmhub tag metadata for categories associated with this charm."""
+
+    terms: List[str]
+    """Charmhub terms that should be agreed to before this charm can be deployed."""
+
+    series: List[str]
+    """List of supported OS series that this charm can support.
+
+    The first entry in the list is the default series that will be used by
+    deploy if no other series is requested by the user.
+    """
+
+    subordinate: bool
+    """Whether this charm is intended to be used as a subordinate charm."""
+
+    min_juju_version: Optional[str]
+    """Indicates the minimum Juju version this charm requires."""
+
+    containers: Dict[str, 'ContainerMeta']
+    """Container metadata for each defined container."""
+
+    requires: Dict[str, 'RelationMeta']
+    """Relations this charm requires."""
+
+    provides: Dict[str, 'RelationMeta']
+    """Relations this charm provides."""
+
+    peers: Dict[str, 'RelationMeta']
+    """Peer relations."""
+
+    relations: Dict[str, 'RelationMeta']
+    """All :class:`RelationMeta` instances.
+
+    This is merged from ``requires``, ``provides``, and ``peers``. If needed,
+    the role of the relation definition can be obtained from its
+    :attr:`role <RelationMeta.role>` attribute.
+    """
+
+    storages: Dict[str, 'StorageMeta']
+    """Storage metadata for each defined storage."""
+
+    resources: Dict[str, 'ResourceMeta']
+    """Resource metadata for each defined resource."""
+
+    payloads: Dict[str, 'PayloadMeta']
+    """Payload metadata for each defined payload."""
+
+    extra_bindings: Dict[str, None]
+    """Additional named bindings that a charm can use for network configuration."""
+
+    actions: Dict[str, 'ActionMeta']
+    """Actions the charm has defined."""
 
     def __init__(self, raw: Optional[Dict[str, Any]] = None,
                  actions_raw: Optional[Dict[str, Any]] = None):
@@ -1063,12 +1119,12 @@ class CharmMeta:
     def from_yaml(
             cls, metadata: Union[str, TextIO],
             actions: Optional[Union[str, TextIO]] = None) -> 'CharmMeta':
-        """Instantiate a CharmMeta from a YAML description of metadata.yaml.
+        """Instantiate a :class:`CharmMeta` from a YAML description of ``metadata.yaml``.
 
         Args:
             metadata: A YAML description of charm metadata (name, relations, etc.)
-                This can be a simple string, or a file-like object. (passed to `yaml.safe_load`).
-            actions: YAML description of Actions for this charm (eg actions.yaml)
+                This can be a simple string, or a file-like object (passed to ``yaml.safe_load``).
+            actions: YAML description of Actions for this charm (e.g., actions.yaml)
         """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
@@ -1093,9 +1149,9 @@ class RelationRole(enum.Enum):
     provides = 'provides'
 
     def is_peer(self) -> bool:
-        """Return whether the current role is peer.
+        """Report whether this role is 'peer'.
 
-        A convenience to avoid having to import charm.
+        ``role.is_peer()`` is a shortcut for ``role == ops.RelationRole.peer``.
         """
         return self is RelationRole.peer
 
@@ -1103,16 +1159,27 @@ class RelationRole(enum.Enum):
 class RelationMeta:
     """Object containing metadata about a relation definition.
 
-    Should not be constructed directly by charm code. Is gotten from one of
+    Should not be constructed directly by charm code, but gotten from one of
     :attr:`CharmMeta.peers`, :attr:`CharmMeta.requires`, :attr:`CharmMeta.provides`,
     or :attr:`CharmMeta.relations`.
+    """
 
-    Attributes:
-        role: This is :class:`RelationRole`; one of peer/requires/provides
-        relation_name: Name of this relation from metadata.yaml
-        interface_name: Optional definition of the interface protocol.
-        limit: Optional definition of maximum number of connections to this relation endpoint.
-        scope: "global" (default) or "container" scope based on how the relation should be used.
+    role: RelationRole
+    """Role this relation takes, one of 'peer', 'requires', or 'provides'."""
+
+    relation_name: str
+    """Name of this relation."""
+
+    interface_name: Optional[str]
+    """Definition of the interface protocol."""
+
+    limit: Optional[int]
+    """Maximum number of connections to this relation endpoint."""
+
+    scope: str
+    """Scope based on how this relation should be used.
+
+    Will be either ``"global"`` or ``"container"``.
     """
 
     VALID_SCOPES = ['global', 'container']
@@ -1136,17 +1203,31 @@ class RelationMeta:
 
 
 class StorageMeta:
-    """Object containing metadata about a storage definition.
+    """Object containing metadata about a storage definition."""
 
-    Attributes:
-        storage_name: Name of storage
-        type: Storage type
-        description: A text description of the storage
-        read_only: True if the storage is read-only
-        minimum_size: Minimum size of storage
-        location: Mount point of storage
-        multiple_range: Range of numeric qualifiers when multiple storage units are used
-    """
+    storage_name: str
+    """Name of storage."""
+
+    type: str
+    """Storage type, "filesystem" or "block"."""
+
+    description: str
+    """Text description of the storage."""
+
+    shared: bool
+    """True if all units of the application share the storage."""
+
+    read_only: bool
+    """True if the storage is read-only."""
+
+    minimum_size: Optional[str]
+    """Minimum size of the storage."""
+
+    location: Optional[str]
+    """Mount point of the storage."""
+
+    multiple_range: Optional[Tuple[int, Optional[int]]]
+    """Range of numeric qualifiers when multiple storage units are used."""
 
     def __init__(self, name: str, raw: '_StorageMetaDict'):
         self.storage_name = name
@@ -1167,12 +1248,21 @@ class StorageMeta:
 
 
 class ResourceMeta:
-    """Object containing metadata about a resource definition.
+    """Object containing metadata about a resource definition."""
 
-    Attributes:
-        resource_name: Name of resource
-        filename: Name of file
-        description: A text description of resource
+    resource_name: str
+    """Name of the resource."""
+
+    type: str
+    """Type of the resource. One of ``"file"`` or ``"oci-image"``."""
+
+    filename: Optional[str]
+    """Filename of the resource file."""
+
+    description: str
+    """A description of the resource.
+
+    This will be empty string (rather than None) if not set in ``metadata.yaml``.
     """
 
     def __init__(self, name: str, raw: '_ResourceMetaDict'):
@@ -1183,12 +1273,13 @@ class ResourceMeta:
 
 
 class PayloadMeta:
-    """Object containing metadata about a payload definition.
+    """Object containing metadata about a payload definition."""
 
-    Attributes:
-        payload_name: Name of payload
-        type: Payload type
-    """
+    payload_name: str
+    """Name of the payload."""
+
+    type: str
+    """Payload type."""
 
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.payload_name = name
@@ -1212,10 +1303,10 @@ class ContainerMeta:
 
     NOTE: this is extremely lightweight right now, and just includes the fields we need for
     Pebble interaction.
-
-    Attributes:
-        name: Name of container (key in the YAML)
     """
+
+    name: str
+    """Name of the container (key in the YAML)."""
 
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
@@ -1268,22 +1359,25 @@ class ContainerMeta:
 class ContainerStorageMeta:
     """Metadata about storage for an individual container.
 
-    Attributes:
-        storage: a name for the mountpoint, which should exist the keys for :class:`StorageMeta`
-                 for the charm
-        location: the location `storage` is mounted at
-
     If multiple locations are specified for the same storage, such as Kubernetes subPath mounts,
-    `location` will not be an accessible attribute, as it would not be possible to determine
-    which mount point was desired, and `locations` should be iterated over.
+    ``location`` will not be an accessible attribute, as it would not be possible to determine
+    which mount point was desired, and ``locations`` should be iterated over.
     """
+
+    storage: str
+    """Name for the mount point, which should exist in the keys of the charm's
+    :class:`StorageMeta`.
+    """
+
+    location: str
+    """The location the storage is mounted at."""
 
     def __init__(self, storage: str, location: str):
         self.storage = storage
         self._locations: List[str] = [location]
 
     def add_location(self, location: str):
-        """Add an additional mountpoint to a known storage."""
+        """Add an additional mount point to a known storage."""
         self._locations.append(location)
 
     @property
@@ -1298,7 +1392,7 @@ class ContainerStorageMeta:
                 return self._locations[0]
             else:
                 raise RuntimeError(
-                    "container has more than one mountpoint with the same backing storage. "
+                    "container has more than one mount point with the same backing storage. "
                     "Request .locations to see a list"
                 )
         else:

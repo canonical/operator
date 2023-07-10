@@ -116,26 +116,30 @@ class Harness(Generic[CharmType]):
     Example::
 
         harness = Harness(MyCharm)
+        self.addCleanup(harness.cleanup)  # always clean up after ourselves
+
         # Do initial setup here
         relation_id = harness.add_relation('db', 'postgresql')
+
         # Now instantiate the charm to see events as the model changes
         harness.begin()
         harness.add_relation_unit(relation_id, 'postgresql/0')
         harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
+
         # Check that charm has properly handled the relation_joined event for postgresql/0
         self.assertEqual(harness.charm. ...)
 
     Args:
         charm_cls: The Charm class that you'll be testing.
         meta: A string or file-like object containing the contents of
-            metadata.yaml. If not supplied, we will look for a 'metadata.yaml' file in the
+            ``metadata.yaml``. If not supplied, we will look for a ``metadata.yaml`` file in the
             parent directory of the Charm, and if not found fall back to a trivial
-            'name: test-charm' metadata.
+            ``name: test-charm`` metadata.
         actions: A string or file-like object containing the contents of
-            actions.yaml. If not supplied, we will look for a 'actions.yaml' file in the
+            ``actions.yaml``. If not supplied, we will look for an ``actions.yaml`` file in the
             parent directory of the Charm.
         config: A string or file-like object containing the contents of
-            config.yaml. If not supplied, we will look for a 'config.yaml' file in the
+            ``config.yaml``. If not supplied, we will look for a ``config.yaml`` file in the
             parent directory of the Charm.
     """
 
@@ -222,7 +226,7 @@ class Harness(Generic[CharmType]):
 
     @property
     def charm(self) -> CharmType:
-        """Return the instance of the charm class that was passed to __init__.
+        """Return the instance of the charm class that was passed to ``__init__``.
 
         Note that the Charm is not instantiated until you have called
         :meth:`.begin()`. Until then, attempting to access this property will raise
@@ -277,7 +281,7 @@ class Harness(Generic[CharmType]):
         containers), and any relation-joined hooks based on what relations have been added before
         you called begin. Note that all of these are fired before returning control
         to the test suite, so if you want to introspect what happens at each step, you need to fire
-        them directly (e.g. Charm.on.install.emit()).
+        them directly (for example, ``Charm.on.install.emit()``).
 
         To use this with all the normal hooks, you should instantiate the harness, setup any
         relations that you want active when the charm starts, and then call this method. This
@@ -379,10 +383,10 @@ class Harness(Generic[CharmType]):
                     relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
-        """Called by your test infrastructure to cleanup any temporary directories/files/etc.
+        """Called by your test infrastructure to clean up any temporary directories/files/etc.
 
-        Currently this only needs to be called if you test with resources. But it is reasonable
-        to always include a `testcase.addCleanup(harness.cleanup)` just in case.
+        You should always call ``self.addCleanup(harness.cleanup)`` after creating a
+        :class:`Harness`.
         """
         self._backend._cleanup()
 
@@ -470,7 +474,7 @@ class Harness(Generic[CharmType]):
     def add_resource(self, resource_name: str, content: AnyStr) -> None:
         """Add content for a resource to the backend.
 
-        This will register the content, so that a call to `Model.resources.fetch(resource_name)`
+        This will register the content, so that a call to ``model.resources.fetch(resource_name)``
         will return a path to a file containing that content.
 
         Args:
@@ -574,7 +578,7 @@ class Harness(Generic[CharmType]):
     def detach_storage(self, storage_id: str) -> None:
         """Detach a storage device.
 
-        The intent of this function is to simulate a "juju detach-storage" call.
+        The intent of this function is to simulate a ``juju detach-storage`` call.
         It will trigger a storage-detaching hook if the storage unit in question exists
         and is presently marked as attached.
 
@@ -596,7 +600,7 @@ class Harness(Generic[CharmType]):
     def attach_storage(self, storage_id: str) -> None:
         """Attach a storage device.
 
-        The intent of this function is to simulate a "juju attach-storage" call.
+        The intent of this function is to simulate a ``juju attach-storage`` call.
         It will trigger a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
 
@@ -622,7 +626,7 @@ class Harness(Generic[CharmType]):
     def remove_storage(self, storage_id: str) -> None:
         """Detach a storage device.
 
-        The intent of this function is to simulate a "juju remove-storage" call.
+        The intent of this function is to simulate a ``juju remove-storage`` call.
         It will trigger a storage-detaching hook if the storage unit in question exists
         and is presently marked as attached.  Then it will remove the storage
         unit from the testing backend.
@@ -748,7 +752,7 @@ class Harness(Generic[CharmType]):
         testing relations and their data bags slightly more natural.
 
         Args:
-            relation_id: The integer relation identifier (as returned by add_relation).
+            relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
             remote_unit_name: A string representing the remote unit that is being added.
 
         Return:
@@ -803,12 +807,8 @@ class Harness(Generic[CharmType]):
         charm life cycle explicit.
 
         Args:
-            relation_id: The integer relation identifier (as returned by add_relation).
+            relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
             remote_unit_name: A string representing the remote unit that is being removed.
-
-        Raises:
-            KeyError: if relation_id or remote_unit_name is not valid
-            ValueError: if remote_unit_name is not valid
         """
         relation_name = self._backend._relation_names[relation_id]
 
@@ -862,12 +862,15 @@ class Harness(Generic[CharmType]):
 
         Args:
             relation_id: The relation whose content we want to look at.
-            app_or_unit: An Application or Unit instance, or its name, whose data we want to read
+            app_or_unit: An :class:`Application <ops.Application>` or
+                :class:`Unit <ops.Unit>` instance, or its name, whose data we
+                want to read.
+
         Return:
-            A dict containing the relation data for `app_or_unit` or None.
+            A dict containing the relation data for ``app_or_unit`` or None.
 
         Raises:
-            KeyError: if relation_id doesn't exist
+            KeyError: if ``relation_id`` doesn't exist
         """
         name = _get_app_or_unit_name(app_or_unit)
 
@@ -878,22 +881,24 @@ class Harness(Generic[CharmType]):
         """Return the content of the pod spec as last set by the charm.
 
         This returns both the pod spec and any k8s_resources that were supplied.
-        See the signature of Model.pod.set_spec
+        See the signature of :meth:`Pod.set_spec <ops.Pod.set_spec>`.
         """
         return self._backend._pod_spec
 
     def get_container_pebble_plan(
             self, container_name: str
     ) -> pebble.Plan:
-        """Return the current Plan that pebble is executing for the given container.
+        """Return the current plan that Pebble is executing for the given container.
 
         Args:
             container_name: The simple name of the associated container
+
         Return:
-            The pebble.Plan for this container. You can use :meth:`ops.pebble.Plan.to_yaml` to get
-            a string form for the content. Will raise KeyError if no pebble client exists
-            for that container name. (should only happen if container is not present in
-            metadata.yaml)
+            The Pebble plan for this container. You can use
+            :meth:`Plan.to_yaml <ops.pebble.Plan.to_yaml>` to get a string
+            form for the content. Will raise ``KeyError`` if no Pebble client
+            exists for that container name (should only happen if container is
+            not present in ``metadata.yaml``).
         """
         client = self._backend._pebble_clients.get(container_name)
         if client is None:
@@ -903,10 +908,10 @@ class Harness(Generic[CharmType]):
     def container_pebble_ready(self, container_name: str):
         """Fire the pebble_ready hook for the associated container.
 
-        This will switch the given container's can_connect state to True
+        This will switch the given container's ``can_connect`` state to True
         before the hook function is called.
 
-        It will do nothing if begin() has not been called.
+        It will do nothing if :meth:`begin()` has not been called.
         """
         if self._charm is None:
             return
@@ -919,13 +924,14 @@ class Harness(Generic[CharmType]):
         return self._backend._workload_version
 
     def set_model_info(self, name: Optional[str] = None, uuid: Optional[str] = None) -> None:
-        """Set the name and uuid of the Model that this is representing.
+        """Set the name and UUID of the model that this is representing.
 
-        This cannot be called once begin() has been called. But it lets you set the value that
-        will be returned by Model.name and Model.uuid.
+        This cannot be called once :meth:`begin` has been called. But it lets
+        you set the value that will be returned by :attr:`Model.name <ops.Model.name>`
+        and :attr:`Model.uuid <ops.Model.uuid>`.
 
-        This is a convenience method to invoke both Harness.set_model_name
-        and Harness.set_model_uuid at once.
+        This is a convenience method to invoke both :meth:`set_model_name`
+        and :meth:`set_model_uuid` at once.
         """
         if name is not None:
             self.set_model_name(name)
@@ -935,8 +941,8 @@ class Harness(Generic[CharmType]):
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
 
-        This cannot be called once begin() has been called. But it lets you set the value that
-        will be returned by Model.name.
+        This cannot be called once :meth:`begin` has been called. But it lets
+        you set the value that will be returned by :attr:`Model.name <ops.Model.name>`.
         """
         if self._charm is not None:
             raise RuntimeError('cannot set the Model name after begin()')
@@ -945,8 +951,8 @@ class Harness(Generic[CharmType]):
     def set_model_uuid(self, uuid: str) -> None:
         """Set the uuid of the Model that this is representing.
 
-        This cannot be called once begin() has been called. But it lets you set the value that
-        will be returned by Model.uuid.
+        This cannot be called once :meth:`begin` has been called. But it lets
+        you set the value that will be returned by :attr:`Model.uuid <ops.Model.uuid>`.
         """
         if self._charm is not None:
             raise RuntimeError('cannot set the Model uuid after begin()')
@@ -960,10 +966,10 @@ class Harness(Generic[CharmType]):
     ) -> None:
         """Update the relation data for a given unit or application in a given relation.
 
-        This also triggers the `relation_changed` event for this relation_id.
+        This also triggers the `relation_changed` event for the given ``relation_id``.
 
         Args:
-            relation_id: The integer relation_id representing this relation.
+            relation_id: The integer relation ID representing this relation.
             app_or_unit: The unit or application name that is being updated.
                 This can be the local or remote application.
             key_values: Each key/value will be updated in the relation data.
@@ -1084,12 +1090,12 @@ class Harness(Generic[CharmType]):
 
         This will trigger a `config_changed` event.
 
-        Note that the `key_values` mapping will only add or update configuration items.
-        To remove existing ones, see the `unset` parameter.
+        Note that the ``key_values`` mapping will only add or update configuration items.
+        To remove existing ones, see the ``unset`` parameter.
 
         Args:
             key_values: A Mapping of key:value pairs to update in config.
-            unset: An iterable of keys to remove from Config.
+            unset: An iterable of keys to remove from config.
                 This sets the value to the default if defined,
                 otherwise removes the key altogether.
         """
@@ -1101,13 +1107,13 @@ class Harness(Generic[CharmType]):
     def set_leader(self, is_leader: bool = True) -> None:
         """Set whether this unit is the leader or not.
 
-        If this charm becomes a leader then `leader_elected` will be triggered.  If Harness.begin()
-        has already been called, then the charm's peer relation should usually be added  *prior* to
-        calling this method (i.e. with Harness.add_relation) to properly initialize and make
+        If this charm becomes a leader then `leader_elected` will be triggered.  If :meth:`begin`
+        has already been called, then the charm's peer relation should usually be added *prior* to
+        calling this method (with :meth:`add_relation`) to properly initialize and make
         available relation data that leader elected hooks may want to access.
 
         Args:
-            is_leader: True/False as to whether this unit is the leader.
+            is_leader: Whether this unit is the leader.
         """
         self._backend._is_leader = is_leader
 
@@ -1117,22 +1123,25 @@ class Harness(Generic[CharmType]):
             self._charm.on.leader_elected.emit()
 
     def set_planned_units(self, num_units: int) -> None:
-        """Set the number of "planned" units that "Application.planned_units" should return.
+        """Set the number of "planned" units.
 
-        In real world circumstances, this number will be the number of units in the
-        application. E.g., this number will be the number of peers this unit has, plus one, as we
-        count our own unit in the total.
+        This is the value that :meth:`Application.planned_units <ops.Application.planned_units>`
+        should return.
 
-        A change to the return from planned_units will not generate an event. Typically, a charm
-        author would check planned units during a config or install hook, or after receiving a peer
-        relation joined event.
+        In real world circumstances, this number will be the number of units
+        in the application. That is, this number will be the number of peers
+        this unit has, plus one, as we count our own unit in the total.
 
+        A change to the return from ``planned_units`` will not generate an
+        event. Typically, a charm author would check planned units during a
+        config or install hook, or after receiving a peer relation joined
+        event.
         """
         if num_units < 0:
             raise TypeError("num_units must be 0 or a positive integer.")
         self._backend._planned_units = num_units
 
-    def reset_planned_units(self):
+    def reset_planned_units(self) -> None:
         """Reset the planned units override.
 
         This allows the harness to fall through to the built in methods that will try to
