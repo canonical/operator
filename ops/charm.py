@@ -827,17 +827,71 @@ class SecretExpiredEvent(SecretEvent):
 
 
 class CollectStatusEvent(EventBase):
-    """TODO."""
+    """Event triggered at the end of every hook to collect statuses for evaluation.
 
-    def add_status(self, status: model.StatusBase) -> None:
+    If the charm wants to provide application or unit status in a consistent
+    way after the end of every hook, it should observe the
+    :attr:`collect_app_status <CharmEvents.collect_app_status>` or
+    :attr:`collect_unit_status <CharmEvents.collect_unit_status>` event,
+    respectively.
+
+    The framework will trigger these events after the hook code runs
+    successfully, and if any statuses have been added using :meth:`add_status`,
+    the framework will choose the highest-priority status and set that as the
+    status (application status for ``collect_app_status``, or unit status for
+    ``collect_unit_status``).
+
+    The order of priorities is as follows, from highest to lowest:
+
+    * error
+    * blocked
+    * waiting
+    * maintenance
+    * active
+    * unknown
+
+    If there are multiple statuses with the same priority, the first one added
+    wins (and if an event is observed multiple times, the handlers are called
+    in the order they were observed).
+
+    A collect-status event can be observed multiple times, and
+    :meth:`add_status` can be called multiple times to add multiple statuses
+    for evaluation. This is useful when a charm has multiple components that
+    each have a status. Each code path in a collect-status handler should
+    call ``add_status`` at least once.
+
+    Below is an example "web app" charm component that observes
+    ``collect_unit_status`` to provide the status of the component, which
+    requires a "port" config option set before it can proceed::
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.webapp = Webapp(self)
+                # initialize other components
+
+        class WebApp(ops.Object):
+            def __init__(self, charm: ops.CharmBase):
+                super().__init__(charm, 'webapp')
+                self.framework.observe(charm.on.collect_unit_status, self._on_collect_status)
+
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
+                if 'port' not in self.model.config:
+                    event.add_status(ops.BlockedStatus('please set "port" config'))
+                    return
+                event.add_status(ops.ActiveStatus())
+    """
+
+    def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.
 
-        TODO: flesh out docstring, describe app vs unit
+        See :class:`CollectStatusEvent` for a description of how to use this.
         """
+        model = self.framework.model
         if self.handle.kind == 'collect_app_status':
-            self.framework.model._app_statuses.append(status)
+            model.app._collected_statuses.append(status)
         else:
-            self.framework.model._unit_statuses.append(status)
+            model.unit._collected_statuses.append(status)
 
 
 class CharmEvents(ObjectEvents):
@@ -896,29 +950,41 @@ class CharmEvents(ObjectEvents):
 
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
     """DEPRECATED. Triggered when leader changes any settings (see
-    :class:`LeaderSettingsChangedEvent`)."""
+    :class:`LeaderSettingsChangedEvent`).
+    """
 
     collect_metrics = EventSource(CollectMetricsEvent)
     """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`)."""
 
     secret_changed = EventSource(SecretChangedEvent)
     """Triggered by Juju on the observer when the secret owner changes its contents (see
-    :class:`SecretChangedEvent`)."""
+    :class:`SecretChangedEvent`).
+    """
 
     secret_expired = EventSource(SecretExpiredEvent)
     """Triggered by Juju on the owner when a secret's expiration time elapses (see
-    :class:`SecretExpiredEvent`)."""
+    :class:`SecretExpiredEvent`).
+    """
 
     secret_rotate = EventSource(SecretRotateEvent)
     """Triggered by Juju on the owner when the secret's rotation policy elapses (see
-    :class:`SecretRotateEvent`)."""
+    :class:`SecretRotateEvent`).
+    """
 
     secret_remove = EventSource(SecretRemoveEvent)
     """Triggered by Juju on the owner when a secret revision can be removed (see
-    :class:`SecretRemoveEvent`)."""
+    :class:`SecretRemoveEvent`).
+    """
 
     collect_app_status = EventSource(CollectStatusEvent)
+    """Triggered at the end of every hook to collect app statuses for evaluation
+    (see :class:`CollectStatusEvent`).
+    """
+
     collect_unit_status = EventSource(CollectStatusEvent)
+    """Triggered at the end of every hook to collect unit statuses for evaluation
+    (see :class:`CollectStatusEvent`).
+    """
 
 
 class CharmBase(Object):

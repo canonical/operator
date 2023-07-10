@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Multi-status test charm for OP035, using Framework.observe events instead
-of regular Python functions.
-"""
+"""Multi-status test charm for OP035, using Framework.observe events."""
 
 import logging
 import typing
@@ -39,28 +37,28 @@ options:
         self.harness.begin()
 
     def test_initial(self):
-        self.harness.model._finalise_statuses(self.harness.charm)
+        self.harness.model._evaluate_status(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"database_mode" required')
 
     def test_database_mode_set(self):
         self.harness.update_config({"database_mode": "single"})
-        self.harness.model._finalise_statuses(self.harness.charm)
+        self.harness.model._evaluate_status(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"webapp_port" required')
 
     def test_webapp_port_set(self):
         self.harness.update_config({"webapp_port": 8080})
-        self.harness.model._finalise_statuses(self.harness.charm)
+        self.harness.model._evaluate_status(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"database_mode" required')
 
     def test_all_config_set(self):
         self.harness.update_config({"database_mode": "single", "webapp_port": 8080})
-        self.harness.model._finalise_statuses(self.harness.charm)
+        self.harness.model._evaluate_status(self.harness.charm)
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "active")
 

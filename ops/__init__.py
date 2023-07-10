@@ -102,7 +102,7 @@ __all__ = [
     'FrameworkEvents',
     'Handle',
     'HandleKind',
-    'LifecycleEvent',  # TODO: this probably shouldn't be public
+    'LifecycleEvent',
     'NoTypeError',
     'Object',
     'ObjectEvents',

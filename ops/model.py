@@ -120,8 +120,6 @@ class Model:
         storages: Iterable[str] = meta.storages
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
-        self._app_statuses: 'List[StatusBase]' = []
-        self._unit_statuses: 'List[StatusBase]' = []
 
     @property
     def unit(self) -> 'Unit':
@@ -276,14 +274,15 @@ class Model:
             info = self._backend.secret_info_get(id=id, label=label)
             return Secret(self._backend, id=info.id, label=info.label)
 
-    def _finalise_statuses(self, charm: 'ops.charm.CharmBase'):
+    def _evaluate_status(self, charm: 'ops.charm.CharmBase'):
+        # Trigger collect-status events and evaluate. See CollectStatusEvent for details.
         charm.on.collect_app_status.emit()
-        if self._app_statuses:
-            self.app.status = StatusBase._get_highest_priority(self._app_statuses)
+        if self.app._collected_statuses:
+            self.app.status = StatusBase._get_highest_priority(self.app._collected_statuses)
 
         charm.on.collect_unit_status.emit()
-        if self._unit_statuses:
-            self.unit.status = StatusBase._get_highest_priority(self._unit_statuses)
+        if self.unit._collected_statuses:
+            self.unit.status = StatusBase._get_highest_priority(self.unit._collected_statuses)
 
 
 class _ModelCache:
@@ -336,6 +335,7 @@ class Application:
         self._cache = cache
         self._is_our_app = self.name == self._backend.app_name
         self._status = None
+        self._collected_statuses: 'List[StatusBase]' = []
 
     def _invalidate(self):
         self._status = None
@@ -347,6 +347,10 @@ class Application:
         Can only be read and set by the lead unit of the application.
 
         The status of remote units is always Unknown.
+
+        You can also use the :attr:`collect_app_status <CharmEvents.collect_app_status>`
+        event if you want to evaluate and set application status consistently
+        at the end of every hook.
 
         Raises:
             RuntimeError: if you try to set the status of another application, or if you try to
@@ -487,6 +491,8 @@ class Unit:
             containers: _ContainerMeta_Raw = meta.containers
             self._containers = ContainerMapping(iter(containers), backend)
 
+        self._collected_statuses: 'List[StatusBase]' = []
+
     def _invalidate(self):
         self._status = None
 
@@ -495,6 +501,10 @@ class Unit:
         """Used to report or read the status of a specific unit.
 
         The status of any unit other than yourself is always Unknown.
+
+        You can also use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
+        event if you want to evaluate and set unit status consistently at the
+        end of every hook.
 
         Raises:
             RuntimeError: if you try to set the status of a unit other than yourself.
@@ -1601,16 +1611,18 @@ class StatusBase:
         return child
 
     _priorities = {
-        "error": 100,
-        "blocked": 90,
-        "waiting": 80,
-        "maintenance": 70,
-        "active": 60,
+        'error': 5,
+        'blocked': 4,
+        'waiting': 3,
+        'maintenance': 2,
+        'active': 1,
+        # 'unknown' or any other status is handled below
     }
 
     @classmethod
     def _get_highest_priority(cls, statuses: 'List[StatusBase]') -> 'StatusBase':
-        return max(statuses, key=lambda s: cls._priorities.get(s.name, 0))
+        """Return the highest-priority status from a list of statuses."""
+        return max(statuses, key=lambda status: cls._priorities.get(status.name, 0))
 
 
 @StatusBase.register

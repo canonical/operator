@@ -625,9 +625,6 @@ class Framework(Object):
         else:
             self._juju_debug_at: Set[str] = set()
 
-        self._app_statuses = []
-        self._unit_statuses = []
-
     def set_breakpointhook(self) -> Optional[Any]:
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
 

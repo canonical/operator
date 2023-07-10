@@ -440,8 +440,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
         _emit_charm_event(charm, dispatcher.event_name)
 
-        # TODO(benhoyt): should we run this in finally block too?
-        model._finalise_statuses(charm)
+        model._evaluate_status(charm)
 
         framework.commit()
     finally:
