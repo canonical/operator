@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Main entry point to the Operator Framework.
+"""Main entry point to the framework.
 
 Note that this module is callable, and calls the :func:`ops.main.main` function.
 This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
@@ -379,7 +379,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     model_backend = ops.model._ModelBackend()
     debug = ('JUJU_DEBUG' in os.environ)
     setup_root_logging(model_backend, debug=debug)
-    logger.debug("Operator Framework %s up and running.", ops.__version__)  # type:ignore
+    logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
     dispatcher.run_any_legacy_hook()

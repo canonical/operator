@@ -35,7 +35,7 @@ class JujuLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         """Send the specified logging record to the Juju backend.
 
-        This method is not used directly by the Operator Framework code, but by
+        This method is not used directly by the ops library, but by
         :class:`logging.Handler` itself as part of the logging machinery.
         """
         self.model_backend.juju_log(record.levelname, self.format(record))

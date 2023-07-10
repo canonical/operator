@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The Operator Framework infrastructure."""
+"""The ops library's infrastructure."""
 
 import collections
 import collections.abc
@@ -148,7 +148,7 @@ class Handle:
         return self._key
 
     @property
-    def path(self):
+    def path(self) -> str:
         """Return the handle's path."""
         return self._path
 
@@ -174,9 +174,10 @@ class Handle:
 
 
 class EventBase:
-    """The base for all the different Events.
+    """The base class for all events.
 
-    Inherit this and override 'snapshot' and 'restore' methods to build a custom event.
+    Inherit this and override the ``snapshot`` and ``restore`` methods to
+    create a custom event.
     """
 
     # gets patched in by `Framework.restore()`, if this event is being re-emitted
@@ -184,6 +185,7 @@ class EventBase:
     # event is being fired for the first time.
     # TODO this is hard to debug, this should be refactored
     framework: 'Framework' = None  # type: ignore
+    """The :class:`Framework` instance (set by the framework itself)."""
 
     def __init__(self, handle: Handle):
         self.handle = handle
@@ -192,7 +194,7 @@ class EventBase:
     def __repr__(self):
         return f"<{self.__class__.__name__} via {self.handle}>"
 
-    def defer(self):
+    def defer(self) -> None:
         """Defer the event to the future.
 
         Deferring an event from a handler puts that handler into a queue, to be
@@ -263,7 +265,7 @@ class EventBase:
 class EventSource:
     """EventSource wraps an event type with a descriptor to facilitate observing and emitting.
 
-    It is generally used as:
+    It is generally used as::
 
         class SomethingHappened(EventBase):
             pass
@@ -271,8 +273,9 @@ class EventSource:
         class SomeObject(Object):
             something_happened = EventSource(SomethingHappened)
 
-    With that, instances of that type will offer the someobj.something_happened
-    attribute which is a BoundEvent and may be used to emit and observe the event.
+    With that, instances of that type will offer the ``someobj.something_happened``
+    attribute which is a :class:`BoundEvent`, and may be used to emit and observe
+    the event.
     """
 
     def __init__(self, event_type: 'Type[EventBase]'):
@@ -407,7 +410,7 @@ class Object:
 
 
 class ObjectEvents(Object):
-    """Convenience type to allow defining .on attributes at class level."""
+    """Convenience type to allow defining ``.on`` attributes at class level."""
 
     handle_kind = "on"
 
@@ -431,23 +434,21 @@ class ObjectEvents(Object):
     def define_event(cls, event_kind: str, event_type: 'Type[EventBase]'):
         """Define an event on this type at runtime.
 
-        cls: a type to define an event on.
-
-        event_kind: an attribute name that will be used to access the
-                    event. Must be a valid python identifier, not be a keyword
-                    or an existing attribute.
-
-        event_type: a type of the event to define.
-
         Note that attempting to define the same event kind more than once will
-        raise a 'overlaps with existing type' runtime error. Ops uses a
+        raise an "overlaps with existing type" runtime error. Ops uses a
         labeling system to track and reconstruct events between hook executions
         (each time a hook runs, the Juju Agent invokes a fresh instance of ops;
         there is no ops process that persists on the host between hooks).
         Having duplicate Python objects creates duplicate labels. Overwriting a
         previously created label means that only the latter code path will be
-        run when the current event, if it does get deferred, is reemitted. This
-        is usually not what is desired, and is error-prone and ambigous.
+        run when the current event, if it does get deferred, is re-emitted. This
+        is usually not what is desired, and is error-prone and ambiguous.
+
+        Args:
+            event_kind: An attribute name that will be used to access the
+                        event. Must be a valid Python identifier, not be a keyword
+                        or an existing attribute.
+            event_type: A type of the event to define.
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
@@ -505,17 +506,21 @@ class LifecycleEvent(EventBase):
 
 
 class PreCommitEvent(LifecycleEvent):
-    """Events that will be emitted first on commit."""
+    """Event that will be emitted first on commit."""
 
 
 class CommitEvent(LifecycleEvent):
-    """Events that will be emitted second on commit."""
+    """Event that will be emitted second on commit."""
 
 
 class FrameworkEvents(ObjectEvents):
     """Manager of all framework events."""
+
     pre_commit = EventSource(PreCommitEvent)
+    """Triggered before the :attr:`commit` event."""
+
     commit = EventSource(CommitEvent)
+    """Triggered before event data is committed to storage."""
 
 
 class NoTypeError(Exception):
@@ -541,17 +546,22 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 
 
 class Framework(Object):
-    """Main interface from the Charm to the Operator Framework internals."""
+    """Main interface from the Charm to the ops library's infrastructure."""
 
     on = FrameworkEvents()  # type: ignore
+    """Used for :meth:`observe`-ing framework-specific events."""
 
     # Override properties from Object so that we can set them in __init__.
     model: 'Model' = None  # type: ignore
+    """The :class:`Model` instance for this charm."""
+
     meta: 'CharmMeta' = None  # type: ignore
+    """The charm's metadata."""
+
     charm_dir: 'pathlib.Path' = None  # type: ignore
+    """The charm project root directory."""
 
     # to help the type checker and IDEs:
-
     if TYPE_CHECKING:
         _stored: 'StoredStateData' = None  # type: ignore
         @property
@@ -618,19 +628,20 @@ class Framework(Object):
         self._app_statuses = []
         self._unit_statuses = []
 
-    def set_breakpointhook(self):
+    def set_breakpointhook(self) -> Optional[Any]:
         """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
 
         This method is called by ``main``, and is not intended to be
         called by users of the framework itself outside of perhaps
         some testing scenarios.
 
-        It returns the old value of sys.excepthook.
-
-        The breakpoint function is a Python >= 3.7 feature.
+        The ``breakpoint()`` function is a Python >= 3.7 feature.
 
         This method was added in ops 1.0; before that, it was done as
-        part of the Framework's __init__.
+        part of the Framework's ``__init__``.
+
+        Returns:
+            The old value of ``sys.breakpointhook``.
         """
         old_breakpointhook = getattr(sys, 'breakpointhook', None)
         if old_breakpointhook is not None:
@@ -639,7 +650,7 @@ class Framework(Object):
             sys.breakpointhook = self.breakpoint
         return old_breakpointhook
 
-    def close(self):
+    def close(self) -> None:
         """Close the underlying backends."""
         self._storage.close()
 
@@ -657,7 +668,7 @@ class Framework(Object):
         """Stop tracking the given object. See also _track."""
         self._objects.pop(obj.handle.path, None)
 
-    def commit(self):
+    def commit(self) -> None:
         """Save changes to the underlying backends."""
         # Give a chance for objects to persist data they want to before a commit is made.
         self.on.pre_commit.emit()
@@ -724,6 +735,9 @@ class Framework(Object):
 
     def observe(self, bound_event: BoundEvent, observer: Callable[[Any], None]):
         """Register observer to be called when bound_event is emitted.
+
+        If this is called multiple times for the same event type, the
+        framework calls the observers in the order they were observed.
 
         The bound_event is generally provided as an attribute of the object that emits
         the event, and is created in this style::
@@ -821,7 +835,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    def reemit(self):
+    def reemit(self) -> None:
         """Reemit previously deferred events to the observers that deferred them.
 
         Only the specific observers that have previously deferred the event will be
@@ -964,7 +978,7 @@ class Framework(Object):
                 "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
                 name, indicated_breakpoints)
 
-    def remove_unreferenced_events(self):
+    def remove_unreferenced_events(self) -> None:
         """Remove events from storage that are not referenced.
 
         In older versions of the framework, events that had no observers would get recorded but
@@ -1076,16 +1090,16 @@ class BoundStoredState:
 
 
 class StoredState:
-    """A class used to store data the charm needs persisted across invocations.
+    """A class used to store data the charm needs, persisted across invocations.
 
     Example::
 
         class MyClass(Object):
             _stored = StoredState()
 
-    Instances of `MyClass` can transparently save state between invocations by
-    setting attributes on `_stored`. Initial state should be set with
-    `set_default` on the bound object, that is::
+    Instances of ``MyClass`` can transparently save state between invocations by
+    setting attributes on ``_stored``. Initial state should be set with
+    ``set_default`` on the bound object, that is::
 
         class MyClass(Object):
             _stored = StoredState()

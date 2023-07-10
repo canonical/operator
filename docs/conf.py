@@ -47,7 +47,7 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 
 # -- Project information -----------------------------------------------------
 
-project = 'The Operator Framework'
+project = 'The ops library'
 copyright = '2019-2023, Canonical Ltd.'
 author = 'Canonical Ltd'
 

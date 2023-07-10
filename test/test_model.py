@@ -1174,6 +1174,64 @@ def test_recursive_push_and_pull(case):
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
 
 
+@pytest.mark.parametrize('case', [
+    PushPullCase(
+        name='push directory without trailing slash',
+        path='foo',
+        dst='/baz',
+        files=['foo/bar/baz.txt', 'foo/foobar.txt'],
+        want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
+    ),
+    PushPullCase(
+        name='push directory with trailing slash',
+        path='foo/',
+        dst='/baz',
+        files=['foo/bar/baz.txt', 'foo/foobar.txt'],
+        want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
+    ),
+    PushPullCase(
+        name='push directory relative pathing',
+        path='./foo',
+        dst='/baz',
+        files=['foo/bar/baz.txt', 'foo/foobar.txt'],
+        want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
+    ),
+])
+def test_push_path_relative(case):
+    harness = ops.testing.Harness(ops.CharmBase, meta='''
+        name: test-app
+        containers:
+          foo:
+            resource: foo-image
+        ''')
+    harness.begin()
+    harness.set_can_connect('foo', True)
+    container = harness.model.unit.containers['foo']
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cwd = os.getcwd()
+        # change working directory to enable relative pathing for testing
+        os.chdir(tmpdir)
+        try:
+            # create test files under temporary test directory
+            tmp = pathlib.Path(tmpdir)
+            for testfile in case.files:
+                testfile_path = pathlib.Path(tmp / testfile)
+                testfile_path.parent.mkdir(parents=True, exist_ok=True)
+                testfile_path.touch(exist_ok=True)
+                testfile_path.write_text("test", encoding="utf-8")
+
+            # push path under test to container
+            container.push_path(case.path, case.dst)
+
+            # test
+            for want_path in case.want:
+                content = container.pull(want_path).read()
+                assert content == 'test'
+        finally:
+            os.chdir(cwd)
+
+
 class TestApplication(unittest.TestCase):
 
     def setUp(self):

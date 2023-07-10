@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Helper to define the version of the Operator Framework project.
+"""Helper to define the version of the ops library.
 
-This module is NOT to be used when developing charms using the Operator Framework.
+This module is NOT to be used when developing charms using ops.
 """
 
 import subprocess
