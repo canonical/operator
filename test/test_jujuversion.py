@@ -69,8 +69,8 @@ class TestJujuVersion(unittest.TestCase):
         self.assertFalse(ops.JujuVersion('2.7.9').has_controller_storage())
 
     def test_has_secrets(self):
-        self.assertTrue(ops.JujuVersion('3.0.2').has_secrets)
-        self.assertFalse(ops.JujuVersion('3.0.1').has_secrets)
+        self.assertTrue(ops.JujuVersion('3.0.3').has_secrets)
+        self.assertFalse(ops.JujuVersion('3.0.2').has_secrets)
         self.assertFalse(ops.JujuVersion('2.9.30').has_secrets)
 
     def test_parsing_errors(self):
