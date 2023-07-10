@@ -1455,21 +1455,21 @@ class Harness(Generic[CharmType]):
         ownership. To circumvent this limitation, the testing harness maps all user and group
         options related to file operations to match the current user and group.
 
-        Example usage:
+        Example usage::
 
-        >>> # charm.py
-        >>> import ops
-        >>> class ExampleCharm(ops.CharmBase):
-        >>>     def __init__(self, *args):
-        >>>         super().__init__(*args)
-        >>>         self.hostname = open("/etc/hostname").read()
+            # charm.py
+            import ops
+            class ExampleCharm(ops.CharmBase):
+                def __init__(self, *args):
+                    super().__init__(*args)
+                    self.hostname = open("/etc/hostname").read()
 
-        >>> # test_charm.py
-        >>> from ops.testing import Harness
-        >>> harness = Harness(ExampleCharm)
-        >>> root = harness.get_filesystem_root("mycontainer")
-        >>> (root / "etc" / "hostname").write_text("hostname.example.com")
-        >>> harness.begin()
+            # test_charm.py
+            from ops.testing import Harness
+            harness = Harness(ExampleCharm)
+            root = harness.get_filesystem_root("mycontainer")
+            (root / "etc" / "hostname").write_text("hostname.example.com")
+            harness.begin()
 
         Args:
             container: The name of the container or the container instance.
