@@ -626,7 +626,7 @@ class Framework(Object):
             self._juju_debug_at: Set[str] = set()
 
     def set_breakpointhook(self) -> Optional[Any]:
-        """Hook into sys.breakpointhook so the builtin breakpoint() works as expected.
+        """Hook into ``sys.breakpointhook`` so the builtin ``breakpoint()`` works as expected.
 
         This method is called by ``main``, and is not intended to be
         called by users of the framework itself outside of perhaps
