@@ -552,8 +552,7 @@ class Harness(Generic[CharmType]):
         will be a number from [0,total_num_disks-1].
 
         The test harness uses symbolic links to imitate storage mounts, which may lead to some
-        inconsistencies compared to the actual charm. Users should be cognizant of
-        this potential discrepancy.
+        inconsistencies compared to the actual charm.
 
         Args:
             storage_name: The storage backend name on the Charm
@@ -1477,6 +1476,8 @@ class Harness(Generic[CharmType]):
         Return:
             The path of the temporary directory associated with the specified container.
         """
+        # it's okay to access the container directly in this context, as its creation has already
+        # been ensured during the model's initialization.
         if isinstance(container, str):
             container_name = container
         else:
@@ -2617,16 +2618,14 @@ class _TestingPebbleClient:
         if not file_path.exists():
             if recursive:
                 return
-            else:
-                raise pebble.PathError(
-                    'not-found', f'remove {path}: no such file or directory')
+            raise pebble.PathError(
+                'not-found', f'remove {path}: no such file or directory')
         if file_path.is_dir():
             if recursive:
                 shutil.rmtree(file_path)
             else:
                 try:
                     file_path.rmdir()
-                    return
                 except OSError:
                     raise pebble.PathError(
                         'generic-file-error',

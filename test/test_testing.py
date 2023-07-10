@@ -4417,6 +4417,9 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
         file_info = self.container.list_files("/foo")[0]
         self.assertEqual(file_info.path, "/foo/bar")
         self.assertEqual(file_info.type, FileType.FILE)
+        root_info = self.container.list_files("/", itself=True)[0]
+        self.assertEqual(root_info.path, "/")
+        self.assertEqual(root_info.name, "/")
 
     def test_storage_mount(self):
         storage_id = self.harness.add_storage("test-storage", 1, attach=True)[0]
