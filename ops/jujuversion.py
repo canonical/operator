@@ -123,3 +123,9 @@ class JujuVersion:
         # * In 3.0.3, a bug with observer labels was fixed (juju/juju#14916)
         # TODO(benhoyt): update to 3.0.3+ once shipped (for juju/juju#14916 fix)
         return (self.major, self.minor, self.patch) >= (3, 0, 2)
+
+    @property
+    def supports_open_port_on_k8s(self) -> bool:
+        """Report whether this Juju version supports open-port on Kubernetes."""
+        # Support added: https://bugs.launchpad.net/juju/+bug/1920960
+        return (self.major, self.minor, self.patch) >= (3, 0, 3)
