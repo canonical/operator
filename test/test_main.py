@@ -265,7 +265,8 @@ class _TestMain(abc.ABC):
             ops.CharmBase.on = ops.CharmEvents()
         self.addCleanup(cleanup)
 
-        fake_script(self, 'juju-log', "exit 0")
+        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'juju-log', 'exit 0')
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -620,6 +621,7 @@ class _TestMain(abc.ABC):
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
 
@@ -639,6 +641,7 @@ class _TestMain(abc.ABC):
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event update_status.'],
             ['juju-log', '--log-level', 'DEBUG', '--', custom_event_prefix],
+            ['is-leader', '--format=json'],
         ]
         # Remove the "[key]>" suffix from the end of the event string
         self.assertTrue(calls[-1][-1].startswith(custom_event_prefix))
