@@ -4391,7 +4391,8 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
     def test_pull_path(self):
         (self.root / "foo").mkdir()
         (self.root / "foo/bar").write_text("bar")
-        # TODO: pull_path doesn't pull empty directories, intended?
+        # TODO: pull_path doesn't pull empty directories
+        # https://github.com/canonical/operator/issues/968
         # (self.root / "foobar").mkdir()
         (self.root / "test").write_text("test")
         with tempfile.TemporaryDirectory() as temp:
