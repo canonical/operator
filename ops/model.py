@@ -265,14 +265,8 @@ class Model:
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id)
-        try:
-            content = self._backend.secret_get(id=id, label=label)
-            return Secret(self._backend, id=id, label=label, content=content)
-        except ModelError:
-            # TODO(benhoyt): remove the secret-info-get fallback once
-            #  juju/juju#14916 is fixed (should be in Juju 3.0.3)
-            info = self._backend.secret_info_get(id=id, label=label)
-            return Secret(self._backend, id=info.id, label=info.label)
+        content = self._backend.secret_get(id=id, label=label)
+        return Secret(self._backend, id=id, label=label, content=content)
 
 
 class _ModelCache:
