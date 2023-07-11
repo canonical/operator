@@ -122,3 +122,9 @@ class JujuVersion:
         #   secret-get-info was separated into its own hook tool
         # * In 3.0.3, a bug with observer labels was fixed (juju/juju#14916)
         return (self.major, self.minor, self.patch) >= (3, 0, 3)
+
+    @property
+    def supports_open_port_on_k8s(self) -> bool:
+        """Report whether this Juju version supports open-port on Kubernetes."""
+        # Support added: https://bugs.launchpad.net/juju/+bug/1920960
+        return (self.major, self.minor, self.patch) >= (3, 0, 3)
