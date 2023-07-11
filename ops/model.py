@@ -274,16 +274,6 @@ class Model:
             info = self._backend.secret_info_get(id=id, label=label)
             return Secret(self._backend, id=info.id, label=info.label)
 
-    def _evaluate_status(self, charm: 'ops.charm.CharmBase'):
-        # Trigger collect-status events and evaluate. See CollectStatusEvent for details.
-        charm.on.collect_app_status.emit()
-        if self.app._collected_statuses:
-            self.app.status = StatusBase._get_highest_priority(self.app._collected_statuses)
-
-        charm.on.collect_unit_status.emit()
-        if self.unit._collected_statuses:
-            self.unit.status = StatusBase._get_highest_priority(self.unit._collected_statuses)
-
 
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
@@ -486,12 +476,11 @@ class Unit:
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
+        self._collected_statuses: 'List[StatusBase]' = []
 
         if self._is_our_unit and hasattr(meta, "containers"):
             containers: _ContainerMeta_Raw = meta.containers
             self._containers = ContainerMapping(iter(containers), backend)
-
-        self._collected_statuses: 'List[StatusBase]' = []
 
     def _invalidate(self):
         self._status = None
@@ -1621,7 +1610,10 @@ class StatusBase:
 
     @classmethod
     def _get_highest_priority(cls, statuses: 'List[StatusBase]') -> 'StatusBase':
-        """Return the highest-priority status from a list of statuses."""
+        """Return the highest-priority status from a list of statuses.
+
+        If there are multiple highest-priority statuses, return the first one.
+        """
         return max(statuses, key=lambda status: cls._priorities.get(status.name, 0))
 
 

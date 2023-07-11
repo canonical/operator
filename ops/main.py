@@ -440,7 +440,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
         _emit_charm_event(charm, dispatcher.event_name)
 
-        model._evaluate_status(charm)
+        ops.charm._evaluate_status(charm)
 
         framework.commit()
     finally:

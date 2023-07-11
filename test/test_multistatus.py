@@ -37,28 +37,28 @@ options:
         self.harness.begin()
 
     def test_initial(self):
-        self.harness.model._evaluate_status(self.harness.charm)
+        self.harness.charm._evaluate_status()
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"database_mode" required')
 
     def test_database_mode_set(self):
         self.harness.update_config({"database_mode": "single"})
-        self.harness.model._evaluate_status(self.harness.charm)
+        self.harness.charm._evaluate_status()
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"webapp_port" required')
 
     def test_webapp_port_set(self):
         self.harness.update_config({"webapp_port": 8080})
-        self.harness.model._evaluate_status(self.harness.charm)
+        self.harness.charm._evaluate_status()
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "blocked")
         self.assertEqual(status.message, '"database_mode" required')
 
     def test_all_config_set(self):
         self.harness.update_config({"database_mode": "single", "webapp_port": 8080})
-        self.harness.model._evaluate_status(self.harness.charm)
+        self.harness.charm._evaluate_status()
         status = self.harness.model.unit.status
         self.assertEqual(status.name, "active")
 

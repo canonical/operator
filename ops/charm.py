@@ -827,7 +827,7 @@ class SecretExpiredEvent(SecretEvent):
 
 
 class CollectStatusEvent(EventBase):
-    """Event triggered at the end of every hook to collect statuses for evaluation.  # noqa
+    """Event triggered at the end of every hook to collect statuses for evaluation.
 
     If the charm wants to provide application or unit status in a consistent
     way after the end of every hook, it should observe the
@@ -836,10 +836,11 @@ class CollectStatusEvent(EventBase):
     respectively.
 
     The framework will trigger these events after the hook code runs
-    successfully, and if any statuses have been added using :meth:`add_status`,
-    the framework will choose the highest-priority status and set that as the
-    status (application status for ``collect_app_status``, or unit status for
-    ``collect_unit_status``).
+    successfully (``collect_app_status`` will only be triggered on the leader
+    unit). If any statuses were added by the event handlers using
+    :meth:`add_status`, the framework will choose the highest-priority status
+    and set that as the status (application status for ``collect_app_status``,
+    or unit status for ``collect_unit_status``).
 
     The order of priorities is as follows, from highest to lowest:
 
@@ -880,6 +881,8 @@ class CollectStatusEvent(EventBase):
                     event.add_status(ops.BlockedStatus('please set "port" config'))
                     return
                 event.add_status(ops.ActiveStatus())
+
+    .. # noqa (pydocstyle barfs on the above for unknown reasons I've spent hours on)
     """
 
     def add_status(self, status: model.StatusBase):
@@ -1076,6 +1079,23 @@ class CharmBase(Object):
     def config(self) -> model.ConfigData:
         """A mapping containing the charm's config and current values."""
         return self.model.config
+
+
+def _evaluate_status(charm: CharmBase):
+    """Trigger collect-status events and evaluate and set the highest-priority status.
+
+    See :class:`CollectStatusEvent` for details.
+    """
+    if charm.framework.model._backend.is_leader():
+        charm.on.collect_app_status.emit()
+        app = charm.app
+        if app._collected_statuses:
+            app.status = model.StatusBase._get_highest_priority(app._collected_statuses)
+
+    charm.on.collect_unit_status.emit()
+    unit = charm.unit
+    if unit._collected_statuses:
+        unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
 
 
 class CharmMeta:
