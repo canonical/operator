@@ -827,7 +827,7 @@ class SecretExpiredEvent(SecretEvent):
 
 
 class CollectStatusEvent(EventBase):
-    """Event triggered at the end of every hook to collect statuses for evaluation.
+    """Event triggered at the end of every hook to collect statuses for evaluation.  # noqa
 
     If the charm wants to provide application or unit status in a consistent
     way after the end of every hook, it should observe the
