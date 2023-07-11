@@ -2569,7 +2569,8 @@ class _TestingPebbleClient:
             rel_path = os.path.relpath(file_info.path, start=self._root)
             rel_path = '/' if rel_path == '.' else '/' + rel_path
             file_info.path = rel_path
-            file_info.name = "/" if rel_path == "/" else os.path.basename(rel_path)
+            if rel_path == "/":
+                file_info.name = "/"
         return file_infos
 
     def make_dir(
