@@ -197,7 +197,7 @@ def main():
 
             process = client.exec(
                 args.exec_command,
-                context=args.context,
+                service_context=args.context,
                 environment=environment,
                 working_dir=args.working_dir,
                 timeout=args.timeout,

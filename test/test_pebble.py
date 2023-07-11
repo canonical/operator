@@ -2642,11 +2642,11 @@ class TestExec(unittest.TestCase):
         return (stdio, stderr, control)
 
     def build_exec_data(
-            self, command, context=None, environment=None, working_dir=None, timeout=None,
+            self, command, service_context=None, environment=None, working_dir=None, timeout=None,
             user_id=None, user=None, group_id=None, group=None, combine_stderr=False):
         return {
             'command': command,
-            'context': context,
+            'service-context': service_context,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': f'{timeout:.3f}s' if timeout is not None else None,

@@ -99,7 +99,7 @@ TcpDict = typing.TypedDict('TcpDict',
                            total=False)
 ExecDict = typing.TypedDict('ExecDict',
                             {'command': str,
-                             'context': str,
+                             'service-context': str,
                              'environment': Dict[str, str],
                              'user-id': Optional[int],
                              'user': str,
@@ -2154,7 +2154,7 @@ class Client:
         self,
         command: List[str],
         *,
-        context: Optional[str] = None,
+        service_context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2176,7 +2176,7 @@ class Client:
         self,
         command: List[str],
         *,
-        context: Optional[str] = None,
+        service_context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2196,7 +2196,7 @@ class Client:
         self,
         command: List[str],
         *,
-        context: Optional[str] = None,
+        service_context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2281,8 +2281,8 @@ class Client:
         Args:
             command: Command to execute: the first item is the name (or path)
                 of the executable, the rest of the items are the arguments.
-            context: If specified, run the command in the context of this
-                service. Specifically, inherit its environment variables,
+            service_context: If specified, run the command in the context of
+                this service. Specifically, inherit its environment variables,
                 user/group settings, and working directory. The other exec
                 options will override the service context; ``environment``
                 will be merged on top of the service's.
@@ -2351,7 +2351,7 @@ class Client:
 
         body = {
             'command': command,
-            'context': context,
+            'service-context': service_context,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': _format_timeout(timeout) if timeout is not None else None,
