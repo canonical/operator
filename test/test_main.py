@@ -17,6 +17,7 @@ import importlib.util
 import io
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -106,17 +107,18 @@ class CharmInitTestCase(unittest.TestCase):
         }
         if extra_environ is not None:
             fake_environ.update(extra_environ)
-        with patch.dict(os.environ, fake_environ):
-            with patch('ops.main._emit_charm_event'):
-                with patch('ops.main._get_charm_dir') as mock_charmdir:
-                    with tempfile.TemporaryDirectory() as tmpdirname:
-                        tmpdirname = Path(tmpdirname)
-                        fake_metadata = tmpdirname / 'metadata.yaml'
-                        with fake_metadata.open('wb') as fh:
-                            fh.write(b'name: test')
-                        mock_charmdir.return_value = tmpdirname
+        with (patch.dict(os.environ, fake_environ),
+              patch('ops.main._emit_charm_event'),
+              patch('ops.main._get_charm_dir') as mock_charmdir,
+              patch('ops.charm._evaluate_status', new=lambda charm: None),
+              tempfile.TemporaryDirectory() as tmpdirname):
+            tmpdirname = Path(tmpdirname)
+            fake_metadata = tmpdirname / 'metadata.yaml'
+            with fake_metadata.open('wb') as fh:
+                fh.write(b'name: test')
+            mock_charmdir.return_value = tmpdirname
 
-                        ops.main(charm_class, **kwargs)
+            ops.main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
@@ -201,11 +203,12 @@ class TestDispatch(unittest.TestCase):
                 dispatch.write_text('', encoding='utf8')
                 dispatch.chmod(0o755)
 
-            with patch.dict(os.environ, fake_environ):
-                with patch('ops.main._emit_charm_event') as mock_charm_event:
-                    with patch('ops.main._get_charm_dir') as mock_charmdir:
-                        mock_charmdir.return_value = tmpdir
-                        ops.main(MyCharm)
+            with (patch.dict(os.environ, fake_environ),
+                  patch('ops.main._emit_charm_event') as mock_charm_event,
+                  patch('ops.main._get_charm_dir') as mock_charmdir,
+                  patch('ops.charm._evaluate_status', new=lambda charm: None)):
+                mock_charmdir.return_value = tmpdir
+                ops.main(MyCharm)
 
         self.assertEqual(mock_charm_event.call_count, 1)
         return mock_charm_event.call_args[0][1]
@@ -644,8 +647,8 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         # Remove the "[key]>" suffix from the end of the event string
-        self.assertTrue(calls[-1][-1].startswith(custom_event_prefix))
-        calls[-1][-1] = custom_event_prefix
+        self.assertRegex(calls[2][-1], re.escape(custom_event_prefix) + '.*')
+        calls[2][-1] = custom_event_prefix
         self.assertEqual(calls, expected)
 
     def test_logger(self):
@@ -905,9 +908,10 @@ class _TestMainWithDispatch(_TestMain):
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_non_executable_hook_and_dispatch(self):
@@ -924,9 +928,10 @@ class _TestMainWithDispatch(_TestMain):
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -1006,9 +1011,10 @@ class _TestMainWithDispatch(_TestMain):
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
 
         self.assertEqual(calls, expected)
 

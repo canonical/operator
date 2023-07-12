@@ -1081,7 +1081,7 @@ class CharmBase(Object):
         return self.model.config
 
 
-def _evaluate_status(charm: CharmBase):
+def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
 
     See :class:`CollectStatusEvent` for details.
