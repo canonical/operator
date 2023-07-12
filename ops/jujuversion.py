@@ -141,5 +141,5 @@ class JujuVersion:
         if self.minor == 1:
             return self.patch >= 6  # 3.1.6+ supports it
         if self.minor == 2:
-            return self.patch >= 1  # 3.2.1+ supports it
+            return self.patch >= 2  # 3.2.2+ supports it
         return True  # 3.3+ will
