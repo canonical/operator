@@ -548,6 +548,10 @@ class RelationBrokenEvent(RelationEvent):
     are currently known locally.
     """
 
+    def defer(self) -> None:
+        """Relation-broken events are not deferrable."""
+        raise RuntimeError('Cannot defer relation-broken events')
+
 
 class StorageEvent(HookEvent):
     """Base class representing storage-related events.
