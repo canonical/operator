@@ -128,3 +128,18 @@ class JujuVersion:
         """Report whether this Juju version supports open-port on Kubernetes."""
         # Support added: https://bugs.launchpad.net/juju/+bug/1920960
         return (self.major, self.minor, self.patch) >= (3, 0, 3)
+
+    @property
+    def supports_exec_service_context(self) -> bool:
+        """Report whether this Juju version supports exec's service_context option."""
+        if self.major < 3:
+            return False  # 2.9 doesn't support it
+        if self.major > 3:
+            return True  # 4.x presumably will
+        if self.minor == 0:
+            return False  # 3.0 doesn't support it
+        if self.minor == 1:
+            return self.patch >= 6  # 3.1.6+ supports it
+        if self.minor == 2:
+            return self.patch >= 1  # 3.2.1+ supports it
+        return True  # 3.3+ will

@@ -2421,6 +2421,11 @@ class Container:
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
         """
+        if service_context is not None:
+            version = JujuVersion.from_environ()
+            if not version.supports_exec_service_context:
+                raise RuntimeError(
+                    f'exec with service_context not supported on Juju version {version}')
         return self._pebble.exec(
             command,
             service_context=service_context,

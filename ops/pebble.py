@@ -99,6 +99,7 @@ TcpDict = typing.TypedDict('TcpDict',
                            total=False)
 ExecDict = typing.TypedDict('ExecDict',
                             {'command': str,
+                             # see JujuVersion.supports_exec_service_context
                              'service-context': str,
                              'environment': Dict[str, str],
                              'user-id': Optional[int],
