@@ -687,6 +687,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(service.backoff_delay, '')
         self.assertIs(service.backoff_factor, None)
         self.assertEqual(service.backoff_limit, '')
+        self.assertIs(service.kill_delay, '')
         self.assertEqual(service.to_dict(), {})
 
     def test_name_only(self):
@@ -717,6 +718,7 @@ class TestService(unittest.TestCase):
             'backoff-delay': '1s',
             'backoff-factor': 4,
             'backoff-limit': '10s',
+            'kill-delay': '420s',
         }
         s = pebble.Service('Name 2', d)
         self.assertEqual(s.name, 'Name 2')
@@ -738,6 +740,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.backoff_delay, '1s')
         self.assertEqual(s.backoff_factor, 4)
         self.assertEqual(s.backoff_limit, '10s')
+        self.assertEqual(s.kill_delay, '420s')
 
         self.assertEqual(s.to_dict(), d)
 
