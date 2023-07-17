@@ -890,11 +890,13 @@ class CollectStatusEvent(EventBase):
 
         See :class:`CollectStatusEvent` for a description of how to use this.
         """
-        model = self.framework.model
+        if not isinstance(status, model.StatusBase):
+            raise TypeError(f'status should be a StatusBase, not {type(status).__name__}')
+        model_ = self.framework.model
         if self.handle.kind == 'collect_app_status':
-            model.app._collected_statuses.append(status)
+            model_.app._collected_statuses.append(status)
         else:
-            model.unit._collected_statuses.append(status)
+            model_.unit._collected_statuses.append(status)
 
 
 class CharmEvents(ObjectEvents):
@@ -980,7 +982,7 @@ class CharmEvents(ObjectEvents):
     """
 
     collect_app_status = EventSource(CollectStatusEvent)
-    """Triggered at the end of every hook to collect app statuses for evaluation
+    """Triggered at the end of every hook on the leader to collect app statuses for evaluation
     (see :class:`CollectStatusEvent`).
     """
 

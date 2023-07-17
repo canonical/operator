@@ -757,3 +757,18 @@ containers:
             ['status-set', '--application=True', 'active', ''],
             ['status-set', '--application=False', 'waiting', 'blah'],
         ])
+
+    def test_add_status_type_error(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                event.add_status('active')
+
+        fake_script(self, 'is-leader', 'echo true')
+
+        charm = MyCharm(self.create_framework())
+        with self.assertRaises(TypeError):
+            ops.charm._evaluate_status(charm)
