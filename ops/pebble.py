@@ -86,6 +86,7 @@ ServiceDict = typing.TypedDict('ServiceDict',
                                 'backoff-delay': str,
                                 'backoff-factor': Optional[int],
                                 'backoff-limit': str,
+                                'kill-delay': Optional[str],
                                 },
                                total=False)
 
@@ -824,6 +825,7 @@ class Service:
         self.backoff_delay = dct.get('backoff-delay', '')
         self.backoff_factor = dct.get('backoff-factor')
         self.backoff_limit = dct.get('backoff-limit', '')
+        self.kill_delay = dct.get('kill-delay', '')
 
     def to_dict(self) -> 'ServiceDict':
         """Convert this service object to its dict representation."""
@@ -848,6 +850,7 @@ class Service:
             ('backoff-delay', self.backoff_delay),
             ('backoff-factor', self.backoff_factor),
             ('backoff-limit', self.backoff_limit),
+            ('kill-delay', self.kill_delay),
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('ServiceDict', dct)
