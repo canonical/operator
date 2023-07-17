@@ -79,6 +79,7 @@ ServiceDict = typing.TypedDict('ServiceDict',
                                 'user-id': Optional[int],
                                 'group': str,
                                 'group-id': Optional[int],
+                                'working-dir': str,
                                 'on-success': str,
                                 'on-failure': str,
                                 'on-check-failure': Dict[str, Any],
@@ -88,9 +89,25 @@ ServiceDict = typing.TypedDict('ServiceDict',
                                 },
                                total=False)
 
-HttpDict = typing.TypedDict('HttpDict', {'url': str})
-TcpDict = typing.TypedDict('TcpDict', {'port': int})
-ExecDict = typing.TypedDict('ExecDict', {'command': str})
+HttpDict = typing.TypedDict('HttpDict',
+                            {'url': str,
+                             'headers': Dict[str, str]},
+                            total=False)
+TcpDict = typing.TypedDict('TcpDict',
+                           {'port': int,
+                            'host': str},
+                           total=False)
+ExecDict = typing.TypedDict('ExecDict',
+                            {'command': str,
+                             # see JujuVersion.supports_exec_service_context
+                             'service-context': str,
+                             'environment': Dict[str, str],
+                             'user-id': Optional[int],
+                             'user': str,
+                             'group-id': Optional[int],
+                             'group': str,
+                             'working-dir': str},
+                            total=False)
 
 CheckDict = typing.TypedDict('CheckDict',
                              {'override': str,
@@ -800,6 +817,7 @@ class Service:
         self.user_id = dct.get('user-id')
         self.group = dct.get('group', '')
         self.group_id = dct.get('group-id')
+        self.working_dir = dct.get('working-dir', '')
         self.on_success = dct.get('on-success', '')
         self.on_failure = dct.get('on-failure', '')
         self.on_check_failure = dict(dct.get('on-check-failure', {}))
@@ -823,6 +841,7 @@ class Service:
             ('user-id', self.user_id),
             ('group', self.group),
             ('group-id', self.group_id),
+            ('working-dir', self.working_dir),
             ('on-success', self.on_success),
             ('on-failure', self.on_failure),
             ('on-check-failure', self.on_check_failure),
@@ -2136,6 +2155,7 @@ class Client:
         self,
         command: List[str],
         *,
+        service_context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2157,6 +2177,7 @@ class Client:
         self,
         command: List[str],
         *,
+        service_context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2176,6 +2197,7 @@ class Client:
         self,
         command: List[str],
         *,
+        service_context: Optional[str] = None,
         environment: Optional[Dict[str, str]] = None,
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -2260,6 +2282,11 @@ class Client:
         Args:
             command: Command to execute: the first item is the name (or path)
                 of the executable, the rest of the items are the arguments.
+            service_context: If specified, run the command in the context of
+                this service. Specifically, inherit its environment variables,
+                user/group settings, and working directory. The other exec
+                options will override the service context; ``environment``
+                will be merged on top of the service's.
             environment: Environment variables to pass to the process.
             working_dir: Working directory to run the command in. If not set,
                 Pebble uses the target user's $HOME directory (and if the user
@@ -2325,6 +2352,7 @@ class Client:
 
         body = {
             'command': command,
+            'service-context': service_context,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': _format_timeout(timeout) if timeout is not None else None,

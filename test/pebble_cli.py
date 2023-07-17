@@ -64,6 +64,7 @@ def main():
     p.add_argument('name', help='check name(s) to filter on', nargs='*')
 
     p = subparsers.add_parser('exec', help='execute a command')
+    p.add_argument('--context', help='service context')
     p.add_argument('--env', help='environment variables to set', action='append',
                    metavar='KEY=VALUE')
     p.add_argument('--working-dir', help='working directory to run command in')
@@ -196,6 +197,7 @@ def main():
 
             process = client.exec(
                 args.exec_command,
+                service_context=args.context,
                 environment=environment,
                 working_dir=args.working_dir,
                 timeout=args.timeout,

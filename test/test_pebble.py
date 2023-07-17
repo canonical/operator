@@ -681,6 +681,7 @@ class TestService(unittest.TestCase):
         self.assertIs(service.user_id, None)
         self.assertEqual(service.group, '')
         self.assertIs(service.group_id, None)
+        self.assertEqual(service.working_dir, '')
         self.assertEqual(service.on_success, '')
         self.assertEqual(service.on_failure, '')
         self.assertEqual(service.on_check_failure, {})
@@ -711,6 +712,7 @@ class TestService(unittest.TestCase):
             'user-id': 1000,
             'group': 'staff',
             'group-id': 2000,
+            'working-dir': '/working/dir',
             'on-success': 'restart',
             'on-failure': 'ignore',
             'on-check-failure': {'chk1': 'halt'},
@@ -732,6 +734,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(s.user_id, 1000)
         self.assertEqual(s.group, 'staff')
         self.assertEqual(s.group_id, 2000)
+        self.assertEqual(s.working_dir, '/working/dir')
         self.assertEqual(s.on_success, 'restart')
         self.assertEqual(s.on_failure, 'ignore')
         self.assertEqual(s.on_check_failure, {'chk1': 'halt'})
@@ -2639,10 +2642,11 @@ class TestExec(unittest.TestCase):
         return (stdio, stderr, control)
 
     def build_exec_data(
-            self, command, environment=None, working_dir=None, timeout=None,
+            self, command, service_context=None, environment=None, working_dir=None, timeout=None,
             user_id=None, user=None, group_id=None, group=None, combine_stderr=False):
         return {
             'command': command,
+            'service-context': service_context,
             'environment': environment or {},
             'working-dir': working_dir,
             'timeout': f'{timeout:.3f}s' if timeout is not None else None,

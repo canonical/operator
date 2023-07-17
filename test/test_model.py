@@ -24,6 +24,7 @@ import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
 from textwrap import dedent
+from unittest.mock import patch
 
 import pytest
 
@@ -1777,10 +1778,12 @@ containers:
         self.assertEqual(len(cm.output), 1)
         self.assertRegex(cm.output[0], r'WARNING:ops.model:.*: api error!')
 
+    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
     def test_exec(self):
         self.pebble.responses.append('fake_exec_process')
         p = self.container.exec(
             ['echo', 'foo'],
+            service_context='srv1',
             environment={'K1': 'V1', 'K2': 'V2'},
             working_dir='WD',
             timeout=10.5,
@@ -1796,6 +1799,7 @@ containers:
         )
         self.assertEqual(self.pebble.requests, [
             ('exec', ['echo', 'foo'], dict(
+                service_context='srv1',
                 environment={'K1': 'V1', 'K2': 'V2'},
                 working_dir='WD',
                 timeout=10.5,
@@ -1811,6 +1815,11 @@ containers:
             ))
         ])
         self.assertEqual(p, 'fake_exec_process')
+
+    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
+    def test_exec_service_context_not_supported(self):
+        with self.assertRaises(RuntimeError):
+            self.container.exec(['foo'], service_context='srv1')
 
     def test_send_signal(self):
         with self.assertRaises(TypeError):
