@@ -1484,6 +1484,21 @@ class Harness(Generic[CharmType]):
             container_name = container.name
         return self._backend._pebble_clients[container_name]._root
 
+    def evaluate_status(self) -> None:
+        """Trigger the collect-status events and set application and/or unit status.
+
+        This will always trigger ``collect_unit_status``, and set the unit status if any
+        statuses were added.
+
+        If running on the leader unit (:meth:`set_leader` has been called with ``True``),
+        this will trigger ``collect_app_status``, and set the application status if any
+        statuses were added.
+
+        Tests should normally call this and then assert that ``self.model.app.status``
+        or ``self.model.unit.status`` is the value expected.
+        """
+        charm._evaluate_status(self.charm)
+
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
