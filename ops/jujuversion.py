@@ -128,3 +128,15 @@ class JujuVersion:
         """Report whether this Juju version supports open-port on Kubernetes."""
         # Support added: https://bugs.launchpad.net/juju/+bug/1920960
         return (self.major, self.minor, self.patch) >= (3, 0, 3)
+
+    @property
+    def supports_exec_service_context(self) -> bool:
+        """Report whether this Juju version supports exec's service_context option."""
+        if (self.major, self.minor, self.patch) < (3, 1, 6):
+            # First released in 3.1.6
+            return False
+        if (self.major, self.minor, self.patch) == (3, 2, 0):
+            # 3.2.0 was released before Pebble was updated, but all other 3.2
+            # releases have the change (3.2.1 tag was never released).
+            return False
+        return True

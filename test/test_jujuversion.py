@@ -80,6 +80,17 @@ class TestJujuVersion(unittest.TestCase):
         self.assertFalse(ops.JujuVersion('3.0.2').supports_open_port_on_k8s)
         self.assertFalse(ops.JujuVersion('2.9.30').supports_open_port_on_k8s)
 
+    def test_supports_exec_service_context(self):
+        self.assertFalse(ops.JujuVersion('2.9.30').supports_exec_service_context)
+        self.assertTrue(ops.JujuVersion('4.0.0').supports_exec_service_context)
+        self.assertFalse(ops.JujuVersion('3.0.0').supports_exec_service_context)
+        self.assertFalse(ops.JujuVersion('3.1.5').supports_exec_service_context)
+        self.assertTrue(ops.JujuVersion('3.1.6').supports_exec_service_context)
+        self.assertFalse(ops.JujuVersion('3.2.0').supports_exec_service_context)
+        self.assertTrue(ops.JujuVersion('3.2.2').supports_exec_service_context)
+        self.assertTrue(ops.JujuVersion('3.3.0').supports_exec_service_context)
+        self.assertTrue(ops.JujuVersion('3.4.0').supports_exec_service_context)
+
     def test_parsing_errors(self):
         invalid_versions = [
             "xyz",
