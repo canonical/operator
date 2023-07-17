@@ -132,14 +132,11 @@ class JujuVersion:
     @property
     def supports_exec_service_context(self) -> bool:
         """Report whether this Juju version supports exec's service_context option."""
-        if self.major < 3:
-            return False  # 2.9 doesn't support it
-        if self.major > 3:
-            return True  # 4.x presumably will
-        if self.minor == 0:
-            return False  # 3.0 doesn't support it
-        if self.minor == 1:
-            return self.patch >= 6  # 3.1.6+ supports it
-        if self.minor == 2:
-            return self.patch >= 2  # 3.2.2+ supports it
-        return True  # 3.3+ will
+        if (self.major, self.minor, self.patch) < (3, 1, 6):
+            # First released in 3.1.6
+            return False
+        if (self.major, self.minor, self.patch) == (3, 2, 0):
+            # 3.2.0 was released before Pebble was updated, but all other 3.2
+            # releases have the change (3.2.1 tag was never released).
+            return False
+        return True
