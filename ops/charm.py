@@ -846,8 +846,8 @@ class CollectStatusEvent(EventBase):
 
     * error
     * blocked
-    * waiting
     * maintenance
+    * waiting
     * active
     * unknown
 
@@ -982,7 +982,7 @@ class CharmEvents(ObjectEvents):
     """
 
     collect_app_status = EventSource(CollectStatusEvent)
-    """Triggered at the end of every hook on the leader to collect app statuses for evaluation
+    """Triggered on the leader at the end of every hook to collect app statuses for evaluation
     (see :class:`CollectStatusEvent`).
     """
 
