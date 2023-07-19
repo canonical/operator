@@ -850,8 +850,8 @@ class CollectStatusEvent(EventBase):
 
     * error
     * blocked
-    * maintenance
     * waiting
+    * maintenance
     * active
     * unknown
 
