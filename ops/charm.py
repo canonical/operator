@@ -15,6 +15,7 @@
 """Base objects for the Charm, events and metadata."""
 
 import enum
+import logging
 import os
 import pathlib
 from typing import (
@@ -72,6 +73,9 @@ if TYPE_CHECKING:
         '_MountDict', {'storage': Required[str],
                        'location': str},
         total=False)
+
+
+logger = logging.getLogger(__name__)
 
 
 class HookEvent(EventBase):
@@ -894,8 +898,12 @@ class CollectStatusEvent(EventBase):
             raise TypeError(f'status should be a StatusBase, not {type(status).__name__}')
         model_ = self.framework.model
         if self.handle.kind == 'collect_app_status':
+            if not isinstance(status, model.ActiveStatus):
+                logger.debug('Adding app status %s', status, stacklevel=2)
             model_.app._collected_statuses.append(status)
         else:
+            if not isinstance(status, model.ActiveStatus):
+                logger.debug('Adding unit status %s', status, stacklevel=2)
             model_.unit._collected_statuses.append(status)
 
 
