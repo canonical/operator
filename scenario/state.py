@@ -80,9 +80,11 @@ class StateValidationError(RuntimeError):
 @dataclasses.dataclass(frozen=True)
 class _DCBase:
     def replace(self, *args, **kwargs):
-        return dataclasses.replace(self, *args, **kwargs)
+        """Produce a deep copy of this class, with some arguments replaced with new ones."""
+        return dataclasses.replace(self.copy(), *args, **kwargs)
 
     def copy(self) -> "Self":
+        """Produce a deep copy of this object."""
         return copy.deepcopy(self)
 
 
