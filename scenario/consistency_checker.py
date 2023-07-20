@@ -333,10 +333,23 @@ def check_relation_consistency(
                     f"expecting relation to be of type PeerRelation, got {type(relation)}",
                 )
 
+    known_endpoints = [a[0] for a in all_relations_meta]
+    for relation in state.relations:
+        if not (ep := relation.endpoint) in known_endpoints:
+            errors.append(f"relation endpoint {ep} is not declared in metadata.")
+
+    seen_ids = set()
     for endpoint, relation_meta in all_relations_meta:
         expected_sub = relation_meta.get("scope", "") == "container"
         relations = _get_relations(endpoint)
         for relation in relations:
+            if relation.relation_id in seen_ids:
+                errors.append(
+                    f"duplicate relation ID: {relation.relation_id} is claimed "
+                    f"by multiple Relation instances",
+                )
+
+            seen_ids.add(relation.relation_id)
             is_sub = isinstance(relation, SubordinateRelation)
             if is_sub and not expected_sub:
                 errors.append(

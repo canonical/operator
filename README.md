@@ -424,7 +424,7 @@ relation = SubordinateRelation(
 relation.remote_unit_name  # "zookeeper/42"
 ```
 
-## Triggering Relation Events
+### Triggering Relation Events
 
 If you want to trigger relation events, the easiest way to do so is get a hold of the Relation instance and grab the
 event from one of its aptly-named properties:
@@ -449,6 +449,30 @@ changed_event = Event('foo-relation-changed', relation=relation)
 
 The reason for this construction is that the event is associated with some relation-specific metadata, that Scenario
 needs to set up the process that will run `ops.main` with the right environment variables.
+
+
+### Working with relation IDs
+
+Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `relation_id`.
+To inspect the ID the next relation instance will have, you can call `Relation.next_relation_id`.
+
+```python
+from scenario import Relation
+next_id = Relation.next_relation_id(update=False)
+rel = Relation('foo')
+assert rel.relation_id == next_id
+``` 
+
+This can be handy when using `replace` to create new relations, to avoid relation ID conflicts:
+
+```python
+from scenario import Relation
+rel = Relation('foo')
+rel2 = rel.replace(local_app_data={"foo": "bar"}, relation_id=Relation.next_relation_id())
+assert rel2.relation_id == rel.relation_id + 1 
+``` 
+
+If you don't do this, and pass both relations into a `State`, you will trigger a consistency checker error.
 
 ### Additional event parameters
 
@@ -960,6 +984,22 @@ state = Context(
 Do this, and you will be able to set up said directory as you like before the charm is run, as well as verify its
 contents after the charm has run. Do keep in mind that the metadata files will be overwritten by Scenario, and therefore
 ignored.
+
+# Immutability
+
+All of the data structures in `state`, e.g. `State, Relation, Container`, etc... are immutable (implemented as frozen dataclasses). 
+
+This means that all components of the state that goes into a `context.run()` call are not mutated by the call, and the state that you obtain in return is a different instance, and all parts of it have been (deep)copied.
+This ensures that you can do delta-based comparison of states without worrying about them being mutated by scenario.
+
+If you want to modify any of these data structures, you will need to either reinstantiate it from scratch, or use the `replace` api. 
+
+```python
+from scenario import Relation
+relation = Relation('foo', remote_app_data={"1":"2"})
+# make a copy of relation, but with remote_app_data set to {"3", "4"} 
+relation2 = relation.replace(remote_app_data={"3", "4"})
+```
 
 # Consistency checks
 
