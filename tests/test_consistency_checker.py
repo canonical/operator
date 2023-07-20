@@ -287,7 +287,7 @@ def test_relation_without_endpoint():
 
     assert_consistent(
         State(
-            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=2)]
         ),
         Event("start"),
         _CharmSpec(
