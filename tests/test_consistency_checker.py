@@ -259,3 +259,41 @@ def test_action_params_type():
             MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "boolean"}}}}
         ),
     )
+
+
+def test_duplicate_relation_ids():
+    assert_inconsistent(
+        State(
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
+        ),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "requires": {"foo": {"interface": "foo"}, "bar": {"interface": "bar"}}
+            },
+        ),
+    )
+
+
+def test_relation_without_endpoint():
+    assert_inconsistent(
+        State(
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
+        ),
+        Event("start"),
+        _CharmSpec(MyCharm, meta={}),
+    )
+
+    assert_consistent(
+        State(
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
+        ),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "requires": {"foo": {"interface": "foo"}, "bar": {"interface": "bar"}}
+            },
+        ),
+    )

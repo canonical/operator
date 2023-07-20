@@ -211,12 +211,13 @@ class RelationBase(_DCBase):
     # we can derive this from the charm's metadata
     interface: str = None
 
-    NEXT_RELATION_ID = 1
+    _next_relation_id_counter = 1
 
     @staticmethod
-    def _next_relation_id():
-        cur = RelationBase.NEXT_RELATION_ID
-        RelationBase.NEXT_RELATION_ID += 1
+    def next_relation_id(update=True):
+        cur = RelationBase._next_relation_id_counter
+        if update:
+            RelationBase._next_relation_id_counter += 1
         logger.info(
             f"relation ID unset; automatically assigning "
             f"{cur}. "
@@ -225,7 +226,7 @@ class RelationBase(_DCBase):
         return cur
 
     # Every new Relation instance gets a new one, if there's trouble, override.
-    relation_id: int = dataclasses.field(default_factory=_next_relation_id)
+    relation_id: int = dataclasses.field(default_factory=next_relation_id)
 
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
