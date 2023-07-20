@@ -180,9 +180,6 @@ class Secret(_DCBase):
             object.__setattr__(self, "rotate", rotate)
 
 
-_RELATION_IDS_CTR = 0
-
-
 def normalize_name(s: str):
     """Event names need underscores instead of dashes."""
     return s.replace("-", "_")
@@ -209,16 +206,6 @@ class ParametrizedEvent:
         return self().deferred(handler=handler, event_id=event_id)
 
 
-def _generate_new_relation_id():
-    global _RELATION_IDS_CTR
-    _RELATION_IDS_CTR += 1
-    logger.info(
-        f"relation ID unset; automatically assigning {_RELATION_IDS_CTR}. "
-        f"If there are problems, pass one manually.",
-    )
-    return _RELATION_IDS_CTR
-
-
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_DCBase):
     endpoint: str
@@ -226,8 +213,22 @@ class RelationBase(_DCBase):
     # we can derive this from the charm's metadata
     interface: str = None
 
+    _next_relation_id_counter = 1
+
+    @staticmethod
+    def next_relation_id(update=True):
+        cur = RelationBase._next_relation_id_counter
+        if update:
+            RelationBase._next_relation_id_counter += 1
+        logger.info(
+            f"relation ID unset; automatically assigning "
+            f"{cur}. "
+            f"If there are problems, pass one manually.",
+        )
+        return cur
+
     # Every new Relation instance gets a new one, if there's trouble, override.
-    relation_id: int = dataclasses.field(default_factory=_generate_new_relation_id)
+    relation_id: int = dataclasses.field(default_factory=next_relation_id)
 
     local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)

@@ -303,3 +303,10 @@ def test_trigger_sub_relation(mycharm):
 def test_cannot_instantiate_relationbase():
     with pytest.raises(RuntimeError):
         RelationBase("")
+
+
+def test_relation_ids():
+    initial_id = RelationBase._next_relation_id_counter
+    for i in range(10):
+        rel = Relation("foo")
+        assert rel.relation_id == initial_id + i
