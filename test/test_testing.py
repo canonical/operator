@@ -1262,6 +1262,31 @@ class TestHarness(unittest.TestCase):
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
 
+    def test_metadata_from_directory_charmcraft_yaml(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        charmcraft_filename = tmp / 'charmcraft.yaml'
+        charmcraft_filename.write_text(textwrap.dedent('''
+            type: charm
+            bases:
+              - build-on:
+                - name: ubuntu
+                  channel: "22.04"
+                run-on:
+                - name: ubuntu
+                  channel: "22.04"
+
+            name: my-charm
+            requires:
+                db:
+                    interface: pgsql
+            '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        harness.begin()
+        self.assertEqual(list(harness.model.relations), ['db'])
+        # The charm_dir also gets set
+        self.assertEqual(harness.framework.charm_dir, tmp)
+
     def test_config_from_directory(self):
         tmp = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, str(tmp))
@@ -1301,6 +1326,34 @@ class TestHarness(unittest.TestCase):
         self.assertFalse('opt_null' in harness.model.config)
         self.assertIsNone(harness._backend._config._defaults['opt_null'])
         self.assertIsNone(harness._backend._config._defaults['opt_no_default'])
+
+    def test_config_from_directory_charmcraft_yaml(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        charmcraft_filename = tmp / 'charmcraft.yaml'
+        charmcraft_filename.write_text(textwrap.dedent('''
+            type: charm
+            bases:
+              - build-on:
+                - name: ubuntu
+                  channel: "22.04"
+                run-on:
+                - name: ubuntu
+                  channel: "22.04"
+
+            config:
+                options:
+                    opt_str:
+                        type: string
+                        default: "val"
+                    opt_int:
+                        type: int
+                        default: 1
+            '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        self.assertEqual(harness.model.config['opt_str'], 'val')
+        self.assertEqual(harness.model.config['opt_int'], 1)
+        self.assertIsInstance(harness.model.config['opt_int'], int)
 
     def test_set_model_name(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -1715,6 +1768,30 @@ class TestHarness(unittest.TestCase):
             test:
                 description: a dummy action
             '''))
+        harness = self._get_dummy_charm_harness(tmp)
+        harness.begin()
+        self.assertEqual(list(harness.framework.meta.actions), ['test'])
+        # The charm_dir also gets set
+        self.assertEqual(harness.framework.charm_dir, tmp)
+
+    def test_actions_from_directory_charmcraft_yaml(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        charmcraft_filename = tmp / 'charmcraft.yaml'
+        charmcraft_filename.write_text(textwrap.dedent('''
+            type: charm
+            bases:
+              - build-on:
+                  - name: ubuntu
+                    channel: "22.04"
+                run-on:
+                  - name: ubuntu
+                    channel: "22.04"
+
+            actions:
+              test:
+                description: a dummy action
+        '''))
         harness = self._get_dummy_charm_harness(tmp)
         harness.begin()
         self.assertEqual(list(harness.framework.meta.actions), ['test'])
