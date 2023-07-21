@@ -206,26 +206,23 @@ class ParametrizedEvent:
         return self().deferred(handler=handler, event_id=event_id)
 
 
+_next_relation_id_counter = 1
+
+
+def next_relation_id(update=True):
+    global _next_relation_id_counter
+    cur = _next_relation_id_counter
+    if update:
+        _next_relation_id_counter += 1
+    return cur
+
+
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_DCBase):
     endpoint: str
 
     # we can derive this from the charm's metadata
     interface: str = None
-
-    _next_relation_id_counter = 1
-
-    @staticmethod
-    def next_relation_id(update=True):
-        cur = RelationBase._next_relation_id_counter
-        if update:
-            RelationBase._next_relation_id_counter += 1
-        logger.info(
-            f"relation ID unset; automatically assigning "
-            f"{cur}. "
-            f"If there are problems, pass one manually.",
-        )
-        return cur
 
     # Every new Relation instance gets a new one, if there's trouble, override.
     relation_id: int = dataclasses.field(default_factory=next_relation_id)
