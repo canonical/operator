@@ -1596,8 +1596,8 @@ class StatusBase:
     _priorities = {
         'error': 5,
         'blocked': 4,
-        'waiting': 3,
-        'maintenance': 2,
+        'maintenance': 3,
+        'waiting': 2,
         'active': 1,
         # 'unknown' or any other status is handled below
     }

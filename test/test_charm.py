@@ -793,10 +793,10 @@ containers:
         charm = MyCharm(self.create_framework(), statuses=['waiting', 'blocked'])
         ops.charm._evaluate_status(charm)
 
-        charm = MyCharm(self.create_framework(), statuses=['maintenance', 'waiting'])
+        charm = MyCharm(self.create_framework(), statuses=['waiting', 'maintenance'])
         ops.charm._evaluate_status(charm)
 
-        charm = MyCharm(self.create_framework(), statuses=['active', 'maintenance'])
+        charm = MyCharm(self.create_framework(), statuses=['active', 'waiting'])
         ops.charm._evaluate_status(charm)
 
         charm = MyCharm(self.create_framework(), statuses=['active', 'unknown'])
@@ -810,8 +810,8 @@ containers:
         self.assertEqual(status_set_calls, [
             ['status-set', '--application=True', 'error', ''],
             ['status-set', '--application=True', 'blocked', ''],
-            ['status-set', '--application=True', 'waiting', ''],
             ['status-set', '--application=True', 'maintenance', ''],
+            ['status-set', '--application=True', 'waiting', ''],
             ['status-set', '--application=True', 'active', ''],
             ['status-set', '--application=True', 'unknown', ''],
         ])
