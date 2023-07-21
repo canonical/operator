@@ -19,6 +19,7 @@ import unittest
 from pathlib import Path
 
 import ops
+import ops.charm
 from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -630,4 +631,187 @@ containers:
             'SecretRotateEvent',
             'SecretRemoveEvent',
             'SecretExpiredEvent',
+        ])
+
+    def test_collect_app_status_leader(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                event.add_status(ops.ActiveStatus())
+                event.add_status(ops.BlockedStatus('first'))
+                event.add_status(ops.WaitingStatus('waiting'))
+                event.add_status(ops.BlockedStatus('second'))
+
+        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'status-set', 'exit 0')
+
+        charm = MyCharm(self.create_framework())
+        ops.charm._evaluate_status(charm)
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+            ['status-set', '--application=True', 'blocked', 'first'],
+        ])
+
+    def test_collect_app_status_no_statuses(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                pass
+
+        fake_script(self, 'is-leader', 'echo true')
+
+        charm = MyCharm(self.create_framework())
+        ops.charm._evaluate_status(charm)
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+        ])
+
+    def test_collect_app_status_non_leader(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                raise Exception  # shouldn't be called
+
+        fake_script(self, 'is-leader', 'echo false')
+
+        charm = MyCharm(self.create_framework())
+        ops.charm._evaluate_status(charm)
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+        ])
+
+    def test_collect_unit_status(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                event.add_status(ops.ActiveStatus())
+                event.add_status(ops.BlockedStatus('first'))
+                event.add_status(ops.WaitingStatus('waiting'))
+                event.add_status(ops.BlockedStatus('second'))
+
+        fake_script(self, 'is-leader', 'echo false')  # called only for collecting app statuses
+        fake_script(self, 'status-set', 'exit 0')
+
+        charm = MyCharm(self.create_framework())
+        ops.charm._evaluate_status(charm)
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+            ['status-set', '--application=False', 'blocked', 'first'],
+        ])
+
+    def test_collect_unit_status_no_statuses(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                pass
+
+        fake_script(self, 'is-leader', 'echo false')  # called only for collecting app statuses
+
+        charm = MyCharm(self.create_framework())
+        ops.charm._evaluate_status(charm)
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+        ])
+
+    def test_collect_app_and_unit_status(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
+                self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+
+            def _on_collect_app_status(self, event):
+                event.add_status(ops.ActiveStatus())
+
+            def _on_collect_unit_status(self, event):
+                event.add_status(ops.WaitingStatus('blah'))
+
+        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'status-set', 'exit 0')
+
+        charm = MyCharm(self.create_framework())
+        ops.charm._evaluate_status(charm)
+
+        self.assertEqual(fake_script_calls(self, True), [
+            ['is-leader', '--format=json'],
+            ['status-set', '--application=True', 'active', ''],
+            ['status-set', '--application=False', 'waiting', 'blah'],
+        ])
+
+    def test_add_status_type_error(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
+            def _on_collect_status(self, event):
+                event.add_status('active')
+
+        fake_script(self, 'is-leader', 'echo true')
+
+        charm = MyCharm(self.create_framework())
+        with self.assertRaises(TypeError):
+            ops.charm._evaluate_status(charm)
+
+    def test_collect_status_priority(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args, statuses=None):
+                super().__init__(*args)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+                self.statuses = statuses
+
+            def _on_collect_status(self, event):
+                for status in self.statuses:
+                    event.add_status(ops.StatusBase.from_name(status, ''))
+
+        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'status-set', 'exit 0')
+
+        charm = MyCharm(self.create_framework(), statuses=['blocked', 'error'])
+        ops.charm._evaluate_status(charm)
+
+        charm = MyCharm(self.create_framework(), statuses=['waiting', 'blocked'])
+        ops.charm._evaluate_status(charm)
+
+        charm = MyCharm(self.create_framework(), statuses=['waiting', 'maintenance'])
+        ops.charm._evaluate_status(charm)
+
+        charm = MyCharm(self.create_framework(), statuses=['active', 'waiting'])
+        ops.charm._evaluate_status(charm)
+
+        charm = MyCharm(self.create_framework(), statuses=['active', 'unknown'])
+        ops.charm._evaluate_status(charm)
+
+        charm = MyCharm(self.create_framework(), statuses=['unknown'])
+        ops.charm._evaluate_status(charm)
+
+        status_set_calls = [call for call in fake_script_calls(self, True)
+                            if call[0] == 'status-set']
+        self.assertEqual(status_set_calls, [
+            ['status-set', '--application=True', 'error', ''],
+            ['status-set', '--application=True', 'blocked', ''],
+            ['status-set', '--application=True', 'maintenance', ''],
+            ['status-set', '--application=True', 'waiting', ''],
+            ['status-set', '--application=True', 'active', ''],
+            ['status-set', '--application=True', 'unknown', ''],
         ])

@@ -319,6 +319,7 @@ class Application:
         self._cache = cache
         self._is_our_app = self.name == self._backend.app_name
         self._status = None
+        self._collected_statuses: 'List[StatusBase]' = []
 
     def _invalidate(self):
         self._status = None
@@ -330,6 +331,10 @@ class Application:
         Can only be read and set by the lead unit of the application.
 
         The status of remote units is always Unknown.
+
+        You can also use the :attr:`collect_app_status <CharmEvents.collect_app_status>`
+        event if you want to evaluate and set application status consistently
+        at the end of every hook.
 
         Raises:
             RuntimeError: if you try to set the status of another application, or if you try to
@@ -465,6 +470,7 @@ class Unit:
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
+        self._collected_statuses: 'List[StatusBase]' = []
 
         if self._is_our_unit and hasattr(meta, "containers"):
             containers: _ContainerMeta_Raw = meta.containers
@@ -478,6 +484,10 @@ class Unit:
         """Used to report or read the status of a specific unit.
 
         The status of any unit other than yourself is always Unknown.
+
+        You can also use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
+        event if you want to evaluate and set unit status consistently at the
+        end of every hook.
 
         Raises:
             RuntimeError: if you try to set the status of a unit other than yourself.
@@ -1582,6 +1592,23 @@ class StatusBase:
                             "missing required `name: str` class attribute")
         cls._statuses[child.name] = child
         return child
+
+    _priorities = {
+        'error': 5,
+        'blocked': 4,
+        'maintenance': 3,
+        'waiting': 2,
+        'active': 1,
+        # 'unknown' or any other status is handled below
+    }
+
+    @classmethod
+    def _get_highest_priority(cls, statuses: 'List[StatusBase]') -> 'StatusBase':
+        """Return the highest-priority status from a list of statuses.
+
+        If there are multiple highest-priority statuses, return the first one.
+        """
+        return max(statuses, key=lambda status: cls._priorities.get(status.name, 0))
 
 
 @StatusBase.register

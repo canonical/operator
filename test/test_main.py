@@ -17,6 +17,7 @@ import importlib.util
 import io
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -73,6 +74,8 @@ class EventSpec:
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
+@patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)
+@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
     @patch('sys.stderr', new_callable=io.StringIO)
@@ -107,16 +110,15 @@ class CharmInitTestCase(unittest.TestCase):
         if extra_environ is not None:
             fake_environ.update(extra_environ)
         with patch.dict(os.environ, fake_environ):
-            with patch('ops.main._emit_charm_event'):
-                with patch('ops.main._get_charm_dir') as mock_charmdir:
-                    with tempfile.TemporaryDirectory() as tmpdirname:
-                        tmpdirname = Path(tmpdirname)
-                        fake_metadata = tmpdirname / 'metadata.yaml'
-                        with fake_metadata.open('wb') as fh:
-                            fh.write(b'name: test')
-                        mock_charmdir.return_value = tmpdirname
+            with patch('ops.main._get_charm_dir') as mock_charmdir:
+                with tempfile.TemporaryDirectory() as tmpdirname:
+                    tmpdirname = Path(tmpdirname)
+                    fake_metadata = tmpdirname / 'metadata.yaml'
+                    with fake_metadata.open('wb') as fh:
+                        fh.write(b'name: test')
+                    mock_charmdir.return_value = tmpdirname
 
-                        ops.main(charm_class, **kwargs)
+                    ops.main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
@@ -174,6 +176,7 @@ class CharmInitTestCase(unittest.TestCase):
 
 @patch('sys.argv', new=("hooks/config-changed",))
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
+@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
 class TestDispatch(unittest.TestCase):
     def _check(self, *, with_dispatch=False, dispatch_path=''):
         """Helper for below tests."""
@@ -265,7 +268,8 @@ class _TestMain(abc.ABC):
             ops.CharmBase.on = ops.CharmEvents()
         self.addCleanup(cleanup)
 
-        fake_script(self, 'juju-log', "exit 0")
+        fake_script(self, 'is-leader', 'echo true')
+        fake_script(self, 'juju-log', 'exit 0')
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -620,6 +624,7 @@ class _TestMain(abc.ABC):
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
 
@@ -632,14 +637,19 @@ class _TestMain(abc.ABC):
         self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status',
                                        set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
 
+        calls = fake_script_calls(self)
+
+        custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event update_status.'],
-            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting custom event '
-                                                       '<CustomEvent via Charm/on/custom[5]>.'],
+            ['juju-log', '--log-level', 'DEBUG', '--', custom_event_prefix],
+            ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(self)
-        self.assertEqual(expected, calls)
+        # Remove the "[key]>" suffix from the end of the event string
+        self.assertRegex(calls[2][-1], re.escape(custom_event_prefix) + '.*')
+        calls[2][-1] = custom_event_prefix
+        self.assertEqual(calls, expected)
 
     def test_logger(self):
         fake_script(self, 'action-get', "echo '{}'")
@@ -898,9 +908,10 @@ class _TestMainWithDispatch(_TestMain):
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_non_executable_hook_and_dispatch(self):
@@ -917,9 +928,10 @@ class _TestMainWithDispatch(_TestMain):
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -999,9 +1011,10 @@ class _TestMainWithDispatch(_TestMain):
              'Using local storage: not a Kubernetes podspec charm'],
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
+            ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-2)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
 
         self.assertEqual(calls, expected)
 

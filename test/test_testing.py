@@ -2691,6 +2691,27 @@ class TestHarness(unittest.TestCase):
         container = harness.charm.unit.get_container("foo")
         self.assertEqual(foo_root, harness.get_filesystem_root(container))
 
+    def test_evaluate_status(self):
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
+                self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+
+            def _on_collect_app_status(self, event):
+                event.add_status(ops.ActiveStatus())
+
+            def _on_collect_unit_status(self, event):
+                event.add_status(ops.BlockedStatus('bar'))
+
+        harness = ops.testing.Harness(TestCharm)
+        harness.set_leader(True)
+        harness.begin()
+        # Tests for the behaviour of status evaluation are in test_charm.py
+        harness.evaluate_status()
+        self.assertEqual(harness.model.app.status, ops.ActiveStatus())
+        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('bar'))
+
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):
