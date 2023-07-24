@@ -242,7 +242,7 @@ if TYPE_CHECKING:
         def shutdown(self): ...                                  # noqa
         def send(self, payload: str): ...                        # noqa
         def send_binary(self, payload: bytes): ...               # noqa
-        def recv(self) -> typing.AnyStr: ...                     # noqa
+        def recv(self) -> Union[str, bytes]: ...                 # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -1411,7 +1411,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
                          encoding: Optional[str]):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk: Union[str, bytes] = typing.cast(Union[str, bytes], ws.recv())
+        chunk = ws.recv()
 
         if isinstance(chunk, str):
             try:
@@ -1474,7 +1474,7 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk: Union[str, bytes] = typing.cast(Union[str, bytes], self.ws.recv())
+            chunk = self.ws.recv()
 
             if isinstance(chunk, str):
                 try:
