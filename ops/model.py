@@ -1548,8 +1548,8 @@ class StatusBase:
 
     _statuses: Dict[str, Type['StatusBase']] = {}
 
-    # Subclasses should override this attribute and make it a string.
-    name = NotImplemented
+    # Subclasses should override this attribute
+    name = ''
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
