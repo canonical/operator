@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
@@ -8,8 +9,8 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
 
 from scenario import Context
-from scenario.runtime import Runtime
-from scenario.state import Event, State, _CharmSpec
+from scenario.runtime import Runtime, UncaughtCharmError
+from scenario.state import Event, Relation, State, _CharmSpec
 
 
 def charm_type():
@@ -117,3 +118,30 @@ def test_unit_name(app_name, unit_id):
         post_event=post_event,
         context=Context(my_charm_type, meta=meta),
     )
+
+
+def test_env_cleanup_on_charm_error():
+    meta = {"name": "frank", "requires": {"box": {"interface": "triangle"}}}
+
+    my_charm_type = charm_type()
+
+    runtime = Runtime(
+        _CharmSpec(
+            my_charm_type,
+            meta=meta,
+        ),
+    )
+
+    def post_event(charm: CharmBase):
+        assert os.getenv("JUJU_REMOTE_APP")
+        raise TypeError
+
+    with pytest.raises(UncaughtCharmError):
+        runtime.exec(
+            state=State(),
+            event=Event("box_relation_changed", relation=Relation("box")),
+            post_event=post_event,
+            context=Context(my_charm_type, meta=meta),
+        )
+
+    assert os.getenv("JUJU_REMOTE_APP", None) is None
