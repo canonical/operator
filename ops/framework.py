@@ -489,6 +489,13 @@ class ObjectEvents(Object):
         event_kinds = ', '.join(sorted(self._event_kinds()))
         return f'<{k.__module__}.{k.__qualname__}: {event_kinds}>'
 
+    def __getattr__(self, name: str):
+        """This tells type checkers to suspend judgement on this type's attributes.
+
+        This allows charms to freely write `self.on.foobar_baz` without mypy/pyright whining.
+        """
+        return super().__getattribute__(name)
+
 
 class PrefixedEvents:
     """Events to be found in all events using a specific prefix."""
