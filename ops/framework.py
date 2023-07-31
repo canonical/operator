@@ -533,6 +533,14 @@ class ObjectEvents(Object):
         event_kinds = ', '.join(sorted(self._event_kinds()))
         return '<{}.{}: {}>'.format(k.__module__, k.__qualname__, event_kinds)
 
+    def __getattr__(self, name: str) -> Any:
+        """The existence of this method tells type checkers to allow dynamic attributes.
+
+        This allows charms to access dynamically-defined events such as
+        ``self.on.db_relation_joined`` without Mypy/Pyright whining.
+        """
+        return super().__getattribute__(name)
+
 
 class PrefixedEvents:
     """Events to be found in all events using a specific prefix."""
