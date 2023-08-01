@@ -1102,6 +1102,22 @@ class Secret:
         return self._id
 
     @property
+    def uri(self) -> Optional[str]:
+        """Fully qualified identifier for this secret.
+
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with a label but no ID.
+        """
+        if not self._id:
+            return
+
+        if self._id.startswith("secret://"):
+            return self._id
+
+        short_id = self._id[self._id.startswith("secret:") and len("secret:"):]
+        return f"secret://{self._backend.model_uuid}/{short_id}"
+
+    @property
     def label(self) -> Optional[str]:
         """Label used to reference this secret locally.
 
