@@ -5,8 +5,8 @@ on: [push, pull_request, workflow_call]
 jobs:
   db-charm-tests:
     runs-on: ubuntu-latest
-    fail-fast: false
     strategy:
+      fail-fast: false
       matrix:
         charm-repo:
           - "canonical/postgresql-operator"
