@@ -1094,12 +1094,39 @@ class Secret:
 
     @property
     def id(self) -> Optional[str]:
-        """Unique identifier for this secret.
+        """Locator ID (URI) for this secret.
+
+        This has an unfortunate name for historical reasons, as it's not
+        really a unique identifier, but the secret's locator URI, which may or
+        may not include the model UUID (for cross-model secrets).
+
+        Charms should treat this as an opaque string for looking up secrets
+        and sharing them via relation data. If you want a truly unique
+        identifier for checking equality, use :attr:`unique_identifier`.
 
         This will be None if you obtained the secret using
         :meth:`Model.get_secret` with a label but no ID.
         """
         return self._id
+
+    @property
+    def unique_identifier(self) -> Optional[str]:
+        """Unique identifier of this secret.
+
+        This is the secret's globally-unique identifier (currently a
+        20-character Xid, for example "9m4e2mr0ui3e8a215n4g"). It is useful
+        for determining if two secrets refer to the same secret object. Most
+        charms should use :attr:`id` (the secret's locator ID) instead.
+
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with a label but no ID.
+        """
+        if self._id is None:
+            return None
+        if '/' in self._id:
+            return self._id.rsplit('/', 1)[-1]
+        else:
+            return self._id.removeprefix('secret:')
 
     @property
     def label(self) -> Optional[str]:
