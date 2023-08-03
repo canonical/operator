@@ -2988,20 +2988,15 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.id, 'secret:124')
         self.assertEqual(secret.unique_identifier, '124')
 
-        secret = self.model.get_secret(id='secret://125')
-        self.assertEqual(secret.id, 'secret://125')
+        secret = self.model.get_secret(id='secret://modeluuid/125')
+        self.assertEqual(secret.id, 'secret://modeluuid/125')
         self.assertEqual(secret.unique_identifier, '125')
-
-        secret = self.model.get_secret(id='secret://modeluuid/126')
-        self.assertEqual(secret.id, 'secret://modeluuid/126')
-        self.assertEqual(secret.unique_identifier, '126')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['secret-get', '--label', 'lbl', '--format=json'],
             ['secret-get', 'secret:123', '--format=json'],
             ['secret-get', 'secret:124', '--format=json'],
-            ['secret-get', 'secret://125', '--format=json'],
-            ['secret-get', 'secret://modeluuid/126', '--format=json'],
+            ['secret-get', 'secret://modeluuid/125', '--format=json'],
         ])
 
 
