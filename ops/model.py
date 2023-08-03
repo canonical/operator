@@ -1125,8 +1125,11 @@ class Secret:
             return None
         if '/' in self._id:
             return self._id.rsplit('/', 1)[-1]
+        elif self._id.startswith('secret:'):
+            return self._id[len('secret:'):]
         else:
-            return self._id.removeprefix('secret:')
+            # Shouldn't get here as id is canonicalized, but just in case.
+            return self._id
 
     @property
     def label(self) -> Optional[str]:
