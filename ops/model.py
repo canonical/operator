@@ -1122,7 +1122,7 @@ class Secret:
         This is the secret's globally-unique identifier (currently a
         20-character Xid, for example "9m4e2mr0ui3e8a215n4g").
 
-        Most charms should use :attr:`id` (the secret's locator ID) to send
+        Charms should use :attr:`id` (the secret's locator ID) to send
         the secret's ID across relation data, and labels (:attr:`label`) to
         assign a charm-local "name" to the secret for lookup in this charm.
         However, ``unique_identifier`` can be useful to distinguish secrets in
