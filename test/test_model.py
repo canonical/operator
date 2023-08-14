@@ -2973,6 +2973,32 @@ class TestSecrets(unittest.TestCase):
             self.model.get_secret(id='123')
         self.assertNotIsInstance(cm.exception, ops.SecretNotFoundError)
 
+    def test_secret_unique_identifier(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "g"}'""")
+
+        secret = self.model.get_secret(label='lbl')
+        self.assertIsNone(secret.id)
+        self.assertIsNone(secret.unique_identifier)
+
+        secret = self.model.get_secret(id='123')
+        self.assertEqual(secret.id, 'secret:123')
+        self.assertEqual(secret.unique_identifier, '123')
+
+        secret = self.model.get_secret(id='secret:124')
+        self.assertEqual(secret.id, 'secret:124')
+        self.assertEqual(secret.unique_identifier, '124')
+
+        secret = self.model.get_secret(id='secret://modeluuid/125')
+        self.assertEqual(secret.id, 'secret://modeluuid/125')
+        self.assertEqual(secret.unique_identifier, '125')
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-get', '--label', 'lbl', '--format=json'],
+            ['secret-get', 'secret:123', '--format=json'],
+            ['secret-get', 'secret:124', '--format=json'],
+            ['secret-get', 'secret://modeluuid/125', '--format=json'],
+        ])
+
 
 class TestSecretInfo(unittest.TestCase):
     def test_init(self):

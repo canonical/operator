@@ -249,9 +249,13 @@ class Model:
     def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> 'Secret':
         """Get the :class:`Secret` with the given ID or label.
 
-        You must provide at least one of `id` or `label`. If you provide both,
-        the secret will be fetched by ID, and the secret's label will be
-        updated to the label you provided.
+        The caller must provide at least one of `id` (the secret's locator ID)
+        or `label` (the charm-local "name").
+
+        If both are provided, the secret will be fetched by ID, and the
+        secret's label will be updated to the label provided. Normally secret
+        owners set a label using ``add_secret``, whereas secret observers set
+        a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
         Args:
             id: Secret ID if fetching by ID.
@@ -411,8 +415,8 @@ class Application:
         Args:
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
-            label: Private label to assign to this secret, which can later be
-                used for lookup.
+            label: Charm-local label (or "name") to assign to this secret,
+                which can later be used for lookup.
             description: Description of the secret's purpose.
             expire: Time in the future (or timedelta from now) at which the
                 secret is due to expire. When that time elapses, Juju will
@@ -1094,7 +1098,17 @@ class Secret:
 
     @property
     def id(self) -> Optional[str]:
-        """Unique identifier for this secret.
+        """Locator ID (URI) for this secret.
+
+        This has an unfortunate name for historical reasons, as it's not
+        really a unique identifier, but the secret's locator URI, which may or
+        may not include the model UUID (for cross-model secrets).
+
+        Charms should treat this as an opaque string for looking up secrets
+        and sharing them via relation data. If you need a charm-local "name"
+        for a secret, use a :attr:`label`. (If a charm needs a truly unique
+        identifier for identifying one secret in a set of secrets of arbitrary
+        size, use :attr:`unique_identifier` -- this should be rare.)
 
         This will be None if you obtained the secret using
         :meth:`Model.get_secret` with a label but no ID.
@@ -1102,12 +1116,62 @@ class Secret:
         return self._id
 
     @property
+    def unique_identifier(self) -> Optional[str]:
+        """Unique identifier of this secret.
+
+        This is the secret's globally-unique identifier (currently a
+        20-character Xid, for example "9m4e2mr0ui3e8a215n4g").
+
+        Charms should use :attr:`id` (the secret's locator ID) to send
+        the secret's ID across relation data, and labels (:attr:`label`) to
+        assign a charm-local "name" to the secret for lookup in this charm.
+        However, ``unique_identifier`` can be useful to distinguish secrets in
+        cases where the charm has a set of secrets of arbitrary size, for
+        example, a group of 10 or 20 TLS certificates.
+
+        This will be None if you obtained the secret using
+        :meth:`Model.get_secret` with a label but no ID.
+        """
+        if self._id is None:
+            return None
+        if '/' in self._id:
+            return self._id.rsplit('/', 1)[-1]
+        elif self._id.startswith('secret:'):
+            return self._id[len('secret:'):]
+        else:
+            # Shouldn't get here as id is canonicalized, but just in case.
+            return self._id
+
+    @property
     def label(self) -> Optional[str]:
         """Label used to reference this secret locally.
 
-        This label is locally unique, that is, Juju will ensure that the
-        entity (the owner or observer) only has one secret with this label at
-        once.
+        This label is effectively a name for the secret that's local to the
+        charm, for example "db-password" or "tls-cert". The secret owner sets
+        a label with :meth:`Application.add_secret` or :meth:`Unit.add_secret`,
+        and the secret observer sets a label with a call to
+        :meth:`Model.get_secret`.
+
+        The label property can be used distinguish between multiple secrets
+        in event handlers like :class:`ops.SecretChangedEvent <ops.charm.SecretChangedEvent>`.
+        For example, if a charm is observing two secrets, it might call
+        ``model.get_secret(id=secret_id, label='db-password')`` and
+        ``model.get_secret(id=secret_id, label='tls-cert')`` in the relevant
+        relation-changed event handlers, and then switch on ``event.secret.label``
+        in secret-changed::
+
+            def _on_secret_changed(self, event):
+                if event.secret.label == 'db-password':
+                    content = event.secret.get_content(refresh=True)
+                    self._configure_db_credentials(content['username'], content['password'])
+                elif event.secret.label == 'tls-cert':
+                    content = event.secret.get_content(refresh=True)
+                    self._update_tls_cert(content['cert'])
+                else:
+                    pass  # ignore other labels (or log a warning)
+
+        Juju will ensure that the entity (the owner or observer) only has one
+        secret with this label at once.
 
         This will be None if you obtained the secret using
         :meth:`Model.get_secret` with an ID but no label.
@@ -1148,7 +1212,7 @@ class Secret:
 
         This will create a new secret revision, and notify all units tracking
         the secret (the "observers") that a new revision is available with a
-        :class:`ops.charm.SecretChangedEvent`.
+        :class:`ops.SecretChangedEvent <ops.charm.SecretChangedEvent>`.
 
         Args:
             content: A key-value mapping containing the payload of the secret,
@@ -1226,8 +1290,9 @@ class Secret:
     def remove_revision(self, revision: int):
         """Remove the given secret revision.
 
-        This is normally called when handling :class:`ops.charm.SecretRemoveEvent`
-        or :class:`ops.charm.SecretExpiredEvent`.
+        This is normally called when handling
+        :class:`ops.SecretRemoveEvent <ops.charm.SecretRemoveEvent>` or
+        :class:`ops.SecretExpiredEvent <ops.charm.SecretExpiredEvent>`.
 
         Args:
             revision: The secret revision to remove. If being called from a
@@ -1242,7 +1307,7 @@ class Secret:
         """Remove all revisions of this secret.
 
         This is called when the secret is no longer needed, for example when
-        handling :class:`ops.charm.RelationBrokenEvent`.
+        handling :class:`ops.RelationBrokenEvent <ops.charm.RelationBrokenEvent>`.
         """
         if self._id is None:
             self._id = self.get_info().id
