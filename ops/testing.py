@@ -19,6 +19,7 @@ import dataclasses
 import datetime
 import fnmatch
 import inspect
+import io
 import ipaddress
 import os
 import pathlib
@@ -2592,7 +2593,11 @@ class _TestingPebbleClient:
             elif isinstance(source, bytes):
                 file_path.write_bytes(source)
             else:
-                with file_path.open('wb' if encoding is None else 'w', encoding=encoding) as f:
+                # If source is binary, open file in binary mode and ignore encoding param
+                is_binary = isinstance(source, (io.RawIOBase, io.BufferedIOBase))
+                open_mode = 'wb' if is_binary else 'w'
+                open_encoding = None if is_binary else encoding
+                with file_path.open(open_mode, encoding=open_encoding) as f:
                     shutil.copyfileobj(cast(IOBase, source), cast(IOBase, f))
             os.chmod(file_path, permissions)
         except FileNotFoundError as e:

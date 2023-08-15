@@ -3998,6 +3998,22 @@ class _PebbleStorageAPIsTestMixin:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
+    def test_push_bytes_ignore_encoding(self):
+        # push() encoding param should be ignored if source is bytes
+        client = self.client
+        client.push(f"{self.prefix}/test", b'\x00\x01', encoding='utf-8')
+        with client.pull(f"{self.prefix}/test", encoding=None) as infile:
+            received_data = infile.read()
+        self.assertEqual(received_data, b'\x00\x01')
+
+    def test_push_bytesio_ignore_encoding(self):
+        # push() encoding param should be ignored if source is binary stream
+        client = self.client
+        client.push(f"{self.prefix}/test", io.BytesIO(b'\x00\x01'), encoding='utf-8')
+        with client.pull(f"{self.prefix}/test", encoding=None) as infile:
+            received_data = infile.read()
+        self.assertEqual(received_data, b'\x00\x01')
+
     def test_push_and_pull_larger_file(self):
         # Intent: to ensure things work appropriately with larger files.
         # Larger files may be sent/received in multiple chunks; this should help for
