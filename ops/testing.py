@@ -19,7 +19,6 @@ import dataclasses
 import datetime
 import fnmatch
 import inspect
-import io
 import ipaddress
 import os
 import pathlib
