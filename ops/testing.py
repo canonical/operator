@@ -2594,7 +2594,7 @@ class _TestingPebbleClient:
                 file_path.write_bytes(source)
             else:
                 # If source is binary, open file in binary mode and ignore encoding param
-                is_binary = isinstance(source, (io.RawIOBase, io.BufferedIOBase))
+                is_binary = isinstance(source.read(0), bytes)
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
                 with file_path.open(open_mode, encoding=open_encoding) as f:
