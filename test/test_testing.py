@@ -39,7 +39,7 @@ import ops.testing
 from ops import pebble
 from ops.model import _ModelBackend
 from ops.pebble import FileType
-from ops.testing import _TestingPebbleClient
+from ops.testing import ExecResult, _TestingPebbleClient
 
 is_linux = platform.system() == 'Linux'
 
@@ -4841,3 +4841,254 @@ class TestPorts(unittest.TestCase):
             unit.open_port('tcp', 0)  # port out of range
         with self.assertRaises(ops.ModelError):
             unit.open_port('tcp', 65536)  # port out of range
+
+
+class TestHandleExec(unittest.TestCase):
+    def setUp(self) -> None:
+        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test
+            containers:
+                test-container:
+                    mounts:
+                        - storage: test-storage
+                          location: /mounts/foo
+            storage:
+                test-storage:
+                    type: filesystem
+            ''')
+        self.harness.begin()
+        self.harness.set_can_connect("test-container", True)
+        self.root = self.harness.get_filesystem_root("test-container")
+        self.container = self.harness.charm.unit.get_container("test-container")
+
+    def tearDown(self) -> None:
+        self.harness.cleanup()
+
+    def test_register_handler(self):
+        self.harness.handle_exec(self.container, ["foo"], result="foo")
+        self.harness.handle_exec(self.container, ["foo", "bar", "foobar"], result="foobar2")
+        self.harness.handle_exec(self.container, ["foo", "bar"], result="foobar")
+
+        stdout, _ = self.container.exec(["foo", "bar", "foobar", "--help"]).wait_output()
+        self.assertEqual(stdout, "foobar2")
+
+        stdout, _ = self.container.exec(["foo", "bar", "--help"]).wait_output()
+        self.assertEqual(stdout, "foobar")
+
+        stdout, _ = self.container.exec(["foo", "bar"]).wait_output()
+        self.assertEqual(stdout, "foobar")
+
+        stdout, _ = self.container.exec(["foo", "--help"]).wait_output()
+        self.assertEqual(stdout, "foo")
+
+    def test_re_register_handler(self):
+        self.harness.handle_exec(self.container, ["foo", "bar"], result="foobar")
+        self.harness.handle_exec(self.container, ["foo"], result="foo")
+
+        stdout, _ = self.container.exec(["foo", "bar"]).wait_output()
+        self.assertEqual(stdout, "foobar")
+
+        self.harness.handle_exec(self.container, ["foo", "bar"], result="hello")
+        stdout, _ = self.container.exec(["foo", "bar"]).wait_output()
+        self.assertEqual(stdout, "hello")
+
+        self.harness.handle_exec(self.container.name, ["foo"], result="hello2")
+        stdout, _ = self.container.exec(["foo"]).wait_output()
+        self.assertEqual(stdout, "hello2")
+
+        with self.assertRaises(pebble.APIError):
+            self.container.exec(["abc"]).wait()
+
+    def test_register_match_all_prefix(self):
+        self.harness.handle_exec(self.container, [], result="hello")
+
+        stdout, _ = self.container.exec(["foo", "bar"]).wait_output()
+        self.assertEqual(stdout, "hello")
+
+        stdout, _ = self.container.exec(["ls"]).wait_output()
+        self.assertEqual(stdout, "hello")
+
+    def test_register_with_result(self):
+        self.harness.handle_exec(self.container, ["foo"], result=10)
+
+        with self.assertRaises(pebble.ExecError) as exc:
+            self.container.exec(["foo"]).wait()
+        self.assertEqual(exc.exception.exit_code, 10)
+
+        self.harness.handle_exec(self.container, ["foo"], result="hello")
+        stdout, stderr = self.container.exec(["foo"]).wait_output()
+        self.assertEqual(stdout, "hello")
+        self.assertEqual(stderr, "")
+        with self.assertRaises(ValueError):
+            self.container.exec(["foo"], encoding=None).wait_output()
+
+        self.harness.handle_exec(self.container, ["foo"], result=b"hello2")
+        stdout, stderr = self.container.exec(["foo"], encoding=None).wait_output()
+        self.assertEqual(stdout, b"hello2")
+        self.assertEqual(stderr, b"")
+        stdout, stderr = self.container.exec(["foo"]).wait_output()
+        self.assertEqual(stdout, "hello2")
+        self.assertEqual(stderr, "")
+
+    def test_register_with_handler(self):
+        args_history = []
+        return_value = 0
+
+        def handler(args):
+            args_history.append(args)
+            return return_value
+
+        self.harness.handle_exec(self.container, ["foo"], handler=handler)
+
+        self.container.exec(["foo", "bar"]).wait()
+        self.assertEqual(len(args_history), 1)
+        self.assertEqual(args_history[-1].command, ["foo", "bar"])
+
+        return_value = 1
+        with self.assertRaises(pebble.ExecError):
+            self.container.exec(["foo", "bar"]).wait()
+
+        return_value = ExecResult(stdout="hello", stderr="error")
+        stdout, stderr = self.container.exec(["foo"]).wait_output()
+        self.assertEqual(stdout, "hello")
+        self.assertEqual(stderr, "error")
+        self.assertEqual(len(args_history), 3)
+
+        self.container.exec(["foo"], environment={"bar": "foobar"}).wait_output()
+        self.assertDictEqual(args_history[-1].environment, {"bar": "foobar"})
+
+        return_value = b"hello"
+        stdout, _ = self.container.exec(["foo"], encoding=None).wait_output()
+        self.assertIsNone(args_history[-1].encoding)
+        self.assertEqual(stdout, b"hello")
+
+        self.container.exec(["foo"], working_dir="/test").wait_output()
+        self.assertEqual(args_history[-1].working_dir, "/test")
+
+        self.container.exec(["foo"], user="foo", user_id=1, group="bar", group_id=2).wait()
+        self.assertEqual(args_history[-1].user, "foo")
+        self.assertEqual(args_history[-1].user_id, 1)
+        self.assertEqual(args_history[-1].group, "bar")
+        self.assertEqual(args_history[-1].group_id, 2)
+
+    def test_exec_timeout(self):
+        def handler(_):
+            raise TimeoutError
+
+        self.harness.handle_exec(self.container, [], handler=handler)
+        with self.assertRaises(TimeoutError):
+            self.container.exec(["ls"], timeout=1).wait()
+        with self.assertRaises(RuntimeError):
+            self.container.exec(["ls"]).wait()
+
+    def test_combined_error(self):
+        return_value = ExecResult(stdout="foobar")
+        self.harness.handle_exec(self.container, [], handler=lambda _: return_value)
+        stdout, stderr = self.container.exec(["ls"], combine_stderr=True).wait_output()
+        self.assertEqual(stdout, "foobar")
+        self.assertEqual(stderr, "")
+
+        return_value = ExecResult(stdout="foobar", stderr="error")
+        with self.assertRaises(ValueError):
+            self.container.exec(["ls"], combine_stderr=True).wait_output()
+
+    def test_exec_stdin(self):
+        args_history = []
+
+        def handler(args):
+            args_history.append(args)
+            return 0
+
+        self.harness.handle_exec(self.container, [], handler=handler)
+        proc = self.container.exec(["ls"], stdin="test")
+        self.assertIsNone(proc.stdin)
+        self.assertEqual(args_history[-1].stdin, "test")
+
+        proc = self.container.exec(["ls"])
+        self.assertIsNotNone(proc.stdin)
+        self.assertIsNone(args_history[-1].stdin)
+
+    def test_exec_stdout_stderr(self):
+        self.harness.handle_exec(
+            self.container, [], result=ExecResult(
+                stdout="output", stderr="error"))
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        proc = self.container.exec(["ls"], stderr=stderr, stdout=stdout)
+        self.assertIsNone(proc.stdout)
+        self.assertIsNone(proc.stderr)
+        proc.wait()
+        self.assertEqual(stdout.getvalue(), "output")
+        self.assertEqual(stderr.getvalue(), "error")
+
+        proc = self.container.exec(["ls"])
+        self.assertIsNotNone(proc.stdout)
+        self.assertIsNotNone(proc.stderr)
+        proc.wait()
+        self.assertEqual(proc.stdout.read(), "output")
+        self.assertEqual(proc.stderr.read(), "error")
+
+        self.harness.handle_exec(
+            self.container, [], result=ExecResult(
+                stdout=b"output", stderr=b"error"))
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        proc = self.container.exec(["ls"], stderr=stderr, stdout=stdout)
+        self.assertEqual(stdout.getvalue(), "output")
+        self.assertEqual(stderr.getvalue(), "error")
+        proc = self.container.exec(["ls"])
+        self.assertEqual(proc.stdout.read(), "output")
+        self.assertEqual(proc.stderr.read(), "error")
+
+        stdout = io.BytesIO()
+        stderr = io.BytesIO()
+        proc = self.container.exec(["ls"], stderr=stderr, stdout=stdout, encoding=None)
+        self.assertEqual(stdout.getvalue(), b"output")
+        self.assertEqual(stderr.getvalue(), b"error")
+        proc = self.container.exec(["ls"], encoding=None)
+        self.assertEqual(proc.stdout.read(), b"output")
+        self.assertEqual(proc.stderr.read(), b"error")
+
+    def test_exec_service_context(self):
+        service = {
+            "command": "test",
+            "working-dir": "/tmp",
+            "user": "foo",
+            "user-id": 1,
+            "group": "bar",
+            "group-id": 2,
+            "environment": {"foo": "bar", "foobar": "barfoo"}
+        }
+        self.container.add_layer(label="test", layer={
+            "summary": "", "description": "", "services": {"test": service}
+        })
+        args_history = []
+
+        def handler(args):
+            args_history.append(args)
+            return 0
+        os.environ["JUJU_VERSION"] = "3.2.1"
+        self.harness.handle_exec(self.container, ["ls"], handler=handler)
+
+        self.container.exec(["ls"], service_context="test").wait()
+        self.assertEqual(args_history[-1].working_dir, "/tmp")
+        self.assertEqual(args_history[-1].user, "foo")
+        self.assertEqual(args_history[-1].user_id, 1)
+        self.assertEqual(args_history[-1].group, "bar")
+        self.assertEqual(args_history[-1].group_id, 2)
+        self.assertDictEqual(args_history[-1].environment, {"foo": "bar", "foobar": "barfoo"})
+
+        self.container.exec(["ls"],
+                            service_context="test",
+                            working_dir="/test",
+                            user="test",
+                            user_id=3,
+                            group="test_group",
+                            group_id=4,
+                            environment={"foo": "hello"}).wait()
+        self.assertEqual(args_history[-1].working_dir, "/test")
+        self.assertEqual(args_history[-1].user, "test")
+        self.assertEqual(args_history[-1].user_id, 3)
+        self.assertEqual(args_history[-1].group, "test_group")
+        self.assertEqual(args_history[-1].group_id, 4)
+        self.assertDictEqual(args_history[-1].environment, {"foo": "hello", "foobar": "barfoo"})
