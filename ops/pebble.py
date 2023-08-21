@@ -1322,7 +1322,7 @@ class ExecProcess(Generic[AnyStr]):
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
-    def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
+    def wait_output(self) -> Tuple[Optional[AnyStr], Optional[AnyStr]]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
@@ -1339,9 +1339,10 @@ class ExecProcess(Generic[AnyStr]):
         else:
             out = io.BytesIO()
             err = io.BytesIO() if self.stderr is not None else None
-
-        t = _start_thread(shutil.copyfileobj, self.stdout, out)
-        self._threads.append(t)
+        # self.stdout can be None, when exec is invoked with the stdout argument
+        if self.stdout is not None:
+            t = _start_thread(shutil.copyfileobj, self.stdout, out)
+            self._threads.append(t)
 
         if self.stderr is not None:
             t = _start_thread(shutil.copyfileobj, self.stderr, err)
@@ -1349,7 +1350,7 @@ class ExecProcess(Generic[AnyStr]):
 
         exit_code: int = self._wait()
 
-        out_value = typing.cast(AnyStr, out.getvalue())
+        out_value = typing.cast(AnyStr, out.getvalue()) if out is not None else None
         err_value = typing.cast(AnyStr, err.getvalue()) if err is not None else None
         if exit_code != 0:
             raise ExecError[AnyStr](self._command, exit_code, out_value, err_value)

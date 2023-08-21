@@ -112,6 +112,11 @@ CharmType = TypeVar('CharmType', bound=charm.CharmBase)
 
 @dataclasses.dataclass
 class ExecArgs:
+    """Represent arguments captured from the :meth:`ops.model.Container.exec` method call.
+
+    These arguments will be passed to the :class:`ops.testing.ExecHandler` handler function.
+    See :meth:`ops.model.Container.exec` for documentation of properties.
+    """
     command: List[str]
     environment: Dict[str, str]
     working_dir: Optional[str]
@@ -127,9 +132,14 @@ class ExecArgs:
 
 @dataclasses.dataclass
 class ExecResult:
+    """Represents the result of a simulated process execution.
+
+    This class is typically used to return the output and exit code from the
+    :class:`ops.testing.ExecHandler` handler function.
+    """
     exit_code: int = 0
-    stdout: Union[str, bytes] = ""
-    stderr: Union[str, bytes] = ""
+    stdout: Union[str, bytes] = b""
+    stderr: Union[str, bytes] = b""
 
 
 ExecHandler = Callable[[ExecArgs], Union[int, str, ExecResult]]
@@ -1578,20 +1588,80 @@ class Harness(Generic[CharmType]):
                     command_prefix: List[str],
                     *,
                     handler: Optional[ExecHandler] = None,
-                    result: Union[int, str, bytes, ExecResult] = None):
+                    result: Optional[Union[int, str, bytes, ExecResult]] = None):
+        """Register a handler to simulate the pebble command execution.
+
+        This allows a test harness to simulate the behavior of running commands in a container.
+        When :meth:`ops.model.Container.exec` is triggered, the registered handler is used to
+        simulate the process execution.
+
+        You can provide:
+
+        - A ``handler``: A function accepting :class:`ops.testing.ExecArgs` and returning
+          :class:`ops.testing.ExecResult` as the simulated process outcome. For simpler cases, the
+          handler can return a string (or byte string)
+          (equivalent to ``ExecResult(exit_code=0, stdout=str_or_bytes)``) or an integer
+          (equivalent to ``ExecResult(exit_code=return_value)``).
+
+        - A ``result``: For simulations don't need to inspect the execution argument, the
+          registration can be further simplified using the ``result`` argument. This is equivalent
+          to setting ``handler=lambda _: result``.
+
+        In cases of multiple command line argument prefix matches for a single command, the
+        longest match takes precedence. The execution handler registration can be updated by
+        re-registering with the same command prefix.
+
+        The execution handler receives the timeout value in ExecArgs. If needed, it can raise a
+        TimeoutError to inform the harness of a timeout occurrence.
+
+        If :meth:`ops.model.Container.exec` is called with ``combine_stderr=True``, the execution
+        handler should, if required, weave the simulated standard error into the standard output.
+        The harness checks the result and will raise an exception if stderr is non-empty.
+
+        Args:
+            container: The specified container or its name.
+            command_prefix: The command prefixes to register against.
+            handler: A handler function that simulates the command's execution.
+            result: A simplified form to specify the command's simulated result.
+
+        Example usage::
+            # handle every command
+            harness.handle_exec('container', [], result=0)
+
+            # simple example that just produces output (exit code 0)
+            harness.handle_exec('webserver', ['ls', '/etc'], result='passwd\nprofile\n')
+
+            # slightly more complex (use stdin)
+            harness.handle_exec('c1', ['sha1sum'],
+                                handler=lambda args: hashlib.sha1(args.stdin).hexdigest())
+
+            # more complex example using args.command
+            def docker_handler(args: testing.ExecArgs) -> testing.ExecResult:
+                match args.command:
+                    case ['docker', 'run', image]:
+                        return testing.ExecResult(stdout=f'running {image}')
+                    case ['docker', 'ps']:
+                        return testing.ExecResult(stdout='CONTAINER ID   IMAGE ...\n')
+                    case _:
+                        return testing.ExecResult(exit_code=1, stderr='unknown command')
+
+            harness.handle_exec('database', ['docker'], handler=docker_handler)
+
+            # handle timeout
+            def handle_timeout(exec_args: testing.ExecArgs) -> int:
+                if exec_args.timeout is not None and exec_args.timeout < 10:
+                    raise TimeoutError
+                return 0
+
+            harness.handle_exec('database', ['foo'], handler=handle_timeout)
+        """
         if (handler is None and result is None) or (handler is not None and result is not None):
             raise ValueError("Either handler or result must be provided, but not both.")
-        if result is not None:
-            def handler(_):
-                return result
-        prefix = tuple(command_prefix)
         container_name = container if isinstance(container, str) else container.name
-        container_exec_handlers = self._backend._pebble_clients[container_name]._exec_handlers
-        for idx, registered_handler in enumerate(container_exec_handlers):
-            if prefix == registered_handler[0]:
-                container_exec_handlers[idx] = (prefix, handler)
-                return
-        bisect.insort(container_exec_handlers, (prefix, handler), key=lambda pair: len(pair[0]))
+        self._backend._pebble_clients[container_name]._handle_exec(
+            command_prefix=command_prefix,
+            handler=(lambda _: result) if handler is None else handler  # type: ignore
+        )
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
@@ -2384,7 +2454,7 @@ class _TestingExecProcess:
         self._timeout = timeout
         self._is_timeout = is_timeout
         if exit_code is None and not is_timeout:
-            raise ValueError("exit code can't be None for non-timeout process")
+            raise ValueError("when is_timeout is False, exit_code must not be None")
         self._exit_code = exit_code
         self.stdin = stdin
         self.stdout = stdout
@@ -2394,16 +2464,19 @@ class _TestingExecProcess:
         if self._is_timeout:
             raise TimeoutError(f'timed out waiting for change 123 ({self._timeout} seconds)')
         if self._exit_code != 0:
-            raise pebble.ExecError(self._command, self._exit_code, None, None)
+            raise pebble.ExecError(self._command, cast(int, self._exit_code), None, None)
 
-    def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
+    def wait_output(self) -> Tuple[Optional[AnyStr], Optional[AnyStr]]:
         if self._is_timeout:
             raise TimeoutError(f'timed out waiting for change 123 ({self._timeout} seconds)')
-        out_value = self.stdout.read()
+        out_value = self.stdout.read() if self.stdout is not None else None
         err_value = self.stderr.read() if self.stderr is not None else None
         if self._exit_code != 0:
-            raise pebble.ExecError[AnyStr](self._command, self._exit_code, out_value, err_value)
-        return out_value, err_value
+            raise pebble.ExecError[AnyStr](self._command,
+                                           cast(int, self._exit_code),
+                                           cast(Union[AnyStr, None], out_value),
+                                           cast(Union[AnyStr, None], err_value))
+        return cast(Union[AnyStr, None], out_value), cast(Union[AnyStr, None], err_value)
 
     def send_signal(self, sig: Union[int, str]):
         # the process is always terminated when ExecProcess is return in the simulation.
@@ -2426,7 +2499,17 @@ class _TestingPebbleClient:
         self._service_status: Dict[str, pebble.ServiceStatus] = {}
         self._root = container_root
         self._backend = backend
-        self._exec_handlers: List[Tuple[int, Tuple[str, ...], ExecHandler]] = []
+        self._exec_handlers: List[Tuple[Tuple[str, ...], ExecHandler]] = []
+
+    def _handle_exec(self, command_prefix: List[str], handler: ExecHandler):
+        prefix = tuple(command_prefix)
+        for idx, registered_handler in enumerate(self._exec_handlers):
+            if prefix == registered_handler[0]:
+                self._exec_handlers[idx] = (prefix, handler)
+                return
+        bisect.insort(self._exec_handlers,
+                      (prefix, handler),
+                      key=lambda pair: len(pair[0]))  # type: ignore
 
     def _check_connection(self):
         if not self._backend._can_connect(self):
@@ -2794,8 +2877,9 @@ class _TestingPebbleClient:
                 return handler
         return None
 
-    def _transform_exec_handler_output(
-            self, data: Union[str, bytes], encoding: Optional[str]) -> Union[TextIO, BytesIO]:
+    def _transform_exec_handler_output(self,
+                                       data: Union[str, bytes],
+                                       encoding: Optional[str]) -> Union[io.BytesIO, io.StringIO]:
         if isinstance(data, bytes):
             if encoding is None:
                 return io.BytesIO(data)
@@ -2828,11 +2912,11 @@ class _TestingPebbleClient:
         self._check_connection()
         handler = self._find_exec_handler(command)
         if handler is None:
+            message = "execution handler not found, please register one using Harness.handle_exec"
             raise pebble.APIError(
-                body={},
-                code=500,
-                status='Internal Server Error',
-                message="exec handler not found, register one use Harness.handle_exec")
+                body={}, code=500, status='Internal Server Error', message=message
+            )
+        environment = {} if environment is None else environment
         if service_context is not None:
             plan = self.get_plan()
             if service_context not in plan.services:
@@ -2843,7 +2927,6 @@ class _TestingPebbleClient:
                     body=body, code=500, status='Internal Server Error', message=message
                 )
             service = plan.services[service_context]
-            environment = {} if environment is None else environment
             environment = {**service.environment, **environment}
             working_dir = service.working_dir if working_dir is None else working_dir
             user = service.user if user is None else user
@@ -2852,7 +2935,7 @@ class _TestingPebbleClient:
             group_id = service.group_id if group_id is None else group_id
 
         if hasattr(stdin, "read"):
-            stdin = stdin.read()
+            stdin = stdin.read()  # type: ignore
 
         exec_args = ExecArgs(
             command=command,
@@ -2863,7 +2946,7 @@ class _TestingPebbleClient:
             user=user,
             group_id=group_id,
             group=group,
-            stdin=stdin,
+            stdin=cast(Union[str, bytes, None], stdin),
             encoding=encoding,
             combine_stderr=combine_stderr
         )
@@ -2884,10 +2967,12 @@ class _TestingPebbleClient:
                                                    stdout=proc_stdout,
                                                    stderr=proc_stderr,
                                                    is_timeout=True)
-                return cast(pebble.ExecProcess, exec_process)
+                return cast(pebble.ExecProcess[Any], exec_process)
             else:
-                raise RuntimeError("TimeoutError was raised from the exec handler "
-                                   "while timeout is not provided in exec arguments")
+                raise RuntimeError(
+                    "a TimeoutError occurred in the execution handler, "
+                    "but no timeout value was provided in the execution arguments."
+                )
         if isinstance(result, int):
             exit_code = result
         elif isinstance(result, str):
@@ -2899,16 +2984,16 @@ class _TestingPebbleClient:
             proc_stdout = self._transform_exec_handler_output(result.stdout, encoding)
             proc_stderr = self._transform_exec_handler_output(result.stderr, encoding)
         else:
-            raise TypeError(f"exec handler returns unknown type {type(result)!r}")
+            raise TypeError(f"execution handler returned an unexpected type: {type(result)!r}.")
         if combine_stderr and proc_stderr.getvalue():
-            raise ValueError("exec handler returns non-empty stderr with combine_stderr turned on")
+            raise ValueError("execution handler returned a non-empty stderr "
+                             "even though combine_stderr is enabled.")
         if stdout is not None:
-            shutil.copyfileobj(proc_stdout, stdout)
+            shutil.copyfileobj(cast(io.IOBase, proc_stdout), cast(io.IOBase, stdout))
             proc_stdout = None
         if stderr is not None:
-            shutil.copyfileobj(proc_stderr, stderr)
+            shutil.copyfileobj(cast(io.IOBase, proc_stderr), cast(io.IOBase, stderr))
             proc_stderr = None
-
         exec_process = _TestingExecProcess(command=command,
                                            timeout=timeout,
                                            exit_code=exit_code,
@@ -2916,7 +3001,7 @@ class _TestingPebbleClient:
                                            stdout=proc_stdout,
                                            stderr=proc_stderr,
                                            is_timeout=False)
-        return cast(pebble.ExecProcess, exec_process)
+        return cast(pebble.ExecProcess[Any], exec_process)
 
     def send_signal(self, sig: Union[int, str], service_names: Iterable[str]):
         if not service_names:
