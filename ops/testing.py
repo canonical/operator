@@ -1625,11 +1625,12 @@ class Harness(Generic[CharmType]):
             result: A simplified form to specify the command's simulated result.
 
         Example usage::
+
             # handle every command
             harness.handle_exec('container', [], result=0)
 
             # simple example that just produces output (exit code 0)
-            harness.handle_exec('webserver', ['ls', '/etc'], result='passwd\nprofile\n')
+            harness.handle_exec('webserver', ['ls', '/etc'], result='passwdprofile')
 
             # slightly more complex (use stdin)
             harness.handle_exec('c1', ['sha1sum'],
@@ -1641,7 +1642,7 @@ class Harness(Generic[CharmType]):
                     case ['docker', 'run', image]:
                         return testing.ExecResult(stdout=f'running {image}')
                     case ['docker', 'ps']:
-                        return testing.ExecResult(stdout='CONTAINER ID   IMAGE ...\n')
+                        return testing.ExecResult(stdout='CONTAINER ID   IMAGE ...')
                     case _:
                         return testing.ExecResult(exit_code=1, stderr='unknown command')
 
