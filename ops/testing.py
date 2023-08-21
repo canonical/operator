@@ -15,7 +15,6 @@
 """Infrastructure to build unit tests for charms using the ops library."""
 
 
-import bisect
 import dataclasses
 import datetime
 import fnmatch
@@ -2508,9 +2507,8 @@ class _TestingPebbleClient:
             if prefix == registered_handler[0]:
                 self._exec_handlers[idx] = (prefix, handler)
                 return
-        bisect.insort(self._exec_handlers,
-                      (prefix, handler),
-                      key=lambda pair: len(pair[0]))  # type: ignore
+        self._exec_handlers.append((prefix, handler))
+        self._exec_handlers.sort(key=lambda pair: len(pair[0]), reverse=True)
 
     def _check_connection(self):
         if not self._backend._can_connect(self):
@@ -2873,7 +2871,7 @@ class _TestingPebbleClient:
             file_path.unlink()
 
     def _find_exec_handler(self, command: List[str]) -> Optional[ExecHandler]:
-        for command_prefix, handler in reversed(self._exec_handlers):
+        for command_prefix, handler in self._exec_handlers:
             if tuple(command[:len(command_prefix)]) == command_prefix:
                 return handler
         return None
