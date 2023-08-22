@@ -2503,12 +2503,19 @@ class _TestingPebbleClient:
 
     def _handle_exec(self, command_prefix: List[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
-        for idx, registered_handler in enumerate(self._exec_handlers):
+        inserted = False
+        for idx in range(len(self._exec_handlers)):
+            if inserted:
+                idx = idx + 1
+            registered_handler = self._exec_handlers[idx]
             if prefix == registered_handler[0]:
                 self._exec_handlers[idx] = (prefix, handler)
                 return
-        self._exec_handlers.append((prefix, handler))
-        self._exec_handlers.sort(key=lambda pair: len(pair[0]), reverse=True)
+            if not inserted and len(prefix) > len(registered_handler[0]):
+                self._exec_handlers.insert(idx, (prefix, handler))
+                inserted = True
+        if not inserted:
+            self._exec_handlers.append((prefix, handler))
 
     def _check_connection(self):
         if not self._backend._can_connect(self):
@@ -2871,6 +2878,7 @@ class _TestingPebbleClient:
             file_path.unlink()
 
     def _find_exec_handler(self, command: List[str]) -> Optional[ExecHandler]:
+        print(self._exec_handlers)
         for command_prefix, handler in self._exec_handlers:
             if tuple(command[:len(command_prefix)]) == command_prefix:
                 return handler

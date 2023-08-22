@@ -19,6 +19,7 @@ import importlib
 import inspect
 import io
 import ipaddress
+import itertools
 import os
 import pathlib
 import platform
@@ -5092,3 +5093,19 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(args_history[-1].group, "test_group")
         self.assertEqual(args_history[-1].group_id, 4)
         self.assertDictEqual(args_history[-1].environment, {"foo": "hello", "foobar": "barfoo"})
+
+    def test_registration_order(self):
+        for n in range(7):
+            pebble = self.harness._backend._pebble_clients[self.container.name]
+            for prefix_lengths in itertools.product(range(1, n + 1), repeat=n):
+                pebble._exec_handlers = []
+                for idx, prefix_len in enumerate(prefix_lengths):
+                    self.harness.handle_exec(self.container, [str(idx)] * prefix_len, result=0)
+                handlers = pebble._exec_handlers
+                self.assertTrue(all(
+                    len(handlers[i][0]) >= len(handlers[i + 1][0])
+                    for i in range(len(handlers) - 1)))
+                self.assertEqual(len(handlers), len(prefix_lengths))
+                for idx, handler in enumerate(handlers):
+                    self.harness.handle_exec(self.container, handler[0], result=idx)
+                    self.assertEqual(handlers[idx][1](None), idx)
