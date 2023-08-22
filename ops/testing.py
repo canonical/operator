@@ -111,10 +111,10 @@ CharmType = TypeVar('CharmType', bound=charm.CharmBase)
 
 @dataclasses.dataclass
 class ExecArgs:
-    """Represent arguments captured from the :meth:`ops.model.Container.exec` method call.
+    """Represent arguments captured from the :meth:`ops.Container.exec` method call.
 
-    These arguments will be passed to the :class:`ops.testing.ExecHandler` handler function.
-    See :meth:`ops.model.Container.exec` for documentation of properties.
+    These arguments will be passed to the ``ops.testing.ExecHandler`` handler function.
+    See :meth:`ops.Container.exec` for documentation of properties.
     """
     command: List[str]
     environment: Dict[str, str]
@@ -134,7 +134,7 @@ class ExecResult:
     """Represents the result of a simulated process execution.
 
     This class is typically used to return the output and exit code from the
-    :class:`ops.testing.ExecHandler` handler function.
+    ``ops.testing.ExecHandler`` handler function.
     """
     exit_code: int = 0
     stdout: Union[str, bytes] = b""
@@ -1591,7 +1591,7 @@ class Harness(Generic[CharmType]):
         """Register a handler to simulate the pebble command execution.
 
         This allows a test harness to simulate the behavior of running commands in a container.
-        When :meth:`ops.model.Container.exec` is triggered, the registered handler is used to
+        When :meth:`ops.Container.exec` is triggered, the registered handler is used to
         simulate the process execution.
 
         You can provide:
@@ -1613,7 +1613,7 @@ class Harness(Generic[CharmType]):
         The execution handler receives the timeout value in ExecArgs. If needed, it can raise a
         TimeoutError to inform the harness of a timeout occurrence.
 
-        If :meth:`ops.model.Container.exec` is called with ``combine_stderr=True``, the execution
+        If :meth:`ops.Container.exec` is called with ``combine_stderr=True``, the execution
         handler should, if required, weave the simulated standard error into the standard output.
         The harness checks the result and will raise an exception if stderr is non-empty.
 
@@ -2878,7 +2878,6 @@ class _TestingPebbleClient:
             file_path.unlink()
 
     def _find_exec_handler(self, command: List[str]) -> Optional[ExecHandler]:
-        print(self._exec_handlers)
         for command_prefix, handler in self._exec_handlers:
             if tuple(command[:len(command_prefix)]) == command_prefix:
                 return handler
