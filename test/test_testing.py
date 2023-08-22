@@ -108,6 +108,38 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_get(rel_id, 'test-app', is_app=True), {})
         self.assertEqual(backend.relation_get(rel_id, 'test-app/0', is_app=False), {})
 
+    def test_add_relation_with_app_data(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        rel_id = harness.add_relation('db', 'postgresql', app_data={'x': '1', 'y': '2'})
+        self.assertIsInstance(rel_id, int)
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql'), {'x': '1', 'y': '2'})
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql/0'), {})
+
+    def test_add_relation_with_unit_data(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        rel_id = harness.add_relation('db', 'postgresql', unit_data={'a': '1', 'b': '2'})
+        self.assertIsInstance(rel_id, int)
+        backend = harness._backend
+        self.assertEqual(backend.relation_ids('db'), [rel_id])
+        self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql'), {})
+        self.assertEqual(harness.get_relation_data(rel_id, 'postgresql/0'), {'a': '1', 'b': '2'})
+
     def test_can_connect_default(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test-app

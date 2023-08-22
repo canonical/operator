@@ -56,14 +56,15 @@ a full deployment. Our [API documentation](https://ops.readthedocs.io/en/latest/
 has the details, including this example:
 
 ```python
+# Initial setup
 harness = Harness(MyCharm)
-# Do initial setup here
-relation_id = harness.add_relation('db', 'postgresql')
+self.addCleanup(harness.cleanup)  # always clean up after ourselves
+
 # Now instantiate the charm to see events as the model changes
 harness.begin()
-harness.add_relation_unit(relation_id, 'postgresql/0')
-harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
-# Check that charm has properly handled the relation_joined event for postgresql/0
+harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
+
+# Check that charm has properly handled relation_joined or relation_changed
 self.assertEqual(harness.charm. ...)
 ```
 
