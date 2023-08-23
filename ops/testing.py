@@ -1622,7 +1622,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             container: The specified container or its name.
-            command_prefix: The command prefixes to register against.
+            command_prefix: The command prefix to register against.
             handler: A handler function that simulates the command's execution.
             result: A simplified form to specify the command's simulated result.
 
