@@ -1628,7 +1628,7 @@ class Harness(Generic[CharmType]):
 
         Example usage::
 
-            # handle every command
+            # produce no output and return 0 for every command
             harness.handle_exec('container', [], result=0)
 
             # simple example that just produces output (exit code 0)
