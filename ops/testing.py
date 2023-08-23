@@ -1603,7 +1603,9 @@ class Harness(Generic[CharmType]):
           (equivalent to ``ExecResult(exit_code=return_value)``).
 
         - A ``result``: For simulations that don't need to inspect the ``exec`` arguments, the
-          registration can be further simplified using the ``result`` argument. This is equivalent
+          output and exit code can be returned directly. Setting ``result`` to str or bytes means
+          use that string as stdout (with exit code 0), or setting ``result`` to int means return
+          that exit code (and no stdout).
           to setting ``handler=lambda _: result``.
 
         In cases of multiple command line argument prefix matches for a single command, the
