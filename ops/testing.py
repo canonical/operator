@@ -1602,7 +1602,7 @@ class Harness(Generic[CharmType]):
           (equivalent to ``ExecResult(exit_code=0, stdout=str_or_bytes)``) or an integer
           (equivalent to ``ExecResult(exit_code=return_value)``).
 
-        - A ``result``: For simulations don't need to inspect the execution argument, the
+        - A ``result``: For simulations that don't need to inspect the ``exec`` arguments, the
           registration can be further simplified using the ``result`` argument. This is equivalent
           to setting ``handler=lambda _: result``.
 
