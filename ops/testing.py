@@ -1608,7 +1608,8 @@ class Harness(Generic[CharmType]):
           that exit code (and no stdout).
           to setting ``handler=lambda _: result``.
 
-        In cases of multiple command line argument prefix matches for a single command, the
+        If ``handle_exec`` is called more than once with overlapping command prefixes,
+        the longest match takes precedence.
         longest match takes precedence. The execution handler registration can be updated by
         re-registering with the same command prefix.
 
