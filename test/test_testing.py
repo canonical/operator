@@ -4850,12 +4850,6 @@ class TestHandleExec(unittest.TestCase):
             name: test
             containers:
                 test-container:
-                    mounts:
-                        - storage: test-storage
-                          location: /mounts/foo
-            storage:
-                test-storage:
-                    type: filesystem
             ''')
         self.harness.begin()
         self.harness.set_can_connect("test-container", True)
@@ -4933,7 +4927,7 @@ class TestHandleExec(unittest.TestCase):
 
     def test_register_with_handler(self):
         args_history = []
-        return_value = 0
+        return_value = None
 
         def handler(args):
             args_history.append(args)
@@ -4945,7 +4939,7 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(len(args_history), 1)
         self.assertEqual(args_history[-1].command, ["foo", "bar"])
 
-        return_value = 1
+        return_value = ExecResult(exit_code=1)
         with self.assertRaises(pebble.ExecError):
             self.container.exec(["foo", "bar"]).wait()
 
@@ -4958,7 +4952,7 @@ class TestHandleExec(unittest.TestCase):
         self.container.exec(["foo"], environment={"bar": "foobar"}).wait_output()
         self.assertDictEqual(args_history[-1].environment, {"bar": "foobar"})
 
-        return_value = b"hello"
+        return_value = ExecResult(stdout=b"hello")
         stdout, _ = self.container.exec(["foo"], encoding=None).wait_output()
         self.assertIsNone(args_history[-1].encoding)
         self.assertEqual(stdout, b"hello")
@@ -4998,7 +4992,6 @@ class TestHandleExec(unittest.TestCase):
 
         def handler(args):
             args_history.append(args)
-            return 0
 
         self.harness.handle_exec(self.container, [], handler=handler)
         proc = self.container.exec(["ls"], stdin="test")
@@ -5067,7 +5060,7 @@ class TestHandleExec(unittest.TestCase):
 
         def handler(args):
             args_history.append(args)
-            return 0
+
         os.environ["JUJU_VERSION"] = "3.2.1"
         self.harness.handle_exec(self.container, ["ls"], handler=handler)
 
@@ -5108,4 +5101,4 @@ class TestHandleExec(unittest.TestCase):
                 self.assertEqual(len(handlers), len(prefix_lengths))
                 for idx, handler in enumerate(handlers):
                     self.harness.handle_exec(self.container, handler[0], result=idx)
-                    self.assertEqual(handlers[idx][1](None), idx)
+                    self.assertEqual(handlers[idx][1](None).exit_code, idx)

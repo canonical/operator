@@ -45,6 +45,7 @@ from typing import (
     Literal,
     Mapping,
     Optional,
+    Sequence,
     Set,
     TextIO,
     Tuple,
@@ -141,7 +142,7 @@ class ExecResult:
     stderr: Union[str, bytes] = b""
 
 
-ExecHandler = Callable[[ExecArgs], Union[int, str, ExecResult]]
+ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
 
 
 # noinspection PyProtectedMember
@@ -1584,11 +1585,11 @@ class Harness(Generic[CharmType]):
 
     def handle_exec(self,
                     container: Union[str, Container],
-                    command_prefix: List[str],
+                    command_prefix: Sequence[str],
                     *,
                     handler: Optional[ExecHandler] = None,
                     result: Optional[Union[int, str, bytes, ExecResult]] = None):
-        """Register a handler to simulate the Pebble command execution.
+        r"""Register a handler to simulate the Pebble command execution.
 
         This allows a test harness to simulate the behavior of running commands in a container.
         When :meth:`ops.Container.exec` is triggered, the registered handler is used to
@@ -1635,8 +1636,9 @@ class Harness(Generic[CharmType]):
             harness.handle_exec('webserver', ['ls', '/etc'], result='passwd\nprofile\n')
 
             # slightly more complex (use stdin)
-            harness.handle_exec('c1', ['sha1sum'],
-                                handler=lambda args: ExecResult(stdout=hashlib.sha1(args.stdin).hexdigest()))
+            harness.handle_exec(
+                'c1', ['sha1sum'],
+                handler=lambda args: ExecResult(stdout=hashlib.sha1(args.stdin).hexdigest()))
 
             # more complex example using args.command
             def docker_handler(args: testing.ExecArgs) -> testing.ExecResult:
@@ -1659,8 +1661,12 @@ class Harness(Generic[CharmType]):
             harness.handle_exec('database', ['foo'], handler=handle_timeout)
         """
         if (handler is None and result is None) or (handler is not None and result is not None):
-            raise ValueError("Either handler or result must be provided, but not both.")
+            raise TypeError("Either handler or result must be provided, but not both.")
         container_name = container if isinstance(container, str) else container.name
+        if isinstance(result, int):
+            result = ExecResult(exit_code=result)
+        if isinstance(result, (str, bytes)):
+            result = ExecResult(stdout=result)
         self._backend._pebble_clients[container_name]._handle_exec(
             command_prefix=command_prefix,
             handler=(lambda _: result) if handler is None else handler  # type: ignore
@@ -2465,13 +2471,17 @@ class _TestingExecProcess:
 
     def wait(self):
         if self._is_timeout:
-            raise TimeoutError(f'timed out waiting for change 123 ({self._timeout} seconds)')
+            raise pebble.TimeoutError(
+                f'timed out waiting for change 123 ({self._timeout} seconds)'
+            )
         if self._exit_code != 0:
             raise pebble.ExecError(self._command, cast(int, self._exit_code), None, None)
 
     def wait_output(self) -> Tuple[Optional[AnyStr], Optional[AnyStr]]:
         if self._is_timeout:
-            raise TimeoutError(f'timed out waiting for change 123 ({self._timeout} seconds)')
+            raise pebble.TimeoutError(
+                f'timed out waiting for change 123 ({self._timeout} seconds)'
+            )
         out_value = self.stdout.read() if self.stdout is not None else None
         err_value = self.stderr.read() if self.stderr is not None else None
         if self._exit_code != 0:
@@ -2504,7 +2514,7 @@ class _TestingPebbleClient:
         self._backend = backend
         self._exec_handlers: List[Tuple[Tuple[str, ...], ExecHandler]] = []
 
-    def _handle_exec(self, command_prefix: List[str], handler: ExecHandler):
+    def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
         inserted = False
         for idx in range(len(self._exec_handlers)):
@@ -2896,7 +2906,9 @@ class _TestingPebbleClient:
                 return io.StringIO(data.decode(encoding=encoding))
         else:
             if encoding is None:
-                raise ValueError(f"exec handler must return bytes if encoding is None, not {data.__class__.__name__}")
+                raise ValueError(
+                    f"exec handler must return bytes if encoding is None,"
+                    f"not {data.__class__.__name__}")
             else:
                 return io.StringIO(data)
 
@@ -2982,12 +2994,10 @@ class _TestingPebbleClient:
                     "a TimeoutError occurred in the execution handler, "
                     "but no timeout value was provided in the execution arguments."
                 )
-        if isinstance(result, int):
-            exit_code = result
-        elif isinstance(result, str):
-            proc_stdout = self._transform_exec_handler_output(result, encoding)
-        elif isinstance(result, bytes):
-            proc_stdout = self._transform_exec_handler_output(result, encoding)
+        if result is None:
+            exit_code = 0
+            proc_stdout = self._transform_exec_handler_output(b'', encoding)
+            proc_stderr = self._transform_exec_handler_output(b'', encoding)
         elif isinstance(result, ExecResult):
             exit_code = result.exit_code
             proc_stdout = self._transform_exec_handler_output(result.stdout, encoding)

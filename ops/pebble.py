@@ -1339,10 +1339,8 @@ class ExecProcess(Generic[AnyStr]):
         else:
             out = io.BytesIO()
             err = io.BytesIO() if self.stderr is not None else None
-        # self.stdout can be None, when exec is invoked with the stdout argument
-        if self.stdout is not None:
-            t = _start_thread(shutil.copyfileobj, self.stdout, out)
-            self._threads.append(t)
+        t = _start_thread(shutil.copyfileobj, self.stdout, out)
+        self._threads.append(t)
 
         if self.stderr is not None:
             t = _start_thread(shutil.copyfileobj, self.stderr, err)
