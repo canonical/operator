@@ -1588,7 +1588,7 @@ class Harness(Generic[CharmType]):
                     *,
                     handler: Optional[ExecHandler] = None,
                     result: Optional[Union[int, str, bytes, ExecResult]] = None):
-        """Register a handler to simulate the pebble command execution.
+        """Register a handler to simulate the Pebble command execution.
 
         This allows a test harness to simulate the behavior of running commands in a container.
         When :meth:`ops.Container.exec` is triggered, the registered handler is used to
