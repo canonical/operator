@@ -134,7 +134,7 @@ class ExecResult:
     """Represents the result of a simulated process execution.
 
     This class is typically used to return the output and exit code from the
-    ``ops.testing.ExecHandler`` handler function.
+    :meth:`Harness.handle_exec` result or handler function.
     """
     exit_code: int = 0
     stdout: Union[str, bytes] = b""
