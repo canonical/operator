@@ -1594,7 +1594,7 @@ class Harness(Generic[CharmType]):
         When :meth:`ops.Container.exec` is triggered, the registered handler is used to
         generate stdout and stderr for the simulated execution.
 
-        You can provide:
+        You can provide either a ``handler`` or a ``result``, but not both:
 
         - A ``handler``: A function accepting :class:`ops.testing.ExecArgs` and returning
           :class:`ops.testing.ExecResult` as the simulated process outcome. For simpler cases, the
