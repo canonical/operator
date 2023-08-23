@@ -1592,7 +1592,7 @@ class Harness(Generic[CharmType]):
 
         This allows a test harness to simulate the behavior of running commands in a container.
         When :meth:`ops.Container.exec` is triggered, the registered handler is used to
-        simulate the process execution.
+        generate stdout and stderr for the simulated execution.
 
         You can provide:
 
