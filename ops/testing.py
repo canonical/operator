@@ -113,7 +113,7 @@ CharmType = TypeVar('CharmType', bound=charm.CharmBase)
 class ExecArgs:
     """Represent arguments captured from the :meth:`ops.Container.exec` method call.
 
-    These arguments will be passed to the ``ops.testing.ExecHandler`` handler function.
+    These arguments will be passed to the :meth:`Harness.handle_exec` handler function.
     See :meth:`ops.Container.exec` for documentation of properties.
     """
     command: List[str]
