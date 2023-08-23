@@ -1598,10 +1598,8 @@ class Harness(Generic[CharmType]):
         You can provide either a ``handler`` or a ``result``, but not both:
 
         - A ``handler``: A function accepting :class:`ops.testing.ExecArgs` and returning
-          :class:`ops.testing.ExecResult` as the simulated process outcome. For simpler cases, the
-          handler can return a string (or byte string)
-          (equivalent to ``ExecResult(exit_code=0, stdout=str_or_bytes)``) or an integer
-          (equivalent to ``ExecResult(exit_code=return_value)``).
+          :class:`ops.testing.ExecResult` as the simulated process outcome. For pure side effect
+          cases, the handler can return None (equivalent to ``ExecResult()``).
 
         - A ``result``: For simulations that don't need to inspect the ``exec`` arguments, the
           output and exit code can be returned directly. Setting ``result`` to str or bytes means
