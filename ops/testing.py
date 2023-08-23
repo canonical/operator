@@ -1632,11 +1632,11 @@ class Harness(Generic[CharmType]):
             harness.handle_exec('container', [], result=0)
 
             # simple example that just produces output (exit code 0)
-            harness.handle_exec('webserver', ['ls', '/etc'], result='passwdprofile')
+            harness.handle_exec('webserver', ['ls', '/etc'], result='passwd\nprofile\n')
 
             # slightly more complex (use stdin)
             harness.handle_exec('c1', ['sha1sum'],
-                                handler=lambda args: hashlib.sha1(args.stdin).hexdigest())
+                                handler=lambda args: ExecResult(stdout=hashlib.sha1(args.stdin).hexdigest()))
 
             # more complex example using args.command
             def docker_handler(args: testing.ExecArgs) -> testing.ExecResult:
@@ -2896,7 +2896,7 @@ class _TestingPebbleClient:
                 return io.StringIO(data.decode(encoding=encoding))
         else:
             if encoding is None:
-                raise ValueError("exec handler return str while bytes is required")
+                raise ValueError(f"exec handler must return bytes if encoding is None, not {data.__class__.__name__}")
             else:
                 return io.StringIO(data)
 
