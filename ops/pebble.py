@@ -1569,7 +1569,7 @@ class Client:
         """
         ctype = headers.get_content_type()
         params = headers.get_params() or {}
-        options = dict((key, value) for key, value in params if value)
+        options = {key: value for key, value in params if value}
         if ctype != expected:
             raise ProtocolError(f'expected Content-Type {expected!r}, got {ctype!r}')
         return options
