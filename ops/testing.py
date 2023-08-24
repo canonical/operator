@@ -110,20 +110,49 @@ CharmType = TypeVar('CharmType', bound=charm.CharmBase)
 class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
-    The model that is created is from the viewpoint of the charm that you are testing.
+    The model created is from the viewpoint of the charm that you are testing.
 
-    Example::
+    Below is an example test using :meth:`begin_with_initial_hooks` that ensures
+    the charm responds correctly to config changes::
 
-        # Initial setup
-        harness = Harness(MyCharm)
-        self.addCleanup(harness.cleanup)  # always clean up after ourselves
+        class TestCharm(unittest.TestCase):
+            def test_foo(self):
+                harness = Harness(MyCharm)
+                self.addCleanup(harness.cleanup)  # always clean up after ourselves
 
-        # Now instantiate the charm to see events as the model changes
-        harness.begin()
-        harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
+                # Instantiate the charm and trigger events that Juju would on startup
+                harness.begin_with_initial_hooks()
 
-        # Check that charm has properly handled relation_joined or relation_changed
-        self.assertEqual(harness.charm. ...)
+                # Update charm config and trigger config-changed
+                harness.update_config({'log_level': 'warn'})
+
+                # Check that charm properly handled config-changed, for example,
+                # the charm added the correct Pebble layer
+                plan = harness.get_container_pebble_plan('prometheus')
+                self.assertIn('--log.level=warn', plan.services['prometheus'].command)
+
+    To set up the model without triggering events (or calling charm code), perform the
+    harness actions before calling :meth:`begin`. Below is an example that adds a
+    relation before calling ``begin``, and then updates config to trigger the
+    ``config-changed`` event in the charm::
+
+        class TestCharm(unittest.TestCase):
+            def test_bar(self):
+                harness = Harness(MyCharm)
+                self.addCleanup(harness.cleanup)  # always clean up after ourselves
+
+                # Set up model before "begin" (no events triggered)
+                harness.set_leader(True)
+                harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
+
+                # Now instantiate the charm to start triggering events as the model changes
+                harness.begin()
+                harness.update_config({'some': 'config'})
+
+                # Check that charm has properly handled config-changed, for example,
+                # has written the app's config file
+                root = harness.get_filesystem_root('container')
+                assert (root / 'etc' / 'app.conf').exists()
 
     Args:
         charm_cls: The Charm class that you'll be testing.

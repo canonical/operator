@@ -56,16 +56,21 @@ a full deployment. Our [API documentation](https://ops.readthedocs.io/en/latest/
 has the details, including this example:
 
 ```python
-# Initial setup
-harness = Harness(MyCharm)
-self.addCleanup(harness.cleanup)  # always clean up after ourselves
+class TestCharm(unittest.TestCase):
+    def test_foo(self):
+        harness = Harness(MyCharm)
+        self.addCleanup(harness.cleanup)  # always clean up after ourselves
 
-# Now instantiate the charm to see events as the model changes
-harness.begin()
-harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
+        # Instantiate the charm and trigger events that Juju would on startup
+        harness.begin_with_initial_hooks()
 
-# Check that charm has properly handled relation_joined or relation_changed
-self.assertEqual(harness.charm. ...)
+        # Update charm config and trigger config-changed
+        harness.update_config({'log_level': 'warn'})
+
+        # Check that charm properly handled config-changed, for example,
+        # the charm added the correct Pebble layer
+        plan = harness.get_container_pebble_plan('prometheus')
+        self.assertIn('--log.level=warn', plan.services['prometheus'].command)
 ```
 
 
