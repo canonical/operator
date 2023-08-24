@@ -1660,15 +1660,15 @@ class Harness(Generic[CharmType]):
         if (handler is None and result is None) or (handler is not None and result is not None):
             raise TypeError("Either handler or result must be provided, but not both.")
         container_name = container if isinstance(container, str) else container.name
-        if result is None:
-            pass
-        elif isinstance(result, int) and not isinstance(result, bool):
-            result = ExecResult(exit_code=result)
-        elif isinstance(result, (str, bytes)):
-            result = ExecResult(stdout=result)
-        elif not isinstance(result, ExecResult):
-            raise TypeError(
-                f"result must be int, str, bytes, or ExecResult, not {result.__class__.__name__}")
+        if result is not None:
+            if isinstance(result, int) and not isinstance(result, bool):
+                result = ExecResult(exit_code=result)
+            elif isinstance(result, (str, bytes)):
+                result = ExecResult(stdout=result)
+            elif not isinstance(result, ExecResult):
+                raise TypeError(
+                    f"result must be int, str, bytes, or ExecResult, "
+                    f"not {result.__class__.__name__}")
         self._backend._pebble_clients[container_name]._handle_exec(
             command_prefix=command_prefix,
             handler=(lambda _: result) if handler is None else handler  # type: ignore
@@ -2885,6 +2885,7 @@ class _TestingPebbleClient:
             command_prefix = tuple(command[:prefix_len])
             if command_prefix in self._exec_handlers:
                 return self._exec_handlers[command_prefix]
+        return None
 
     def _transform_exec_handler_output(self,
                                        data: Union[str, bytes],
