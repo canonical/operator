@@ -2474,7 +2474,7 @@ class _TestingExecProcess:
     def wait(self):
         if self._is_timeout:
             raise pebble.TimeoutError(
-                f'timed out waiting for change 123 ({self._timeout} seconds)'
+                f'timed out waiting for change ({self._timeout} seconds)'
             )
         if self._exit_code != 0:
             raise pebble.ExecError(self._command, cast(int, self._exit_code), None, None)
@@ -2482,7 +2482,7 @@ class _TestingExecProcess:
     def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
         if self._is_timeout:
             raise pebble.TimeoutError(
-                f'timed out waiting for change 123 ({self._timeout} seconds)'
+                f'timed out waiting for change ({self._timeout} seconds)'
             )
         out_value = self.stdout.read() if self.stdout is not None else None
         err_value = self.stderr.read() if self.stderr is not None else None
