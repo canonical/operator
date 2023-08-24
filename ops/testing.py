@@ -1660,10 +1660,15 @@ class Harness(Generic[CharmType]):
         if (handler is None and result is None) or (handler is not None and result is not None):
             raise TypeError("Either handler or result must be provided, but not both.")
         container_name = container if isinstance(container, str) else container.name
-        if isinstance(result, int):
+        if result is None:
+            pass
+        elif isinstance(result, int) and not isinstance(result, bool):
             result = ExecResult(exit_code=result)
-        if isinstance(result, (str, bytes)):
+        elif isinstance(result, (str, bytes)):
             result = ExecResult(stdout=result)
+        elif not isinstance(result, ExecResult):
+            raise TypeError(
+                f"result must be int, str, bytes, or ExecResult, not {result.__class__.__name__}")
         self._backend._pebble_clients[container_name]._handle_exec(
             command_prefix=command_prefix,
             handler=(lambda _: result) if handler is None else handler  # type: ignore
@@ -2474,7 +2479,7 @@ class _TestingExecProcess:
         if self._exit_code != 0:
             raise pebble.ExecError(self._command, cast(int, self._exit_code), None, None)
 
-    def wait_output(self) -> Tuple[Optional[AnyStr], Optional[AnyStr]]:
+    def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
         if self._is_timeout:
             raise pebble.TimeoutError(
                 f'timed out waiting for change 123 ({self._timeout} seconds)'
@@ -2486,7 +2491,7 @@ class _TestingExecProcess:
                                            cast(int, self._exit_code),
                                            cast(Union[AnyStr, None], out_value),
                                            cast(Union[AnyStr, None], err_value))
-        return cast(Union[AnyStr, None], out_value), cast(Union[AnyStr, None], err_value)
+        return cast(AnyStr, out_value), cast(Union[AnyStr, None], err_value)
 
     def send_signal(self, sig: Union[int, str]):
         # the process is always terminated when ExecProcess is return in the simulation.
@@ -2509,23 +2514,11 @@ class _TestingPebbleClient:
         self._service_status: Dict[str, pebble.ServiceStatus] = {}
         self._root = container_root
         self._backend = backend
-        self._exec_handlers: List[Tuple[Tuple[str, ...], ExecHandler]] = []
+        self._exec_handlers: Dict[Tuple[str, ...], ExecHandler] = {}
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
-        inserted = False
-        for idx in range(len(self._exec_handlers)):
-            if inserted:
-                idx = idx + 1
-            registered_handler = self._exec_handlers[idx]
-            if prefix == registered_handler[0]:
-                self._exec_handlers[idx] = (prefix, handler)
-                return
-            if not inserted and len(prefix) > len(registered_handler[0]):
-                self._exec_handlers.insert(idx, (prefix, handler))
-                inserted = True
-        if not inserted:
-            self._exec_handlers.append((prefix, handler))
+        self._exec_handlers[prefix] = handler
 
     def _check_connection(self):
         if not self._backend._can_connect(self):
@@ -2888,10 +2881,10 @@ class _TestingPebbleClient:
             file_path.unlink()
 
     def _find_exec_handler(self, command: List[str]) -> Optional[ExecHandler]:
-        for command_prefix, handler in self._exec_handlers:
-            if tuple(command[:len(command_prefix)]) == command_prefix:
-                return handler
-        return None
+        for prefix_len in reversed(range(len(command) + 1)):
+            command_prefix = tuple(command[:prefix_len])
+            if command_prefix in self._exec_handlers:
+                return self._exec_handlers[command_prefix]
 
     def _transform_exec_handler_output(self,
                                        data: Union[str, bytes],
@@ -2968,7 +2961,6 @@ class _TestingPebbleClient:
             encoding=encoding,
             combine_stderr=combine_stderr
         )
-        exit_code = 0
         proc_stdin = self._transform_exec_handler_output(b"", encoding)
         if stdin is not None:
             proc_stdin = None
