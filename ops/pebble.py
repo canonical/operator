@@ -18,9 +18,9 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
 import binascii
-import cgi
 import copy
 import datetime
+import email.message
 import email.parser
 import enum
 import http.client
@@ -134,8 +134,6 @@ PlanDict = typing.TypedDict('PlanDict',
                             total=False)
 
 if TYPE_CHECKING:
-    from email.message import Message
-
     from typing_extensions import Literal, Protocol, TypedDict
 
     # callback types for _MultiParser header and body handlers
@@ -1563,13 +1561,15 @@ class Client:
         return raw_resp
 
     @staticmethod
-    def _ensure_content_type(headers: 'Message',
+    def _ensure_content_type(headers: email.message.Message,
                              expected: 'Literal["multipart/form-data", "application/json"]'):
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
         Return a dict of any options in the header, e.g., {'boundary': ...}.
         """
-        ctype, options = cgi.parse_header(headers.get('Content-Type', ''))
+        ctype = headers.get_content_type()
+        params = headers.get_params() or {}
+        options = dict((key, value) for key, value in params if value)
         if ctype != expected:
             raise ProtocolError(f'expected Content-Type {expected!r}, got {ctype!r}')
         return options
@@ -2519,7 +2519,7 @@ class _FilesParser:
     def __init__(self, boundary: Union[bytes, str]):
         self._response: Optional[_FilesResponse] = None  # externally managed
         self._part_type: Optional[Literal["response", "files"]] = None  # externally managed
-        self._headers: Optional['Message'] = None  # externally managed
+        self._headers: Optional[email.message.Message] = None  # externally managed
         self._files: Dict[str, _Tempfile] = {}
 
         # Prepare the MIME multipart boundary line patterns.

@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cgi
 import datetime
+import email.message
 import email.parser
 import io
 import json
@@ -1045,7 +1045,10 @@ class MockClient(pebble.Client):
 
 class MockHTTPResponse:
     def __init__(self, headers, body):
-        self.headers = headers
+        message = email.message.Message()
+        for key, value in (headers or {}).items():
+            message[key] = value
+        self.headers = message
         reader = io.BytesIO(body)
         self.read = reader.read
 
@@ -1955,12 +1958,12 @@ Content-Disposition: form-data; name="response"\r
         ])
 
     def test_pull_protocol_errors(self):
-        self.client.responses.append(({'Content-Type': 'ct'}, b''))
+        self.client.responses.append(({'Content-Type': 'c/t'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
             self.client.pull('/etc/hosts')
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertEqual(str(cm.exception),
-                         "expected Content-Type 'multipart/form-data', got 'ct'")
+                         "expected Content-Type 'multipart/form-data', got 'c/t'")
 
         self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
@@ -2189,9 +2192,10 @@ bad path\r
         })
 
     def _parse_write_multipart(self, content_type, body):
-        ctype, options = cgi.parse_header(content_type)
-        self.assertEqual(ctype, 'multipart/form-data')
-        boundary = options['boundary']
+        message = email.message.Message()
+        message['Content-Type'] = content_type
+        self.assertEqual(message.get_content_type(), 'multipart/form-data')
+        boundary = message.get_param('boundary')
 
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
