@@ -1339,6 +1339,7 @@ class ExecProcess(Generic[AnyStr]):
         else:
             out = io.BytesIO()
             err = io.BytesIO() if self.stderr is not None else None
+
         t = _start_thread(shutil.copyfileobj, self.stdout, out)
         self._threads.append(t)
 
