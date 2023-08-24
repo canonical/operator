@@ -1597,23 +1597,22 @@ class Harness(Generic[CharmType]):
 
         You can provide either a ``handler`` or a ``result``, but not both:
 
-        - A ``handler``: A function accepting :class:`ops.testing.ExecArgs` and returning
-          :class:`ops.testing.ExecResult` as the simulated process outcome. For pure side effect
-          cases, the handler can return None (equivalent to ``ExecResult()``).
+        - A ``handler`` is a function accepting :class:`ops.testing.ExecArgs` and returning
+          :class:`ops.testing.ExecResult` as the simulated process outcome. For cases that
+          have side effects but don't return output, the handler can return ``None``, which
+          is equivalent to returning ``ExecResult()``.
 
-        - A ``result``: For simulations that don't need to inspect the ``exec`` arguments, the
-          output and exit code can be returned directly. Setting ``result`` to str or bytes means
-          use that string as stdout (with exit code 0), or setting ``result`` to int means return
+        - A ``result`` is for simulations that don't need to inspect the ``exec`` arguments; the
+          output or exit code is provided directly. Setting ``result`` to str or bytes means
+          use that string as stdout (with exit code 0); setting ``result`` to int means return
           that exit code (and no stdout).
-          to setting ``handler=lambda _: result``.
 
-        If ``handle_exec`` is called more than once with overlapping command prefixes,
-        the longest match takes precedence.
-        longest match takes precedence. The execution handler registration can be updated by
+        If ``handle_exec`` is called more than once with overlapping command prefixes, the
+        longest match takes precedence. The registration of an execution handler can be updated by
         re-registering with the same command prefix.
 
-        The execution handler receives the timeout value in ExecArgs. If needed, it can raise a
-        TimeoutError to inform the harness of a timeout occurrence.
+        The execution handler receives the timeout value in the ``ExecArgs``. If needed,
+        it can raise a ``TimeoutError`` to inform the harness that a timeout occurred.
 
         If :meth:`ops.Container.exec` is called with ``combine_stderr=True``, the execution
         handler should, if required, weave the simulated standard error into the standard output.
@@ -1651,8 +1650,8 @@ class Harness(Generic[CharmType]):
             harness.handle_exec('database', ['docker'], handler=docker_handler)
 
             # handle timeout
-            def handle_timeout(exec_args: testing.ExecArgs) -> int:
-                if exec_args.timeout is not None and exec_args.timeout < 10:
+            def handle_timeout(args: testing.ExecArgs) -> int:
+                if args.timeout is not None and args.timeout < 10:
                     raise TimeoutError
                 return 0
 
