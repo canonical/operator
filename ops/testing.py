@@ -149,23 +149,49 @@ ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
 class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
-    The model that is created is from the viewpoint of the charm that you are testing.
+    The model created is from the viewpoint of the charm that you are testing.
 
-    Example::
+    Below is an example test using :meth:`begin_with_initial_hooks` that ensures
+    the charm responds correctly to config changes::
 
-        harness = Harness(MyCharm)
-        self.addCleanup(harness.cleanup)  # always clean up after ourselves
+        class TestCharm(unittest.TestCase):
+            def test_foo(self):
+                harness = Harness(MyCharm)
+                self.addCleanup(harness.cleanup)  # always clean up after ourselves
 
-        # Do initial setup here
-        relation_id = harness.add_relation('db', 'postgresql')
+                # Instantiate the charm and trigger events that Juju would on startup
+                harness.begin_with_initial_hooks()
 
-        # Now instantiate the charm to see events as the model changes
-        harness.begin()
-        harness.add_relation_unit(relation_id, 'postgresql/0')
-        harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
+                # Update charm config and trigger config-changed
+                harness.update_config({'log_level': 'warn'})
 
-        # Check that charm has properly handled the relation_joined event for postgresql/0
-        self.assertEqual(harness.charm. ...)
+                # Check that charm properly handled config-changed, for example,
+                # the charm added the correct Pebble layer
+                plan = harness.get_container_pebble_plan('prometheus')
+                self.assertIn('--log.level=warn', plan.services['prometheus'].command)
+
+    To set up the model without triggering events (or calling charm code), perform the
+    harness actions before calling :meth:`begin`. Below is an example that adds a
+    relation before calling ``begin``, and then updates config to trigger the
+    ``config-changed`` event in the charm::
+
+        class TestCharm(unittest.TestCase):
+            def test_bar(self):
+                harness = Harness(MyCharm)
+                self.addCleanup(harness.cleanup)  # always clean up after ourselves
+
+                # Set up model before "begin" (no events triggered)
+                harness.set_leader(True)
+                harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
+
+                # Now instantiate the charm to start triggering events as the model changes
+                harness.begin()
+                harness.update_config({'some': 'config'})
+
+                # Check that charm has properly handled config-changed, for example,
+                # has written the app's config file
+                root = harness.get_filesystem_root('container')
+                assert (root / 'etc' / 'app.conf').exists()
 
     Args:
         charm_cls: The Charm class that you'll be testing.
@@ -336,9 +362,7 @@ class Harness(Generic[CharmType]):
             # Add storage if needed before begin_with_initial_hooks() is called
             storage_ids = harness.add_storage('data', count=1)[0]
             storage_id = storage_id[0] # we only added one storage instance
-            relation_id = harness.add_relation('db', 'postgresql')
-            harness.add_relation_unit(relation_id, 'postgresql/0')
-            harness.update_relation_data(relation_id, 'postgresql/0', {'key': 'val'})
+            harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
             harness.set_leader(True)
             harness.update_config({'initial': 'config'})
             harness.begin_with_initial_hooks()
@@ -737,20 +761,45 @@ class Harness(Generic[CharmType]):
                 model.Storage(storage_name, storage_index, self._backend))
         self._backend._storage_remove(storage_id)
 
-    def add_relation(self, relation_name: str, remote_app: str) -> int:
-        """Declare that there is a new relation between this app and `remote_app`.
+    def add_relation(self, relation_name: str, remote_app: str, *,
+                     app_data: Optional[Mapping[str, str]] = None,
+                     unit_data: Optional[Mapping[str, str]] = None) -> int:
+        """Declare that there is a new relation between this application and `remote_app`.
 
-        In the case of adding peer relations, `remote_app` is *this* app.  This function creates a
-        relation with an application and will trigger a relation-created hook. To relate units (and
-        trigger relation-joined and relation-changed hooks), you should also call
-        :meth:`.add_relation_unit`.
+        This function creates a relation with an application and triggers a
+        :class:`RelationCreatedEvent <ops.RelationCreatedEvent>`.
+
+        If `app_data` or `unit_data` are provided, also add a new unit
+        (``<remote_app>/0``) to the relation and trigger
+        :class:`RelationJoinedEvent <ops.RelationJoinedEvent>`. Then update
+        the application data if `app_data` is provided and the unit data if
+        `unit_data` is provided, triggering
+        :class:`RelationChangedEvent <ops.RelationChangedEvent>` after each update.
+        Alternatively, charm tests can call :meth:`add_relation_unit` and
+        :meth:`update_relation_data` explicitly.
+
+        Example usage::
+
+            secret_id = harness.add_model_secret('mysql', {'password': 'SECRET'})
+            harness.add_relation('db', 'mysql', unit_data={
+                'host': 'mysql.localhost,
+                'username': 'appuser',
+                'secret-id': secret_id,
+            })
 
         Args:
-            relation_name: The relation on Charm that is being related to
-            remote_app: The name of the application that is being related to
+            relation_name: The relation on the charm that is being related to.
+            remote_app: The name of the application that is being related to.
+                To add a peer relation, set to the name of *this* application.
+            app_data: If provided, also add a new unit to the relation
+                (triggering relation-joined) and set the *application* relation data
+                (triggering relation-changed).
+            unit_data: If provided, also add a new unit to the relation
+                (triggering relation-joined) and set the *unit* relation data
+                (triggering relation-changed).
 
         Return:
-            The relation_id created by this add_relation.
+            The ID of the relation created.
         """
         relation_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(
@@ -770,6 +819,15 @@ class Harness(Generic[CharmType]):
         if self._model is not None:
             self._model.relations._invalidate(relation_name)
         self._emit_relation_created(relation_name, relation_id, remote_app)
+
+        if app_data is not None or unit_data is not None:
+            remote_unit = remote_app + '/0'
+            self.add_relation_unit(relation_id, remote_unit)
+            if app_data is not None:
+                self.update_relation_data(relation_id, remote_app, app_data)
+            if unit_data is not None:
+                self.update_relation_data(relation_id, remote_unit, unit_data)
+
         return relation_id
 
     def remove_relation(self, relation_id: int) -> None:
@@ -830,16 +888,20 @@ class Harness(Generic[CharmType]):
     def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Add a new unit to a relation.
 
-        Example::
-
-          rel_id = harness.add_relation('db', 'postgresql')
-          harness.add_relation_unit(rel_id, 'postgresql/0')
-
         This will trigger a `relation_joined` event. This would naturally be
         followed by a `relation_changed` event, which you can trigger with
         :meth:`.update_relation_data`. This separation is artificial in the
         sense that Juju will always fire the two, but is intended to make
         testing relations and their data bags slightly more natural.
+
+        Unless finer-grained control is needed, most charm tests can call
+        :meth:`add_relation` with the `app_data` or `unit_data` argument
+        instead of using this function.
+
+        Example::
+
+          rel_id = harness.add_relation('db', 'postgresql')
+          harness.add_relation_unit(rel_id, 'postgresql/0')
 
         Args:
             relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
@@ -1057,6 +1119,10 @@ class Harness(Generic[CharmType]):
         """Update the relation data for a given unit or application in a given relation.
 
         This also triggers the `relation_changed` event for the given ``relation_id``.
+
+        Unless finer-grained control is needed, most charm tests can call
+        :meth:`add_relation` with the `app_data` or `unit_data` argument
+        instead of using this function.
 
         Args:
             relation_id: The integer relation ID representing this relation.
