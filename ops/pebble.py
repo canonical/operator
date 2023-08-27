@@ -1338,6 +1338,11 @@ class ExecProcess(Generic[AnyStr]):
             out = io.BytesIO()
             err = io.BytesIO() if self.stderr is not None else None
 
+        if self.stdout is None:
+            raise TypeError(
+                "stdout is already being consumed by another object provided to the exec function"
+            )
+
         t = _start_thread(shutil.copyfileobj, self.stdout, out)
         self._threads.append(t)
 

@@ -2925,6 +2925,15 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ])
 
+    def test_wait_output_no_stdout(self):
+        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+        stdout_buffer = io.BytesIO()
+        process = self.client.exec(["echo", "FOOBAR"], stdout=stdout_buffer, encoding=None)
+        with self.assertRaises(TypeError):
+            process.wait_output()
+
     def test_wait_output_bad_command(self):
         stdio, stderr, _ = self.add_responses('123', 0)
         stdio.receives.append(b'Python 3.8.10\n')
