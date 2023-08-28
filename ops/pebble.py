@@ -1331,6 +1331,12 @@ class ExecProcess(Generic[AnyStr]):
             ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
         """
+        if self.stdout is None:
+            raise TypeError(
+                "can't use wait_output() when exec was called with the stdout argument; "
+                "use wait() instead"
+            )
+
         if self._encoding is not None:
             out = io.StringIO()
             err = io.StringIO() if self.stderr is not None else None
