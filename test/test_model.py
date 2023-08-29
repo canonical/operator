@@ -3104,6 +3104,18 @@ class TestSecretClass(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True),
                          [['secret-get', 'secret:z', '--format=json']])
 
+    def test_get_content_copies_dict(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "bar"}'""")
+
+        secret = self.make_secret(id='z')
+        content = secret.get_content()
+        self.assertEqual(content, {'foo': 'bar'})
+        content['new'] = 'value'
+        self.assertEqual(secret.get_content(), {'foo': 'bar'})
+
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['secret-get', 'secret:z', '--format=json']])
+
     def test_peek_content(self):
         fake_script(self, 'secret-get', """echo '{"foo": "peeked"}'""")
 
