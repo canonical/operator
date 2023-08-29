@@ -1181,6 +1181,9 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> Dict[str, str]:
         """Get the secret's content.
 
+        Returns:
+            A copy of the secret's content dictionary.
+
         Args:
             refresh: If true, fetch the latest revision's content and tell
                 Juju to update to tracking that revision. The default is to
@@ -1190,7 +1193,7 @@ class Secret:
         if refresh or self._content is None:
             self._content = self._backend.secret_get(
                 id=self.id, label=self.label, refresh=refresh)
-        return self._content
+        return self._content.copy()
 
     def peek_content(self) -> Dict[str, str]:
         """Get the content of the latest revision of this secret.
