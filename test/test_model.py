@@ -3116,6 +3116,24 @@ class TestSecretClass(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True),
                          [['secret-get', 'secret:z', '--format=json']])
 
+    def test_set_content_invalidates_cache(self):
+        fake_script(self, 'secret-get', """echo '{"foo": "bar"}'""")
+        fake_script(self, 'secret-set', """exit 0""")
+
+        secret = self.make_secret(id='z')
+        old_content = secret.get_content()
+        self.assertEqual(old_content, {'foo': 'bar'})
+        secret.set_content({'new': 'content'})
+        fake_script(self, 'secret-get', """echo '{"new": "content"}'""")
+        new_content = secret.get_content()
+        self.assertEqual(new_content, {'new': 'content'})
+
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['secret-get', 'secret:z', '--format=json'],
+            ['secret-set', 'secret:z', 'new=content'],
+            ['secret-get', 'secret:z', '--format=json'],
+        ])
+
     def test_peek_content(self):
         fake_script(self, 'secret-get', """echo '{"foo": "peeked"}'""")
 
