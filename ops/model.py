@@ -1225,6 +1225,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_set(typing.cast(str, self.id), content=content)
+        self._content = None  # invalidate cache so it's refetched next get_content()
 
     def set_info(self, *,
                  label: Optional[str] = None,
