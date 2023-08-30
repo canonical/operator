@@ -11,8 +11,7 @@ jobs:
       matrix:
         charm-repo:
           - "canonical/alertmanager-k8s-operator"
-# TODO: currently failing
-#          - "canonical/prometheus-k8s-operator"
+          - "canonical/prometheus-k8s-operator"
           - "canonical/grafana-k8s-operator"
 
     steps:
