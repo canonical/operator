@@ -18,7 +18,7 @@ from ops import pebble
 from ops.charm import CharmEvents
 from ops.model import SecretRotate, StatusBase
 
-from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
+# from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
 
 JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
@@ -29,6 +29,8 @@ if typing.TYPE_CHECKING:
     except ImportError:
         from typing_extensions import Self
     from ops.testing import CharmType
+
+    from scenario import Context
 
     PathLike = Union[str, Path]
     AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
@@ -615,17 +617,9 @@ class Container(_DCBase):
             infos[name] = info
         return infos
 
-    @property
-    def filesystem(self) -> "_MockFileSystem":
-        """Simulated pebble filesystem."""
-        mounts = {
-            name: _MockStorageMount(
-                src=Path(spec.src),
-                location=PurePosixPath(spec.location),
-            )
-            for name, spec in self.mounts.items()
-        }
-        return _MockFileSystem(mounts=mounts)
+    def get_filesystem(self, ctx: "Context") -> Path:
+        """Simulated pebble filesystem in this context."""
+        return ctx._get_container_root(self.name)
 
     @property
     def pebble_ready_event(self):
