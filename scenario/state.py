@@ -762,6 +762,24 @@ class StoredState(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
+class Port(_DCBase):
+    protocol: Literal["tcp", "udp", "icmp"]
+    port: Optional[int] = None
+    """The port to open. Required for TCP and UDP; not allowed for ICMP."""
+
+    def __post_init__(self):
+        port = self.port
+        if self.protocol == "icmp" and port:
+            raise StateValidationError("`port` arg not supported with `icmp` protocol")
+        elif not port:
+            raise StateValidationError(
+                f"`port` arg required with `{self.protocol}` protocol",
+            )
+        if port and not (1 <= port <= 65535):
+            raise StateValidationError(f"`port` outside bounds [1:65535], got {port}")
+
+
+@dataclasses.dataclass(frozen=True)
 class State(_DCBase):
     """Represents the juju-owned portion of a unit's state.
 
@@ -776,6 +794,7 @@ class State(_DCBase):
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
+    opened_ports: Set[Port] = dataclasses.field(default_factory=set)
     leader: bool = False
     model: Model = Model()
     secrets: List[Secret] = dataclasses.field(default_factory=list)
