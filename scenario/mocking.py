@@ -4,6 +4,7 @@
 import datetime
 import random
 from io import StringIO
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple, Union
 
 from ops import pebble
@@ -17,7 +18,7 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
-from scenario.state import JujuLogLine, PeerRelation, Port
+from scenario.state import JujuLogLine, Mount, PeerRelation, Port
 
 if TYPE_CHECKING:
     from scenario.context import Context
@@ -75,19 +76,37 @@ class _MockModelBackend(_ModelBackend):
         self._charm_spec = charm_spec
 
     def opened_ports(self) -> Set[Port]:
-        return self._state.opened_ports
+        return set(self._state.opened_ports)
 
     def open_port(self, protocol: str, port: Optional[int] = None):
         # fixme: the charm will get hit with a StateValidationError
         #  here, not the expected ModelError...
-        self._state.opened_ports.add(Port(protocol, port))
+        port = Port(protocol, port)
+        ports = self._state.opened_ports
+        if port not in ports:
+            ports.append(port)
 
     def close_port(self, protocol: str, port: Optional[int] = None):
-        self._state.opened_ports.discard(Port(protocol, port))
+        port = Port(protocol, port)
+        ports = self._state.opened_ports
+        if port in ports:
+            ports.remove(port)
 
     def get_pebble(self, socket_path: str) -> "Client":
+        container_name = socket_path.split("/")[
+            3
+        ]  # /charm/containers/<container_name>/pebble.socket
+        container_root = self._context._get_container_root(container_name)
+        try:
+            mounts = self._state.get_container(container_name).mounts
+        except ValueError:
+            # container not defined in state.
+            mounts = {}
+
         return _MockPebbleClient(
             socket_path=socket_path,
+            container_root=container_root,
+            mounts=mounts,
             state=self._state,
             event=self._event,
             charm_spec=self._charm_spec,
@@ -381,6 +400,8 @@ class _MockPebbleClient(_TestingPebbleClient):
     def __init__(
         self,
         socket_path: str,
+        container_root: Path,
+        mounts: Dict[str, Mount],
         *,
         state: "State",
         event: "Event",
@@ -390,6 +411,15 @@ class _MockPebbleClient(_TestingPebbleClient):
         self.socket_path = socket_path
         self._event = event
         self._charm_spec = charm_spec
+
+        # initialize simulated filesystem
+        container_root.mkdir(parents=True)
+        for _, mount in mounts.items():
+            mounting_dir = container_root / mount.location[1:]
+            mounting_dir.parent.mkdir(parents=True, exist_ok=True)
+            mounting_dir.symlink_to(mount.src)
+
+        self._root = container_root
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
@@ -407,10 +437,6 @@ class _MockPebbleClient(_TestingPebbleClient):
                 f"Did you forget a Container, or is the socket path "
                 f"{self.socket_path!r} wrong?",
             )
-
-    @property
-    def _fs(self):
-        return self._container.filesystem
 
     @property
     def _layers(self) -> Dict[str, pebble.Layer]:

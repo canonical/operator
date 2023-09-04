@@ -530,12 +530,8 @@ from scenario.state import Container, State, Mount
 
 local_file = Path('/path/to/local/real/file.txt')
 
-state = State(containers=[
-    Container(name="foo",
-              can_connect=True,
-              mounts={'local': Mount('/local/share/config.yaml', local_file)})
-]
-)
+container = Container(name="foo", can_connect=True, mounts={'local': Mount('/local/share/config.yaml', local_file)})
+state = State(containers=[container])
 ```
 
 In this case, if the charm were to:
@@ -547,7 +543,7 @@ def _on_start(self, _):
 ```
 
 then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempdir` for nicely wrapping
-strings and passing them to the charm via the container.
+data and passing it to the charm via the container.
 
 `container.push` works similarly, so you can write a test like:
 
@@ -634,6 +630,30 @@ def test_pebble_exec():
         state_in,
     )
 ```
+
+# Ports
+
+Since `ops 2.6.0`, charms can invoke the `open-port`, `close-port`, and `opened-ports` hook tools to manage the ports opened on the host vm/container. Using the `State.opened_ports` api, you can: 
+
+- simulate a charm run with a port opened by some previous execution
+```python
+from scenario import State, Port, Context
+
+ctx = Context(MyCharm)
+ctx.run("start", State(opened_ports=[Port("tcp", 42)]))
+```
+- assert that a charm has called `open-port` or `close-port`:
+```python
+from scenario import State, Port, Context
+
+ctx = Context(MyCharm)
+state1 = ctx.run("start", State())
+assert state1.opened_ports == [Port("tcp", 42)]
+
+state2 = ctx.run("stop", state1)
+assert state2.opened_ports == []
+```
+
 
 # Secrets
 

@@ -159,7 +159,7 @@ class Runtime:
     @staticmethod
     def _cleanup_env(env):
         # TODO consider cleaning up env on __delete__, but ideally you should be
-        #  running this in a clean venv or a container anyway.
+        #  running this in a clean env or a container anyway.
         # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
         for key in env:
             # os.unsetenv does not work !?
@@ -403,8 +403,8 @@ class Runtime:
             finally:
                 logger.info(" - Exited ops.main.")
 
-            logger.info(" - Clearing env")
-            self._cleanup_env(env)
+                logger.info(" - Clearing env")
+                self._cleanup_env(env)
 
             logger.info(" - closing storage")
             output_state = self._close_storage(output_state, temporary_charm_root)
