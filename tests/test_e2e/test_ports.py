@@ -6,12 +6,12 @@ from scenario.state import Port
 
 
 class MyCharm(CharmBase):
-    pass
+    META = {"name": "edgar"}
 
 
 @pytest.fixture
 def ctx():
-    return Context(MyCharm)
+    return Context(MyCharm, meta=MyCharm.META)
 
 
 def test_open_port(ctx):

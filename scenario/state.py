@@ -79,6 +79,10 @@ class StateValidationError(RuntimeError):
     # **combination** of several parts of the State are.
 
 
+class MetadataNotFoundError(RuntimeError):
+    """Raised when Scenario can't find a metadata.yaml file in the provided charm root."""
+
+
 @dataclasses.dataclass(frozen=True)
 class _DCBase:
     def replace(self, *args, **kwargs):
@@ -911,6 +915,11 @@ class _CharmSpec(_DCBase):
         charm_root = charm_source_path.parent.parent
 
         metadata_path = charm_root / "metadata.yaml"
+        if not metadata_path.exists():
+            raise MetadataNotFoundError(
+                f"invalid charm root {charm_root!r}; "
+                f"expected to contain at least a `metadata.yaml` file.",
+            )
         meta = yaml.safe_load(metadata_path.open())
 
         actions = config = None
