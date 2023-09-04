@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import tempfile
 from collections import namedtuple
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union
 
 from ops import EventBase
@@ -11,8 +13,6 @@ from scenario.runtime import Runtime
 from scenario.state import Action, Event, _CharmSpec
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from ops.testing import CharmType
 
     from scenario.state import JujuLogLine, State, _EntityStatus
@@ -84,6 +84,7 @@ class Context:
         self.charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
+        self._tmp = tempfile.TemporaryDirectory()
 
         # streaming side effects from running an event
         self.juju_log: List["JujuLogLine"] = []
@@ -96,6 +97,10 @@ class Context:
         self._action_logs = []
         self._action_results = None
         self._action_failure = ""
+
+    def _get_container_root(self, container_name: str):
+        """Get the path to a tempdir where this container's simulated root will live."""
+        return Path(self._tmp.name) / "containers" / container_name
 
     def clear(self):
         """Cleanup side effects histories."""

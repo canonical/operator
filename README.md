@@ -530,12 +530,8 @@ from scenario.state import Container, State, Mount
 
 local_file = Path('/path/to/local/real/file.txt')
 
-state = State(containers=[
-    Container(name="foo",
-              can_connect=True,
-              mounts={'local': Mount('/local/share/config.yaml', local_file)})
-]
-)
+container = Container(name="foo", can_connect=True, mounts={'local': Mount('/local/share/config.yaml', local_file)})
+state = State(containers=[container])
 ```
 
 In this case, if the charm were to:
@@ -547,7 +543,7 @@ def _on_start(self, _):
 ```
 
 then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempdir` for nicely wrapping
-strings and passing them to the charm via the container.
+data and passing it to the charm via the container.
 
 `container.push` works similarly, so you can write a test like:
 
