@@ -13,7 +13,7 @@ version = "5.0.1.1"
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
 ]
-description = "Python library providing a Scenario-based testing API for Operator Framework charms."
+description = "Python library providing a state-transition testing API for Operator Framework charms."
 license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
