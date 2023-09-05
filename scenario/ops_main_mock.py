@@ -139,7 +139,9 @@ def main(
             framework.reemit()
 
         if emitter:
-            yield emitter.setup(charm)
+            emitter._setup(charm)
+
+        yield
 
         if pre_event:
             pre_event(charm)
@@ -152,3 +154,5 @@ def main(
         framework.commit()
     finally:
         framework.close()
+
+    return None

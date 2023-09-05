@@ -1,4 +1,5 @@
 import pytest
+from ops import ActiveStatus
 from ops.charm import CharmBase
 
 from scenario import Action, Context, State
@@ -18,6 +19,7 @@ def mycharm():
 
         def _on_event(self, e):
             print("event!")
+            self.unit.status = ActiveStatus(e.handle.kind)
 
     return MyCharm
 
@@ -38,6 +40,7 @@ def test_emitter_implicit(mycharm):
         print("charm before", emitter.charm)
 
     assert emitter.output
+    assert emitter.output.unit_status == ActiveStatus("start")
 
 
 def test_emitter_reemit_fails(mycharm):
@@ -61,5 +64,5 @@ def test_context_emitter(mycharm):
 def test_context_action_emitter(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
     with ctx.action_emitter(Action("do-x"), State()) as emitter:
-        state_out = emitter.emit()
-        assert state_out.state.model.name
+        ao = emitter.emit()
+        assert ao.state.model.name

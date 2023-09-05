@@ -11,6 +11,7 @@ from ops.framework import EventBase
 from scenario import Context
 from scenario.runtime import Runtime, UncaughtCharmError
 from scenario.state import Event, Relation, State, _CharmSpec
+from scenario.utils import exhaust
 
 
 def charm_type():
@@ -52,13 +53,14 @@ def test_event_hooks():
 
         pre_event = MagicMock(return_value=None)
         post_event = MagicMock(return_value=None)
-        runtime.exec(
+        runner = runtime.exec(
             state=State(),
             event=Event("update_status"),
             pre_event=pre_event,
             post_event=post_event,
             context=Context(my_charm_type, meta=meta),
         )
+        exhaust(runner)
 
         assert pre_event.called
         assert post_event.called
@@ -85,9 +87,10 @@ def test_event_emission():
             ),
         )
 
-        runtime.exec(
+        runner = runtime.exec(
             state=State(), event=Event("bar"), context=Context(my_charm_type, meta=meta)
         )
+        exhaust(runner)
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)
@@ -137,11 +140,12 @@ def test_env_cleanup_on_charm_error():
         raise TypeError
 
     with pytest.raises(UncaughtCharmError):
-        runtime.exec(
+        runner = runtime.exec(
             state=State(),
             event=Event("box_relation_changed", relation=Relation("box")),
             post_event=post_event,
             context=Context(my_charm_type, meta=meta),
         )
+        exhaust(runner)
 
     assert os.getenv("JUJU_REMOTE_APP", None) is None

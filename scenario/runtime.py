@@ -14,6 +14,7 @@ from typing import (
     Callable,
     ContextManager,
     Dict,
+    Generator,
     List,
     Optional,
     Tuple,
@@ -344,7 +345,7 @@ class Runtime:
         emitter: "Emitter" = None,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-    ) -> "State":
+    ) -> Generator["State", None, None]:
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the
@@ -397,9 +398,15 @@ class Runtime:
                     ),
                 )
 
-                # if we are passing an emitter, main is a generator and this is a generator too
-                if emitter:
-                    yield next(main)
+                # main is a generator, let's step it up until its yield
+                # statement = right before firing the event
+                yield next(main)
+
+                # exhaust the iterator = allow ops to tear down
+                try:
+                    next(main)
+                except StopIteration:
+                    pass
 
             except NoObserverError:
                 raise  # propagate along
@@ -407,6 +414,7 @@ class Runtime:
                 raise UncaughtCharmError(
                     f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}",
                 ) from e
+
             finally:
                 logger.info(" - Exited ops.main.")
 

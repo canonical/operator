@@ -4,13 +4,24 @@
 import tempfile
 from collections import namedtuple
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Type,
+    Union,
+)
 
 from ops import EventBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import Action, Event, _CharmSpec
+from scenario.utils import exhaust
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
@@ -53,7 +64,7 @@ class _Emitter:
         self.charm: Optional[CharmType] = None
         self.output: Optional[Union["State", ActionOutput]] = None
 
-    def setup(self, charm: "CharmType"):
+    def _setup(self, charm: "CharmType"):
         self.charm = charm
 
     def _runner(self):
@@ -73,11 +84,7 @@ class _Emitter:
             raise AlreadyEmittedError("Can only _Emitter.emit() once.")
         self._emitted = True
 
-        try:
-            out = next(self._run)
-        except StopIteration as e:
-            out = e.value
-        self.output = out
+        self.output = out = exhaust(self._run)
         return out
 
     def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
@@ -91,7 +98,7 @@ class _EventEmitter(_Emitter):
         output: State
 
     def _runner(self):
-        return self._ctx.run(self._arg, self._state_in, _emitter=self)
+        return self._ctx._run_event(self._arg, self._state_in, emitter=self)
 
 
 class _ActionEmitter(_Emitter):
@@ -102,7 +109,12 @@ class _ActionEmitter(_Emitter):
         return self._ctx._finalize_action(super().emit())
 
     def _runner(self):
-        return self._ctx.run_action(self._arg, self._state_in, _emitter=self)
+        return self._ctx._run_action(self._arg, self._state_in, emitter=self)
+
+
+class _LegacyEmitter(_Emitter):
+    def _runner(self):
+        pass
 
 
 class Context:
@@ -234,11 +246,27 @@ class Context:
     ):
         return _ActionEmitter(self, action, state)
 
+    def _run_event(
+        self,
+        event: Union["Event", str],
+        state: "State",
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        emitter: "_Emitter" = None,
+    ) -> Generator["State", None, None]:
+        runner = self._run(
+            self._coalesce_event(event),
+            state=state,
+            emitter=emitter,
+            pre_event=pre_event,
+            post_event=post_event,
+        )
+        return runner
+
     def run(
         self,
         event: Union["Event", str],
         state: "State",
-        _emitter: "_Emitter" = None,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
@@ -255,10 +283,26 @@ class Context:
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
         """
+        runner = self._run_event(event, state, pre_event, post_event)
+
+        # return the output
+        # step it once to get to the point before the event is emitted
+        # step it twice to let Runtime terminate
+        return exhaust(runner)
+
+    def _run_action(
+        self,
+        action: Union["Action", str],
+        state: "State",
+        pre_event: Optional[Callable[["CharmType"], None]] = None,
+        post_event: Optional[Callable[["CharmType"], None]] = None,
+        emitter: _Emitter = None,
+    ) -> Generator["State", None, None]:
+        action = self._coalesce_action(action)
         return self._run(
-            self._coalesce_event(event),
+            action.event,
             state=state,
-            emitter=_emitter,
+            emitter=emitter,
             pre_event=pre_event,
             post_event=post_event,
         )
@@ -267,9 +311,9 @@ class Context:
         self,
         action: Union["Action", str],
         state: "State",
-        _emitter: _Emitter,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
+        _emitter: _Emitter = None,
     ) -> ActionOutput:
         """Trigger a charm execution with an Action and a State.
 
@@ -284,20 +328,14 @@ class Context:
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
         """
-
-        action = self._coalesce_action(action)
-
-        state_out = self._run(
-            action.event,
-            state=state,
+        runner = self._run_action(
+            action,
+            state,
+            pre_event,
+            post_event,
             emitter=_emitter,
-            pre_event=pre_event,
-            post_event=post_event,
         )
-
-        if _emitter:
-            return state_out
-        return self._finalize_action(state_out)
+        return self._finalize_action(exhaust(runner))
 
     def _finalize_action(self, state_out: "State"):
         ao = ActionOutput(
@@ -318,15 +356,16 @@ class Context:
         self,
         event: "Event",
         state: "State",
-        emitter: _Emitter = None,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-    ) -> "State":
+        emitter: _Emitter = None,
+    ) -> Generator["State", None, None]:
         runtime = Runtime(
             charm_spec=self.charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
         )
+
         return runtime.exec(
             state=state,
             event=event,
@@ -335,3 +374,19 @@ class Context:
             post_event=post_event,
             context=self,
         )
+
+    def _coalesce_emitter(
+        self,
+        emitter: _Emitter,
+        pre_event,
+        post_event,
+        event: "Event",
+        state: "State",
+    ):
+        if emitter and (pre_event or post_event):
+            raise ValueError("cannot call Context with emitter AND [pre/post]-event")
+
+        if emitter:
+            return emitter
+
+        return _LegacyEmitter(self, pre_event, post_event, event, state)
