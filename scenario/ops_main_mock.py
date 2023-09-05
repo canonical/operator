@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import ops.charm
 import ops.framework
@@ -18,8 +18,6 @@ from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_a
 from ops.main import logger as ops_logger
 
 if TYPE_CHECKING:
-    from ops.testing import CharmType
-
     from scenario.context import Context, Emitter
     from scenario.state import Event, State, _CharmSpec
 
@@ -81,8 +79,6 @@ def _emit_charm_event(
 
 def main(
     emitter: "Emitter" = None,
-    pre_event: Optional[Callable[["CharmType"], None]] = None,
-    post_event: Optional[Callable[["CharmType"], None]] = None,
     state: "State" = None,
     event: "Event" = None,
     context: "Context" = None,
@@ -143,15 +139,10 @@ def main(
 
         yield
 
-        if pre_event:
-            pre_event(charm)
-
         _emit_charm_event(charm, dispatcher.event_name, event)
 
-        if post_event:
-            post_event(charm)
-
         framework.commit()
+
     finally:
         framework.close()
 

@@ -9,6 +9,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
 
 from scenario import Context
+from scenario.context import _LegacyEmitter
 from scenario.runtime import Runtime, UncaughtCharmError
 from scenario.state import Event, Relation, State, _CharmSpec
 from scenario.utils import exhaust
@@ -56,8 +57,7 @@ def test_event_hooks():
         runner = runtime.exec(
             state=State(),
             event=Event("update_status"),
-            pre_event=pre_event,
-            post_event=post_event,
+            emitter=_LegacyEmitter(pre_event, post_event),
             context=Context(my_charm_type, meta=meta),
         )
         exhaust(runner)
@@ -118,7 +118,7 @@ def test_unit_name(app_name, unit_id):
     runtime.exec(
         state=State(unit_id=unit_id),
         event=Event("start"),
-        post_event=post_event,
+        emitter=_LegacyEmitter(None, post_event),
         context=Context(my_charm_type, meta=meta),
     )
 
@@ -143,7 +143,7 @@ def test_env_cleanup_on_charm_error():
         runner = runtime.exec(
             state=State(),
             event=Event("box_relation_changed", relation=Relation("box")),
-            post_event=post_event,
+            emitter=_LegacyEmitter(post=post_event),
             context=Context(my_charm_type, meta=meta),
         )
         exhaust(runner)

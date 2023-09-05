@@ -27,11 +27,22 @@ def mycharm():
 def test_emitter(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     with _EventEmitter(ctx, "start", State()) as emitter:
-        print("charm before", emitter.charm)
+        assert isinstance(emitter.charm, mycharm)
         state_out = emitter.emit()
-        print("charm after", emitter.charm)
 
     assert state_out
+
+
+def test_emitter_legacy(mycharm):
+    ctx = Context(mycharm, meta=mycharm.META)
+
+    def pre_event(charm):
+        print(1)
+
+    def post_event(charm):
+        print(2)
+
+    ctx.run("start", State(), pre_event=pre_event, post_event=post_event)
 
 
 def test_emitter_implicit(mycharm):

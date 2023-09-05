@@ -92,6 +92,10 @@ class _Emitter:
             logger.debug("emitter not invoked. Doing so implicitly...")
             self.emit()
 
+    def _finalize(self):
+        """Compatibility shim for _LegacyEmitter."""
+        pass
+
 
 class _EventEmitter(_Emitter):
     if TYPE_CHECKING:
@@ -112,9 +116,20 @@ class _ActionEmitter(_Emitter):
         return self._ctx._run_action(self._arg, self._state_in, emitter=self)
 
 
-class _LegacyEmitter(_Emitter):
-    def _runner(self):
-        pass
+class _LegacyEmitter:
+    def __init__(self, pre=None, post=None):
+        self.pre = pre
+        self.post = post
+        self.charm = None
+
+    def _setup(self, charm):
+        self.charm = charm
+        if self.pre:
+            self.pre(charm)
+
+    def _finalize(self):
+        if self.post:
+            self.post(self.charm)
 
 
 class Context:
@@ -369,9 +384,7 @@ class Context:
         return runtime.exec(
             state=state,
             event=event,
-            emitter=emitter,
-            pre_event=pre_event,
-            post_event=post_event,
+            emitter=self._coalesce_emitter(emitter, pre_event, post_event),
             context=self,
         )
 
@@ -380,8 +393,6 @@ class Context:
         emitter: _Emitter,
         pre_event,
         post_event,
-        event: "Event",
-        state: "State",
     ):
         if emitter and (pre_event or post_event):
             raise ValueError("cannot call Context with emitter AND [pre/post]-event")
@@ -389,4 +400,4 @@ class Context:
         if emitter:
             return emitter
 
-        return _LegacyEmitter(self, pre_event, post_event, event, state)
+        return _LegacyEmitter(pre_event, post_event)
