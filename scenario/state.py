@@ -761,20 +761,28 @@ class StoredState(_DCBase):
 
 @dataclasses.dataclass(frozen=True)
 class Port(_DCBase):
+    """Represents a port on the charm host."""
+
     protocol: Literal["tcp", "udp", "icmp"]
     port: Optional[int] = None
     """The port to open. Required for TCP and UDP; not allowed for ICMP."""
 
     def __post_init__(self):
         port = self.port
-        if self.protocol == "icmp" and port:
-            raise StateValidationError("`port` arg not supported with `icmp` protocol")
-        elif not port:
+        is_icmp = self.protocol == "icmp"
+        if port:
+            if is_icmp:
+                raise StateValidationError(
+                    "`port` arg not supported with `icmp` protocol",
+                )
+            if not (1 <= port <= 65535):
+                raise StateValidationError(
+                    f"`port` outside bounds [1:65535], got {port}",
+                )
+        elif not is_icmp:
             raise StateValidationError(
                 f"`port` arg required with `{self.protocol}` protocol",
             )
-        if port and not (1 <= port <= 65535):
-            raise StateValidationError(f"`port` outside bounds [1:65535], got {port}")
 
 
 @dataclasses.dataclass(frozen=True)
