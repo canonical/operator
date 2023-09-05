@@ -34,10 +34,10 @@ I like metaphors, so here we go:
 - There is a theatre stage.
 - You pick an actor (a Charm) to put on the stage. Not just any actor: an improv one.
 - You arrange the stage with content that the actor will have to interact with. This consists of selecting:
-    - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what
-      other actors are there around it, what is written in those pebble-shaped books on the table?
-    - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the
-      stage (relation-departed), or the content of one of the books changes).
+  - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what
+    other actors are there around it, what is written in those pebble-shaped books on the table?
+  - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the
+    stage (relation-departed), or the content of one of the books changes).
 - How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a
   container), or write something down into one of the books.
 
@@ -66,15 +66,15 @@ Comparing scenario tests with `Harness` tests:
 A scenario test consists of three broad steps:
 
 - **Arrange**:
-    - declare the input state
-    - select an event to fire
+  - declare the input state
+  - select an event to fire
 - **Act**:
-    - run the state (i.e. obtain the output state)
-    - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal
-      APIs
+  - run the state (i.e. obtain the output state)
+  - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal
+    APIs
 - **Assert**:
-    - verify that the output state (or the delta with the input state) is how you expect it to be
-    - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
+  - verify that the output state (or the delta with the input state) is how you expect it to be
+  - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, and no leadership.
@@ -88,14 +88,14 @@ from ops.model import UnknownStatus
 
 
 class MyCharm(CharmBase):
-    pass
+  pass
 
 
 def test_scenario_base():
-    ctx = Context(MyCharm,
-                  meta={"name": "foo"})
-    out = ctx.run('start', State())
-    assert out.unit_status == UnknownStatus()
+  ctx = Context(MyCharm,
+                meta={"name": "foo"})
+  out = ctx.run('start', State())
+  assert out.unit_status == UnknownStatus()
 ```
 
 Now let's start making it more complicated. Our charm sets a special state if it has leadership on 'start':
@@ -108,22 +108,22 @@ from ops.model import ActiveStatus
 
 
 class MyCharm(CharmBase):
-    def __init__(self, ...):
-        self.framework.observe(self.on.start, self._on_start)
+  def __init__(self, ...):
+    self.framework.observe(self.on.start, self._on_start)
 
-    def _on_start(self, _):
-        if self.unit.is_leader():
-            self.unit.status = ActiveStatus('I rule')
-        else:
-            self.unit.status = ActiveStatus('I am ruled')
+  def _on_start(self, _):
+    if self.unit.is_leader():
+      self.unit.status = ActiveStatus('I rule')
+    else:
+      self.unit.status = ActiveStatus('I am ruled')
 
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    ctx = Context(MyCharm,
-                  meta={"name": "foo"})
-    out = ctx.run('start', State(leader=leader))
-    assert out.unit_status == ActiveStatus('I rule' if leader else 'I am ruled')
+  ctx = Context(MyCharm,
+                meta={"name": "foo"})
+  out = ctx.run('start', State(leader=leader))
+  assert out.unit_status == ActiveStatus('I rule' if leader else 'I am ruled')
 ```
 
 By defining the right state we can programmatically define what answers will the charm get to all the questions it can
@@ -141,16 +141,16 @@ from ops.model import MaintenanceStatus, ActiveStatus, WaitingStatus, BlockedSta
 
 # charm code:
 def _on_event(self, _event):
-    self.unit.status = MaintenanceStatus('determining who the ruler is...')
-    try:
-        if self._call_that_takes_a_few_seconds_and_only_passes_on_leadership:
-            self.unit.status = ActiveStatus('I rule')
-        else:
-            self.unit.status = WaitingStatus('checking this is right...')
-            self._check_that_takes_some_more_time()
-            self.unit.status = ActiveStatus('I am ruled')
-    except:
-        self.unit.status = BlockedStatus('something went wrong')
+  self.unit.status = MaintenanceStatus('determining who the ruler is...')
+  try:
+    if self._call_that_takes_a_few_seconds_and_only_passes_on_leadership:
+      self.unit.status = ActiveStatus('I rule')
+    else:
+      self.unit.status = WaitingStatus('checking this is right...')
+      self._check_that_takes_some_more_time()
+      self.unit.status = ActiveStatus('I am ruled')
+  except:
+    self.unit.status = BlockedStatus('something went wrong')
 ```
 
 More broadly, often we want to test 'side effects' of executing a charm, such as what events have been emitted, what statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its relationship with the `State`.
@@ -181,20 +181,20 @@ from scenario import State, Context
 
 
 def test_statuses():
-    ctx = Context(MyCharm,
-                  meta={"name": "foo"})
-    ctx.run('start', State(leader=False))
-    assert ctx.unit_status_history == [
-        UnknownStatus(),
-        MaintenanceStatus('determining who the ruler is...'),
-        WaitingStatus('checking this is right...'),
-        ActiveStatus("I am ruled"),
-    ]
+  ctx = Context(MyCharm,
+                meta={"name": "foo"})
+  ctx.run('start', State(leader=False))
+  assert ctx.unit_status_history == [
+    UnknownStatus(),
+    MaintenanceStatus('determining who the ruler is...'),
+    WaitingStatus('checking this is right...'),
+    ActiveStatus("I am ruled"),
+  ]
 
-    assert ctx.app_status_history == [
-        UnknownStatus(),
-        ActiveStatus(""),
-    ]
+  assert ctx.app_status_history == [
+    UnknownStatus(),
+    ActiveStatus(""),
+  ]
 ```
 
 Note that the current status is not in the **unit status history**.
@@ -213,8 +213,8 @@ from scenario import State, Status
 # ...
 ctx.run('start', State(unit_status=ActiveStatus('foo')))
 assert ctx.unit_status_history == [
-    ActiveStatus('foo'),  # now the first status is active: 'foo'!
-    # ...
+  ActiveStatus('foo'),  # now the first status is active: 'foo'!
+  # ...
 ]
 
 ```
@@ -246,11 +246,11 @@ from ops.charm import StartEvent
 
 
 def test_foo():
-    ctx = Context(...)
-    ctx.run('start', ...)
+  ctx = Context(...)
+  ctx.run('start', ...)
 
-    assert len(ctx.emitted_events) == 1
-    assert isinstance(ctx.emitted_events[0], StartEvent)
+  assert len(ctx.emitted_events) == 1
+  assert isinstance(ctx.emitted_events[0], StartEvent)
 ```
 
 ### Low-level access: using directly `capture_events`
@@ -266,11 +266,11 @@ from ops.charm import StartEvent, UpdateStatusEvent
 from scenario import State, Context, DeferredEvent, capture_events
 
 with capture_events() as emitted:
-    ctx = Context(...)
-    state_out = ctx.run(
-        "update-status",
-        State(deferred=[DeferredEvent("start", ...)])
-    )
+  ctx = Context(...)
+  state_out = ctx.run(
+    "update-status",
+    State(deferred=[DeferredEvent("start", ...)])
+  )
 
 # deferred events get reemitted first
 assert isinstance(emitted[0], StartEvent)
@@ -288,8 +288,8 @@ from ops.charm import StartEvent, RelationEvent
 from scenario import capture_events
 
 with capture_events(StartEvent, RelationEvent) as emitted:
-    # capture all `start` and `*-relation-*` events.
-    pass
+  # capture all `start` and `*-relation-*` events.
+  pass
 ```
 
 Configuration:
@@ -312,41 +312,41 @@ from scenario import Relation, State, Context
 
 # This charm copies over remote app data to local unit data
 class MyCharm(CharmBase):
-    ...
+  ...
 
-    def _on_event(self, e):
-        rel = e.relation
-        assert rel.app.name == 'remote'
-        assert rel.data[self.unit]['abc'] == 'foo'
-        rel.data[self.unit]['abc'] = rel.data[e.app]['cde']
+  def _on_event(self, e):
+    rel = e.relation
+    assert rel.app.name == 'remote'
+    assert rel.data[self.unit]['abc'] == 'foo'
+    rel.data[self.unit]['abc'] = rel.data[e.app]['cde']
 
 
 def test_relation_data():
-    state_in = State(relations=[
-        Relation(
-            endpoint="foo",
-            interface="bar",
-            remote_app_name="remote",
-            local_unit_data={"abc": "foo"},
-            remote_app_data={"cde": "baz!"},
-        ),
-    ])
-    ctx = Context(MyCharm,
-                  meta={"name": "foo"})
+  state_in = State(relations=[
+    Relation(
+      endpoint="foo",
+      interface="bar",
+      remote_app_name="remote",
+      local_unit_data={"abc": "foo"},
+      remote_app_data={"cde": "baz!"},
+    ),
+  ])
+  ctx = Context(MyCharm,
+                meta={"name": "foo"})
 
-    state_out = ctx.run('start', state_in)
+  state_out = ctx.run('start', state_in)
 
-    assert state_out.relations[0].local_unit_data == {"abc": "baz!"}
-    # you can do this to check that there are no other differences:
-    assert state_out.relations == [
-        Relation(
-            endpoint="foo",
-            interface="bar",
-            remote_app_name="remote",
-            local_unit_data={"abc": "baz!"},
-            remote_app_data={"cde": "baz!"},
-        ),
-    ]
+  assert state_out.relations[0].local_unit_data == {"abc": "baz!"}
+  # you can do this to check that there are no other differences:
+  assert state_out.relations == [
+    Relation(
+      endpoint="foo",
+      interface="bar",
+      remote_app_name="remote",
+      local_unit_data={"abc": "baz!"},
+      remote_app_data={"cde": "baz!"},
+    ),
+  ]
 
 # which is very idiomatic and superbly explicit. Noice.
 ```
@@ -376,8 +376,8 @@ have `remote_app_name` or `remote_app_data` arguments. Also, it talks in terms o
 from scenario.state import PeerRelation
 
 relation = PeerRelation(
-    endpoint="peers",
-    peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
+  endpoint="peers",
+  peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
 )
 ```
 
@@ -388,11 +388,11 @@ be flagged by the Consistency Checker:
 from scenario import State, PeerRelation, Context
 
 state_in = State(relations=[
-    PeerRelation(
-        endpoint="peers",
-        peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
-    )],
-    unit_id=1)
+  PeerRelation(
+    endpoint="peers",
+    peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
+  )],
+  unit_id=1)
 
 Context(...).run("start", state_in)  # invalid: this unit's id cannot be the ID of a peer.
 
@@ -416,10 +416,10 @@ argument. Also, it talks in terms of `primary`:
 from scenario.state import SubordinateRelation
 
 relation = SubordinateRelation(
-    endpoint="peers",
-    remote_unit_data={"foo": "bar"},
-    remote_app_name="zookeeper",
-    remote_unit_id=42
+  endpoint="peers",
+  remote_unit_data={"foo": "bar"},
+  remote_app_name="zookeeper",
+  remote_unit_id=42
 )
 relation.remote_unit_name  # "zookeeper/42"
 ```
@@ -514,8 +514,8 @@ An example of a scene including some containers:
 from scenario.state import Container, State
 
 state = State(containers=[
-    Container(name="foo", can_connect=True),
-    Container(name="bar", can_connect=False)
+  Container(name="foo", can_connect=True),
+  Container(name="bar", can_connect=False)
 ])
 ```
 
@@ -538,8 +538,8 @@ In this case, if the charm were to:
 
 ```python
 def _on_start(self, _):
-    foo = self.unit.get_container('foo')
-    content = foo.pull('/local/share/config.yaml').read()
+  foo = self.unit.get_container('foo')
+  content = foo.pull('/local/share/config.yaml').read()
 ```
 
 then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempdir` for nicely wrapping
@@ -554,30 +554,30 @@ from scenario import State, Container, Mount, Context
 
 
 class MyCharm(CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+  def __init__(self, *args):
+    super().__init__(*args)
+    self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
 
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
+  def _on_pebble_ready(self, _):
+    foo = self.unit.get_container('foo')
+    foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
 
 
 def test_pebble_push():
-    with tempfile.NamedTemporaryFile() as local_file:
-        container = Container(name='foo',
-                              can_connect=True,
-                              mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
-        state_in = State(
-            containers=[container]
-        )
-        Context(
-            MyCharm,
-            meta={"name": "foo", "containers": {"foo": {}}}).run(
-            "start",
-            state_in,
-        )
-        assert local_file.read().decode() == "TEST"
+  with tempfile.NamedTemporaryFile() as local_file:
+    container = Container(name='foo',
+                          can_connect=True,
+                          mounts={'local': Mount('/local/share/config.yaml', local_file.name)})
+    state_in = State(
+      containers=[container]
+    )
+    Context(
+      MyCharm,
+      meta={"name": "foo", "containers": {"foo": {}}}).run(
+      "start",
+      state_in,
+    )
+    assert local_file.read().decode() == "TEST"
 ```
 
 `container.pebble_ready_event` is syntactic sugar for: `Event("foo-pebble-ready", container=container)`. The reason we
@@ -603,32 +603,32 @@ drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib
 
 
 class MyCharm(CharmBase):
-    def _on_start(self, _):
-        foo = self.unit.get_container('foo')
-        proc = foo.exec(['ls', '-ll'])
-        stdout, _ = proc.wait_output()
-        assert stdout == LS_LL
+  def _on_start(self, _):
+    foo = self.unit.get_container('foo')
+    proc = foo.exec(['ls', '-ll'])
+    stdout, _ = proc.wait_output()
+    assert stdout == LS_LL
 
 
 def test_pebble_exec():
-    container = Container(
-        name='foo',
-        exec_mock={
-            ('ls', '-ll'):  # this is the command we're mocking
-                ExecOutput(return_code=0,  # this data structure contains all we need to mock the call.
-                           stdout=LS_LL)
-        }
-    )
-    state_in = State(
-        containers=[container]
-    )
-    state_out = Context(
-        MyCharm,
-        meta={"name": "foo", "containers": {"foo": {}}},
-    ).run(
-        container.pebble_ready_event,
-        state_in,
-    )
+  container = Container(
+    name='foo',
+    exec_mock={
+      ('ls', '-ll'):  # this is the command we're mocking
+        ExecOutput(return_code=0,  # this data structure contains all we need to mock the call.
+                   stdout=LS_LL)
+    }
+  )
+  state_in = State(
+    containers=[container]
+  )
+  state_out = Context(
+    MyCharm,
+    meta={"name": "foo", "containers": {"foo": {}}},
+  ).run(
+    container.pebble_ready_event,
+    state_in,
+  )
 ```
 
 # Secrets
@@ -639,12 +639,12 @@ Scenario has secrets. Here's how you use them.
 from scenario import State, Secret
 
 state = State(
-    secrets=[
-        Secret(
-            id='foo',
-            contents={0: {'key': 'public'}}
-        )
-    ]
+  secrets=[
+    Secret(
+      id='foo',
+      contents={0: {'key': 'public'}}
+    )
+  ]
 )
 ```
 
@@ -661,15 +661,15 @@ To specify a secret owned by this unit (or app):
 from scenario import State, Secret
 
 state = State(
-    secrets=[
-        Secret(
-            id='foo',
-            contents={0: {'key': 'public'}},
-            owner='unit',  # or 'app'
-            remote_grants={0: {"remote"}}
-            # the secret owner has granted access to the "remote" app over some relation with ID 0
-        )
-    ]
+  secrets=[
+    Secret(
+      id='foo',
+      contents={0: {'key': 'public'}},
+      owner='unit',  # or 'app'
+      remote_grants={0: {"remote"}}
+      # the secret owner has granted access to the "remote" app over some relation with ID 0
+    )
+  ]
 )
 ```
 
@@ -679,15 +679,15 @@ To specify a secret owned by some other application and give this unit (or app) 
 from scenario import State, Secret
 
 state = State(
-    secrets=[
-        Secret(
-            id='foo',
-            contents={0: {'key': 'public'}},
-            # owner=None, which is the default
-            granted="unit",  # or "app",
-            revision=0,  # the revision that this unit (or app) is currently tracking
-        )
-    ]
+  secrets=[
+    Secret(
+      id='foo',
+      contents={0: {'key': 'public'}},
+      # owner=None, which is the default
+      granted="unit",  # or "app",
+      revision=0,  # the revision that this unit (or app) is currently tracking
+    )
+  ]
 )
 ```
 
@@ -708,16 +708,16 @@ from charm import MyCharm
 
 
 def test_backup_action():
-    ctx = Context(MyCharm)
+  ctx = Context(MyCharm)
 
-    # If you didn't declare do_backup in the charm's `actions.yaml`, 
-    # the `ConsistencyChecker` will slap you on the wrist and refuse to proceed.
-    out: ActionOutput = ctx.run_action("do_backup_action", State())
+  # If you didn't declare do_backup in the charm's `actions.yaml`, 
+  # the `ConsistencyChecker` will slap you on the wrist and refuse to proceed.
+  out: ActionOutput = ctx.run_action("do_backup_action", State())
 
-    # you can assert action results, logs, failure using the ActionOutput interface
-    assert out.results == {'foo': 'bar'}
-    assert out.logs == ['baz', 'qux']
-    assert out.failure == 'boo-hoo'
+  # you can assert action results, logs, failure using the ActionOutput interface
+  assert out.results == {'foo': 'bar'}
+  assert out.logs == ['baz', 'qux']
+  assert out.failure == 'boo-hoo'
 ```
 
 ## Parametrized Actions
@@ -730,15 +730,15 @@ from charm import MyCharm
 
 
 def test_backup_action():
-    # define an action
-    action = Action('do_backup', params={'a': 'b'})
-    ctx = Context(MyCharm)
+  # define an action
+  action = Action('do_backup', params={'a': 'b'})
+  ctx = Context(MyCharm)
 
-    # if the parameters (or their type) don't match what declared in actions.yaml, 
-    # the `ConsistencyChecker` will slap you on the other wrist. 
-    out: ActionOutput = ctx.run_action(action, State())
+  # if the parameters (or their type) don't match what declared in actions.yaml, 
+  # the `ConsistencyChecker` will slap you on the other wrist. 
+  out: ActionOutput = ctx.run_action(action, State())
 
-    # ...
+  # ...
 ```
 
 # Deferred events
@@ -753,26 +753,26 @@ from scenario import State, deferred, Context
 
 
 class MyCharm(...):
-    ...
+  ...
 
-    def _on_update_status(self, e):
-        e.defer()
+  def _on_update_status(self, e):
+    e.defer()
 
-    def _on_start(self, e):
-        e.defer()
+  def _on_start(self, e):
+    e.defer()
 
 
 def test_start_on_deferred_update_status(MyCharm):
-    """Test charm execution if a 'start' is dispatched when in the previous run an update-status had been deferred."""
-    state_in = State(
-        deferred=[
-            deferred('update_status',
-                     handler=MyCharm._on_update_status)
-        ]
-    )
-    state_out = Context(MyCharm).run('start', state_in)
-    assert len(state_out.deferred) == 1
-    assert state_out.deferred[0].name == 'start'
+  """Test charm execution if a 'start' is dispatched when in the previous run an update-status had been deferred."""
+  state_in = State(
+    deferred=[
+      deferred('update_status',
+               handler=MyCharm._on_update_status)
+    ]
+  )
+  state_out = Context(MyCharm).run('start', state_in)
+  assert len(state_out.deferred) == 1
+  assert state_out.deferred[0].name == 'start'
 ```
 
 You can also generate the 'deferred' data structure (called a DeferredEvent) from the corresponding Event (and the
@@ -783,7 +783,7 @@ from scenario import Event, Relation
 
 
 class MyCharm(...):
-    ...
+  ...
 
 
 deferred_start = Event('start').deferred(MyCharm._on_start)
@@ -805,16 +805,16 @@ from scenario import State, Context
 
 
 class MyCharm(...):
-    ...
+  ...
 
-    def _on_start(self, e):
-        e.defer()
+  def _on_start(self, e):
+    e.defer()
 
 
 def test_defer(MyCharm):
-    out = Context(MyCharm).run('start', State())
-    assert len(out.deferred) == 1
-    assert out.deferred[0].name == 'start'
+  out = Context(MyCharm).run('start', State())
+  assert len(out.deferred) == 1
+  assert out.deferred[0].name == 'start'
 ```
 
 ## Deferring relation events
@@ -828,22 +828,22 @@ from scenario import State, Relation, deferred
 
 
 class MyCharm(...):
-    ...
+  ...
 
-    def _on_foo_relation_changed(self, e):
-        e.defer()
+  def _on_foo_relation_changed(self, e):
+    e.defer()
 
 
 def test_start_on_deferred_update_status(MyCharm):
-    foo_relation = Relation('foo')
-    State(
-        relations=[foo_relation],
-        deferred=[
-            deferred('foo_relation_changed',
-                     handler=MyCharm._on_foo_relation_changed,
-                     relation=foo_relation)
-        ]
-    )
+  foo_relation = Relation('foo')
+  State(
+    relations=[foo_relation],
+    deferred=[
+      deferred('foo_relation_changed',
+               handler=MyCharm._on_foo_relation_changed,
+               relation=foo_relation)
+    ]
+  )
 ```
 
 but you can also use a shortcut from the relation event itself, as mentioned above:
@@ -854,7 +854,7 @@ from scenario import Relation
 
 
 class MyCharm(...):
-    ...
+  ...
 
 
 foo_relation = Relation('foo')
@@ -872,9 +872,9 @@ For general-purpose usage, you will need to instantiate DeferredEvent directly.
 from scenario import DeferredEvent
 
 my_deferred_event = DeferredEvent(
-    handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
-    owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
-    observer='_on_database_ready'
+  handle_path='MyCharm/MyCharmLib/on/database_ready[1]',
+  owner='MyCharmLib',  # the object observing the event. Could also be MyCharm.
+  observer='_on_database_ready'
 )
 ```
 
@@ -889,21 +889,21 @@ from scenario import State, StoredState
 
 
 class MyCharmType(CharmBase):
-    my_stored_state = Ops_StoredState()
+  my_stored_state = Ops_StoredState()
 
-    def __init__(self, framework: Framework):
-        super().__init__(framework)
-        assert self.my_stored_state.foo == 'bar'  # this will pass!
+  def __init__(self, framework: Framework):
+    super().__init__(framework)
+    assert self.my_stored_state.foo == 'bar'  # this will pass!
 
 
 state = State(stored_state=[
-    StoredState(
-        owner_path="MyCharmType",
-        name="my_stored_state",
-        content={
-            'foo': 'bar',
-            'baz': {42: 42},
-        })
+  StoredState(
+    owner_path="MyCharmType",
+    name="my_stored_state",
+    content={
+      'foo': 'bar',
+      'baz': {42: 42},
+    })
 ])
 ```
 
@@ -937,6 +937,53 @@ This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
 
 (always omit the 'root', i.e. the charm framework key, from the path)
 
+# Live charm introspection
+
+Scenario is a black-box, state-transition testing framework. It makes it trivial to assert that a status went from A to B, but not to assert that, in the context of this charm execution, with this state, a certain method call would return a given piece of data.
+
+Scenario offers a context manager for this use case specifically:
+
+```python
+from ops.charm import CharmBase
+
+from scenario import Context, State
+
+
+class MyCharm(CharmBase):
+  META = {"name": "mycharm"}
+
+  def __init__(self, framework):
+    super().__init__(framework)
+    self.a = "a"
+    framework.observe(self.on.start, self._on_start)
+
+  def _on_start(self, event):
+    self.a = "b"
+
+
+def test_live_charm_introspection(mycharm):
+  ctx = Context(mycharm, meta=mycharm.META)
+  # If you want to do this with actions, you can use `Context.action_emitter` instead.
+  with ctx.emitter("start", State()) as emitter:
+    # this is your charm instance, after ops has set it up
+    charm = emitter.charm
+    assert isinstance(charm, MyCharm)
+    assert charm.a == "a"
+
+  # this will tell ops.main to proceed with normal execution and emit the "start" event on the charm
+  state_out = emitter.emit()
+
+  # after that is done, we are handed back control and we can again do some introspection
+  assert charm.a == "b"
+
+  # state_out is, as in regular scenario tests, a State object you can assert on:
+  assert state_out.unit_status == ...
+```
+
+Note that you can't `emitter.emit()` multiple times: the emitter is a context that ensures that ops.main 'pauses' right before emitting the event to hand you some introspection hooks, but for the rest this is a regular scenario test: you can't emit multiple events in a single charm execution.
+
+
+
 # The virtual charm root
 
 Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. The
@@ -950,7 +997,7 @@ from scenario import State, Context
 
 
 class MyCharmType(CharmBase):
-    pass
+  pass
 
 
 ctx = Context(charm_type=MyCharmType,
@@ -968,14 +1015,14 @@ import tempfile
 
 
 class MyCharmType(CharmBase):
-    pass
+  pass
 
 
 td = tempfile.TemporaryDirectory()
 state = Context(
-    charm_type=MyCharmType,
-    meta={'name': 'my-charm-name'},
-    charm_root=td.name
+  charm_type=MyCharmType,
+  meta={'name': 'my-charm-name'},
+  charm_root=td.name
 ).run('start', State())
 ```
 
@@ -985,12 +1032,12 @@ ignored.
 
 # Immutability
 
-All of the data structures in `state`, e.g. `State, Relation, Container`, etc... are immutable (implemented as frozen dataclasses). 
+All of the data structures in `state`, e.g. `State, Relation, Container`, etc... are immutable (implemented as frozen dataclasses).
 
 This means that all components of the state that goes into a `context.run()` call are not mutated by the call, and the state that you obtain in return is a different instance, and all parts of it have been (deep)copied.
 This ensures that you can do delta-based comparison of states without worrying about them being mutated by scenario.
 
-If you want to modify any of these data structures, you will need to either reinstantiate it from scratch, or use the `replace` api. 
+If you want to modify any of these data structures, you will need to either reinstantiate it from scratch, or use the `replace` api.
 
 ```python
 from scenario import Relation
