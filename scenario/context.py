@@ -32,6 +32,79 @@ class InvalidActionError(InvalidEventError):
     """raised when something is wrong with the action passed to Context.run_action"""
 
 
+class AlreadyEmittedError(RuntimeError):
+    """Raised when _Emitter.emit() is called more than once."""
+
+
+class _Emitter:
+    def __init__(
+        self,
+        ctx: "Context",
+        arg: Union[str, Action, Event],
+        state_in: "State",
+    ):
+        self._ctx = ctx
+        self._arg = arg
+        self._state_in = state_in
+
+        self._emitted: bool = False
+        self._run = None
+
+        self.charm: Optional[CharmType] = None
+        self.output: Optional[Union["State", ActionOutput]] = None
+
+    def setup(self, charm: "CharmType"):
+        self.charm = charm
+
+    def _runner(self):
+        raise NotImplementedError("override in subclass")
+
+    def __enter__(self):
+        self._run = self._runner()
+        next(self._run)
+        return self
+
+    def emit(self) -> "State":
+        """Emit the event and proceed with charm execution.
+
+        This can only be done once.
+        """
+        if self._emitted:
+            raise AlreadyEmittedError("Can only _Emitter.emit() once.")
+        self._emitted = True
+
+        try:
+            out = next(self._run)
+        except StopIteration as e:
+            out = e.value
+        self.output = out
+        return out
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+        if not self._emitted:
+            logger.debug("emitter not invoked. Doing so implicitly...")
+            self.emit()
+
+
+class _EventEmitter(_Emitter):
+    if TYPE_CHECKING:
+        output: State
+
+    def _runner(self):
+        return self._ctx.run(self._arg, self._state_in, _emitter=self)
+
+
+class _ActionEmitter(_Emitter):
+    if TYPE_CHECKING:
+        output: ActionOutput
+
+    def emit(self) -> ActionOutput:
+        return self._ctx._finalize_action(super().emit())
+
+    def _runner(self):
+        return self._ctx.run_action(self._arg, self._state_in, _emitter=self)
+
+
 class Context:
     """Scenario test execution context."""
 
@@ -120,10 +193,52 @@ class Context:
         else:
             self.unit_status_history.append(state.unit_status)
 
+    @staticmethod
+    def _coalesce_action(action: Union[str, Action]):
+        if isinstance(action, str):
+            return Action(action)
+
+        if not isinstance(action, Action):
+            raise InvalidActionError(
+                f"Expected Action or action name; got {type(action)}",
+            )
+        return action
+
+    @staticmethod
+    def _coalesce_event(event: Union[str, Event]):
+        # Validate the event and cast to Event.
+        if isinstance(event, str):
+            event = Event(event)
+
+        if not isinstance(event, Event):
+            raise InvalidEventError(f"Expected Event | str, got {type(event)}")
+
+        if event._is_action_event:
+            raise InvalidEventError(
+                "Cannot Context.run() action events. "
+                "Use Context.run_action instead.",
+            )
+        return event
+
+    def emitter(
+        self,
+        event: Union["Event", str],
+        state: "State",
+    ):
+        return _EventEmitter(self, event, state)
+
+    def action_emitter(
+        self,
+        action: Union["Action", str],
+        state: "State",
+    ):
+        return _ActionEmitter(self, action, state)
+
     def run(
         self,
         event: Union["Event", str],
         state: "State",
+        _emitter: "_Emitter" = None,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
@@ -140,22 +255,10 @@ class Context:
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
         """
-        """Validate the event and cast to Event."""
-        if isinstance(event, str):
-            event = Event(event)
-
-        if not isinstance(event, Event):
-            raise InvalidEventError(f"Expected Event | str, got {type(event)}")
-
-        if event._is_action_event:
-            raise InvalidEventError(
-                "Cannot Context.run() action events. "
-                "Use Context.run_action instead.",
-            )
-
         return self._run(
-            event,
+            self._coalesce_event(event),
             state=state,
+            emitter=_emitter,
             pre_event=pre_event,
             post_event=post_event,
         )
@@ -164,6 +267,7 @@ class Context:
         self,
         action: Union["Action", str],
         state: "State",
+        _emitter: _Emitter,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> ActionOutput:
@@ -181,21 +285,21 @@ class Context:
             Will receive the charm instance as only positional argument.
         """
 
-        if isinstance(action, str):
-            action = Action(action)
-
-        if not isinstance(action, Action):
-            raise InvalidActionError(
-                f"Expected Action or action name; got {type(action)}",
-            )
+        action = self._coalesce_action(action)
 
         state_out = self._run(
             action.event,
             state=state,
+            emitter=_emitter,
             pre_event=pre_event,
             post_event=post_event,
         )
 
+        if _emitter:
+            return state_out
+        return self._finalize_action(state_out)
+
+    def _finalize_action(self, state_out: "State"):
         ao = ActionOutput(
             state_out,
             self._action_logs,
@@ -214,6 +318,7 @@ class Context:
         self,
         event: "Event",
         state: "State",
+        emitter: _Emitter = None,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
@@ -222,10 +327,10 @@ class Context:
             juju_version=self.juju_version,
             charm_root=self.charm_root,
         )
-
         return runtime.exec(
             state=state,
             event=event,
+            emitter=emitter,
             pre_event=pre_event,
             post_event=post_event,
             context=self,

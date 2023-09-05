@@ -34,7 +34,7 @@ from scenario.state import DeferredEvent, PeerRelation, StoredState
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.context import Context
+    from scenario.context import Context, Emitter
     from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
@@ -341,6 +341,7 @@ class Runtime:
         state: "State",
         event: "Event",
         context: "Context",
+        emitter: "Emitter" = None,
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
     ) -> "State":
@@ -384,7 +385,8 @@ class Runtime:
             from scenario.ops_main_mock import main as mocked_main
 
             try:
-                mocked_main(
+                main = mocked_main(
+                    emitter=emitter,
                     pre_event=pre_event,
                     post_event=post_event,
                     state=output_state,
@@ -394,6 +396,11 @@ class Runtime:
                         charm_type=self._wrap(charm_type),
                     ),
                 )
+
+                # if we are passing an emitter, main is a generator and this is a generator too
+                if emitter:
+                    yield next(main)
+
             except NoObserverError:
                 raise  # propagate along
             except Exception as e:

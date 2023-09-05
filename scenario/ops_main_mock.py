@@ -20,7 +20,7 @@ from ops.main import logger as ops_logger
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.context import Context
+    from scenario.context import Context, Emitter
     from scenario.state import Event, State, _CharmSpec
 
 
@@ -80,6 +80,7 @@ def _emit_charm_event(
 
 
 def main(
+    emitter: "Emitter" = None,
     pre_event: Optional[Callable[["CharmType"], None]] = None,
     post_event: Optional[Callable[["CharmType"], None]] = None,
     state: "State" = None,
@@ -136,6 +137,9 @@ def main(
         # they do not have the full access to all hook tools.
         if not dispatcher.is_restricted_context():
             framework.reemit()
+
+        if emitter:
+            yield emitter.setup(charm)
 
         if pre_event:
             pre_event(charm)
