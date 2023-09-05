@@ -48,6 +48,8 @@ class AlreadyEmittedError(RuntimeError):
 
 
 class _Emitter:
+    """Context manager to offer test code some runtime charm object introspection."""
+
     def __init__(
         self,
         ctx: "Context",
@@ -117,6 +119,8 @@ class _ActionEmitter(_Emitter):
 
 
 class _LegacyEmitter:
+    """Compatibility shim to keep using the [pre/post]-event syntax while we're deprecating it."""
+
     def __init__(self, pre=None, post=None):
         self.pre = pre
         self.post = post
@@ -247,11 +251,48 @@ class Context:
             )
         return event
 
+    def _coalesce_emitter(
+        self,
+        emitter: Optional[_Emitter],
+        pre_event: Optional[Callable],
+        post_event: Optional[Callable],
+    ) -> Union[_LegacyEmitter, _Emitter]:
+        # validate emitter and pre/post event arguments, cast to emitter
+        legacy_mode = pre_event or post_event
+        if legacy_mode:
+            logger.warning(
+                "The [pre/post]_event syntax is deprecated and "
+                "will be removed in a future release. "
+                "Please start using the Context.[event/action]_runner context manager.",
+            )
+
+        if emitter and legacy_mode:
+            raise ValueError(
+                "cannot call Context with emitter AND legacy [pre/post]-event",
+            )
+
+        if emitter:
+            return emitter
+
+        return _LegacyEmitter(pre_event, post_event)
+
     def emitter(
         self,
         event: Union["Event", str],
         state: "State",
     ):
+        """Context manager to introspect live charm object before and after the event is emitted.
+
+        Usage:
+        >>> with Context.action_emitter("start", State()) as emitter:
+        >>>     assert emitter.charm._some_private_attribute == "foo"
+        >>>     emitter.emit()  # this will fire the event
+        >>>     assert emitter.charm._some_private_attribute == "bar"
+
+        :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
+        :arg state: the State instance to use as data source for the hook tool calls that the
+            charm will invoke when handling the Event.
+        """
         return _EventEmitter(self, event, state)
 
     def action_emitter(
@@ -259,22 +300,30 @@ class Context:
         action: Union["Action", str],
         state: "State",
     ):
+        """Context manager to introspect live charm object before and after the event is emitted.
+
+        Usage:
+        >>> with Context.action_emitter("foo-action", State()) as emitter:
+        >>>     assert emitter.charm._some_private_attribute == "foo"
+        >>>     emitter.emit()  # this will fire the event
+        >>>     assert emitter.charm._some_private_attribute == "bar"
+
+        :arg action: the Action that the charm will execute. Can be a string or an Action instance.
+        :arg state: the State instance to use as data source for the hook tool calls that the
+            charm will invoke when handling the Action (event).
+        """
         return _ActionEmitter(self, action, state)
 
     def _run_event(
         self,
         event: Union["Event", str],
         state: "State",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
         emitter: "_Emitter" = None,
     ) -> Generator["State", None, None]:
         runner = self._run(
             self._coalesce_event(event),
             state=state,
             emitter=emitter,
-            pre_event=pre_event,
-            post_event=post_event,
         )
         return runner
 
@@ -295,10 +344,16 @@ class Context:
             charm will invoke when handling the Event.
         :arg pre_event: callback to be invoked right before emitting the event on the newly
             instantiated charm. Will receive the charm instance as only positional argument.
+            This argument is deprecated. Please use Context.event_emitter instead.
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
+            This argument is deprecated. Please use Context.event_emitter instead.
         """
-        runner = self._run_event(event, state, pre_event, post_event)
+        runner = self._run_event(
+            event,
+            state,
+            emitter=self._coalesce_emitter(None, pre_event, post_event),
+        )
 
         # return the output
         # step it once to get to the point before the event is emitted
@@ -309,8 +364,6 @@ class Context:
         self,
         action: Union["Action", str],
         state: "State",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
         emitter: _Emitter = None,
     ) -> Generator["State", None, None]:
         action = self._coalesce_action(action)
@@ -318,8 +371,6 @@ class Context:
             action.event,
             state=state,
             emitter=emitter,
-            pre_event=pre_event,
-            post_event=post_event,
         )
 
     def run_action(
@@ -328,7 +379,6 @@ class Context:
         state: "State",
         pre_event: Optional[Callable[["CharmType"], None]] = None,
         post_event: Optional[Callable[["CharmType"], None]] = None,
-        _emitter: _Emitter = None,
     ) -> ActionOutput:
         """Trigger a charm execution with an Action and a State.
 
@@ -340,15 +390,15 @@ class Context:
             charm will invoke when handling the Action (event).
         :arg pre_event: callback to be invoked right before emitting the event on the newly
             instantiated charm. Will receive the charm instance as only positional argument.
+            This argument is deprecated. Please use Context.event_emitter instead.
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
+            This argument is deprecated. Please use Context.event_emitter instead.
         """
         runner = self._run_action(
             action,
             state,
-            pre_event,
-            post_event,
-            emitter=_emitter,
+            emitter=self._coalesce_emitter(None, pre_event, post_event),
         )
         return self._finalize_action(exhaust(runner))
 
@@ -371,8 +421,6 @@ class Context:
         self,
         event: "Event",
         state: "State",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
         emitter: _Emitter = None,
     ) -> Generator["State", None, None]:
         runtime = Runtime(
@@ -384,20 +432,6 @@ class Context:
         return runtime.exec(
             state=state,
             event=event,
-            emitter=self._coalesce_emitter(emitter, pre_event, post_event),
+            emitter=emitter,
             context=self,
         )
-
-    def _coalesce_emitter(
-        self,
-        emitter: _Emitter,
-        pre_event,
-        post_event,
-    ):
-        if emitter and (pre_event or post_event):
-            raise ValueError("cannot call Context with emitter AND [pre/post]-event")
-
-        if emitter:
-            return emitter
-
-        return _LegacyEmitter(pre_event, post_event)

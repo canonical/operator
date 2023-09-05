@@ -137,6 +137,7 @@ def main(
         if emitter:
             emitter._setup(charm)
 
+        # give control back to the emitter to do any setup and pre-event assertions
         yield
 
         _emit_charm_event(charm, dispatcher.event_name, event)
