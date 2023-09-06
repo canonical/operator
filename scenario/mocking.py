@@ -5,7 +5,7 @@ import datetime
 import random
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple, Union
 
 from ops import pebble
 from ops.model import (
@@ -18,7 +18,7 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
-from scenario.state import JujuLogLine, Mount, PeerRelation
+from scenario.state import JujuLogLine, Mount, PeerRelation, Port
 
 if TYPE_CHECKING:
     from scenario.context import Context
@@ -74,6 +74,23 @@ class _MockModelBackend(_ModelBackend):
         self._event = event
         self._context = context
         self._charm_spec = charm_spec
+
+    def opened_ports(self) -> Set[Port]:
+        return set(self._state.opened_ports)
+
+    def open_port(self, protocol: str, port: Optional[int] = None):
+        # fixme: the charm will get hit with a StateValidationError
+        #  here, not the expected ModelError...
+        port = Port(protocol, port)
+        ports = self._state.opened_ports
+        if port not in ports:
+            ports.append(port)
+
+    def close_port(self, protocol: str, port: Optional[int] = None):
+        port = Port(protocol, port)
+        ports = self._state.opened_ports
+        if port in ports:
+            ports.remove(port)
 
     def get_pebble(self, socket_path: str) -> "Client":
         container_name = socket_path.split("/")[

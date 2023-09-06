@@ -79,6 +79,10 @@ class StateValidationError(RuntimeError):
     # **combination** of several parts of the State are.
 
 
+class MetadataNotFoundError(RuntimeError):
+    """Raised when Scenario can't find a metadata.yaml file in the provided charm root."""
+
+
 @dataclasses.dataclass(frozen=True)
 class _DCBase:
     def replace(self, *args, **kwargs):
@@ -756,6 +760,32 @@ class StoredState(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
+class Port(_DCBase):
+    """Represents a port on the charm host."""
+
+    protocol: Literal["tcp", "udp", "icmp"]
+    port: Optional[int] = None
+    """The port to open. Required for TCP and UDP; not allowed for ICMP."""
+
+    def __post_init__(self):
+        port = self.port
+        is_icmp = self.protocol == "icmp"
+        if port:
+            if is_icmp:
+                raise StateValidationError(
+                    "`port` arg not supported with `icmp` protocol",
+                )
+            if not (1 <= port <= 65535):
+                raise StateValidationError(
+                    f"`port` outside bounds [1:65535], got {port}",
+                )
+        elif not is_icmp:
+            raise StateValidationError(
+                f"`port` arg required with `{self.protocol}` protocol",
+            )
+
+
+@dataclasses.dataclass(frozen=True)
 class State(_DCBase):
     """Represents the juju-owned portion of a unit's state.
 
@@ -770,6 +800,9 @@ class State(_DCBase):
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     networks: List[Network] = dataclasses.field(default_factory=list)
     containers: List[Container] = dataclasses.field(default_factory=list)
+
+    # we don't use sets to make json serialization easier
+    opened_ports: List[Port] = dataclasses.field(default_factory=list)
     leader: bool = False
     model: Model = Model()
     secrets: List[Secret] = dataclasses.field(default_factory=list)
@@ -890,6 +923,11 @@ class _CharmSpec(_DCBase):
         charm_root = charm_source_path.parent.parent
 
         metadata_path = charm_root / "metadata.yaml"
+        if not metadata_path.exists():
+            raise MetadataNotFoundError(
+                f"invalid charm root {charm_root!r}; "
+                f"expected to contain at least a `metadata.yaml` file.",
+            )
         meta = yaml.safe_load(metadata_path.open())
 
         actions = config = None

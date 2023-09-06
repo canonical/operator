@@ -8,7 +8,7 @@ from ops.framework import Framework
 from ops.pebble import ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import Container, ExecOutput, Mount, State
+from scenario.state import Container, ExecOutput, Mount, Port, State
 from tests.helpers import trigger
 
 
@@ -93,6 +93,10 @@ def test_fs_push(charm_cls):
         event="start",
         post_event=callback,
     )
+
+
+def test_port_equality():
+    assert Port("tcp", 42) == Port("tcp", 42)
 
 
 @pytest.mark.parametrize("make_dirs", (True, False))

@@ -631,6 +631,30 @@ def test_pebble_exec():
     )
 ```
 
+# Ports
+
+Since `ops 2.6.0`, charms can invoke the `open-port`, `close-port`, and `opened-ports` hook tools to manage the ports opened on the host vm/container. Using the `State.opened_ports` api, you can: 
+
+- simulate a charm run with a port opened by some previous execution
+```python
+from scenario import State, Port, Context
+
+ctx = Context(MyCharm)
+ctx.run("start", State(opened_ports=[Port("tcp", 42)]))
+```
+- assert that a charm has called `open-port` or `close-port`:
+```python
+from scenario import State, Port, Context
+
+ctx = Context(MyCharm)
+state1 = ctx.run("start", State())
+assert state1.opened_ports == [Port("tcp", 42)]
+
+state2 = ctx.run("stop", state1)
+assert state2.opened_ports == []
+```
+
+
 # Secrets
 
 Scenario has secrets. Here's how you use them.
