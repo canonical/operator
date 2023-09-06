@@ -395,6 +395,10 @@ class _MockPebbleClient(_TestingPebbleClient):
         self._event = event
         self._charm_spec = charm_spec
 
+        # wipe just in case
+        if container_root.exists():
+            container_root.rmdir()
+
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
         for _, mount in mounts.items():
