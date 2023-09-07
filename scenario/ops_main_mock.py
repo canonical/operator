@@ -18,7 +18,7 @@ from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_a
 from ops.main import logger as ops_logger
 
 if TYPE_CHECKING:
-    from scenario.context import Context, Emitter
+    from scenario.context import Context, manager
     from scenario.state import Event, State, _CharmSpec
 
 
@@ -78,7 +78,7 @@ def _emit_charm_event(
 
 
 def main(
-    emitter: "Emitter" = None,
+    manager: "manager" = None,
     state: "State" = None,
     event: "Event" = None,
     context: "Context" = None,
@@ -134,10 +134,10 @@ def main(
         if not dispatcher.is_restricted_context():
             framework.reemit()
 
-        if emitter:
-            emitter._setup(charm)
+        if manager:
+            manager._setup(charm)
 
-        # give control back to the emitter to do any setup and pre-event assertions
+        # give control back to the manager to do any setup and pre-event assertions
         yield
 
         _emit_charm_event(charm, dispatcher.event_name, event)

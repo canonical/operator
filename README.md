@@ -963,15 +963,15 @@ class MyCharm(CharmBase):
 
 def test_live_charm_introspection(mycharm):
   ctx = Context(mycharm, meta=mycharm.META)
-  # If you want to do this with actions, you can use `Context.action_emitter` instead.
-  with ctx.emitter("start", State()) as emitter:
+  # If you want to do this with actions, you can use `Context.action_manager` instead.
+  with ctx.manager("start", State()) as manager:
     # this is your charm instance, after ops has set it up
-    charm = emitter.charm
+    charm = manager.charm
     assert isinstance(charm, MyCharm)
     assert charm.a == "a"
 
   # this will tell ops.main to proceed with normal execution and emit the "start" event on the charm
-  state_out = emitter.emit()
+  state_out = runner.run()
 
   # after that is done, we are handed back control and we can again do some introspection
   assert charm.a == "b"
@@ -980,7 +980,7 @@ def test_live_charm_introspection(mycharm):
   assert state_out.unit_status == ...
 ```
 
-Note that you can't `emitter.emit()` multiple times: the emitter is a context that ensures that ops.main 'pauses' right before emitting the event to hand you some introspection hooks, but for the rest this is a regular scenario test: you can't emit multiple events in a single charm execution.
+Note that you can't `runner.run()` multiple times: the manager is a context that ensures that ops.main 'pauses' right before emitting the event to hand you some introspection hooks, but for the rest this is a regular scenario test: you can't emit multiple events in a single charm execution.
 
 
 

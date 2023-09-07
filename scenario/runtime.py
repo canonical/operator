@@ -32,7 +32,7 @@ from scenario.state import DeferredEvent, PeerRelation, StoredState
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.context import Context, _Emitter, _LegacyEmitter
+    from scenario.context import Context, _LegacyManager, _Manager
     from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
@@ -339,7 +339,7 @@ class Runtime:
         state: "State",
         event: "Event",
         context: "Context",
-        emitter: Optional[Union["_Emitter", "_LegacyEmitter"]] = None,
+        manager: Optional[Union["_Manager", "_LegacyManager"]] = None,
     ) -> Generator["State", None, None]:
         """Runs an event with this state as initial state on a charm.
 
@@ -382,7 +382,7 @@ class Runtime:
 
             try:
                 main = mocked_main(
-                    emitter=emitter,
+                    manager=manager,
                     state=output_state,
                     event=event,
                     context=context,
@@ -401,9 +401,9 @@ class Runtime:
                 except StopIteration:
                     pass
 
-                logger.info(" - Finalizing emitter (legacy)")
-                if emitter:
-                    emitter._finalize()
+                logger.info(" - Finalizing manager (legacy)")
+                if manager:
+                    manager._finalize()
 
             except NoObserverError:
                 raise  # propagate along

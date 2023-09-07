@@ -3,7 +3,7 @@ from ops import ActiveStatus
 from ops.charm import CharmBase
 
 from scenario import Action, Context, State
-from scenario.context import AlreadyEmittedError, _EventEmitter
+from scenario.context import AlreadyEmittedError, _EventManager
 
 
 @pytest.fixture(scope="function")
@@ -24,16 +24,16 @@ def mycharm():
     return MyCharm
 
 
-def test_emitter(mycharm):
+def test_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with _EventEmitter(ctx, "start", State()) as emitter:
-        assert isinstance(emitter.charm, mycharm)
-        state_out = emitter.emit()
+    with _EventManager(ctx, "start", State()) as manager:
+        assert isinstance(manager.charm, mycharm)
+        state_out = manager.run()
 
     assert state_out
 
 
-def test_emitter_legacy(mycharm):
+def test_manager_legacy(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
 
     def pre_event(charm):
@@ -45,35 +45,35 @@ def test_emitter_legacy(mycharm):
     ctx.run("start", State(), pre_event=pre_event, post_event=post_event)
 
 
-def test_emitter_implicit(mycharm):
+def test_manager_implicit(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with _EventEmitter(ctx, "start", State()) as emitter:
-        print("charm before", emitter.charm)
+    with _EventManager(ctx, "start", State()) as manager:
+        print("charm before", manager.charm)
 
-    assert emitter.output
-    assert emitter.output.unit_status == ActiveStatus("start")
+    assert manager.output
+    assert manager.output.unit_status == ActiveStatus("start")
 
 
-def test_emitter_reemit_fails(mycharm):
+def test_manager_reemit_fails(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with _EventEmitter(ctx, "start", State()) as emitter:
-        print("charm before", emitter.charm)
-        emitter.emit()
+    with _EventManager(ctx, "start", State()) as manager:
+        print("charm before", manager.charm)
+        manager.run()
         with pytest.raises(AlreadyEmittedError):
-            emitter.emit()
+            manager.run()
 
-    assert emitter.output
+    assert manager.output
 
 
-def test_context_emitter(mycharm):
+def test_context_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with ctx.emitter("start", State()) as emitter:
-        state_out = emitter.emit()
+    with ctx.manager("start", State()) as manager:
+        state_out = manager.run()
         assert state_out.model.name
 
 
-def test_context_action_emitter(mycharm):
+def test_context_action_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
-    with ctx.action_emitter(Action("do-x"), State()) as emitter:
-        ao = emitter.emit()
+    with ctx.action_manager(Action("do-x"), State()) as manager:
+        ao = manager.run()
         assert ao.state.model.name
