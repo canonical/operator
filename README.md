@@ -7,18 +7,20 @@
 [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://discourse.charmhub.io/t/rethinking-charm-testing-with-ops-scenario/8649)
 [![Python >= 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
 
-Scenario is a state-transition, functional testing framework for Operator Framework charms.
+Scenario is a state-transition testing SDK for Operator Framework charms.
 
 Where the Harness enables you to procedurally mock pieces of the state the charm needs to function, Scenario tests allow
 you to declaratively define the state all at once, and use it as a sort of context against which you can fire a single
 event on the charm and execute its logic.
 
-This puts scenario tests somewhere in between unit and integration tests: some say 'functional', some say 'contract'.
+This puts scenario tests somewhere in between unit and integration tests: some say 'functional', some say 'contract', I prefer 'state-transition'.
 
-Scenario tests nudge you into thinking of a charm as an input->output function. Input is what we call a `Scene`: the
-union of an `Event` (why am I being executed) and a `State` (am I leader? what is my relation data? what is my
-config?...). The output is another context instance: the context after the charm has had a chance to interact with the
-mocked juju model and affect the state back.
+Scenario tests nudge you into thinking of a charm as an input->output function. The input is the
+union of an `Event` (why am I, charm, being executed) and a `State` (am I leader? what is my relation data? what is my
+config?...). The output is another `State`: the state after the charm has had a chance to interact with the
+mocked juju model and affect the initial state back.
+
+For example: a charm is executed with a `start` event, and based on whether it has leadership or not (according to its input state), it will decide to set `active` or `blocked` status (which will be reflected in the output state).
 
 ![state transition model depiction](resources/state-transition-model.png)
 
@@ -34,10 +36,10 @@ I like metaphors, so here we go:
 - There is a theatre stage.
 - You pick an actor (a Charm) to put on the stage. Not just any actor: an improv one.
 - You arrange the stage with content that the actor will have to interact with. This consists of selecting:
-    - An initial situation (State) in which the actor is, e.g. is the actor the main role or an NPC (is_leader), or what
+    - An initial situation (`State`) in which the actor is, e.g. is the actor the main role or an NPC (`is_leader`), or what
       other actors are there around it, what is written in those pebble-shaped books on the table?
-    - Something that has just happened (an Event) and to which the actor has to react (e.g. one of the NPCs leaves the
-      stage (relation-departed), or the content of one of the books changes).
+    - Something that has just happened (an `Event`) and to which the actor has to react (e.g. one of the NPCs leaves the
+      stage (`relation-departed`), or the content of one of the books changes).
 - How the actor will react to the event will have an impact on the context: e.g. the actor might knock over a table (a
   container), or write something down into one of the books.
 
@@ -77,7 +79,7 @@ A scenario test consists of three broad steps:
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
 
 The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
-available. The charm has no config, no relations, no networks, and no leadership.
+available. The charm has no config, no relations, no networks, no leadership, and its status is `unknown`.
 
 With that, we can write the simplest possible scenario test:
 
@@ -92,8 +94,7 @@ class MyCharm(CharmBase):
 
 
 def test_scenario_base():
-    ctx = Context(MyCharm,
-                  meta={"name": "foo"})
+    ctx = Context(MyCharm, meta={"name": "foo"})
     out = ctx.run('start', State())
     assert out.unit_status == UnknownStatus()
 ```
