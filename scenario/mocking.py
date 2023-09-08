@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import datetime
 import random
+import shutil
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple, Union
@@ -414,7 +415,8 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         # wipe just in case
         if container_root.exists():
-            container_root.rmdir()
+            # Path.rmdir will fail if root is nonempty
+            shutil.rmtree(container_root)
 
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
