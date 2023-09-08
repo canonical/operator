@@ -3,17 +3,19 @@
 # See LICENSE file for licensing details.
 import tempfile
 from collections import namedtuple
+from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ContextManager,
     Dict,
-    Generator,
     List,
     Optional,
     Type,
     Union,
+    cast,
 )
 
 from ops import EventBase
@@ -21,11 +23,11 @@ from ops import EventBase
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import Action, Event, _CharmSpec
-from scenario.utils import exhaust
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
+    from scenario.ops_main_mock import Ops
     from scenario.state import JujuLogLine, State, _EntityStatus
 
     PathLike = Union[str, Path]
@@ -63,30 +65,39 @@ class _Manager:
         self._emitted: bool = False
         self._run = None
 
-        self.charm: Optional[CharmType] = None
+        self.ops: Optional["Ops"] = None
         self.output: Optional[Union["State", ActionOutput]] = None
 
-    def _setup(self, charm: "CharmType"):
-        self.charm = charm
+    @property
+    def charm(self) -> "CharmType":
+        return self.ops.charm
 
+    @property
     def _runner(self):
         raise NotImplementedError("override in subclass")
 
+    def _get_output(self):
+        raise NotImplementedError("override in subclass")
+
     def __enter__(self):
-        self._run = self._runner()
-        next(self._run)
+        self._wrapped_ctx = wrapped_ctx = self._runner()(self._arg, self._state_in)
+        ops = wrapped_ctx.__enter__()
+        self.ops = ops
         return self
 
-    def run(self) -> "State":
+    def run(self) -> Union[ActionOutput, "State"]:
         """Emit the event and proceed with charm execution.
 
         This can only be done once.
         """
         if self._emitted:
-            raise AlreadyEmittedError("Can only _runner.run() once.")
+            raise AlreadyEmittedError("Can only context.manager.run() once.")
         self._emitted = True
 
-        self.output = out = exhaust(self._run)
+        # wrap up Runtime.exec() so that we can gather the output state
+        self._wrapped_ctx.__exit__(None, None, None)
+
+        self.output = out = self._get_output()
         return out
 
     def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
@@ -94,46 +105,33 @@ class _Manager:
             logger.debug("manager not invoked. Doing so implicitly...")
             self.run()
 
-    def _finalize(self):
-        """Compatibility shim for _Legacymanager."""
-        pass
-
 
 class _EventManager(_Manager):
     if TYPE_CHECKING:
         output: State
 
+        def run(self) -> "State":
+            return cast("State", super().run())
+
     def _runner(self):
-        return self._ctx._run_event(self._arg, self._state_in, manager=self)
+        return self._ctx._run_event
+
+    def _get_output(self):
+        return self._ctx._output_state
 
 
 class _ActionManager(_Manager):
     if TYPE_CHECKING:
         output: ActionOutput
 
-    def run(self) -> ActionOutput:
-        return self._ctx._finalize_action(super().run())
+        def run(self) -> "ActionOutput":
+            return cast("ActionOutput", super().run())
 
     def _runner(self):
-        return self._ctx._run_action(self._arg, self._state_in, manager=self)
+        return self._ctx._run_action
 
-
-class _LegacyManager:
-    """Compatibility shim to keep using the [pre/post]-event syntax while we're deprecating it."""
-
-    def __init__(self, pre=None, post=None):
-        self.pre = pre
-        self.post = post
-        self.charm = None
-
-    def _setup(self, charm):
-        self.charm = charm
-        if self.pre:
-            self.pre(charm)
-
-    def _finalize(self):
-        if self.post:
-            self.post(self.charm)
+    def _get_output(self):
+        return self._ctx._finalize_action(self._ctx._output_state)
 
 
 class Context:
@@ -197,10 +195,17 @@ class Context:
         self.workload_version_history: List[str] = []
         self.emitted_events: List[EventBase] = []
 
+        # set by Runtime.exec() in self._run()
+        self._output_state: Optional["State"] = None
+
         # ephemeral side effects from running an action
         self._action_logs = []
         self._action_results = None
         self._action_failure = ""
+
+    def _set_output_state(self, output_state: "State"):
+        """Hook for Runtime to set the output state."""
+        self._output_state = output_state
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
@@ -216,6 +221,7 @@ class Context:
         self._action_logs = []
         self._action_results = None
         self._action_failure = ""
+        self._output_state = None
 
     def _record_status(self, state: "State", is_app: bool):
         """Record the previous status before a status change."""
@@ -251,30 +257,19 @@ class Context:
             )
         return event
 
-    def _coalesce_manager(
-        self,
-        manager: Optional[_Manager],
+    @staticmethod
+    def _warn_deprecation_if_pre_or_post_event(
         pre_event: Optional[Callable],
         post_event: Optional[Callable],
-    ) -> Union[_LegacyManager, _Manager]:
-        # validate manager and pre/post event arguments, cast to manager
+    ):
+        # warn if pre/post event arguments are passed
         legacy_mode = pre_event or post_event
         if legacy_mode:
             logger.warning(
                 "The [pre/post]_event syntax is deprecated and "
                 "will be removed in a future release. "
-                "Please start using the Context.[event/action]_runner context manager.",
+                "Please use the ``Context.[action_]manager`` context manager.",
             )
-
-        if manager and legacy_mode:
-            raise ValueError(
-                "cannot call Context with manager AND legacy [pre/post]-event",
-            )
-
-        if manager:
-            return manager
-
-        return _LegacyManager(pre_event, post_event)
 
     def manager(
         self,
@@ -284,9 +279,9 @@ class Context:
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage:
-        >>> with context.action_manager("start", State()) as manager:
+        >>> with Context().manager("start", State()) as manager:
         >>>     assert manager.charm._some_private_attribute == "foo"
-        >>>     runner.run()  # this will fire the event
+        >>>     manager.run()  # this will fire the event
         >>>     assert manager.charm._some_private_attribute == "bar"
 
         :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
@@ -303,9 +298,9 @@ class Context:
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage:
-        >>> with context.action_manager("foo-action", State()) as manager:
+        >>> with Context().action_manager("foo-action", State()) as manager:
         >>>     assert manager.charm._some_private_attribute == "foo"
-        >>>     runner.run()  # this will fire the event
+        >>>     manager.run()  # this will fire the event
         >>>     assert manager.charm._some_private_attribute == "bar"
 
         :arg action: the Action that the charm will execute. Can be a string or an Action instance.
@@ -314,18 +309,17 @@ class Context:
         """
         return _ActionManager(self, action, state)
 
+    @contextmanager
     def _run_event(
         self,
         event: Union["Event", str],
         state: "State",
-        manager: "_Manager" = None,
-    ) -> Generator["State", None, None]:
-        runner = self._run(
-            self._coalesce_event(event),
+    ) -> ContextManager["Ops"]:
+        with self._run(
+            event=self._coalesce_event(event),
             state=state,
-            manager=manager,
-        )
-        return runner
+        ) as ops:
+            yield ops
 
     def run(
         self,
@@ -349,29 +343,21 @@ class Context:
             Will receive the charm instance as only positional argument.
             This argument is deprecated. Please use Context.event_manager instead.
         """
-        runner = self._run_event(
+        self._warn_deprecation_if_pre_or_post_event(pre_event, post_event)
+
+        with self._run_event(
             event,
             state,
-            manager=self._coalesce_manager(None, pre_event, post_event),
-        )
+        ) as ops:
+            if pre_event:
+                pre_event(ops.charm)
 
-        # return the output
-        # step it once to get to the point before the event is emitted
-        # step it twice to let Runtime terminate
-        return exhaust(runner)
+            ops.emit()
 
-    def _run_action(
-        self,
-        action: Union["Action", str],
-        state: "State",
-        manager: _Manager = None,
-    ) -> Generator["State", None, None]:
-        action = self._coalesce_action(action)
-        return self._run(
-            action.event,
-            state=state,
-            manager=manager,
-        )
+            if post_event:
+                post_event(ops.charm)
+
+        return self._output_state
 
     def run_action(
         self,
@@ -395,12 +381,21 @@ class Context:
             Will receive the charm instance as only positional argument.
             This argument is deprecated. Please use Context.event_manager instead.
         """
-        runner = self._run_action(
-            action,
-            state,
-            manager=self._coalesce_manager(None, pre_event, post_event),
-        )
-        return self._finalize_action(exhaust(runner))
+        self._warn_deprecation_if_pre_or_post_event(pre_event, post_event)
+
+        with self._run_action(
+            action=self._coalesce_action(action),
+            state=state,
+        ) as ops:
+            if pre_event:
+                pre_event(ops.charm)
+
+            ops.emit()
+
+            if post_event:
+                post_event(ops.charm)
+
+        return self._finalize_action(self._output_state)
 
     def _finalize_action(self, state_out: "State"):
         ao = ActionOutput(
@@ -417,21 +412,33 @@ class Context:
 
         return ao
 
+    @contextmanager
+    def _run_action(
+        self,
+        action: Union["Action", str],
+        state: "State",
+    ) -> ContextManager["Ops"]:
+        action = self._coalesce_action(action)
+        with self._run(
+            event=action.event,
+            state=state,
+        ) as ops:
+            yield ops
+
+    @contextmanager
     def _run(
         self,
         event: "Event",
         state: "State",
-        manager: _Manager = None,
-    ) -> Generator["State", None, None]:
+    ) -> ContextManager["Ops"]:
         runtime = Runtime(
             charm_spec=self.charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
         )
-
-        return runtime.exec(
+        with runtime.exec(
             state=state,
             event=event,
-            manager=manager,
             context=self,
-        )
+        ) as ops:
+            yield ops

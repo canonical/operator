@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     ContextManager,
-    Generator,
     List,
     Optional,
     Tuple,
@@ -32,7 +31,8 @@ from scenario.state import DeferredEvent, PeerRelation, StoredState
 if TYPE_CHECKING:
     from ops.testing import CharmType
 
-    from scenario.context import Context, _LegacyManager, _Manager
+    from scenario.context import Context
+    from scenario.ops_main_mock import Ops
     from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
@@ -130,6 +130,28 @@ class UnitStateDB:
             db.save_snapshot(stored_state.handle_path, stored_state.content)
 
         db.close()
+
+
+class _OpsMainContext:
+    """Context manager representing ops.main execution context.
+
+    When entered, ops.main sets up everything up until the charm.
+    When .emit() is called, ops.main proceeds with emitting the event.
+    When exited, if .emit has not been called manually, it is called automatically.
+    """
+
+    def __init__(self):
+        self._has_emitted = False
+
+    def __enter__(self):
+        pass
+
+    def emit(self):
+        self._has_emitted = True
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+        if not self._has_emitted:
+            self.emit()
 
 
 class Runtime:
@@ -334,13 +356,13 @@ class Runtime:
             with capture_events() as captured:
                 yield (temporary_charm_root, captured)
 
+    @contextmanager
     def exec(
         self,
         state: "State",
         event: "Event",
         context: "Context",
-        manager: Optional[Union["_Manager", "_LegacyManager"]] = None,
-    ) -> Generator["State", None, None]:
+    ) -> ContextManager["Ops"]:
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the
@@ -376,13 +398,10 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
-            # we don't import from ops.main because we need some extras, such as the
-            # pre/post_event hooks
-            from scenario.ops_main_mock import main as mocked_main
+            from scenario.ops_main_mock import Ops
 
             try:
-                main = mocked_main(
-                    manager=manager,
+                ops = Ops(
                     state=output_state,
                     event=event,
                     context=context,
@@ -390,20 +409,12 @@ class Runtime:
                         charm_type=self._wrap(charm_type),
                     ),
                 )
+                ops.setup()
 
-                # main is a generator, let's step it up until its yield
-                # statement = right before firing the event
-                yield next(main)
+                yield ops
 
-                # exhaust the iterator = allow ops to tear down
-                try:
-                    next(main)
-                except StopIteration:
-                    pass
-
-                logger.info(" - Finalizing manager (legacy)")
-                if manager:
-                    manager._finalize()
+                # if the caller did not manually emit or commit: do that.
+                ops.finalize()
 
             except NoObserverError:
                 raise  # propagate along
@@ -424,4 +435,4 @@ class Runtime:
         context.emitted_events.extend(captured)
 
         logger.info("event dispatched. done.")
-        return output_state
+        context._set_output_state(output_state)

@@ -9,10 +9,8 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
 
 from scenario import Context
-from scenario.context import _LegacyManager
 from scenario.runtime import Runtime, UncaughtCharmError
 from scenario.state import Event, Relation, State, _CharmSpec
-from scenario.utils import exhaust
 
 
 def charm_type():
@@ -32,38 +30,6 @@ def charm_type():
             MyCharm._event = e
 
     return MyCharm
-
-
-def test_event_hooks():
-    with TemporaryDirectory() as tempdir:
-        meta = {
-            "name": "foo",
-            "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
-        }
-        temppath = Path(tempdir)
-        meta_file = temppath / "metadata.yaml"
-        meta_file.write_text(yaml.safe_dump(meta))
-
-        my_charm_type = charm_type()
-        runtime = Runtime(
-            _CharmSpec(
-                my_charm_type,
-                meta=meta,
-            ),
-        )
-
-        pre_event = MagicMock(return_value=None)
-        post_event = MagicMock(return_value=None)
-        runner = runtime.exec(
-            state=State(),
-            event=Event("update_status"),
-            manager=_LegacyManager(pre_event, post_event),
-            context=Context(my_charm_type, meta=meta),
-        )
-        exhaust(runner)
-
-        assert pre_event.called
-        assert post_event.called
 
 
 def test_event_emission():
@@ -87,10 +53,10 @@ def test_event_emission():
             ),
         )
 
-        runner = runtime.exec(
+        with runtime.exec(
             state=State(), event=Event("bar"), context=Context(my_charm_type, meta=meta)
-        )
-        exhaust(runner)
+        ) as ops:
+            pass
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)
@@ -112,15 +78,12 @@ def test_unit_name(app_name, unit_id):
         ),
     )
 
-    def post_event(charm: CharmBase):
-        assert charm.unit.name == f"{app_name}/{unit_id}"
-
-    runtime.exec(
+    with runtime.exec(
         state=State(unit_id=unit_id),
         event=Event("start"),
-        manager=_LegacyManager(None, post_event),
         context=Context(my_charm_type, meta=meta),
-    )
+    ) as charm:
+        assert charm.unit.name == f"{app_name}/{unit_id}"
 
 
 def test_env_cleanup_on_charm_error():
@@ -135,17 +98,12 @@ def test_env_cleanup_on_charm_error():
         ),
     )
 
-    def post_event(charm: CharmBase):
-        assert os.getenv("JUJU_REMOTE_APP")
-        raise TypeError
-
     with pytest.raises(UncaughtCharmError):
-        runner = runtime.exec(
+        with runtime.exec(
             state=State(),
             event=Event("box_relation_changed", relation=Relation("box")),
-            manager=_LegacyManager(post=post_event),
             context=Context(my_charm_type, meta=meta),
-        )
-        exhaust(runner)
+        ) as charm:
+            assert os.getenv("JUJU_REMOTE_APP")
 
     assert os.getenv("JUJU_REMOTE_APP", None) is None
