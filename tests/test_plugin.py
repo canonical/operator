@@ -4,7 +4,7 @@ pytest_plugins = "pytester"
 sys.path.append(".")
 
 
-def test_context(pytester):
+def test_plugin_ctx_run(pytester):
     # create a temporary pytest test module
     pytester.makepyfile(
         """

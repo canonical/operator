@@ -82,8 +82,8 @@ def test_unit_name(app_name, unit_id):
         state=State(unit_id=unit_id),
         event=Event("start"),
         context=Context(my_charm_type, meta=meta),
-    ) as charm:
-        assert charm.unit.name == f"{app_name}/{unit_id}"
+    ) as ops:
+        assert ops.charm.unit.name == f"{app_name}/{unit_id}"
 
 
 def test_env_cleanup_on_charm_error():
