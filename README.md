@@ -154,7 +154,9 @@ def _on_event(self, _event):
         self.unit.status = BlockedStatus('something went wrong')
 ```
 
-More broadly, often we want to test 'side effects' of executing a charm, such as what events have been emitted, what statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its relationship with the `State`.
+More broadly, often we want to test 'side effects' of executing a charm, such as what events have been emitted, what
+statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its
+relationship with the `State`.
 
 # Context and State
 
@@ -451,7 +453,6 @@ changed_event = Event('foo-relation-changed', relation=relation)
 The reason for this construction is that the event is associated with some relation-specific metadata, that Scenario
 needs to set up the process that will run `ops.main` with the right environment variables.
 
-
 ### Working with relation IDs
 
 Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `relation_id`.
@@ -460,6 +461,7 @@ To inspect the ID the next relation instance will have, you can call `state.next
 ```python
 from scenario import Relation
 from scenario.state import next_relation_id
+
 next_id = next_relation_id(update=False)
 rel = Relation('foo')
 assert rel.relation_id == next_id
@@ -470,6 +472,7 @@ This can be handy when using `replace` to create new relations, to avoid relatio
 ```python
 from scenario import Relation
 from scenario.state import next_relation_id
+
 rel = Relation('foo')
 rel2 = rel.replace(local_app_data={"foo": "bar"}, relation_id=next_relation_id())
 assert rel2.relation_id == rel.relation_id + 1 
@@ -937,30 +940,95 @@ the output side the same as any other bit of state.
 
 # Emitting custom events
 
-While the main use case of Scenario is to emit juju events, i.e. the built-in `start`, `install`, `*-relation-changed`, etc..., it can be sometimes handy to directly trigger custom events defined on arbitrary Objects in your hierarchy.
+While the main use case of Scenario is to emit juju events, i.e. the built-in `start`, `install`, `*-relation-changed`,
+etc..., it can be sometimes handy to directly trigger custom events defined on arbitrary Objects in your hierarchy.
 
 Suppose your charm uses a charm library providing an `ingress_provided` event.
-The 'proper' way to emit it is to run the event that causes that custom event to be emitted by the library, whatever that may be, for example a `foo-relation-changed`.
+The 'proper' way to emit it is to run the event that causes that custom event to be emitted by the library, whatever
+that may be, for example a `foo-relation-changed`.
 
-However, that may mean that you have to set up all sorts of State and mocks so that the right preconditions are met and the event is emitted at all.
+However, that may mean that you have to set up all sorts of State and mocks so that the right preconditions are met and
+the event is emitted at all.
 
 If for whatever reason you don't want to do that and you attempt to run that event directly you will get an error:
+
 ```python
 from scenario import Context, State
+
 Context(...).run("ingress_provided", State())  # raises scenario.ops_main_mock.NoObserverError
 ```
-This happens because the framework, by default, searches for an event source named `ingress_provided` in `charm.on`, but since the event is defined on another Object, it will fail to find it.
+
+This happens because the framework, by default, searches for an event source named `ingress_provided` in `charm.on`, but
+since the event is defined on another Object, it will fail to find it.
 
 You can prefix the event name with the path leading to its owner to tell Scenario where to find the event source:
 
 ```python
 from scenario import Context, State
+
 Context(...).run("my_charm_lib.on.ingress_provided", State())
 ```
 
 This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
 
 (always omit the 'root', i.e. the charm framework key, from the path)
+
+# Live charm introspection
+
+Scenario is a black-box, state-transition testing framework. It makes it trivial to assert that a status went from A to
+B, but not to assert that, in the context of this charm execution, with this state, a certain method call would return a
+given piece of data.
+
+Scenario offers a context manager for this use case specifically:
+
+```python
+from ops import CharmBase, StoredState
+
+from charms.bar.lib_name.v1.charm_lib import CharmLib
+from scenario import Context, State
+
+
+class MyCharm(CharmBase):
+    META = {"name": "mycharm"}
+    _stored = StoredState()
+    
+    def __init__(self, framework):
+        super().__init__(framework)
+        self._stored.set_default(a="a")
+        self.my_charm_lib = CharmLib()
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, event):
+        self._stored.a = "b"
+
+
+def test_live_charm_introspection(mycharm):
+    ctx = Context(mycharm, meta=mycharm.META)
+    # If you want to do this with actions, you can use `Context.action_manager` instead.
+    with ctx.manager("start", State()) as manager:
+        # this is your charm instance, after ops has set it up
+        charm: MyCharm = manager.charm
+        
+        # we can check attributes on nested Objects or the charm itself 
+        assert charm.my_charm_lib.foo == "foo"
+        # such as stored state
+        assert charm._stored.a == "a"
+
+        # this will tell ops.main to proceed with normal execution and emit the "start" event on the charm
+        state_out = manager.run()
+    
+        # after that is done, we are handed back control, and we can again do some introspection
+        assert charm.my_charm_lib.foo == "bar"
+        # and check that the charm's internal state is as we expect
+        assert charm._stored.a == "b"
+
+    # state_out is, as in regular scenario tests, a State object you can assert on:
+    assert state_out.unit_status == ...
+```
+
+Note that you can't call `manager.run()` multiple times: the manager is a context that ensures that `ops.main` 'pauses' right
+before emitting the event to hand you some introspection hooks, but for the rest this is a regular scenario test: you
+can't emit multiple events in a single charm execution.
 
 # The virtual charm root
 
@@ -1010,16 +1078,20 @@ ignored.
 
 # Immutability
 
-All of the data structures in `state`, e.g. `State, Relation, Container`, etc... are immutable (implemented as frozen dataclasses). 
+All of the data structures in `state`, e.g. `State, Relation, Container`, etc... are immutable (implemented as frozen
+dataclasses).
 
-This means that all components of the state that goes into a `context.run()` call are not mutated by the call, and the state that you obtain in return is a different instance, and all parts of it have been (deep)copied.
+This means that all components of the state that goes into a `context.run()` call are not mutated by the call, and the
+state that you obtain in return is a different instance, and all parts of it have been (deep)copied.
 This ensures that you can do delta-based comparison of states without worrying about them being mutated by scenario.
 
-If you want to modify any of these data structures, you will need to either reinstantiate it from scratch, or use the `replace` api. 
+If you want to modify any of these data structures, you will need to either reinstantiate it from scratch, or use
+the `replace` api.
 
 ```python
 from scenario import Relation
-relation = Relation('foo', remote_app_data={"1":"2"})
+
+relation = Relation('foo', remote_app_data={"1": "2"})
 # make a copy of relation, but with remote_app_data set to {"3", "4"} 
 relation2 = relation.replace(remote_app_data={"3", "4"})
 ```

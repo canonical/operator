@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import ops.charm
 import ops.framework
@@ -18,8 +18,6 @@ from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_a
 from ops.main import logger as ops_logger
 
 if TYPE_CHECKING:
-    from ops.testing import CharmType
-
     from scenario.context import Context
     from scenario.state import Event, State, _CharmSpec
 
@@ -79,18 +77,13 @@ def _emit_charm_event(
     event_to_emit.emit(*args, **kwargs)
 
 
-def main(
-    pre_event: Optional[Callable[["CharmType"], None]] = None,
-    post_event: Optional[Callable[["CharmType"], None]] = None,
-    state: "State" = None,
-    event: "Event" = None,
-    context: "Context" = None,
-    charm_spec: "_CharmSpec" = None,
+def setup_framework(
+    charm_dir,
+    state: "State",
+    event: "Event",
+    context: "Context",
+    charm_spec: "_CharmSpec",
 ):
-    """Set up the charm and dispatch the observed event."""
-    charm_class = charm_spec.charm_type
-    charm_dir = _get_charm_dir()
-
     from scenario.mocking import _MockModelBackend
 
     model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
@@ -105,9 +98,6 @@ def main(
         "Operator Framework %s up and running.",
         ops.__version__,
     )  # type:ignore
-
-    dispatcher = _Dispatcher(charm_dir)
-    dispatcher.run_any_legacy_hook()
 
     metadata = (charm_dir / "metadata.yaml").read_text()
     actions_meta = charm_dir / "actions.yaml"
@@ -125,26 +115,97 @@ def main(
     store = ops.storage.SQLiteStorage(charm_state_path)
     framework = ops.framework.Framework(store, charm_dir, meta, model)
     framework.set_breakpointhook()
-    try:
-        sig = inspect.signature(charm_class)
-        sig.bind(framework)  # signature check
+    return framework
 
-        charm = charm_class(framework)
-        dispatcher.ensure_event_links(charm)
 
-        # Skip reemission of deferred events for collect-metrics events because
-        # they do not have the full access to all hook tools.
-        if not dispatcher.is_restricted_context():
-            framework.reemit()
+def setup_charm(charm_class, framework, dispatcher):
+    sig = inspect.signature(charm_class)
+    sig.bind(framework)  # signature check
 
-        if pre_event:
-            pre_event(charm)
+    charm = charm_class(framework)
+    dispatcher.ensure_event_links(charm)
+    return charm
 
-        _emit_charm_event(charm, dispatcher.event_name, event)
 
-        if post_event:
-            post_event(charm)
+def setup(state: "State", event: "Event", context: "Context", charm_spec: "_CharmSpec"):
+    """Setup dispatcher, framework and charm objects."""
+    charm_class = charm_spec.charm_type
+    charm_dir = _get_charm_dir()
 
-        framework.commit()
-    finally:
-        framework.close()
+    dispatcher = _Dispatcher(charm_dir)
+    dispatcher.run_any_legacy_hook()
+
+    framework = setup_framework(charm_dir, state, event, context, charm_spec)
+    charm = setup_charm(charm_class, framework, dispatcher)
+    return dispatcher, framework, charm
+
+
+class Ops:
+    """Class to manage stepping through ops setup, event emission and framework commit."""
+
+    def __init__(
+        self,
+        state: "State",
+        event: "Event",
+        context: "Context",
+        charm_spec: "_CharmSpec",
+    ):
+        self.state = state
+        self.event = event
+        self.context = context
+        self.charm_spec = charm_spec
+
+        # set by setup()
+        self.dispatcher = None
+        self.framework = None
+        self.charm = None
+
+        self._has_setup = False
+        self._has_emitted = False
+        self._has_committed = False
+
+    def setup(self):
+        """Setup framework, charm and dispatcher."""
+        self._has_setup = True
+        self.dispatcher, self.framework, self.charm = setup(
+            self.state,
+            self.event,
+            self.context,
+            self.charm_spec,
+        )
+
+    def emit(self):
+        """Emit the event on the charm."""
+        if not self._has_setup:
+            raise RuntimeError("should .setup() before you .emit()")
+        self._has_emitted = True
+
+        try:
+            if not self.dispatcher.is_restricted_context():
+                self.framework.reemit()
+
+            _emit_charm_event(self.charm, self.dispatcher.event_name, self.event)
+
+        except Exception:
+            self.framework.close()
+            raise
+
+    def commit(self):
+        """Commit the framework and teardown."""
+        if not self._has_emitted:
+            raise RuntimeError("should .emit() before you .commit()")
+
+        self._has_committed = True
+        try:
+            self.framework.commit()
+        finally:
+            self.framework.close()
+
+    def finalize(self):
+        """Step through all non-manually-called procedures and run them."""
+        if not self._has_setup:
+            self.setup()
+        if not self._has_emitted:
+            self.emit()
+        if not self._has_committed:
+            self.commit()

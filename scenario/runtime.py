@@ -10,10 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Callable,
     ContextManager,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -35,6 +32,7 @@ if TYPE_CHECKING:
     from ops.testing import CharmType
 
     from scenario.context import Context
+    from scenario.ops_main_mock import Ops
     from scenario.state import AnyRelation, Event, State, _CharmSpec
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
@@ -134,6 +132,28 @@ class UnitStateDB:
         db.close()
 
 
+class _OpsMainContext:
+    """Context manager representing ops.main execution context.
+
+    When entered, ops.main sets up everything up until the charm.
+    When .emit() is called, ops.main proceeds with emitting the event.
+    When exited, if .emit has not been called manually, it is called automatically.
+    """
+
+    def __init__(self):
+        self._has_emitted = False
+
+    def __enter__(self):
+        pass
+
+    def emit(self):
+        self._has_emitted = True
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+        if not self._has_emitted:
+            self.emit()
+
+
 class Runtime:
     """Charm runtime wrapper.
 
@@ -160,12 +180,13 @@ class Runtime:
     def _cleanup_env(env):
         # TODO consider cleaning up env on __delete__, but ideally you should be
         #  running this in a clean env or a container anyway.
-        # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
+        # cleanup the env, in case we'll be firing multiple events, we don't want to pollute it.
         for key in env:
-            # os.unsetenv does not work !?
+            # os.unsetenv does not always seem to work !?
             del os.environ[key]
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
+        """Build the simulated environment the operator framework expects."""
         if event.name.endswith("_action"):
             # todo: do we need some special metadata, or can we assume action names
             #  are always dashes?
@@ -201,9 +222,9 @@ class Runtime:
             )
 
             remote_unit_id = event.relation_remote_unit_id
-            if (
-                remote_unit_id is None
-            ):  # don't check truthiness because it could be int(0)
+
+            # don't check truthiness because remote_unit_id could be 0
+            if remote_unit_id is None:
                 remote_unit_ids = relation._remote_unit_ids  # pyright: ignore
 
                 if len(remote_unit_ids) == 1:
@@ -336,14 +357,13 @@ class Runtime:
             with capture_events() as captured:
                 yield (temporary_charm_root, captured)
 
+    @contextmanager
     def exec(
         self,
         state: "State",
         event: "Event",
         context: "Context",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
-    ) -> "State":
+    ) -> ContextManager["Ops"]:
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the
@@ -379,14 +399,10 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
-            # we don't import from ops.main because we need some extras, such as the
-            # pre/post_event hooks
-            from scenario.ops_main_mock import main as mocked_main
+            from scenario.ops_main_mock import Ops
 
             try:
-                mocked_main(
-                    pre_event=pre_event,
-                    post_event=post_event,
+                ops = Ops(
                     state=output_state,
                     event=event,
                     context=context,
@@ -394,12 +410,20 @@ class Runtime:
                         charm_type=self._wrap(charm_type),
                     ),
                 )
+                ops.setup()
+
+                yield ops
+
+                # if the caller did not manually emit or commit: do that.
+                ops.finalize()
+
             except NoObserverError:
                 raise  # propagate along
             except Exception as e:
                 raise UncaughtCharmError(
                     f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}",
                 ) from e
+
             finally:
                 logger.info(" - Exited ops.main.")
 
@@ -412,65 +436,4 @@ class Runtime:
         context.emitted_events.extend(captured)
 
         logger.info("event dispatched. done.")
-        return output_state
-
-
-def trigger(
-    state: "State",
-    event: Union["Event", str],
-    charm_type: Type["CharmType"],
-    pre_event: Optional[Callable[["CharmType"], None]] = None,
-    post_event: Optional[Callable[["CharmType"], None]] = None,
-    # if not provided, will be autoloaded from charm_type.
-    meta: Optional[Dict[str, Any]] = None,
-    actions: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict[str, Any]] = None,
-    charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
-    juju_version: str = "3.0",
-) -> "State":
-    """Trigger a charm execution with an Event and a State.
-
-    Calling this function will call ops' main() and set up the context according to the specified
-    State, then emit the event on the charm.
-
-    :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
-    :arg state: the State instance to use as data source for the hook tool calls that the charm will
-        invoke when handling the Event.
-    :arg charm_type: the CharmBase subclass to call ``ops.main()`` on.
-    :arg pre_event: callback to be invoked right before emitting the event on the newly
-        instantiated charm. Will receive the charm instance as only positional argument.
-    :arg post_event: callback to be invoked right after emitting the event on the charm instance.
-        Will receive the charm instance as only positional argument.
-    :arg meta: charm metadata to use. Needs to be a valid metadata.yaml format (as a python dict).
-        If none is provided, we will search for a ``metadata.yaml`` file in the charm root.
-    :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a python dict).
-        If none is provided, we will search for a ``actions.yaml`` file in the charm root.
-    :arg config: charm config to use. Needs to be a valid config.yaml format (as a python dict).
-        If none is provided, we will search for a ``config.yaml`` file in the charm root.
-    :arg juju_version: Juju agent version to simulate.
-    :arg charm_root: virtual charm root the charm will be executed with.
-        If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
-        execution cwd, you need to use this. E.g.:
-
-        >>> virtual_root = tempfile.TemporaryDirectory()
-        >>> local_path = Path(local_path.name)
-        >>> (local_path / 'foo').mkdir()
-        >>> (local_path / 'foo' / 'bar.yaml').write_text('foo: bar')
-        >>> scenario, State(), (... charm_root=virtual_root)
-
-    """
-    logger.warning(
-        "DEPRECATION NOTICE: scenario.runtime.trigger() is deprecated and "
-        "will be removed soon; please use the scenario.context.Context api.",
-    )
-    from scenario.context import Context
-
-    ctx = Context(
-        charm_type=charm_type,
-        meta=meta,
-        actions=actions,
-        config=config,
-        charm_root=charm_root,
-        juju_version=juju_version,
-    )
-    return ctx.run(event, state=state, pre_event=pre_event, post_event=post_event)
+        context._set_output_state(output_state)
