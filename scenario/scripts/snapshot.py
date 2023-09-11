@@ -32,6 +32,7 @@ from scenario.state import (
     Model,
     Mount,
     Network,
+    Port,
     Relation,
     Secret,
     State,
@@ -476,6 +477,27 @@ def get_endpoints(juju_status: Dict, target: JujuUnitName) -> Tuple[str, ...]:
     return relations
 
 
+def get_opened_ports(
+    target: JujuUnitName,
+    model: Optional[str],
+) -> List[Port]:
+    """Get opened ports list from target."""
+    logger.info("getting opened ports...")
+
+    opened_ports_raw = _juju_exec(
+        target,
+        model,
+        "opened-ports --format json",
+    )
+    ports = []
+
+    for raw_port in json.loads(opened_ports_raw):
+        _port_n, _proto = raw_port.split("/")
+        ports.append(Port(_proto, int(_port_n)))
+
+    return ports
+
+
 def get_config(
     target: JujuUnitName,
     model: Optional[str],
@@ -753,6 +775,11 @@ def _snapshot(
             workload_version=status.workload_version,
             model=state_model,
             config=if_include("c", lambda: get_config(target, model), {}),
+            opened_ports=if_include(
+                "p",
+                lambda: get_opened_ports(target, model),
+                [],
+            ),
             relations=if_include(
                 "r",
                 lambda: get_relations(
@@ -870,12 +897,12 @@ def snapshot(
         "Pipe it to a file and fill in the blanks.",
     ),
     include: str = typer.Option(
-        "rckndt",
+        "rckndtp",
         "--include",
         "-i",
         help="What data to include in the state. "
         "``r``: relation, ``c``: config, ``k``: containers, "
-        "``n``: networks, ``S``: secrets(!), "
+        "``n``: networks, ``S``: secrets(!), ``p``: opened ports, "
         "``d``: deferred events, ``t``: stored state.",
     ),
     include_dead_relation_networks: bool = typer.Option(

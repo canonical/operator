@@ -22,7 +22,7 @@ from ops import EventBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
-from scenario.state import Action, Event, _CharmSpec
+from scenario.state import Action, Event, MetadataNotFoundError, _CharmSpec
 
 if TYPE_CHECKING:
     from ops.testing import CharmType
@@ -43,6 +43,10 @@ class InvalidEventError(RuntimeError):
 
 class InvalidActionError(InvalidEventError):
     """raised when something is wrong with the action passed to Context.run_action"""
+
+
+class ContextSetupError(RuntimeError):
+    """Raised by Context when setup fails."""
 
 
 class AlreadyEmittedError(RuntimeError):
@@ -172,7 +176,14 @@ class Context:
 
         if not any((meta, actions, config)):
             logger.debug("Autoloading charmspec...")
-            spec = _CharmSpec.autoload(charm_type)
+            try:
+                spec = _CharmSpec.autoload(charm_type)
+            except MetadataNotFoundError as e:
+                raise ContextSetupError(
+                    f"Cannot setup scenario with `charm_type`={charm_type}. "
+                    f"Did you forget to pass `meta` to this Context?",
+                ) from e
+
         else:
             if not meta:
                 meta = {"name": str(charm_type.__name__)}

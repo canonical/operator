@@ -17,11 +17,12 @@ from scenario.scripts.utils import JujuUnitName
 from scenario.state import (
     Container,
     DeferredEvent,
+    Port,
     Relation,
     Secret,
     State,
-    Status,
     StoredState,
+    _EntityStatus,
 )
 
 SNAPSHOT_DATA_DIR = (Path(os.getcwd()).parent / "snapshot_storage").absolute()
@@ -35,13 +36,17 @@ def set_relations(relations: Iterable[Relation]) -> List[str]:  # noqa: U100
     return []
 
 
-def set_status(status: Status) -> List[str]:
+def set_status(
+    unit_status: _EntityStatus,
+    app_status: _EntityStatus,
+    app_version: str,
+) -> List[str]:
     logger.info("preparing status...")
     cmds = []
 
-    cmds.append(f"status-set {status.unit.name} {status.unit.message}")
-    cmds.append(f"status-set --application {status.app.name} {status.app.message}")
-    cmds.append(f"application-version-set {status.app_version}")
+    cmds.append(f"status-set {unit_status.name} {unit_status.message}")
+    cmds.append(f"status-set --application {app_status.name} {app_status.message}")
+    cmds.append(f"application-version-set {app_version}")
 
     return cmds
 
@@ -50,6 +55,18 @@ def set_config(config: Dict[str, str]) -> List[str]:  # noqa: U100
     logger.info("preparing config...")
     logger.warning("set_config not implemented yet")
     return []
+
+
+def set_opened_ports(opened_ports: List[Port]) -> List[str]:
+    logger.info("preparing opened ports...")
+    # fixme: this will only open new ports, it will not close all already-open ports.
+
+    cmds = []
+
+    for port in opened_ports:
+        cmds.append(f"open-port {port.port}/{port.protocol}")
+
+    return cmds
 
 
 def set_containers(containers: Iterable[Container]) -> List[str]:  # noqa: U100
@@ -137,7 +154,11 @@ def _state_apply(
 
     j_exec_cmds: List[str] = []
 
-    j_exec_cmds += if_include("s", lambda: set_status(state.status))
+    j_exec_cmds += if_include(
+        "s",
+        lambda: set_status(state.unit_status, state.app_status, state.workload_version),
+    )
+    j_exec_cmds += if_include("p", lambda: set_opened_ports(state.opened_ports))
     j_exec_cmds += if_include("r", lambda: set_relations(state.relations))
     j_exec_cmds += if_include("S", lambda: set_secrets(state.secrets))
 
