@@ -231,7 +231,8 @@ class Context:
             self.unit_status_history.append(state.unit_status)
 
     @staticmethod
-    def _coalesce_action(action: Union[str, Action]):
+    def _coalesce_action(action: Union[str, Action]) -> Action:
+        """Validate the action argument and cast to Action."""
         if isinstance(action, str):
             return Action(action)
 
@@ -242,8 +243,8 @@ class Context:
         return action
 
     @staticmethod
-    def _coalesce_event(event: Union[str, Event]):
-        # Validate the event and cast to Event.
+    def _coalesce_event(event: Union[str, Event]) -> Event:
+        """Validate the event argument and cast to Event."""
         if isinstance(event, str):
             event = Event(event)
 
@@ -315,10 +316,8 @@ class Context:
         event: Union["Event", str],
         state: "State",
     ) -> ContextManager["Ops"]:
-        with self._run(
-            event=self._coalesce_event(event),
-            state=state,
-        ) as ops:
+        _event = self._coalesce_event(event)
+        with self._run(event=_event, state=state) as ops:
             yield ops
 
     def run(
@@ -338,17 +337,14 @@ class Context:
             charm will invoke when handling the Event.
         :arg pre_event: callback to be invoked right before emitting the event on the newly
             instantiated charm. Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use Context.event_manager instead.
+            This argument is deprecated. Please use ``Context.manager`` instead.
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use Context.event_manager instead.
+            This argument is deprecated. Please use ``Context.manager`` instead.
         """
         self._warn_deprecation_if_pre_or_post_event(pre_event, post_event)
 
-        with self._run_event(
-            event,
-            state,
-        ) as ops:
+        with self._run_event(event=event, state=state) as ops:
             if pre_event:
                 pre_event(ops.charm)
 
@@ -376,17 +372,15 @@ class Context:
             charm will invoke when handling the Action (event).
         :arg pre_event: callback to be invoked right before emitting the event on the newly
             instantiated charm. Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use Context.event_manager instead.
+            This argument is deprecated. Please use ``Context.action_manager`` instead.
         :arg post_event: callback to be invoked right after emitting the event on the charm.
             Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use Context.event_manager instead.
+            This argument is deprecated. Please use ``Context.action_manager`` instead.
         """
         self._warn_deprecation_if_pre_or_post_event(pre_event, post_event)
 
-        with self._run_action(
-            action=self._coalesce_action(action),
-            state=state,
-        ) as ops:
+        _action = self._coalesce_action(action)
+        with self._run_action(action=_action, state=state) as ops:
             if pre_event:
                 pre_event(ops.charm)
 
@@ -418,11 +412,8 @@ class Context:
         action: Union["Action", str],
         state: "State",
     ) -> ContextManager["Ops"]:
-        action = self._coalesce_action(action)
-        with self._run(
-            event=action.event,
-            state=state,
-        ) as ops:
+        _action = self._coalesce_action(action)
+        with self._run(event=_action.event, state=state) as ops:
             yield ops
 
     @contextmanager

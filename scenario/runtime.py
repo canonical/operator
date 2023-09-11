@@ -180,12 +180,13 @@ class Runtime:
     def _cleanup_env(env):
         # TODO consider cleaning up env on __delete__, but ideally you should be
         #  running this in a clean env or a container anyway.
-        # cleanup env, in case we'll be firing multiple events, we don't want to accumulate.
+        # cleanup the env, in case we'll be firing multiple events, we don't want to pollute it.
         for key in env:
-            # os.unsetenv does not work !?
+            # os.unsetenv does not always seem to work !?
             del os.environ[key]
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
+        """Build the simulated environment the operator framework expects."""
         if event.name.endswith("_action"):
             # todo: do we need some special metadata, or can we assume action names
             #  are always dashes?
@@ -221,9 +222,9 @@ class Runtime:
             )
 
             remote_unit_id = event.relation_remote_unit_id
-            if (
-                remote_unit_id is None
-            ):  # don't check truthiness because it could be int(0)
+
+            # don't check truthiness because remote_unit_id could be 0
+            if remote_unit_id is None:
                 remote_unit_ids = relation._remote_unit_ids  # pyright: ignore
 
                 if len(remote_unit_ids) == 1:
