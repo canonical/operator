@@ -28,7 +28,9 @@ from scenario.scripts.utils import JujuUnitName
 from scenario.state import (
     Address,
     BindAddress,
+    BindFailedError,
     Container,
+    Event,
     Model,
     Mount,
     Network,
@@ -98,7 +100,15 @@ def format_test_case(
 ):
     """Format this State as a pytest test case."""
     ct = charm_type_name or "CHARM_TYPE,  # TODO: replace with charm type name"
-    en = event_name or "EVENT_NAME,  # TODO: replace with event name"
+    en = "EVENT_NAME,  # TODO: replace with event name"
+    if event_name:
+        try:
+            en = Event(event_name).bind(state)
+        except BindFailedError:
+            logger.error(
+                f"Failed to bind {event_name} to {state}; leaving placeholder instead",
+            )
+
     jv = juju_version or "3.0,  # TODO: check juju version is correct"
     state_fmt = repr(state)
     return _try_format(
@@ -723,11 +733,12 @@ def _snapshot(
     target: str,
     model: Optional[str] = None,
     pprint: bool = True,
-    include: str = None,
+    include: Optional[str] = None,
     include_juju_relation_data=False,
     include_dead_relation_networks=False,
     format: FormatOption = "state",
-    fetch_files: Dict[str, List[Path]] = None,
+    event_name: Optional[str] = None,
+    fetch_files: Optional[Dict[str, List[Path]]] = None,
     temp_dir_base_path: Path = SNAPSHOT_OUTPUT_DIR,
 ):
     """see snapshot's docstring"""
@@ -852,6 +863,7 @@ def _snapshot(
             charm_type_name = try_guess_charm_type_name()
             txt = format_test_case(
                 state,
+                event_name=event_name,
                 charm_type_name=charm_type_name,
                 juju_version=juju_version,
             )
@@ -895,6 +907,13 @@ def snapshot(
         "``json``: Outputs a Jsonified State object. Perfect for storage. "
         "``pytest``: Outputs a full-blown pytest scenario test based on this State. "
         "Pipe it to a file and fill in the blanks.",
+    ),
+    event_name: str = typer.Option(
+        None,
+        "--event_name",
+        "-e",
+        help="Event to include in the generate test file; only applicable "
+        "if the output format is 'pytest'.",
     ),
     include: str = typer.Option(
         "rckndtp",
@@ -946,6 +965,7 @@ def snapshot(
         target=target,
         model=model,
         format=format,
+        event_name=event_name,
         include=include,
         include_juju_relation_data=include_juju_relation_data,
         include_dead_relation_networks=include_dead_relation_networks,

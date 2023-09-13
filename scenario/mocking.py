@@ -456,7 +456,12 @@ class _MockPebbleClient(_TestingPebbleClient):
         cmd = tuple(args[0])
         out = self._container.exec_mock.get(cmd)
         if not out:
-            raise RuntimeError(f"mock for cmd {cmd} not found.")
+            raise RuntimeError(
+                f"mock for cmd {cmd} not found. Please pass to the Container "
+                f"{self._container.name} a scenario.ExecOutput mock for the "
+                f"command your charm is attempting to run, or patch "
+                f"out whatever leads to the call.",
+            )
 
         change_id = out._run()
         return _MockExecProcess(change_id=change_id, command=cmd, out=out)
