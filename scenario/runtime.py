@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     ContextManager,
+    Dict,
     List,
     Optional,
     Tuple,
@@ -54,10 +55,6 @@ class ScenarioRuntimeError(RuntimeError):
 
 class UncaughtCharmError(ScenarioRuntimeError):
     """Error raised if the charm raises while handling the event being dispatched."""
-
-
-class DirtyVirtualCharmRootError(ScenarioRuntimeError):
-    """Error raised when the runtime can't initialize the vroot without overwriting metadata."""
 
 
 class InconsistentScenarioError(ScenarioRuntimeError):
@@ -298,30 +295,31 @@ class Runtime:
         config_yaml = virtual_charm_root / "config.yaml"
         actions_yaml = virtual_charm_root / "actions.yaml"
 
-        metadata_files_present = any(
-            file.exists() for file in (metadata_yaml, config_yaml, actions_yaml)
-        )
+        metadata_files_present: Dict[Path, bool] = {
+            file: file.exists() for file in (metadata_yaml, config_yaml, actions_yaml)
+        }
+
+        any_metadata_files_present_in_vroot = any(metadata_files_present.values())
 
         if spec.is_autoloaded and vroot_is_custom:
             # since the spec is autoloaded, in theory the metadata contents won't differ, so we can
             # overwrite away even if the custom vroot is the real charm root (the local repo).
             # Still, log it for clarity.
-            if metadata_files_present:
-                logger.info(
+            if any_metadata_files_present_in_vroot:
+                logger.debug(
                     f"metadata files found in custom vroot {vroot}. "
                     f"The spec was autoloaded so the contents should be identical. "
                     f"Proceeding...",
                 )
 
-        elif not spec.is_autoloaded and metadata_files_present:
-            logger.error(
+        elif not spec.is_autoloaded and any_metadata_files_present_in_vroot:
+            logger.warn(
                 f"Some metadata files found in custom user-provided vroot {vroot} "
-                f"while you have passed meta, config or actions to trigger(). "
-                "We don't want to risk overwriting them mindlessly, so we abort. "
-                "You should not include any metadata files in the charm_root. "
-                "Single source of truth are the arguments passed to trigger(). ",
+                f"while you have passed meta, config or actions to Context.run(). "
+                "Single source of truth are the arguments passed to Context.run(). "
+                "Vroot metadata files will be overwritten. "
+                "To avoid this, clean any metadata files from the vroot before calling run.",
             )
-            raise DirtyVirtualCharmRootError(vroot)
 
         metadata_yaml.write_text(yaml.safe_dump(spec.meta))
         config_yaml.write_text(yaml.safe_dump(spec.config or {}))
@@ -329,7 +327,11 @@ class Runtime:
 
         yield virtual_charm_root
 
-        if not vroot_is_custom:
+        if vroot_is_custom:
+            for file, present in metadata_files_present.items():
+                if not present:
+                    file.unlink()
+        else:
             vroot.cleanup()
 
     @staticmethod
