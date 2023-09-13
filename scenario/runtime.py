@@ -295,8 +295,9 @@ class Runtime:
         config_yaml = virtual_charm_root / "config.yaml"
         actions_yaml = virtual_charm_root / "actions.yaml"
 
-        metadata_files_present: Dict[Path, bool] = {
-            file: file.exists() for file in (metadata_yaml, config_yaml, actions_yaml)
+        metadata_files_present: Dict[Path, Union[str, False]] = {
+            file: file.read_text() if file.exists() else False
+            for file in (metadata_yaml, config_yaml, actions_yaml)
         }
 
         any_metadata_files_present_in_vroot = any(metadata_files_present.values())
@@ -328,9 +329,12 @@ class Runtime:
         yield virtual_charm_root
 
         if vroot_is_custom:
-            for file, present in metadata_files_present.items():
-                if not present:
+            for file, previous_content in metadata_files_present.items():
+                if not previous_content:  # False: file did not exist before
                     file.unlink()
+                else:
+                    file.write_text(previous_content)
+
         else:
             vroot.cleanup()
 

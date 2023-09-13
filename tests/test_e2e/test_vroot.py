@@ -52,19 +52,23 @@ def test_vroot(vroot):
 
 def test_vroot_cleanup_if_exists(vroot):
     meta_file = vroot / "metadata.yaml"
-    meta_file.write_text(yaml.safe_dump({"name": "karl"}))
+    raw_ori_meta = yaml.safe_dump({"name": "karl"})
+    meta_file.write_text(raw_ori_meta)
 
     with Context(MyCharm, meta=MyCharm.META, charm_root=vroot).manager(
         "start",
         State(),
     ) as mgr:
         assert meta_file.exists()
+        assert meta_file.read_text() == yaml.safe_dump({"name": "my-charm"})
         assert (
             mgr.charm.meta.name == "my-charm"
         )  # not karl! Context.meta takes precedence
         mgr.run()
         assert meta_file.exists()
 
+    # meta file was restored to its previous contents
+    assert meta_file.read_text() == raw_ori_meta
     assert meta_file.exists()
 
 
