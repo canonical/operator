@@ -1103,8 +1103,13 @@ class Event(_DCBase):
         a suitable relation in the provided state and return a copy of itself with that
         relation attached.
         """
+        entity_name = self.name.split("_")[0]
+
         if self._is_workload_event and not self.container:
-            container = state.get_container(self.name.split("_")[0])
+            try:
+                container = state.get_container(entity_name)
+            except ValueError:
+                raise BindFailedError(f"no container found with name {entity_name}")
             return self.replace(container=container)
 
         if self._is_secret_event and not self.secret:
@@ -1117,7 +1122,7 @@ class Event(_DCBase):
             return self.replace(secret=state.secrets[0])
 
         if self._is_relation_event and not self.relation:
-            ep_name = self.name.split("_")[0]
+            ep_name = entity_name
             relations = state.get_relations(ep_name)
             if len(relations) < 1:
                 raise BindFailedError(f"no relations on {ep_name} found in state")
@@ -1129,6 +1134,12 @@ class Event(_DCBase):
             raise BindFailedError(
                 "cannot automatically bind action events: if the action has mandatory parameters "
                 "this would probably result in horrible, undebuggable failures downstream.",
+            )
+
+        else:
+            raise BindFailedError(
+                f"cannot bind {self}: only relation, secret, "
+                f"or workload events can be bound.",
             )
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
