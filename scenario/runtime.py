@@ -316,9 +316,10 @@ class Runtime:
         elif not spec.is_autoloaded and any_metadata_files_present_in_vroot:
             logger.warn(
                 f"Some metadata files found in custom user-provided vroot {vroot} "
-                f"while you have passed meta, config or actions to Context.run(). "
+                "while you have passed meta, config or actions to Context.run(). "
                 "Single source of truth are the arguments passed to Context.run(). "
-                "Vroot metadata files will be overwritten. "
+                "Vroot metadata files will be overwritten for the "
+                "duration of this test, and restored afterwards. "
                 "To avoid this, clean any metadata files from the vroot before calling run.",
             )
 
