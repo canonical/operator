@@ -525,6 +525,7 @@ state = State(containers=[
 
 In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it would give `False`.
 
+### Container filesystem setup
 You can configure a container to have some files in it:
 
 ```python
@@ -588,6 +589,45 @@ def test_pebble_push():
 need to associate the container with the event is that the Framework uses an envvar to determine which container the
 pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting
 that envvar into the charm's runtime.
+
+### Container filesystem post-mortem
+If the charm writes files to a container (to a location you didn't Mount as a temporary folder you have access to), you will be able to inspect them using the `get_filesystem` api.
+
+```python
+from ops.charm import CharmBase
+from scenario import State, Container, Mount, Context
+
+
+class MyCharm(CharmBase):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, _):
+        foo = self.unit.get_container('foo')
+        foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
+
+
+def test_pebble_push():
+    container = Container(name='foo',
+                          can_connect=True)
+    state_in = State(
+        containers=[container]
+    )
+    Context(
+        MyCharm,
+        meta={"name": "foo", "containers": {"foo": {}}}).run(
+        "start",
+        state_in,
+    )
+
+    # this is the root of the simulated container filesystem. Any mounts will be symlinks in it.
+    container_root_fs = container.get_filesystem(ctx)
+    cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
+    assert cfg_file.read_text() == "TEST"
+```
+
+### `Container.exec` mocks
 
 `container.exec` is a tad more complicated, but if you get to this low a level of simulation, you probably will have far
 worse issues to deal with. You need to specify, for each possible command the charm might run on the container, what the
