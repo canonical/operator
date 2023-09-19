@@ -223,7 +223,7 @@ def state_apply(
         "of k8s charms, this might mean files obtained through Mounts,",
     ),
 ):
-    """Gather and output the State of a remote target unit.
+    """Apply a State to a remote target unit.
 
     If black is available, the output will be piped through it for formatting.
 
