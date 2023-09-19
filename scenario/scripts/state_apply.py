@@ -223,14 +223,18 @@ def state_apply(
         "of k8s charms, this might mean files obtained through Mounts,",
     ),
 ):
-    """Gather and output the State of a remote target unit.
+    """Apply a State to a remote target unit.
 
     If black is available, the output will be piped through it for formatting.
 
     Usage: state-apply myapp/0 > ./tests/scenario/case1.py
     """
     push_files_ = json.loads(push_files.read_text()) if push_files else None
-    state_ = json.loads(state.read_text())
+    state_json = json.loads(state.read_text())
+
+    # TODO: state_json to State
+    raise NotImplementedError("WIP: implement State.from_json")
+    state_: State = State.from_json(state_json)
 
     return _state_apply(
         target=target,
