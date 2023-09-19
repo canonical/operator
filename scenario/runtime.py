@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     ContextManager,
+    Dict,
     List,
     Optional,
     Tuple,
@@ -54,10 +55,6 @@ class ScenarioRuntimeError(RuntimeError):
 
 class UncaughtCharmError(ScenarioRuntimeError):
     """Error raised if the charm raises while handling the event being dispatched."""
-
-
-class DirtyVirtualCharmRootError(ScenarioRuntimeError):
-    """Error raised when the runtime can't initialize the vroot without overwriting metadata."""
 
 
 class InconsistentScenarioError(ScenarioRuntimeError):
@@ -286,42 +283,50 @@ class Runtime:
         # is what the user passed via the CharmSpec
         spec = self._charm_spec
 
-        if vroot := self._charm_root:
-            vroot_is_custom = True
-            virtual_charm_root = Path(vroot)
+        if charm_virtual_root := self._charm_root:
+            charm_virtual_root_is_custom = True
+            virtual_charm_root = Path(charm_virtual_root)
         else:
-            vroot = tempfile.TemporaryDirectory()
-            virtual_charm_root = Path(vroot.name)
-            vroot_is_custom = False
+            charm_virtual_root = tempfile.TemporaryDirectory()
+            virtual_charm_root = Path(charm_virtual_root.name)
+            charm_virtual_root_is_custom = False
 
         metadata_yaml = virtual_charm_root / "metadata.yaml"
         config_yaml = virtual_charm_root / "config.yaml"
         actions_yaml = virtual_charm_root / "actions.yaml"
 
-        metadata_files_present = any(
-            file.exists() for file in (metadata_yaml, config_yaml, actions_yaml)
+        metadata_files_present: Dict[Path, Optional[str]] = {
+            file: file.read_text() if file.exists() else None
+            for file in (metadata_yaml, config_yaml, actions_yaml)
+        }
+
+        any_metadata_files_present_in_charm_virtual_root = any(
+            v is not None for v in metadata_files_present.values()
         )
 
-        if spec.is_autoloaded and vroot_is_custom:
+        if spec.is_autoloaded and charm_virtual_root_is_custom:
             # since the spec is autoloaded, in theory the metadata contents won't differ, so we can
             # overwrite away even if the custom vroot is the real charm root (the local repo).
             # Still, log it for clarity.
-            if metadata_files_present:
-                logger.info(
-                    f"metadata files found in custom vroot {vroot}. "
+            if any_metadata_files_present_in_charm_virtual_root:
+                logger.debug(
+                    f"metadata files found in custom charm_root {charm_virtual_root}. "
                     f"The spec was autoloaded so the contents should be identical. "
                     f"Proceeding...",
                 )
 
-        elif not spec.is_autoloaded and metadata_files_present:
-            logger.error(
-                f"Some metadata files found in custom user-provided vroot {vroot} "
-                f"while you have passed meta, config or actions to trigger(). "
-                "We don't want to risk overwriting them mindlessly, so we abort. "
-                "You should not include any metadata files in the charm_root. "
-                "Single source of truth are the arguments passed to trigger(). ",
+        elif (
+            not spec.is_autoloaded and any_metadata_files_present_in_charm_virtual_root
+        ):
+            logger.warn(
+                f"Some metadata files found in custom user-provided charm_root "
+                f"{charm_virtual_root} while you have passed meta, config or actions to "
+                f"Context.run(). "
+                "Single source of truth are the arguments passed to Context.run(). "
+                "charm_root metadata files will be overwritten for the "
+                "duration of this test, and restored afterwards. "
+                "To avoid this, clean any metadata files from the charm_root before calling run.",
             )
-            raise DirtyVirtualCharmRootError(vroot)
 
         metadata_yaml.write_text(yaml.safe_dump(spec.meta))
         config_yaml.write_text(yaml.safe_dump(spec.config or {}))
@@ -329,8 +334,15 @@ class Runtime:
 
         yield virtual_charm_root
 
-        if not vroot_is_custom:
-            vroot.cleanup()
+        if charm_virtual_root_is_custom:
+            for file, previous_content in metadata_files_present.items():
+                if previous_content is None:  # None == file did not exist before
+                    file.unlink()
+                else:
+                    file.write_text(previous_content)
+
+        else:
+            charm_virtual_root.cleanup()
 
     @staticmethod
     def _get_state_db(temporary_charm_root: Path):

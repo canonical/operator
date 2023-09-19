@@ -2,12 +2,12 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus
 
-from scenario import State
-from scenario.runtime import DirtyVirtualCharmRootError
+from scenario import Context, State
 from tests.helpers import trigger
 
 
@@ -22,9 +22,10 @@ class MyCharm(CharmBase):
         self.unit.status = ActiveStatus(f"{foo.read_text()} {baz.read_text()}")
 
 
-def test_vroot():
-    with tempfile.TemporaryDirectory() as myvroot:
-        t = Path(myvroot)
+@pytest.fixture
+def charm_virtual_root():
+    with tempfile.TemporaryDirectory() as mycharm_virtual_root:
+        t = Path(mycharm_virtual_root)
         src = t / "src"
         src.mkdir()
         foobar = src / "foo.bar"
@@ -35,29 +36,54 @@ def test_vroot():
         quxcos = baz / "qux.kaboodle"
         quxcos.write_text("world")
 
-        out = trigger(
-            State(),
-            "start",
-            charm_type=MyCharm,
-            meta=MyCharm.META,
-            charm_root=t,
-        )
+        yield t
 
+
+def test_charm_virtual_root(charm_virtual_root):
+    out = trigger(
+        State(),
+        "start",
+        charm_type=MyCharm,
+        meta=MyCharm.META,
+        charm_root=charm_virtual_root,
+    )
     assert out.unit_status == ("active", "hello world")
 
 
-@pytest.mark.parametrize("meta_overwrite", ["metadata", "actions", "config"])
-def test_dirty_vroot_raises(meta_overwrite):
-    with tempfile.TemporaryDirectory() as myvroot:
-        t = Path(myvroot)
-        meta_file = t / f"{meta_overwrite}.yaml"
-        meta_file.touch()
+def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
+    meta_file = charm_virtual_root / "metadata.yaml"
+    raw_ori_meta = yaml.safe_dump({"name": "karl"})
+    meta_file.write_text(raw_ori_meta)
 
-        with pytest.raises(DirtyVirtualCharmRootError):
-            trigger(
-                State(),
-                "start",
-                charm_type=MyCharm,
-                meta=MyCharm.META,
-                charm_root=t,
-            )
+    with Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root).manager(
+        "start",
+        State(),
+    ) as mgr:
+        assert meta_file.exists()
+        assert meta_file.read_text() == yaml.safe_dump({"name": "my-charm"})
+        assert (
+            mgr.charm.meta.name == "my-charm"
+        )  # not karl! Context.meta takes precedence
+        mgr.run()
+        assert meta_file.exists()
+
+    # meta file was restored to its previous contents
+    assert meta_file.read_text() == raw_ori_meta
+    assert meta_file.exists()
+
+
+def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
+    meta_file = charm_virtual_root / "metadata.yaml"
+
+    assert not meta_file.exists()
+
+    with Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root).manager(
+        "start",
+        State(),
+    ) as mgr:
+        assert meta_file.exists()
+        assert meta_file.read_text() == yaml.safe_dump({"name": "my-charm"})
+        mgr.run()
+        assert not meta_file.exists()
+
+    assert not meta_file.exists()

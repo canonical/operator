@@ -35,7 +35,7 @@ def trigger(
     meta: Optional[Dict[str, Any]] = None,
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
-    charm_root: Optional[Dict["PathLike", "PathLike"]] = None,
+    charm_root: Optional["PathLike"] = None,
     juju_version: str = "3.0",
 ) -> "State":
     ctx = Context(
