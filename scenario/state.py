@@ -83,6 +83,10 @@ class MetadataNotFoundError(RuntimeError):
     """Raised when Scenario can't find a metadata.yaml file in the provided charm root."""
 
 
+class BindFailedError(RuntimeError):
+    """Raised when Event.bind fails."""
+
+
 @dataclasses.dataclass(frozen=True)
 class _DCBase:
     def replace(self, *args, **kwargs):
@@ -1091,6 +1095,52 @@ class Event(_DCBase):
             builtins.append(container_name + PEBBLE_READY_EVENT_SUFFIX)
 
         return event_name in builtins
+
+    def bind(self, state: State):
+        """Attach to this event the state component it needs.
+
+        For example, a relation event initialized without a Relation instance will search for
+        a suitable relation in the provided state and return a copy of itself with that
+        relation attached.
+        """
+        entity_name = self.name.split("_")[0]
+
+        if self._is_workload_event and not self.container:
+            try:
+                container = state.get_container(entity_name)
+            except ValueError:
+                raise BindFailedError(f"no container found with name {entity_name}")
+            return self.replace(container=container)
+
+        if self._is_secret_event and not self.secret:
+            if len(state.secrets) < 1:
+                raise BindFailedError(f"no secrets found in state: cannot bind {self}")
+            if len(state.secrets) > 1:
+                raise BindFailedError(
+                    f"too many secrets found in state: cannot automatically bind {self}",
+                )
+            return self.replace(secret=state.secrets[0])
+
+        if self._is_relation_event and not self.relation:
+            ep_name = entity_name
+            relations = state.get_relations(ep_name)
+            if len(relations) < 1:
+                raise BindFailedError(f"no relations on {ep_name} found in state")
+            if len(relations) > 1:
+                logger.warning(f"too many relations on {ep_name}: binding to first one")
+            return self.replace(relation=relations[0])
+
+        if self._is_action_event and not self.action:
+            raise BindFailedError(
+                "cannot automatically bind action events: if the action has mandatory parameters "
+                "this would probably result in horrible, undebuggable failures downstream.",
+            )
+
+        else:
+            raise BindFailedError(
+                f"cannot bind {self}: only relation, secret, "
+                f"or workload events can be bound.",
+            )
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""

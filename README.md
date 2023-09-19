@@ -525,6 +525,7 @@ state = State(containers=[
 
 In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it would give `False`.
 
+### Container filesystem setup
 You can configure a container to have some files in it:
 
 ```python
@@ -588,6 +589,45 @@ def test_pebble_push():
 need to associate the container with the event is that the Framework uses an envvar to determine which container the
 pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting
 that envvar into the charm's runtime.
+
+### Container filesystem post-mortem
+If the charm writes files to a container (to a location you didn't Mount as a temporary folder you have access to), you will be able to inspect them using the `get_filesystem` api.
+
+```python
+from ops.charm import CharmBase
+from scenario import State, Container, Mount, Context
+
+
+class MyCharm(CharmBase):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, _):
+        foo = self.unit.get_container('foo')
+        foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
+
+
+def test_pebble_push():
+    container = Container(name='foo',
+                          can_connect=True)
+    state_in = State(
+        containers=[container]
+    )
+    Context(
+        MyCharm,
+        meta={"name": "foo", "containers": {"foo": {}}}).run(
+        "start",
+        state_in,
+    )
+
+    # this is the root of the simulated container filesystem. Any mounts will be symlinks in it.
+    container_root_fs = container.get_filesystem(ctx)
+    cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
+    assert cfg_file.read_text() == "TEST"
+```
+
+### `Container.exec` mocks
 
 `container.exec` is a tad more complicated, but if you get to this low a level of simulation, you probably will have far
 worse issues to deal with. You need to specify, for each possible command the charm might run on the container, what the
@@ -1032,10 +1072,10 @@ can't emit multiple events in a single charm execution.
 
 # The virtual charm root
 
-Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. The
+Before executing the charm, Scenario copies the charm's `/src`, any libs, the metadata, config, and actions `yaml`s to a temporary directory. The
 charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can be
 either inferred from the charm type being passed to `Context` or be passed to it as an argument, thereby overriding
-the inferred one. This also allows you to test with charms defined on the fly, as in:
+the inferred one. This also allows you to test charms defined on the fly, as in:
 
 ```python
 from ops.charm import CharmBase
@@ -1052,7 +1092,7 @@ ctx.run('start', State())
 ```
 
 A consequence of this fact is that you have no direct control over the tempdir that we are creating to put the metadata
-you are passing to trigger (because `ops` expects it to be a file...). That is, unless you pass your own:
+you are passing to `.run()` (because `ops` expects it to be a file...). That is, unless you pass your own:
 
 ```python
 from ops.charm import CharmBase
@@ -1073,8 +1113,11 @@ state = Context(
 ```
 
 Do this, and you will be able to set up said directory as you like before the charm is run, as well as verify its
-contents after the charm has run. Do keep in mind that the metadata files will be overwritten by Scenario, and therefore
-ignored.
+contents after the charm has run. Do keep in mind that any metadata files you create in it will be overwritten by Scenario, and therefore
+ignored, if you pass any metadata keys to `Context`. Omit `meta` in the call
+above, and Scenario will instead attempt to read `metadata.yaml` from the
+temporary directory.
+
 
 # Immutability
 
