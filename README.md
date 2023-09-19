@@ -1032,10 +1032,10 @@ can't emit multiple events in a single charm execution.
 
 # The virtual charm root
 
-Before executing the charm, Scenario writes the metadata, config, and actions `yaml`s to a temporary directory. The
+Before executing the charm, Scenario copies the charm's `/src`, any libs, the metadata, config, and actions `yaml`s to a temporary directory. The
 charm will see that tempdir as its 'root'. This allows us to keep things simple when dealing with metadata that can be
 either inferred from the charm type being passed to `Context` or be passed to it as an argument, thereby overriding
-the inferred one. This also allows you to test with charms defined on the fly, as in:
+the inferred one. This also allows you to test charms defined on the fly, as in:
 
 ```python
 from ops.charm import CharmBase
@@ -1052,7 +1052,7 @@ ctx.run('start', State())
 ```
 
 A consequence of this fact is that you have no direct control over the tempdir that we are creating to put the metadata
-you are passing to trigger (because `ops` expects it to be a file...). That is, unless you pass your own:
+you are passing to `.run()` (because `ops` expects it to be a file...). That is, unless you pass your own:
 
 ```python
 from ops.charm import CharmBase
@@ -1073,8 +1073,11 @@ state = Context(
 ```
 
 Do this, and you will be able to set up said directory as you like before the charm is run, as well as verify its
-contents after the charm has run. Do keep in mind that the metadata files will be overwritten by Scenario, and therefore
-ignored.
+contents after the charm has run. Do keep in mind that any metadata files you create in it will be overwritten by Scenario, and therefore
+ignored, if you pass any metadata keys to `Context`. Omit `meta` in the call
+above, and Scenario will instead attempt to read `metadata.yaml` from the
+temporary directory.
+
 
 # Immutability
 

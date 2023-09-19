@@ -23,9 +23,9 @@ class MyCharm(CharmBase):
 
 
 @pytest.fixture
-def vroot():
-    with tempfile.TemporaryDirectory() as myvroot:
-        t = Path(myvroot)
+def charm_virtual_root():
+    with tempfile.TemporaryDirectory() as mycharm_virtual_root:
+        t = Path(mycharm_virtual_root)
         src = t / "src"
         src.mkdir()
         foobar = src / "foo.bar"
@@ -39,23 +39,23 @@ def vroot():
         yield t
 
 
-def test_vroot(vroot):
+def test_charm_virtual_root(charm_virtual_root):
     out = trigger(
         State(),
         "start",
         charm_type=MyCharm,
         meta=MyCharm.META,
-        charm_root=vroot,
+        charm_root=charm_virtual_root,
     )
     assert out.unit_status == ("active", "hello world")
 
 
-def test_vroot_cleanup_if_exists(vroot):
-    meta_file = vroot / "metadata.yaml"
+def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
+    meta_file = charm_virtual_root / "metadata.yaml"
     raw_ori_meta = yaml.safe_dump({"name": "karl"})
     meta_file.write_text(raw_ori_meta)
 
-    with Context(MyCharm, meta=MyCharm.META, charm_root=vroot).manager(
+    with Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root).manager(
         "start",
         State(),
     ) as mgr:
@@ -72,12 +72,12 @@ def test_vroot_cleanup_if_exists(vroot):
     assert meta_file.exists()
 
 
-def test_vroot_cleanup_if_not_exists(vroot):
-    meta_file = vroot / "metadata.yaml"
+def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
+    meta_file = charm_virtual_root / "metadata.yaml"
 
     assert not meta_file.exists()
 
-    with Context(MyCharm, meta=MyCharm.META, charm_root=vroot).manager(
+    with Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root).manager(
         "start",
         State(),
     ) as mgr:
