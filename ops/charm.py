@@ -729,7 +729,7 @@ class SecretChangedEvent(SecretEvent):
     a new secret revision, and all applications or units that are tracking this
     secret will be notified via this event that a new revision is available.
 
-    Typically, fetch the new content by calling 
+    Typically, fetch the new content by calling
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
     """
