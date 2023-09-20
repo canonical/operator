@@ -3411,10 +3411,13 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'close-port', 'exit 0')
         fake_script(self, 'opened-ports', 'exit 0')
         self.unit.set_ports(8000, 8025)
-        self.assertEqual(fake_script_calls(self, clear=True), [
-            ['opened-ports', ''],
-            ['open-port', '8025/tcp'],
+        calls = fake_script_calls(self, clear=True)
+        self.assertEqual(calls.pop(0), ['opened-ports', ''])
+        # We make no guarantee on the order the ports are opened.
+        calls.sort()
+        self.assertEqual(calls, [
             ['open-port', '8000/tcp'],
+            ['open-port', '8025/tcp'],
         ])
         fake_script(self, 'opened-ports', 'echo 8025/tcp')
         self.unit.set_ports(ops.Port('udp', 8022))
