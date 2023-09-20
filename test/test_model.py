@@ -3406,6 +3406,30 @@ class TestPorts(unittest.TestCase):
             ['opened-ports', ''],
         ])
 
+    def test_set_ports(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
+        fake_script(self, 'opened-ports', 'exit 0')
+        self.unit.set_ports(8000, 8025)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+            ['open-port', '8025/tcp'],
+            ['open-port', '8000/tcp'],
+        ])
+        fake_script(self, 'opened-ports', 'echo 8025/tcp')
+        self.unit.set_ports(ops.Port('udp', 8022))
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+            ['close-port', '8025/tcp'],
+            ['open-port', '8022/udp'],
+        ])
+        fake_script(self, 'opened-ports', 'echo 8022/udp')
+        self.unit.set_ports()
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+            ['close-port', '8022/udp'],
+        ])
+
 
 if __name__ == "__main__":
     unittest.main()
