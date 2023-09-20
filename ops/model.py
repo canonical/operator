@@ -633,13 +633,13 @@ class Unit:
         """
         self._backend.close_port(protocol.lower(), port)
 
-    def opened_ports(self) -> Set['OpenedPort']:
+    def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
 
 @dataclasses.dataclass(frozen=True)
-class OpenedPort:
+class Port:
     """Represents a port opened by :meth:`Unit.open_port`."""
 
     protocol: typing.Literal['tcp', 'udp', 'icmp']
@@ -647,6 +647,9 @@ class OpenedPort:
 
     port: Optional[int]
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
+
+
+OpenedPort = Port  # Alias for backwards compatibility.
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -3245,13 +3248,13 @@ class _ModelBackend:
         arg = f'{port}/{protocol}' if port is not None else protocol
         self._run('close-port', arg)
 
-    def opened_ports(self) -> Set[OpenedPort]:
+    def opened_ports(self) -> Set[Port]:
         # We could use "opened-ports --format=json", but it's not really
         # structured; it's just an array of strings which are the lines of the
         # text output, like ["icmp","8081/udp"]. So it's probably just as
         # likely to change as the text output, and doesn't seem any better.
         output = typing.cast(str, self._run('opened-ports', return_output=True))
-        ports: Set[OpenedPort] = set()
+        ports: Set[Port] = set()
         for line in output.splitlines():
             line = line.strip()
             if not line:
@@ -3262,9 +3265,9 @@ class _ModelBackend:
         return ports
 
     @classmethod
-    def _parse_opened_port(cls, port_str: str) -> Optional[OpenedPort]:
+    def _parse_opened_port(cls, port_str: str) -> Optional[Port]:
         if port_str == 'icmp':
-            return OpenedPort('icmp', None)
+            return Port('icmp', None)
         port_range, slash, protocol = port_str.partition('/')
         if not slash or protocol not in ['tcp', 'udp']:
             logger.warning('Unexpected opened-ports protocol: %s', port_str)
@@ -3273,7 +3276,7 @@ class _ModelBackend:
         if hyphen:
             logger.warning('Ignoring opened-ports port range: %s', port_str)
         protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
-        return OpenedPort(protocol_lit, int(port))
+        return Port(protocol_lit, int(port))
 
 
 class _ModelBackendValidator:
