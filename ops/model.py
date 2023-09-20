@@ -606,6 +606,9 @@ class Unit:
         However, normally charms should make the same open_port() call from
         every unit.
 
+        Use :func:`set_ports()` for a more declarative approach where all of
+        the ports that should be open are provided in a single call.
+
         Args:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
@@ -624,6 +627,10 @@ class Unit:
         usually not an issue; normally charms should make the same
         close_port() call from every unit.
 
+        Use :func:`set_ports()` for a more declarative approach where all
+        of the ports that should be open are provided in a single call.
+        For example, ``set_ports()`` will close all open ports.
+
         Args:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
@@ -636,6 +643,37 @@ class Unit:
     def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
+
+    def set_ports(self, *ports: Union[int, 'Port']) -> None:
+        """Set the open ports for this unit, closing any others that are open.
+
+        Register intent with Juju that the application should be accessed on
+        the given ports and no others, but the ports are not actually opened
+        externally until the admin runs "juju expose" and any closed ports are
+        not actually closed externally until the admin runs "juju unexpose".
+
+        On Kubernetes sidecar charms, the ports opened are not strictly
+        per-unit: Juju will open the union of ports from all units.
+        However, normally charms should make the same set_ports() call from
+        every unit.
+
+        Use :func:`open_port()` and :func:`close_port()` to manage ports
+        individually.
+
+        Args:
+            ports: The ports to open. Provide an int to open a TCP port, or
+                a :class:`Port` to open a port for another protocol.
+        """
+        existing_ports = self._backend.opened_ports()
+        # Normalise to get easier comparisons.
+        desired_ports = {
+            Port('tcp', port) if isinstance(port, int) else port
+            for port in ports
+        }
+        for port in existing_ports.difference(desired_ports):
+            self._backend.close_port(port.protocol, port.port)
+        for port in desired_ports.difference(existing_ports):
+            self._backend.open_port(port.protocol, port.port)
 
 
 @dataclasses.dataclass(frozen=True)
