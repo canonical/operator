@@ -664,16 +664,19 @@ class Unit:
             ports: The ports to open. Provide an int to open a TCP port, or
                 a :class:`Port` to open a port for another protocol.
         """
-        existing_ports = self._backend.opened_ports()
         # Normalise to get easier comparisons.
+        existing_ports = {
+            (port.protocol, port.port)
+            for port in self._backend.opened_ports()
+        }
         desired_ports = {
-            Port('tcp', port) if isinstance(port, int) else port
+            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
             for port in ports
         }
-        for port in existing_ports.difference(desired_ports):
-            self._backend.close_port(port.protocol, port.port)
-        for port in desired_ports.difference(existing_ports):
-            self._backend.open_port(port.protocol, port.port)
+        for protocol, port in existing_ports.difference(desired_ports):
+            self._backend.close_port(protocol, port)
+        for protocol, port in desired_ports.difference(existing_ports):
+            self._backend.open_port(protocol, port)
 
 
 @dataclasses.dataclass(frozen=True)
