@@ -123,7 +123,7 @@ class Model:
 
     @property
     def unit(self) -> 'Unit':
-        """The unit that is running this code (that is, yourself).
+        """The unit that is running this code.
 
         Use :meth:`get_unit` to get an arbitrary unit by name.
         """
@@ -195,7 +195,7 @@ class Model:
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
-        Use :attr:`unit` to get your own unit.
+        Use :attr:`unit` to get the model's own unit.
 
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
@@ -205,7 +205,7 @@ class Model:
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
 
-        Use :attr:`app` to get your own application.
+        Use :attr:`app` to get the model's own application.
 
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
@@ -305,8 +305,8 @@ class _ModelCache:
 class Application:
     """Represents a named application in the model.
 
-    This might be your application, or might be an application that you are related to.
-    Charmers should not instantiate Application objects directly, but should use
+    This might be this charm's application, or might be an application this charm is related
+    to. Charmers should not instantiate Application objects directly, but should use
     :attr:`Model.app` to get the application this unit is part of, or
     :meth:`Model.get_app` if they need a reference to a given application.
     """
@@ -336,14 +336,13 @@ class Application:
 
         The status of remote units is always Unknown.
 
-        You can also use the :attr:`collect_app_status <CharmEvents.collect_app_status>`
-        event if you want to evaluate and set application status consistently
-        at the end of every hook.
+        Alternatively, use the :attr:`collect_app_status <CharmEvents.collect_app_status>`
+        event to evaluate and set application status consistently at the end of every hook.
 
         Raises:
-            RuntimeError: if you try to set the status of another application, or if you try to
-                set the status of this application as a unit that is not the leader.
-            InvalidStatusError: if you try to set the status to something that is not a
+            RuntimeError: if setting the status of another application, or if setting the
+                status of this application as a unit that is not the leader.
+            InvalidStatusError: if setting the status to something that is not a
                 :class:`StatusBase`
 
         Example::
@@ -453,8 +452,8 @@ def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedel
 class Unit:
     """Represents a named unit in the model.
 
-    This might be your unit, another unit of your application, or a unit of another application
-    that you are related to.
+    This might be this charm's unit, another unit of the charm's application, or a unit of
+    another application that the charm is related to.
     """
 
     name: str
@@ -487,15 +486,14 @@ class Unit:
     def status(self) -> 'StatusBase':
         """Used to report or read the status of a specific unit.
 
-        The status of any unit other than yourself is always Unknown.
+        The status of any unit in a different charm is always Unknown.
 
-        You can also use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
-        event if you want to evaluate and set unit status consistently at the
-        end of every hook.
+        Alternatively, use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
+        event to evaluate and set unit status consistently at the end of every hook.
 
         Raises:
-            RuntimeError: if you try to set the status of a unit other than yourself.
-            InvalidStatusError: if you try to set the status to something other than
+            RuntimeError: if setting the status of a unit in another charm.
+            InvalidStatusError: if setting the status to something other than
                 a :class:`StatusBase`
         Example::
 
@@ -531,10 +529,10 @@ class Unit:
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
 
-        This can only be called for your own unit.
+        This can only be called for the charm's own unit.
 
         Raises:
-            RuntimeError: if called for a unit that is not yourself
+            RuntimeError: if called for a unit of another charm
         """
         if self._is_our_unit:
             # This value is not cached as it is not guaranteed to persist for the whole duration
@@ -852,8 +850,8 @@ class Network:
 
     interfaces: List['NetworkInterface']
     """A list of network interface details. This includes the information
-    about how your application should be configured (for example, what IP
-    addresses you should bind to).
+    about how the application should be configured (for example, what IP
+    addresses should be bound to).
 
     Multiple addresses for a single interface are represented as multiple
     interfaces, for example::
@@ -862,11 +860,11 @@ class Network:
     """
 
     ingress_addresses: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]
-    """A list of IP addresses that other units should use to get in touch with you."""
+    """A list of IP addresses that other units should use to get in touch with the charm."""
 
     egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
     """A list of networks representing the subnets that other units will see
-    you connecting from. Due to things like NAT it isn't always possible to
+    the charm connecting from. Due to things like NAT it isn't always possible to
     narrow it down to a single address, but when it is clear, the CIDRs will
     be constrained to a single address (for example, 10.0.0.1/32).
     """
@@ -897,10 +895,10 @@ class Network:
 
     @property
     def bind_address(self) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
-        """A single address that your application should bind() to.
+        """A single address that the charm's application should bind() to.
 
         For the common case where there is a single answer. This represents a single
-        address from :attr:`.interfaces` that can be used to configure where your
+        address from :attr:`.interfaces` that can be used to configure where the charm's
         application should bind() and listen().
         """
         if self.interfaces:
@@ -911,11 +909,11 @@ class Network:
     @property
     def ingress_address(self) -> Optional[
             Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
-        """The address other applications should use to connect to your unit.
+        """The address other applications should use to connect to the charm's unit.
 
-        Due to things like public/private addresses, NAT and tunneling, the address you bind()
-        to is not always the address other people can use to connect() to you.
-        This is just the first address from :attr:`.ingress_addresses`.
+        Due to things like public/private addresses, NAT and tunneling, the address the charm
+        will bind() to is not always the address other people can use to connect() to the
+        charm. This is just the first address from :attr:`.ingress_addresses`.
         """
         if self.ingress_addresses:
             return self.ingress_addresses[0]
@@ -1105,12 +1103,12 @@ class Secret:
         may not include the model UUID (for cross-model secrets).
 
         Charms should treat this as an opaque string for looking up secrets
-        and sharing them via relation data. If you need a charm-local "name"
+        and sharing them via relation data. If a charm-local "name" is needed
         for a secret, use a :attr:`label`. (If a charm needs a truly unique
         identifier for identifying one secret in a set of secrets of arbitrary
         size, use :attr:`unique_identifier` -- this should be rare.)
 
-        This will be None if you obtained the secret using
+        This will be None if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         return self._id
@@ -1129,7 +1127,7 @@ class Secret:
         cases where the charm has a set of secrets of arbitrary size, for
         example, a group of 10 or 20 TLS certificates.
 
-        This will be None if you obtained the secret using
+        This will be None if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         if self._id is None:
@@ -1173,7 +1171,7 @@ class Secret:
         Juju will ensure that the entity (the owner or observer) only has one
         secret with this label at once.
 
-        This will be None if you obtained the secret using
+        This will be None if the secret was obtained using
         :meth:`Model.get_secret` with an ID but no label.
         """
         return self._label
@@ -2179,7 +2177,7 @@ class Container:
         * /foo/foobar.txt
         * /quux.txt
 
-        You could push the following ways::
+        These are ways to push::
 
             # copy one file
             container.push_path('/foo/foobar.txt', '/dst')
@@ -2260,7 +2258,7 @@ class Container:
         * /foo/foobar.txt
         * /quux.txt
 
-        You could pull the following ways::
+        These are ways to pull::
 
             # copy one file
             container.pull_path('/foo/foobar.txt', '/dst')
@@ -2651,9 +2649,9 @@ class TooManyRelatedAppsError(ModelError):
 class RelationDataError(ModelError):
     """Raised when a relation data read/write is invalid.
 
-    This is raised if you're either trying to set a value to something that isn't a string,
-    or if you are trying to set a value in a bucket that you don't have access to. (For example,
-    another application/unit, or setting your application data without being the leader.)
+    This is raised when either trying to set a value to something that isn't a string,
+    or when trying to set a value in a bucket without the required access. (For example,
+    another application/unit, or setting application data without being the leader.)
     """
 
 
@@ -2662,9 +2660,9 @@ class RelationDataTypeError(RelationDataError):
 
 
 class RelationDataAccessError(RelationDataError):
-    """Raised by ``Relation.data[entity][key] = value`` if you don't have access.
+    """Raised by ``Relation.data[entity][key] = value`` if sufficient access is not available.
 
-    This typically means that you don't have permission to write read/write the databag,
+    This typically means that permission to write read/write the databag is missing,
     but in some cases it is raised when attempting to read/write from a deceased remote entity.
     """
 

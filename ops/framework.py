@@ -202,7 +202,7 @@ class EventBase:
         the result of an action, or any event other than metric events. The
         queue of events will be dispatched before the new event is processed.
 
-        From the above you may deduce, but it's important to point out:
+        Important points that follow from the above:
 
         * ``defer()`` does not interrupt the execution of the current event
           handler. In almost all cases, a call to ``defer()`` should be followed
@@ -220,19 +220,19 @@ class EventBase:
 
         The general desire to call ``defer()`` happens when some precondition
         isn't yet met. However, care should be exercised as to whether it is
-        better to defer this event so that you see it again, or whether it is
+        better to defer this event so that it is seen again, or whether it is
         better to just wait for the event that indicates the precondition has
         been met.
 
-        For example, if ``config-changed`` is fired, and you are waiting for
-        different config, there is no reason to defer the event because there
-        will be a *different* ``config-changed`` event when the config actually
-        changes, rather than checking to see if maybe config has changed prior
-        to every other event that occurs.
+        For example, if ``config-changed`` is fired, and handling the event
+        cannot complete without a different config, there is no reason to defer
+        the event because there will be a *different* ``config-changed`` event
+        when the config actually changes, rather than checking to see if maybe
+        config has changed prior to every other event that occurs.
 
-        Similarly, if you need 2 events to occur before you are ready to
-        proceed (say event A and B). When you see event A, you could chose to
-        ``defer()`` it because you haven't seen B yet. However, that leads to:
+        Similarly, if two events need to occur before execution can proceed
+        (say event A and B), the event A handler could ``defer()`` because B
+        has not been seen yet. However, that leads to:
 
         1. event A fires, calls defer()
 
@@ -242,7 +242,6 @@ class EventBase:
 
         3. At some future time, event C happens, which also checks if A can
            proceed.
-
         """
         logger.debug("Deferring %s.", self)
         self.deferred = True
@@ -1360,8 +1359,8 @@ class StoredSet(typing.MutableSet[Any]):
 
         Per https://docs.python.org/3/library/collections.abc.html
         if the Set mixin is being used in a class with a different constructor signature,
-        you will need to override _from_iterable() with a classmethod that can construct
-        new instances from an iterable argument.
+        override _from_iterable() with a classmethod that can construct new instances
+        from an iterable argument.
         """
         return set(it)
 

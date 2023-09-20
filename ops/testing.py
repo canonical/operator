@@ -149,7 +149,7 @@ ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
 class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
-    The model created is from the viewpoint of the charm that you are testing.
+    The model created is from the viewpoint of the charm that being tested.
 
     Below is an example test using :meth:`begin_with_initial_hooks` that ensures
     the charm responds correctly to config changes::
@@ -194,7 +194,7 @@ class Harness(Generic[CharmType]):
                 assert (root / 'etc' / 'app.conf').exists()
 
     Args:
-        charm_cls: The Charm class that you'll be testing.
+        charm_cls: The Charm class to test.
         meta: A string or file-like object containing the contents of
             ``metadata.yaml``. If not supplied, we will look for a ``metadata.yaml`` file in the
             parent directory of the Charm, and if not found fall back to a trivial
@@ -260,8 +260,8 @@ class Harness(Generic[CharmType]):
 
 
         If event_name == '', conversely, the Harness will believe that no hook
-        is running, allowing you to temporarily have unrestricted access to read/write
-        a relation's databags even if you're inside an event handler.
+        is running, allowing temporary unrestricted access to read/write a relation's
+        databags even from inside an event handler.
         >>> def test_foo():
         >>>     class MyCharm:
         >>>         ...
@@ -292,9 +292,8 @@ class Harness(Generic[CharmType]):
     def charm(self) -> CharmType:
         """Return the instance of the charm class that was passed to ``__init__``.
 
-        Note that the Charm is not instantiated until you have called
-        :meth:`.begin()`. Until then, attempting to access this property will raise
-        an exception.
+        Note that the Charm is not instantiated until :meth:`.begin()` is called.
+        Until then, attempting to access this property will raise an exception.
         """
         if self._charm is None:
             raise RuntimeError('The charm instance is not available yet. '
@@ -315,7 +314,7 @@ class Harness(Generic[CharmType]):
         """Instantiate the Charm and start handling events.
 
         Before calling :meth:`begin`, there is no Charm instance, so changes to the Model won't
-        emit events. You must call :meth:`.begin` before :attr:`.charm` is valid.
+        emit events. Call :meth:`.begin` for :attr:`.charm` to be valid.
         """
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
@@ -339,18 +338,17 @@ class Harness(Generic[CharmType]):
         self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
-        """Called when you want the Harness to fire the same hooks that Juju would fire at startup.
+        """Have the Harness fire the same hooks that Juju would fire at startup.
 
         This triggers install, relation-created, config-changed, start, pebble-ready (for any
         containers), and any relation-joined hooks based on what relations have been added before
-        you called begin. Note that all of these are fired before returning control
-        to the test suite, so if you want to introspect what happens at each step, you need to fire
-        them directly (for example, ``Charm.on.install.emit()``).
+        begin was called. Note that all of these are fired before returning control
+        to the test suite, so to introspect what happens at each step, fire them directly
+        (for example, ``Charm.on.install.emit()``).
 
-        To use this with all the normal hooks, you should instantiate the harness, setup any
-        relations that you want active when the charm starts, and then call this method. This
-        method will automatically create and add peer relations that are specified in
-        metadata.yaml.
+        To use this with all the normal hooks, instantiate the harness, setup any relations that
+        should be active when the charm starts, and then call this method. This method will
+        automatically create and add peer relations that are specified in metadata.yaml.
 
         If the charm metadata specifies containers, this sets can_connect to True for all
         containers (in addition to triggering pebble-ready for each).
@@ -445,10 +443,9 @@ class Harness(Generic[CharmType]):
                     relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
-        """Called by your test infrastructure to clean up any temporary directories/files/etc.
+        """Called by the test infrastructure to clean up any temporary directories/files/etc.
 
-        You should always call ``self.addCleanup(harness.cleanup)`` after creating a
-        :class:`Harness`.
+        Always call ``self.addCleanup(harness.cleanup)`` after creating a :class:`Harness`.
         """
         self._backend._cleanup()
 
@@ -619,9 +616,9 @@ class Harness(Generic[CharmType]):
     def enable_hooks(self) -> None:
         """Re-enable hook events from charm.on when the model is changed.
 
-        By default hook events are enabled once you call :meth:`.begin`,
-        but if you have used :meth:`.disable_hooks`, this can be used to
-        enable them again.
+        By default hook events are enabled once :meth:`.begin` is called,
+        but if :meth:`.disable_hooks` is used, this can be used to enable
+        them again.
         """
         self._hooks_enabled = True
 
@@ -889,7 +886,7 @@ class Harness(Generic[CharmType]):
         """Add a new unit to a relation.
 
         This will trigger a `relation_joined` event. This would naturally be
-        followed by a `relation_changed` event, which you can trigger with
+        followed by a `relation_changed` event, which can be triggered with
         :meth:`.update_relation_data`. This separation is artificial in the
         sense that Juju will always fire the two, but is intended to make
         testing relations and their data bags slightly more natural.
@@ -1046,7 +1043,7 @@ class Harness(Generic[CharmType]):
             container_name: The simple name of the associated container
 
         Return:
-            The Pebble plan for this container. You can use
+            The Pebble plan for this container. Use
             :meth:`Plan.to_yaml <ops.pebble.Plan.to_yaml>` to get a string
             form for the content. Will raise ``KeyError`` if no Pebble client
             exists for that container name (should only happen if container is
@@ -1078,9 +1075,9 @@ class Harness(Generic[CharmType]):
     def set_model_info(self, name: Optional[str] = None, uuid: Optional[str] = None) -> None:
         """Set the name and UUID of the model that this is representing.
 
-        This cannot be called once :meth:`begin` has been called. But it lets
-        you set the value that will be returned by :attr:`Model.name <ops.Model.name>`
-        and :attr:`Model.uuid <ops.Model.uuid>`.
+        This cannot be called once :meth:`begin` has been called. Use it to set the
+        value that will be returned by :attr:`Model.name <ops.Model.name>` and
+        :attr:`Model.uuid <ops.Model.uuid>`.
 
         This is a convenience method to invoke both :meth:`set_model_name`
         and :meth:`set_model_uuid` at once.
@@ -1093,8 +1090,8 @@ class Harness(Generic[CharmType]):
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
 
-        This cannot be called once :meth:`begin` has been called. But it lets
-        you set the value that will be returned by :attr:`Model.name <ops.Model.name>`.
+        This cannot be called once :meth:`begin` has been called. Use it to set the
+        value that will be returned by :attr:`Model.name <ops.Model.name>`.
         """
         if self._charm is not None:
             raise RuntimeError('cannot set the Model name after begin()')
@@ -1103,8 +1100,8 @@ class Harness(Generic[CharmType]):
     def set_model_uuid(self, uuid: str) -> None:
         """Set the uuid of the Model that this is representing.
 
-        This cannot be called once :meth:`begin` has been called. But it lets
-        you set the value that will be returned by :attr:`Model.uuid <ops.Model.uuid>`.
+        This cannot be called once :meth:`begin` has been called. Use it to set the
+        value that will be returned by :attr:`Model.uuid <ops.Model.uuid>`.
         """
         if self._charm is not None:
             raise RuntimeError('cannot set the Model uuid after begin()')
@@ -1464,8 +1461,8 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret to grant access to. This should
                 normally be the return value of :meth:`add_model_secret`.
             observer: The name of the application (or specific unit) to grant
-                access to. You must already have created a relation between
-                this application and the charm under test.
+                access to. A relation between this application and the charm
+                under test must already have been created.
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
@@ -1487,8 +1484,8 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret to revoke access for. This should
                 normally be the return value of :meth:`add_model_secret`.
             observer: The name of the application (or specific unit) to revoke
-                access to. You must already have created a relation between
-                this application and the charm under test.
+                access to. A relation between this application and the charm under
+                test must have already been created.
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
@@ -1551,7 +1548,7 @@ class Harness(Generic[CharmType]):
 
         This event is fired by Juju for a specific revision when all the
         secret's observers have refreshed to a later revision, however, in the
-        harness you call this method to fire the event manually.
+        harness call this method to fire the event manually.
 
         Args:
             secret_id: The ID of the secret associated with the event.
@@ -1661,7 +1658,7 @@ class Harness(Generic[CharmType]):
         When :meth:`ops.Container.exec` is triggered, the registered handler is used to
         generate stdout and stderr for the simulated execution.
 
-        You can provide either a ``handler`` or a ``result``, but not both:
+        A ``handler`` or a ``result`` may be provided, but not both:
 
         - A ``handler`` is a function accepting :class:`ops.testing.ExecArgs` and returning
           :class:`ops.testing.ExecResult` as the simulated process outcome. For cases that
