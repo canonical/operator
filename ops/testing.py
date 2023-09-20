@@ -1075,7 +1075,7 @@ class Harness(Generic[CharmType]):
     def set_model_info(self, name: Optional[str] = None, uuid: Optional[str] = None) -> None:
         """Set the name and UUID of the model that this is representing.
 
-        This cannot be called once :meth:`begin` has been called. Use it to set the
+        Cannot be called once :meth:`begin` has been called. Use it to set the
         value that will be returned by :attr:`Model.name <ops.Model.name>` and
         :attr:`Model.uuid <ops.Model.uuid>`.
 
@@ -1090,7 +1090,7 @@ class Harness(Generic[CharmType]):
     def set_model_name(self, name: str) -> None:
         """Set the name of the Model that this is representing.
 
-        This cannot be called once :meth:`begin` has been called. Use it to set the
+        Cannot be called once :meth:`begin` has been called. Use it to set the
         value that will be returned by :attr:`Model.name <ops.Model.name>`.
         """
         if self._charm is not None:
@@ -1100,7 +1100,7 @@ class Harness(Generic[CharmType]):
     def set_model_uuid(self, uuid: str) -> None:
         """Set the uuid of the Model that this is representing.
 
-        This cannot be called once :meth:`begin` has been called. Use it to set the
+        Cannot be called once :meth:`begin` has been called. Use it to set the
         value that will be returned by :attr:`Model.uuid <ops.Model.uuid>`.
         """
         if self._charm is not None:
