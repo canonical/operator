@@ -3317,11 +3317,13 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'open-port', 'exit 0')
 
         self.unit.open_port('tcp', 8080)
+        self.unit.open_port(port=8025)
         self.unit.open_port('UDP', 4000)
         self.unit.open_port('icmp')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['open-port', '8080/tcp'],
+            ['open-port', '8025/tcp'],
             ['open-port', '4000/udp'],
             ['open-port', 'icmp'],
         ])
@@ -3341,11 +3343,13 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'close-port', 'exit 0')
 
         self.unit.close_port('tcp', 8080)
+        self.unit.close_port(port=8025)
         self.unit.close_port('UDP', 4000)
         self.unit.close_port('icmp')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['close-port', '8080/tcp'],
+            ['close-port', '8025/tcp'],
             ['close-port', '4000/udp'],
             ['close-port', 'icmp'],
         ])

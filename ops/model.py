@@ -593,7 +593,7 @@ class Unit:
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content)
 
-    def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
+    def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'] = 'tcp',
                   port: Optional[int] = None):
         """Open a port with the given protocol for this unit.
 
@@ -615,7 +615,7 @@ class Unit:
         """
         self._backend.open_port(protocol.lower(), port)
 
-    def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
+    def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'] = 'tcp',
                    port: Optional[int] = None):
         """Close a port with the given protocol for this unit.
 
