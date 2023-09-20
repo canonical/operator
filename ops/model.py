@@ -486,13 +486,13 @@ class Unit:
     def status(self) -> 'StatusBase':
         """Used to report or read the status of a specific unit.
 
-        The status of any unit in a different charm is always Unknown.
+        The status of any unit other than the current unit is always Unknown.
 
         Alternatively, use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
         event to evaluate and set unit status consistently at the end of every hook.
 
         Raises:
-            RuntimeError: if setting the status of a unit in another charm.
+            RuntimeError: if setting the status of a unit other than the current unit
             InvalidStatusError: if setting the status to something other than
                 a :class:`StatusBase`
         Example::
@@ -2177,7 +2177,7 @@ class Container:
         * /foo/foobar.txt
         * /quux.txt
 
-        These are ways to push::
+        These are various push examples::
 
             # copy one file
             container.push_path('/foo/foobar.txt', '/dst')
@@ -2258,7 +2258,7 @@ class Container:
         * /foo/foobar.txt
         * /quux.txt
 
-        These are ways to pull::
+        These are various pull examples::
 
             # copy one file
             container.pull_path('/foo/foobar.txt', '/dst')
@@ -2649,7 +2649,7 @@ class TooManyRelatedAppsError(ModelError):
 class RelationDataError(ModelError):
     """Raised when a relation data read/write is invalid.
 
-    This is raised when either trying to set a value to something that isn't a string,
+    This is raised either when trying to set a value to something that isn't a string,
     or when trying to set a value in a bucket without the required access. (For example,
     another application/unit, or setting application data without being the leader.)
     """
@@ -2660,7 +2660,7 @@ class RelationDataTypeError(RelationDataError):
 
 
 class RelationDataAccessError(RelationDataError):
-    """Raised by ``Relation.data[entity][key] = value`` if sufficient access is not available.
+    """Raised by ``Relation.data[entity][key] = value`` if unable to access.
 
     This typically means that permission to write read/write the databag is missing,
     but in some cases it is raised when attempting to read/write from a deceased remote entity.

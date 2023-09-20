@@ -1005,7 +1005,7 @@ class CharmBase(Object):
 
     :code:`CharmBase` is used to create a charm. This is done by inheriting
     from :code:`CharmBase` and customising the subclass as required. So to
-    create a charm, say ``MyCharm``, define a charm class and set up the
+    create a charm called ``MyCharm``, define a charm class and set up the
     required event handlers (“hooks”) in its constructor::
 
         import logging

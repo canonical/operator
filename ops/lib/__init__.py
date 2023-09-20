@@ -96,7 +96,7 @@ def use(name: str, api: int, author: str) -> ModuleType:
 def autoimport():
     """Find all libs in the path and enable use of them.
 
-    Call this only when a package has been installed or sys.path has been
+    Call this function only when a package has been installed or sys.path has been
     otherwise changed in the current run, and the changes need to be seen.
     Otherwise libraries are found on first call of `use`.
 

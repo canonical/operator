@@ -149,7 +149,7 @@ ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
 class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
 
-    The model created is from the viewpoint of the charm that being tested.
+    The model created is from the viewpoint of the charm that is being tested.
 
     Below is an example test using :meth:`begin_with_initial_hooks` that ensures
     the charm responds correctly to config changes::
@@ -338,7 +338,7 @@ class Harness(Generic[CharmType]):
         self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
-        """Have the Harness fire the same hooks that Juju would fire at startup.
+        """Fire the same hooks that Juju would fire at startup.
 
         This triggers install, relation-created, config-changed, start, pebble-ready (for any
         containers), and any relation-joined hooks based on what relations have been added before
@@ -616,8 +616,8 @@ class Harness(Generic[CharmType]):
     def enable_hooks(self) -> None:
         """Re-enable hook events from charm.on when the model is changed.
 
-        By default hook events are enabled once :meth:`.begin` is called,
-        but if :meth:`.disable_hooks` is used, this can be used to enable
+        By default, hook events are enabled once :meth:`.begin` is called,
+        but if :meth:`.disable_hooks` is used, this method will enable
         them again.
         """
         self._hooks_enabled = True
