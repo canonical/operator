@@ -593,8 +593,76 @@ class Unit:
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content)
 
+    if typing.TYPE_CHECKING:
+        @typing.overload
+        def open_port(self, protocol: typing.Literal['tcp', 'udp'], port: int) -> None:
+            """Open a port with the given protocol for this unit.
+
+            Calling this registers intent with Juju that the application should be
+            accessed on the given port, but the port isn't actually opened
+            externally until the admin runs "juju expose".
+
+            On Kubernetes sidecar charms, the ports opened are not strictly
+            per-unit: Juju will open the union of ports from all units.
+            However, normally charms should make the same open_port() call from
+            every unit.
+
+            Use :func:`set_ports()` for a more declarative approach where all of
+            the ports that should be open are provided in a single call.
+
+            Args:
+                protocol: String representing the protocol; must be one of
+                    'tcp' or 'udp' (lowercase is recommended, but
+                    uppercase is also supported).
+                port: The port to open.
+            """
+
+        @typing.overload
+        def open_port(self, *, port: int, protocol: typing.Literal['tcp'] = 'tcp') -> None:
+            """Open a tcp port for this unit.
+
+            Calling this registers intent with Juju that the application should be
+            accessed on the given port, but the port isn't actually opened
+            externally until the admin runs "juju expose".
+
+            On Kubernetes sidecar charms, the ports opened are not strictly
+            per-unit: Juju will open the union of ports from all units.
+            However, normally charms should make the same open_port() call from
+            every unit.
+
+            Use :func:`set_ports()` for a more declarative approach where all of
+            the ports that should be open are provided in a single call.
+
+            Args:
+                protocol: Must be 'tcp' (lowercase is recommended, but
+                    uppercase is also supported).
+                port: The port to open.
+            """
+
+        @typing.overload
+        def open_port(self, protocol: typing.Literal['icmp'], port: None = None) -> None:
+            """Open a icmp port for this unit.
+
+            Calling this registers intent with Juju that the application should be
+            accessed on the given port, but the port isn't actually opened
+            externally until the admin runs "juju expose".
+
+            On Kubernetes sidecar charms, the ports opened are not strictly
+            per-unit: Juju will open the union of ports from all units.
+            However, normally charms should make the same open_port() call from
+            every unit.
+
+            Use :func:`set_ports()` for a more declarative approach where all of
+            the ports that should be open are provided in a single call.
+
+            Args:
+                protocol: Must be 'icmp' (lowercase is recommended, but
+                    uppercase is also supported).
+                port: Must be None.
+            """
+
     def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'] = 'tcp',
-                  port: Optional[int] = None):
+                  port: Optional[int] = None) -> None:
         """Open a port with the given protocol for this unit.
 
         Calling this registers intent with Juju that the application should be
@@ -615,11 +683,81 @@ class Unit:
                 uppercase is also supported).
             port: The port to open. Required for TCP and UDP; not allowed
                 for ICMP.
+
+        Raises:
+            ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
+                or ``port`` is not provided when ``protocol`` is 'tcp' or
+                'udp'.
         """
-        self._backend.open_port(protocol.lower(), port)
+        normalised_protocol : str = protocol.lower()
+        if normalised_protocol == 'icmp' and port is not None:
+            raise ModelError("icmp cannot have a port number specified")
+        elif normalised_protocol in ('tcp', 'udp') and port is None:
+            raise ModelError(f"{normalised_protocol} must have a port number specified")
+        self._backend.open_port(normalised_protocol, port)
+
+    if typing.TYPE_CHECKING:
+        @typing.overload
+        def close_port(self, protocol: typing.Literal['tcp', 'udp'], port: int) -> None:
+            """Close a port with the given protocol for this unit.
+
+            On Kubernetes sidecar charms, Juju will only close the port once the
+            last unit that opened that port has closed it. However, this is
+            usually not an issue; normally charms should make the same
+            close_port() call from every unit.
+
+            Use :func:`set_ports()` for a more declarative approach where all
+            of the ports that should be open are provided in a single call.
+            For example, ``set_ports()`` will close all open ports.
+
+            Args:
+                protocol: String representing the protocol; must be one of
+                    'tcp' or 'udp' (lowercase is recommended, but
+                    uppercase is also supported).
+                port: The port to open.
+            """
+
+        @typing.overload
+        def close_port(self, *, port: int, protocol: typing.Literal['tcp'] = 'tcp') -> None:
+            """Close a port with the given protocol for this unit.
+
+            On Kubernetes sidecar charms, Juju will only close the port once the
+            last unit that opened that port has closed it. However, this is
+            usually not an issue; normally charms should make the same
+            close_port() call from every unit.
+
+            Use :func:`set_ports()` for a more declarative approach where all
+            of the ports that should be open are provided in a single call.
+            For example, ``set_ports()`` will close all open ports.
+
+            Args:
+                protocol: Must be 'tcp' (lowercase is recommended, but
+                    uppercase is also supported).
+                port: The port to open.
+            """
+
+        @typing.overload
+        def close_port(self, protocol: typing.Literal['icmp'], port: None = None) -> None:
+            """Close a port with the given protocol for this unit.
+
+            On Kubernetes sidecar charms, Juju will only close the port once the
+            last unit that opened that port has closed it. However, this is
+            usually not an issue; normally charms should make the same
+            close_port() call from every unit.
+
+            Use :func:`set_ports()` for a more declarative approach where all
+            of the ports that should be open are provided in a single call.
+            For example, ``set_ports()`` will close all open ports.
+
+            Args:
+                protocol: String representing the protocol; must be one of
+                    'tcp', 'udp', or 'icmp' (lowercase is recommended, but
+                    uppercase is also supported).
+                port: Must be None.
+            """
 
     def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'] = 'tcp',
-                   port: Optional[int] = None):
+                   port: Optional[int] = None) -> None:
         """Close a port with the given protocol for this unit.
 
         On Kubernetes sidecar charms, Juju will only close the port once the
@@ -637,8 +775,18 @@ class Unit:
                 uppercase is also supported).
             port: The port to open. Required for TCP and UDP; not allowed
                 for ICMP.
+
+        Raises:
+            ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
+                or ``port`` is not provided when ``protocol`` is 'tcp' or
+                'udp'.
         """
-        self._backend.close_port(protocol.lower(), port)
+        normalised_protocol : str = protocol.lower()
+        if normalised_protocol == 'icmp' and port is not None:
+            raise ModelError("icmp cannot have a port number specified")
+        elif normalised_protocol in ('tcp', 'udp') and port is None:
+            raise ModelError(f"{normalised_protocol} must have a port number specified")
+        self._backend.close_port(normalised_protocol, port)
 
     def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""
