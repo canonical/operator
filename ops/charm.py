@@ -519,7 +519,7 @@ class RelationDepartedEvent(RelationEvent):
     def departing_unit(self) -> Optional[model.Unit]:
         """The :class:`ops.Unit` that is departing, if any.
 
-        Use this to determine (for example) whether this unit is the
+        Use this method to determine (for example) whether this unit is the
         departing one.
         """
         # doing this on init would fail because `framework` gets patched in
