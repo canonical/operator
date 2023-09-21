@@ -593,15 +593,6 @@ class Unit:
             owner='unit')
         return Secret(self._backend, id=id, label=label, content=content)
 
-    if typing.TYPE_CHECKING:
-        @typing.overload
-        def open_port(self, protocol: typing.Literal['tcp', 'udp'], port: int) -> None:  # noqa
-            ...
-
-        @typing.overload
-        def open_port(self, protocol: typing.Literal['icmp'], port: None = None) -> None:  # noqa
-            ...
-
     def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
                   port: Optional[int] = None) -> None:
         """Open a port with the given protocol for this unit.
@@ -636,15 +627,6 @@ class Unit:
         elif normalised_protocol in ('tcp', 'udp') and port is None:
             raise ModelError(f"{normalised_protocol} must have a port number specified")
         self._backend.open_port(normalised_protocol, port)
-
-    if typing.TYPE_CHECKING:
-        @typing.overload
-        def close_port(self, protocol: typing.Literal['tcp', 'udp'], port: int) -> None:  # noqa
-            ...
-
-        @typing.overload
-        def close_port(self, protocol: typing.Literal['icmp'], port: None = None) -> None:  # noqa
-            ...
 
     def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
                    port: Optional[int] = None) -> None:
