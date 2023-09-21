@@ -699,7 +699,7 @@ class Unit:
 
 @dataclasses.dataclass(frozen=True)
 class Port:
-    """Represents a port opened by :meth:`Unit.open_port`."""
+    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
 
     protocol: typing.Literal['tcp', 'udp', 'icmp']
     """The IP protocol."""
