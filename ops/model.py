@@ -600,7 +600,7 @@ class Unit:
         Some behaviour, such as whether the port is opened externally without
         using "juju expose" and whether the opened ports are per-unit, differs
         between Kubernetes and machine charms. See the
-        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--open-port>`_
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--open-port>`__
         for more detail.
 
         Args:
@@ -619,7 +619,7 @@ class Unit:
         Some behaviour, such as whether the port is closed externally without
         using "juju unexpose", differs between Kubernetes and machine charms.
         See the
-        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--close-port>`_
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--close-port>`__
         for more detail.
 
         Args:
