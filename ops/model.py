@@ -195,7 +195,7 @@ class Model:
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
-        Use :attr:`unit` to get the model's own unit.
+        Use :attr:`unit` to get the current unit.
 
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
@@ -205,7 +205,7 @@ class Model:
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
 
-        Use :attr:`app` to get the model's own application.
+        Use :attr:`app` to get this charm's application.
 
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
@@ -529,10 +529,10 @@ class Unit:
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
 
-        This can only be called for the charm's own unit.
+        This can only be called for the current unit.
 
         Raises:
-            RuntimeError: if called for a unit of another charm
+            RuntimeError: if called for another unit
         """
         if self._is_our_unit:
             # This value is not cached as it is not guaranteed to persist for the whole duration
