@@ -597,7 +597,7 @@ class Unit:
                   port: Optional[int] = None):
         """Open a port with the given protocol for this unit.
 
-        Some behaviour, such as whether the post is opened externally without
+        Some behaviour, such as whether the port is opened externally without
         using "juju expose" and whether the opened ports are per-unit, differs
         between Kubernetes and machine charms. See the
         `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--open-port>`_
