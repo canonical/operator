@@ -224,11 +224,10 @@ class EventBase:
         better to just wait for the event that indicates the precondition has
         been met.
 
-        For example, if ``config-changed`` is fired, and handling the event
-        cannot complete without a different config, there is no reason to defer
-        the event because there will be a *different* ``config-changed`` event
-        when the config actually changes, rather than checking to see if maybe
-        config has changed prior to every other event that occurs.
+        For example, if handling a config change requires that two config
+        values are changed, there's no reason to defer the first
+        ``config-changed`` because there will be a *second* ``config-changed``
+        event fired when the other config value changes.
 
         Similarly, if two events need to occur before execution can proceed
         (say event A and B), the event A handler could ``defer()`` because B
