@@ -595,14 +595,11 @@ class Unit:
                   port: Optional[int] = None):
         """Open a port with the given protocol for this unit.
 
-        Calling this registers intent with Juju that the application should be
-        accessed on the given port, but the port isn't actually opened
-        externally until the admin runs "juju expose".
-
-        On Kubernetes sidecar charms, the ports opened are not strictly
-        per-unit: Juju will open the union of ports from all units.
-        However, normally charms should make the same open_port() call from
-        every unit.
+        Some behaviour, such as whether the port is opened externally without
+        using "juju expose" and whether the opened ports are per-unit, differs
+        between Kubernetes and machine charms. See the
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--open-port>`__
+        for more detail.
 
         Args:
             protocol: String representing the protocol; must be one of
@@ -617,10 +614,11 @@ class Unit:
                    port: Optional[int] = None):
         """Close a port with the given protocol for this unit.
 
-        On Kubernetes sidecar charms, Juju will only close the port once the
-        last unit that opened that port has closed it. However, this is
-        usually not an issue; normally charms should make the same
-        close_port() call from every unit.
+        Some behaviour, such as whether the port is closed externally without
+        using "juju unexpose", differs between Kubernetes and machine charms.
+        See the
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--close-port>`__
+        for more detail.
 
         Args:
             protocol: String representing the protocol; must be one of
