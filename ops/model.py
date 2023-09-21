@@ -665,15 +665,11 @@ class Unit:
     def set_ports(self, *ports: Union[int, 'Port']) -> None:
         """Set the open ports for this unit, closing any others that are open.
 
-        Register intent with Juju that the application should be accessed on
-        the given ports and no others, but the ports are not actually opened
-        externally until the admin runs "juju expose" and any closed ports are
-        not actually closed externally until the admin runs "juju unexpose".
-
-        On Kubernetes sidecar charms, the ports opened are not strictly
-        per-unit: Juju will open the union of ports from all units.
-        However, normally charms should make the same set_ports() call from
-        every unit.
+        Some behaviour, such as whether the port is opened or closed externally without
+        using Juju's ``expose`` & ``unexpose`` commands, differs between Kubernetes
+        and machine charms. See the
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--networking>`__
+        for more detail.
 
         Use :meth:`open_port` and :meth:`close_port` to manage ports
         individually.
