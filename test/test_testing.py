@@ -4822,30 +4822,24 @@ class TestPorts(unittest.TestCase):
         unit = harness.model.unit
 
         unit.open_port('tcp', 8080)
-        unit.open_port(port=8025)
         unit.open_port('udp', 4000)
         unit.open_port('icmp')
 
         ports_set = unit.opened_ports()
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
-        self.assertEqual(len(ports), 4)
+        self.assertEqual(len(ports), 3)
         self.assertIsInstance(ports[0], ops.Port)
         self.assertEqual(ports[0].protocol, 'icmp')
         self.assertIsNone(ports[0].port)
-        self.assertIsInstance(ports[1], ops.Port)
         self.assertEqual(ports[1].protocol, 'tcp')
-        self.assertEqual(ports[1].port, 8025)
+        self.assertEqual(ports[1].port, 8080)
         self.assertIsInstance(ports[1], ops.Port)
-        self.assertEqual(ports[2].protocol, 'tcp')
-        self.assertEqual(ports[2].port, 8080)
-        self.assertIsInstance(ports[2], ops.Port)
-        self.assertEqual(ports[3].protocol, 'udp')
-        self.assertEqual(ports[3].port, 4000)
+        self.assertEqual(ports[2].protocol, 'udp')
+        self.assertEqual(ports[2].port, 4000)
 
         unit.close_port('tcp', 8080)
         unit.close_port('tcp', 8080)  # closing same port again has no effect
-        unit.close_port(port=8025)
         unit.close_port('udp', 4000)
 
         ports_set = unit.opened_ports()
@@ -4872,8 +4866,6 @@ class TestPorts(unittest.TestCase):
             unit.open_port('ftp', 8080)  # invalid protocol
         with self.assertRaises(ops.ModelError):
             unit.open_port('tcp')  # tcp must have port
-        with self.assertRaises(ops.ModelError):
-            unit.open_port()  # tcp (default) must have port
         with self.assertRaises(ops.ModelError):
             unit.open_port('udp')  # udp must have port
         with self.assertRaises(ops.ModelError):

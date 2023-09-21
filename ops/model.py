@@ -607,34 +607,12 @@ class Unit:
             However, normally charms should make the same open_port() call from
             every unit.
 
-            Use :func:`set_ports()` for a more declarative approach where all of
+            Use :meth:`set_ports` for a more declarative approach where all of
             the ports that should be open are provided in a single call.
 
             Args:
                 protocol: String representing the protocol; must be one of
                     'tcp' or 'udp' (lowercase is recommended, but
-                    uppercase is also supported).
-                port: The port to open.
-            """
-
-        @typing.overload
-        def open_port(self, *, port: int, protocol: typing.Literal['tcp'] = 'tcp') -> None:
-            """Open a tcp port for this unit.
-
-            Calling this registers intent with Juju that the application should be
-            accessed on the given port, but the port isn't actually opened
-            externally until the admin runs "juju expose".
-
-            On Kubernetes sidecar charms, the ports opened are not strictly
-            per-unit: Juju will open the union of ports from all units.
-            However, normally charms should make the same open_port() call from
-            every unit.
-
-            Use :func:`set_ports()` for a more declarative approach where all of
-            the ports that should be open are provided in a single call.
-
-            Args:
-                protocol: Must be 'tcp' (lowercase is recommended, but
                     uppercase is also supported).
                 port: The port to open.
             """
@@ -652,7 +630,7 @@ class Unit:
             However, normally charms should make the same open_port() call from
             every unit.
 
-            Use :func:`set_ports()` for a more declarative approach where all of
+            Use :meth:`set_ports` for a more declarative approach where all of
             the ports that should be open are provided in a single call.
 
             Args:
@@ -661,7 +639,7 @@ class Unit:
                 port: Must be None.
             """
 
-    def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'] = 'tcp',
+    def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
                   port: Optional[int] = None) -> None:
         """Open a port with the given protocol for this unit.
 
@@ -674,7 +652,7 @@ class Unit:
         However, normally charms should make the same open_port() call from
         every unit.
 
-        Use :func:`set_ports()` for a more declarative approach where all of
+        Use :meth:`set_ports` for a more declarative approach where all of
         the ports that should be open are provided in a single call.
 
         Args:
@@ -706,32 +684,13 @@ class Unit:
             usually not an issue; normally charms should make the same
             close_port() call from every unit.
 
-            Use :func:`set_ports()` for a more declarative approach where all
+            Use :meth:`set_ports` for a more declarative approach where all
             of the ports that should be open are provided in a single call.
             For example, ``set_ports()`` will close all open ports.
 
             Args:
                 protocol: String representing the protocol; must be one of
                     'tcp' or 'udp' (lowercase is recommended, but
-                    uppercase is also supported).
-                port: The port to open.
-            """
-
-        @typing.overload
-        def close_port(self, *, port: int, protocol: typing.Literal['tcp'] = 'tcp') -> None:
-            """Close a port with the given protocol for this unit.
-
-            On Kubernetes sidecar charms, Juju will only close the port once the
-            last unit that opened that port has closed it. However, this is
-            usually not an issue; normally charms should make the same
-            close_port() call from every unit.
-
-            Use :func:`set_ports()` for a more declarative approach where all
-            of the ports that should be open are provided in a single call.
-            For example, ``set_ports()`` will close all open ports.
-
-            Args:
-                protocol: Must be 'tcp' (lowercase is recommended, but
                     uppercase is also supported).
                 port: The port to open.
             """
@@ -745,7 +704,7 @@ class Unit:
             usually not an issue; normally charms should make the same
             close_port() call from every unit.
 
-            Use :func:`set_ports()` for a more declarative approach where all
+            Use :meth:`set_ports` for a more declarative approach where all
             of the ports that should be open are provided in a single call.
             For example, ``set_ports()`` will close all open ports.
 
@@ -756,7 +715,7 @@ class Unit:
                 port: Must be None.
             """
 
-    def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'] = 'tcp',
+    def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
                    port: Optional[int] = None) -> None:
         """Close a port with the given protocol for this unit.
 
@@ -765,7 +724,7 @@ class Unit:
         usually not an issue; normally charms should make the same
         close_port() call from every unit.
 
-        Use :func:`set_ports()` for a more declarative approach where all
+        Use :meth:`set_ports` for a more declarative approach where all
         of the ports that should be open are provided in a single call.
         For example, ``set_ports()`` will close all open ports.
 
@@ -805,7 +764,7 @@ class Unit:
         However, normally charms should make the same set_ports() call from
         every unit.
 
-        Use :func:`open_port()` and :func:`close_port()` to manage ports
+        Use :meth:`open_port` and :meth:`close_port` to manage ports
         individually.
 
         Args:
@@ -813,17 +772,17 @@ class Unit:
                 a :class:`Port` to open a port for another protocol.
         """
         # Normalise to get easier comparisons.
-        existing_ports = {
+        existing = {
             (port.protocol, port.port)
             for port in self._backend.opened_ports()
         }
-        desired_ports = {
+        desired = {
             ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
             for port in ports
         }
-        for protocol, port in existing_ports.difference(desired_ports):
+        for protocol, port in existing - desired:
             self._backend.close_port(protocol, port)
-        for protocol, port in desired_ports.difference(existing_ports):
+        for protocol, port in desired - existing:
             self._backend.open_port(protocol, port)
 
 

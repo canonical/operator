@@ -2489,12 +2489,12 @@ class _TestingModelBackend:
         else:
             self._secrets = [s for s in self._secrets if s.id != id]
 
-    def open_port(self, protocol: str = 'tcp', port: Optional[int] = None):
+    def open_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
         self._opened_ports.add(model.Port(protocol_lit, port))
 
-    def close_port(self, protocol: str = 'tcp', port: Optional[int] = None):
+    def close_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
         self._opened_ports.discard(model.Port(protocol_lit, port))
