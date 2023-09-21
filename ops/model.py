@@ -616,7 +616,7 @@ class Unit:
                    port: Optional[int] = None):
         """Close a port with the given protocol for this unit.
 
-        Some behaviour, such as whether the post is closed externally without
+        Some behaviour, such as whether the port is closed externally without
         using "juju unexpose", differs between Kubernetes and machine charms.
         See the
         `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--close-port>`_
