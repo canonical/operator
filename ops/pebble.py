@@ -1899,6 +1899,21 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
+    if typing.TYPE_CHECKING:
+        @typing.overload
+        def pull(self,
+                 path: str,
+                 *,
+                 encoding: None) -> BinaryIO:
+            ...
+
+        @typing.overload
+        def pull(self,
+                 path: str,
+                 *,
+                 encoding: str) -> TextIO:
+            ...
+
     def pull(self,
              path: str,
              *,
