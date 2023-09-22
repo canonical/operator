@@ -241,7 +241,7 @@ class ConfigChangedEvent(HookEvent):
       This event notifies the charm of its initial configuration.
       Typically, this event will fire between an :class:`install <InstallEvent>`
       and a :class:`start <StartEvent>` during the startup sequence
-      (when you first deploy a unit), but in general it will fire whenever
+      (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
     - As a specific instance of the above point: when networking changes
@@ -519,8 +519,8 @@ class RelationDepartedEvent(RelationEvent):
     def departing_unit(self) -> Optional[model.Unit]:
         """The :class:`ops.Unit` that is departing, if any.
 
-        You can use this to determine (for example) whether *you* are the
-        departing unit.
+        Use this method to determine (for example) whether this unit is the
+        departing one.
         """
         # doing this on init would fail because `framework` gets patched in
         # post-init
@@ -729,7 +729,7 @@ class SecretChangedEvent(SecretEvent):
     a new secret revision, and all applications or units that are tracking this
     secret will be notified via this event that a new revision is available.
 
-    Typically, you will want to fetch the new content by calling
+    Typically, the charm will fetch the new content by calling
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
     """
@@ -757,7 +757,7 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call
+    Typically, the charm will call
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision.
     """
@@ -1005,7 +1005,7 @@ class CharmBase(Object):
 
     :code:`CharmBase` is used to create a charm. This is done by inheriting
     from :code:`CharmBase` and customising the subclass as required. So to
-    create your own charm, say ``MyCharm``, define a charm class and set up the
+    create a charm called ``MyCharm``, define a charm class and set up the
     required event handlers (“hooks”) in its constructor::
 
         import logging
