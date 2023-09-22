@@ -16,6 +16,7 @@
 
 import io
 import logging
+import typing
 import unittest
 from unittest.mock import patch
 
@@ -26,15 +27,15 @@ from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 class FakeModelBackend:
 
     def __init__(self):
-        self._calls = []
+        self._calls : typing.List[typing.Tuple[str, str]] = []
 
-    def calls(self, clear=False):
+    def calls(self, clear: bool = False):
         calls = self._calls
         if clear:
             self._calls = []
         return calls
 
-    def juju_log(self, level, message):
+    def juju_log(self, level: str, message: str):
         for line in _ModelBackend.log_split(message):
             self._calls.append((level, line))
 
@@ -48,7 +49,7 @@ class TestLogging(unittest.TestCase):
         logging.getLogger().handlers.clear()
 
     def test_default_logging(self):
-        ops.log.setup_root_logging(self.backend)
+        ops.log.setup_root_logging(self.backend)  # type: ignore
 
         logger = logging.getLogger()
         self.assertEqual(logger.level, logging.DEBUG)
@@ -71,7 +72,7 @@ class TestLogging(unittest.TestCase):
     def test_handler_filtering(self):
         logger = logging.getLogger()
         logger.setLevel(logging.INFO)
-        logger.addHandler(ops.log.JujuLogHandler(self.backend, logging.WARNING))
+        logger.addHandler(ops.log.JujuLogHandler(self.backend, logging.WARNING))  # type: ignore
         logger.info('foo')
         self.assertEqual(self.backend.calls(), [])
         logger.warning('bar')
@@ -80,7 +81,7 @@ class TestLogging(unittest.TestCase):
     def test_no_stderr_without_debug(self):
         buffer = io.StringIO()
         with patch('sys.stderr', buffer):
-            ops.log.setup_root_logging(self.backend, debug=False)
+            ops.log.setup_root_logging(self.backend, debug=False)  # type: ignore
             logger = logging.getLogger()
             logger.debug('debug message')
             logger.info('info message')
@@ -98,7 +99,7 @@ class TestLogging(unittest.TestCase):
     def test_debug_logging(self):
         buffer = io.StringIO()
         with patch('sys.stderr', buffer):
-            ops.log.setup_root_logging(self.backend, debug=True)
+            ops.log.setup_root_logging(self.backend, debug=True)  # type: ignore
             logger = logging.getLogger()
             logger.debug('debug message')
             logger.info('info message')
@@ -120,7 +121,7 @@ class TestLogging(unittest.TestCase):
         )
 
     def test_reduced_logging(self):
-        ops.log.setup_root_logging(self.backend)
+        ops.log.setup_root_logging(self.backend)  # type: ignore
         logger = logging.getLogger()
         logger.setLevel(logging.WARNING)
         logger.debug('debug')
@@ -132,7 +133,7 @@ class TestLogging(unittest.TestCase):
         buffer = io.StringIO()
 
         with patch('sys.stderr', buffer):
-            ops.log.setup_root_logging(self.backend, debug=True)
+            ops.log.setup_root_logging(self.backend, debug=True)  # type: ignore
             logger = logging.getLogger()
             logger.debug('l' * MAX_LOG_LINE_LEN)
 
