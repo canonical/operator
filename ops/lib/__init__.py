@@ -96,9 +96,9 @@ def use(name: str, api: int, author: str) -> ModuleType:
 def autoimport():
     """Find all libs in the path and enable use of them.
 
-    You only need to call this if you've installed a package or
-    otherwise changed sys.path in the current run, and need to see the
-    changes. Otherwise libraries are found on first call of `use`.
+    Call this function only when a package has been installed or sys.path has been
+    otherwise changed in the current run, and the changes need to be seen.
+    Otherwise libraries are found on first call of `use`.
 
     DEPRECATED: This function is deprecated. Prefer charm libraries instead
     (https://juju.is/docs/sdk/library).
