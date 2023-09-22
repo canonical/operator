@@ -340,7 +340,7 @@ class _Dispatcher:
 
 def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     """Figure out whether we want to use controller storage or not."""
-    # if you've previously used local state, carry on using that
+    # if local state has been used previously, carry on using that
     if db_path.exists():
         return False
 
@@ -368,7 +368,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     The event name is based on the way this executable was called (argv[0]).
 
     Args:
-        charm_class: your charm class.
+        charm_class: the charm class to instantiate and receive the event.
         use_juju_for_storage: whether to use controller-side storage. If not specified
             then kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
