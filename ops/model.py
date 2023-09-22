@@ -452,7 +452,7 @@ def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedel
 class Unit:
     """Represents a named unit in the model.
 
-    This might be this charm's unit, another unit of the charm's application, or a unit of
+    This might be the current unit, another unit of the charm's application, or a unit of
     another application that the charm is related to.
     """
 
@@ -907,7 +907,7 @@ class Network:
     @property
     def ingress_address(self) -> Optional[
             Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
-        """The address other applications should use to connect to the charm's unit.
+        """The address other applications should use to connect to the current unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address the charm
         will bind() to is not always the address other people can use to connect() to the
