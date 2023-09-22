@@ -18,33 +18,49 @@ import http.server
 import json
 import os
 import re
+import socket
 import socketserver
 import tempfile
 import threading
+import typing
 import urllib.parse
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    def __init__(self, request, client_address, server):
-        self.routes = [
+    if typing.TYPE_CHECKING:
+        _route = typing.List[
+            typing.Tuple[
+                typing.Literal['GET', 'POST'], re.Pattern[str], typing.Callable[
+                    [re.Match[str], typing.Dict[str, str], typing.Dict[str, str]], None
+                ]
+            ]
+        ]
+
+    def __init__(self,
+                 request: socket.socket,
+                 client_address : typing.Tuple[str,
+                                               int],
+                 server: socketserver.BaseServer):
+        self.routes : Handler._route = [
             ('GET', re.compile(r'^/system-info$'), self.get_system_info),
             ('POST', re.compile(r'^/services$'), self.services_action),
         ]
         self._services = ['foo']
         super().__init__(request, ('unix-socket', 80), server)
 
-    def log_message(self, format, *args):
+    def log_message(self, format: str, *args: typing.Any):
         # Disable logging for tests
         pass
 
-    def respond(self, d, status=200):
+    def respond(self, d: typing.Dict[str, typing.Union[str, int,
+                None, typing.Dict[str, str]]], status: int = 200) -> None:
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         d_json = json.dumps(d, indent=4, sort_keys=True)
         self.wfile.write(d_json.encode('utf-8'))
 
-    def bad_request(self, message):
+    def bad_request(self, message: str) -> None:
         d = {
             "result": {
                 "message": message,
@@ -55,7 +71,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 400)
 
-    def not_found(self):
+    def not_found(self) -> None:
         d = {
             "result": {
                 "message": "invalid API endpoint requested"
@@ -66,7 +82,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 404)
 
-    def method_not_allowed(self):
+    def method_not_allowed(self) -> None:
         d = {
             "result": {
                 "message": 'method "PUT" not allowed'
@@ -77,7 +93,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 405)
 
-    def internal_server_error(self, msg):
+    def internal_server_error(self, msg: Exception) -> None:
         d = {
             "result": {
                 "message": f"internal server error: {msg}",
@@ -88,13 +104,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 500)
 
-    def do_GET(self):  # noqa: N802 ("should be lowercase")
+    def do_GET(self) -> None:  # noqa: N802 ("should be lowercase")
         self.do_request('GET')
 
-    def do_POST(self):  # noqa: N802 ("should be lowercase")
+    def do_POST(self) -> None:  # noqa: N802 ("should be lowercase")
         self.do_request('POST')
 
-    def do_request(self, request_method):
+    def do_request(self, request_method: typing.Literal['GET', 'POST']) -> None:
         path, _, query = self.path.partition('?')
         path = urllib.parse.unquote(path)
         query = dict(urllib.parse.parse_qsl(query))
@@ -104,7 +120,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         path = path[3:]
 
-        allowed = []
+        allowed : typing.List[str] = []
         for method, regex, func in self.routes:
             match = regex.match(path)
             if match:
@@ -124,19 +140,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         self.not_found()
 
-    def read_body_json(self):
+    def read_body_json(self) -> typing.Dict[str, str]:
         try:
             content_len = int(self.headers.get('Content-Length', ''))
         except ValueError:
             content_len = 0
         if not content_len:
-            return None
+            return {}
         body = self.rfile.read(content_len)
         if isinstance(body, bytes):
             body = body.decode('utf-8')
         return json.loads(body)
 
-    def get_system_info(self, match, query, data):
+    def get_system_info(self,
+                        match: re.Match[str],
+                        query: typing.Dict[str,
+                                           str],
+                        data: typing.Dict[str,
+                                          str]) -> None:
         self.respond({
             "result": {
                 "version": "3.14.159"
@@ -146,7 +167,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "type": "sync"
         })
 
-    def services_action(self, match, query, data):
+    def services_action(self,
+                        match: re.Match[str],
+                        query: typing.Dict[str,
+                                           str],
+                        data: typing.Dict[str,
+                                          str]) -> None:
         action = data['action']
         services = data['services']
         if action == 'start':
@@ -165,7 +191,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.bad_request(f'action "{action}" not implemented')
 
 
-def start_server():
+def start_server() -> typing.Tuple[typing.Callable[[], None], str]:
     socket_dir = tempfile.mkdtemp(prefix='test-ops.pebble')
     socket_path = os.path.join(socket_dir, 'test.socket')
 
