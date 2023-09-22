@@ -1901,14 +1901,14 @@ class Client:
 
     if typing.TYPE_CHECKING:
         @typing.overload
-        def pull(self,
+        def pull(self,  # noqa
                  path: str,
                  *,
                  encoding: None) -> BinaryIO:
             ...
 
         @typing.overload
-        def pull(self,
+        def pull(self,  # noqa
                  path: str,
                  *,
                  encoding: str) -> TextIO:
