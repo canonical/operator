@@ -618,12 +618,7 @@ class Unit:
                 or ``port`` is not provided when ``protocol`` is 'tcp' or
                 'udp'.
         """
-        normalised_protocol : str = protocol.lower()
-        if normalised_protocol == 'icmp' and port is not None:
-            raise ModelError("icmp cannot have a port number specified")
-        elif normalised_protocol in ('tcp', 'udp') and port is None:
-            raise ModelError(f"{normalised_protocol} must have a port number specified")
-        self._backend.open_port(normalised_protocol, port)
+        self._backend.open_port(protocol.lower(), port)
 
     def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
                    port: Optional[int] = None) -> None:
@@ -651,12 +646,7 @@ class Unit:
                 or ``port`` is not provided when ``protocol`` is 'tcp' or
                 'udp'.
         """
-        normalised_protocol : str = protocol.lower()
-        if normalised_protocol == 'icmp' and port is not None:
-            raise ModelError("icmp cannot have a port number specified")
-        elif normalised_protocol in ('tcp', 'udp') and port is None:
-            raise ModelError(f"{normalised_protocol} must have a port number specified")
-        self._backend.close_port(normalised_protocol, port)
+        self._backend.close_port(protocol.lower(), port)
 
     def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""

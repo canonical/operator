@@ -3337,11 +3337,6 @@ class TestPorts(unittest.TestCase):
             ['open-port', '8080/ftp'],
         ])
 
-        with self.assertRaises(ops.ModelError) as cm:
-            self.unit.open_port('icmp', 8000)
-        with self.assertRaises(ops.ModelError) as cm:
-            self.unit.open_port('udp')
-
     def test_close_port(self):
         fake_script(self, 'close-port', 'exit 0')
 
@@ -3365,11 +3360,6 @@ class TestPorts(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['close-port', '8080/ftp'],
         ])
-
-        with self.assertRaises(ops.ModelError) as cm:
-            self.unit.close_port('icmp', 8000)
-        with self.assertRaises(ops.ModelError) as cm:
-            self.unit.close_port('udp')
 
     def test_opened_ports(self):
         fake_script(self, 'opened-ports', """echo 8080/tcp; echo icmp""")
