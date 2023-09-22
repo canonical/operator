@@ -90,9 +90,7 @@ class TestStrconv(unittest.TestCase):
             timeconv.parse_rfc3339('2021-99-99T04:36:22Z')
 
         with self.assertRaises(ValueError):
-            timeconv.parse_rfc3339(
-                timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777x'))  # type: ignore
+            timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777x')
 
         with self.assertRaises(ValueError):
-            timeconv.parse_rfc3339(
-                timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777-99:99'))  # type: ignore
+            timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777-99:99')
