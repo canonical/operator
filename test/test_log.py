@@ -16,6 +16,7 @@
 
 import io
 import logging
+import typing
 import unittest
 from unittest.mock import patch
 
@@ -23,18 +24,18 @@ import ops.log
 from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 
 
-class FakeModelBackend:
+class FakeModelBackend(_ModelBackend):
 
     def __init__(self):
-        self._calls = []
+        self._calls: typing.List[typing.Tuple[str, str]] = []
 
-    def calls(self, clear=False):
+    def calls(self, clear: bool = False):
         calls = self._calls
         if clear:
             self._calls = []
         return calls
 
-    def juju_log(self, level, message):
+    def juju_log(self, level: str, message: str):
         for line in _ModelBackend.log_split(message):
             self._calls.append((level, line))
 
