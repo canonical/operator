@@ -71,7 +71,7 @@ class JujuVersion:
             and self.build == other.build
             and self.patch == other.patch)
 
-    def __lt__(self, other: 'JujuVersion') -> bool:
+    def __lt__(self, other: Union[str, 'JujuVersion']) -> bool:
         if self is other:
             return False
         if isinstance(other, str):
