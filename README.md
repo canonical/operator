@@ -16,17 +16,17 @@ event on the charm and execute its logic.
 This puts scenario tests somewhere in between unit and integration tests: some say 'functional', some say 'contract', I prefer 'state-transition'.
 
 Scenario tests nudge you into thinking of a charm as an input->output function. The input is the
-union of an `Event` (why am I, charm, being executed) and a `State` (am I leader? what is my relation data? what is my
-config?...). The output is another `State`: the state after the charm has had a chance to interact with the
+union of an `Event` (why am I, charm, being executed), a `State` (am I leader? what is my relation data? what is my
+config?...) and the charm's execution `Context` (what relations can I have? what containers can I have?...). The output is another `State`: the state after the charm has had a chance to interact with the
 mocked juju model and affect the initial state back.
-
-For example: a charm is executed with a `start` event, and based on whether it has leadership or not (according to its input state), it will decide to set `active` or `blocked` status (which will be reflected in the output state).
 
 ![state transition model depiction](resources/state-transition-model.png)
 
+For example: a charm currently in `unknown` status is executed with a `start` event, and based on whether it has leadership or not (according to its input state), it will decide to set `active` or `blocked` status (which will be reflected in the output state).
+
 Scenario-testing a charm, then, means verifying that:
 
-- the charm does not raise uncaught exceptions while handling the scene
+- the charm does not raise uncaught exceptions while handling the event
 - the output state (or the diff with the input state) is as expected.
 
 # Core concepts as a metaphor
@@ -53,32 +53,30 @@ author's expectations.
 Comparing scenario tests with `Harness` tests:
 
 - Harness exposes an imperative API: the user is expected to call methods on the Harness driving it to the desired
-  state, then verify its validity by calling charm methods or inspecting the raw data.
+  state, then verify its validity by calling charm methods or inspecting the raw data. In contrast, Scenario is declarative. You fully specify an initial state, an execution context and an event, then you run the charm and inspect the results.
 - Harness instantiates the charm once, then allows you to fire multiple events on the charm, which is breeding ground
   for subtle bugs. Scenario tests are centered around testing single state transitions, that is, one event at a time.
   This ensures that the execution environment is as clean as possible (for a unit test).
 - Harness maintains a model of the juju Model, which is a maintenance burden and adds complexity. Scenario mocks at the
   level of hook tools and stores all mocking data in a monolithic data structure (the State), which makes it more
   lightweight and portable.
-- TODO: Scenario can mock at the level of hook tools. Decoupling charm and context allows us to swap out easily any part
-  of this flow, and even share context data across charms, codebases, teams...
 
 # Writing scenario tests
 
 A scenario test consists of three broad steps:
 
 - **Arrange**:
+    - declare the context 
     - declare the input state
     - select an event to fire
 - **Act**:
-    - run the state (i.e. obtain the output state)
-    - optionally, use pre-event and post-event hooks to get a hold of the charm instance and run assertions on internal
-      APIs
+    - run the context (i.e. obtain the output state, given the input state and the event)
 - **Assert**:
     - verify that the output state (or the delta with the input state) is how you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
+    - optionally, you can use a context manager to get a hold of the charm instance and run assertions on internal APIs and the internal state of the charm and operator framework.
 
-The most basic scenario is the so-called `null scenario`: one in which all is defaulted and barely any data is
+The most basic scenario is one in which all is defaulted and barely any data is
 available. The charm has no config, no relations, no networks, no leadership, and its status is `unknown`.
 
 With that, we can write the simplest possible scenario test:
@@ -405,14 +403,13 @@ Context(...).run("start", state_in)  # invalid: this unit's id cannot be the ID 
 ### SubordinateRelation
 
 To declare a subordinate relation, you should use `scenario.state.SubordinateRelation`. The core difference with regular
-relations is that subordinate relations always have exactly one remote unit (there is always exactly one primary unit
-that this unit can see). So unlike `Relation`, a `SubordinateRelation` does not have a `remote_units_data` argument.
-Instead, it has a `remote_unit_data` taking a single `Dict[str:str]`, and takes the primary unit ID as a separate
-argument. Also, it talks in terms of `primary`:
+relations is that subordinate relations always have exactly one remote unit (there is always exactly one remote unit
+that this unit can see). 
+Because of that, `SubordinateRelation`, compared to `Relation`, always talks in terms of `remote`:
 
+- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` taking a single `Dict[str:str]`. The remote unit ID can be provided as a separate argument. 
 - `Relation.remote_unit_ids` becomes `SubordinateRelation.primary_id` (a single ID instead of a list of IDs)
-- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` (a single databag instead of a mapping
-  from unit IDs to databags)
+- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` (a single databag instead of a mapping from unit IDs to databags)
 - `Relation.remote_app_name` maps to `SubordinateRelation.primary_app_name`
 
 ```python
@@ -512,7 +509,7 @@ be no containers. So if the charm were to `self.unit.containers`, it would get b
 To give the charm access to some containers, you need to pass them to the input state, like so:
 `State(containers=[...])`
 
-An example of a scene including some containers:
+An example of a state including some containers:
 
 ```python
 from scenario.state import Container, State
@@ -1006,7 +1003,7 @@ You can prefix the event name with the path leading to its owner to tell Scenari
 ```python
 from scenario import Context, State
 
-Context(...).run("my_charm_lib.on.ingress_provided", State())
+Context(...).run("my_charm_lib.on.foo", State())
 ```
 
 This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
@@ -1016,10 +1013,10 @@ This will instruct Scenario to emit `my_charm.my_charm_lib.on.foo`.
 # Live charm introspection
 
 Scenario is a black-box, state-transition testing framework. It makes it trivial to assert that a status went from A to
-B, but not to assert that, in the context of this charm execution, with this state, a certain method call would return a
-given piece of data.
+B, but not to assert that, in the context of this charm execution, with this state, a certain charm-internal method was called and returned a
+given piece of data, or would return this and that _if_ it had been called.
 
-Scenario offers a context manager for this use case specifically:
+Scenario offers a cheekily-named context manager for this use case specifically:
 
 ```python
 from ops import CharmBase, StoredState
