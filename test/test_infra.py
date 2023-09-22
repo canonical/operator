@@ -43,7 +43,7 @@ class InfrastructureTests(unittest.TestCase):
 
     def test_quote_backslashes(self):
         # ensure we're not using unneeded backslash to escape strings
-        issues : typing.List[typing.Tuple[str, int, str]] = []
+        issues: typing.List[typing.Tuple[str, int, str]] = []
         for filepath in get_python_filepaths():
             with open(filepath, "rt", encoding="utf8") as fh:
                 for idx, line in enumerate(fh, 1):
@@ -55,7 +55,7 @@ class InfrastructureTests(unittest.TestCase):
 
     def test_ensure_copyright(self):
         # all non-empty Python files must have a proper copyright somewhere in the first 5 lines
-        issues : typing.List[str] = []
+        issues: typing.List[str] = []
         regex = re.compile(r"# Copyright \d\d\d\d(-\d\d\d\d)? Canonical Ltd.\n")
         for filepath in get_python_filepaths():
             if os.stat(filepath).st_size == 0:
@@ -102,7 +102,7 @@ class InfrastructureTests(unittest.TestCase):
 
         # For some reason "setup.py --requires" doesn't work, so do this the hard way
         with open('setup.py', encoding='utf-8') as f:
-            lines : typing.List[str] = []
+            lines: typing.List[str] = []
             for line in f:
                 if 'install_requires=[' in line:
                     break
@@ -132,7 +132,7 @@ class ImportersTestCase(unittest.TestCase):
             with self.subTest(name=name):
                 self.check(name)
 
-    def check(self, name : str):
+    def check(self, name: str):
         """Helper function to run the test."""
         fd, testfile = tempfile.mkstemp()
         self.addCleanup(os.unlink, testfile)
