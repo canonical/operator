@@ -40,7 +40,7 @@ def datetime_utc(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: i
     return datetime.datetime(y, m, d, hour, min, sec, micro, tzinfo=tz)
 
 
-def datetime_nzdt(y: int, m: int, d: int, hour: int, min: int, sec: int, micro:int = 0):
+def datetime_nzdt(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: int = 0):
     tz = datetime.timezone(datetime.timedelta(hours=13))
     return datetime.datetime(y, m, d, hour, min, sec, micro, tzinfo=tz)
 
