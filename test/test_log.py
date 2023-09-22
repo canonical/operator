@@ -27,7 +27,7 @@ from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 class FakeModelBackend(_ModelBackend):
 
     def __init__(self):
-        self._calls : typing.List[typing.Tuple[str, str]] = []
+        self._calls: typing.List[typing.Tuple[str, str]] = []
 
     def calls(self, clear: bool = False):
         calls = self._calls
