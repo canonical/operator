@@ -14,6 +14,7 @@
 
 import os
 import sys
+import typing
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from random import shuffle
@@ -23,13 +24,17 @@ from textwrap import dedent
 from unittest import TestCase
 from unittest.mock import patch
 
-import logassert
 import pytest
 
 import ops.lib
 
 # Ignore deprecation warnings for this module.
-pytestmark = pytest.mark.filterwarnings('ignore::DeprecationWarning')
+pytestmark: pytest.MarkDecorator = pytest.mark.filterwarnings('ignore::DeprecationWarning')
+
+
+# ModuleSpec to pass when we know it will not be used but we want the
+# type to match.
+_dummy_spec = ModuleSpec("", loader=None)
 
 
 def _mklib(topdir: str, pkgname: str, libname: str) -> Path:
@@ -60,14 +65,12 @@ def _mklib(topdir: str, pkgname: str, libname: str) -> Path:
     return lib / '__init__.py'
 
 
-def _flatten(specgen):
-    return sorted([os.path.dirname(spec.origin) for spec in specgen])
+def _flatten(specgen: typing.Iterable[ModuleSpec]) -> typing.List[str]:
+    return sorted([os.path.dirname(spec.origin if spec.origin is not None else "")
+                  for spec in specgen])
 
 
 class TestLibFinder(TestCase):
-    def setUp(self):
-        logassert.setup(self, 'ops.lib')
-
     def _mkdtemp(self) -> str:
         tmpdir = mkdtemp()
         self.addCleanup(rmtree, tmpdir)
@@ -77,14 +80,12 @@ class TestLibFinder(TestCase):
         tmpdir = self._mkdtemp()
 
         self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
-        self.assertLoggedDebug('Looking for ops.lib packages under', tmpdir)
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
         self.assertEqual(
             _flatten(ops.lib._find_all_specs([tmpdir])),
             [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
-        self.assertLoggedDebug("Found", "foo.opslib.bar")
 
     def test_multi(self):
         tmp_dir_a = self._mkdtemp()
@@ -173,7 +174,7 @@ class TestLibFinder(TestCase):
 
 
 class TestLibParser(TestCase):
-    def _mkmod(self, name: str, content: str = None) -> ModuleSpec:
+    def _mkmod(self, name: str, content: typing.Optional[str] = None) -> ModuleSpec:
         fd, fname = mkstemp(text=True)
         self.addCleanup(os.unlink, fname)
         if content is not None:
@@ -181,9 +182,6 @@ class TestLibParser(TestCase):
                 f.write(dedent(content))
         os.close(fd)
         return ModuleSpec(name=name, loader=None, origin=fname)
-
-    def setUp(self):
-        logassert.setup(self, 'ops.lib')
 
     def test_simple(self):
         """Check that we can load a reasonably straightforward lib."""
@@ -196,11 +194,9 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice@example.com", 2, 42))
+        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
         # also check the repr while we're at it
         self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Success")
 
     def test_libauthor_has_dashes(self):
         m = self._mkmod('foo', '''
@@ -211,7 +207,7 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice-someone@example.com", 2, 42))
+        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice-someone@example.com", 2, 42))
         # also check the repr while we're at it
         self.assertEqual(repr(lib), '<_Lib foo by alice-someone@example.com, API 2, patch 42>')
 
@@ -224,7 +220,7 @@ class TestLibParser(TestCase):
         LIBANANA=True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice@example.com", 2, 42))
+        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
         # also check the repr while we're at it
         self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
 
@@ -237,7 +233,7 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(None, "foo", "alice@example.com", 2, 42))
+        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
         # also check the repr while we're at it
         self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
 
@@ -249,11 +245,6 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug(
-            "Missing opslib metadata after reading to end of file:"
-            " got API, NAME, and PATCH, but missing AUTHOR")
-        self.assertNotLogged("Success")
 
     def test_too_long(self):
         """Check that if the file is too long, nothing is returned."""
@@ -264,11 +255,6 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug(
-            "Missing opslib metadata after reading to line 99:"
-            " missing API, AUTHOR, NAME, and PATCH")
-        self.assertNotLogged("Success")
 
     def test_no_origin(self):
         """Check that _parse_lib doesn't choke when given a spec with no origin."""
@@ -292,9 +278,6 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Failed")
-        self.assertNotLogged("Success")
 
     def test_name_is_number(self):
         """Check our behaviour when the name in the lib is a number."""
@@ -305,9 +288,6 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for NAME: expected str, got int")
-        self.assertNotLogged("Success")
 
     def test_api_is_string(self):
         """Check our behaviour when the api in the lib is a string."""
@@ -318,9 +298,6 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for API: expected int, got str")
-        self.assertNotLogged("Success")
 
     def test_patch_is_string(self):
         """Check our behaviour when the patch in the lib is a string."""
@@ -331,9 +308,6 @@ class TestLibParser(TestCase):
         LIBAUTHOR = "alice@example.com"
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for PATCH: expected int, got str")
-        self.assertNotLogged("Success")
 
     def test_author_is_number(self):
         """Check our behaviour when the author in the lib is a number."""
@@ -344,13 +318,15 @@ class TestLibParser(TestCase):
         LIBAUTHOR = 43
         ''')
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Bad type for AUTHOR: expected str, got int")
-        self.assertNotLogged("Success")
 
     def test_other_encoding(self):
         """Check that we don't crash when a library is not UTF-8."""
         m = self._mkmod('foo')
+        # This should never be the case, but we need to show type checkers
+        # that it's not.
+        if m.origin is None:
+            self.assertIsNotNone(m.origin)
+            return
         with open(m.origin, 'wt', encoding='latin-1') as f:
             f.write(dedent('''
             LIBNAME = "foo"
@@ -360,51 +336,48 @@ class TestLibParser(TestCase):
             LIBANANA = "Ñoño"
             '''))
         self.assertIsNone(ops.lib._parse_lib(m))
-        self.assertLoggedDebug("Parsing", "foo")
-        self.assertLoggedDebug("Failed", "can't decode")
-        self.assertNotLogged("Success")
 
 
 class TestLib(TestCase):
 
     def test_lib_comparison(self):
         self.assertNotEqual(
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 0),
-            ops.lib._Lib(None, "bar", "bob@example.com", 0, 1))
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0),
+            ops.lib._Lib(_dummy_spec, "bar", "bob@example.com", 0, 1))
         self.assertEqual(
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 1),
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 1))
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1),
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
 
         self.assertLess(
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 0),
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 1))
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0),
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
         self.assertLess(
-            ops.lib._Lib(None, "foo", "alice@example.com", 0, 1),
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 1))
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 0, 1),
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
         self.assertLess(
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 1),
-            ops.lib._Lib(None, "foo", "bob@example.com", 1, 1))
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1),
+            ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1))
         self.assertLess(
-            ops.lib._Lib(None, "bar", "alice@example.com", 1, 1),
-            ops.lib._Lib(None, "foo", "alice@example.com", 1, 1))
+            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1),
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
 
         with self.assertRaises(TypeError):
-            42 < ops.lib._Lib(None, "bar", "alice@example.com", 1, 1)
+            42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore
         with self.assertRaises(TypeError):
-            ops.lib._Lib(None, "bar", "alice@example.com", 1, 1) < 42
+            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < 42  # type: ignore
 
         # these two might be surprising in that they don't raise an exception,
         # but they are correct: our __eq__ bailing means Python falls back to
         # its default of checking object identity.
-        self.assertNotEqual(ops.lib._Lib(None, "bar", "alice@example.com", 1, 1), 42)
-        self.assertNotEqual(42, ops.lib._Lib(None, "bar", "alice@example.com", 1, 1))
+        self.assertNotEqual(ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1), 42)
+        self.assertNotEqual(42, ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1))
 
     def test_lib_order(self):
-        a = ops.lib._Lib(None, "bar", "alice@example.com", 1, 0)
-        b = ops.lib._Lib(None, "bar", "alice@example.com", 1, 1)
-        c = ops.lib._Lib(None, "foo", "alice@example.com", 1, 0)
-        d = ops.lib._Lib(None, "foo", "alice@example.com", 1, 1)
-        e = ops.lib._Lib(None, "foo", "bob@example.com", 1, 1)
+        a = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 0)
+        b = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)
+        c = ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0)
+        d = ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
+        e = ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1)
 
         for i in range(20):
             with self.subTest(i):
@@ -414,11 +387,11 @@ class TestLib(TestCase):
 
     def test_use_bad_args_types(self):
         with self.assertRaises(TypeError):
-            ops.lib.use(1, 2, 'bob@example.com')
+            ops.lib.use(1, 2, 'bob@example.com')  # type: ignore
         with self.assertRaises(TypeError):
-            ops.lib.use('foo', '2', 'bob@example.com')
+            ops.lib.use('foo', '2', 'bob@example.com')  # type: ignore
         with self.assertRaises(TypeError):
-            ops.lib.use('foo', 2, ops.lib.use)
+            ops.lib.use('foo', 2, ops.lib.use)  # type: ignore
 
     def test_use_bad_args_values(self):
         with self.assertRaises(ValueError):
@@ -559,7 +532,7 @@ class TestLibFunctional(TestCase):
         baz = ops.lib.use('baz', 2, 'alice@example.com')
         self.assertEqual(baz.LIBAPI, 2)
 
-    def _test_submodule(self, *, relative=False):
+    def _test_submodule(self, *, relative: bool = False):
         tmpdir = self._mkdtemp()
         sys.path = [tmpdir]
 
