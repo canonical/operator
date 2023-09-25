@@ -3402,8 +3402,7 @@ class TestPorts(unittest.TestCase):
             ['opened-ports', ''],
         ])
 
-    def test_set_ports(self):
-        # No existing ports, open new ones.
+    def test_set_ports_all_open(self):
         fake_script(self, 'open-port', 'exit 0')
         fake_script(self, 'close-port', 'exit 0')
         fake_script(self, 'opened-ports', 'exit 0')
@@ -3415,7 +3414,11 @@ class TestPorts(unittest.TestCase):
             ['open-port', '8000/tcp'],
             ['open-port', '8025/tcp'],
         ])
+
+    def test_set_ports_mixed(self):
         # Two open ports, leave one alone and open another one.
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
         fake_script(self, 'opened-ports', 'echo 8025/tcp; echo 8028/tcp')
         self.unit.set_ports(ops.Port('udp', 8022), 8028)
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -3423,7 +3426,10 @@ class TestPorts(unittest.TestCase):
             ['close-port', '8025/tcp'],
             ['open-port', '8022/udp'],
         ])
-        # Completely replace the opened ports.
+
+    def test_set_ports_replace(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
         fake_script(self, 'opened-ports', 'echo 8025/tcp; echo 8028/tcp')
         self.unit.set_ports(8001, 8002)
         calls = fake_script_calls(self, clear=True)
@@ -3435,14 +3441,20 @@ class TestPorts(unittest.TestCase):
             ['open-port', '8001/tcp'],
             ['open-port', '8002/tcp'],
         ])
-        # Close everything.
+
+    def test_set_ports_close_all(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
         fake_script(self, 'opened-ports', 'echo 8022/udp')
         self.unit.set_ports()
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['opened-ports', ''],
             ['close-port', '8022/udp'],
         ])
-        # Opening an already open port is a no-op.
+
+    def test_set_ports_noop(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
         fake_script(self, 'opened-ports', 'echo 8000/tcp')
         self.unit.set_ports(ops.Port('tcp', 8000))
         self.assertEqual(fake_script_calls(self, clear=True), [
