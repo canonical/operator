@@ -1486,9 +1486,16 @@ class BreakpointTests(BaseTestCase):
             os.environ.pop('JUJU_DEBUG_AT', None)
             framework = self.create_framework()
 
-        with self.assertNoLogs(level="WARNING"):
-            with patch('pdb.Pdb.set_trace') as mock:
-                framework.breakpoint()
+        with patch('pdb.Pdb.set_trace') as mock:
+            # We want to verify that there are *no* logs at warning level.
+            # However, assertNoLogs is Python 3.10+.
+            try:
+                with self.assertLogs(level="WARNING"):
+                    framework.breakpoint()
+            except AssertionError:
+                pass
+            else:
+                self.fail("No warning logs should be generated")
         self.assertEqual(mock.call_count, 0)
         self.assertEqual(fake_stderr.getvalue(), "")
 
