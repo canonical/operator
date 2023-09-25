@@ -30,7 +30,6 @@ jobs:
             GITHUB_SERVER_URL_ESC=`echo $GITHUB_SERVER_URL | sed -e 's/\//\\\\\\//g'`
             sed -i -e "s/^ops[ ><=].*/ops = { git = \"$GITHUB_SERVER_URL_ESC\/$GITHUB_REPOSITORY_ESC.git\", rev=\"$GITHUB_SHA\" }/g" pyproject.toml
           fi
-          cat pyproject.toml
 
       - name: Install dependencies
         run: pip install tox==4.2.8
