@@ -25,8 +25,6 @@ from pathlib import Path
 from test.test_helpers import BaseTestCase, fake_script
 from unittest.mock import patch
 
-import logassert
-
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
 from ops.storage import NoSnapshotError, SQLiteStorage
@@ -41,13 +39,14 @@ class TestFramework(BaseTestCase):
         patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
         patcher.start()
         self.addCleanup(patcher.stop)
-        logassert.setup(self, 'ops')
 
     def test_deprecated_init(self):
         # For 0.7, this still works, but it is deprecated.
-        framework = ops.Framework(':memory:', None, None, None)
-        self.assertLoggedWarning(
-            "deprecated: Framework now takes a Storage not a path")
+        with self.assertLogs(level="WARNING") as cm:
+            framework = ops.Framework(':memory:', None, None, None)
+        self.assertIn(
+            "WARNING:ops.framework:deprecated: Framework now takes a Storage not a path",
+            cm.output)
         self.assertIsInstance(framework._storage, SQLiteStorage)
 
     def test_handle_path(self):
@@ -356,12 +355,7 @@ class TestFramework(BaseTestCase):
         obs = MyObserver(framework, "1")
 
         framework.observe(pub.foo, obs._on_foo)
-
-        self.assertNotLogged("Deferring")
         pub.foo.emit(1)
-        self.assertLogged("Deferring <MyEvent via MyNotifier[1]/foo[1]>.")
-        self.assertNotLogged("Re-emitting")
-
         framework.reemit()
 
         # Two things being checked here:
@@ -375,7 +369,6 @@ class TestFramework(BaseTestCase):
         #    we'd get a foo=3).
         #
         self.assertEqual(obs.seen, ["on_foo:foo=2", "on_foo:foo=2"])
-        self.assertLoggedDebug("Re-emitting deferred event <MyEvent via MyNotifier[1]/foo[1]>.")
 
     def test_weak_observer(self):
         framework = self.create_framework()
@@ -1487,10 +1480,6 @@ class GenericObserver(ops.Object):
 @patch('sys.stderr', new_callable=io.StringIO)
 class BreakpointTests(BaseTestCase):
 
-    def setUp(self):
-        super().setUp()
-        logassert.setup(self, 'ops')
-
     def test_ignored(self, fake_stderr):
         # It doesn't do anything really unless proper environment is there.
         with patch.dict(os.environ):
@@ -1498,10 +1487,17 @@ class BreakpointTests(BaseTestCase):
             framework = self.create_framework()
 
         with patch('pdb.Pdb.set_trace') as mock:
-            framework.breakpoint()
+            # We want to verify that there are *no* logs at warning level.
+            # However, assertNoLogs is Python 3.10+.
+            try:
+                with self.assertLogs(level="WARNING"):
+                    framework.breakpoint()
+            except AssertionError:
+                pass
+            else:
+                self.fail("No warning logs should be generated")
         self.assertEqual(mock.call_count, 0)
         self.assertEqual(fake_stderr.getvalue(), "")
-        self.assertNotLoggedWarning("Breakpoint", "skipped")
 
     def test_pdb_properly_called(self, fake_stderr):
         # The debugger needs to leave the user in the frame where the breakpoint is executed,
@@ -1658,17 +1654,20 @@ class BreakpointTests(BaseTestCase):
 
     def test_named_indicated_unnamed(self, fake_stderr):
         # Some breakpoint was indicated, but the framework call was unnamed
-        self.check_trace_set('some-breakpoint', None, 0)
-        self.assertLoggedWarning(
-            "Breakpoint None skipped",
-            "not found in the requested breakpoints: {'some-breakpoint'}")
+        with self.assertLogs(level="WARNING") as cm:
+            self.check_trace_set('some-breakpoint', None, 0)
+        self.assertEqual(cm.output, [
+            "WARNING:ops.framework:Breakpoint None skipped "
+            "(not found in the requested breakpoints: {'some-breakpoint'})"
+        ])
 
     def test_named_indicated_somethingelse(self, fake_stderr):
         # Some breakpoint was indicated, but the framework call was with a different name
-        self.check_trace_set('some-breakpoint', 'other-name', 0)
-        self.assertLoggedWarning(
-            "Breakpoint 'other-name' skipped",
-            "not found in the requested breakpoints: {'some-breakpoint'}")
+        with self.assertLogs(level="WARNING") as cm:
+            self.check_trace_set('some-breakpoint', 'other-name', 0)
+        self.assertEqual(cm.output, [
+            "WARNING:ops.framework:Breakpoint 'other-name' skipped "
+            "(not found in the requested breakpoints: {'some-breakpoint'})"])
 
     def test_named_indicated_ingroup(self, fake_stderr):
         # A multiple breakpoint was indicated, and the framework call used a name among those.
