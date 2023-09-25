@@ -654,7 +654,7 @@ class Unit:
         """Set the open ports for this unit, closing any others that are open.
 
         Some behaviour, such as whether the port is opened or closed externally without
-        using Juju's ``expose`` & ``unexpose`` commands, differs between Kubernetes
+        using Juju's ``expose`` and ``unexpose`` commands, differs between Kubernetes
         and machine charms. See the
         `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--networking>`__
         for more detail.
