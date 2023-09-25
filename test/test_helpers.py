@@ -17,6 +17,7 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
+import typing
 import unittest
 
 import ops
@@ -24,7 +25,7 @@ from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
 
-def fake_script(test_case, name, content):
+def fake_script(test_case: unittest.TestCase, name: str, content: str):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
         old_path = os.environ["PATH"]
@@ -57,7 +58,7 @@ def fake_script(test_case, name, content):
         f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
 
-def fake_script_calls(test_case, clear=False):
+def fake_script_calls(test_case: unittest.TestCase, clear: bool = False):
     calls_file = test_case.fake_script_path / 'calls.txt'
     if not calls_file.exists():
         return []
@@ -105,7 +106,10 @@ class FakeScriptTest(unittest.TestCase):
 
 class BaseTestCase(unittest.TestCase):
 
-    def create_framework(self, *, model=None, tmpdir=None):
+    def create_framework(self,
+                         *,
+                         model: typing.Optional[ops.Model] = None,
+                         tmpdir: typing.Optional[pathlib.Path] = None):
         """Create a Framework object.
 
         By default operate in-memory; pass a temporary directory via the 'tmpdir'
@@ -122,7 +126,7 @@ class BaseTestCase(unittest.TestCase):
         framework = ops.Framework(
             SQLiteStorage(data_fpath),
             charm_dir,
-            meta=None,
+            meta=model._cache._meta if model else ops.CharmMeta(),
             model=model)
         self.addCleanup(framework.close)
         return framework
