@@ -1951,7 +1951,7 @@ class _TestingModelBackend:
         self._planned_units: Optional[int] = None
         self._hook_is_running = ''
         self._secrets: List[_Secret] = []
-        self._opened_ports: Set[model.OpenedPort] = set()
+        self._opened_ports: Set[model.Port] = set()
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
@@ -2489,14 +2489,14 @@ class _TestingModelBackend:
     def open_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
-        self._opened_ports.add(model.OpenedPort(protocol_lit, port))
+        self._opened_ports.add(model.Port(protocol_lit, port))
 
     def close_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
-        self._opened_ports.discard(model.OpenedPort(protocol_lit, port))
+        self._opened_ports.discard(model.Port(protocol_lit, port))
 
-    def opened_ports(self) -> Set[model.OpenedPort]:
+    def opened_ports(self) -> Set[model.Port]:
         return set(self._opened_ports)
 
     def _check_protocol_and_port(self, protocol: str, port: Optional[int]):

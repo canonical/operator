@@ -3368,10 +3368,10 @@ class TestPorts(unittest.TestCase):
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 2)
-        self.assertIsInstance(ports[0], ops.OpenedPort)
+        self.assertIsInstance(ports[0], ops.Port)
         self.assertEqual(ports[0].protocol, 'icmp')
         self.assertIsNone(ports[0].port)
-        self.assertIsInstance(ports[1], ops.OpenedPort)
+        self.assertIsInstance(ports[1], ops.Port)
         self.assertEqual(ports[1].protocol, 'tcp')
         self.assertEqual(ports[1].port, 8080)
 
@@ -3391,13 +3391,72 @@ class TestPorts(unittest.TestCase):
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 2)
-        self.assertIsInstance(ports[0], ops.OpenedPort)
+        self.assertIsInstance(ports[0], ops.Port)
         self.assertEqual(ports[0].protocol, 'tcp')
         self.assertEqual(ports[0].port, 8080)
-        self.assertIsInstance(ports[1], ops.OpenedPort)
+        self.assertIsInstance(ports[1], ops.Port)
         self.assertEqual(ports[1].protocol, 'udp')
         self.assertEqual(ports[1].port, 1000)
 
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+        ])
+
+    def test_set_ports_all_open(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
+        fake_script(self, 'opened-ports', 'exit 0')
+        self.unit.set_ports(8000, 8025)
+        calls = fake_script_calls(self, clear=True)
+        self.assertEqual(calls.pop(0), ['opened-ports', ''])
+        calls.sort()  # We make no guarantee on the order the ports are opened.
+        self.assertEqual(calls, [
+            ['open-port', '8000/tcp'],
+            ['open-port', '8025/tcp'],
+        ])
+
+    def test_set_ports_mixed(self):
+        # Two open ports, leave one alone and open another one.
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
+        fake_script(self, 'opened-ports', 'echo 8025/tcp; echo 8028/tcp')
+        self.unit.set_ports(ops.Port('udp', 8022), 8028)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+            ['close-port', '8025/tcp'],
+            ['open-port', '8022/udp'],
+        ])
+
+    def test_set_ports_replace(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
+        fake_script(self, 'opened-ports', 'echo 8025/tcp; echo 8028/tcp')
+        self.unit.set_ports(8001, 8002)
+        calls = fake_script_calls(self, clear=True)
+        self.assertEqual(calls.pop(0), ['opened-ports', ''])
+        calls.sort()
+        self.assertEqual(calls, [
+            ['close-port', '8025/tcp'],
+            ['close-port', '8028/tcp'],
+            ['open-port', '8001/tcp'],
+            ['open-port', '8002/tcp'],
+        ])
+
+    def test_set_ports_close_all(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
+        fake_script(self, 'opened-ports', 'echo 8022/udp')
+        self.unit.set_ports()
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['opened-ports', ''],
+            ['close-port', '8022/udp'],
+        ])
+
+    def test_set_ports_noop(self):
+        fake_script(self, 'open-port', 'exit 0')
+        fake_script(self, 'close-port', 'exit 0')
+        fake_script(self, 'opened-ports', 'echo 8000/tcp')
+        self.unit.set_ports(ops.Port('tcp', 8000))
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['opened-ports', ''],
         ])
