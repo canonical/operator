@@ -28,7 +28,7 @@ jobs:
           else
             GITHUB_REPOSITORY_ESC=`echo $GITHUB_REPOSITORY | sed -e 's/\//\\\\\\//'`
             GITHUB_SERVER_URL_ESC=`echo $GITHUB_SERVER_URL | sed -e 's/\//\\\\\\//g'`
-            sed -i -e "s/^ops[ ><=].*/git\+$GITHUB_SERVER_URL_ESC\/$GITHUB_REPOSITORY_ESC@$GITHUB_SHA#egg=ops/g" pyproject.toml
+            sed -i -e "s/^ops[ ><=].*/ops = { git = \"$GITHUB_SERVER_URL_ESC\/$GITHUB_REPOSITORY_ESC.git\", rev=\"$GITHUB_SHA\" }/g" pyproject.toml
           fi
 
       - name: Install dependencies
