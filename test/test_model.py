@@ -20,6 +20,7 @@ import json
 import os
 import pathlib
 import tempfile
+import types
 import typing
 import unittest
 from collections import OrderedDict
