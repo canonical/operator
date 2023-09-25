@@ -36,40 +36,41 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
             os.environ['PATH'] = old_path
 
         test_case.addCleanup(cleanup)
-        test_case.fake_script_path = pathlib.Path(fake_script_path)
+        test_case.fake_script_path = pathlib.Path(fake_script_path)  # type: ignore
 
-    template_args = {
+    template_args: typing.Dict[str, str] = {
         'name': name,
-        'path': test_case.fake_script_path.as_posix(),
+        'path': test_case.fake_script_path.as_posix(),  # type: ignore
         'content': content,
     }
 
-    path = test_case.fake_script_path / name
-    with path.open('wt') as f:
+    path: pathlib.Path = test_case.fake_script_path / name  # type: ignore
+    with path.open('wt') as f:  # type: ignore
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
-        f.write('''#!/bin/sh
+        f.write(  # type: ignore
+            '''#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}'''.format_map(template_args))
-    os.chmod(str(path), 0o755)
+    os.chmod(str(path), 0o755)  # type: ignore
     # TODO: this hardcodes the path to bash.exe, which works for now but might
     #       need to be set via environ or something like that.
-    path.with_suffix(".bat").write_text(
+    path.with_suffix(".bat").write_text(  # type: ignore
         f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
 
-def fake_script_calls(test_case: unittest.TestCase, clear: bool = False):
-    calls_file = test_case.fake_script_path / 'calls.txt'
-    if not calls_file.exists():
+def fake_script_calls(test_case: unittest.TestCase, clear: bool = False) -> typing.List[typing.List[str]]:
+    calls_file: pathlib.Path = test_case.fake_script_path / 'calls.txt'  # type: ignore
+    if not calls_file.exists():  # type: ignore
         return []
 
     # newline and encoding forced to linuxy defaults because on
     # windows they're written from git-bash
-    with calls_file.open('r+t', newline='\n', encoding='utf8') as f:
-        calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
+    with calls_file.open('r+t', newline='\n', encoding='utf8') as f:  # type: ignore
+        calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]  # type: ignore
         if clear:
-            f.truncate(0)
-    return calls
+            f.truncate(0)  # type: ignore
+    return calls  # type: ignore
 
 
 class FakeScriptTest(unittest.TestCase):
