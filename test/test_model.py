@@ -2789,7 +2789,7 @@ class TestModelBackend(unittest.TestCase):
         ]
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)
+                self.backend.add_metrics(metrics, labels)  # type: ignore
 
     def test_invalid_metric_labels(self):
         invalid_inputs: typing.List[_metric_and_label_pair] = [
