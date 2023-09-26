@@ -52,11 +52,11 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self, event_type: typing.Type[ops.EventBase], event_name: str, env_var=None,
-                 relation_id=None, remote_app=None, remote_unit=None,
-                 model_name: typing.Optional[str] = None, set_in_env=None, workload_name=None,
-                 departing_unit_name=None, secret_id=None, secret_label=None,
-                 secret_revision=None):
+    def __init__(self, event_type: typing.Type[ops.EventBase], event_name: str, env_var: typing.Optional[str] = None,
+                 relation_id: typing.Optional[int] = None, remote_app: typing.Optional[str] = None, remote_unit: typing.Optional[str] = None,
+                 model_name: typing.Optional[str] = None, set_in_env:typing.Optional[typing.Dict[str, str]] = None, workload_name: typing.Optional[str] = None,
+                 departing_unit_name: typing.Optional[str] = None, secret_id: typing.Optional[str] = None, secret_label: typing.Optional[str] = None,
+                 secret_revision:typing.Optional[str] = None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -297,7 +297,7 @@ class _TestMain(abc.ABC):
             return NotImplemented
 
         @abc.abstractmethod
-        def assertNotIn(self, member: typing.Any, container: typing.Container[typing.Any], msg: typing.Optional[str] = None):
+        def assertNotIn(self, member: typing.Any, container: typing.Iterable[typing.Any], msg: typing.Optional[str] = None):
             """Should be provided by unittest.TestCase."""
             return NotImplemented
 
@@ -347,6 +347,9 @@ class _TestMain(abc.ABC):
             self.fail("Unable to load spec")
             return
         self.charm_module = importlib.util.module_from_spec(charm_spec)
+        if charm_spec.loader is None:
+            self.fail("Something went wrong loading the module")
+            return
         charm_spec.loader.exec_module(self.charm_module)
 
         self._prepare_initial_hooks()
@@ -409,6 +412,10 @@ class _TestMain(abc.ABC):
         if event_spec.set_in_env is not None:
             env.update(event_spec.set_in_env)
         if issubclass(event_spec.event_type, ops.SecretEvent):
+            if event_spec.secret_id is None:
+                # We do it this way around to show type checkers that it's not None.
+                self.assertIsNotNone(event_spec.secret_id)
+                return
             env.update({
                 'JUJU_SECRET_ID': event_spec.secret_id,
                 'JUJU_SECRET_LABEL': event_spec.secret_label or '',
@@ -443,11 +450,19 @@ class _TestMain(abc.ABC):
                 'JUJU_REMOTE_APP': '',
             })
         if issubclass(event_spec.event_type, ops.WorkloadEvent):
+            # Show type checkers that the name is not None.
+            if event_spec.workload_name is None:
+                self.assertIsNotNone(event_spec.workload_name)
+                return
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
             })
         if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
+            # Show type checkers that this is not None.
+            if event_spec.env_var is None:
+                self.assertIsNotNone(event_spec.env_var)
+                return
             env.update({
                 event_spec.env_var: event_filename,
             })
@@ -500,7 +515,7 @@ class _TestMain(abc.ABC):
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
-        events_under_test = [(
+        events_under_test: typing.List[typing.Tuple[EventSpec, typing.Dict[str, typing.Union[str, int, None]]]] = [(
             EventSpec(ops.InstallEvent, 'install'),
             {},
         ), (
@@ -939,7 +954,7 @@ class _TestMainWithDispatch(_TestMain):
             EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
         }
 
-        def _assess_event_links(event_spec):
+        def _assess_event_links(event_spec: EventSpec):
             self.assertNotIn(self.hooks_dir / event_spec.event_name, self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 self.assertFalse((self.JUJU_CHARM_DIR / event_hook).exists(),
@@ -1059,7 +1074,7 @@ class _TestMainWithDispatch(_TestMain):
         shutil.copy(str(path), str(hook_path))
 
         event = EventSpec(ops.InstallEvent, 'install')
-        state = self._simulate_event(event)
+        state: ops.InstallEvent = self._simulate_event(event)
 
         # the .on. was only called once
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
