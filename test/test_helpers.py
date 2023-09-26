@@ -59,7 +59,8 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
         f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
 
-def fake_script_calls(test_case: unittest.TestCase, clear: bool = False) -> typing.List[typing.List[str]]:
+def fake_script_calls(test_case: unittest.TestCase,
+                      clear: bool = False) -> typing.List[typing.List[str]]:
     calls_file: pathlib.Path = test_case.fake_script_path / 'calls.txt'  # type: ignore
     if not calls_file.exists():  # type: ignore
         return []
