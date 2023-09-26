@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import typing
 import unittest
 import warnings
 from pathlib import Path
@@ -51,9 +52,9 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self, event_type, event_name, env_var=None,
+    def __init__(self, event_type: typing.Type[ops.EventBase], event_name: str, env_var=None,
                  relation_id=None, remote_app=None, remote_unit=None,
-                 model_name=None, set_in_env=None, workload_name=None,
+                 model_name: typing.Optional[str] = None, set_in_env=None, workload_name=None,
                  departing_unit_name=None, secret_id=None, secret_label=None,
                  secret_revision=None):
         self.event_type = event_type
@@ -71,13 +72,13 @@ class EventSpec:
         self.secret_revision = secret_revision
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
-@patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)
-@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
+@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class CharmInitTestCase(unittest.TestCase):
 
     @patch('sys.stderr', new_callable=io.StringIO)
-    def test_breakpoint(self, fake_stderr):
+    def test_breakpoint(self, fake_stderr: io.StringIO):
         class MyCharm(ops.CharmBase):
             pass
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
@@ -98,7 +99,13 @@ class CharmInitTestCase(unittest.TestCase):
 
         self.assertEqual(mock.call_count, 0)
 
-    def _check(self, charm_class, *, extra_environ=None, **kwargs):
+    def _check(
+            self,
+            charm_class: typing.Type[ops.CharmBase],
+            *,
+            extra_environ: typing.Optional[typing.Dict[str, str]] = None,
+            **kwargs: typing.Any
+    ):
         """Helper for below tests."""
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
@@ -116,13 +123,13 @@ class CharmInitTestCase(unittest.TestCase):
                         fh.write(b'name: test')
                     mock_charmdir.return_value = tmpdirname
 
-                    ops.main(charm_class, **kwargs)
+                    ops.main(charm_class, **kwargs)  # type: ignore
 
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):
-                super().__init__(*args)
+            def __init__(self, *args):  # type: ignore
+                super().__init__(*args)  # type: ignore
 
         with warnings.catch_warnings(record=True) as warn_cm:
             self._check(MyCharm)
@@ -131,8 +138,8 @@ class CharmInitTestCase(unittest.TestCase):
     def test_init_signature_old_key_argument(self):
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, framework, somekey):
-                super().__init__(framework, somekey)
+            def __init__(self, framework: ops.Framework, somekey: typing.Any):
+                super().__init__(framework, somekey)  # type: ignore
 
         # Support for "key" has been deprecated since ops 0.7 and was removed in 2.0
         with self.assertRaises(TypeError):
@@ -141,7 +148,7 @@ class CharmInitTestCase(unittest.TestCase):
     def test_init_signature_only_framework(self):
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
 
         with warnings.catch_warnings(record=True) as warn_cm:
@@ -173,13 +180,13 @@ class CharmInitTestCase(unittest.TestCase):
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
-@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
+@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestDispatch(unittest.TestCase):
-    def _check(self, *, with_dispatch=False, dispatch_path=''):
+    def _check(self, *, with_dispatch: bool = False, dispatch_path: str = ''):
         """Helper for below tests."""
         class MyCharm(ops.CharmBase):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
 
         fake_environ = {
@@ -206,7 +213,7 @@ class TestDispatch(unittest.TestCase):
                 with patch('ops.main._emit_charm_event') as mock_charm_event:
                     with patch('ops.main._get_charm_dir') as mock_charmdir:
                         mock_charmdir.return_value = tmpdir
-                        ops.main(MyCharm)
+                        ops.main(MyCharm)  # type: ignore
 
         self.assertEqual(mock_charm_event.call_count, 1)
         return mock_charm_event.call_args[0][1]
@@ -230,7 +237,7 @@ class TestDispatch(unittest.TestCase):
 class _TestMain(abc.ABC):
 
     @abc.abstractmethod
-    def _setup_entry_point(self, directory, entry_point):
+    def _setup_entry_point(self, directory: Path, entry_point: str):
         """Set up the given entry point in the given directory.
 
         If not using dispatch, that would be a symlink <dir>/<entry_point>
@@ -240,7 +247,7 @@ class _TestMain(abc.ABC):
         return NotImplemented
 
     @abc.abstractmethod
-    def _call_event(self, rel_path, env):
+    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
         """Set up the environment and call (i.e. run) the given event."""
         return NotImplemented
 
@@ -253,6 +260,58 @@ class _TestMain(abc.ABC):
         """
         return NotImplemented
 
+    if typing.TYPE_CHECKING:
+        @abc.abstractmethod
+        def addCleanup(self, function: typing.Callable[..., None], /, *args: typing.Any, **kwargs: typing.Any):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def fail(self, msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def assertRaises(self, exception: typing.Type[BaseException], *, msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def assertRegex(self, text: str, regex: str, msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def assertEqual(self, first: typing.Any, second: typing.Any, msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+        
+        @abc.abstractmethod
+        def assertIsNotNone(self, expr: typing.Any, msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def assertFalse(self, expr: typing.Any, msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def assertNotIn(self, member: typing.Any, container: typing.Container[typing.Any], msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def assertIn(self, member: typing.Any, container: typing.Container[typing.Any], msg: typing.Optional[str] = None):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+        @abc.abstractmethod
+        def subTest(self, msg: typing.Optional[str] = None, **params: typing.Any):
+            """Should be provided by unittest.TestCase."""
+            return NotImplemented
+
+    @abc.abstractmethod
     def setUp(self):
         self._setup_charm_dir()
 
@@ -260,10 +319,10 @@ class _TestMain(abc.ABC):
         # We use a subclass temporarily to prevent these side effects from leaking.
         class TestCharmEvents(ops.CharmEvents):
             pass
-        ops.CharmBase.on = TestCharmEvents()
+        ops.CharmBase.on = TestCharmEvents()  # type: ignore
 
         def cleanup():
-            ops.CharmBase.on = ops.CharmEvents()
+            ops.CharmBase.on = ops.CharmEvents()  # type: ignore
         self.addCleanup(cleanup)
 
         fake_script(self, 'is-leader', 'echo true')
@@ -284,6 +343,9 @@ class _TestMain(abc.ABC):
         shutil.copytree(str(TEST_CHARM_DIR), str(self.JUJU_CHARM_DIR))
 
         charm_spec = importlib.util.spec_from_file_location("charm", charm_path)
+        if charm_spec is None:
+            self.fail("Unable to load spec")
+            return
         self.charm_module = importlib.util.module_from_spec(charm_spec)
         charm_spec.loader.exec_module(self.charm_module)
 
@@ -304,7 +366,7 @@ class _TestMain(abc.ABC):
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
             self._setup_entry_point(actions_dir, action_name)
 
-    def _read_and_clear_state(self, event_name: str):
+    def _read_and_clear_state(self, event_name: str) -> ops.StoredStateData:
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -314,7 +376,7 @@ class _TestMain(abc.ABC):
                         meta = ops.CharmMeta.from_yaml(m, a)
                 else:
                     meta = ops.CharmMeta.from_yaml(m)
-            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)
+            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)  # type: ignore
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -332,7 +394,7 @@ class _TestMain(abc.ABC):
             stored = ops.StoredStateData(None, None)
         return stored
 
-    def _simulate_event(self, event_spec):
+    def _simulate_event(self, event_spec: EventSpec):
         ppath = Path(__file__).parent
         pypath = str(ppath.parent)
         if 'PYTHONPATH' in os.environ:
@@ -684,7 +746,9 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script_calls(self)]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-        self.assertRegex(calls.pop(0), 'Using local storage: not a Kubernetes podspec charm')
+        self.assertRegex(
+            calls.pop(0),
+            'Using local storage: not a Kubernetes podspec charm')
         self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
 
         self.maxDiff = None
@@ -696,7 +760,10 @@ class _TestMain(abc.ABC):
             '    raise RuntimeError."failing as requested".\n'
             'RuntimeError: failing as requested'
         )
-        self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
+        self.assertEqual(
+            len(calls),
+            1,
+            f"expected 1 call, but got extra: {calls[1:]}")
 
     def test_sets_model_name(self):
         self._prepare_actions()
@@ -734,11 +801,11 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
     has_dispatch = False
     hooks_are_symlinks = True
 
-    def _setup_entry_point(self, directory, entry_point):
+    def _setup_entry_point(self, directory: Path, entry_point: str):
         path = directory / entry_point
         path.symlink_to(self.charm_exec_path)
 
-    def _call_event(self, rel_path, env):
+    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
         env['JUJU_VERSION'] = '2.7.0'
         event_file = self.JUJU_CHARM_DIR / rel_path
         # Note that sys.executable is used to make sure we are using the same
@@ -801,7 +868,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         }
         initial_hooks = {f"hooks/{ev.event_name}" for ev in initial_events}
 
-        def _assess_event_links(event_spec):
+        def _assess_event_links(event_spec: EventSpec):
             self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
             for event_hook in all_event_hooks:
                 hook_path = self.JUJU_CHARM_DIR / event_hook
@@ -834,14 +901,14 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
 
 class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
-    def _call_event(self, rel_path, env):
+    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
         super()._call_event(rel_path, env)
 
 
 class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
-    def _call_event(self, rel_path, env):
+    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         super()._call_event(rel_path, env)
 
@@ -849,7 +916,7 @@ class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
 class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
     hooks_are_symlinks = False
 
-    def _setup_entry_point(self, directory, entry_point):
+    def _setup_entry_point(self, directory: Path, entry_point: str):
         charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
         path = directory / entry_point
         shutil.copy(charm_path, str(path))
@@ -909,7 +976,8 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)),
+                         'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_non_executable_hook_and_dispatch(self):
@@ -929,7 +997,8 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-3)),
+                         'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -1018,12 +1087,12 @@ class _TestMainWithDispatch(_TestMain):
 
 
 class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
-    def _setup_entry_point(self, directory, entry_point):
+    def _setup_entry_point(self, directory: Path, entry_point: str):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
             path.symlink_to(os.path.join('src', 'charm.py'))
 
-    def _call_event(self, rel_path, env):
+    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
@@ -1079,7 +1148,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
 
     has_dispatch = True
 
-    def _setup_entry_point(self, directory, entry_point):
+    def _setup_entry_point(self, directory: Path, entry_point: str):
         path = (self.JUJU_CHARM_DIR / 'dispatch')
         if not path.exists():
             path.write_text('#!/bin/sh\nexec "{}" "{}"\n'.format(
@@ -1087,7 +1156,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
                 self.JUJU_CHARM_DIR / 'src/charm.py'))
             path.chmod(0o755)
 
-    def _call_event(self, rel_path, env):
+    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
         fake_script(
