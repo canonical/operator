@@ -52,11 +52,21 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self, event_type: typing.Type[ops.EventBase], event_name: str, env_var: typing.Optional[str] = None,
-                 relation_id: typing.Optional[int] = None, remote_app: typing.Optional[str] = None, remote_unit: typing.Optional[str] = None,
-                 model_name: typing.Optional[str] = None, set_in_env:typing.Optional[typing.Dict[str, str]] = None, workload_name: typing.Optional[str] = None,
-                 departing_unit_name: typing.Optional[str] = None, secret_id: typing.Optional[str] = None, secret_label: typing.Optional[str] = None,
-                 secret_revision:typing.Optional[str] = None):
+    def __init__(self,
+                 event_type: typing.Type[ops.EventBase],
+                 event_name: str,
+                 env_var: typing.Optional[str] = None,
+                 relation_id: typing.Optional[int] = None,
+                 remote_app: typing.Optional[str] = None,
+                 remote_unit: typing.Optional[str] = None,
+                 model_name: typing.Optional[str] = None,
+                 set_in_env: typing.Optional[typing.Dict[str,
+                                                         str]] = None,
+                 workload_name: typing.Optional[str] = None,
+                 departing_unit_name: typing.Optional[str] = None,
+                 secret_id: typing.Optional[str] = None,
+                 secret_label: typing.Optional[str] = None,
+                 secret_revision: typing.Optional[str] = None):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -262,7 +272,8 @@ class _TestMain(abc.ABC):
 
     if typing.TYPE_CHECKING:
         @abc.abstractmethod
-        def addCleanup(self, function: typing.Callable[..., None], /, *args: typing.Any, **kwargs: typing.Any):
+        def addCleanup(
+                self, function: typing.Callable[..., None], /, *args: typing.Any, **kwargs: typing.Any):
             """Should be provided by unittest.TestCase."""
             return NotImplemented
 
@@ -272,7 +283,11 @@ class _TestMain(abc.ABC):
             return NotImplemented
 
         @abc.abstractmethod
-        def assertRaises(self, exception: typing.Type[BaseException], *, msg: typing.Optional[str] = None):
+        def assertRaises(
+                self,
+                exception: typing.Type[BaseException],
+                *,
+                msg: typing.Optional[str] = None):
             """Should be provided by unittest.TestCase."""
             return NotImplemented
 
@@ -282,10 +297,14 @@ class _TestMain(abc.ABC):
             return NotImplemented
 
         @abc.abstractmethod
-        def assertEqual(self, first: typing.Any, second: typing.Any, msg: typing.Optional[str] = None):
+        def assertEqual(
+                self,
+                first: typing.Any,
+                second: typing.Any,
+                msg: typing.Optional[str] = None):
             """Should be provided by unittest.TestCase."""
             return NotImplemented
-        
+
         @abc.abstractmethod
         def assertIsNotNone(self, expr: typing.Any, msg: typing.Optional[str] = None):
             """Should be provided by unittest.TestCase."""
@@ -297,12 +316,18 @@ class _TestMain(abc.ABC):
             return NotImplemented
 
         @abc.abstractmethod
-        def assertNotIn(self, member: typing.Any, container: typing.Iterable[typing.Any], msg: typing.Optional[str] = None):
+        def assertNotIn(self,
+                        member: typing.Any,
+                        container: typing.Iterable[typing.Any],
+                        msg: typing.Optional[str] = None):
             """Should be provided by unittest.TestCase."""
             return NotImplemented
 
         @abc.abstractmethod
-        def assertIn(self, member: typing.Any, container: typing.Container[typing.Any], msg: typing.Optional[str] = None):
+        def assertIn(self,
+                     member: typing.Any,
+                     container: typing.Container[typing.Any],
+                     msg: typing.Optional[str] = None):
             """Should be provided by unittest.TestCase."""
             return NotImplemented
 
@@ -379,7 +404,8 @@ class _TestMain(abc.ABC):
                         meta = ops.CharmMeta.from_yaml(m, a)
                 else:
                     meta = ops.CharmMeta.from_yaml(m)
-            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)  # type: ignore
+            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta,
+                                      None, event_name)  # type: ignore
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
