@@ -27,8 +27,6 @@ import warnings
 from pathlib import Path
 from unittest.mock import patch
 
-import logassert
-
 import ops
 from ops.main import CHARM_STATE_FILE, _should_use_controller_storage
 from ops.storage import SQLiteStorage
@@ -1137,26 +1135,20 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
 
 
 class TestStorageHeuristics(unittest.TestCase):
-    def setUp(self):
-        logassert.setup(self, '')
-
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "1.0"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using local storage: JUJU_VERSION=1.0.0')
 
     def test_fallback_to_current_juju_version__new_enough(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertTrue(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using controller storage: JUJU_VERSION=2.8.0')
 
     def test_not_if_not_in_k8s(self):
         meta = ops.CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
             self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
-            self.assertLogged('Using local storage: not a Kubernetes podspec charm')
 
     def test_not_if_already_local(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")

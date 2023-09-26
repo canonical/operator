@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import sys
+import typing
 import warnings
 from ast import literal_eval
 from importlib.machinery import ModuleSpec
@@ -117,7 +118,7 @@ def autoimport():
         versions.sort(reverse=True)
 
 
-def _find_all_specs(path):
+def _find_all_specs(path: typing.Iterable[str]) -> typing.Iterator[ModuleSpec]:
     for sys_dir in path:
         if sys_dir == "":
             sys_dir = "."
@@ -192,7 +193,7 @@ class _Missing:
         return f"got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}"
 
 
-def _parse_lib(spec):
+def _parse_lib(spec: ModuleSpec) -> typing.Optional["_Lib"]:
     if spec.origin is None:
         # "can't happen"
         logger.warning("No origin for %r (no idea why; please report)", spec.name)
