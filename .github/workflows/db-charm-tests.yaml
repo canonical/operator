@@ -34,6 +34,7 @@ jobs:
             sed -i -e "/^ops[ ><=].*/d" pyproject.toml
             sed -i -e "s/poetry install --only main,charm-libs,unit/poetry lock\n    poetry install --only main,charm-libs,unit\n    pip install -e myops/" tox.ini
           fi
+          cat tox.ini
 
       - name: Install dependencies
         run: pip install tox==4.2.8
