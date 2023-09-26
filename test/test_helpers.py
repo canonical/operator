@@ -128,7 +128,7 @@ class BaseTestCase(unittest.TestCase):
             SQLiteStorage(data_fpath),
             charm_dir,
             meta=model._cache._meta if model else ops.CharmMeta(),
-            model=model)
+            model=model)  # type: ignore
         self.addCleanup(framework.close)
         return framework
 
