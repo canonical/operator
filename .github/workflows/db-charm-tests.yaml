@@ -25,16 +25,18 @@ jobs:
         with:
           path: myops
 
+      - name: Install patch dependencies
+        run: pip install poetry==1.6.1
+
       - name: Update 'ops' dependency in test charm to latest
         run: |
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
-            sed -i -e "/^ops[ ><=].*/d" pyproject.toml
-            sed -i -e "s/poetry install --only main,charm-libs,unit/poetry lock\n    poetry install --only main,charm-libs,unit\n    pip install -e myops/" tox.ini
+            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
+            poetry lock
           fi
-          cat tox.ini
 
       - name: Install dependencies
         run: pip install tox==4.2.8
