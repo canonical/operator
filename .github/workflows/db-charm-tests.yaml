@@ -20,15 +20,19 @@ jobs:
         with:
           repository: ${{ matrix.charm-repo }}
 
+      - name: Checkout the operator repository
+        uses: actions/checkout@v3
+        with:
+          path: myops
+
       - name: Update 'ops' dependency in test charm to latest
         run: |
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
-            GITHUB_REPOSITORY_ESC=`echo $GITHUB_REPOSITORY | sed -e 's/\//\\\\\\//'`
-            GITHUB_SERVER_URL_ESC=`echo $GITHUB_SERVER_URL | sed -e 's/\//\\\\\\//g'`
-            sed -i -e "s/^ops[ ><=].*/ops = { git = \"$GITHUB_SERVER_URL_ESC\/$GITHUB_REPOSITORY_ESC.git\", rev=\"$GITHUB_SHA\" }/g" pyproject.toml
+            sed -i -e "s/^ops[ ><=].*/d" pyproject.toml
+            sed -i -e "s/poetry install --only main,charm-libs,unit/poetry install --only main,charm-libs,unit\n    pip install -e myops" tox.ini
           fi
 
       - name: Install dependencies
