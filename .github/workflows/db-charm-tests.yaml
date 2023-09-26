@@ -32,7 +32,7 @@ jobs:
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
             sed -i -e "/^ops[ ><=].*/d" pyproject.toml
-            sed -i -e "s/poetry install --only main,charm-libs,unit/poetry install --only main,charm-libs,unit\n    pip install -e myops" tox.ini
+            sed -i -e "s/poetry install --only main,charm-libs,unit/poetry install --only main,charm-libs,unit\n    pip install -e myops/" tox.ini
           fi
 
       - name: Install dependencies
