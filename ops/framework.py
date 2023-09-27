@@ -1107,13 +1107,13 @@ class StoredState:
         class MyClass(Object):
             _stored = StoredState()
 
-        def __init__(self, parent, key):
-            super().__init__(parent, key)
-            self._stored.set_default(seen=set())
-            self.framework.observe(self.on.seen, self._on_seen)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self._stored.set_default(seen=set())
+                self.framework.observe(self.on.seen, self._on_seen)
 
-        def _on_seen(self, event):
-            self._stored.seen.add(event.uuid)
+            def _on_seen(self, event):
+                self._stored.seen.add(event.uuid)
 
     """
 
