@@ -2759,8 +2759,13 @@ class TestModelBackend(unittest.TestCase):
                          [['juju-log', '--log-level', 'BAR', '--', 'foo']])
 
     def test_valid_metrics(self):
+        if typing.TYPE_CHECKING:
+            _caselist = typing.List[typing.Tuple[
+                typing.Mapping[str, typing.Union[int, float]],
+                typing.Mapping[str, str],
+                typing.List[typing.List[str]]]]
         fake_script(self, 'add-metric', 'exit 0')
-        test_cases = [(
+        test_cases: _caselist = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
             OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
             [['add-metric', '--labels', 'de=ad,be=ef_ -',
