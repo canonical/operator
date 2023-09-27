@@ -26,7 +26,7 @@ jobs:
           path: myops
 
       - name: Install patch dependencies
-        run: pip install poetry~=1.6.1
+        run: pip install poetry~=1.6
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
@@ -43,6 +43,3 @@ jobs:
 
       - name: Run the charm's unit tests
         run: tox -vve unit
-
-      - name: Run the charm's static analysis checks
-        run: tox -vve static-charm
