@@ -14,12 +14,14 @@
 # limitations under the License.
 
 import datetime
+import io
 import ipaddress
 import json
 import os
 import pathlib
 import tempfile
 import types
+import typing
 import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
@@ -65,24 +67,31 @@ class TestModel(unittest.TestCase):
         self.harness._get_backend_calls(reset=True)
         self.model = self.harness.model
 
+    def model_get_relation(self, name: str = 'db1', relation_id: typing.Optional[int] = None) -> ops.Relation:
+        """Wrapper around self.model.get_relation that enforces that None is not returned."""
+        rel_db1 = self.model.get_relation(name, relation_id)
+        self.assertIsNotNone(rel_db1)
+        assert rel_db1 is not None  # Type checkers understand this, but not the previous line.
+        return rel_db1
+
     def test_model_attributes(self):
         self.assertIs(self.model.app, self.model.unit.app)
         self.assertIsNone(self.model.name)
 
     def test_unit_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.unit = object()
+            self.model.unit = object()  # type: ignore
 
     def test_app_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.app = object()
+            self.model.app = object()  # type: ignore
 
     def test_model_name_from_backend(self):
         self.harness.set_model_name('default')
         m = ops.Model(ops.CharmMeta(), self.harness._backend)
         self.assertEqual(m.name, 'default')
         with self.assertRaises(AttributeError):
-            m.name = "changes-disallowed"
+            m.name = "changes-disallowed"  # type: ignore
 
     def test_relations_keys(self):
         rel_app1 = self.harness.add_relation('db1', 'remoteapp1')
@@ -107,7 +116,7 @@ class TestModel(unittest.TestCase):
 
     def test_relations_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.relations = {}
+            self.model.relations = {}  # type: ignore
 
     def test_get_relation(self):
         # one relation on db1
@@ -120,14 +129,14 @@ class TestModel(unittest.TestCase):
 
         with self.assertRaises(ops.ModelError):
             # You have to specify it by just the integer ID
-            self.model.get_relation('db1', f'db1:{relation_id_db1}')
+            self.model.get_relation('db1', f'db1:{relation_id_db1}')  # type: ignore
         rel_db1 = self.model.get_relation('db1', relation_id_db1)
         self.assertIsInstance(rel_db1, ops.Relation)
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
             ('relation_list', relation_id_db1),
         ])
-        dead_rel = self.model.get_relation('db1', 7)
+        dead_rel = self.model_get_relation('db1', 7)
         self.assertIsInstance(dead_rel, ops.Relation)
         self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
         self.assertEqual(dead_rel.data[self.model.unit], {})
@@ -155,7 +164,7 @@ class TestModel(unittest.TestCase):
 
     def test_peer_relation_app(self):
         self.harness.add_relation('db2', 'myapp')
-        rel_dbpeer = self.model.get_relation('db2')
+        rel_dbpeer = self.model_get_relation('db2')
         self.assertIs(rel_dbpeer.app, self.model.app)
 
     def test_remote_units_is_our(self):
@@ -164,7 +173,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls()
 
-        for u in self.model.get_relation('db1').units:
+        for u in self.model_get_relation('db1').units:
             self.assertFalse(u._is_our_unit)
             self.assertFalse(u.app._is_our_app)
 
@@ -186,14 +195,14 @@ class TestModel(unittest.TestCase):
                 self.harness.update_relation_data(
                     relation_id,
                     'remoteapp1/0',
-                    {42: 'remoteapp1-0'})
+                    {42: 'remoteapp1-0'})  # type: ignore
 
         with self.assertRaises(ops.RelationDataError):
             with self.harness._event_context('foo_event'):
                 self.harness.update_relation_data(
                     relation_id,
                     'remoteapp1/0',
-                    {'foo': 42})
+                    {'foo': 42})  # type: ignore
 
     def test_get_app_relation_data(self):
         self.harness.begin()
@@ -222,10 +231,10 @@ class TestModel(unittest.TestCase):
 
         random_unit = self.model.get_unit('randomunit/0')
         with self.assertRaises(KeyError):
-            self.model.get_relation('db1').data[random_unit]
+            self.model_get_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                   self.model.get_relation('db1').units))
-        self.assertEqual(self.model.get_relation('db1').data[remoteapp1_0],
+                                   self.model_get_relation('db1').units))
+        self.assertEqual(self.model_get_relation('db1').data[remoteapp1_0],
                          {'host': 'remoteapp1-0'})
 
         self.assertBackendCalls([
@@ -243,7 +252,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         # Try to get relation data for an invalid remote application.
         random_app = self.model._cache.get(ops.Application, 'randomapp')
         with self.assertRaises(KeyError):
@@ -271,9 +280,9 @@ class TestModel(unittest.TestCase):
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                   self.model.get_relation('db1').units))
+                                   self.model_get_relation('db1').units))
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         self.assertEqual(repr(rel_db1.data[remoteapp1_0]), "{'host': 'remoteapp1/0'}")
@@ -305,7 +314,7 @@ class TestModel(unittest.TestCase):
         self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'nothing'})
         self.resetBackendCalls()
         with self.harness._event_context('foo_event'):
-            rel_db1 = self.model.get_relation('db1')
+            rel_db1 = self.model_get_relation('db1')
             # update_relation_data will also trigger relation-get, so we
             # invalidate the cache to ensure it will be reloaded
             rel_db1.data[self.model.unit]._invalidate()
@@ -328,7 +337,7 @@ class TestModel(unittest.TestCase):
 
         local_app = self.model.unit.app
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
 
         rel_db1.data[local_app]['password'] = 'foo'
@@ -350,7 +359,7 @@ class TestModel(unittest.TestCase):
 
         local_app = self.model.unit.app
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
 
         with self.harness._event_context('foo_event'):
@@ -390,7 +399,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
@@ -411,7 +420,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         with self.harness._event_context('foo_event'):
@@ -446,7 +455,7 @@ class TestModel(unittest.TestCase):
             raise ops.ModelError()
         backend.update_relation_data = broken_update_relation_data
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
 
@@ -472,7 +481,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         for key, value in (
                 ('foo', 1),
                 ('foo', None),
@@ -509,7 +518,7 @@ class TestModel(unittest.TestCase):
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         self.harness.begin()
         self.harness.set_leader(True)
         self.resetBackendCalls()
@@ -554,7 +563,7 @@ class TestModel(unittest.TestCase):
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model.get_relation('db1')
+        rel_db1 = self.model_get_relation('db1')
         self.harness.begin()
         self.harness.set_leader(False)
 
@@ -590,7 +599,7 @@ class TestModel(unittest.TestCase):
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
-        rel = self.model.get_relation('db1')
+        rel = self.model_get_relation('db1')
         self.assertEqual(rel.units, set())
         self.assertIs(rel.app, self.model.get_app('remoteapp1'))
         self.assertBackendCalls([
@@ -609,13 +618,13 @@ class TestModel(unittest.TestCase):
         })
         with self.assertRaises(TypeError):
             # Confirm that we cannot modify config values.
-            self.model.config['foo'] = 'bar'
+            self.model.config['foo'] = 'bar'  # type: ignore
 
         self.assertBackendCalls([('config_get',)])
 
     def test_config_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.config = {}
+            self.model.config = {}  # type: ignore
 
     def test_is_leader(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
@@ -625,7 +634,7 @@ class TestModel(unittest.TestCase):
 
         def check_remote_units():
             # Cannot determine leadership for remote units.
-            for u in self.model.get_relation('db1').units:
+            for u in self.model_get_relation('db1').units:
                 with self.assertRaises(RuntimeError):
                     u.is_leader()
 
@@ -654,7 +663,7 @@ class TestModel(unittest.TestCase):
 
     def test_workload_version_invalid(self):
         with self.assertRaises(TypeError) as cm:
-            self.model.unit.set_workload_version(5)
+            self.model.unit.set_workload_version(5)  # type: ignore
         self.assertEqual(str(cm.exception), "workload version must be a str, not int: 5")
         self.assertBackendCalls([])
 
@@ -673,7 +682,7 @@ class TestModel(unittest.TestCase):
 
     def test_resources_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.resources = object()
+            self.model.resources = object()  # type: ignore
 
     def test_pod_spec(self):
         self.harness.set_leader(True)
@@ -690,7 +699,7 @@ class TestModel(unittest.TestCase):
 
     def test_pod_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.pod = object()
+            self.model.pod = object()  # type: ignore
 
     def test_base_status_instance_raises(self):
         with self.assertRaises(TypeError):
@@ -700,7 +709,7 @@ class TestModel(unittest.TestCase):
             pass
 
         with self.assertRaises(AttributeError):
-            ops.StatusBase.register_status(NoNameStatus)
+            ops.StatusBase.register_status(NoNameStatus)  # type: ignore
 
     def test_status_repr(self):
         test_cases = {
@@ -807,18 +816,18 @@ class TestModel(unittest.TestCase):
 
     def test_set_unit_status_invalid(self):
         with self.assertRaises(ops.InvalidStatusError):
-            self.model.unit.status = 'blocked'
+            self.model.unit.status = 'blocked'  # type: ignore
 
     def test_set_app_status_invalid(self):
         with self.assertRaises(ops.InvalidStatusError):
-            self.model.app.status = 'blocked'
+            self.model.app.status = 'blocked'  # type: ignore
 
     def test_remote_unit_status(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                  self.model.get_relation('db1').units))
+                                  self.model_get_relation('db1').units))
         self.resetBackendCalls()
 
         # Remote unit status is always unknown.
@@ -842,7 +851,7 @@ class TestModel(unittest.TestCase):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
-        remoteapp1 = self.model.get_relation('db1').app
+        remoteapp1 = self.model_get_relation('db1').app
         self.resetBackendCalls()
 
         # Remote application status is always unknown.
@@ -863,7 +872,7 @@ class TestModel(unittest.TestCase):
 
     def test_storage(self):
         meta = ops.CharmMeta()
-        meta.storages = {'disks': None, 'data': None}
+        meta.storages = {'disks': ops.StorageMeta('test', {}), 'data': ops.StorageMeta('test', {})}
         model = ops.Model(meta, _ModelBackend('myapp/0'))
 
         fake_script(self, 'storage-list', '''
@@ -921,16 +930,20 @@ class TestModel(unittest.TestCase):
         # Invalid count parameter types.
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
-                model.storages.request('data', count_v)
+                model.storages.request('data', count_v)  # type: ignore
 
     def test_storages_immutable(self):
         with self.assertRaises(AttributeError):
-            self.model.storages = {}
+            self.model.storages = {}  # type: ignore
 
     def resetBackendCalls(self):  # noqa: N802
         self.harness._get_backend_calls(reset=True)
 
-    def assertBackendCalls(self, expected, *, reset=True):  # noqa: N802
+    def assertBackendCalls(  # noqa: N802
+            self,
+            expected: typing.List[typing.Tuple[typing.Any, ...]],
+            *,
+            reset: bool = True):
         self.assertEqual(expected, self.harness._get_backend_calls(reset=reset))
 
     def test_run_error(self):
@@ -945,13 +958,14 @@ class TestModel(unittest.TestCase):
 class PushPullCase:
     """Test case for table-driven tests."""
 
-    def __init__(self, **vals):
+    def __init__(self, *, name: str, path: str, files: typing.List[str], want: typing.Optional[typing.Set[str]] = None, dst: typing.Optional[str] = None, errors: typing.Optional[typing.Set[str]] = None):
         self.pattern = None
-        self.dst = None
-        self.errors = []
-        self.want = set()
-        for key, val in vals.items():
-            setattr(self, key, val)
+        self.dst = dst
+        self.errors = errors or set()
+        self.name = name
+        self.path = path
+        self.files = files
+        self.want = want or set()
 
 
 recursive_list_cases = [
@@ -977,8 +991,8 @@ recursive_list_cases = [
 
 
 @pytest.mark.parametrize('case', recursive_list_cases)
-def test_recursive_list(case):
-    def list_func_gen(file_list):
+def test_recursive_list(case: PushPullCase):
+    def list_func_gen(file_list: typing.List[str]):
         args = {
             'last_modified': datetime.time(),
             'permissions': 0o777,
@@ -988,7 +1002,8 @@ def test_recursive_list(case):
             'group_id': 1024,
             'group': 'bar',
         }
-        file_infos, dirs = [], set()
+        file_infos: typing.List[pebble.FileInfo] = []
+        dirs: typing.Set[str] = set()
         for f in file_list:
             file_infos.append(
                 pebble.FileInfo(
@@ -1010,7 +1025,7 @@ def test_recursive_list(case):
 
         def inner(path):
             path = str(path)
-            matches = []
+            matches: typing.List[pebble.FileInfo] = []
             for info in file_infos:
                 # exclude file infos for separate trees and also
                 # for the directory we are listing itself - we only want its contents.
@@ -1111,7 +1126,7 @@ recursive_push_pull_cases = [
 
 
 @pytest.mark.parametrize('case', recursive_push_pull_cases)
-def test_recursive_push_and_pull(case):
+def test_recursive_push_and_pull(case: PushPullCase):
     # full "integration" test of push+pull
     harness = ops.testing.Harness(ops.CharmBase, meta='''
         name: test-app
@@ -1142,7 +1157,7 @@ def test_recursive_push_and_pull(case):
         # otherwise remove leading slash so we can do the path join properly.
         push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
 
-    errors = []
+    errors: typing.Set[str] = set()
     try:
         c.push_path(push_path, case.dst)
     except ops.MultiPushPullError as err:
@@ -1161,7 +1176,7 @@ def test_recursive_push_and_pull(case):
         c.push(fpath, 'hello', make_dirs=True)
 
     # test pull
-    errors = []
+    errors: typing.Set[str] = set()
     try:
         c.pull_path(case.path, os.path.join(pull_dst.name, case.dst[1:]))
     except ops.MultiPushPullError as err:
@@ -1313,7 +1328,7 @@ class TestApplication(unittest.TestCase):
         self.assertEqual(self.app.planned_units(), 1)
 
         with self.assertRaises(TypeError):
-            self.harness.set_planned_units("foo")
+            self.harness.set_planned_units("foo")  # type: ignore
 
         with self.assertRaises(TypeError):
             self.harness.set_planned_units(-3423000102312321090)
@@ -1398,7 +1413,7 @@ containers:
         backend = MockPebbleBackend('myapp/0')
         self.model = ops.Model(meta, backend)
         self.container = self.model.unit.containers['c1']
-        self.pebble = self.container.pebble
+        self.pebble: MockPebbleClient = self.container.pebble  # type: ignore
 
     def test_socket_path(self):
         self.assertEqual(self.pebble.socket_path, '/charm/containers/c1/pebble.socket')
@@ -1499,10 +1514,10 @@ containers:
         container = model.unit.containers['c1']
 
         with self.assertRaises(TypeError):
-            container.start(['foo'])
+            container.start(['foo'])  # type: ignore
 
         with self.assertRaises(TypeError):
-            container.stop(['foo'])
+            container.stop(['foo'])  # type: ignore
 
     def test_add_layer(self):
         self.container.add_layer('a', 'summary: str\n')
@@ -1518,7 +1533,7 @@ containers:
 
         # combine is a keyword-only arg (should be combine=True)
         with self.assertRaises(TypeError):
-            self.container.add_layer('x', {}, True)
+            self.container.add_layer('x', {}, True)  # type: ignore
 
     def test_get_plan(self):
         plan_yaml = 'services:\n foo:\n  override: replace\n  command: bar'
@@ -1781,6 +1796,8 @@ containers:
     @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
     def test_exec(self):
         self.pebble.responses.append('fake_exec_process')
+        stdout = io.StringIO('STDOUT')
+        stderr = io.StringIO('STDERR')
         p = self.container.exec(
             ['echo', 'foo'],
             service_context='srv1',
@@ -1792,9 +1809,9 @@ containers:
             group_id=1000,
             group='staff',
             stdin='STDIN',
-            stdout='STDOUT',
-            stderr='STDERR',
-            encoding=None,
+            stdout=stdout,
+            stderr=stderr,
+            encoding="encoding",
             combine_stderr=True,
         )
         self.assertEqual(self.pebble.requests, [
@@ -1808,9 +1825,9 @@ containers:
                 group_id=1000,
                 group='staff',
                 stdin='STDIN',
-                stdout='STDOUT',
-                stderr='STDERR',
-                encoding=None,
+                stdout=stdout,
+                stderr=stderr,
+                encoding="encoding",
                 combine_stderr=True,
             ))
         ])
@@ -1844,10 +1861,10 @@ class MockPebbleBackend(_ModelBackend):
 
 
 class MockPebbleClient:
-    def __init__(self, socket_path):
+    def __init__(self, socket_path: str):
         self.socket_path = socket_path
-        self.requests = []
-        self.responses = []
+        self.requests: typing.List[typing.Tuple[typing.Any, ...]] = []
+        self.responses: typing.List[typing.Any] = []
 
     def autostart_services(self):
         self.requests.append(('autostart',))
@@ -1859,16 +1876,22 @@ class MockPebbleClient:
     def replan_services(self):
         self.requests.append(('replan',))
 
-    def start_services(self, service_names):
+    def start_services(self, service_names: str):
         self.requests.append(('start', service_names))
 
-    def stop_services(self, service_names):
+    def stop_services(self, service_names: str):
         self.requests.append(('stop', service_names))
 
-    def restart_services(self, service_names):
+    def restart_services(self, service_names: str):
         self.requests.append(('restart', service_names))
 
-    def add_layer(self, label, layer, combine=False):
+    def add_layer(self,
+                  label: str,
+                  layer: typing.Union[str,
+                                      ops.pebble.LayerDict,
+                                      ops.pebble.Layer],
+                  *,
+                  combine: bool = False):
         if isinstance(layer, dict):
             layer = pebble.Layer(layer).to_yaml()
         elif isinstance(layer, pebble.Layer):
@@ -1879,40 +1902,58 @@ class MockPebbleClient:
         self.requests.append(('get_plan',))
         return self.responses.pop(0)
 
-    def get_services(self, names=None):
+    def get_services(self, names: typing.Optional[str] = None):
         self.requests.append(('get_services', names))
         return self.responses.pop(0)
 
-    def get_checks(self, level=None, names=None):
+    def get_checks(self, level: typing.Optional[str] = None, names: typing.Optional[str] = None):
         self.requests.append(('get_checks', level, names))
         return self.responses.pop(0)
 
-    def pull(self, path, *, encoding='utf-8'):
+    def pull(self, path: str, *, encoding: str = 'utf-8'):
         self.requests.append(('pull', path, encoding))
         return self.responses.pop(0)
 
-    def push(self, path, source, *, encoding='utf-8', make_dirs=False, permissions=None,
-             user_id=None, user=None, group_id=None, group=None):
+    def push(
+            self,
+            path: str,
+            source: 'ops.pebble._IOSource',
+            *,
+            encoding: str = 'utf-8',
+            make_dirs: bool = False,
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None):
         self.requests.append(('push', path, source, encoding, make_dirs, permissions,
                               user_id, user, group_id, group))
 
-    def list_files(self, path, *, pattern=None, itself=False):
+    def list_files(self, path: str, *, pattern: typing.Optional[str] = None, itself: bool = False):
         self.requests.append(('list_files', path, pattern, itself))
         return self.responses.pop(0)
 
-    def make_dir(self, path, *, make_parents=False, permissions=None, user_id=None, user=None,
-                 group_id=None, group=None):
+    def make_dir(
+            self,
+            path: str,
+            *,
+            make_parents: bool = False,
+            permissions: typing.Optional[int] = None,
+            user_id: typing.Optional[int] = None,
+            user: typing.Optional[str] = None,
+            group_id: typing.Optional[int] = None,
+            group: typing.Optional[str] = None):
         self.requests.append(('make_dir', path, make_parents, permissions, user_id, user,
                               group_id, group))
 
-    def remove_path(self, path, *, recursive=False):
+    def remove_path(self, path: str, *, recursive: bool = False):
         self.requests.append(('remove_path', path, recursive))
 
-    def exec(self, command, **kwargs):
+    def exec(self, command: typing.List[str], **kwargs: typing.Any):
         self.requests.append(('exec', command, kwargs))
         return self.responses.pop(0)
 
-    def send_signal(self, signal, service_names):
+    def send_signal(self, signal: typing.Union[str, int], service_names: str):
         self.requests.append(('send_signal', signal, service_names))
 
 
@@ -1988,7 +2029,21 @@ class TestModelBindings(unittest.TestCase):
   ]
 }'''
 
-    def _check_binding_data(self, binding_name, binding):
+    def model_get_relation(self, name: str = 'db1', relation_id: typing.Optional[int] = None):
+        """Wrapper around self.model.get_relation that enforces that None is not returned."""
+        rel_db1 = self.model.get_relation(name, relation_id)
+        self.assertIsNotNone(rel_db1)
+        assert rel_db1 is not None  # Type checkers understand this, but not the previous line.
+        return rel_db1
+
+    def model_get_binding(self, binding_key: typing.Union[str, ops.Relation]):
+        """Wrapper around self.model.get_binding that enforces that None is not returned."""
+        binding = self.model.get_binding(binding_key)
+        self.assertIsNotNone(binding)
+        assert binding is not None  # Type checkers understand this, but not the previous line.
+        return binding
+
+    def _check_binding_data(self, binding_name: str, binding: ops.Binding):
         self.assertEqual(binding.name, binding_name)
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('192.0.2.2'))
         self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('192.0.2.2'))
@@ -2050,7 +2105,7 @@ class TestModelBindings(unittest.TestCase):
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
-        binding = self.model.get_binding(binding_name)
+        binding = self.model_get_binding(binding_name)
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
@@ -2064,7 +2119,7 @@ class TestModelBindings(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
             ['network-get', 'db0', '-r', '4', '--format=json'],
         ]
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
@@ -2096,7 +2151,7 @@ class TestModelBindings(unittest.TestCase):
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
-        binding = self.model.get_binding(binding_name)
+        binding = self.model_get_binding(binding_name)
         self.assertEqual(binding.name, 'db0')
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('10.1.89.35'))
         self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('10.152.183.158'))
@@ -2107,7 +2162,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_empty_bind_addresses(self):
@@ -2115,7 +2170,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_no_bind_addresses(self):
@@ -2123,7 +2178,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_empty_interface_info(self):
@@ -2136,7 +2191,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(len(binding.network.interfaces), 1)
         interface = binding.network.interfaces[0]
         self.assertIsNone(interface.address)
@@ -2149,7 +2204,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, [])
         self.assertEqual(binding.network.ingress_address, None)
 
@@ -2161,7 +2216,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(binding.network.egress_subnets, [])
 
     def test_unresolved_ingress_addresses(self):
@@ -2175,7 +2230,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model.get_binding(self.model.get_relation(binding_name))
+        binding = self.model_get_binding(self.model_get_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
@@ -2193,18 +2248,18 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_get_set_is_app_arg(self):
         # No is_app provided.
         with self.assertRaises(TypeError):
-            self.backend.relation_set(1, 'fookey', 'barval')
+            self.backend.relation_set(1, 'fookey', 'barval')  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.backend.relation_get(1, 'fooentity')
+            self.backend.relation_get(1, 'fooentity')  # type: ignore
 
         # Invalid types for is_app.
         for is_app_v in [None, 1, 2.0, 'a', b'beef']:
             with self.assertRaises(TypeError):
-                self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)
+                self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)  # type: ignore
 
             with self.assertRaises(TypeError):
-                self.backend.relation_get(1, 'fooentity', is_app=is_app_v)
+                self.backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
 
     def test_is_leader_refresh(self):
         meta = ops.CharmMeta.from_yaml('''
@@ -2367,10 +2422,10 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'status-set', 'exit 1')
 
         test_cases = (
-            lambda: self.backend.status_get(False),
-            lambda: self.backend.status_get(True),
-            lambda: self.backend.status_set('active', '', False),
-            lambda: self.backend.status_set('active', '', True),
+            lambda: self.backend.status_get(False),  # type: ignore
+            lambda: self.backend.status_get(True),  # type: ignore
+            lambda: self.backend.status_set('active', '', False),  # type: ignore
+            lambda: self.backend.status_set('active', '', True),  # type: ignore
         )
 
         for case in test_cases:
@@ -2450,35 +2505,39 @@ class TestModelBackend(unittest.TestCase):
     def test_status_set_is_app_not_bool_raises(self):
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
             with self.assertRaises(TypeError):
-                self.backend.status_set(ops.ActiveStatus, is_app=is_app_v)
+                self.backend.status_set(ops.ActiveStatus, is_app=is_app_v)  # type: ignore
 
     def test_storage_tool_errors(self):
-        test_cases = [(
-            lambda: fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.storage_list('foobar'),
-            ops.ModelError,
-            [['storage-list', 'foobar', '--format=json']],
-        ), (
-            lambda: fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.storage_get('foobar', 'someattr'),
-            ops.ModelError,
-            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
-        ), (
-            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.storage_add('foobar', count=2),
-            ops.ModelError,
-            [['storage-add', 'foobar=2']],
-        ), (
-            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.storage_add('foobar', count=object),
-            TypeError,
-            [],
-        ), (
-            lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
-            lambda: self.backend.storage_add('foobar', count=True),
-            TypeError,
-            [],
-        )]
+        test_cases: typing.List[typing.Tuple[
+            typing.Callable[[], None],
+            typing.Callable[[], None],
+            typing.Type[BaseException],
+            typing.List[typing.List[str]]]] = [(
+                lambda: fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1'),
+                lambda: self.backend.storage_list('foobar'),
+                ops.ModelError,
+                [['storage-list', 'foobar', '--format=json']],
+            ), (
+                lambda: fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1'),
+                lambda: self.backend.storage_get('foobar', 'someattr'),
+                ops.ModelError,
+                [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
+            ), (
+                lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
+                lambda: self.backend.storage_add('foobar', count=2),
+                ops.ModelError,
+                [['storage-add', 'foobar=2']],
+            ), (
+                lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
+                lambda: self.backend.storage_add('foobar', count=object),  # type: ignore
+                TypeError,
+                [],
+            ), (
+                lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
+                lambda: self.backend.storage_add('foobar', count=True),
+                TypeError,
+                [],
+            )]
         for do_fake, run, exception, calls in test_cases:
             do_fake()
             with self.assertRaises(exception):
@@ -2635,9 +2694,9 @@ class TestModelBackend(unittest.TestCase):
     def test_application_version_set_invalid(self):
         fake_script(self, 'application-version-set', 'exit 0')
         with self.assertRaises(TypeError):
-            self.backend.application_version_set(2)
+            self.backend.application_version_set(2)  # type: ignore
         with self.assertRaises(TypeError):
-            self.backend.application_version_set()
+            self.backend.application_version_set()  # type: ignore
         self.assertEqual(fake_script_calls(self), [])
 
     def test_juju_log(self):
@@ -2647,7 +2706,7 @@ class TestModelBackend(unittest.TestCase):
                          [['juju-log', '--log-level', 'WARNING', '--', 'foo']])
 
         with self.assertRaises(TypeError):
-            self.backend.juju_log('DEBUG')
+            self.backend.juju_log('DEBUG')  # type: ignore
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
         fake_script(self, 'juju-log', 'exit 1')
@@ -2673,7 +2732,9 @@ class TestModelBackend(unittest.TestCase):
             self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
     def test_invalid_metric_names(self):
-        invalid_inputs = [
+        invalid_inputs: typing.List[typing.Tuple[
+            typing.Dict[str, float],
+            typing.Dict[typing.Any, typing.Any]]] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
@@ -2692,7 +2753,9 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
-        invalid_inputs = [
+        invalid_inputs: typing.List[typing.Tuple[
+            typing.Dict[str, typing.Union[float, str]],
+            typing.Dict[typing.Any, typing.Any]]] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
@@ -2701,7 +2764,7 @@ class TestModelBackend(unittest.TestCase):
         ]
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)
+                self.backend.add_metrics(metrics, labels)  # type: ignore
 
     def test_invalid_metric_labels(self):
         invalid_inputs = [
@@ -2812,7 +2875,7 @@ echo '{
 class TestLazyMapping(unittest.TestCase):
 
     def test_invalidate(self):
-        loaded = []
+        loaded: typing.List[int] = []
 
         class MyLazyMap(ops.LazyMapping):
             def _load(self):
@@ -2889,17 +2952,21 @@ class TestSecrets(unittest.TestCase):
 
     def test_unit_add_secret_errors(self):
         # Additional add_secret tests are done in TestApplication
-        errors = [
-            ({'xy': 'bar'}, {}, ValueError),
-            ({'foo': 'x'}, {'expire': 7}, TypeError),
-        ]
+        errors: typing.List[typing.Tuple[
+            typing.Any,
+            typing.Dict[str, typing.Any],
+            typing.Type[BaseException]]] = [
+            ({'xy': 'bar'}, {}, ValueError), ({'foo': 'x'}, {'expire': 7}, TypeError), ]
         for content, kwargs, exc_type in errors:
             msg = f'expected {exc_type.__name__} when adding secret content {content}'
             with self.assertRaises(exc_type, msg=msg):
-                self.unit.add_secret(content, **kwargs)
+                self.unit.add_secret(content, **kwargs)  # type: ignore
 
     def test_add_secret_errors(self):
-        errors = [
+        errors: typing.List[typing.Tuple[
+            typing.Any,
+            typing.Dict[str, typing.Any],
+            typing.Type[BaseException]]] = [
             # Invalid content dict or types
             (None, {}, TypeError),
             ({}, {}, ValueError),
@@ -2917,9 +2984,9 @@ class TestSecrets(unittest.TestCase):
         for content, kwargs, exc_type in errors:
             msg = f'expected {exc_type.__name__} when adding secret content {content}'
             with self.assertRaises(exc_type, msg=msg):
-                self.app.add_secret(content, **kwargs)
+                self.app.add_secret(content, **kwargs)  # type: ignore
             with self.assertRaises(exc_type, msg=msg):
-                self.unit.add_secret(content, **kwargs)
+                self.unit.add_secret(content, **kwargs)  # type: ignore
 
     def test_get_secret_id(self):
         fake_script(self, 'secret-get', """echo '{"foo": "g"}'""")
@@ -3059,7 +3126,11 @@ class TestSecretClass(unittest.TestCase):
     def setUp(self):
         self.model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
 
-    def make_secret(self, id=None, label=None, content=None):
+    def make_secret(self,
+                    id: typing.Optional[str] = None,
+                    label: typing.Optional[str] = None,
+                    content: typing.Optional[typing.Dict[str,
+                                                         str]] = None):
         return ops.Secret(self.model._backend, id=id, label=label, content=content)
 
     def test_id_and_label(self):
@@ -3317,7 +3388,7 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'open-port', 'exit 0')
 
         self.unit.open_port('tcp', 8080)
-        self.unit.open_port('UDP', 4000)
+        self.unit.open_port('UDP', 4000)  # type: ignore
         self.unit.open_port('icmp')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -3330,7 +3401,7 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'open-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
         with self.assertRaises(ops.ModelError) as cm:
-            self.unit.open_port('ftp', 8080)
+            self.unit.open_port('ftp', 8080)  # type: ignore
         self.assertEqual(str(cm.exception), 'ERROR bad protocol\n')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -3341,7 +3412,7 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'close-port', 'exit 0')
 
         self.unit.close_port('tcp', 8080)
-        self.unit.close_port('UDP', 4000)
+        self.unit.close_port('UDP', 4000)  # type: ignore
         self.unit.close_port('icmp')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
@@ -3354,7 +3425,7 @@ class TestPorts(unittest.TestCase):
         fake_script(self, 'close-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
         with self.assertRaises(ops.ModelError) as cm:
-            self.unit.close_port('ftp', 8080)
+            self.unit.close_port('ftp', 8080)  # type: ignore
         self.assertEqual(str(cm.exception), 'ERROR bad protocol\n')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
