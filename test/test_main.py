@@ -399,6 +399,8 @@ class _TestMain(abc.ABC):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self, event_name: str) -> ops.StoredStateData:
+        framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta,
+                                    None, event_name)  # type: ignore
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -408,8 +410,6 @@ class _TestMain(abc.ABC):
                         meta = ops.CharmMeta.from_yaml(m, a)
                 else:
                     meta = ops.CharmMeta.from_yaml(m)
-            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta,
-                                      None, event_name)  # type: ignore
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -424,7 +424,7 @@ class _TestMain(abc.ABC):
             storage.commit()
             framework.close()
         else:
-            stored = ops.StoredStateData(None, None)
+            stored = ops.StoredStateData(ops.Object(framework, None), "")
         return stored
 
     def _simulate_event(self, event_spec: EventSpec):
@@ -512,6 +512,8 @@ class _TestMain(abc.ABC):
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        if typing.TYPE_CHECKING:
+            assert state is not None
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
