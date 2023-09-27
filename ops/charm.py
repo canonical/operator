@@ -60,7 +60,7 @@ if TYPE_CHECKING:
         'location': str,
         'multiple-range': str,
         'multiple': _MultipleRange
-    })
+    }, total=False)
 
     _ResourceMetaDict = TypedDict(
         '_ResourceMetaDict', {
