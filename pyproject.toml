@@ -29,6 +29,8 @@ docstring-convention = "google"
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py",
+    "test/charms/test_main/src/*.py",
+    "test/charms/test_smoke/src/*.py",
     "test/test_private.py",
     "test/test_infra.py",
     "test/test_jujuversion.py",
