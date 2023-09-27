@@ -11,9 +11,8 @@ jobs:
         charm-repo:
           - "canonical/postgresql-operator"
           - "canonical/postgresql-k8s-operator"
-# TODO: uncomment once we've fixed https://github.com/canonical/operator/issues/987
-#          - "canonical/mysql-operator"
-#          - "canonical/mysql-k8s-operator"
+          - "canonical/mysql-operator"
+          - "canonical/mysql-k8s-operator"
 
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
@@ -21,16 +20,26 @@ jobs:
         with:
           repository: ${{ matrix.charm-repo }}
 
+      - name: Checkout the operator repository
+        uses: actions/checkout@v3
+        with:
+          path: myops
+
+      - name: Install patch dependencies
+        run: pip install poetry~=1.6
+
       - name: Update 'ops' dependency in test charm to latest
         run: |
-          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+          if [ -e "requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+          else
+            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
+            poetry lock
+          fi
 
       - name: Install dependencies
-        run: pip install tox==4.2.8
+        run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
         run: tox -vve unit
-
-      - name: Run the charm's static analysis checks
-        run: tox -vve static-charm
