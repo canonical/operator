@@ -20,7 +20,6 @@ import json
 import os
 import pathlib
 import tempfile
-import types
 import typing
 import unittest
 from collections import OrderedDict
@@ -67,7 +66,10 @@ class TestModel(unittest.TestCase):
         self.harness._get_backend_calls(reset=True)
         self.model = self.harness.model
 
-    def model_get_relation(self, name: str = 'db1', relation_id: typing.Optional[int] = None) -> ops.Relation:
+    def model_get_relation(
+            self,
+            name: str = 'db1',
+            relation_id: typing.Optional[int] = None) -> ops.Relation:
         """Wrapper around self.model.get_relation that enforces that None is not returned."""
         rel_db1 = self.model.get_relation(name, relation_id)
         self.assertIsNotNone(rel_db1)
@@ -454,7 +456,11 @@ class TestModel(unittest.TestCase):
         #       but there was nothing illegal about the data that was being set,
         #       for us to properly test the side effects of relation-set failing.
 
-        def broken_update_relation_data(relation_id, entity, key, value):
+        def broken_update_relation_data(
+                relation_id: int,
+                entity: typing.Union[ops.Unit, ops.Application],
+                key: str,
+                value: str):
             backend._calls.append(('update_relation_data', relation_id, entity, key, value))
             raise ops.ModelError()
         backend.update_relation_data = broken_update_relation_data
@@ -498,7 +504,7 @@ class TestModel(unittest.TestCase):
         ):
             with self.assertRaises(ops.RelationDataError):
                 with self.harness.framework._event_context('foo_event'):
-                    rel_db1.data[self.model.unit][key] = value
+                    rel_db1.data[self.model.unit][key] = value  # type: ignore
 
         # No data has actually been changed
         self.assertEqual(dict(rel_db1.data[self.model.unit]), {'host': 'myapp-0'})
@@ -859,6 +865,8 @@ class TestModel(unittest.TestCase):
         self.resetBackendCalls()
 
         # Remote application status is always unknown.
+        if typing.TYPE_CHECKING:
+            assert remoteapp1 is not None
         self.assertIsInstance(remoteapp1.status, ops.UnknownStatus)
 
         test_statuses = (
@@ -876,7 +884,13 @@ class TestModel(unittest.TestCase):
 
     def test_storage(self):
         meta = ops.CharmMeta()
-        meta.storages = {'disks': ops.StorageMeta('test', {}), 'data': ops.StorageMeta('test', {})}
+        raw: 'ops.charm._StorageMetaDict' = {
+            'type': 'test',
+        }
+        meta.storages = {
+            'disks': ops.StorageMeta(
+                'test', raw), 'data': ops.StorageMeta(
+                'test', raw)}
         model = ops.Model(meta, _ModelBackend('myapp/0'))
 
         fake_script(self, 'storage-list', '''
@@ -962,7 +976,15 @@ class TestModel(unittest.TestCase):
 class PushPullCase:
     """Test case for table-driven tests."""
 
-    def __init__(self, *, name: str, path: str, files: typing.List[str], want: typing.Optional[typing.Set[str]] = None, dst: typing.Optional[str] = None, errors: typing.Optional[typing.Set[str]] = None):
+    def __init__(self,
+                 *,
+                 name: str,
+                 path: typing.Union[str,
+                                    typing.List[str]],
+                 files: typing.List[str],
+                 want: typing.Optional[typing.Set[str]] = None,
+                 dst: typing.Optional[str] = None,
+                 errors: typing.Optional[typing.Set[str]] = None):
         self.pattern = None
         self.dst = dst
         self.errors = errors or set()
@@ -994,11 +1016,22 @@ recursive_list_cases = [
 ]
 
 
+if typing.TYPE_CHECKING:
+    class ConstFileInfoArgs(typing.TypedDict):
+        last_modified: datetime.datetime
+        permissions: int
+        size: int
+        user_id: int
+        user: str
+        group_id: int
+        group: str
+
+
 @pytest.mark.parametrize('case', recursive_list_cases)
 def test_recursive_list(case: PushPullCase):
     def list_func_gen(file_list: typing.List[str]):
-        args = {
-            'last_modified': datetime.time(),
+        args: ConstFileInfoArgs = {
+            'last_modified': datetime.datetime.now(),
             'permissions': 0o777,
             'size': 42,
             'user_id': 0,
@@ -1027,25 +1060,27 @@ def test_recursive_list(case: PushPullCase):
                         type=pebble.FileType.DIRECTORY,
                         **args))
 
-        def inner(path):
-            path = str(path)
+        def inner(path: pathlib.Path):
+            path_str = str(path)
             matches: typing.List[pebble.FileInfo] = []
             for info in file_infos:
                 # exclude file infos for separate trees and also
                 # for the directory we are listing itself - we only want its contents.
-                if not info.path.startswith(path) or (
-                        info.type == pebble.FileType.DIRECTORY and path == info.path):
+                if not info.path.startswith(path_str) or (
+                        info.type == pebble.FileType.DIRECTORY and path_str == info.path):
                     continue
                 # exclude file infos for files that are in subdirectories of path.
                 # we only want files that are directly in path.
-                if info.path[len(path):].find('/') > 0:
+                if info.path[len(path_str):].find('/') > 0:
                     continue
                 matches.append(info)
             return matches
         return inner
 
     # test raw business logic for recursion and dest path construction
-    files = set()
+    files: typing.Set[typing.Union[str, pathlib.Path]] = set()
+    if typing.TYPE_CHECKING:
+        assert isinstance(case.path, str)
     case.path = os.path.normpath(case.path)
     case.files = [os.path.normpath(f) for f in case.files]
     case.want = {os.path.normpath(f) for f in case.want}
@@ -1162,6 +1197,8 @@ def test_recursive_push_and_pull(case: PushPullCase):
         push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
 
     errors: typing.Set[str] = set()
+    if typing.TYPE_CHECKING:
+        assert case.dst is not None
     try:
         c.push_path(push_path, case.dst)
     except ops.MultiPushPullError as err:
@@ -1217,7 +1254,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
         want={'/baz/foo/foobar.txt', '/baz/foo/bar/baz.txt'},
     ),
 ])
-def test_push_path_relative(case):
+def test_push_path_relative(case: PushPullCase):
     harness = ops.testing.Harness(ops.CharmBase, meta='''
         name: test-app
         containers:
@@ -1242,6 +1279,8 @@ def test_push_path_relative(case):
                 testfile_path.write_text("test", encoding="utf-8")
 
             # push path under test to container
+            if typing.TYPE_CHECKING:
+                assert case.dst is not None
             container.push_path(case.path, case.dst)
 
             # test
@@ -1468,8 +1507,8 @@ containers:
         ])
 
     def test_restart_fallback(self):
-        def restart_services(services):
-            self.pebble.requests.append(('restart', services))
+        def restart_services(service_names: str):
+            self.pebble.requests.append(('restart', service_names))
             raise pebble.APIError({}, 400, "", "")
 
         self.pebble.restart_services = restart_services
@@ -1493,7 +1532,7 @@ containers:
         ])
 
     def test_restart_fallback_non_400_error(self):
-        def restart_services(services):
+        def restart_services(service_names: str):
             raise pebble.APIError({}, 500, "", "")
 
         self.pebble.restart_services = restart_services
@@ -1548,7 +1587,7 @@ containers:
         self.assertEqual(plan.to_yaml(), yaml.safe_dump(yaml.safe_load(plan_yaml)))
 
     @staticmethod
-    def _make_service(name, startup, current):
+    def _make_service(name: str, startup: str, current: str):
         return pebble.ServiceInfo.from_dict(
             {'name': name, 'startup': startup, 'current': current})
 
@@ -1614,7 +1653,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
-            }),
+            }),  # type: ignore
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
                 'level': 'alive',
@@ -1660,7 +1699,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
-            })
+            })  # type: ignore
         ])
         c = self.container.get_check('c1')
         self.assertEqual(self.pebble.requests, [('get_checks', None, ('c1', ))])
@@ -1683,7 +1722,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
-            }),
+            }),  # type: ignore
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
                 'level': 'alive',
@@ -1719,10 +1758,10 @@ containers:
         ])
         self.pebble.requests = []
 
-        self.container.push('/path/2', b'content2', encoding=None, make_dirs=True,
+        self.container.push('/path/2', b'content2', encoding='utf-8', make_dirs=True,
                             permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
         self.assertEqual(self.pebble.requests, [
-            ('push', '/path/2', b'content2', None, True, 0o600, 12, 'bob', 34, 'staff'),
+            ('push', '/path/2', b'content2', 'utf-8', True, 0o600, 12, 'bob', 34, 'staff'),
         ])
 
     def test_list_files(self):
@@ -1790,7 +1829,7 @@ containers:
 
     def test_can_connect_api_error(self):
         def raise_error():
-            raise pebble.APIError('body', 404, 'status', 'api error!')
+            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
         self.pebble.get_system_info = raise_error
         with self.assertLogs('ops') as cm:
             self.assertFalse(self.container.can_connect())
@@ -1860,7 +1899,7 @@ containers:
 
 
 class MockPebbleBackend(_ModelBackend):
-    def get_pebble(self, socket_path):
+    def get_pebble(self, socket_path: str):
         return MockPebbleClient(socket_path)
 
 
@@ -2081,7 +2120,7 @@ class TestModelBindings(unittest.TestCase):
         # Basic validation for passing invalid keys.
         for name in (object, 0):
             with self.assertRaises(ops.ModelError):
-                self.model.get_binding(name)
+                self.model.get_binding(name)  # type: ignore
 
     def test_dead_relations(self):
         fake_script(
@@ -3303,43 +3342,67 @@ class TestSecretClass(unittest.TestCase):
             secret.set_info()  # no args provided
 
     def test_grant(self):
+        fake_script(self, 'relation-list', """echo '[]'""")
         fake_script(self, 'secret-grant', """exit 0""")
         fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
         secret = self.make_secret(id='x')
-        secret.grant(types.SimpleNamespace(id=123))
-        secret.grant(types.SimpleNamespace(id=234), unit=types.SimpleNamespace(name='app/0'))
+        backend = ops.model._ModelBackend('test', 'test', 'test')
+        meta = ops.CharmMeta()
+        cache = ops.model._ModelCache(meta, backend)
+        unit = ops.Unit('test', meta, backend, cache)
+        rel123 = ops.Relation('test', 123, True, unit, backend, cache)
+        rel234 = ops.Relation('test', 234, True, unit, backend, cache)
+        secret.grant(rel123)
+        unit = ops.Unit('app/0', meta, backend, cache)
+        secret.grant(rel234, unit=unit)
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
         secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
-        secret.grant(types.SimpleNamespace(id=345))
+        rel345 = ops.Relation('test', 345, True, unit, backend, cache)
+        secret.grant(rel345)
         self.assertEqual(secret.id, 'secret:z')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '123', '--format=json'],
+            ['relation-list', '-r', '234', '--format=json'],
             ['secret-grant', 'secret:x', '--relation', '123'],
             ['secret-grant', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['relation-list', '-r', '345', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
             ['secret-grant', 'secret:z', '--relation', '345'],
         ])
 
     def test_revoke(self):
+        fake_script(self, 'relation-list', """echo '[]'""")
         fake_script(self, 'secret-revoke', """exit 0""")
         fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
         secret = self.make_secret(id='x')
-        secret.revoke(types.SimpleNamespace(id=123))
-        secret.revoke(types.SimpleNamespace(id=234), unit=types.SimpleNamespace(name='app/0'))
+        backend = ops.model._ModelBackend('test', 'test', 'test')
+        meta = ops.CharmMeta()
+        cache = ops.model._ModelCache(meta, backend)
+        unit = ops.Unit('test', meta, backend, cache)
+        rel123 = ops.Relation('test', 123, True, unit, backend, cache)
+        rel234 = ops.Relation('test', 234, True, unit, backend, cache)
+        secret.revoke(rel123)
+        unit = ops.Unit('app/0', meta, backend, cache)
+        secret.revoke(rel234, unit=unit)
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
         secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
-        secret.revoke(types.SimpleNamespace(id=345))
+        rel345 = ops.Relation('test', 345, True, unit, backend, cache)
+        secret.revoke(rel345)
         self.assertEqual(secret.id, 'secret:z')
 
         self.assertEqual(fake_script_calls(self, clear=True), [
+            ['relation-list', '-r', '123', '--format=json'],
+            ['relation-list', '-r', '234', '--format=json'],
             ['secret-revoke', 'secret:x', '--relation', '123'],
             ['secret-revoke', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['relation-list', '-r', '345', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
             ['secret-revoke', 'secret:z', '--relation', '345'],
         ])
