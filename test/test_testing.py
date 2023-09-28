@@ -3034,15 +3034,15 @@ class RelationChangedViewer(ops.Object):
         self.changes.append(dict(data))
 
 
-if typing.TYPE_CHECKING:
-    # In Python 3.11+ replace this with Required/NotRequired.
-    class BaseRecordedChange(typing.TypedDict):
-        name: str
+# In Python 3.11+ replace this with Required/NotRequired.
+class BaseRecordedChange(typing.TypedDict):
+    name: str
 
-    class RecordedChange(BaseRecordedChange, total=False):
-        data: typing.Dict[str, typing.Any]
-        relation: str
-        container: typing.Optional[str]
+
+class RecordedChange(BaseRecordedChange, total=False):
+    data: typing.Dict[str, typing.Any]
+    relation: str
+    container: typing.Optional[str]
 
 
 class RecordingCharm(ops.CharmBase):
@@ -4053,41 +4053,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
 class _PebbleStorageAPIsTestMixin:
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
-    prefix: str = None  # type: ignore
+    prefix: str
 
     # Override this in classes using this mixin.
-    client: ops.pebble.Client = None  # type: ignore
+    client: ops.pebble.Client
 
-    if typing.TYPE_CHECKING:
-        # Provide these in classes using this mixin, generally by mixing with a TestCase.
-        def assertEqual(  # noqa
-                self,
-                first: typing.Any,
-                second: typing.Any,
-                msg: typing.Optional[str] = None):
-            ...
-
-        _cm_type = typing.ContextManager[unittest.case._AssertRaisesContext[BaseException]]
-
-        def assertRaises(  # noqa
-                self,
-                exception: typing.Type[BaseException],
-                *,
-                msg: typing.Optional[str] = None) -> _cm_type:
-            ...
-
-        def assertIsInstance(  # noqa
-                self,
-                obj: typing.Any,
-                cls: typing.Type[object],
-                msg: typing.Optional[str] = None):
-            ...
-
-        def assertIn(self,  # noqa
-                     member: typing.Any,
-                     container: typing.Container[typing.Any],
-                     msg: typing.Optional[str] = None):
-            ...
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertIn = unittest.TestCase.assertIn  # noqa
+    assertIsInstance = unittest.TestCase.assertIsInstance  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
 
     def test_push_and_pull_bytes(self):
         self._test_push_and_pull_data(
@@ -4100,21 +4074,6 @@ class _PebbleStorageAPIsTestMixin:
             original_data='日本語',  # "Japanese" in Japanese
             encoding='sjis',
             stream_class=io.StringIO)
-
-    if typing.TYPE_CHECKING:
-        @typing.overload
-        def _test_push_and_pull_data(self,
-                                     original_data: bytes,
-                                     encoding: None,
-                                     stream_class: typing.Type[io.BytesIO]) -> typing.NoReturn:
-            ...
-
-        @typing.overload
-        def _test_push_and_pull_data(self,
-                                     original_data: str,
-                                     encoding: str,
-                                     stream_class: typing.Type[io.StringIO]) -> typing.NoReturn:
-            ...
 
     def _test_push_and_pull_data(self,
                                  original_data: typing.Union[str, bytes],
@@ -4179,7 +4138,6 @@ class _PebbleStorageAPIsTestMixin:
 
         with self.assertRaises(pebble.PathError) as cm:
             client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=False)
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=True)
@@ -4190,7 +4148,6 @@ class _PebbleStorageAPIsTestMixin:
         client.push(f"{self.prefix}/file", data)
         with self.assertRaises(pebble.PathError) as cm:
             client.push(f"{self.prefix}/file/file", data)
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_with_permission_mask(self):
@@ -4206,7 +4163,6 @@ class _PebbleStorageAPIsTestMixin:
         ):
             with self.assertRaises(pebble.PathError) as cm:
                 client.push(f"{self.prefix}/file", data, permissions=bad_permission)
-            cm.exception = typing.cast(pebble.PathError, cm.exception)
             self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_files_and_list(self):
@@ -4246,13 +4202,11 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_pull_not_found(self):
         with self.assertRaises(pebble.PathError) as cm:
             self.client.pull("/not/found")
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, "not-found")
         self.assertIn("/not/found", cm.exception.message)
 
@@ -4260,7 +4214,6 @@ class _PebbleStorageAPIsTestMixin:
         self.client.make_dir(f"{self.prefix}/subdir")
         with self.assertRaises(pebble.PathError) as cm:
             self.client.pull(f"{self.prefix}/subdir")
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, "generic-file-error")
         self.assertIn(f"{self.prefix}/subdir", cm.exception.message)
 
@@ -4268,7 +4221,6 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.APIError) as cm:
             client.list_files("/not/existing/file/")
-        cm.exception = typing.cast(pebble.APIError, cm.exception)
         self.assertEqual(cm.exception.code, 404)
         self.assertEqual(cm.exception.status, 'Not Found')
         self.assertEqual(cm.exception.message, 'stat /not/existing/file/: no '
@@ -4326,7 +4278,6 @@ class _PebbleStorageAPIsTestMixin:
 
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=False)
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=True)
@@ -4338,7 +4289,6 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir('dir')
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_make_subdir_of_file_fails(self):
@@ -4348,13 +4298,11 @@ class _PebbleStorageAPIsTestMixin:
         # Direct child case
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(f"{self.prefix}/file/subdir")
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Recursive creation case, in case its flow is different
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(f"{self.prefix}/file/subdir/subdir", make_parents=True)
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_make_dir_with_permission_mask(self):
@@ -4376,7 +4324,6 @@ class _PebbleStorageAPIsTestMixin:
         )):
             with self.assertRaises(pebble.PathError) as cm:
                 client.make_dir(f"{self.prefix}/dir3_{i}", permissions=bad_permission)
-            cm.exception = typing.cast(pebble.PathError, cm.exception)
             self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_remove_path(self):
@@ -4395,7 +4342,6 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-empty directory, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
             client.remove_path(f"{self.prefix}/dir", recursive=False)
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
@@ -4404,7 +4350,6 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-existent path, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
             client.remove_path(f"{self.prefix}/dir/does/not/exist/asdf", recursive=False)
-        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         # Remove non-existent path, recursive=True: succeeds
@@ -4774,8 +4719,8 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 1)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretChangedEvent)
-        assert isinstance(event, ops.SecretChangedEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretChangedEvent)
         self.assertEqual(event.secret.get_content(), {'foo': '1'})
         self.assertEqual(event.secret.get_content(refresh=True), {'foo': '2'})
         self.assertEqual(event.secret.get_content(), {'foo': '2'})
@@ -4886,13 +4831,13 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 2)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretRotateEvent)
-        assert isinstance(event, ops.SecretRotateEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRotateEvent)
         self.assertEqual(event.secret.label, 'lbl')
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
         event = harness.charm.events[1]
-        self.assertIsInstance(event, ops.SecretRotateEvent)
-        assert isinstance(event, ops.SecretRotateEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRotateEvent)
         self.assertEqual(event.secret.label, 'override')
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
 
@@ -4912,14 +4857,14 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 2)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
-        assert isinstance(event, ops.SecretRemoveEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'lbl')
         self.assertEqual(event.revision, 1)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
         event = harness.charm.events[1]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
-        assert isinstance(event, ops.SecretRemoveEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'override')
         self.assertEqual(event.revision, 42)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
@@ -4940,14 +4885,14 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 2)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
-        assert isinstance(event, ops.SecretRemoveEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'lbl')
         self.assertEqual(event.revision, 1)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
         event = harness.charm.events[1]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
-        assert isinstance(event, ops.SecretRemoveEvent)  # Dupes previous line for type checkers.
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'override')
         self.assertEqual(event.revision, 42)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
@@ -5196,10 +5141,8 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "error")
 
         proc = self.container.exec(["ls"])
-        self.assertIsNotNone(proc.stdout)
-        assert proc.stdout is not None  # Dupes the previous line for type checking
-        self.assertIsNotNone(proc.stderr)
-        assert proc.stderr is not None  # Dupes the previous line for type checking
+        assert proc.stdout is not None  # Not assertIsNotNone to help type checkers.
+        assert proc.stderr is not None  # Not assertIsNotNone to help type checkers.
         proc.wait()
         self.assertEqual(proc.stdout.read(), "output")
         self.assertEqual(proc.stderr.read(), "error")
@@ -5213,10 +5156,8 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "output")
         self.assertEqual(stderr.getvalue(), "error")
         proc = self.container.exec(["ls"])
-        self.assertIsNotNone(proc.stdout)
-        assert proc.stdout is not None  # Dupes the previous line for type checking
-        self.assertIsNotNone(proc.stderr)
-        assert proc.stderr is not None  # Dupes the previous line for type checking
+        assert proc.stdout is not None  # Not assertIsNotNone to help type checkers.
+        assert proc.stderr is not None  # Not assertIsNotNone to help type checkers.
         self.assertEqual(proc.stdout.read(), "output")
         self.assertEqual(proc.stderr.read(), "error")
 
@@ -5226,10 +5167,8 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), b"output")
         self.assertEqual(stderr.getvalue(), b"error")
         proc = self.container.exec(["ls"], encoding=None)
-        self.assertIsNotNone(proc.stdout)
-        assert proc.stdout is not None  # Dupes the previous line for type checking
-        self.assertIsNotNone(proc.stderr)
-        assert proc.stderr is not None  # Dupes the previous line for type checking
+        assert proc.stdout is not None  # Not assertIsNotNone to help type checkers.
+        assert proc.stderr is not None  # Not assertIsNotNone to help type checkers.
         self.assertEqual(proc.stdout.read(), b"output")
         self.assertEqual(proc.stderr.read(), b"error")
 
