@@ -260,7 +260,8 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(KeyError):
             rel_db1.data[random_app]
 
-        remoteapp1: ops.Application = rel_db1.app  # type: ignore
+        remoteapp1 = rel_db1.app
+        assert remoteapp1 is not None
         self.assertEqual(remoteapp1.name, 'remoteapp1')
         self.assertEqual(rel_db1.data[remoteapp1],
                          {'secret': 'cafedeadbeef'})
