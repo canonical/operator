@@ -66,7 +66,7 @@ class TestModel(unittest.TestCase):
         self.harness._get_backend_calls(reset=True)
         self.model = self.harness.model
 
-    def model_get_relation(
+    def ensure_relation(
             self,
             name: str = 'db1',
             relation_id: typing.Optional[int] = None) -> ops.Relation:
@@ -138,7 +138,7 @@ class TestModel(unittest.TestCase):
             ('relation_ids', 'db1'),
             ('relation_list', relation_id_db1),
         ])
-        dead_rel = self.model_get_relation('db1', 7)
+        dead_rel = self.ensure_relation('db1', 7)
         self.assertIsInstance(dead_rel, ops.Relation)
         self.assertEqual(set(dead_rel.data.keys()), {self.model.unit, self.model.unit.app})
         self.assertEqual(dead_rel.data[self.model.unit], {})
@@ -166,7 +166,7 @@ class TestModel(unittest.TestCase):
 
     def test_peer_relation_app(self):
         self.harness.add_relation('db2', 'myapp')
-        rel_dbpeer = self.model_get_relation('db2')
+        rel_dbpeer = self.ensure_relation('db2')
         self.assertIs(rel_dbpeer.app, self.model.app)
 
     def test_remote_units_is_our(self):
@@ -175,7 +175,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls()
 
-        for u in self.model_get_relation('db1').units:
+        for u in self.ensure_relation('db1').units:
             self.assertFalse(u._is_our_unit)
             self.assertFalse(u.app._is_our_app)
 
@@ -233,10 +233,10 @@ class TestModel(unittest.TestCase):
 
         random_unit = self.model.get_unit('randomunit/0')
         with self.assertRaises(KeyError):
-            self.model_get_relation('db1').data[random_unit]
+            self.ensure_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                   self.model_get_relation('db1').units))
-        self.assertEqual(self.model_get_relation('db1').data[remoteapp1_0],
+                                   self.ensure_relation('db1').units))
+        self.assertEqual(self.ensure_relation('db1').data[remoteapp1_0],
                          {'host': 'remoteapp1-0'})
 
         self.assertBackendCalls([
@@ -254,7 +254,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         # Try to get relation data for an invalid remote application.
         random_app = self.model._cache.get(ops.Application, 'randomapp')
         with self.assertRaises(KeyError):
@@ -282,9 +282,9 @@ class TestModel(unittest.TestCase):
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                   self.model_get_relation('db1').units))
+                                   self.ensure_relation('db1').units))
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[remoteapp1_0])
         self.assertEqual(repr(rel_db1.data[remoteapp1_0]), "{'host': 'remoteapp1/0'}")
@@ -316,7 +316,7 @@ class TestModel(unittest.TestCase):
         self.harness.update_relation_data(relation_id, 'myapp/0', {'host': 'nothing'})
         self.resetBackendCalls()
         with self.harness._event_context('foo_event'):
-            rel_db1 = self.model_get_relation('db1')
+            rel_db1 = self.ensure_relation('db1')
             # update_relation_data will also trigger relation-get, so we
             # invalidate the cache to ensure it will be reloaded
             rel_db1.data[self.model.unit]._invalidate()
@@ -339,7 +339,7 @@ class TestModel(unittest.TestCase):
 
         local_app = self.model.unit.app
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
 
         rel_db1.data[local_app]['password'] = 'foo'
@@ -361,7 +361,7 @@ class TestModel(unittest.TestCase):
 
         local_app = self.model.unit.app
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         self.assertEqual(rel_db1.data[local_app], {'password': 'deadbeefcafe'})
 
         with self.harness._event_context('foo_event'):
@@ -382,8 +382,7 @@ class TestModel(unittest.TestCase):
             # leaders can read
             self.harness.set_leader(True)
             relation = self.harness.model.get_relation('db2')
-            if typing.TYPE_CHECKING:
-                assert relation is not None and relation.app is not None
+            assert relation is not None and relation.app is not None
             self.assertEqual(relation.data[relation.app]['foo'], 'bar')
 
     def test_relation_data_access_peer_minion(self):
@@ -394,8 +393,7 @@ class TestModel(unittest.TestCase):
             # nonleaders can read
             self.harness.set_leader(False)
             relation = self.harness.model.get_relation('db2')
-            if typing.TYPE_CHECKING:
-                assert relation is not None and relation.app is not None
+            assert relation is not None and relation.app is not None
             self.assertEqual(relation.data[relation.app]['foo'], 'bar')
 
     def test_relation_data_del_key(self):
@@ -405,7 +403,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         del rel_db1.data[self.model.unit]['host']
@@ -426,7 +424,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
         with self.harness._event_context('foo_event'):
@@ -465,7 +463,7 @@ class TestModel(unittest.TestCase):
             raise ops.ModelError()
         backend.update_relation_data = broken_update_relation_data
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         # Force memory cache to be loaded.
         self.assertIn('host', rel_db1.data[self.model.unit])
 
@@ -491,7 +489,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         for key, value in (
                 ('foo', 1),
                 ('foo', None),
@@ -528,7 +526,7 @@ class TestModel(unittest.TestCase):
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         self.harness.begin()
         self.harness.set_leader(True)
         self.resetBackendCalls()
@@ -573,7 +571,7 @@ class TestModel(unittest.TestCase):
         self.model.relations._invalidate('db1')
         self.resetBackendCalls()
 
-        rel_db1 = self.model_get_relation('db1')
+        rel_db1 = self.ensure_relation('db1')
         self.harness.begin()
         self.harness.set_leader(False)
 
@@ -609,7 +607,7 @@ class TestModel(unittest.TestCase):
 
     def test_relation_no_units(self):
         self.harness.add_relation('db1', 'remoteapp1')
-        rel = self.model_get_relation('db1')
+        rel = self.ensure_relation('db1')
         self.assertEqual(rel.units, set())
         self.assertIs(rel.app, self.model.get_app('remoteapp1'))
         self.assertBackendCalls([
@@ -644,7 +642,7 @@ class TestModel(unittest.TestCase):
 
         def check_remote_units():
             # Cannot determine leadership for remote units.
-            for u in self.model_get_relation('db1').units:
+            for u in self.ensure_relation('db1').units:
                 with self.assertRaises(RuntimeError):
                     u.is_leader()
 
@@ -837,7 +835,7 @@ class TestModel(unittest.TestCase):
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
         remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                  self.model_get_relation('db1').units))
+                                  self.ensure_relation('db1').units))
         self.resetBackendCalls()
 
         # Remote unit status is always unknown.
@@ -861,12 +859,11 @@ class TestModel(unittest.TestCase):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/1')
-        remoteapp1 = self.model_get_relation('db1').app
+        remoteapp1 = self.ensure_relation('db1').app
         self.resetBackendCalls()
 
         # Remote application status is always unknown.
-        if typing.TYPE_CHECKING:
-            assert remoteapp1 is not None
+        assert remoteapp1 is not None
         self.assertIsInstance(remoteapp1.status, ops.UnknownStatus)
 
         test_statuses = (
@@ -1079,8 +1076,7 @@ def test_recursive_list(case: PushPullCase):
 
     # test raw business logic for recursion and dest path construction
     files: typing.Set[typing.Union[str, pathlib.Path]] = set()
-    if typing.TYPE_CHECKING:
-        assert isinstance(case.path, str)
+    assert isinstance(case.path, str)
     case.path = os.path.normpath(case.path)
     case.files = [os.path.normpath(f) for f in case.files]
     case.want = {os.path.normpath(f) for f in case.want}
@@ -1197,8 +1193,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
         push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
 
     errors: typing.Set[str] = set()
-    if typing.TYPE_CHECKING:
-        assert case.dst is not None
+    assert case.dst is not None
     try:
         c.push_path(push_path, case.dst)
     except ops.MultiPushPullError as err:
@@ -1279,8 +1274,7 @@ def test_push_path_relative(case: PushPullCase):
                 testfile_path.write_text("test", encoding="utf-8")
 
             # push path under test to container
-            if typing.TYPE_CHECKING:
-                assert case.dst is not None
+            assert case.dst is not None
             container.push_path(case.path, case.dst)
 
             # test
@@ -2072,11 +2066,10 @@ class TestModelBindings(unittest.TestCase):
   ]
 }'''
 
-    def model_get_relation(self, name: str = 'db1', relation_id: typing.Optional[int] = None):
+    def ensure_relation(self, name: str = 'db1', relation_id: typing.Optional[int] = None):
         """Wrapper around self.model.get_relation that enforces that None is not returned."""
         rel_db1 = self.model.get_relation(name, relation_id)
-        self.assertIsNotNone(rel_db1)
-        assert rel_db1 is not None  # Type checkers understand this, but not the previous line.
+        assert rel_db1 is not None, rel_db1  # Type checkers don't understand `assertIsNotNone`
         return rel_db1
 
     def model_get_binding(self, binding_key: typing.Union[str, ops.Relation]):
@@ -2162,7 +2155,7 @@ class TestModelBindings(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
             ['network-get', 'db0', '-r', '4', '--format=json'],
         ]
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
@@ -2205,7 +2198,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_empty_bind_addresses(self):
@@ -2213,7 +2206,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_no_bind_addresses(self):
@@ -2221,7 +2214,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_empty_interface_info(self):
@@ -2234,7 +2227,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(len(binding.network.interfaces), 1)
         interface = binding.network.interfaces[0]
         self.assertIsNone(interface.address)
@@ -2247,7 +2240,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, [])
         self.assertEqual(binding.network.ingress_address, None)
 
@@ -2259,7 +2252,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.egress_subnets, [])
 
     def test_unresolved_ingress_addresses(self):
@@ -2273,7 +2266,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.model_get_relation(binding_name))
+        binding = self.model_get_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
