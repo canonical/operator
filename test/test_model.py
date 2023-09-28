@@ -3168,8 +3168,7 @@ class TestSecretClass(unittest.TestCase):
     def make_secret(self,
                     id: typing.Optional[str] = None,
                     label: typing.Optional[str] = None,
-                    content: typing.Optional[typing.Dict[str,
-                                                         str]] = None):
+                    content: typing.Optional[typing.Dict[str, str]] = None):
         return ops.Secret(self.model._backend, id=id, label=label, content=content)
 
     def test_id_and_label(self):
