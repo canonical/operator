@@ -585,7 +585,10 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id)
         self.assertIsNone(self._find_relation_in_model_by_id(harness, rel_id))
 
-    def _find_relation_in_model_by_id(self, harness: ops.testing.Harness['RelationEventCharm'], rel_id: int):
+    def _find_relation_in_model_by_id(
+            self,
+            harness: ops.testing.Harness['RelationEventCharm'],
+            rel_id: int):
         for relations in harness.charm.model.relations.values():
             for relation in relations:
                 if rel_id == relation.id:
@@ -3065,7 +3068,7 @@ if typing.TYPE_CHECKING:
     # In Python 3.11+ replace this with Required/NotRequired.
     class BaseRecordedChange(typing.TypedDict):
         name: str
-    
+
     class RecordedChange(BaseRecordedChange, total=False):
         data: typing.Dict[str, typing.Any]
         relation: str
@@ -3172,7 +3175,10 @@ class RelationEventCharm(RecordingCharm):
                 assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
-        recording: RecordedChange = {'name': event_name, 'relation': event.relation.name, 'data': data}
+        recording: RecordedChange = {
+            'name': event_name,
+            'relation': event.relation.name,
+            'data': data}
 
         if self.record_relation_data_on_events:
             recording["data"].update({'relation_data': {
@@ -4087,16 +4093,31 @@ class _PebbleStorageAPIsTestMixin:
 
     if typing.TYPE_CHECKING:
         # Provide these in classes using this mixin, generally by mixing with a TestCase.
-        def assertEqual(self, first: typing.Any, second: typing.Any, msg: typing.Optional[str] = None):
+        def assertEqual(  # noqa
+                self,
+                first: typing.Any,
+                second: typing.Any,
+                msg: typing.Optional[str] = None):
             ...
 
-        def assertRaises(self, exception: typing.Type[BaseException], *, msg: typing.Optional[str] = None):
-            ...
-        
-        def assertIsInstance(self, obj: typing.Any, cls: typing.Type[object], msg: typing.Optional[str] = None):
+        def assertRaises(  # noqa
+                self,
+                exception: typing.Type[BaseException],
+                *,
+                msg: typing.Optional[str] = None) -> typing.ContextManager[BaseException]:
             ...
 
-        def assertIn(self, member: typing.Any, container: typing.Container[typing.Any], msg: typing.Optional[str] = None):
+        def assertIsInstance(  # noqa
+                self,
+                obj: typing.Any,
+                cls: typing.Type[object],
+                msg: typing.Optional[str] = None):
+            ...
+
+        def assertIn(self,  # noqa
+                     member: typing.Any,
+                     container: typing.Container[typing.Any],
+                     msg: typing.Optional[str] = None):
             ...
 
     def test_push_and_pull_bytes(self):
@@ -4111,7 +4132,27 @@ class _PebbleStorageAPIsTestMixin:
             encoding='sjis',
             stream_class=io.StringIO)
 
-    def _test_push_and_pull_data(self, original_data: typing.Union[str, bytes], encoding: typing.Optional[str], stream_class: typing.Union[typing.Type[io.BytesIO], typing.Type[io.StringIO]]):
+    if typing.TYPE_CHECKING:
+        @typing.overload
+        def _test_push_and_pull_data(self,
+                                     original_data: bytes,
+                                     encoding: None,
+                                     stream_class: typing.Type[io.BytesIO]) -> typing.NoReturn:
+            ...
+
+        @typing.overload
+        def _test_push_and_pull_data(self,
+                                     original_data: str,
+                                     encoding: str,
+                                     stream_class: typing.Type[io.StringIO]) -> typing.NoReturn:
+            ...
+
+    def _test_push_and_pull_data(self,
+                                 original_data: typing.Union[str,
+                                                             bytes],
+                                 encoding: typing.Optional[str],
+                                 stream_class: typing.Union[typing.Type[io.BytesIO],
+                                                            typing.Type[io.StringIO]]):
         client = self.client
         client.push(f"{self.prefix}/test", original_data, encoding=encoding)
         with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
@@ -4826,12 +4867,15 @@ class TestSecrets(unittest.TestCase):
         if typing.TYPE_CHECKING:
             assert secret.id is not None
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
-        secret.grant(harness.model.get_relation('db'))
+        rel = harness.model.get_relation('db')
+        if typing.TYPE_CHECKING:
+            assert rel is not None
+        secret.grant(rel)
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp'})
 
-        secret.revoke(harness.model.get_relation('db'))
+        secret.revoke(rel)
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
-        secret.grant(harness.model.get_relation('db'), unit=harness.model.get_unit('webapp/0'))
+        secret.grant(rel, unit=harness.model.get_unit('webapp/0'))
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp/0'})
 
     def test_trigger_secret_rotation(self):
@@ -5154,9 +5198,7 @@ class TestHandleExec(unittest.TestCase):
         stderr = io.StringIO()
         proc = self.container.exec(["ls"], stderr=stderr, stdout=stdout)
         self.assertIsNone(proc.stdout)
-        assert proc.stdout is not None  # Dupes the previous line for type checking
         self.assertIsNone(proc.stderr)
-        assert proc.stderr is not None  # Dupes the previous line for type checking
         proc.wait()
         self.assertEqual(stdout.getvalue(), "output")
         self.assertEqual(stderr.getvalue(), "error")
@@ -5200,7 +5242,7 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(proc.stderr.read(), b"error")
 
     def test_exec_service_context(self):
-        service = {
+        service: ops.pebble.ServiceDict = {
             "command": "test",
             "working-dir": "/tmp",
             "user": "foo",
@@ -5209,9 +5251,13 @@ class TestHandleExec(unittest.TestCase):
             "group-id": 2,
             "environment": {"foo": "bar", "foobar": "barfoo"}
         }
-        self.container.add_layer(label="test", layer={
-            "summary": "", "description": "", "services": {"test": service}
-        })
+        layer = ops.pebble.Layer(
+            ops.pebble.LayerDict(
+                summary="",
+                description="",
+                services={
+                    "test": service}))
+        self.container.add_layer(label="test", layer=layer)
         args_history: typing.List[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
