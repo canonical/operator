@@ -1924,9 +1924,7 @@ class MockPebbleClient:
 
     def add_layer(self,
                   label: str,
-                  layer: typing.Union[str,
-                                      ops.pebble.LayerDict,
-                                      ops.pebble.Layer],
+                  layer: typing.Union[str, ops.pebble.LayerDict, ops.pebble.Layer],
                   *,
                   combine: bool = False):
         if isinstance(layer, dict):
