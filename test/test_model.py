@@ -886,9 +886,9 @@ class TestModel(unittest.TestCase):
             'type': 'test',
         }
         meta.storages = {
-            'disks': ops.StorageMeta(
-                'test', raw), 'data': ops.StorageMeta(
-                'test', raw)}
+            'disks': ops.StorageMeta('test', raw),
+            'data': ops.StorageMeta('test', raw),
+        }
         model = ops.Model(meta, _ModelBackend('myapp/0'))
 
         fake_script(self, 'storage-list', '''
