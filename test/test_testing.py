@@ -5031,7 +5031,7 @@ class TestHandleExec(unittest.TestCase):
     def test_register_with_result(self):
         self.harness.handle_exec(self.container, ["foo"], result=10)
 
-        with self.assertRaises(pebble.ExecError[str]) as exc:
+        with self.assertRaises(pebble.ExecError) as exc:
             self.container.exec(["foo"]).wait()
         self.assertEqual(exc.exception.exit_code, 10)
 
@@ -5182,13 +5182,12 @@ class TestHandleExec(unittest.TestCase):
             "group-id": 2,
             "environment": {"foo": "bar", "foobar": "barfoo"}
         }
-        layer = ops.pebble.Layer(
-            ops.pebble.LayerDict(
-                summary="",
-                description="",
-                services={
-                    "test": service}))
-        self.container.add_layer(label="test", layer=layer)
+        layer: ops.pebble.LayerDict = {
+            'summary': "",
+            'description': "",
+            'services': {
+                "test": service}}
+        self.container.add_layer(label="test", layer=ops.pebble.Layer(layer))
         args_history: typing.List[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
