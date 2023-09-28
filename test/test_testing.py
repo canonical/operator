@@ -5031,9 +5031,9 @@ class TestHandleExec(unittest.TestCase):
     def test_register_with_result(self):
         self.harness.handle_exec(self.container, ["foo"], result=10)
 
-        with self.assertRaises(pebble.ExecError) as exc:  # type: ignore
+        with self.assertRaises(pebble.ExecError[str]) as exc:
             self.container.exec(["foo"]).wait()
-        self.assertEqual(exc.exception.exit_code, 10)  # type: ignore
+        self.assertEqual(exc.exception.exit_code, 10)
 
         self.harness.handle_exec(self.container, ["foo"], result="hello")
         stdout, stderr = self.container.exec(["foo"]).wait_output()
