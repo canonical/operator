@@ -1013,15 +1013,14 @@ recursive_list_cases = [
 ]
 
 
-if typing.TYPE_CHECKING:
-    class ConstFileInfoArgs(typing.TypedDict):
-        last_modified: datetime.datetime
-        permissions: int
-        size: int
-        user_id: int
-        user: str
-        group_id: int
-        group: str
+class ConstFileInfoArgs(typing.TypedDict):
+    last_modified: datetime.datetime
+    permissions: int
+    size: int
+    user_id: int
+    user: str
+    group_id: int
+    group: str
 
 
 @pytest.mark.parametrize('case', recursive_list_cases)
@@ -2070,7 +2069,7 @@ class TestModelBindings(unittest.TestCase):
         assert rel_db1 is not None, rel_db1  # Type checkers don't understand `assertIsNotNone`
         return rel_db1
 
-    def model_get_binding(self, binding_key: typing.Union[str, ops.Relation]):
+    def ensure_binding(self, binding_key: typing.Union[str, ops.Relation]):
         """Wrapper around self.model.get_binding that enforces that None is not returned."""
         binding = self.model.get_binding(binding_key)
         self.assertIsNotNone(binding)
@@ -2139,7 +2138,7 @@ class TestModelBindings(unittest.TestCase):
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
-        binding = self.model_get_binding(binding_name)
+        binding = self.ensure_binding(binding_name)
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
@@ -2153,7 +2152,7 @@ class TestModelBindings(unittest.TestCase):
             ['relation-list', '-r', '4', '--format=json'],
             ['network-get', 'db0', '-r', '4', '--format=json'],
         ]
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self._check_binding_data(binding_name, binding)
         self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
@@ -2185,7 +2184,7 @@ class TestModelBindings(unittest.TestCase):
         binding_name = 'db0'
         expected_calls = [['network-get', 'db0', '--format=json']]
 
-        binding = self.model_get_binding(binding_name)
+        binding = self.ensure_binding(binding_name)
         self.assertEqual(binding.name, 'db0')
         self.assertEqual(binding.network.bind_address, ipaddress.ip_address('10.1.89.35'))
         self.assertEqual(binding.network.ingress_address, ipaddress.ip_address('10.152.183.158'))
@@ -2196,7 +2195,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_empty_bind_addresses(self):
@@ -2204,7 +2203,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_no_bind_addresses(self):
@@ -2212,7 +2211,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.interfaces, [])
 
     def test_empty_interface_info(self):
@@ -2225,7 +2224,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(len(binding.network.interfaces), 1)
         interface = binding.network.interfaces[0]
         self.assertIsNone(interface.address)
@@ -2238,7 +2237,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, [])
         self.assertEqual(binding.network.ingress_address, None)
 
@@ -2250,7 +2249,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.egress_subnets, [])
 
     def test_unresolved_ingress_addresses(self):
@@ -2264,7 +2263,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{network_data}' || exit 1''')
         binding_name = 'db0'
-        binding = self.model_get_binding(self.ensure_relation(binding_name))
+        binding = self.ensure_binding(self.ensure_relation(binding_name))
         self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
@@ -2750,11 +2749,10 @@ class TestModelBackend(unittest.TestCase):
                          [['juju-log', '--log-level', 'BAR', '--', 'foo']])
 
     def test_valid_metrics(self):
-        if typing.TYPE_CHECKING:
-            _caselist = typing.List[typing.Tuple[
-                typing.Mapping[str, typing.Union[int, float]],
-                typing.Mapping[str, str],
-                typing.List[typing.List[str]]]]
+        _caselist = typing.List[typing.Tuple[
+            typing.Mapping[str, typing.Union[int, float]],
+            typing.Mapping[str, str],
+            typing.List[typing.List[str]]]]
         fake_script(self, 'add-metric', 'exit 0')
         test_cases: _caselist = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
