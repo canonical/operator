@@ -1751,7 +1751,7 @@ containers:
         ])
         self.pebble.requests = []
 
-        self.container.push('/path/2', b'content2', encoding='utf-8', make_dirs=True,
+        self.container.push('/path/2', b'content2', make_dirs=True,
                             permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
         self.assertEqual(self.pebble.requests, [
             ('push', '/path/2', b'content2', 'utf-8', True, 0o600, 12, 'bob', 34, 'staff'),
@@ -2541,41 +2541,29 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.status_set(ops.ActiveStatus, is_app=is_app_v)  # type: ignore
 
     def test_storage_tool_errors(self):
-        test_cases: typing.List[typing.Tuple[
-            typing.Callable[[], None],
-            typing.Callable[[], None],
-            typing.Type[BaseException],
-            typing.List[typing.List[str]]]] = [(
-                lambda: fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.storage_list('foobar'),
-                ops.ModelError,
-                [['storage-list', 'foobar', '--format=json']],
-            ), (
-                lambda: fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.storage_get('foobar', 'someattr'),
-                ops.ModelError,
-                [['storage-get', '-s', 'foobar', 'someattr', '--format=json']],
-            ), (
-                lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.storage_add('foobar', count=2),
-                ops.ModelError,
-                [['storage-add', 'foobar=2']],
-            ), (
-                lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.storage_add('foobar', count=object),  # type: ignore
-                TypeError,
-                [],
-            ), (
-                lambda: fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.storage_add('foobar', count=True),
-                TypeError,
-                [],
-            )]
-        for do_fake, run, exception, calls in test_cases:
-            do_fake()
-            with self.assertRaises(exception):
-                run()
-            self.assertEqual(fake_script_calls(self, clear=True), calls)
+        fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.ModelError):
+            self.backend.storage_list('foobar')
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['storage-list', 'foobar', '--format=json']])
+        fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.ModelError):
+            self.backend.storage_get('foobar', 'someattr')
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['storage-get', '-s', 'foobar', 'someattr', '--format=json']])
+        fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(ops.ModelError):
+            self.backend.storage_add('foobar', count=2)
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['storage-add', 'foobar=2']])
+        fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(TypeError):
+            self.backend.storage_add('foobar', count=object),  # type: ignore
+        self.assertEqual(fake_script_calls(self, clear=True), [])
+        fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
+        with self.assertRaises(TypeError):
+            self.backend.storage_add('foobar', count=True)
+        self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_network_get(self):
         network_get_out = '''{
@@ -3373,20 +3361,17 @@ class TestSecretClass(unittest.TestCase):
         fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
         secret = self.make_secret(id='x')
-        backend = ops.model._ModelBackend('test', 'test', 'test')
-        meta = ops.CharmMeta()
-        cache = ops.model._ModelCache(meta, backend)
-        unit = ops.Unit('test', meta, backend, cache)
-        rel123 = ops.Relation('test', 123, True, unit, backend, cache)
-        rel234 = ops.Relation('test', 234, True, unit, backend, cache)
+        unit = ops.Unit('test', ops.CharmMeta(), self.model._backend, self.model._cache)
+        rel123 = ops.Relation('test', 123, True, unit, self.model._backend, self.model._cache)
+        rel234 = ops.Relation('test', 234, True, unit, self.model._backend, self.model._cache)
         secret.revoke(rel123)
-        unit = ops.Unit('app/0', meta, backend, cache)
+        unit = ops.Unit('app/0', ops.CharmMeta(), self.model._backend, self.model._cache)
         secret.revoke(rel234, unit=unit)
 
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
         secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
-        rel345 = ops.Relation('test', 345, True, unit, backend, cache)
+        rel345 = ops.Relation('test', 345, True, unit, self.model._backend, self.model._cache)
         secret.revoke(rel345)
         self.assertEqual(secret.id, 'secret:z')
 
