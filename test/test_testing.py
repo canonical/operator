@@ -56,8 +56,7 @@ class SetLeaderErrorTester(ops.CharmBase):
 
     def _on_leader_elected(self, event: ops.EventBase):
         peers = self.model.get_relation(self._peer_name)
-        if typing.TYPE_CHECKING:
-            assert peers is not None
+        assert peers is not None
         peers.data[self.app]["foo"] = "bar"
 
 
@@ -500,8 +499,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
         harness.charm.get_changes(reset=True)  # ignore relation created events
         relation = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert relation is not None
+        assert relation is not None
         self.assertEqual(len(relation.units), 1)
         # Check relation data is correct
         rel_unit = harness.charm.model.get_unit('postgresql/0')
@@ -516,8 +514,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_list(rel_id), [])
         # Check the unit is actually removed from the relations the model knows about
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         self.assertEqual(len(rel.units), 0)
         self.assertFalse(rel_unit in rel.data)
         # Check relation departed was raised with correct data
@@ -830,8 +827,7 @@ class TestHarness(unittest.TestCase):
         helper = DBRelationChangedHelper(harness.charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         rel.data[harness.charm.model.unit]['key'] = 'value'
         # there should be no event for updating our own data
         harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
@@ -858,12 +854,10 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
 
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         rel.data[harness.charm.model.unit]['key'] = 'value'
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v1'})
         self.assertEqual({'key': 'v1'}, rel.data[harness.charm.model.unit])
         # Make sure there was no event
@@ -914,8 +908,7 @@ class TestHarness(unittest.TestCase):
         helper = DBRelationChangedHelper(harness.charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         rel.data[harness.charm.app]['key'] = 'value'
         harness.update_relation_data(rel_id, 'postgresql', {'key': 'v1'})
         self.assertEqual({'key': 'v1'}, rel.data[harness.charm.app])
@@ -952,8 +945,7 @@ class TestHarness(unittest.TestCase):
 
         harness.update_relation_data(rel_id, 'my-charm', {'new': 'value'})
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         self.assertEqual(rel.data[harness.charm.app]['new'], 'value')
 
         # Our app data bag got updated.
@@ -1192,8 +1184,7 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
         rel = harness.charm.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         with harness._event_context('foo'):
             with self.assertRaises(ops.ModelError):
                 rel.data[harness.charm.app]['foo'] = 'bar'
@@ -1898,8 +1889,7 @@ class TestHarness(unittest.TestCase):
         class MyCharm(ops.CharmBase):
             def event_handler(self, evt: ops.RelationEvent):
                 rel = evt.relation
-                if typing.TYPE_CHECKING:
-                    assert rel is not None and rel.app is not None
+                assert rel is not None and rel.app is not None
                 rel.data[rel.app]['foo'] = 'bar'
 
         harness = ops.testing.Harness(MyCharm, meta='''
@@ -1941,20 +1931,17 @@ class TestHarness(unittest.TestCase):
         def mock_join_db(event: ops.EventBase):
             # the harness thinks we're inside a db_relation_joined hook
             # but we want to mock the remote data here:
-            if typing.TYPE_CHECKING:
-                assert isinstance(event, ops.RelationEvent)
+            assert isinstance(event, ops.RelationEvent)
             with harness._event_context(''):
                 # pretend for a moment we're not in a hook context,
                 # so the harness will let us:
-                print(event.relation.app)
                 event.relation.data[harness.charm.app]['foo'] = 'bar'
 
         harness.charm._join_db = mock_join_db
         rel_id = harness.add_relation('db', 'remote')
         harness.add_relation_unit(rel_id, 'remote/0')
         rel = harness.charm.model.get_relation('db', rel_id)
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         self.assertEqual({'foo': 'bar'},
                          harness.get_relation_data(rel_id, 'test-charm'))
 
@@ -1976,8 +1963,7 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         harness.add_relation_unit(rel_id, 'postgresql/0')
         rel = harness.charm.model.get_relation('db', rel_id)
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         del rel.data[harness.charm.model.unit]['foo']
         self.assertEqual({}, harness.get_relation_data(rel_id, 'test-charm/0'))
 
@@ -2373,8 +2359,7 @@ class TestHarness(unittest.TestCase):
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
         rel = harness.model.get_relation('peer')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         rel_id = rel.id
         self.assertEqual(
             harness.charm.changes,
@@ -2874,8 +2859,7 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.0.10')
 
         binding = self.harness.model.get_binding('db')
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2899,11 +2883,9 @@ class TestNetwork(unittest.TestCase):
                                  egress_subnets=['10.0.0.0/8', '10.10.0.0/16'])
 
         relation = self.harness.model.get_relation('db', relation_id)
-        if typing.TYPE_CHECKING:
-            assert relation is not None
+        assert relation is not None
         binding = self.harness.model.get_binding(relation)
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2924,16 +2906,14 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.2.1', endpoint='db')
 
         binding = self.harness.model.get_binding('db')
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.2.1'))
 
         # Ensure binding for the other interface is still on the default value
         foo_binding = self.harness.model.get_binding('foo')
-        if typing.TYPE_CHECKING:
-            assert foo_binding is not None
+        assert foo_binding is not None
         self.assertEqual(foo_binding.network.bind_address,
                          ipaddress.IPv4Address('10.0.0.1'))
 
@@ -2944,19 +2924,16 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id)
 
         relation = self.harness.model.get_relation('db', relation_id)
-        if typing.TYPE_CHECKING:
-            assert relation is not None
+        assert relation is not None
         binding = self.harness.model.get_binding(relation)
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('35.0.0.1'))
 
         # Ensure binding for the other interface is still on the default value
         foo_binding = self.harness.model.get_binding('foo')
-        if typing.TYPE_CHECKING:
-            assert foo_binding is not None
+        assert foo_binding is not None
         self.assertEqual(foo_binding.network.bind_address,
                          ipaddress.IPv4Address('10.0.0.1'))
 
@@ -2965,11 +2942,9 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.0.10', endpoint='db')
 
         relation = self.harness.model.get_relation('db', relation_id)
-        if typing.TYPE_CHECKING:
-            assert relation is not None
+        assert relation is not None
         binding = self.harness.model.get_binding(relation)
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2978,8 +2953,7 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.0.10')
 
         binding = self.harness.model.get_binding('db')
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2988,8 +2962,7 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('2001:0db8::a:0:0:1')
 
         binding = self.harness.model.get_binding('db')
-        if typing.TYPE_CHECKING:
-            assert binding is not None
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
@@ -3005,8 +2978,7 @@ class TestNetwork(unittest.TestCase):
     def test_network_get_relation_not_found(self):
         with self.assertRaises(ops.RelationNotFoundError):
             binding = self.harness.model.get_binding('db')
-            if typing.TYPE_CHECKING:
-                assert binding is not None
+            assert binding is not None
             binding.network
 
     def test_add_network_endpoint_not_in_meta(self):
@@ -3040,8 +3012,7 @@ class DBRelationChangedHelper(ops.Object):
             self.changes.append((event.relation.id, event.unit.name))
         else:
             app = event.app
-            if typing.TYPE_CHECKING:
-                assert app is not None
+            assert app is not None
             self.changes.append((event.relation.id, app.name))
 
 
@@ -3058,8 +3029,7 @@ class RelationChangedViewer(ops.Object):
             data = event.relation.data[event.unit]
         else:
             app = event.app
-            if typing.TYPE_CHECKING:
-                assert app is not None
+            assert app is not None
             data = event.relation.data[app]
         self.changes.append(dict(data))
 
@@ -3171,8 +3141,7 @@ class RelationEventCharm(RecordingCharm):
 
         data = dict(app=app_name, unit=unit_name, relation_id=event.relation.id)
         if isinstance(event, ops.RelationDepartedEvent):
-            if typing.TYPE_CHECKING:
-                assert event.departing_unit is not None
+            assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
         recording: RecordedChange = {
@@ -3194,9 +3163,8 @@ class RelationBrokenTester(RelationEventCharm):
 
     def _on_relation_broken(self, event: ops.RelationBrokenEvent):
         rel = event.relation
-        if typing.TYPE_CHECKING:
-            assert rel is not None and rel.app is not None
-        print(rel.data[rel.app]['bar'])
+        assert rel is not None and rel.app is not None
+        rel.data[rel.app]['bar']  # invalid access to app data
 
 
 class ContainerEventCharm(RecordingCharm):
@@ -4789,8 +4757,7 @@ class TestSecrets(unittest.TestCase):
 
         secret = harness.model.app.add_secret({'foo': 'bar'})
         with self.assertRaises(RuntimeError):
-            if typing.TYPE_CHECKING:
-                assert secret.id is not None
+            assert secret.id is not None
             harness.set_secret_content(secret.id, {'bar': 'foo'})
 
     def test_set_secret_content_invalid_secret_id(self):
@@ -4860,16 +4827,13 @@ class TestSecrets(unittest.TestCase):
 
         relation_id = harness.add_relation('db', 'webapp')
         harness.add_relation_unit(relation_id, 'webapp/0')
-        if typing.TYPE_CHECKING:
-            assert harness is not None
+        assert harness is not None
 
         secret = harness.model.app.add_secret({'foo': 'x'})
-        if typing.TYPE_CHECKING:
-            assert secret.id is not None
+        assert secret.id is not None
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
         rel = harness.model.get_relation('db')
-        if typing.TYPE_CHECKING:
-            assert rel is not None
+        assert rel is not None
         secret.grant(rel)
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp'})
 
@@ -4883,8 +4847,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
-        if typing.TYPE_CHECKING:
-            assert secret.id is not None
+        assert secret.id is not None
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_rotate, harness.charm.record_event)
         harness.trigger_secret_rotation(secret.id)
@@ -4910,8 +4873,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
-        if typing.TYPE_CHECKING:
-            assert secret.id is not None
+        assert secret.id is not None
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
         harness.trigger_secret_removal(secret.id, 1)
@@ -4939,8 +4901,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
-        if typing.TYPE_CHECKING:
-            assert secret.id is not None
+        assert secret.id is not None
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
         harness.trigger_secret_removal(secret.id, 1)
