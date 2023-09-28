@@ -3042,7 +3042,7 @@ if typing.TYPE_CHECKING:
     class RecordedChange(BaseRecordedChange, total=False):
         data: typing.Dict[str, typing.Any]
         relation: str
-        container: str
+        container: typing.Optional[str]
 
 
 class RecordingCharm(ops.CharmBase):
@@ -3162,9 +3162,8 @@ class RelationBrokenTester(RelationEventCharm):
     """Access inaccessible relation data."""
 
     def _on_relation_broken(self, event: ops.RelationBrokenEvent):
-        rel = event.relation
-        assert rel is not None and rel.app is not None
-        rel.data[rel.app]['bar']  # invalid access to app data
+        # We expect this to fail, because the relation has broken.
+        event.relation.data[event.relation.app]['bar']  # type: ignore
 
 
 class ContainerEventCharm(RecordingCharm):
@@ -4068,11 +4067,13 @@ class _PebbleStorageAPIsTestMixin:
                 msg: typing.Optional[str] = None):
             ...
 
+        _cm_type = typing.ContextManager[unittest.case._AssertRaisesContext[BaseException]]
+
         def assertRaises(  # noqa
                 self,
                 exception: typing.Type[BaseException],
                 *,
-                msg: typing.Optional[str] = None) -> typing.ContextManager[BaseException]:
+                msg: typing.Optional[str] = None) -> _cm_type:
             ...
 
         def assertIsInstance(  # noqa
@@ -4116,20 +4117,29 @@ class _PebbleStorageAPIsTestMixin:
             ...
 
     def _test_push_and_pull_data(self,
-                                 original_data: typing.Union[str,
-                                                             bytes],
+                                 original_data: typing.Union[str, bytes],
                                  encoding: typing.Optional[str],
                                  stream_class: typing.Union[typing.Type[io.BytesIO],
                                                             typing.Type[io.StringIO]]):
         client = self.client
-        client.push(f"{self.prefix}/test", original_data, encoding=encoding)
+        # We separate out the calls to make it clearer to type checkers what's happening.
+        if encoding is None:
+            client.push(f"{self.prefix}/test", original_data)
+        else:
+            client.push(f"{self.prefix}/test", original_data, encoding=encoding)
         with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
         # We also support file-like objects as input, so let's test that case as well.
-        small_file = stream_class(original_data)
-        client.push(f"{self.prefix}/test", small_file, encoding=encoding)
+        if encoding is None:
+            stream_class = typing.cast(typing.Type[io.BytesIO], stream_class)
+            small_file = stream_class(typing.cast(bytes, original_data))
+            client.push(f"{self.prefix}/test", small_file)
+        else:
+            stream_class = typing.cast(typing.Type[io.StringIO], stream_class)
+            small_file = stream_class(typing.cast(str, original_data))
+            client.push(f"{self.prefix}/test", small_file, encoding=encoding)
         with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
@@ -4158,7 +4168,7 @@ class _PebbleStorageAPIsTestMixin:
         original_data = os.urandom(data_size)
 
         client = self.client
-        client.push(f"{self.prefix}/test", original_data, encoding=None)
+        client.push(f"{self.prefix}/test", original_data)
         with client.pull(f"{self.prefix}/test", encoding=None) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
@@ -4169,6 +4179,7 @@ class _PebbleStorageAPIsTestMixin:
 
         with self.assertRaises(pebble.PathError) as cm:
             client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=False)
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=True)
@@ -4179,6 +4190,7 @@ class _PebbleStorageAPIsTestMixin:
         client.push(f"{self.prefix}/file", data)
         with self.assertRaises(pebble.PathError) as cm:
             client.push(f"{self.prefix}/file/file", data)
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_with_permission_mask(self):
@@ -4194,7 +4206,8 @@ class _PebbleStorageAPIsTestMixin:
         ):
             with self.assertRaises(pebble.PathError) as cm:
                 client.push(f"{self.prefix}/file", data, permissions=bad_permission)
-        self.assertEqual(cm.exception.kind, 'generic-file-error')
+            cm.exception = typing.cast(pebble.PathError, cm.exception)
+            self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_files_and_list(self):
         data = 'data'
@@ -4233,11 +4246,13 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.push('file', '')
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_pull_not_found(self):
         with self.assertRaises(pebble.PathError) as cm:
             self.client.pull("/not/found")
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, "not-found")
         self.assertIn("/not/found", cm.exception.message)
 
@@ -4245,6 +4260,7 @@ class _PebbleStorageAPIsTestMixin:
         self.client.make_dir(f"{self.prefix}/subdir")
         with self.assertRaises(pebble.PathError) as cm:
             self.client.pull(f"{self.prefix}/subdir")
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, "generic-file-error")
         self.assertIn(f"{self.prefix}/subdir", cm.exception.message)
 
@@ -4252,6 +4268,7 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.APIError) as cm:
             client.list_files("/not/existing/file/")
+        cm.exception = typing.cast(pebble.APIError, cm.exception)
         self.assertEqual(cm.exception.code, 404)
         self.assertEqual(cm.exception.status, 'Not Found')
         self.assertEqual(cm.exception.message, 'stat /not/existing/file/: no '
@@ -4309,6 +4326,7 @@ class _PebbleStorageAPIsTestMixin:
 
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=False)
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=True)
@@ -4320,6 +4338,7 @@ class _PebbleStorageAPIsTestMixin:
         client = self.client
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir('dir')
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_make_subdir_of_file_fails(self):
@@ -4329,11 +4348,13 @@ class _PebbleStorageAPIsTestMixin:
         # Direct child case
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(f"{self.prefix}/file/subdir")
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Recursive creation case, in case its flow is different
         with self.assertRaises(pebble.PathError) as cm:
             client.make_dir(f"{self.prefix}/file/subdir/subdir", make_parents=True)
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_make_dir_with_permission_mask(self):
@@ -4355,6 +4376,7 @@ class _PebbleStorageAPIsTestMixin:
         )):
             with self.assertRaises(pebble.PathError) as cm:
                 client.make_dir(f"{self.prefix}/dir3_{i}", permissions=bad_permission)
+            cm.exception = typing.cast(pebble.PathError, cm.exception)
             self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_remove_path(self):
@@ -4373,6 +4395,7 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-empty directory, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
             client.remove_path(f"{self.prefix}/dir", recursive=False)
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'generic-file-error')
 
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
@@ -4381,6 +4404,7 @@ class _PebbleStorageAPIsTestMixin:
         # Remove non-existent path, recursive=False: error
         with self.assertRaises(pebble.PathError) as cm:
             client.remove_path(f"{self.prefix}/dir/does/not/exist/asdf", recursive=False)
+        cm.exception = typing.cast(pebble.PathError, cm.exception)
         self.assertEqual(cm.exception.kind, 'not-found')
 
         # Remove non-existent path, recursive=True: succeeds
@@ -4393,6 +4417,13 @@ class _PebbleStorageAPIsTestMixin:
     # * Parent directories created via make_dir(make_parents=True) default to root:root ownership
     #   and 0o755 permissions; as we default to None for ownership/permissions, we do ignore this
     #   nuance.
+
+
+class _MakedirArgs(typing.TypedDict):
+    user_id: typing.Optional[int]
+    user: typing.Optional[str]
+    group_id: typing.Optional[int]
+    group: typing.Optional[str]
 
 
 class TestPebbleStorageAPIsUsingMocks(
@@ -4483,7 +4514,7 @@ class TestPebbleStorageAPIsUsingMocks(
         data = 'data'
         client = self.client
         user, group = self._select_testing_user_group()
-        cases = [
+        cases: typing.List[_MakedirArgs] = [
             {
                 "user_id": user.pw_uid,
                 "user": None,
@@ -4523,7 +4554,7 @@ class TestPebbleStorageAPIsUsingMocks(
     def test_make_dir_with_ownership(self):
         client = self.client
         user, group = self._select_testing_user_group()
-        cases = [
+        cases: typing.List[_MakedirArgs] = [
             {
                 "user_id": user.pw_uid,
                 "user": None,
@@ -5055,9 +5086,9 @@ class TestHandleExec(unittest.TestCase):
     def test_register_with_result(self):
         self.harness.handle_exec(self.container, ["foo"], result=10)
 
-        with self.assertRaises(pebble.ExecError) as exc:
+        with self.assertRaises(pebble.ExecError) as exc:  # type: ignore
             self.container.exec(["foo"]).wait()
-        self.assertEqual(exc.exception.exit_code, 10)
+        self.assertEqual(exc.exception.exit_code, 10)  # type: ignore
 
         self.harness.handle_exec(self.container, ["foo"], result="hello")
         stdout, stderr = self.container.exec(["foo"]).wait_output()
