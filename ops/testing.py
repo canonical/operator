@@ -2793,7 +2793,7 @@ class _TestingPebbleClient:
             )
 
     def pull(self, path: str, *,
-             encoding: str = 'utf-8') -> Union[BinaryIO, TextIO]:
+             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
