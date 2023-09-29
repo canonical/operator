@@ -4537,28 +4537,6 @@ class TestPebbleStorageAPIsUsingMocks(
             self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
 
 
-@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
-class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIsTestMixin):
-    def setUp(self):
-        socket_path = os.getenv('PEBBLE_SOCKET')
-        pebble_dir = os.getenv('PEBBLE')
-        if not socket_path and pebble_dir:
-            socket_path = os.path.join(pebble_dir, '.pebble.socket')
-        assert socket_path and pebble_dir, 'PEBBLE must be set if RUN_REAL_PEBBLE_TESTS set'
-
-        self.prefix = tempfile.mkdtemp(dir=pebble_dir)
-        self.client = pebble.Client(socket_path=socket_path)
-
-    def tearDown(self):
-        shutil.rmtree(self.prefix)
-
-    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
-    # test mixin class.
-    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
-    def test_make_dir_with_permission_mask(self):
-        pass
-
-
 class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
     def setUp(self) -> None:
         self.harness = ops.testing.Harness(ops.CharmBase, meta='''

@@ -15,6 +15,7 @@
 
 import json
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -24,6 +25,8 @@ import urllib.request
 import uuid
 
 from ops import pebble
+
+from .test_testing import _PebbleStorageAPIsTestMixin
 
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
@@ -35,7 +38,7 @@ from ops import pebble
 # In another terminal, run the tests:
 #
 # $ source .tox/unit/bin/activate
-# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_pebble.py -v -k RealPebble
+# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_real_pebble.py -v
 # $ deactivate
 #
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
@@ -249,3 +252,25 @@ class TestRealPebble(unittest.TestCase):
         process.wait()
 
         self.assertEqual(reads, [b'one\n', b'2\n', b'THREE\n'])
+
+
+@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
+class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIsTestMixin):
+    def setUp(self):
+        socket_path = os.getenv('PEBBLE_SOCKET')
+        pebble_dir = os.getenv('PEBBLE')
+        if not socket_path and pebble_dir:
+            socket_path = os.path.join(pebble_dir, '.pebble.socket')
+        assert socket_path and pebble_dir, 'PEBBLE must be set if RUN_REAL_PEBBLE_TESTS set'
+
+        self.prefix = tempfile.mkdtemp(dir=pebble_dir)
+        self.client = pebble.Client(socket_path=socket_path)
+
+    def tearDown(self):
+        shutil.rmtree(self.prefix)
+
+    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
+    # test mixin class.
+    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
+    def test_make_dir_with_permission_mask(self):
+        pass
