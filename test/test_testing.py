@@ -4050,7 +4050,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
 # For testing file-ops of the pebble client.  This is refactored into a
 # separate mixin so we can run these tests against both the mock client as
 # well as a real pebble server instance.
-class _PebbleStorageAPIsTestMixin:
+class PebbleStorageAPIsTestMixin:
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
     prefix: str
@@ -4374,7 +4374,7 @@ class _MakedirArgs(typing.TypedDict):
 class TestPebbleStorageAPIsUsingMocks(
         unittest.TestCase,
         _TestingPebbleClientMixin,
-        _PebbleStorageAPIsTestMixin):
+        PebbleStorageAPIsTestMixin):
     def setUp(self):
         self.prefix = '/prefix'
         self.client = self.get_testing_client()
