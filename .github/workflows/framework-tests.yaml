@@ -86,7 +86,7 @@ jobs:
           PEBBLE: /tmp/pebble
 
       - name: Run Real pebble tests
-        run: tox -e unit -- -k RealPebble
+        run: tox -e unit -- test/test_real_pebble
         env:
           RUN_REAL_PEBBLE_TESTS: 1
           PEBBLE: /tmp/pebble
