@@ -2,7 +2,7 @@
 
 To work in the framework itself you will need Python >= 3.8. Linting, testing,
 and docs automation is performed using
-[`tox`](https://tox.readthedocs.io/en/latest/) which you should install.
+[`tox`](https://tox.readthedocs.io/en/latest/), which you should install.
 For improved performance on the tests, ensure that you have PyYAML
 installed with the correct extensions:
 
@@ -23,7 +23,7 @@ tox
 tox -e unit
 tox -e unit test/test_charm.py
 
-# Format the code using isort
+# Format the code using isort and autopep8
 tox -e fmt
 
 # Generate a local copy of the Sphinx docs in docs/_build
@@ -53,7 +53,7 @@ pytest
 ## Pebble Tests
 
 The framework has some tests that interact with a real/live pebble server.  To
-run these tests, you must have (pebble)[https://github.com/canonical/pebble]
+run these tests, you must have [pebble](https://github.com/canonical/pebble)
 installed and available in your path.  If you have the Go toolchain installed,
 you can run `go install github.com/canonical/pebble/cmd/pebble@latest`.  This will
 install pebble to `$GOBIN` if it is set or `$HOME/go/bin` otherwise.  Add
@@ -85,19 +85,19 @@ In general, new functionality
 should always be accompanied by user-focused documentation that is posted to
 https://juju.is/docs/sdk.  The content for this site is written and hosted on
 https://discourse.charmhub.io/c/doc.  New documentation should get a new
-topic/post on this discourse forum and then should be linked into the main
+topic/post on this Discourse forum and then should be linked into the main
 docs navigation page(s) as appropriate.  The ops library's SDK page
 content is pulled from
-[here](https://discourse.charmhub.io/t/the-charmed-operator-software-development-kit-sdk-docs/4449).
+[the corresponding Discourse topic](https://discourse.charmhub.io/t/the-charmed-operator-software-development-kit-sdk-docs/4449).
 Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
-takes you to the corresponding discourse page where docs can be commented on
+takes you to the corresponding Discourse page where docs can be commented on
 and edited (if you have earned those privileges).
 
 The ops library's API reference is automatically built and published to
-[here](https://ops.readthedocs.io/en/latest/).  Please be complete with
+[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/).  Please be complete with
 docstrings and keep them informative for _users_.
 
-Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted like done [here](https://juju.is/docs/sdk/pebble#heading--file-exists) with markdown like this:
+Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted (for example, as done for [File and directory existence in 1.4](https://juju.is/docs/sdk/interact-with-pebble#heading--file-exists)) with Markdown like this:
 
 ```markdown
 [note status="version"]1.4[/note]
@@ -117,7 +117,7 @@ are listed in [requirements.txt](requirements.txt).
 
 To make a release of the ops library, do the following:
 
-1. Visit the [releases page on github](https://github.com/canonical/operator/releases).
+1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
 2. Click "Draft a new release"
 3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
    E.g. 2.3.12
@@ -126,8 +126,8 @@ To make a release of the ops library, do the following:
 
 This will trigger an automatic build for the Python package and publish it to PyPI (the API token/secret is already set up in the repository settings).
 
-See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the github actions, not the versions of the ops library.)
+See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the GitHub actions, not the versions of the ops library.)
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-Announce the release on discourse.
+Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Mattermost](https://chat.charmhub.io/charmhub/channels/charm-dev)
