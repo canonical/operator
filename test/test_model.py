@@ -2267,6 +2267,9 @@ class TestModelBindings(unittest.TestCase):
         self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
+_metric_and_label_pair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
+
+
 class TestModelBackend(unittest.TestCase):
 
     def setUp(self):
@@ -2757,9 +2760,7 @@ class TestModelBackend(unittest.TestCase):
             self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
     def test_invalid_metric_names(self):
-        invalid_inputs: typing.List[typing.Tuple[
-            typing.Dict[str, float],
-            typing.Dict[typing.Any, typing.Any]]] = [
+        invalid_inputs: typing.List[_metric_and_label_pair] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
@@ -2778,21 +2779,19 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
-        invalid_inputs: typing.List[typing.Tuple[
-            typing.Dict[str, typing.Union[float, str]],
-            typing.Dict[typing.Any, typing.Any]]] = [
+        invalid_inputs: typing.List[_metric_and_label_pair] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
-            ({'foo': 'bar'}, {}),
-            ({'foo': '1O'}, {}),
+            ({'foo': 'bar'}, {}),  # type: ignore
+            ({'foo': '1O'}, {}),  # type: ignore
         ]
         for metrics, labels in invalid_inputs:
             with self.assertRaises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)  # type: ignore
+                self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_labels(self):
-        invalid_inputs = [
+        invalid_inputs: typing.List[_metric_and_label_pair] = [
             ({'foo': 4.2}, {'': 'baz'}),
             ({'foo': 4.2}, {',bar': 'baz'}),
             ({'foo': 4.2}, {'b=a=r': 'baz'}),
@@ -2803,7 +2802,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_label_values(self):
-        invalid_inputs = [
+        invalid_inputs: typing.List[_metric_and_label_pair] = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
             ({'foo': 4.2}, {'bar': 'b=az'}),
@@ -2977,21 +2976,17 @@ class TestSecrets(unittest.TestCase):
 
     def test_unit_add_secret_errors(self):
         # Additional add_secret tests are done in TestApplication
-        errors: typing.List[typing.Tuple[
-            typing.Any,
-            typing.Dict[str, typing.Any],
-            typing.Type[BaseException]]] = [
-            ({'xy': 'bar'}, {}, ValueError), ({'foo': 'x'}, {'expire': 7}, TypeError), ]
+        errors: typing.Any = [
+            ({'xy': 'bar'}, {}, ValueError),
+            ({'foo': 'x'}, {'expire': 7}, TypeError),
+        ]
         for content, kwargs, exc_type in errors:
             msg = f'expected {exc_type.__name__} when adding secret content {content}'
             with self.assertRaises(exc_type, msg=msg):
                 self.unit.add_secret(content, **kwargs)  # type: ignore
 
     def test_add_secret_errors(self):
-        errors: typing.List[typing.Tuple[
-            typing.Any,
-            typing.Dict[str, typing.Any],
-            typing.Type[BaseException]]] = [
+        errors: typing.Any = [
             # Invalid content dict or types
             (None, {}, TypeError),
             ({}, {}, ValueError),
