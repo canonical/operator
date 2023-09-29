@@ -26,7 +26,7 @@ import uuid
 
 from ops import pebble
 
-from .test_testing import _PebbleStorageAPIsTestMixin
+from .test_testing import PebbleStorageAPIsTestMixin
 
 
 # Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
