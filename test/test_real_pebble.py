@@ -255,7 +255,7 @@ class TestRealPebble(unittest.TestCase):
 
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
-class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIsTestMixin):
+class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
     def setUp(self):
         socket_path = os.getenv('PEBBLE_SOCKET')
         pebble_dir = os.getenv('PEBBLE')
