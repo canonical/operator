@@ -70,7 +70,7 @@ To do this even more manually, you could start the pebble server yourself:
 ```sh
 export PEBBLE=$HOME/pebble
 export RUN_REAL_PEBBLE_TESTS=1
-pebble run --create-dirs &>pebble.log &
+pebble run --create-dirs --http=:4000 &>pebble.log &
 
 # Then
 tox -e unit -- test/test_real_pebble.py
