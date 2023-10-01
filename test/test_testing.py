@@ -4050,7 +4050,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
 # For testing file-ops of the pebble client.  This is refactored into a
 # separate mixin so we can run these tests against both the mock client as
 # well as a real pebble server instance.
-class _PebbleStorageAPIsTestMixin:
+class PebbleStorageAPIsTestMixin:
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
     prefix: str
@@ -4374,7 +4374,7 @@ class _MakedirArgs(typing.TypedDict):
 class TestPebbleStorageAPIsUsingMocks(
         unittest.TestCase,
         _TestingPebbleClientMixin,
-        _PebbleStorageAPIsTestMixin):
+        PebbleStorageAPIsTestMixin):
     def setUp(self):
         self.prefix = '/prefix'
         self.client = self.get_testing_client()
@@ -4535,28 +4535,6 @@ class TestPebbleStorageAPIsUsingMocks(
             client.make_dir(f"{self.prefix}/dir{idx}", **case)
             dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
             self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
-
-
-@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
-class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIsTestMixin):
-    def setUp(self):
-        socket_path = os.getenv('PEBBLE_SOCKET')
-        pebble_dir = os.getenv('PEBBLE')
-        if not socket_path and pebble_dir:
-            socket_path = os.path.join(pebble_dir, '.pebble.socket')
-        assert socket_path and pebble_dir, 'PEBBLE must be set if RUN_REAL_PEBBLE_TESTS set'
-
-        self.prefix = tempfile.mkdtemp(dir=pebble_dir)
-        self.client = pebble.Client(socket_path=socket_path)
-
-    def tearDown(self):
-        shutil.rmtree(self.prefix)
-
-    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
-    # test mixin class.
-    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
-    def test_make_dir_with_permission_mask(self):
-        pass
 
 
 class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
