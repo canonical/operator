@@ -340,8 +340,6 @@ class _TestMain(abc.ABC):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self, event_name: str) -> ops.StoredStateData:
-        framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta,
-                                  None, event_name)  # type: ignore
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -351,6 +349,8 @@ class _TestMain(abc.ABC):
                         meta = ops.CharmMeta.from_yaml(m, a)
                 else:
                     meta = ops.CharmMeta.from_yaml(m)
+            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta,
+                                      None, event_name)  # type: ignore
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -365,7 +365,7 @@ class _TestMain(abc.ABC):
             storage.commit()
             framework.close()
         else:
-            stored = ops.StoredStateData(ops.Object(framework, None), "")
+            stored = ops.StoredStateData(None, None)
         return stored
 
     def _simulate_event(self, event_spec: EventSpec):
@@ -725,7 +725,13 @@ class _TestMain(abc.ABC):
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
-            self.assertIn(calls, fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
+            self.assertIn(
+                calls,
+                fake_script_calls(
+                    typing.cast(
+                        unittest.TestCase,
+                        self),
+                    clear=True))
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
@@ -769,7 +775,8 @@ class _TestMain(abc.ABC):
         self._prepare_actions()
 
         fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
-        fake_script(typing.cast(unittest.TestCase, self), 'status-get', """echo '{"status": "unknown", "message": ""}'""")
+        fake_script(typing.cast(unittest.TestCase, self), 'status-get',
+                    """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
