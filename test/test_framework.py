@@ -1276,10 +1276,8 @@ class TestStoredState(BaseTestCase):
 
         class WrappedFramework(ops.Framework):
             def __init__(self,
-                         store: typing.Union[SQLiteStorage,
-                                             JujuStorage],
-                         charm_dir: typing.Union[str,
-                                                 Path],
+                         store: typing.Union[SQLiteStorage, JujuStorage],
+                         charm_dir: typing.Union[str, Path],
                          meta: ops.CharmMeta,
                          model: ops.Model,
                          event_name: str):
