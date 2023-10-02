@@ -52,9 +52,9 @@ class TestFramework(BaseTestCase):
 
     def test_handle_path(self):
         cases = [
-            (ops.Handle(None, "root", None), "root"),
+            (ops.Handle(None, "root", 'test1'), "root"),
             (ops.Handle(None, "root", "1"), "root[1]"),
-            (ops.Handle(ops.Handle(None, "root", None), "child", None), "root/child"),
+            (ops.Handle(ops.Handle(None, "root", 'test2'), "child", 'test3'), "root/child"),
             (ops.Handle(ops.Handle(None, "root", "1"), "child", "2"), "root[1]/child[2]"),
         ]
         for handle, path in cases:
@@ -80,7 +80,7 @@ class TestFramework(BaseTestCase):
 
         handle = ops.Handle(None, "a_foo", "some_key")
 
-        framework.register_type(Foo, None, handle.kind)
+        framework.register_type(Foo, None, handle.kind)  # type: ignore
 
         try:
             framework.load_snapshot(handle)
@@ -92,6 +92,8 @@ class TestFramework(BaseTestCase):
 
     def test_snapshot_roundtrip(self):
         class Foo:
+            handle_kind = 'foo'
+
             def __init__(self, handle: ops.Handle, n: int):
                 self.handle = handle
                 self.my_n = n
@@ -107,19 +109,21 @@ class TestFramework(BaseTestCase):
 
         framework1 = self.create_framework(tmpdir=self.tmpdir)
         framework1.register_type(Foo, None, handle.kind)
-        framework1.save_snapshot(event)
+        framework1.save_snapshot(event)  # type: ignore
         framework1.commit()
         framework1.close()
 
         framework2 = self.create_framework(tmpdir=self.tmpdir)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
+        event2 = typing.cast(Foo, event2)
         self.assertEqual(event2.my_n, 2)
 
-        framework2.save_snapshot(event2)
+        framework2.save_snapshot(event2)  # type: ignore
         del event2
         gc.collect()
         event3 = framework2.load_snapshot(handle)
+        event3 = typing.cast(Foo, event3)
         self.assertEqual(event3.my_n, 3)
 
         framework2.drop_snapshot(event.handle)
@@ -244,8 +248,8 @@ class TestFramework(BaseTestCase):
 
         framework.commit()
 
-        self.assertEqual(obs._stored.myinitdata, 41)
-        self.assertEqual(obs._stored.mydata, 42)
+        self.assertEqual(obs._stored.myinitdata, 41)  # type: ignore
+        self.assertEqual(obs._stored.mydata, 42)  # type: ignore
         self.assertTrue(obs.seen, [ops.PreCommitEvent, ops.CommitEvent])
         framework.close()
 
@@ -253,11 +257,11 @@ class TestFramework(BaseTestCase):
 
         new_obs = PreCommitObserver(other_framework, None)
 
-        self.assertEqual(obs._stored.myinitdata, 41)
-        self.assertEqual(new_obs._stored.mydata, 42)
+        self.assertEqual(obs._stored.myinitdata, 41)  # type: ignore
+        self.assertEqual(new_obs._stored.mydata, 42)  # type: ignore
 
         with self.assertRaises(AttributeError):
-            new_obs._stored.myotherdata
+            new_obs._stored.myotherdata  # type: ignore
 
     def test_defer_and_reemit(self):
         framework = self.create_framework()
@@ -410,7 +414,11 @@ class TestFramework(BaseTestCase):
         framework = self.create_framework()
 
         class MyObject(ops.Object):
-            pass
+            def snapshot(self) -> typing.Dict[str, typing.Any]:
+                raise NotImplementedError()
+
+            def restore(self, snapshot: typing.Dict[str, typing.Any]) -> None:
+                raise NotImplementedError()
 
         o1 = MyObject(framework, "path")
         # Creating a second object at the same path should fail with RuntimeError
@@ -440,25 +448,27 @@ class TestFramework(BaseTestCase):
                 self.value = name
 
             def snapshot(self):
-                return self.value
+                return {"value": self.value}
 
-            def restore(self, value: str):
-                self.value = value
+            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+                self.value = snapshot["value"]
 
         framework.register_type(MyObject, None, MyObject.handle_kind)
         o1 = MyObject(framework, "path")
-        framework.save_snapshot(o1)
+        framework.save_snapshot(o1)  # type: ignore
         framework.commit()
         o_handle = o1.handle
         del o1
         gc.collect()
         o2 = framework.load_snapshot(o_handle)
+        o2 = typing.cast(MyObject, o2)
         # Trying to load_snapshot a second object at the same path should fail with RuntimeError
         with self.assertRaises(RuntimeError):
             framework.load_snapshot(o_handle)
         # Unless we _forget the object first
         framework._forget(o2)
         o3 = framework.load_snapshot(o_handle)
+        o3 = typing.cast(MyObject, o3)
         self.assertEqual(o2.value, o3.value)
         # A loaded object also prevents direct creation of an object
         with self.assertRaises(RuntimeError):
@@ -472,6 +482,7 @@ class TestFramework(BaseTestCase):
         framework_copy2 = self.create_framework(tmpdir=self.tmpdir)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
+        o_copy2 = typing.cast(MyObject, o_copy2)
         self.assertEqual(o_copy2.value, "path")
 
     def test_events_base(self):
@@ -524,14 +535,14 @@ class TestFramework(BaseTestCase):
             foo = event
 
         with self.assertRaises(RuntimeError) as cm:
-            class OtherEvents(ops.ObjectEvents):
+            class OtherEvents(ops.ObjectEvents):  # type: ignore
                 foo = event
         self.assertEqual(
             str(cm.exception.__cause__),
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
-            class MyNotifier(ops.Object):
+            class MyNotifier(ops.Object):  # type: ignore
                 on = MyEvents()  # type: ignore
                 bar = event
         self.assertEqual(
@@ -545,7 +556,7 @@ class TestFramework(BaseTestCase):
         framework = self.create_framework()
 
         class MyEvent(ops.EventBase):
-            pass
+            handle_kind = "test"
 
         class MyNotifier(ops.Object):
             foo = ops.EventSource(MyEvent)
@@ -764,6 +775,8 @@ class TestFramework(BaseTestCase):
         to_be_saved = {"bar": TestFramework}
 
         class FooEvent(ops.EventBase):
+            handle_kind = "test"
+
             def snapshot(self):
                 return to_be_saved
 
@@ -871,24 +884,24 @@ class TestStoredState(BaseTestCase):
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
     def test_stored_dict_repr(self):
-        self.assertEqual(repr(ops.StoredDict(None, {})), "ops.framework.StoredDict()")
+        self.assertEqual(repr(ops.StoredDict(None, {})), "ops.framework.StoredDict()")  # type: ignore
         self.assertEqual(
             repr(
                 ops.StoredDict(
-                    None, {
+                    None, {  # type: ignore
                         "a": 1})), "ops.framework.StoredDict({'a': 1})")
 
     def test_stored_list_repr(self):
-        self.assertEqual(repr(ops.StoredList(None, [])), "ops.framework.StoredList()")
+        self.assertEqual(repr(ops.StoredList(None, [])), "ops.framework.StoredList()")  # type: ignore
         self.assertEqual(
             repr(
                 ops.StoredList(
-                    None, [
+                    None, [  # type: ignore
                         1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
 
     def test_stored_set_repr(self):
-        self.assertEqual(repr(ops.StoredSet(None, set())), 'ops.framework.StoredSet()')
-        self.assertEqual(repr(ops.StoredSet(None, {1})), 'ops.framework.StoredSet({1})')
+        self.assertEqual(repr(ops.StoredSet(None, set())), 'ops.framework.StoredSet()')  # type: ignore
+        self.assertEqual(repr(ops.StoredSet(None, {1})), 'ops.framework.StoredSet({1})')  # type: ignore
 
     def test_basic_state_storage(self):
         class SomeObject(ops.Object):
@@ -912,7 +925,7 @@ class TestStoredState(BaseTestCase):
         class Sub(SomeObject):
             pass
 
-        class SubSub(SomeObject):
+        class SubSub(Sub):
             pass
 
         self._stored_state_tests(SubSub)
@@ -950,14 +963,14 @@ class TestStoredState(BaseTestCase):
         obj = cls(framework, "1")
 
         try:
-            obj._stored.foo
+            obj._stored.foo  # type: ignore
         except AttributeError as e:
             self.assertEqual(str(e), "attribute 'foo' is not stored")
         else:
             self.fail("AttributeError not raised")
 
         try:
-            obj._stored.on = "nonono"
+            obj._stored.on = "nonono"  # type: ignore
         except AttributeError as e:
             self.assertEqual(str(e), "attribute 'on' is reserved and cannot be set")
         else:
