@@ -887,20 +887,14 @@ class TestStoredState(BaseTestCase):
     def test_stored_dict_repr(self):
         self.assertEqual(repr(ops.StoredDict(None, {})),  # type: ignore
                          "ops.framework.StoredDict()")
-        self.assertEqual(
-            repr(
-                ops.StoredDict(
-                    None, {  # type: ignore
-                        "a": 1})), "ops.framework.StoredDict({'a': 1})")
+        self.assertEqual(repr(ops.StoredDict(None, {"a": 1})),  # type: ignore
+                         "ops.framework.StoredDict({'a': 1})")
 
     def test_stored_list_repr(self):
         self.assertEqual(repr(ops.StoredList(None, [])),  # type: ignore
                          "ops.framework.StoredList()")
-        self.assertEqual(
-            repr(
-                ops.StoredList(
-                    None, [  # type: ignore
-                        1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
+        self.assertEqual(repr(ops.StoredList(None, [1, 2, 3])),  # type: ignore
+                         'ops.framework.StoredList([1, 2, 3])')
 
     def test_stored_set_repr(self):
         self.assertEqual(repr(ops.StoredSet(None, set())),  # type: ignore
