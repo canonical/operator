@@ -37,4 +37,5 @@ async def test_smoke(ops_test: OpsTest):
             charm, series=series, application_name=f"{series}-smoke")
         await model.wait_for_idle(timeout=600)  # type: ignore
 
-        assert app.status == "active", f"Series {series} failed with '{app.status}' status"  # type: ignore
+        assert_msg = f"Series {series} failed with '{app.status}' status"  # type: ignore
+        assert app.status == "active", assert_msg  # type: ignore
