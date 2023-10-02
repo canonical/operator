@@ -37,6 +37,7 @@ include = ["ops/*.py", "ops/_private/*.py",
     "test/test_lib.py",
     "test/test_model.py",
     "test/test_testing.py",
+    "test/test_storage.py",
     "test/test_charm.py",
 ]
 pythonVersion = "3.8" # check no python > 3.8 features are used
