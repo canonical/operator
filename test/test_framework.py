@@ -28,7 +28,7 @@ from unittest.mock import patch
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
-from ops.storage import NoSnapshotError, SQLiteStorage, JujuStorage
+from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 
 class TestFramework(BaseTestCase):
@@ -52,9 +52,10 @@ class TestFramework(BaseTestCase):
 
     def test_handle_path(self):
         cases = [
-            (ops.Handle(None, "root", 'test1'), "root"),
+            (ops.Handle(None, "root", 'test1'), "root[test1]"),
             (ops.Handle(None, "root", "1"), "root[1]"),
-            (ops.Handle(ops.Handle(None, "root", 'test2'), "child", 'test3'), "root/child"),
+            (ops.Handle(ops.Handle(None, "root", 'test2'), "child", 'test3'),
+             "root[test2]/child[test3]"),
             (ops.Handle(ops.Handle(None, "root", "1"), "child", "2"), "root[1]/child[2]"),
         ]
         for handle, path in cases:
@@ -884,7 +885,8 @@ class TestStoredState(BaseTestCase):
         self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
     def test_stored_dict_repr(self):
-        self.assertEqual(repr(ops.StoredDict(None, {})), "ops.framework.StoredDict()")  # type: ignore
+        self.assertEqual(repr(ops.StoredDict(None, {})),  # type: ignore
+                         "ops.framework.StoredDict()")
         self.assertEqual(
             repr(
                 ops.StoredDict(
@@ -892,7 +894,8 @@ class TestStoredState(BaseTestCase):
                         "a": 1})), "ops.framework.StoredDict({'a': 1})")
 
     def test_stored_list_repr(self):
-        self.assertEqual(repr(ops.StoredList(None, [])), "ops.framework.StoredList()")  # type: ignore
+        self.assertEqual(repr(ops.StoredList(None, [])),  # type: ignore
+                         "ops.framework.StoredList()")
         self.assertEqual(
             repr(
                 ops.StoredList(
@@ -900,8 +903,10 @@ class TestStoredState(BaseTestCase):
                         1, 2, 3])), 'ops.framework.StoredList([1, 2, 3])')
 
     def test_stored_set_repr(self):
-        self.assertEqual(repr(ops.StoredSet(None, set())), 'ops.framework.StoredSet()')  # type: ignore
-        self.assertEqual(repr(ops.StoredSet(None, {1})), 'ops.framework.StoredSet({1})')  # type: ignore
+        self.assertEqual(repr(ops.StoredSet(None, set())),  # type: ignore
+                         'ops.framework.StoredSet()')
+        self.assertEqual(repr(ops.StoredSet(None, {1})),  # type: ignore
+                         'ops.framework.StoredSet({1})')
 
     def test_basic_state_storage(self):
         class SomeObject(ops.Object):
@@ -959,8 +964,13 @@ class TestStoredState(BaseTestCase):
         self._stored_state_tests(FinalChild)
 
     def _stored_state_tests(self, cls: typing.Type[ops.Object]):
+        @typing.runtime_checkable
+        class _StoredProtocol(typing.Protocol):
+            _stored: ops.StoredState
+
         framework = self.create_framework(tmpdir=self.tmpdir)
         obj = cls(framework, "1")
+        assert isinstance(obj, _StoredProtocol)
 
         try:
             obj._stored.foo  # type: ignore
@@ -994,6 +1004,7 @@ class TestStoredState(BaseTestCase):
         # Since this has the same absolute object handle, it will get its state back.
         framework_copy = self.create_framework(tmpdir=self.tmpdir)
         obj_copy = cls(framework_copy, "1")
+        assert isinstance(obj_copy, _StoredProtocol)
         self.assertEqual(obj_copy._stored.foo, 42)
         self.assertEqual(obj_copy._stored.bar, "s")
         self.assertEqual(obj_copy._stored.baz, 4.2)
@@ -1140,7 +1151,7 @@ class TestStoredState(BaseTestCase):
             lambda a, b: a['a'].pop(b),
             lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
-            lambda: {'s': set()},
+            lambda: {'s': set()},  # type: ignore
             'a',
             {'s': {'a'}},
             lambda a, b: a['s'].add(b),
@@ -1264,7 +1275,14 @@ class TestStoredState(BaseTestCase):
             _stored = ops.StoredState()
 
         class WrappedFramework(ops.Framework):
-            def __init__(self, store: typing.Union[SQLiteStorage, JujuStorage], charm_dir: typing.Union[str, Path], meta: ops.CharmMeta, model: ops.Model, event_name: str):
+            def __init__(self,
+                         store: typing.Union[SQLiteStorage,
+                                             JujuStorage],
+                         charm_dir: typing.Union[str,
+                                                 Path],
+                         meta: ops.CharmMeta,
+                         model: ops.Model,
+                         event_name: str):
                 super().__init__(store, charm_dir, meta, model, event_name)
                 self.snapshots: typing.List[typing.Any] = []
 
@@ -1302,7 +1320,8 @@ class TestStoredState(BaseTestCase):
             framework.close()
 
             storage_copy = SQLiteStorage(self.tmpdir / "framework.data")
-            framework_copy = WrappedFramework(storage_copy, self.tmpdir, None, None, "foo")
+            framework_copy = WrappedFramework(
+                storage_copy, self.tmpdir, None, None, "foo")  # type: ignore
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
@@ -1418,7 +1437,8 @@ class TestStoredState(BaseTestCase):
     def test_set_operations(self):
         test_case = typing.Tuple[
             typing.Set[str],  # A set to test an operation against (other_set).
-            typing.Callable[[typing.Set[str], typing.Set[str]], typing.Set[str]],  # An operation to test.
+            # An operation to test.
+            typing.Callable[[typing.Set[str], typing.Set[str]], typing.Set[str]],
             typing.Set[str],  # The expected result of operation(obj._stored.set, other_set).
             typing.Set[str],  # The expected result of operation(other_set, obj._stored.set).
         ]
@@ -1461,6 +1481,7 @@ class TestStoredState(BaseTestCase):
         for i, (variable_operand, operation, ab_res, ba_res) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
             obj._stored.set = {"a", "b"}
+            assert isinstance(obj._stored.set, ops.StoredSet)
 
             for a, b, expected in [
                     (obj._stored.set, variable_operand, ab_res),
