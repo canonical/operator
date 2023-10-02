@@ -1061,13 +1061,17 @@ class BoundStoredState:
 
     if TYPE_CHECKING:
         @typing.overload
-        def __getattr__(self, key: Literal['on']) -> ObjectEvents:  # type: ignore
+        def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+            pass
+
+        @typing.overload
+        def __getattr__(self, key: str) -> Any:
             pass
 
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
         if key == "on":
-            return self._data.on  # type: ignore  # casting won't work for some reason
+            return self._data.on
         if key not in self._data:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
