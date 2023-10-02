@@ -339,7 +339,9 @@ class _TestMain(abc.ABC):
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
             self._setup_entry_point(actions_dir, action_name)
 
-    def _read_and_clear_state(self, event_name: str) -> ops.StoredStateData:
+    def _read_and_clear_state(self,
+                              event_name: str) -> typing.Union[ops.BoundStoredState,
+                                                               ops.StoredStateData]:
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -355,7 +357,10 @@ class _TestMain(abc.ABC):
             class ThisCharmEvents(MyCharmEvents):
                 pass
 
-            class Charm(self.charm_module.Charm):
+            class _HasStored(typing.Protocol):
+                _stored: ops.StoredState
+
+            class Charm(self.charm_module.Charm, _HasStored):  # type: ignore
                 on = ThisCharmEvents()
 
             mycharm = Charm(framework)
@@ -365,7 +370,7 @@ class _TestMain(abc.ABC):
             storage.commit()
             framework.close()
         else:
-            stored = ops.StoredStateData(None, None)
+            stored = ops.StoredStateData(None, None)  # type: ignore
         return stored
 
     def _simulate_event(self, event_spec: EventSpec):
@@ -453,14 +458,16 @@ class _TestMain(abc.ABC):
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
-        assert state is not None
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(list(state.observed_event_types), ['ConfigChangedEvent'])
 
         # Re-emit should pick the deferred config-changed.
         state = self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status'))
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(
             list(state.observed_event_types),
             ['ConfigChangedEvent', 'UpdateStatusEvent'])
@@ -470,14 +477,17 @@ class _TestMain(abc.ABC):
 
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(list(state.observed_event_types), ['ConfigChangedEvent'])
 
         # Re-emit should not pick the deferred config-changed because
         # collect-metrics runs in a restricted context.
         state = self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect-metrics'))
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(list(state.observed_event_types), ['CollectMetricsEvent'])
 
     def test_multiple_events_handled(self):
@@ -768,7 +778,7 @@ class _TestMain(abc.ABC):
             ops.ActionEvent, 'get_model_name_action',
             env_var='JUJU_ACTION_NAME',
             model_name='test-model-name'))
-        self.assertIsNotNone(state)
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state._on_get_model_name_action, ['test-model-name'])
 
     def test_has_valid_status(self):
@@ -780,7 +790,7 @@ class _TestMain(abc.ABC):
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
-        self.assertIsNotNone(state)
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state.status_name, 'unknown')
         self.assertEqual(state.status_message, '')
         fake_script(
@@ -790,7 +800,7 @@ class _TestMain(abc.ABC):
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
-        self.assertIsNotNone(state)
+        assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state.status_name, 'blocked')
         self.assertEqual(state.status_message, 'help meeee')
 
@@ -954,6 +964,7 @@ class _TestMainWithDispatch(_TestMain):
         self.fake_script_path = self.hooks_dir
         fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 0')
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        assert isinstance(state, ops.BoundStoredState)
 
         # the script was called, *and*, the .on. was called
         self.assertEqual(fake_script_calls(typing.cast(
@@ -982,6 +993,7 @@ class _TestMainWithDispatch(_TestMain):
     def test_non_executable_hook_and_dispatch(self):
         (self.hooks_dir / "install").write_text("")
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        assert isinstance(state, ops.BoundStoredState)
 
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
@@ -1045,6 +1057,7 @@ class _TestMainWithDispatch(_TestMain):
                     hook_path.symlink_to(path)
 
                     state = self._simulate_event(event)
+                    assert isinstance(state, ops.BoundStoredState)
 
                     # the .on. was only called once
                     self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
@@ -1058,7 +1071,8 @@ class _TestMainWithDispatch(_TestMain):
         shutil.copy(str(path), str(hook_path))
 
         event = EventSpec(ops.InstallEvent, 'install')
-        state: ops.InstallEvent = self._simulate_event(event)
+        state = self._simulate_event(event)
+        assert isinstance(state, ops.BoundStoredState)
 
         # the .on. was only called once
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
