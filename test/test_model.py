@@ -1000,13 +1000,13 @@ recursive_list_cases = [
         name='basic recursive list',
         path='/',
         files=['/foo/bar.txt', '/baz.txt'],
-        want={'/foo/bar.txt', '/baz.txt', '/foo'},
+        want={'/foo', '/foo/bar.txt', '/baz.txt'},
     ),
     PushPullCase(
         name='basic recursive list reverse',
         path='/',
         files=['/baz.txt', '/foo/bar.txt'],
-        want={'/foo/bar.txt', '/baz.txt', '/foo'},
+        want={'/foo', '/foo/bar.txt', '/baz.txt'},
     ),
     PushPullCase(
         name='directly list a (non-directory) file',
