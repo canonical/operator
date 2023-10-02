@@ -345,7 +345,7 @@ class TestFramework(BaseTestCase):
             def snapshot(self):
                 return {"My N!": self.my_n}
 
-            def restore(self, snapshot: typing.Dict[str, int]):
+            def restore(self, snapshot: typing.Dict[str, typing.Any]):
                 super().restore(snapshot)
                 self.my_n = snapshot["My N!"] + 1
 
