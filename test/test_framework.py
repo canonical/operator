@@ -28,7 +28,7 @@ from unittest.mock import patch
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
-from ops.storage import NoSnapshotError, SQLiteStorage
+from ops.storage import NoSnapshotError, SQLiteStorage, JujuStorage
 
 
 class TestFramework(BaseTestCase):
@@ -273,7 +273,7 @@ class TestFramework(BaseTestCase):
             c = ops.EventSource(MyEvent)
 
         class MyObserver(ops.Object):
-            def __init__(self, parent, key):
+            def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
                 self.seen: typing.List[str] = []
                 self.done: typing.Dict[str, bool] = {}
@@ -1089,12 +1089,19 @@ class TestStoredState(BaseTestCase):
         # Test and validation functions in a list of 2-tuples.
         # Assignment and keywords like del are not supported in lambdas
         #  so functions are used instead.
-        test_operations = [(
-            lambda: {},         # Operand A.
-            None,               # Operand B.
-            {},                 # Expected result.
-            lambda a, b: None,  # Operation to perform.
-            lambda res, expected_res: self.assertEqual(res, expected_res)  # Validation to perform.
+        test_case = typing.Tuple[
+            typing.Callable[[], typing.Any],                        # Called to get operand A.
+            typing.Any,                                             # Operand B.
+            typing.Any,                                             # Expected result.
+            typing.Callable[[typing.Any, typing.Any], None],        # Operation to perform.
+            typing.Callable[[typing.Any, typing.Any], typing.Any],  # Validation to perform.
+        ]
+        test_operations: typing.List[test_case] = [(
+            lambda: {},
+            None,
+            {},
+            lambda a, b: None,
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {},
             {'a': {}},
@@ -1244,11 +1251,11 @@ class TestStoredState(BaseTestCase):
             _stored = ops.StoredState()
 
         class WrappedFramework(ops.Framework):
-            def __init__(self, store, charm_dir, meta, model, event_name):
+            def __init__(self, store: typing.Union[SQLiteStorage, JujuStorage], charm_dir: typing.Union[str, Path], meta: ops.CharmMeta, model: ops.Model, event_name: str):
                 super().__init__(store, charm_dir, meta, model, event_name)
-                self.snapshots = []
+                self.snapshots: typing.List[typing.Any] = []
 
-            def save_snapshot(self, value):
+            def save_snapshot(self, value: typing.Union[ops.StoredStateData, ops.EventBase]):
                 if value.handle.path == 'SomeObject[1]/StoredStateData[_stored]':
                     self.snapshots.append((type(value), value.snapshot()))
                 return super().save_snapshot(value)
@@ -1256,7 +1263,7 @@ class TestStoredState(BaseTestCase):
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
             storage = SQLiteStorage(self.tmpdir / "framework.data")
-            framework = WrappedFramework(storage, self.tmpdir, None, None, "foo")
+            framework = WrappedFramework(storage, self.tmpdir, None, None, "foo")  # type: ignore
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1296,12 +1303,19 @@ class TestStoredState(BaseTestCase):
             framework_copy.close()
 
     def test_comparison_operations(self):
-        test_operations = [(
-            {"1"},               # Operand A.
-            {"1", "2"},          # Operand B.
-            lambda a, b: a < b,  # Operation to test.
-            True,                # Result of op(A, B).
-            False,               # Result of op(B, A).
+        test_case = typing.Tuple[
+            typing.Any,                                       # Operand A.
+            typing.Any,                                       # Operand B.
+            typing.Callable[[typing.Any, typing.Any], bool],  # Operation to test.
+            bool,                                             # Result of op(A, B).
+            bool,                                             # Result of op(B, A).
+        ]
+        test_operations: typing.List[test_case] = [(
+            {"1"},
+            {"1", "2"},
+            lambda a, b: a < b,
+            True,
+            False,
         ), (
             {"1"},
             {"1", "2"},
@@ -1389,11 +1403,17 @@ class TestStoredState(BaseTestCase):
             self.assertEqual(op(b, obj._stored.a), op_ba)
 
     def test_set_operations(self):
-        test_operations = [(
-            {"1"},  # A set to test an operation against (other_set).
-            lambda a, b: a | b,  # An operation to test.
-            {"1", "a", "b"},  # The expected result of operation(obj._stored.set, other_set).
-            {"1", "a", "b"}  # The expected result of operation(other_set, obj._stored.set).
+        test_case = typing.Tuple[
+            typing.Set[str],  # A set to test an operation against (other_set).
+            typing.Callable[[typing.Set[str], typing.Set[str]], typing.Set[str]],  # An operation to test.
+            typing.Set[str],  # The expected result of operation(obj._stored.set, other_set).
+            typing.Set[str],  # The expected result of operation(other_set, obj._stored.set).
+        ]
+        test_operations: typing.List[test_case] = [(
+            {"1"},
+            lambda a, b: a | b,
+            {"1", "a", "b"},
+            {"1", "a", "b"}
         ), (
             {"a", "c"},
             lambda a, b: a - b,
@@ -1634,7 +1654,7 @@ class BreakpointTests(BaseTestCase):
         for name in not_really_names:
             with self.subTest(name=name):
                 with self.assertRaises(TypeError) as cm:
-                    framework.breakpoint(name)
+                    framework.breakpoint(name)  # type: ignore
                 self.assertEqual(str(cm.exception), 'breakpoint names must be strings')
 
     def check_trace_set(
