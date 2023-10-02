@@ -4574,11 +4574,13 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
             (tempdir / "foo/bar").mkdir(parents=True)
             (tempdir / "foo/test").write_text("test")
             (tempdir / "foo/bar/foobar").write_text("foobar")
+            (tempdir / "foo/baz").mkdir(parents=True)
             self.container.push_path(tempdir / "foo", "/tmp")
 
             self.assertTrue((self.root / "tmp").is_dir())
             self.assertTrue((self.root / "tmp/foo").is_dir())
             self.assertTrue((self.root / "tmp/foo/bar").is_dir())
+            self.assertTrue((self.root / "tmp/foo/baz").is_dir())
             self.assertEqual((self.root / "tmp/foo/test").read_text(), "test")
             self.assertEqual((self.root / "tmp/foo/bar/foobar").read_text(), "foobar")
 
@@ -4595,16 +4597,14 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
     def test_pull_path(self):
         (self.root / "foo").mkdir()
         (self.root / "foo/bar").write_text("bar")
-        # TODO: pull_path doesn't pull empty directories
-        # https://github.com/canonical/operator/issues/968
-        # (self.root / "foobar").mkdir()
+        (self.root / "foobar").mkdir()
         (self.root / "test").write_text("test")
         with tempfile.TemporaryDirectory() as temp:
             tempdir = pathlib.Path(temp)
             self.container.pull_path("/", tempdir)
             self.assertTrue((tempdir / "foo").is_dir())
             self.assertEqual((tempdir / "foo/bar").read_text(), "bar")
-            # self.assertTrue((tempdir / "foobar").is_dir())
+            self.assertTrue((tempdir / "foobar").is_dir())
             self.assertEqual((tempdir / "test").read_text(), "test")
 
     def test_list_files(self):
