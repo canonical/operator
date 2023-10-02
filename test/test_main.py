@@ -270,75 +270,16 @@ class _TestMain(abc.ABC):
         """
         return NotImplemented
 
-    if typing.TYPE_CHECKING:
-        @abc.abstractmethod
-        def addCleanup(  # noqa
-                self,
-                function: typing.Callable[..., None],
-                /,
-                *args: typing.Any,
-                **kwargs: typing.Any):
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def fail(self, msg: typing.Optional[str] = None):
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertRaises(  # noqa
-                self,
-                exception: typing.Type[BaseException],
-                *,
-                msg: typing.Optional[str] = None):
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertRegex(self, text: str, regex: str, msg: typing.Optional[str] = None):  # noqa
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertEqual(  # noqa
-                self,
-                first: typing.Any,
-                second: typing.Any,
-                msg: typing.Optional[str] = None):
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertIsNotNone(self, expr: typing.Any, msg: typing.Optional[str] = None):  # noqa
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertFalse(self, expr: typing.Any, msg: typing.Optional[str] = None):  # noqa
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertNotIn(self,  # noqa
-                        member: typing.Any,
-                        container: typing.Iterable[typing.Any],
-                        msg: typing.Optional[str] = None):
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def assertIn(self,  # noqa
-                     member: typing.Any,
-                     container: typing.Container[typing.Any],
-                     msg: typing.Optional[str] = None):
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
-
-        @abc.abstractmethod
-        def subTest(self, msg: typing.Optional[str] = None, **params: typing.Any):  # noqa
-            """Should be provided by unittest.TestCase."""
-            return NotImplemented
+    addCleanup = unittest.TestCase.addCleanup  # noqa
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertFalse = unittest.TestCase.assertFalse  # noqa
+    assertIn = unittest.TestCase.assertIn  # noqa
+    assertIsNotNone = unittest.TestCase.assertIsNotNone  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
+    assertRegex = unittest.TestCase.assertRegex  # noqa
+    assertNotIn = unittest.TestCase.assertNotIn  # noqa
+    fail = unittest.TestCase.fail
+    subTest = unittest.TestCase.subTest  # noqa
 
     @abc.abstractmethod
     def setUp(self):
@@ -354,8 +295,8 @@ class _TestMain(abc.ABC):
             ops.CharmBase.on = ops.CharmEvents()  # type: ignore
         self.addCleanup(cleanup)
 
-        fake_script(self, 'is-leader', 'echo true')
-        fake_script(self, 'juju-log', 'exit 0')
+        fake_script(typing.cast(unittest.TestCase, self), 'is-leader', 'echo true')
+        fake_script(typing.cast(unittest.TestCase, self), 'juju-log', 'exit 0')
 
         # set to something other than None for tests that care
         self.stdout = None
@@ -400,7 +341,7 @@ class _TestMain(abc.ABC):
 
     def _read_and_clear_state(self, event_name: str) -> ops.StoredStateData:
         framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta,
-                                    None, event_name)  # type: ignore
+                                  None, event_name)  # type: ignore
         if self.CHARM_STATE_FILE.stat().st_size:
             storage = SQLiteStorage(self.CHARM_STATE_FILE)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -512,8 +453,7 @@ class _TestMain(abc.ABC):
     def test_event_reemitted(self):
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
-        if typing.TYPE_CHECKING:
-            assert state is not None
+        assert state is not None
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
@@ -526,7 +466,7 @@ class _TestMain(abc.ABC):
             ['ConfigChangedEvent', 'UpdateStatusEvent'])
 
     def test_no_reemission_on_collect_metrics(self):
-        fake_script(self, 'add-metric', 'exit 0')
+        fake_script(typing.cast(unittest.TestCase, self), 'add-metric', 'exit 0')
 
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
@@ -543,7 +483,7 @@ class _TestMain(abc.ABC):
     def test_multiple_events_handled(self):
         self._prepare_actions()
 
-        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
@@ -723,10 +663,10 @@ class _TestMain(abc.ABC):
         self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
     def test_collect_metrics(self):
-        fake_script(self, 'add-metric', 'exit 0')
+        fake_script(typing.cast(unittest.TestCase, self), 'add-metric', 'exit 0')
         self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
-        fake_script_calls(self, clear=True)
+        fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
         self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect_metrics'))
 
         expected = [
@@ -735,18 +675,18 @@ class _TestMain(abc.ABC):
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(self)
+        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
 
         self.assertEqual(calls, expected)
 
     def test_custom_event(self):
         self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
-        fake_script_calls(self, clear=True)
+        fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
         self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status',
                                        set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
 
-        calls = fake_script_calls(self)
+        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
 
         custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
@@ -761,7 +701,7 @@ class _TestMain(abc.ABC):
         self.assertEqual(calls, expected)
 
     def test_logger(self):
-        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
 
         test_cases = [(
             EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
@@ -785,14 +725,14 @@ class _TestMain(abc.ABC):
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
-            self.assertIn(calls, fake_script_calls(self, clear=True))
+            self.assertIn(calls, fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(ops.InstallEvent, 'install',
                                            set_in_env={'TRY_EXCEPTHOOK': '1'}))
 
-        calls = [' '.join(i) for i in fake_script_calls(self)]
+        calls = [' '.join(i) for i in fake_script_calls(typing.cast(unittest.TestCase, self))]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
         self.assertRegex(
@@ -817,7 +757,7 @@ class _TestMain(abc.ABC):
     def test_sets_model_name(self):
         self._prepare_actions()
 
-        fake_script(self, 'action-get', "echo '{}'")
+        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_model_name_action',
             env_var='JUJU_ACTION_NAME',
@@ -828,8 +768,8 @@ class _TestMain(abc.ABC):
     def test_has_valid_status(self):
         self._prepare_actions()
 
-        fake_script(self, 'action-get', "echo '{}'")
-        fake_script(self, 'status-get', """echo '{"status": "unknown", "message": ""}'""")
+        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
+        fake_script(typing.cast(unittest.TestCase, self), 'status-get', """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
@@ -837,7 +777,9 @@ class _TestMain(abc.ABC):
         self.assertEqual(state.status_name, 'unknown')
         self.assertEqual(state.status_message, '')
         fake_script(
-            self, 'status-get', """echo '{"status": "blocked", "message": "help meeee"}'""")
+            typing.cast(unittest.TestCase, self),
+            'status-get',
+            """echo '{"status": "blocked", "message": "help meeee"}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME'))
@@ -1003,11 +945,12 @@ class _TestMainWithDispatch(_TestMain):
     def test_hook_and_dispatch(self):
         old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
-        fake_script(self, 'install', 'exit 0')
+        fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 0')
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
 
         # the script was called, *and*, the .on. was called
-        self.assertEqual(fake_script_calls(self), [['install', '']])
+        self.assertEqual(fake_script_calls(typing.cast(
+            unittest.TestCase, self)), [['install', '']])
         self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
 
         self.fake_script_path = old_path
@@ -1024,7 +967,7 @@ class _TestMainWithDispatch(_TestMain):
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(self)
+        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         self.assertRegex(' '.join(calls.pop(-3)),
                          'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
@@ -1045,7 +988,7 @@ class _TestMainWithDispatch(_TestMain):
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(self)
+        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         self.assertRegex(' '.join(calls.pop(-3)),
                          'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
@@ -1056,7 +999,7 @@ class _TestMainWithDispatch(_TestMain):
 
         old_path = self.fake_script_path
         self.fake_script_path = self.hooks_dir
-        fake_script(self, 'install', 'exit 42')
+        fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 42')
         event = EventSpec(ops.InstallEvent, 'install')
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(event)
@@ -1064,7 +1007,7 @@ class _TestMainWithDispatch(_TestMain):
 
         self.stdout.seek(0)
         self.assertEqual(self.stdout.read(), b'')
-        calls = fake_script_calls(self)
+        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
@@ -1129,7 +1072,7 @@ class _TestMainWithDispatch(_TestMain):
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(self)
+        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
 
         self.assertEqual(calls, expected)
