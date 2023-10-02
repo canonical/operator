@@ -1104,7 +1104,7 @@ class TestStoredState(BaseTestCase):
         framework.commit()
 
     def test_mutable_types(self):
-        # Test and validation functions in a list of 2-tuples.
+        # Test and validation functions in a list of tuples.
         # Assignment and keywords like del are not supported in lambdas
         #  so functions are used instead.
         test_case = typing.Tuple[
