@@ -39,3 +39,14 @@ def test_run_action():
     assert isinstance(a, Action)
     assert a.event.name == "do_foo_action"
     assert s is state
+
+
+def test_clear():
+    ctx = Context(MyCharm, meta={"name": "foo"})
+    state = State()
+
+    ctx.run("start", state)
+    assert ctx.emitted_events
+
+    ctx.clear()
+    assert not ctx.emitted_events  # and others...

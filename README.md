@@ -370,7 +370,6 @@ To declare a peer relation, you should use `scenario.state.PeerRelation`. The co
 that peer relations do not have a "remote app" (it's this app, in fact). So unlike `Relation`, a `PeerRelation` does not
 have `remote_app_name` or `remote_app_data` arguments. Also, it talks in terms of `peers`:
 
-- `Relation.remote_unit_ids` maps to `PeerRelation.peers_ids`
 - `Relation.remote_units_data` maps to `PeerRelation.peers_data`
 
 ```python
@@ -488,7 +487,7 @@ remote unit that the event is about. The reason that this parameter is not suppl
 events, is that the relation already ties 'this app' to some 'remote app' (cfr. the `Relation.remote_app_name` attr),
 but not to a specific unit. What remote unit this event is about is not a `State` concern but an `Event` one.
 
-The `remote_unit_id` will default to the first ID found in the relation's `remote_unit_ids`, but if the test you are
+The `remote_unit_id` will default to the first ID found in the relation's `remote_units_data`, but if the test you are
 writing is close to that domain, you should probably override it and pass it manually.
 
 ```python

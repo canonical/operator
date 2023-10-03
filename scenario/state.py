@@ -35,6 +35,8 @@ if typing.TYPE_CHECKING:
     PathLike = Union[str, Path]
     AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
     AnyJson = Union[str, bool, dict, int, float, list]
+    RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
+    UnitID = int
 
 logger = scenario_logger.getChild("state")
 
@@ -103,7 +105,7 @@ class Secret(_DCBase):
     id: str
 
     # mapping from revision IDs to each revision's contents
-    contents: Dict[int, Dict[str, str]]
+    contents: Dict[int, "RawSecretRevisionContents"]
 
     # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
     owner: Literal["unit", "application", None] = None
@@ -168,7 +170,7 @@ class Secret(_DCBase):
 
     def _update_metadata(
         self,
-        content: Optional[Dict[str, str]] = None,
+        content: Optional["RawSecretRevisionContents"] = None,
         label: Optional[str] = None,
         description: Optional[str] = None,
         expire: Optional[datetime.datetime] = None,
@@ -195,27 +197,6 @@ def normalize_name(s: str):
     return s.replace("-", "_")
 
 
-class ParametrizedEvent:
-    def __init__(self, accept_params: Tuple[str], category: str, *args, **kwargs):
-        self._accept_params = accept_params
-        self._category = category
-        self._args = args
-        self._kwargs = kwargs
-
-    def __call__(self, remote_unit: Optional[str] = None) -> "Event":
-        """Construct an Event object using the arguments provided at init and any extra params."""
-        if remote_unit and "remote_unit" not in self._accept_params:
-            raise ValueError(
-                f"cannot pass param `remote_unit` to a "
-                f"{self._category} event constructor.",
-            )
-
-        return Event(*self._args, *self._kwargs, relation_remote_unit_id=remote_unit)
-
-    def deferred(self, handler: Callable, event_id: int = 1) -> "DeferredEvent":
-        return self().deferred(handler=handler, event_id=event_id)
-
-
 _next_relation_id_counter = 1
 
 
@@ -237,8 +218,8 @@ class RelationBase(_DCBase):
     # Every new Relation instance gets a new one, if there's trouble, override.
     relation_id: int = dataclasses.field(default_factory=next_relation_id)
 
-    local_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    local_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    local_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    local_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
 
     @property
     def _databags(self):
@@ -251,7 +232,10 @@ class RelationBase(_DCBase):
         """Ids of the units on the other end of this relation."""
         raise NotImplementedError()
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:  # noqa: U100
+    def _get_databag_for_remote(
+        self,
+        unit_id: int,  # noqa: U100
+    ) -> "RawDataBagContents":
         """Return the databag for some remote unit ID."""
         raise NotImplementedError()
 
@@ -318,73 +302,17 @@ class RelationBase(_DCBase):
         )
 
 
-def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
-    """Unify and validate a list of unit IDs and a mapping from said ids to databag contents.
-
-    This allows the user to pass equivalently:
-    ids = []
-    data = {1: {}}
-
-    or
-
-    ids = [1]
-    data = {}
-
-    or
-
-    ids = [1]
-    data = {1: {}}
-
-    but catch the inconsistent:
-
-    ids = [1]
-    data = {2: {}}
-
-    or
-
-    ids = [2]
-    data = {1: {}}
-    """
-    if ids and data:
-        if not set(ids) == set(data):
-            raise StateValidationError(
-                f"{ids} should include any and all IDs from {data}",
-            )
-    elif ids:
-        data = {x: {} for x in ids}
-    elif data:
-        ids = list(data)
-    else:
-        ids = [0]
-        data = {0: {}}
-    return ids, data
-
-
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
     remote_app_name: str = "remote"
 
-    # fixme: simplify API by deriving remote_unit_ids from remote_units_data.
-    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
-
     # local limit
     limit: int = 1
 
-    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
-        default_factory=dict,
+    remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    remote_units_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
+        default_factory=lambda: {0: {}},
     )
-
-    def __post_init__(self):
-        super().__post_init__()
-
-        remote_unit_ids, remote_units_data = unify_ids_and_remote_units_data(
-            self.remote_unit_ids,
-            self.remote_units_data,
-        )
-        # bypass frozen dataclass
-        object.__setattr__(self, "remote_unit_ids", remote_unit_ids)
-        object.__setattr__(self, "remote_units_data", remote_units_data)
 
     @property
     def _remote_app_name(self) -> str:
@@ -394,9 +322,9 @@ class Relation(RelationBase):
     @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
-        return tuple(self.remote_unit_ids)
+        return tuple(self.remote_units_data)
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+    def _get_databag_for_remote(self, unit_id: int) -> "RawDataBagContents":
         """Return the databag for some remote unit ID."""
         return self.remote_units_data[unit_id]
 
@@ -411,8 +339,8 @@ class Relation(RelationBase):
 
 @dataclasses.dataclass(frozen=True)
 class SubordinateRelation(RelationBase):
-    remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
-    remote_unit_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    remote_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
 
     # app name and ID of the remote unit that *this unit* is attached to.
     remote_app_name: str = "remote"
@@ -423,7 +351,7 @@ class SubordinateRelation(RelationBase):
         """Ids of the units on the other end of this relation."""
         return (self.remote_unit_id,)
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+    def _get_databag_for_remote(self, unit_id: int) -> "RawDataBagContents":
         """Return the databag for some remote unit ID."""
         if unit_id is not self.remote_unit_id:
             raise ValueError(
@@ -447,10 +375,11 @@ class SubordinateRelation(RelationBase):
 
 @dataclasses.dataclass(frozen=True)
 class PeerRelation(RelationBase):
-    peers_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
-
-    # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
-    peers_ids: List[int] = dataclasses.field(default_factory=list)
+    peers_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
+        default_factory=lambda: {0: {}},
+    )
+    # mapping from peer unit IDs to their databag contents.
+    # Consistency checks will validate that *this unit*'s ID is not in here.
 
     @property
     def _databags(self):
@@ -462,20 +391,11 @@ class PeerRelation(RelationBase):
     @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
-        return tuple(self.peers_ids)
+        return tuple(self.peers_data)
 
-    def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
+    def _get_databag_for_remote(self, unit_id: int) -> "RawDataBagContents":
         """Return the databag for some remote unit ID."""
         return self.peers_data[unit_id]
-
-    def __post_init__(self):
-        peers_ids, peers_data = unify_ids_and_remote_units_data(
-            self.peers_ids,
-            self.peers_data,
-        )
-        # bypass frozen dataclass guards
-        object.__setattr__(self, "peers_ids", peers_ids)
-        object.__setattr__(self, "peers_data", peers_data)
 
 
 def _random_model_name():

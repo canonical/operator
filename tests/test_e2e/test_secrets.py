@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
@@ -208,6 +210,44 @@ def test_grant(mycharm, app):
 
     vals = list(out.secrets[0].remote_grants.values())
     assert vals == [{"remote"}] if app else [{"remote/0"}]
+
+
+def test_update_metadata(mycharm):
+    exp = datetime.datetime(2050, 12, 12)
+
+    def post_event(charm: CharmBase):
+        secret = charm.model.get_secret(label="mylabel")
+        secret.set_info(
+            label="babbuccia",
+            description="blu",
+            expire=exp,
+            rotate=SecretRotate.DAILY,
+        )
+
+    out = trigger(
+        State(
+            secrets=[
+                Secret(
+                    owner="unit",
+                    id="foo",
+                    label="mylabel",
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ],
+        ),
+        "update_status",
+        mycharm,
+        meta={"name": "local"},
+        post_event=post_event,
+    )
+
+    secret_out = out.secrets[0]
+    assert secret_out.label == "babbuccia"
+    assert secret_out.rotate == SecretRotate.DAILY
+    assert secret_out.description == "blu"
+    assert secret_out.expire == exp
 
 
 def test_grant_nonowner(mycharm):
