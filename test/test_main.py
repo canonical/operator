@@ -722,7 +722,8 @@ class _TestMain(abc.ABC):
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
-            self.assertIn(calls, fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
+            self.assertIn(calls,
+                          fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
