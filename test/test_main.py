@@ -244,6 +244,11 @@ class TestDispatch(unittest.TestCase):
         self.assertEqual(event, 'foo')
 
 
+_event_test = typing.List[typing.Tuple[
+    EventSpec,
+    typing.Dict[str, typing.Union[str, int, None]]]]
+
+
 class _TestMain(abc.ABC):
 
     @abc.abstractmethod
@@ -487,131 +492,129 @@ class _TestMain(abc.ABC):
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
-        events_under_test: typing.List[typing.Tuple[
-            EventSpec,
-            typing.Dict[str, typing.Union[str, int, None]]]] = [(
-                EventSpec(ops.InstallEvent, 'install'),
-                {},
-            ), (
-                EventSpec(ops.StartEvent, 'start'),
-                {},
-            ), (
-                EventSpec(ops.UpdateStatusEvent, 'update_status'),
-                {},
-            ), (
-                EventSpec(ops.LeaderSettingsChangedEvent, 'leader_settings_changed'),
-                {},
-            ), (
-                EventSpec(ops.RelationJoinedEvent, 'db_relation_joined',
-                          relation_id=1,
-                          remote_app='remote',
-                          remote_unit='remote/0'),
-                {'relation_name': 'db',
-                 'relation_id': 1,
-                 'app_name': 'remote',
-                 'unit_name': 'remote/0'},
-            ), (
-                EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
-                          relation_id=2,
-                          remote_app='remote',
-                          remote_unit='remote/0'),
-                {'relation_name': 'mon',
-                 'relation_id': 2,
-                 'app_name': 'remote',
-                 'unit_name': 'remote/0'},
-            ), (
-                EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
-                          relation_id=2,
-                          remote_app='remote',
-                          remote_unit=None),
-                {'relation_name': 'mon',
-                 'relation_id': 2,
-                 'app_name': 'remote'},
-            ), (
-                EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
-                          relation_id=2,
-                          remote_app='remote',
-                          remote_unit='remote/0',
-                          departing_unit_name='remote/42'),
-                {'relation_name': 'mon',
-                 'relation_id': 2,
-                 'app_name': 'remote',
-                 'unit_name': 'remote/0',
-                 'departing_unit': 'remote/42'},
-            ), (
-                EventSpec(ops.RelationBrokenEvent, 'ha_relation_broken',
-                          relation_id=3),
-                {'relation_name': 'ha',
-                 'relation_id': 3},
-            ), (
-                # Events without a remote app specified (for Juju < 2.7).
-                EventSpec(ops.RelationJoinedEvent, 'db_relation_joined',
-                          relation_id=1,
-                          remote_unit='remote/0'),
-                {'relation_name': 'db',
-                 'relation_id': 1,
-                 'app_name': 'remote',
-                 'unit_name': 'remote/0'},
-            ), (
-                EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
-                          relation_id=2,
-                          remote_unit='remote/0'),
-                {'relation_name': 'mon',
-                 'relation_id': 2,
-                 'app_name': 'remote',
-                 'unit_name': 'remote/0'},
-            ), (
-                EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
-                          relation_id=2,
-                          remote_unit='remote/0',
-                          departing_unit_name='remote/42'),
-                {'relation_name': 'mon',
-                 'relation_id': 2,
-                 'app_name': 'remote',
-                 'unit_name': 'remote/0',
-                 'departing_unit': 'remote/42'},
-            ), (
-                EventSpec(ops.ActionEvent, 'start_action',
-                          env_var='JUJU_ACTION_NAME'),
-                {},
-            ), (
-                EventSpec(ops.ActionEvent, 'foo_bar_action',
-                          env_var='JUJU_ACTION_NAME'),
-                {},
-            ), (
-                EventSpec(ops.PebbleReadyEvent, 'test_pebble_ready',
-                          workload_name='test'),
-                {'container_name': 'test'},
-            ), (
-                EventSpec(ops.SecretChangedEvent, 'secret_changed',
-                          secret_id='secret:12345',
-                          secret_label='foo'),
-                {'id': 'secret:12345',
-                 'label': 'foo'}
-            ), (
-                EventSpec(ops.SecretRotateEvent, 'secret_rotate',
-                          secret_id='secret:12345',
-                          secret_label='foo',
-                          secret_revision='42'),
-                {'id': 'secret:12345',
-                 'label': 'foo'}
-            ), (
-                EventSpec(ops.SecretRemoveEvent, 'secret_remove',
-                          secret_id='secret:12345',
-                          secret_label='foo',
-                          secret_revision='42'),
-                {'id': 'secret:12345',
-                 'label': 'foo',
-                 'revision': 42}
-            ), (
-                EventSpec(ops.SecretExpiredEvent, 'secret_expired',
-                          secret_id='secret:12345',
-                          secret_label='foo',
-                          secret_revision='42'),
-                {'id': 'secret:12345',
-                 'label': 'foo',
-                 'revision': 42}
-            )]
+        events_under_test: _event_test = [(
+            EventSpec(ops.InstallEvent, 'install'),
+            {},
+        ), (
+            EventSpec(ops.StartEvent, 'start'),
+            {},
+        ), (
+            EventSpec(ops.UpdateStatusEvent, 'update_status'),
+            {},
+        ), (
+            EventSpec(ops.LeaderSettingsChangedEvent, 'leader_settings_changed'),
+            {},
+        ), (
+            EventSpec(ops.RelationJoinedEvent, 'db_relation_joined',
+                      relation_id=1,
+                      remote_app='remote',
+                      remote_unit='remote/0'),
+            {'relation_name': 'db',
+             'relation_id': 1,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
+                      relation_id=2,
+                      remote_app='remote',
+                      remote_unit='remote/0'),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
+                      relation_id=2,
+                      remote_app='remote',
+                      remote_unit=None),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote'},
+        ), (
+            EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
+                      relation_id=2,
+                      remote_app='remote',
+                      remote_unit='remote/0',
+                      departing_unit_name='remote/42'),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0',
+             'departing_unit': 'remote/42'},
+        ), (
+            EventSpec(ops.RelationBrokenEvent, 'ha_relation_broken',
+                      relation_id=3),
+            {'relation_name': 'ha',
+             'relation_id': 3},
+        ), (
+            # Events without a remote app specified (for Juju < 2.7).
+            EventSpec(ops.RelationJoinedEvent, 'db_relation_joined',
+                      relation_id=1,
+                      remote_unit='remote/0'),
+            {'relation_name': 'db',
+             'relation_id': 1,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(ops.RelationChangedEvent, 'mon_relation_changed',
+                      relation_id=2,
+                      remote_unit='remote/0'),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0'},
+        ), (
+            EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
+                      relation_id=2,
+                      remote_unit='remote/0',
+                      departing_unit_name='remote/42'),
+            {'relation_name': 'mon',
+             'relation_id': 2,
+             'app_name': 'remote',
+             'unit_name': 'remote/0',
+             'departing_unit': 'remote/42'},
+        ), (
+            EventSpec(ops.ActionEvent, 'start_action',
+                      env_var='JUJU_ACTION_NAME'),
+            {},
+        ), (
+            EventSpec(ops.ActionEvent, 'foo_bar_action',
+                      env_var='JUJU_ACTION_NAME'),
+            {},
+        ), (
+            EventSpec(ops.PebbleReadyEvent, 'test_pebble_ready',
+                      workload_name='test'),
+            {'container_name': 'test'},
+        ), (
+            EventSpec(ops.SecretChangedEvent, 'secret_changed',
+                      secret_id='secret:12345',
+                      secret_label='foo'),
+            {'id': 'secret:12345',
+             'label': 'foo'}
+        ), (
+            EventSpec(ops.SecretRotateEvent, 'secret_rotate',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo'}
+        ), (
+            EventSpec(ops.SecretRemoveEvent, 'secret_remove',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        ), (
+            EventSpec(ops.SecretExpiredEvent, 'secret_expired',
+                      secret_id='secret:12345',
+                      secret_label='foo',
+                      secret_revision='42'),
+            {'id': 'secret:12345',
+             'label': 'foo',
+             'revision': 42}
+        )]
 
         logger.debug('Expected events %s', events_under_test)
 
