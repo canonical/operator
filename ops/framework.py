@@ -101,7 +101,7 @@ class Handle:
     under the same parent and kind may have the same key.
     """
 
-    def __init__(self, parent: Optional[Union['Handle', 'Object']], kind: str, key: str):
+    def __init__(self, parent: Optional[Union['Handle', 'Object']], kind: str, key: Optional[str]):
         if isinstance(parent, Object):
             # if it's not an Object, it will be either a Handle (good) or None (no parent)
             parent = parent.handle
@@ -119,7 +119,7 @@ class Handle:
             else:
                 self._path = f"{kind}"  # don't need f-string, but consistent with above
 
-    def nest(self, kind: str, key: str) -> 'Handle':
+    def nest(self, kind: str, key: Optional[str]) -> 'Handle':
         """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
@@ -143,7 +143,7 @@ class Handle:
         return self._kind
 
     @property
-    def key(self) -> str:
+    def key(self) -> Optional[str]:
         """Return the handle's key."""
         return self._key
 
