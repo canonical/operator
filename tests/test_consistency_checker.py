@@ -142,6 +142,11 @@ def test_bad_config_option_type():
         Event("bar"),
         _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "string"}}}),
     )
+    assert_inconsistent(
+        State(config={"foo": True}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {}}}),
+    )
     assert_consistent(
         State(config={"foo": True}),
         Event("bar"),
@@ -151,9 +156,23 @@ def test_bad_config_option_type():
 
 @pytest.mark.parametrize("bad_v", ("1.0", "0", "1.2", "2.35.42", "2.99.99", "2.99"))
 def test_secrets_jujuv_bad(bad_v):
+    secret = Secret("secret:foo", {0: {"a": "b"}})
     assert_inconsistent(
-        State(secrets=[Secret("secret:foo", {0: {"a": "b"}})]),
+        State(secrets=[secret]),
         Event("bar"),
+        _CharmSpec(MyCharm, {}),
+        bad_v,
+    )
+    assert_inconsistent(
+        State(secrets=[secret]),
+        secret.changed_event,
+        _CharmSpec(MyCharm, {}),
+        bad_v,
+    )
+
+    assert_inconsistent(
+        State(),
+        secret.changed_event,
         _CharmSpec(MyCharm, {}),
         bad_v,
     )
@@ -182,6 +201,20 @@ def test_peer_relation_consistency():
     )
 
 
+def test_duplicate_endpoints_inconsistent():
+    assert_inconsistent(
+        State(),
+        Event("bar"),
+        _CharmSpec(
+            MyCharm,
+            {
+                "requires": {"foo": {"interface": "bar"}},
+                "provides": {"foo": {"interface": "baz"}},
+            },
+        ),
+    )
+
+
 def test_sub_relation_consistency():
     assert_inconsistent(
         State(relations=[Relation("foo")]),
@@ -191,6 +224,7 @@ def test_sub_relation_consistency():
             {"requires": {"foo": {"interface": "bar", "scope": "container"}}},
         ),
     )
+
     assert_consistent(
         State(relations=[SubordinateRelation("foo")]),
         Event("bar"),
@@ -223,6 +257,32 @@ def test_container_pebble_evt_consistent():
         State(containers=[container]),
         container.pebble_ready_event,
         _CharmSpec(MyCharm, {"containers": {"foo-bar-baz": {}}}),
+    )
+
+
+def test_action_not_in_meta_inconsistent():
+    action = Action("foo", params={"bar": "baz"})
+    assert_inconsistent(
+        State(),
+        action.event,
+        _CharmSpec(MyCharm, meta={}, actions={}),
+    )
+
+
+def test_action_meta_type_inconsistent():
+    action = Action("foo", params={"bar": "baz"})
+    assert_inconsistent(
+        State(),
+        action.event,
+        _CharmSpec(
+            MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "zabazaba"}}}}
+        ),
+    )
+
+    assert_inconsistent(
+        State(),
+        action.event,
+        _CharmSpec(MyCharm, meta={}, actions={"foo": {"params": {"bar": {}}}}),
     )
 
 

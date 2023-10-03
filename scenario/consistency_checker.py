@@ -185,6 +185,7 @@ def _check_action_event(
             f"action event {event.name} refers to action {action.name} "
             f"which is not declared in the charm metadata (actions.yaml).",
         )
+        return
 
     _check_action_param_types(charm_spec, action, errors, warnings)
 

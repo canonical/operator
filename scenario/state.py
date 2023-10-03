@@ -195,27 +195,6 @@ def normalize_name(s: str):
     return s.replace("-", "_")
 
 
-class ParametrizedEvent:
-    def __init__(self, accept_params: Tuple[str], category: str, *args, **kwargs):
-        self._accept_params = accept_params
-        self._category = category
-        self._args = args
-        self._kwargs = kwargs
-
-    def __call__(self, remote_unit: Optional[str] = None) -> "Event":
-        """Construct an Event object using the arguments provided at init and any extra params."""
-        if remote_unit and "remote_unit" not in self._accept_params:
-            raise ValueError(
-                f"cannot pass param `remote_unit` to a "
-                f"{self._category} event constructor.",
-            )
-
-        return Event(*self._args, *self._kwargs, relation_remote_unit_id=remote_unit)
-
-    def deferred(self, handler: Callable, event_id: int = 1) -> "DeferredEvent":
-        return self().deferred(handler=handler, event_id=event_id)
-
-
 _next_relation_id_counter = 1
 
 
