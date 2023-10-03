@@ -26,15 +26,14 @@ async def test_smoke(ops_test: OpsTest):
 
     # Build the charm. (We just build it for focal -- it *should* work to deploy it on
     # older versions of Juju.)
-    charm = await ops_test.build_charm("./test/charms/test_smoke/")  # type: ignore
+    charm = await ops_test.build_charm("./test/charms/test_smoke/")
 
     for series in ['focal', 'bionic', 'xenial']:
         model = ops_test.model
         assert model is not None
-        app = await model.deploy(  # type: ignore
+        app = await model.deploy(
             charm, series=series, application_name=f"{series}-smoke")
-        await model.wait_for_idle(timeout=600)  # type: ignore
+        await model.wait_for_idle(timeout=600)
 
         assert app is not None
-        assert_msg = f"Series {series} failed with '{app.status}' status"  # type: ignore
-        assert app.status == "active", assert_msg  # type: ignore
+        assert app.status == "active", f"Series {series} failed with '{app.status}' status"

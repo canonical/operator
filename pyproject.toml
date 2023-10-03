@@ -31,7 +31,6 @@ docstring-convention = "google"
 include = ["ops/*.py", "ops/_private/*.py",
     "test/charms/test_main/src/*.py",
     "test/charms/test_smoke/src/*.py",
-    "test/smoke/*.py",
     "test/test_private.py",
     "test/test_infra.py",
     "test/test_jujuversion.py",
