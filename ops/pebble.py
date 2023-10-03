@@ -1911,7 +1911,7 @@ class Client:
         def pull(self,  # noqa
                  path: str,
                  *,
-                 encoding: str) -> TextIO:
+                 encoding: str = 'utf-8') -> TextIO:
             ...
 
     def pull(self,
