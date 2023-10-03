@@ -318,73 +318,17 @@ class RelationBase(_DCBase):
         )
 
 
-def unify_ids_and_remote_units_data(ids: List[int], data: Dict[int, Any]):
-    """Unify and validate a list of unit IDs and a mapping from said ids to databag contents.
-
-    This allows the user to pass equivalently:
-    ids = []
-    data = {1: {}}
-
-    or
-
-    ids = [1]
-    data = {}
-
-    or
-
-    ids = [1]
-    data = {1: {}}
-
-    but catch the inconsistent:
-
-    ids = [1]
-    data = {2: {}}
-
-    or
-
-    ids = [2]
-    data = {1: {}}
-    """
-    if ids and data:
-        if not set(ids) == set(data):
-            raise StateValidationError(
-                f"{ids} should include any and all IDs from {data}",
-            )
-    elif ids:
-        data = {x: {} for x in ids}
-    elif data:
-        ids = list(data)
-    else:
-        ids = [0]
-        data = {0: {}}
-    return ids, data
-
-
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
     remote_app_name: str = "remote"
-
-    # fixme: simplify API by deriving remote_unit_ids from remote_units_data.
-    remote_unit_ids: List[int] = dataclasses.field(default_factory=list)
 
     # local limit
     limit: int = 1
 
     remote_app_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     remote_units_data: Dict[int, Dict[str, str]] = dataclasses.field(
-        default_factory=dict,
+        default_factory=lambda: {0: {}},
     )
-
-    def __post_init__(self):
-        super().__post_init__()
-
-        remote_unit_ids, remote_units_data = unify_ids_and_remote_units_data(
-            self.remote_unit_ids,
-            self.remote_units_data,
-        )
-        # bypass frozen dataclass
-        object.__setattr__(self, "remote_unit_ids", remote_unit_ids)
-        object.__setattr__(self, "remote_units_data", remote_units_data)
 
     @property
     def _remote_app_name(self) -> str:
@@ -394,7 +338,7 @@ class Relation(RelationBase):
     @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
-        return tuple(self.remote_unit_ids)
+        return tuple(self.remote_units_data)
 
     def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
         """Return the databag for some remote unit ID."""
@@ -447,10 +391,11 @@ class SubordinateRelation(RelationBase):
 
 @dataclasses.dataclass(frozen=True)
 class PeerRelation(RelationBase):
-    peers_data: Dict[int, Dict[str, str]] = dataclasses.field(default_factory=dict)
-
-    # IDs of the peers. Consistency checks will validate that *this unit*'s ID is not in here.
-    peers_ids: List[int] = dataclasses.field(default_factory=list)
+    peers_data: Dict[int, Dict[str, str]] = dataclasses.field(
+        default_factory=lambda: {0: {}},
+    )
+    # mapping from peer unit IDs to their databag contents.
+    # Consistency checks will validate that *this unit*'s ID is not in here.
 
     @property
     def _databags(self):
@@ -462,20 +407,11 @@ class PeerRelation(RelationBase):
     @property
     def _remote_unit_ids(self) -> Tuple[int]:
         """Ids of the units on the other end of this relation."""
-        return tuple(self.peers_ids)
+        return tuple(self.peers_data)
 
     def _get_databag_for_remote(self, unit_id: int) -> Dict[str, str]:
         """Return the databag for some remote unit ID."""
         return self.peers_data[unit_id]
-
-    def __post_init__(self):
-        peers_ids, peers_data = unify_ids_and_remote_units_data(
-            self.peers_ids,
-            self.peers_data,
-        )
-        # bypass frozen dataclass guards
-        object.__setattr__(self, "peers_ids", peers_ids)
-        object.__setattr__(self, "peers_data", peers_data)
 
 
 def _random_model_name():

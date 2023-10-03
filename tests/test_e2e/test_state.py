@@ -147,7 +147,6 @@ def test_relation_get(mycharm):
                 interface="bar",
                 local_app_data={"a": "because"},
                 remote_app_name="remote",
-                remote_unit_ids=[0, 1, 2],
                 remote_app_data={"a": "b"},
                 local_unit_data={"c": "d"},
                 remote_units_data={0: {}, 1: {"e": "f"}, 2: {}},
@@ -198,9 +197,7 @@ def test_relation_set(mycharm):
         endpoint="foo",
         interface="bar",
         remote_app_name="remote",
-        remote_unit_ids=[1, 4],
-        local_app_data={},
-        local_unit_data={},
+        remote_units_data={1: {}, 4: {}},
     )
     state = State(
         leader=True,
