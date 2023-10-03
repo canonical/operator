@@ -644,7 +644,8 @@ class _TestMain(abc.ABC):
             self.assertEqual(list(state.observed_event_types), [event_spec.event_type.__name__])
 
             if expected_event_data:
-                self.assertEqual(getattr(state, f"{event_spec.event_name}_data"), expected_event_data)
+                self.assertEqual(getattr(state, f"{event_spec.event_name}_data"),
+                                 expected_event_data)
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit."""
