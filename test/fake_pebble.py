@@ -25,6 +25,18 @@ import threading
 import typing
 import urllib.parse
 
+# This should use Required/NotRequired in Python 3.11+
+_ResponseBase = typing.TypedDict(
+    "_Response", {
+        "result": typing.Optional[typing.Dict[str, str]],
+        "status": str,
+        "status-code": int,
+        "type": str})
+
+
+class _Response(_ResponseBase, total=False):
+    change: str
+
 
 class Handler(http.server.BaseHTTPRequestHandler):
     if typing.TYPE_CHECKING:
@@ -38,10 +50,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def __init__(self,
                  request: socket.socket,
-                 client_address : typing.Tuple[str,
-                                               int],
+                 client_address: typing.Tuple[str, int],
                  server: socketserver.BaseServer):
-        self.routes : Handler._route = [
+        self.routes: Handler._route = [
             ('GET', re.compile(r'^/system-info$'), self.get_system_info),
             ('POST', re.compile(r'^/services$'), self.services_action),
         ]
@@ -52,8 +63,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # Disable logging for tests
         pass
 
-    def respond(self, d: typing.Dict[str, typing.Union[str, int,
-                None, typing.Dict[str, str]]], status: int = 200) -> None:
+    def respond(self, d: _Response, status: int = 200) -> None:
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
@@ -61,7 +71,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(d_json.encode('utf-8'))
 
     def bad_request(self, message: str) -> None:
-        d = {
+        d: _Response = {
             "result": {
                 "message": message,
             },
@@ -72,7 +82,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.respond(d, 400)
 
     def not_found(self) -> None:
-        d = {
+        d: _Response = {
             "result": {
                 "message": "invalid API endpoint requested"
             },
@@ -83,7 +93,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.respond(d, 404)
 
     def method_not_allowed(self) -> None:
-        d = {
+        d: _Response = {
             "result": {
                 "message": 'method "PUT" not allowed'
             },
@@ -94,7 +104,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.respond(d, 405)
 
     def internal_server_error(self, msg: Exception) -> None:
-        d = {
+        d: _Response = {
             "result": {
                 "message": f"internal server error: {msg}",
             },
@@ -120,7 +130,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         path = path[3:]
 
-        allowed : typing.List[str] = []
+        allowed: typing.List[str] = []
         for method, regex, func in self.routes:
             match = regex.match(path)
             if match:
