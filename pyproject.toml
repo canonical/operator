@@ -29,6 +29,8 @@ docstring-convention = "google"
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py",
+    "test/charms/test_main/src/*.py",
+    "test/charms/test_smoke/src/*.py",
     "test/test_private.py",
     "test/test_infra.py",
     "test/test_jujuversion.py",
@@ -40,6 +42,7 @@ include = ["ops/*.py", "ops/_private/*.py",
     "test/test_storage.py",
     "test/test_charm.py",
     "test/test_framework.py",
+    "test/test_main.py",
 ]
 pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"

@@ -16,33 +16,29 @@
 import logging
 import os
 import sys
+import typing
 
 sys.path.append('lib')
 
-from ops.charm import (  # noqa: E402 (module-level import after non-import code)
-    CharmBase,
-    CharmEvents,
-)
-from ops.framework import EventBase, EventSource, StoredState  # noqa: E402 (ditto)
-from ops.main import main  # noqa: E402 (ditto)
+import ops  # noqa: E402 (module-level import after non-import code)
 
 logger = logging.getLogger()
 
 
-class CustomEvent(EventBase):
+class CustomEvent(ops.EventBase):
     pass
 
 
-class MyCharmEvents(CharmEvents):
-    custom = EventSource(CustomEvent)
+class MyCharmEvents(ops.CharmEvents):
+    custom = ops.EventSource(CustomEvent)
 
 
-class Charm(CharmBase):
-    on = MyCharmEvents()
+class Charm(ops.CharmBase):
+    on = MyCharmEvents()  # type: ignore
 
-    _stored = StoredState()
+    _stored = ops.StoredState()
 
-    def __init__(self, *args):
+    def __init__(self, *args: typing.Any):
         super().__init__(*args)
         self._stored.set_default(
             try_excepthook=False,
@@ -117,37 +113,37 @@ class Charm(CharmBase):
         if os.getenv('TRY_EXCEPTHOOK', False):
             raise RuntimeError("failing as requested")
 
-    def _on_install(self, event):
+    def _on_install(self, event: ops.InstallEvent):
         self._stored.on_install.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_start(self, event):
+    def _on_start(self, event: ops.StartEvent):
         self._stored.on_start.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_config_changed(self, event):
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
         self._stored.on_config_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         event.defer()
 
-    def _on_update_status(self, event):
+    def _on_update_status(self, event: ops.UpdateStatusEvent):
         self._stored.on_update_status.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
         if os.getenv('EMIT_CUSTOM_EVENT'):
             self.on.custom.emit()
 
-    def _on_leader_settings_changed(self, event):
+    def _on_leader_settings_changed(self, event: ops.LeaderSettingsChangedEvent):
         self._stored.on_leader_settings_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_db_relation_joined(self, event):
+    def _on_db_relation_joined(self, event: ops.RelationJoinedEvent):
         assert event.app is not None, 'application name cannot be None for a relation-joined event'
         self._stored.on_db_relation_joined.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.db_relation_joined_data = event.snapshot()
 
-    def _on_mon_relation_changed(self, event):
+    def _on_mon_relation_changed(self, event: ops.RelationChangedEvent):
         assert event.app is not None, (
             'application name cannot be None for a relation-changed event')
         if os.environ.get('JUJU_REMOTE_UNIT'):
@@ -158,14 +154,14 @@ class Charm(CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.mon_relation_changed_data = event.snapshot()
 
-    def _on_mon_relation_departed(self, event):
+    def _on_mon_relation_departed(self, event: ops.RelationDepartedEvent):
         assert event.app is not None, (
             'application name cannot be None for a relation-departed event')
         self._stored.on_mon_relation_departed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.mon_relation_departed_data = event.snapshot()
 
-    def _on_ha_relation_broken(self, event):
+    def _on_ha_relation_broken(self, event: ops.RelationBrokenEvent):
         assert event.app is None, (
             'relation-broken events cannot have a reference to a remote application')
         assert event.unit is None, (
@@ -174,88 +170,92 @@ class Charm(CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.ha_relation_broken_data = event.snapshot()
 
-    def _on_test_pebble_ready(self, event):
+    def _on_test_pebble_ready(self, event: ops.PebbleReadyEvent):
         assert event.workload is not None, (
             'workload events must have a reference to a container')
         self._stored.on_test_pebble_ready.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.test_pebble_ready_data = event.snapshot()
 
-    def _on_start_action(self, event):
+    def _on_start_action(self, event: ops.ActionEvent):
         assert event.handle.kind == 'start_action', (
             'event action name cannot be different from the one being handled')
         self._stored.on_start_action.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_secret_changed(self, event):
+    def _on_secret_changed(self, event: ops.SecretChangedEvent):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
             f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.secret_changed_data = event.snapshot()
 
-    def _on_secret_remove(self, event):
+    def _on_secret_remove(self, event: ops.SecretRemoveEvent):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
             f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_remove.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.secret_remove_data = event.snapshot()
 
-    def _on_secret_rotate(self, event):
+    def _on_secret_rotate(self, event: ops.SecretRotateEvent):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
             f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_rotate.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.secret_rotate_data = event.snapshot()
 
-    def _on_secret_expired(self, event):
+    def _on_secret_expired(self, event: ops.SecretExpiredEvent):
         # subprocess and isinstance don't mix well
         assert type(event.secret).__name__ == 'Secret', (
             f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}')
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_expired.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.secret_expired_data = event.snapshot()
 
-    def _on_foo_bar_action(self, event):
+    def _on_foo_bar_action(self, event: ops.ActionEvent):
         assert event.handle.kind == 'foo_bar_action', (
             'event action name cannot be different from the one being handled')
         self._stored.on_foo_bar_action.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_get_status_action(self, event):
+    def _on_get_status_action(self, event: ops.CollectStatusEvent):
         self._stored.status_name = self.unit.status.name
         self._stored.status_message = self.unit.status.message
 
-    def _on_collect_metrics(self, event):
+    def _on_collect_metrics(self, event: ops.CollectMetricsEvent):
         self._stored.on_collect_metrics.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
-        event.add_metrics({'foo': 42}, {'bar': 4.2})
+        event.add_metrics({'foo': 42}, {'bar': '4.2'})
 
-    def _on_custom(self, event):
+    def _on_custom(self, event: MyCharmEvents):
         self._stored.on_custom.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_log_critical_action(self, event):
+    def _on_log_critical_action(self, event: ops.ActionEvent):
         logger.critical('super critical')
 
-    def _on_log_error_action(self, event):
+    def _on_log_error_action(self, event: ops.ActionEvent):
         logger.error('grave error')
 
-    def _on_log_warning_action(self, event):
+    def _on_log_warning_action(self, event: ops.ActionEvent):
         logger.warning('wise warning')
 
-    def _on_log_info_action(self, event):
+    def _on_log_info_action(self, event: ops.ActionEvent):
         logger.info('useful info')
 
-    def _on_log_debug_action(self, event):
+    def _on_log_debug_action(self, event: ops.ActionEvent):
         logger.debug('insightful debug')
 
-    def _on_get_model_name_action(self, event):
+    def _on_get_model_name_action(self, event: ops.ActionEvent):
         self._stored._on_get_model_name_action.append(self.model.name)
 
 
 if __name__ == '__main__':
-    main(Charm)
+    ops.main(Charm)  # type: ignore
