@@ -281,7 +281,6 @@ class _TestMain(abc.ABC):
     fail = unittest.TestCase.fail
     subTest = unittest.TestCase.subTest  # noqa
 
-    @abc.abstractmethod
     def setUp(self):
         self._setup_charm_dir()
 
@@ -536,8 +535,7 @@ class _TestMain(abc.ABC):
                           remote_unit=None),
                 {'relation_name': 'mon',
                  'relation_id': 2,
-                 'app_name': 'remote',
-                 'unit_name': None},
+                 'app_name': 'remote'},
             ), (
                 EventSpec(ops.RelationDepartedEvent, 'mon_relation_departed',
                           relation_id=2,
@@ -548,7 +546,7 @@ class _TestMain(abc.ABC):
                  'relation_id': 2,
                  'app_name': 'remote',
                  'unit_name': 'remote/0',
-                 'departing_unit_name': 'remote/42'},
+                 'departing_unit': 'remote/42'},
             ), (
                 EventSpec(ops.RelationBrokenEvent, 'ha_relation_broken',
                           relation_id=3),
@@ -580,7 +578,7 @@ class _TestMain(abc.ABC):
                  'relation_id': 2,
                  'app_name': 'remote',
                  'unit_name': 'remote/0',
-                 'departing_unit_name': 'remote/42'},
+                 'departing_unit': 'remote/42'},
             ), (
                 EventSpec(ops.ActionEvent, 'start_action',
                           env_var='JUJU_ACTION_NAME'),
@@ -598,16 +596,14 @@ class _TestMain(abc.ABC):
                           secret_id='secret:12345',
                           secret_label='foo'),
                 {'id': 'secret:12345',
-                 'label': 'foo',
-                 'revision': 42}
+                 'label': 'foo'}
             ), (
                 EventSpec(ops.SecretRotateEvent, 'secret_rotate',
                           secret_id='secret:12345',
                           secret_label='foo',
                           secret_revision='42'),
                 {'id': 'secret:12345',
-                 'label': 'foo',
-                 'revision': 42}
+                 'label': 'foo'}
             ), (
                 EventSpec(ops.SecretRemoveEvent, 'secret_remove',
                           secret_id='secret:12345',
@@ -634,6 +630,7 @@ class _TestMain(abc.ABC):
         # Simulate hook executions for every event.
         for event_spec, expected_event_data in events_under_test:
             state = self._simulate_event(event_spec)
+            assert isinstance(state, ops.BoundStoredState)
 
             state_key = f"on_{event_spec.event_name}"
             handled_events = getattr(state, state_key, [])
@@ -646,9 +643,8 @@ class _TestMain(abc.ABC):
 
             self.assertEqual(list(state.observed_event_types), [event_spec.event_type.__name__])
 
-            if event_spec.event_name in expected_event_data:
-                self.assertEqual(state[f"{event_spec.event_name}_data"],
-                                 expected_event_data[event_spec.event_name])
+            if expected_event_data:
+                self.assertEqual(getattr(state, f"{event_spec.event_name}_data"), expected_event_data)
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit."""
