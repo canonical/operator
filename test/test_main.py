@@ -428,7 +428,7 @@ class _TestMain(abc.ABC):
             })
         if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
-            assert event_spec.env_var is not None:
+            assert event_spec.env_var is not None
             env.update({
                 event_spec.env_var: event_filename,
             })
