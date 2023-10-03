@@ -317,13 +317,9 @@ class _TestMain(abc.ABC):
         shutil.copytree(str(TEST_CHARM_DIR), str(self.JUJU_CHARM_DIR))
 
         charm_spec = importlib.util.spec_from_file_location("charm", charm_path)
-        if charm_spec is None:
-            self.fail("Unable to load spec")
-            return
+        assert charm_spec is not None
         self.charm_module = importlib.util.module_from_spec(charm_spec)
-        if charm_spec.loader is None:
-            self.fail("Something went wrong loading the module")
-            return
+        assert charm_spec.loader is not None
         charm_spec.loader.exec_module(self.charm_module)
 
         self._prepare_initial_hooks()
@@ -726,9 +722,7 @@ class _TestMain(abc.ABC):
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
-            self.assertIn(
-                calls,
-                fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
+            self.assertIn(calls, fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
@@ -738,9 +732,7 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script_calls(typing.cast(unittest.TestCase, self))]
 
         self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-        self.assertRegex(
-            calls.pop(0),
-            'Using local storage: not a Kubernetes podspec charm')
+        self.assertRegex(calls.pop(0), 'Using local storage: not a Kubernetes podspec charm')
         self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
 
         self.maxDiff = None
@@ -752,10 +744,7 @@ class _TestMain(abc.ABC):
             '    raise RuntimeError."failing as requested".\n'
             'RuntimeError: failing as requested'
         )
-        self.assertEqual(
-            len(calls),
-            1,
-            f"expected 1 call, but got extra: {calls[1:]}")
+        self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
 
     def test_sets_model_name(self):
         self._prepare_actions()
