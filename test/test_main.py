@@ -387,10 +387,7 @@ class _TestMain(abc.ABC):
         if event_spec.set_in_env is not None:
             env.update(event_spec.set_in_env)
         if issubclass(event_spec.event_type, ops.SecretEvent):
-            if event_spec.secret_id is None:
-                # We do it this way around to show type checkers that it's not None.
-                self.assertIsNotNone(event_spec.secret_id)
-                return
+            assert event_spec.secret_id is not None
             env.update({
                 'JUJU_SECRET_ID': event_spec.secret_id,
                 'JUJU_SECRET_LABEL': event_spec.secret_label or '',
@@ -425,19 +422,13 @@ class _TestMain(abc.ABC):
                 'JUJU_REMOTE_APP': '',
             })
         if issubclass(event_spec.event_type, ops.WorkloadEvent):
-            # Show type checkers that the name is not None.
-            if event_spec.workload_name is None:
-                self.assertIsNotNone(event_spec.workload_name)
-                return
+            assert event_spec.workload_name is not None
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
             })
         if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
-            # Show type checkers that this is not None.
-            if event_spec.env_var is None:
-                self.assertIsNotNone(event_spec.env_var)
-                return
+            assert event_spec.env_var is not None:
             env.update({
                 event_spec.env_var: event_filename,
             })
@@ -734,11 +725,7 @@ class _TestMain(abc.ABC):
             self._simulate_event(event_spec)
             self.assertIn(
                 calls,
-                fake_script_calls(
-                    typing.cast(
-                        unittest.TestCase,
-                        self),
-                    clear=True))
+                fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
