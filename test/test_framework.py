@@ -52,10 +52,9 @@ class TestFramework(BaseTestCase):
 
     def test_handle_path(self):
         cases = [
-            (ops.Handle(None, "root", 'test1'), "root[test1]"),
+            (ops.Handle(None, "root", None), "root"),
             (ops.Handle(None, "root", "1"), "root[1]"),
-            (ops.Handle(ops.Handle(None, "root", 'test2'), "child", 'test3'),
-             "root[test2]/child[test3]"),
+            (ops.Handle(ops.Handle(None, "root", None), "child", None), "root/child"),
             (ops.Handle(ops.Handle(None, "root", "1"), "child", "2"), "root[1]/child[2]"),
         ]
         for handle, path in cases:
