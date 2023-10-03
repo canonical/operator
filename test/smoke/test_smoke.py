@@ -15,7 +15,6 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import logging
-import typing
 
 from pytest_operator.plugin import OpsTest
 
@@ -31,11 +30,11 @@ async def test_smoke(ops_test: OpsTest):
 
     for series in ['focal', 'bionic', 'xenial']:
         model = ops_test.model
-        if typing.TYPE_CHECKING:
-            assert model is not None
+        assert model is not None
         app = await model.deploy(  # type: ignore
             charm, series=series, application_name=f"{series}-smoke")
         await model.wait_for_idle(timeout=600)  # type: ignore
 
+        assert app is not None
         assert_msg = f"Series {series} failed with '{app.status}' status"  # type: ignore
         assert app.status == "active", assert_msg  # type: ignore
