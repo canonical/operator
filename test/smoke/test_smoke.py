@@ -29,11 +29,8 @@ async def test_smoke(ops_test: OpsTest):
     charm = await ops_test.build_charm("./test/charms/test_smoke/")
 
     for series in ['focal', 'bionic', 'xenial']:
-        model = ops_test.model
-        assert model is not None
-        app = await model.deploy(
+        app = await ops_test.model.deploy(
             charm, series=series, application_name=f"{series}-smoke")
-        await model.wait_for_idle(timeout=600)
+        await ops_test.model.wait_for_idle(timeout=600)
 
-        assert app is not None
         assert app.status == "active", f"Series {series} failed with '{app.status}' status"
