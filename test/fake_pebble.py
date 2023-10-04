@@ -39,14 +39,11 @@ class _Response(_ResponseBase, total=False):
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    if typing.TYPE_CHECKING:
-        _route = typing.List[
-            typing.Tuple[
-                typing.Literal['GET', 'POST'], re.Pattern[str], typing.Callable[
-                    [re.Match[str], typing.Dict[str, str], typing.Dict[str, str]], None
-                ]
-            ]
-        ]
+    _route = typing.List[typing.Tuple[
+        typing.Literal['GET', 'POST'],
+        re.Pattern[str],
+        typing.Callable[[re.Match[str], typing.Dict[str, str], typing.Dict[str, str]], None]
+    ]]
 
     def __init__(self,
                  request: socket.socket,
