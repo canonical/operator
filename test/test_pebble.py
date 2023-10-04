@@ -1631,9 +1631,7 @@ class TestClient(unittest.TestCase):
             })
 
         response = self.client.wait_change(
-            typing.cast(
-                pebble.ChangeID,
-                '70'),
+            typing.cast(pebble.ChangeID, '70'),
             timeout=timeout,
             delay=1)
         self.assertEqual(response.id, '70')
