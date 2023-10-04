@@ -286,9 +286,8 @@ single log
         self.assertEqual(task.data, {})
 
     def test_task_from_dict(self):
-        task_id = pebble.TaskID("78")
         d: pebble._TaskDict = {
-            "id": task_id,
+            "id": typing.cast(pebble.TaskID, "78"),
             "kind": "start",
             "progress": {
                 "done": 1,
@@ -302,7 +301,7 @@ single log
             "data": {"exit-code": 42},
         }  # type: ignore (no explicit log)
         task = pebble.Task.from_dict(d)
-        self.assertEqual(task.id, task_id)
+        self.assertEqual(task.id, '78')
         self.assertEqual(task.kind, 'start')
         self.assertEqual(task.summary, 'Start service "svc"')
         self.assertEqual(task.status, 'Done')
