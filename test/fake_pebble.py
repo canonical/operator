@@ -160,7 +160,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return json.loads(body)
 
     def get_system_info(self,
-                        match: re.Match[str],
+                        match: typing.Any,
                         query: typing.Dict[str, str],
                         data: typing.Dict[str, str]):
         self.respond({
@@ -173,7 +173,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         })
 
     def services_action(self,
-                        match: re.Match[str],
+                        match: typing.Any,
                         query: typing.Dict[str, str],
                         data: typing.Dict[str, str]):
         action = data['action']
