@@ -148,7 +148,7 @@ class TestRealPebble(unittest.TestCase):
         process = self.client.exec(['true'])
         process.wait()
 
-        with self.assertRaises(pebble.ExecError[str]) as cm:
+        with self.assertRaises(pebble.ExecError) as cm:
             process = self.client.exec(['/bin/sh', '-c', 'exit 42'])
             process.wait()
         self.assertEqual(cm.exception.exit_code, 42)
