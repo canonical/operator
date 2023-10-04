@@ -2275,6 +2275,9 @@ class Container:
             try:
                 for info in Container._list_recursive(local_list, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    if info.type is pebble.FileType.DIRECTORY:
+                        self.make_dir(dstpath, make_parents=True)
+                        continue
                     with open(info.path) as src:
                         self.push(
                             dstpath,
@@ -2352,6 +2355,9 @@ class Container:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    if info.type is pebble.FileType.DIRECTORY:
+                        dstpath.mkdir(parents=True, exist_ok=True)
+                        continue
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
@@ -2406,6 +2412,9 @@ class Container:
 
         for info in list_func(path):
             if info.type is pebble.FileType.DIRECTORY:
+                # Yield the directory to ensure empty directories are created, then
+                # all of the contained files.
+                yield info
                 yield from Container._list_recursive(list_func, Path(info.path))
             elif info.type in (pebble.FileType.FILE, pebble.FileType.SYMLINK):
                 yield info

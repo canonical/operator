@@ -981,14 +981,18 @@ class PushPullCase:
                  files: typing.List[str],
                  want: typing.Optional[typing.Set[str]] = None,
                  dst: typing.Optional[str] = None,
-                 errors: typing.Optional[typing.Set[str]] = None):
+                 errors: typing.Optional[typing.Set[str]] = None,
+                 dirs: typing.Optional[typing.Set[str]] = None,
+                 want_dirs: typing.Optional[typing.Set[str]] = None):
         self.pattern = None
         self.dst = dst
         self.errors = errors or set()
         self.name = name
         self.path = path
         self.files = files
+        self.dirs = dirs or set()
         self.want = want or set()
+        self.want_dirs = want_dirs or set()
 
 
 recursive_list_cases = [
@@ -996,13 +1000,13 @@ recursive_list_cases = [
         name='basic recursive list',
         path='/',
         files=['/foo/bar.txt', '/baz.txt'],
-        want={'/foo/bar.txt', '/baz.txt'},
+        want={'/foo', '/foo/bar.txt', '/baz.txt'},
     ),
     PushPullCase(
         name='basic recursive list reverse',
         path='/',
         files=['/baz.txt', '/foo/bar.txt'],
-        want={'/foo/bar.txt', '/baz.txt'},
+        want={'/foo', '/foo/bar.txt', '/baz.txt'},
     ),
     PushPullCase(
         name='directly list a (non-directory) file',
@@ -1156,6 +1160,14 @@ recursive_push_pull_cases = [
         files=['/foo/bar/baz.txt', '/foo/foobar.txt', '/quux.txt'],
         want={'/baz/foobar.txt', '/baz/bar/baz.txt'},
     ),
+    PushPullCase(
+        name='push/pull an empty directory',
+        path='/foo',
+        dst='/foobar',
+        files=[],
+        dirs={'/foo/baz'},
+        want_dirs={'/foobar/foo/baz'},
+    ),
 ]
 
 
@@ -1179,6 +1191,10 @@ def test_recursive_push_and_pull(case: PushPullCase):
         os.makedirs(os.path.dirname(fpath), exist_ok=True)
         with open(fpath, 'w') as f:
             f.write('hello')
+    if case.dirs:
+        for directory in case.dirs:
+            fpath = os.path.join(push_src.name, directory[1:])
+            os.makedirs(fpath, exist_ok=True)
 
     # test push
     if isinstance(case.path, list):
@@ -1204,11 +1220,16 @@ def test_recursive_push_and_pull(case: PushPullCase):
         f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
     for fpath in case.want:
         assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
+    for fdir in case.want_dirs:
+        assert c.isdir(fdir), f'push_path failed: dir {fdir} missing at destination'
 
     # create pull test case filesystem structure
     pull_dst = tempfile.TemporaryDirectory()
     for fpath in case.files:
         c.push(fpath, 'hello', make_dirs=True)
+    if case.dirs:
+        for directory in case.dirs:
+            c.make_dir(directory, make_parents=True)
 
     # test pull
     errors: typing.Set[str] = set()
@@ -1223,6 +1244,8 @@ def test_recursive_push_and_pull(case: PushPullCase):
         f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
     for fpath in case.want:
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
+    for fdir in case.want_dirs:
+        assert c.isdir(fdir), f'pull_path failed: dir {fdir} missing at destination'
 
 
 @pytest.mark.parametrize('case', [
