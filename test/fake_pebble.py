@@ -41,7 +41,7 @@ class _Response(_ResponseBase, total=False):
 class Handler(http.server.BaseHTTPRequestHandler):
     _route = typing.List[typing.Tuple[
         typing.Literal['GET', 'POST'],
-        re.Pattern[str],
+        typing.Any,
         typing.Callable[..., None]
     ]]
 
