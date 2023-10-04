@@ -95,7 +95,7 @@ class TestTypes(unittest.TestCase):
 
     def test_change_error(self):
         change = pebble.Change(
-            id=pebble.ChangeID('1234'),
+            id=typing.cast(pebble.ChangeID, '1234'),
             kind='start',
             summary='Start service "foo"',
             status='Done',
@@ -114,7 +114,7 @@ class TestTypes(unittest.TestCase):
 
     def test_change_error_with_task_logs(self):
         change = pebble.Change(
-            id=pebble.ChangeID('1234'),
+            id=typing.cast(pebble.ChangeID, '1234'),
             kind='start',
             summary='Start service "foo"',
             status='Done',
@@ -325,7 +325,7 @@ single log
 
     def test_change_init(self):
         change = pebble.Change(
-            id=pebble.ChangeID('70'),
+            id=typing.cast(pebble.ChangeID, '70'),
             kind='autostart',
             err='SILLY',
             ready=True,
@@ -1399,8 +1399,7 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change_id = pebble.ChangeID('70')
-        change = self.client.get_change(change_id)
+        change = self.client.get_change(typing.cast(pebble.ChangeID, '70'))
         self.assert_mock_change(change)
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/changes/70', None, None),
@@ -1426,8 +1425,7 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change_id = pebble.ChangeID('70')
-        change = self.client.abort_change(change_id)
+        change = self.client.abort_change(typing.cast(pebble.ChangeID, '70'))
         self.assert_mock_change(change)
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/changes/70', None, {'action': 'abort'}),
