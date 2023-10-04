@@ -332,6 +332,10 @@ class Application:
     def status(self) -> 'StatusBase':
         """Used to report or read the status of the overall application.
 
+        Changes to status take effect immediately, unlike other Juju operations
+        such as modifying relation data or secrets, which only take effect after
+        a successful event.
+
         Can only be read and set by the lead unit of the application.
 
         The status of remote units is always Unknown.
@@ -485,6 +489,10 @@ class Unit:
     @property
     def status(self) -> 'StatusBase':
         """Used to report or read the status of a specific unit.
+
+        Changes to status take effect immediately, unlike other Juju operations
+        such as modifying relation data or secrets, which only take effect after
+        a successful event.
 
         The status of any unit other than the current unit is always Unknown.
 
