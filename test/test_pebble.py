@@ -1434,8 +1434,7 @@ class TestClient(unittest.TestCase):
     def _services_action_helper(
             self,
             action: str,
-            api_func: typing.Callable[[],
-                                      str],
+            api_func: typing.Callable[[], str],
             services: typing.List[str]):
         self.client.responses.append({
             "change": "70",
