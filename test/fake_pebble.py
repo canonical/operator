@@ -60,14 +60,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # Disable logging for tests
         pass
 
-    def respond(self, d: _Response, status: int = 200) -> None:
+    def respond(self, d: _Response, status: int = 200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         d_json = json.dumps(d, indent=4, sort_keys=True)
         self.wfile.write(d_json.encode('utf-8'))
 
-    def bad_request(self, message: str) -> None:
+    def bad_request(self, message: str):
         d: _Response = {
             "result": {
                 "message": message,
@@ -78,7 +78,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 400)
 
-    def not_found(self) -> None:
+    def not_found(self):
         d: _Response = {
             "result": {
                 "message": "invalid API endpoint requested"
@@ -89,7 +89,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 404)
 
-    def method_not_allowed(self) -> None:
+    def method_not_allowed(self):
         d: _Response = {
             "result": {
                 "message": 'method "PUT" not allowed'
@@ -100,7 +100,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 405)
 
-    def internal_server_error(self, msg: Exception) -> None:
+    def internal_server_error(self, msg: Exception):
         d: _Response = {
             "result": {
                 "message": f"internal server error: {msg}",
@@ -111,13 +111,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 500)
 
-    def do_GET(self) -> None:  # noqa: N802 ("should be lowercase")
+    def do_GET(self):  # noqa: N802 ("should be lowercase")
         self.do_request('GET')
 
-    def do_POST(self) -> None:  # noqa: N802 ("should be lowercase")
+    def do_POST(self):  # noqa: N802 ("should be lowercase")
         self.do_request('POST')
 
-    def do_request(self, request_method: typing.Literal['GET', 'POST']) -> None:
+    def do_request(self, request_method: typing.Literal['GET', 'POST']):
         path, _, query = self.path.partition('?')
         path = urllib.parse.unquote(path)
         query = dict(urllib.parse.parse_qsl(query))
@@ -161,10 +161,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def get_system_info(self,
                         match: re.Match[str],
-                        query: typing.Dict[str,
-                                           str],
-                        data: typing.Dict[str,
-                                          str]) -> None:
+                        query: typing.Dict[str, str],
+                        data: typing.Dict[str, str]):
         self.respond({
             "result": {
                 "version": "3.14.159"
@@ -176,10 +174,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def services_action(self,
                         match: re.Match[str],
-                        query: typing.Dict[str,
-                                           str],
-                        data: typing.Dict[str,
-                                          str]) -> None:
+                        query: typing.Dict[str, str],
+                        data: typing.Dict[str, str]):
         action = data['action']
         services = data['services']
         if action == 'start':
