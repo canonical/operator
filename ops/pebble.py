@@ -2148,8 +2148,8 @@ class Client:
                        to ``rm -rf <file|dir>``.
 
         Raises:
-            PathError: If the file does not exist and `recursive` is false, or if
-                a relative path is provided.
+            PathError: If the file cannot be removed (perhaps it does not
+                exist) and `recursive` is false, or if a relative path is provided.
 
         """
         info: Dict[str, Any] = {'path': path}

@@ -2515,8 +2515,8 @@ class Container:
                        to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If the file does not exist and `recursive` is false, or if
-                a relative path is provided.
+            pebble.PathError: If the file cannot be removed (perhaps it does not
+                exist) and `recursive` is false, or if a relative path is provided.
 
         """
         self._pebble.remove_path(str(path), recursive=recursive)
