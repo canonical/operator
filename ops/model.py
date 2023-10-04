@@ -2509,7 +2509,11 @@ class Container:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, recursively delete path and everything under it.
+            recursive: If True, and path is a directory, recursively deletes it and
+                       everything under it. If the path is a file, delete the file and
+                       do nothing if the file is non-existent. Behaviourally similar
+                       to ``rm -rf <file|dir>``.
+
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
