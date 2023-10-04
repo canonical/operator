@@ -2515,7 +2515,7 @@ class Container:
                        to ``rm -rf <file|dir>``.
 
         Raises:
-            PathError: If the file does not exist and `recursive` is false, or if
+            pebble.PathError: If the file does not exist and `recursive` is false, or if
                 a relative path is provided.
 
         """
