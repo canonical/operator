@@ -225,8 +225,9 @@ def main():
                     if stderr:
                         print(repr(stderr), end='', file=sys.stderr)
                 sys.exit(0)
-            except pebble.ExecError as e:  # type: ignore
-                print('ExecError:', e, file=sys.stderr)  # type: ignore
+            # The `[str]` here is to resolve the same issue as above.
+            except pebble.ExecError[str] as e:
+                print('ExecError:', e, file=sys.stderr)
                 sys.exit(e.exit_code)
 
         elif args.command == 'ls':
