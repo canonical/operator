@@ -53,10 +53,13 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     Optional,
+    Protocol,
     Sequence,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
 )
 
@@ -134,8 +137,6 @@ PlanDict = typing.TypedDict('PlanDict',
                             total=False)
 
 if TYPE_CHECKING:
-    from typing_extensions import Literal, Protocol, TypedDict
-
     # callback types for _MultiParser header and body handlers
     class _BodyHandler(Protocol):
         def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa

@@ -50,6 +50,7 @@ from typing import (
     TextIO,
     Tuple,
     Type,
+    TypedDict,
     TypeVar,
     Union,
     cast,
@@ -62,8 +63,6 @@ from ops.model import Container, RelationNotFoundError
 from ops.pebble import ExecProcess
 
 if TYPE_CHECKING:
-    from typing_extensions import TypedDict
-
     from ops.model import _NetworkDict
 
     ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]

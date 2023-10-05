@@ -48,6 +48,7 @@ from typing import (
     TextIO,
     Tuple,
     Type,
+    TypedDict,
     Union,
 )
 
@@ -60,8 +61,6 @@ from ops.jujuversion import JujuVersion
 K8sSpec = Mapping[str, Any]
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import TypedDict
-
     from ops.testing import _ConfigOption
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
