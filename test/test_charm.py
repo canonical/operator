@@ -199,7 +199,7 @@ peers:
         charm.on['pro1'].relation_departed.emit(rel, app, unit)
         charm.on['pro-2'].relation_departed.emit(rel, app, unit)
         charm.on['peer1'].relation_broken.emit(rel, app)
-        charm.on['peer-2'].relation_broken.emit(rel)
+        charm.on['peer-2'].relation_broken.emit(rel, app)
 
         self.assertEqual(charm.seen, [
             'RelationJoinedEvent',

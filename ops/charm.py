@@ -369,12 +369,12 @@ class RelationEvent(HookEvent):
     """
 
     relation: 'Relation'
-    """The relation involved in this event."""
+    """The relation involved in this event.
+    """
 
-    app: Optional[model.Application]
+    app: model.Application
     """The remote application that has triggered this event.
-
-    This may be ``None`` for relation-broken events."""
+    """
 
     unit: Optional[model.Unit]
     """The remote unit that has triggered this event.
@@ -393,7 +393,12 @@ class RelationEvent(HookEvent):
                 f'cannot create RelationEvent with application {app} and unit {unit}')
 
         self.relation = relation
-        self.app = app
+        if app is None:
+            logger.warning("'app' expected but not received.")
+            # Do an explicit assignment here so that we can contain the type: ignore.
+            self.app = None  # type: ignore
+        else:
+            self.app = app
         self.unit = unit
 
     def snapshot(self) -> Dict[str, Any]:
@@ -428,7 +433,8 @@ class RelationEvent(HookEvent):
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         else:
-            self.app = None
+            logger.warning("'app_name' expected in snapshot but not found.")
+            self.app = None  # type: ignore
 
         unit_name = snapshot.get('unit_name')
         if unit_name:
@@ -444,15 +450,9 @@ class RelationCreatedEvent(RelationEvent):
     can occur before units for those applications have started. All existing
     relations should be established before start.
     """
-    app: model.Application
-    """The remote application that has triggered this event."""
-
     unit: None
-    """Always ``None``."""
-
-    def __init__(self, handle: 'Handle', relation: 'Relation',
-                 app: model.Application, unit: None = None):
-        super().__init__(handle, relation, app, unit)
+    """Always ``None``.
+    """
 
 
 class RelationJoinedEvent(RelationEvent):
@@ -466,15 +466,9 @@ class RelationJoinedEvent(RelationEvent):
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
-    app: model.Application
-    """The remote application that has triggered this event."""
-
     unit: model.Unit
-    """The remote unit that has triggered this event."""
-
-    def __init__(self, handle: 'Handle', relation: 'Relation',
-                 app: model.Application, unit: model.Unit):
-        super().__init__(handle, relation, app, unit)
+    """The remote unit that has triggered this event.
+    """
 
 
 class RelationChangedEvent(RelationEvent):
@@ -495,8 +489,6 @@ class RelationChangedEvent(RelationEvent):
     The settings that may be queried, or set, are determined by the relation’s
     interface.
     """
-    app: model.Application
-    """The remote application that has triggered this event."""
 
 
 class RelationDepartedEvent(RelationEvent):
@@ -517,15 +509,13 @@ class RelationDepartedEvent(RelationEvent):
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
-    app: model.Application
-    """The remote application that has triggered this event."""
-
     unit: model.Unit
-    """The remote unit that has triggered this event."""
+    """The remote unit that has triggered this event.
+    """
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
-                 app: model.Application,
-                 unit: model.Unit,
+                 app: Optional[model.Application] = None,
+                 unit: Optional[model.Unit] = None,
                  departing_unit_name: Optional[str] = None):
         super().__init__(handle, relation, app=app, unit=unit)
 
@@ -578,11 +568,8 @@ class RelationBrokenEvent(RelationEvent):
     are currently known locally.
     """
     unit: None
-    """Always ``None``."""
-
-    def __init__(self, handle: 'Handle', relation: 'Relation',
-                 app: Optional[model.Application] = None, unit: None = None):
-        super().__init__(handle, relation, app, unit)
+    """Always ``None``.
+    """
 
 
 class StorageEvent(HookEvent):
