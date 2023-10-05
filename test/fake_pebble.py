@@ -25,17 +25,15 @@ import threading
 import typing
 import urllib.parse
 
-# This should use Required/NotRequired in Python 3.11+
-_ResponseBase = typing.TypedDict(
+from typing_extensions import NotRequired
+
+_Response = typing.TypedDict(
     "_Response", {
         "result": typing.Optional[typing.Dict[str, str]],
         "status": str,
         "status-code": int,
-        "type": str})
-
-
-class _Response(_ResponseBase, total=False):
-    change: str
+        "type": str,
+        "change": NotRequired[str]})
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
