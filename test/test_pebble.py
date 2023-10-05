@@ -95,7 +95,7 @@ class TestTypes(unittest.TestCase):
 
     def test_change_error(self):
         change = pebble.Change(
-            id=typing.cast(pebble.ChangeID, '1234'),
+            id=pebble.ChangeID('1234'),
             kind='start',
             summary='Start service "foo"',
             status='Done',
@@ -114,7 +114,7 @@ class TestTypes(unittest.TestCase):
 
     def test_change_error_with_task_logs(self):
         change = pebble.Change(
-            id=typing.cast(pebble.ChangeID, '1234'),
+            id=pebble.ChangeID('1234'),
             kind='start',
             summary='Start service "foo"',
             status='Done',
