@@ -217,7 +217,7 @@ single log
             'last-added': '2021-01-26T17:01:02.12345+13:00',
             'expire-after': '1s',
             'repeat-after': '2s',
-        }  # type: ignore (no explicit last-shown)
+        }
         warning = pebble.Warning.from_dict(d)
         self.assertEqual(warning.message, 'Look out...')
         self.assertEqual(warning.first_added, datetime_nzdt(2020, 12, 25, 17, 18, 54, 16274))
@@ -299,7 +299,7 @@ single log
             "status": "Done",
             "summary": 'Start service "svc"',
             "data": {"exit-code": 42},
-        }  # type: ignore (no explicit log)
+        }
         task = pebble.Task.from_dict(d)
         self.assertEqual(task.id, '78')
         self.assertEqual(task.kind, 'start')
@@ -417,7 +417,7 @@ single log
             'type': 'directory',
             'permissions': '644',
             'last-modified': '2021-01-28T14:37:04.291517768+13:00',
-        }  # type: ignore (missing various keys)
+        }
         info = pebble.FileInfo.from_dict(d)
         self.assertEqual(info.path, '/etc')
         self.assertEqual(info.name, 'etc')
@@ -993,7 +993,7 @@ class TestCheckInfo(unittest.TestCase):
             'name': 'chk3',
             'status': 'up',
             'threshold': 3,
-        }  # type: ignore (no explicit level or failures)
+        }
         check = pebble.CheckInfo.from_dict(d)
         self.assertEqual(check.name, 'chk3')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)

@@ -64,6 +64,7 @@ from typing import (
 )
 
 import websocket  # type: ignore
+from typing_extensions import NotRequired
 
 from ops._private import timeconv, yaml
 
@@ -162,20 +163,20 @@ if TYPE_CHECKING:
     _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
     _CheckInfoDict = TypedDict('_CheckInfoDict',
                                {"name": str,
-                                "level": Optional[Union['CheckLevel', str]],
+                                "level": NotRequired[Optional[Union['CheckLevel', str]]],
                                 "status": Union['CheckStatus', str],
-                                "failures": int,
+                                "failures": NotRequired[int],
                                 "threshold": int})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
-                               "size": Optional[int],
+                               "size": NotRequired[Optional[int]],
                                "permissions": str,
                                "last-modified": str,
-                               "user-id": Optional[int],
-                               "user": Optional[str],
-                               "group-id": Optional[int],
-                               "group": Optional[str],
+                               "user-id": NotRequired[Optional[int]],
+                               "user": NotRequired[Optional[str]],
+                               "group-id": NotRequired[Optional[int]],
+                               "group": NotRequired[Optional[str]],
                                "type": Union['FileType', str]})
 
     _AuthDict = TypedDict('_AuthDict',
@@ -202,11 +203,11 @@ if TYPE_CHECKING:
                            'kind': str,
                            'summary': str,
                            'status': str,
-                           'log': Optional[List[str]],
+                           'log': NotRequired[Optional[List[str]]],
                            'progress': _ProgressDict,
                            'spawn-time': str,
-                           'ready-time': str,
-                           'data': Optional[Dict[str, Any]]})
+                           'ready-time': NotRequired[Optional[str]],
+                           'data': NotRequired[Optional[Dict[str, Any]]]})
     _ChangeDict = TypedDict('_ChangeDict',
                             {'id': str,
                              'kind': str,
@@ -232,7 +233,7 @@ if TYPE_CHECKING:
                              {'message': str,
                               'first-added': str,
                               'last-added': str,
-                              'last-shown': Optional[str],
+                              'last-shown': NotRequired[Optional[str]],
                               'expire-after': str,
                               'repeat-after': str})
 
@@ -604,7 +605,7 @@ class Task:
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
-            ready_time=(timeconv.parse_rfc3339(d['ready-time'])
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
