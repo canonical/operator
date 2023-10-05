@@ -64,7 +64,6 @@ from typing import (
 )
 
 import websocket  # type: ignore
-from typing_extensions import NotRequired
 
 from ops._private import timeconv, yaml
 
@@ -138,6 +137,8 @@ PlanDict = typing.TypedDict('PlanDict',
                             total=False)
 
 if TYPE_CHECKING:
+    from typing_extensions import NotRequired
+
     # callback types for _MultiParser header and body handlers
     class _BodyHandler(Protocol):
         def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
