@@ -216,17 +216,17 @@ if TYPE_CHECKING:
                              'status': str,
                              'ready': bool,
                              'spawn-time': str,
-                             'tasks': Optional[List[_TaskDict]],
-                             'err': Optional[str],
-                             'ready-time': Optional[str],
-                             'data': Optional[Dict[str, Any]]})
+                             'tasks': NotRequired[Optional[List[_TaskDict]]],
+                             'err': NotRequired[Optional[str]],
+                             'ready-time': NotRequired[Optional[str]],
+                             'data': NotRequired[Optional[Dict[str, Any]]]})
 
     _Error = TypedDict('_Error',
                        {'kind': str,
                         'message': str})
     _Item = TypedDict('_Item',
                       {'path': str,
-                       'error': _Error})
+                       'error': NotRequired[_Error]})
     _FilesResponse = TypedDict('_FilesResponse',
                                {'result': List[_Item]})
 

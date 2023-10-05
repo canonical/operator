@@ -2669,7 +2669,8 @@ class TestExec(unittest.TestCase):
         })
 
         change = build_mock_change_dict(change_id)
-        assert change['tasks'] is not None
+        # pyright doesn't understand "assert change.get('tasks') is not None"
+        assert 'tasks' in change and change['tasks'] is not None
         change['tasks'][0]['data'] = {'exit-code': exit_code}
         if change_err is not None:
             change['err'] = change_err
