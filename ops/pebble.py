@@ -1899,20 +1899,13 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
-    if typing.TYPE_CHECKING:
-        @typing.overload
-        def pull(self,  # noqa
-                 path: str,
-                 *,
-                 encoding: None) -> BinaryIO:
-            ...
+    @typing.overload
+    def pull(self, path: str, *, encoding: None) -> BinaryIO:  # noqa
+        ...
 
-        @typing.overload
-        def pull(self,  # noqa
-                 path: str,
-                 *,
-                 encoding: str = 'utf-8') -> TextIO:
-            ...
+    @typing.overload
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:  # noqa
+        ...
 
     def pull(self,
              path: str,
