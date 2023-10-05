@@ -369,12 +369,10 @@ class RelationEvent(HookEvent):
     """
 
     relation: 'Relation'
-    """The relation involved in this event.
-    """
+    """The relation involved in this event."""
 
     app: model.Application
-    """The remote application that has triggered this event.
-    """
+    """The remote application that has triggered this event."""
 
     unit: Optional[model.Unit]
     """The remote unit that has triggered this event.
@@ -451,8 +449,7 @@ class RelationCreatedEvent(RelationEvent):
     relations should be established before start.
     """
     unit: None
-    """Always ``None``.
-    """
+    """Always ``None``."""
 
 
 class RelationJoinedEvent(RelationEvent):
@@ -467,8 +464,7 @@ class RelationJoinedEvent(RelationEvent):
     the relation is created and is by convention not deleted.
     """
     unit: model.Unit
-    """The remote unit that has triggered this event.
-    """
+    """The remote unit that has triggered this event."""
 
 
 class RelationChangedEvent(RelationEvent):
@@ -510,8 +506,7 @@ class RelationDepartedEvent(RelationEvent):
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
     unit: model.Unit
-    """The remote unit that has triggered this event.
-    """
+    """The remote unit that has triggered this event."""
 
     def __init__(self, handle: 'Handle', relation: 'Relation',
                  app: Optional[model.Application] = None,
@@ -568,8 +563,7 @@ class RelationBrokenEvent(RelationEvent):
     are currently known locally.
     """
     unit: None
-    """Always ``None``.
-    """
+    """Always ``None``."""
 
 
 class StorageEvent(HookEvent):
