@@ -409,8 +409,8 @@ class _TestMain(abc.ABC):
                 env['JUJU_REMOTE_APP'] = remote_app
 
             if (remote_app is None
-                or issubclass(event_spec.event_type, ops.RelationJoinedEvent)
-                or issubclass(event_spec.event_type, ops.RelationChangedEvent)
+                    or issubclass(event_spec.event_type, ops.RelationJoinedEvent)
+                    or issubclass(event_spec.event_type, ops.RelationChangedEvent)
                     or issubclass(event_spec.event_type, ops.RelationDepartedEvent)):
                 remote_unit = event_spec.remote_unit
                 if remote_unit is None:
