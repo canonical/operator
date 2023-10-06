@@ -172,7 +172,6 @@ class _Tempfile(Protocol):
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-    """An object that provides both read() and write() methods for any string type."""
     def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
     def write(self, __s: typing.AnyStr) -> int: ...  # noqa
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
