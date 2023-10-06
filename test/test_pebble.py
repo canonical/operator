@@ -1084,7 +1084,7 @@ class MockTime:
 
 def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     return {
-        "id": pebble.ChangeID(change_id),
+        "id": change_id,
         "kind": "autostart",
         "ready": True,
         "ready-time": "2021-01-28T14:37:04.291517768+13:00",
