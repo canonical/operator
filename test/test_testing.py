@@ -34,6 +34,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import yaml
+from typing_extensions import Required
 
 import ops
 import ops.testing
@@ -3034,12 +3035,8 @@ class RelationChangedViewer(ops.Object):
         self.changes.append(dict(data))
 
 
-# In Python 3.11+ replace this with Required/NotRequired.
-class BaseRecordedChange(typing.TypedDict):
-    name: str
-
-
-class RecordedChange(BaseRecordedChange, total=False):
+class RecordedChange(typing.TypedDict, total=False):
+    name: Required[str]
     data: typing.Dict[str, typing.Any]
     relation: str
     container: typing.Optional[str]

@@ -28,6 +28,7 @@ from typing import (
     Optional,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
     cast,
 )
@@ -37,7 +38,7 @@ from ops._private import yaml
 from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
 
 if TYPE_CHECKING:
-    from typing_extensions import Required, TypedDict
+    from typing_extensions import Required
 
     from ops.framework import Handle
     from ops.model import Container, Relation, Storage

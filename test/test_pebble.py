@@ -21,12 +21,13 @@ import json
 import signal
 import tempfile
 import test.fake_pebble as fake_pebble
+import typing
 import unittest
 import unittest.mock
 import unittest.util
 
 import pytest
-import websocket
+import websocket  # type: ignore
 
 from ops import pebble
 from ops._private import yaml
@@ -35,12 +36,12 @@ from ops._private import yaml
 unittest.util._MAX_LENGTH = 1000
 
 
-def datetime_utc(y, m, d, hour, min, sec, micro=0):
+def datetime_utc(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: int = 0):
     tz = datetime.timezone.utc
     return datetime.datetime(y, m, d, hour, min, sec, micro, tzinfo=tz)
 
 
-def datetime_nzdt(y, m, d, hour, min, sec, micro=0):
+def datetime_nzdt(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: int = 0):
     tz = datetime.timezone(datetime.timedelta(hours=13))
     return datetime.datetime(y, m, d, hour, min, sec, micro, tzinfo=tz)
 
@@ -104,6 +105,7 @@ class TestTypes(unittest.TestCase):
             spawn_time=datetime.datetime.now(),
             ready_time=datetime.datetime.now(),
         )
+        assert change.err is not None
         error = pebble.ChangeError(change.err, change)
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(error.err, 'Some error')
@@ -153,6 +155,7 @@ class TestTypes(unittest.TestCase):
             spawn_time=datetime.datetime.now(),
             ready_time=datetime.datetime.now(),
         )
+        assert change.err is not None
         error = pebble.ChangeError(change.err, change)
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(error.err, 'Some error')
@@ -208,7 +211,7 @@ single log
         self.assertEqual(warning.repeat_after, '2s')
 
     def test_warning_from_dict(self):
-        d = {
+        d: pebble._WarningDict = {
             'message': 'Look out...',
             'first-added': '2020-12-25T17:18:54.016273778+13:00',
             'last-added': '2021-01-26T17:01:02.12345+13:00',
@@ -283,7 +286,7 @@ single log
         self.assertEqual(task.data, {})
 
     def test_task_from_dict(self):
-        d = {
+        d: pebble._TaskDict = {
             "id": "78",
             "kind": "start",
             "progress": {
@@ -344,7 +347,7 @@ single log
         self.assertEqual(change.data, {})
 
     def test_change_from_dict(self):
-        d = {
+        d: 'pebble._ChangeDict' = {
             "id": "70",
             "kind": "autostart",
             "err": "SILLY",
@@ -408,7 +411,7 @@ single log
         self.assertEqual(info.group, 'staff')
 
     def test_file_info_from_dict(self):
-        d = {
+        d: pebble._FileInfoDict = {
             'path': '/etc',
             'name': 'etc',
             'type': 'directory',
@@ -444,7 +447,7 @@ single log
 class TestPlan(unittest.TestCase):
     def test_no_args(self):
         with self.assertRaises(TypeError):
-            pebble.Plan()
+            pebble.Plan()  # type: ignore
 
     def test_services(self):
         plan = pebble.Plan('')
@@ -459,7 +462,7 @@ class TestPlan(unittest.TestCase):
 
         # Should be read-only ("can't set attribute")
         with self.assertRaises(AttributeError):
-            plan.services = {}
+            plan.services = {}  # type: ignore
 
     def test_checks(self):
         plan = pebble.Plan('')
@@ -475,7 +478,7 @@ class TestPlan(unittest.TestCase):
 
         # Should be read-only ("can't set attribute")
         with self.assertRaises(AttributeError):
-            plan.checks = {}
+            plan.checks = {}  # type: ignore
 
     def test_yaml(self):
         # Starting with nothing, we get the empty result
@@ -518,7 +521,7 @@ checks:
 
 
 class TestLayer(unittest.TestCase):
-    def _assert_empty(self, layer):
+    def _assert_empty(self, layer: pebble.Layer):
         self.assertEqual(layer.summary, '')
         self.assertEqual(layer.description, '')
         self.assertEqual(layer.services, {})
@@ -532,7 +535,7 @@ class TestLayer(unittest.TestCase):
         s = pebble.Layer({})
         self._assert_empty(s)
 
-        d = {
+        d: pebble.LayerDict = {
             'summary': 'Sum Mary',
             'description': 'The quick brown fox!',
             'services': {
@@ -609,7 +612,7 @@ summary: Sum Mary
         s = pebble.Layer({})
         self._assert_empty(s)
 
-        d = {
+        d: pebble.LayerDict = {
             'summary': 'Sum Mary',
             'description': 'The quick brown fox!',
             'services': {
@@ -632,7 +635,7 @@ summary: Sum Mary
         s = pebble.Layer({})
         self._assert_empty(s)
 
-        d = {
+        d: pebble.LayerDict = {
             'summary': 'Sum Mary',
             'description': 'The quick brown fox!',
             'services': {
@@ -660,7 +663,7 @@ summary: Sum Mary
 
 
 class TestService(unittest.TestCase):
-    def _assert_empty(self, service, name):
+    def _assert_empty(self, service: pebble.Service, name: str):
         self.assertEqual(service.name, name)
         self.assertEqual(service.summary, '')
         self.assertEqual(service.description, '')
@@ -693,7 +696,7 @@ class TestService(unittest.TestCase):
         s = pebble.Service('Name 1', {})
         self._assert_empty(s, 'Name 1')
 
-        d = {
+        d: pebble.ServiceDict = {
             'summary': 'Sum Mary',
             'description': 'The lazy quick brown',
             'startup': 'Start Up',
@@ -758,7 +761,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(d['on-check-failure'], {'chk1': 'halt'})
 
     def test_equality(self):
-        d = {
+        d: pebble.ServiceDict = {
             'summary': 'Sum Mary',
             'description': 'The lazy quick brown',
             'startup': 'Start Up',
@@ -798,7 +801,7 @@ class TestService(unittest.TestCase):
 
 
 class TestCheck(unittest.TestCase):
-    def _assert_empty(self, check, name):
+    def _assert_empty(self, check: pebble.Check, name: str):
         self.assertEqual(check.name, name)
         self.assertEqual(check.override, '')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
@@ -814,7 +817,7 @@ class TestCheck(unittest.TestCase):
         self._assert_empty(check, 'chk')
 
     def test_dict(self):
-        d = {
+        d: pebble.CheckDict = {
             'override': 'replace',
             'level': 'alive',
             'period': '10s',
@@ -840,6 +843,7 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(check.to_dict(), d)
 
         # Ensure pebble.Check has made copies of mutable objects
+        assert check.http is not None and check.tcp is not None and check.exec is not None
         check.http['url'] = 'https://www.google.com'
         self.assertEqual(d['http'], {'url': 'https://example.com/'})
         check.tcp['port'] = 81
@@ -848,7 +852,7 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(d['exec'], {'command': 'echo foo'})
 
     def test_level_raw(self):
-        d = {
+        d: pebble.CheckDict = {
             'override': 'replace',
             'level': 'foobar!',
             'period': '10s',
@@ -860,7 +864,7 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(check.level, 'foobar!')  # remains a string
 
     def test_equality(self):
-        d = {
+        d: pebble.CheckDict = {
             'override': 'replace',
             'level': 'alive',
             'period': '10s',
@@ -985,11 +989,12 @@ class TestCheckInfo(unittest.TestCase):
         self.assertEqual(check.failures, 5)
         self.assertEqual(check.threshold, 3)
 
-        check = pebble.CheckInfo.from_dict({
+        d: pebble._CheckInfoDict = {
             'name': 'chk3',
             'status': 'up',
             'threshold': 3,
-        })
+        }
+        check = pebble.CheckInfo.from_dict(d)
         self.assertEqual(check.name, 'chk3')
         self.assertEqual(check.level, pebble.CheckLevel.UNSET)
         self.assertEqual(check.status, pebble.CheckStatus.UP)
@@ -1010,16 +1015,24 @@ class TestCheckInfo(unittest.TestCase):
         self.assertEqual(check.threshold, 3)
 
 
+_bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]
+
+
 class MockClient(pebble.Client):
     """Mock Pebble client that simply records requests and returns stored responses."""
 
     def __init__(self):
-        self.requests = []
-        self.responses = []
+        self.requests: typing.List[typing.Any] = []
+        self.responses: typing.List[typing.Any] = []
         self.timeout = 5
-        self.websockets = {}
+        self.websockets: typing.Dict[typing.Any, MockWebsocket] = {}
 
-    def _request(self, method, path, query=None, body=None):
+    def _request(self,
+                 method: str,
+                 path: str,
+                 query: typing.Optional[typing.Dict[str, typing.Any]] = None,
+                 body: typing.Optional[typing.Dict[str, typing.Any]] = None
+                 ) -> typing.Dict[str, typing.Any]:
         self.requests.append((method, path, query, body))
         resp = self.responses.pop(0)
         if isinstance(resp, Exception):
@@ -1028,17 +1041,23 @@ class MockClient(pebble.Client):
             resp = resp()
         return resp
 
-    def _request_raw(self, method, path, query=None, headers=None, data=None):
+    def _request_raw(self,
+                     method: str,
+                     path: str,
+                     query: typing.Optional[typing.Dict[str, typing.Any]] = None,
+                     headers: typing.Optional[typing.Dict[str, str]] = None,
+                     data: typing.Optional[typing.Union[bytes, _bytes_generator]] = None):
         self.requests.append((method, path, query, headers, data))
         headers, body = self.responses.pop(0)
+        assert headers is not None
         return MockHTTPResponse(headers, body)
 
-    def _connect_websocket(self, task_id, websocket_id):
+    def _connect_websocket(self, task_id: str, websocket_id: str):
         return self.websockets[task_id, websocket_id]
 
 
 class MockHTTPResponse:
-    def __init__(self, headers, body):
+    def __init__(self, headers: typing.Dict[str, str], body: bytes):
         message = email.message.Message()
         for key, value in (headers or {}).items():
             message[key] = value
@@ -1059,11 +1078,11 @@ class MockTime:
     def time(self):
         return self._time
 
-    def sleep(self, delay):
+    def sleep(self, delay: float):
         self._time += delay
 
 
-def build_mock_change_dict(change_id='70'):
+def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     return {
         "id": change_id,
         "kind": "autostart",
@@ -1080,7 +1099,7 @@ def build_mock_change_dict(change_id='70'):
                     "done": 1,
                     "label": "",
                     "total": 1,
-                    "extra-field": "foo",
+                    "extra-field": "foo",  # type: ignore
                 },
                 "ready-time": "2021-01-28T14:37:03.270218778+13:00",
                 "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
@@ -1097,14 +1116,14 @@ class TestMultipartParser(unittest.TestCase):
     class _Case:
         def __init__(
                 self,
-                name,
-                data,
-                want_headers,
-                want_bodies,
-                want_bodies_done,
-                max_boundary=14,
-                max_lookahead=8 * 1024,
-                error=''):
+                name: str,
+                data: bytes,
+                want_headers: typing.List[bytes],
+                want_bodies: typing.List[bytes],
+                want_bodies_done: typing.List[bool],
+                max_boundary: int = 14,
+                max_lookahead: int = 8 * 1024,
+                error: str = ''):
             self.name = name
             self.data = data
             self.want_headers = want_headers
@@ -1203,16 +1222,16 @@ class TestMultipartParser(unittest.TestCase):
         marker = b'qwerty'
         for i, test in enumerate(tests):
             for chunk_size in chunk_sizes:
-                headers = []
-                bodies = []
-                bodies_done = []
+                headers: typing.List[bytes] = []
+                bodies: typing.List[bytes] = []
+                bodies_done: typing.List[bool] = []
 
-                def handle_header(data):
+                def handle_header(data: typing.Any):
                     headers.append(bytes(data))
                     bodies.append(b'')
                     bodies_done.append(False)
 
-                def handle_body(data, done=False):
+                def handle_body(data: bytes, done: bool = False):
                     bodies[-1] += data
                     bodies_done[-1] = done
 
@@ -1232,7 +1251,7 @@ class TestMultipartParser(unittest.TestCase):
                         parser.feed(data)
                 except Exception as err:
                     if not test.error:
-                        self.fail('unexpected error:', err)
+                        self.fail(f'unexpected error: {err}')
                         break
                     self.assertEqual(test.error, str(err))
                 else:
@@ -1258,7 +1277,7 @@ class TestClient(unittest.TestCase):
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
         with self.assertRaises(TypeError):
-            pebble.Client()  # socket_path arg required
+            pebble.Client()  # type: ignore (socket_path arg required)
 
     def test_get_system_info(self):
         self.client.responses.append({
@@ -1277,7 +1296,7 @@ class TestClient(unittest.TestCase):
         ])
 
     def test_get_warnings(self):
-        empty = {
+        empty: typing.Dict[str, typing.Any] = {
             "result": [],
             "status": "OK",
             "status-code": 200,
@@ -1312,7 +1331,7 @@ class TestClient(unittest.TestCase):
             }),
         ])
 
-    def assert_mock_change(self, change):
+    def assert_mock_change(self, change: pebble.Change):
         self.assertEqual(change.id, '70')
         self.assertEqual(change.kind, 'autostart')
         self.assertEqual(change.summary, 'Autostart service "svc"')
@@ -1336,7 +1355,7 @@ class TestClient(unittest.TestCase):
         self.assertEqual(change.spawn_time, datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202))
 
     def test_get_changes(self):
-        empty = {
+        empty: typing.Dict[str, typing.Any] = {
             "result": [],
             "status": "OK",
             "status-code": 200,
@@ -1380,7 +1399,20 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.get_change('70')
+        change = self.client.get_change(pebble.ChangeID('70'))
+        self.assert_mock_change(change)
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/changes/70', None, None),
+        ])
+
+    def test_get_change_str(self):
+        self.client.responses.append({
+            "result": build_mock_change_dict(),
+            "status": "OK",
+            "status-code": 200,
+            "type": "sync"
+        })
+        change = self.client.get_change('70')  # type: ignore
         self.assert_mock_change(change)
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/changes/70', None, None),
@@ -1393,13 +1425,17 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.abort_change('70')
+        change = self.client.abort_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/changes/70', None, {'action': 'abort'}),
         ])
 
-    def _services_action_helper(self, action, api_func, services):
+    def _services_action_helper(
+            self,
+            action: str,
+            api_func: typing.Callable[[], str],
+            services: typing.List[str]):
         self.client.responses.append({
             "change": "70",
             "result": None,
@@ -1422,7 +1458,8 @@ class TestClient(unittest.TestCase):
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ])
 
-    def _services_action_async_helper(self, action, api_func, services):
+    def _services_action_async_helper(
+            self, action: str, api_func: typing.Callable[..., str], services: typing.List[str]):
         self.client.responses.append({
             "change": "70",
             "result": None,
@@ -1454,16 +1491,16 @@ class TestClient(unittest.TestCase):
         self._services_action_helper('start', api_func, ['svc'])
 
         with self.assertRaises(TypeError):
-            self.client.start_services(1)
+            self.client.start_services(1)  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.client.start_services([1])
+            self.client.start_services([1])  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.client.start_services([['foo']])
+            self.client.start_services([['foo']])  # type: ignore
 
     def test_start_services_async(self):
-        def api_func(timeout=30):
+        def api_func(timeout: float = 30):
             return self.client.start_services(['svc'], timeout=timeout)
         self._services_action_async_helper('start', api_func, ['svc'])
 
@@ -1473,16 +1510,16 @@ class TestClient(unittest.TestCase):
         self._services_action_helper('stop', api_func, ['svc'])
 
         with self.assertRaises(TypeError):
-            self.client.stop_services(1)
+            self.client.stop_services(1)  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.client.stop_services([1])
+            self.client.stop_services([1])  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.client.stop_services([['foo']])
+            self.client.stop_services([['foo']])  # type: ignore
 
     def test_stop_services_async(self):
-        def api_func(timeout=30):
+        def api_func(timeout: float = 30):
             return self.client.stop_services(['svc'], timeout=timeout)
         self._services_action_async_helper('stop', api_func, ['svc'])
 
@@ -1492,16 +1529,16 @@ class TestClient(unittest.TestCase):
         self._services_action_helper('restart', api_func, ['svc'])
 
         with self.assertRaises(TypeError):
-            self.client.restart_services(1)
+            self.client.restart_services(1)  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.client.restart_services([1])
+            self.client.restart_services([1])  # type: ignore
 
         with self.assertRaises(TypeError):
-            self.client.restart_services([['foo']])
+            self.client.restart_services([['foo']])  # type: ignore
 
     def test_restart_services_async(self):
-        def api_func(timeout=30):
+        def api_func(timeout: float = 30):
             return self.client.restart_services(['svc'], timeout=timeout)
         self._services_action_async_helper('restart', api_func, ['svc'])
 
@@ -1533,7 +1570,7 @@ class TestClient(unittest.TestCase):
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ])
 
-    def test_wait_change_success(self, timeout=30.0):
+    def test_wait_change_success(self, timeout: typing.Optional[float] = 30.0):
         change = build_mock_change_dict()
         self.client.responses.append({
             "result": change,
@@ -1542,7 +1579,7 @@ class TestClient(unittest.TestCase):
             "type": "sync"
         })
 
-        response = self.client.wait_change('70', timeout=timeout)
+        response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout)
         self.assertEqual(response.id, '70')
         self.assertTrue(response.ready)
 
@@ -1554,7 +1591,7 @@ class TestClient(unittest.TestCase):
         self.test_wait_change_success(timeout=None)
 
     def test_wait_change_success_multiple_calls(self):
-        def timeout_response(n):
+        def timeout_response(n: float):
             self.time.sleep(n)  # simulate passing of time due to wait_change call
             raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
@@ -1568,7 +1605,7 @@ class TestClient(unittest.TestCase):
             "type": "sync"
         })
 
-        response = self.client.wait_change('70')
+        response = self.client.wait_change(pebble.ChangeID('70'))
         self.assertEqual(response.id, '70')
         self.assertTrue(response.ready)
 
@@ -1579,7 +1616,7 @@ class TestClient(unittest.TestCase):
 
         self.assertEqual(self.time.time(), 4)
 
-    def test_wait_change_success_polled(self, timeout=30.0):
+    def test_wait_change_success_polled(self, timeout: typing.Optional[float] = 30.0):
         # Trigger polled mode
         self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
@@ -1593,7 +1630,7 @@ class TestClient(unittest.TestCase):
                 "type": "sync"
             })
 
-        response = self.client.wait_change('70', timeout=timeout, delay=1)
+        response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout, delay=1)
         self.assertEqual(response.id, '70')
         self.assertTrue(response.ready)
 
@@ -1610,7 +1647,7 @@ class TestClient(unittest.TestCase):
         self.test_wait_change_success_polled(timeout=None)
 
     def test_wait_change_timeout(self):
-        def timeout_response(n):
+        def timeout_response(n: float):
             self.time.sleep(n)  # simulate passing of time due to wait_change call
             raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
@@ -1618,7 +1655,7 @@ class TestClient(unittest.TestCase):
         self.client.responses.append(lambda: timeout_response(2))
 
         with self.assertRaises(pebble.TimeoutError) as cm:
-            self.client.wait_change('70', timeout=6)
+            self.client.wait_change(pebble.ChangeID('70'), timeout=6)
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertIsInstance(cm.exception, TimeoutError)
 
@@ -1644,7 +1681,7 @@ class TestClient(unittest.TestCase):
             })
 
         with self.assertRaises(pebble.TimeoutError) as cm:
-            self.client.wait_change('70', timeout=3, delay=1)
+            self.client.wait_change(pebble.ChangeID('70'), timeout=3, delay=1)
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertIsInstance(cm.exception, TimeoutError)
 
@@ -1667,7 +1704,7 @@ class TestClient(unittest.TestCase):
             "type": "sync"
         })
         # wait_change() itself shouldn't raise an error
-        response = self.client.wait_change('70')
+        response = self.client.wait_change(pebble.ChangeID('70'))
         self.assertEqual(response.id, '70')
         self.assertEqual(response.err, 'Some kind of service error')
 
@@ -1700,7 +1737,7 @@ services:
         self.client.add_layer('c', layer.to_dict())
         self.client.add_layer('d', layer, combine=True)
 
-        def build_expected(label, combine):
+        def build_expected(label: str, combine: bool):
             return {
                 'action': 'add',
                 'combine': combine,
@@ -1718,13 +1755,13 @@ services:
 
     def test_add_layer_invalid_type(self):
         with self.assertRaises(TypeError):
-            self.client.add_layer('foo', 42)
+            self.client.add_layer('foo', 42)  # type: ignore
         with self.assertRaises(TypeError):
-            self.client.add_layer(42, 'foo')
+            self.client.add_layer(42, 'foo')  # type: ignore
 
         # combine is a keyword-only arg (should be combine=True)
         with self.assertRaises(TypeError):
-            self.client.add_layer('foo', {}, True)
+            self.client.add_layer('foo', {}, True)  # type: ignore
 
     def test_get_plan(self):
         plan_yaml = """
@@ -2007,7 +2044,7 @@ bad path\r
     def test_push_text(self):
         self._test_push_str(io.StringIO('content 😀\nfoo\r\nbar'))
 
-    def _test_push_str(self, source):
+    def _test_push_str(self, source: typing.Union[str, typing.IO[str]]):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -2045,7 +2082,7 @@ bad path\r
     def test_push_binary(self):
         self._test_push_bytes(io.BytesIO(b'content \xf0\x9f\x98\x80\nfoo\r\nbar'))
 
-    def _test_push_bytes(self, source):
+    def _test_push_bytes(self, source: typing.Union[bytes, typing.IO[bytes]]):
         self.client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -2185,11 +2222,14 @@ bad path\r
             'files': [{'path': '/foo/bar'}],
         })
 
-    def _parse_write_multipart(self, content_type, body):
+    def _parse_write_multipart(self,
+                               content_type: str,
+                               body: _bytes_generator):
         message = email.message.Message()
         message['Content-Type'] = content_type
         self.assertEqual(message.get_content_type(), 'multipart/form-data')
         boundary = message.get_param('boundary')
+        assert isinstance(boundary, str)
 
         # We have to manually write the Content-Type with boundary, because
         # email.parser expects the entire multipart message with headers.
@@ -2441,7 +2481,7 @@ bad path\r
             self.client.send_signal('SIGHUP', 'should-be-a-list')
 
         with self.assertRaises(TypeError):
-            self.client.send_signal('SIGHUP', [1, 2])
+            self.client.send_signal('SIGHUP', [1, 2])  # type: ignore
 
     def test_get_checks_all(self):
         self.client.responses.append({
@@ -2571,7 +2611,7 @@ class TestExecError(unittest.TestCase):
         self.assertEqual(e.stderr, 'err')
 
     def test_str(self):
-        e = pebble.ExecError(['x'], 1, None, None)
+        e = pebble.ExecError[str](['x'], 1, None, None)
         self.assertEqual(str(e), "non-zero exit code 1 executing ['x']")
 
         e = pebble.ExecError(['x'], 1, 'only-out', None)
@@ -2586,20 +2626,20 @@ class TestExecError(unittest.TestCase):
 
     def test_str_truncated(self):
         e = pebble.ExecError(['foo'], 2, 'longout', 'longerr')
-        e.STR_MAX_OUTPUT = 5
+        e.STR_MAX_OUTPUT = 5  # type: ignore
         self.assertEqual(str(e), "non-zero exit code 2 executing ['foo'], "
                                  + "stdout='longo' [truncated], stderr='longe' [truncated]")
 
 
 class MockWebsocket:
     def __init__(self):
-        self.sends = []
-        self.receives = []
+        self.sends: typing.List[typing.Tuple[str, typing.Union[str, bytes]]] = []
+        self.receives: typing.List[typing.Union[str, bytes]] = []
 
-    def send_binary(self, b):
+    def send_binary(self, b: bytes):
         self.sends.append(('BIN', b))
 
-    def send(self, s):
+    def send(self, s: str):
         self.sends.append(('TXT', s))
 
     def recv(self):
@@ -2617,7 +2657,8 @@ class TestExec(unittest.TestCase):
         time_patcher.start()
         self.addCleanup(time_patcher.stop)
 
-    def add_responses(self, change_id, exit_code, change_err=None):
+    def add_responses(self, change_id: str, exit_code: int,
+                      change_err: typing.Optional[str] = None):
         task_id = f"T{change_id}"  # create a task_id based on change_id
         self.client.responses.append({
             'change': change_id,
@@ -2625,6 +2666,8 @@ class TestExec(unittest.TestCase):
         })
 
         change = build_mock_change_dict(change_id)
+        # pyright doesn't understand "assert change.get('tasks') is not None"
+        assert 'tasks' in change and change['tasks'] is not None
         change['tasks'][0]['data'] = {'exit-code': exit_code}
         if change_err is not None:
             change['err'] = change_err
@@ -2642,9 +2685,17 @@ class TestExec(unittest.TestCase):
         }
         return (stdio, stderr, control)
 
-    def build_exec_data(
-            self, command, service_context=None, environment=None, working_dir=None, timeout=None,
-            user_id=None, user=None, group_id=None, group=None, combine_stderr=False):
+    def build_exec_data(self,
+                        command: typing.List[str],
+                        service_context: typing.Optional[str] = None,
+                        environment: typing.Optional[typing.Dict[str, str]] = None,
+                        working_dir: typing.Optional[str] = None,
+                        timeout: typing.Optional[float] = None,
+                        user_id: typing.Optional[int] = None,
+                        user: typing.Optional[str] = None,
+                        group_id: typing.Optional[int] = None,
+                        group: typing.Optional[str] = None,
+                        combine_stderr: bool = False):
         return {
             'command': command,
             'service-context': service_context,
@@ -2660,15 +2711,15 @@ class TestExec(unittest.TestCase):
 
     def test_arg_errors(self):
         with self.assertRaises(TypeError):
-            self.client.exec('foo')
+            self.client.exec('foo')  # type: ignore
         with self.assertRaises(ValueError):
             self.client.exec([])
         with self.assertRaises(ValueError):
-            self.client.exec(['foo'], stdin='s', encoding=None)
+            self.client.exec(['foo'], stdin='s', encoding=None)  # type: ignore
         with self.assertRaises(ValueError):
             self.client.exec(['foo'], stdin=b's')
         with self.assertRaises(TypeError):
-            self.client.exec(['foo'], stdin=123)
+            self.client.exec(['foo'], stdin=123)  # type: ignore
         with self.assertRaises(ValueError):
             self.client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
                              combine_stderr=True)
@@ -3077,12 +3128,13 @@ class TestExec(unittest.TestCase):
             err.close()
 
     def test_wait_returned_io(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio = self.add_responses('123', 0)[0]
         stdio.receives.append(b'FOO BAR\n')
         stdio.receives.append(b'BAZZ\n')
         stdio.receives.append('{"command":"end"}')
 
         process = self.client.exec(['awk', '{ print toupper($) }'])
+        assert process.stdout is not None and process.stdin is not None
         process.stdin.write('Foo Bar\n')
         self.assertEqual(process.stdout.read(4), 'FOO ')
         process.stdin.write('bazz\n')
@@ -3101,12 +3153,13 @@ class TestExec(unittest.TestCase):
         ])
 
     def test_wait_returned_io_bytes(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+        stdio = self.add_responses('123', 0)[0]
         stdio.receives.append(b'FOO BAR\n')
         stdio.receives.append(b'BAZZ\n')
         stdio.receives.append('{"command":"end"}')
 
         process = self.client.exec(['awk', '{ print toupper($) }'], encoding=None)
+        assert process.stdout is not None and process.stdin is not None
         process.stdin.write(b'Foo Bar\n')
         self.assertEqual(process.stdout.read(4), b'FOO ')
         self.assertEqual(process.stdout.read(), b'BAR\n')
@@ -3128,7 +3181,7 @@ class TestExec(unittest.TestCase):
 
     def test_connect_websocket_error(self):
         class Client(MockClient):
-            def _connect_websocket(self, change_id, websocket_id):
+            def _connect_websocket(self, change_id: str, websocket_id: str):
                 raise websocket.WebSocketException('conn!')
 
         self.client = Client()
@@ -3147,7 +3200,7 @@ class TestExec(unittest.TestCase):
         stdio, stderr, _ = self.add_responses('123', 0)
         raised = False
 
-        def send_binary(b):
+        def send_binary(b: bytes):
             nonlocal raised
             raised = True
             raise Exception('a simulated error!')
