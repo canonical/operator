@@ -19,6 +19,7 @@ import shutil
 import tempfile
 import threading
 import time
+import typing
 import unittest
 import urllib.error
 import urllib.request
@@ -45,8 +46,10 @@ from .test_testing import PebbleStorageAPIsTestMixin
 class TestRealPebble(unittest.TestCase):
     def setUp(self):
         socket_path = os.getenv('PEBBLE_SOCKET')
-        if not socket_path and os.getenv('PEBBLE'):
-            socket_path = os.path.join(os.getenv('PEBBLE'), '.pebble.socket')
+        pebble_path = os.getenv('PEBBLE')
+        if not socket_path and pebble_path:
+            assert isinstance(pebble_path, str)
+            socket_path = os.path.join(pebble_path, '.pebble.socket')
         assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
 
         self.client = pebble.Client(socket_path=socket_path)
@@ -211,8 +214,10 @@ class TestRealPebble(unittest.TestCase):
 
     def test_exec_streaming(self):
         process = self.client.exec(['cat'])
+        assert process.stdout is not None
 
         def stdin_thread():
+            assert process.stdin is not None
             try:
                 for line in ['one\n', '2\n', 'THREE\n']:
                     process.stdin.write(line)
@@ -223,7 +228,7 @@ class TestRealPebble(unittest.TestCase):
 
         threading.Thread(target=stdin_thread).start()
 
-        reads = []
+        reads: typing.List[str] = []
         for line in process.stdout:
             reads.append(line)
 
@@ -233,8 +238,10 @@ class TestRealPebble(unittest.TestCase):
 
     def test_exec_streaming_bytes(self):
         process = self.client.exec(['cat'], encoding=None)
+        assert process.stdout is not None
 
         def stdin_thread():
+            assert process.stdin is not None
             try:
                 for line in [b'one\n', b'2\n', b'THREE\n']:
                     process.stdin.write(line)
@@ -245,7 +252,7 @@ class TestRealPebble(unittest.TestCase):
 
         threading.Thread(target=stdin_thread).start()
 
-        reads = []
+        reads: typing.List[bytes] = []
         for line in process.stdout:
             reads.append(line)
 

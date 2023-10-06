@@ -48,6 +48,7 @@ from typing import (
     TextIO,
     Tuple,
     Type,
+    TypedDict,
     Union,
 )
 
@@ -60,8 +61,6 @@ from ops.jujuversion import JujuVersion
 K8sSpec = Mapping[str, Any]
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import TypedDict
-
     from ops.testing import _ConfigOption
 
     _StorageDictType = Dict[str, Optional[List['Storage']]]
@@ -2143,6 +2142,14 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
+    @typing.overload
+    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:  # noqa
+        ...
+
+    @typing.overload
+    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:  # noqa
+        ...
+
     def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
@@ -2369,7 +2376,7 @@ class Container:
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(typing.cast(BinaryIO, src), dst)
+                            shutil.copyfileobj(src, dst)
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
