@@ -1093,7 +1093,7 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
         "summary": 'Autostart service "svc"',
         "tasks": [
             {
-                "id": pebble.TaskID("78"),
+                "id": "78",
                 "kind": "start",
                 "progress": {
                     "done": 1,
