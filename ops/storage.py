@@ -19,7 +19,6 @@ import pickle
 import shutil
 import sqlite3
 import subprocess
-import typing
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Generator, List, Optional, Tuple, Union
@@ -29,16 +28,15 @@ import yaml  # pyright: ignore[reportMissingModuleSource]
 logger = logging.getLogger()
 
 
-if typing.TYPE_CHECKING:
-    # _Notice = Tuple[event_path, observer_path, method_name]
-    _Notice = Tuple[str, str, str]
-    _Notices = List[_Notice]
+# _Notice = Tuple[event_path, observer_path, method_name]
+_Notice = Tuple[str, str, str]
+_Notices = List[_Notice]
 
-    # This is a function that takes a Tuple and returns a yaml node.
-    # it replaces a method, so the first argument passed to the function
-    # (Any) is 'self'.
-    _TupleRepresenterType = Callable[[Any, Tuple[Any, ...]], yaml.Node]
-    _NoticeGenerator = Generator['_Notice', None, None]
+# This is a function that takes a Tuple and returns a yaml node.
+# it replaces a method, so the first argument passed to the function
+# (Any) is 'self'.
+_TupleRepresenterType = Callable[[Any, Tuple[Any, ...]], yaml.Node]
+_NoticeGenerator = Generator['_Notice', None, None]
 
 
 def _run(args: List[str], **kw: Any):

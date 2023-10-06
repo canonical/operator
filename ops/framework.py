@@ -37,7 +37,9 @@ from typing import (
     Hashable,
     Iterable,
     List,
+    Literal,
     Optional,
+    Protocol,
     Set,
     Tuple,
     Type,
@@ -46,6 +48,7 @@ from typing import (
 )
 
 from ops import charm
+from ops.model import Model, _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 
@@ -62,23 +65,18 @@ class Serializable(typing.Protocol):
     def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
 
 
-if TYPE_CHECKING:
-    from typing import Literal, Protocol
+class _StoredObject(Protocol):
+    _under: Any = None  # noqa
 
-    from ops.charm import CharmMeta
-    from ops.model import Model, _ModelBackend
 
-    class _StoredObject(Protocol):
-        _under: Any = None  # noqa
+StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
 
-    StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
-
-    _Path = _Kind = _MethodName = _EventKey = str
-    # used to type Framework Attributes
-    _ObserverPath = List[Tuple[_Path, _MethodName, _Path, _EventKey]]
-    _ObjectPath = Tuple[Optional[_Path], _Kind]
-    _PathToObjectMapping = Dict[_Path, 'Object']
-    _PathToSerializableMapping = Dict[_Path, Serializable]
+_Path = _Kind = _MethodName = _EventKey = str
+# used to type Framework Attributes
+_ObserverPath = List[Tuple[_Path, _MethodName, _Path, _EventKey]]
+_ObjectPath = Tuple[Optional[_Path], _Kind]
+_PathToObjectMapping = Dict[_Path, 'Object']
+_PathToSerializableMapping = Dict[_Path, Serializable]
 
 _T = TypeVar("_T")
 _EventType = TypeVar('_EventType', bound='EventBase')
@@ -561,21 +559,22 @@ class Framework(Object):
     model: 'Model' = None  # type: ignore
     """The :class:`Model` instance for this charm."""
 
-    meta: 'CharmMeta' = None  # type: ignore
+    meta: 'charm.CharmMeta' = None  # type: ignore
     """The charm's metadata."""
 
     charm_dir: 'pathlib.Path' = None  # type: ignore
     """The charm project root directory."""
 
+    _stored: 'StoredStateData' = None  # type: ignore
+
     # to help the type checker and IDEs:
     if TYPE_CHECKING:
-        _stored: 'StoredStateData' = None  # type: ignore
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
-                 meta: 'CharmMeta', model: 'Model',
+                 meta: 'charm.CharmMeta', model: 'Model',
                  event_name: Optional[str] = None):
         super().__init__(self, None)
 
@@ -1059,14 +1058,13 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
-    if TYPE_CHECKING:
-        @typing.overload
-        def __getattr__(self, key: Literal['on']) -> ObjectEvents:
-            pass
+    @typing.overload
+    def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+        pass
 
-        @typing.overload
-        def __getattr__(self, key: str) -> Any:
-            pass
+    @typing.overload
+    def __getattr__(self, key: str) -> Any:
+        pass
 
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
@@ -1125,20 +1123,19 @@ class StoredState:
         self.parent_type: Optional[Type[Any]] = None
         self.attr_name: Optional[str] = None
 
-    if TYPE_CHECKING:
-        @typing.overload
-        def __get__(
-                self,
-                parent: Literal[None],
-                parent_type: 'Type[_ObjectType]') -> 'StoredState':
-            pass
+    @typing.overload
+    def __get__(
+            self,
+            parent: Literal[None],
+            parent_type: 'Type[_ObjectType]') -> 'StoredState':
+        pass
 
-        @typing.overload
-        def __get__(
-                self,
-                parent: '_ObjectType',
-                parent_type: 'Type[_ObjectType]') -> BoundStoredState:
-            pass
+    @typing.overload
+    def __get__(
+            self,
+            parent: '_ObjectType',
+            parent_type: 'Type[_ObjectType]') -> BoundStoredState:
+        pass
 
     def __get__(self,
                 parent: Optional['_ObjectType'],

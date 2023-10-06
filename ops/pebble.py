@@ -136,32 +136,56 @@ PlanDict = typing.TypedDict('PlanDict',
                              'checks': Dict[str, CheckDict]},
                             total=False)
 
+_AuthDict = TypedDict('_AuthDict',
+                      {'permissions': Optional[str],
+                       'user-id': Optional[int],
+                       'user': Optional[str],
+                       'group-id': Optional[int],
+                       'group': Optional[str],
+                       'path': Optional[str],
+                       'make-dirs': Optional[bool],
+                       'make-parents': Optional[bool],
+                       }, total=False)
+
+_ServiceInfoDict = TypedDict('_ServiceInfoDict',
+                             {'startup': Union['ServiceStartup', str],
+                                 'current': Union['ServiceStatus', str],
+                                 'name': str})
+
+# Callback types for _MultiParser header and body handlers
+
+
+class _BodyHandler(Protocol):
+    def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
+
+
+_HeaderHandler = Callable[[bytes], None]
+
+# tempfile.NamedTemporaryFile has an odd interface because of that
+# 'name' attribute, so we need to make a Protocol for it.
+
+
+class _Tempfile(Protocol):
+    name = ''
+    def write(self, data: bytes): ...  # noqa
+    def close(self): ...  # noqa
+
+
+class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
+    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
+    def write(self, __s: typing.AnyStr) -> int: ...  # noqa
+    def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
+
+
+_AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
+_TextOrBinaryIO = Union[TextIO, BinaryIO]
+_IOSource = Union[str, bytes, _AnyStrFileLikeIO]
+
+_SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
+
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
-    # callback types for _MultiParser header and body handlers
-    class _BodyHandler(Protocol):
-        def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
-
-    _HeaderHandler = Callable[[bytes], None]
-
-    # tempfile.NamedTemporaryFile has an odd interface because of that
-    # 'name' attribute, so we need to make a Protocol for it.
-    class _Tempfile(Protocol):
-        name = ''
-        def write(self, data: bytes): ...  # noqa
-        def close(self): ...  # noqa
-
-    class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-        def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
-        def write(self, __s: typing.AnyStr) -> int: ...  # noqa
-        def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
-
-    _AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
-    _TextOrBinaryIO = Union[TextIO, BinaryIO]
-    _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
-
-    _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
     _CheckInfoDict = TypedDict('_CheckInfoDict',
                                {"name": str,
                                 "level": NotRequired[Optional[Union['CheckLevel', str]]],
@@ -179,21 +203,6 @@ if TYPE_CHECKING:
                                "group-id": NotRequired[Optional[int]],
                                "group": NotRequired[Optional[str]],
                                "type": Union['FileType', str]})
-
-    _AuthDict = TypedDict('_AuthDict',
-                          {'permissions': Optional[str],
-                           'user-id': Optional[int],
-                           'user': Optional[str],
-                           'group-id': Optional[int],
-                           'group': Optional[str],
-                           'path': Optional[str],
-                           'make-dirs': Optional[bool],
-                           'make-parents': Optional[bool],
-                           }, total=False)
-    _ServiceInfoDict = TypedDict('_ServiceInfoDict',
-                                 {'startup': Union['ServiceStartup', str],
-                                  'current': Union['ServiceStatus', str],
-                                  'name': str})
 
     _ProgressDict = TypedDict('_ProgressDict',
                               {'label': str,
@@ -238,12 +247,14 @@ if TYPE_CHECKING:
                               'expire-after': str,
                               'repeat-after': str})
 
-    class _WebSocket(Protocol):
-        def connect(self, url: str, socket: socket.socket): ...  # noqa
-        def shutdown(self): ...                                  # noqa
-        def send(self, payload: str): ...                        # noqa
-        def send_binary(self, payload: bytes): ...               # noqa
-        def recv(self) -> Union[str, bytes]: ...                 # noqa
+
+class _WebSocket(Protocol):
+    def connect(self, url: str, socket: socket.socket): ...  # noqa
+    def shutdown(self): ...                                  # noqa
+    def send(self, payload: str): ...                        # noqa
+    def send_binary(self, payload: bytes): ...               # noqa
+    def recv(self) -> Union[str, bytes]: ...                 # noqa
+
 
 logger = logging.getLogger(__name__)
 

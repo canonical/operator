@@ -35,13 +35,17 @@ from typing import (
 
 from ops import model
 from ops._private import yaml
-from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
+from ops.framework import (
+    EventBase,
+    EventSource,
+    Framework,
+    Handle,
+    Object,
+    ObjectEvents,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import Required
-
-    from ops.framework import Handle
-    from ops.model import Container, Relation, Storage
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
@@ -369,7 +373,7 @@ class RelationEvent(HookEvent):
     relations with the same name.
     """
 
-    relation: 'Relation'
+    relation: 'model.Relation'
     """The relation involved in this event."""
 
     # TODO(benhoyt): I *think* app should never be None, but confirm and update type
@@ -383,7 +387,7 @@ class RelationEvent(HookEvent):
     :class:`Application <model.Application>`-level event.
     """
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None):
         super().__init__(handle)
@@ -498,7 +502,7 @@ class RelationDepartedEvent(RelationEvent):
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None,
                  departing_unit_name: Optional[str] = None):
@@ -563,10 +567,10 @@ class StorageEvent(HookEvent):
     of :class:`StorageEvent`.
     """
 
-    storage: 'Storage'
+    storage: 'model.Storage'
     """Storage instance this event refers to."""
 
-    def __init__(self, handle: 'Handle', storage: 'Storage'):
+    def __init__(self, handle: 'Handle', storage: 'model.Storage'):
         super().__init__(handle)
         self.storage = storage
 
@@ -645,7 +649,7 @@ class WorkloadEvent(HookEvent):
     a :class:`PebbleReadyEvent`.
     """
 
-    workload: 'Container'
+    workload: 'model.Container'
     """The workload involved in this event.
 
     Workload currently only can be a :class:`Container <model.Container>`, but
@@ -653,7 +657,7 @@ class WorkloadEvent(HookEvent):
     for example a machine.
     """
 
-    def __init__(self, handle: 'Handle', workload: 'Container'):
+    def __init__(self, handle: 'Handle', workload: 'model.Container'):
         super().__init__(handle)
 
         self.workload = workload

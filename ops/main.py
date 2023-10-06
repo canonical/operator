@@ -26,7 +26,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import ops.charm
 import ops.framework
@@ -35,11 +35,6 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
-
-if TYPE_CHECKING:
-    from ops.charm import CharmBase
-    from ops.framework import BoundEvent, EventSource
-    from ops.model import Relation
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -68,7 +63,7 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
+def _create_event_link(charm: 'ops.charm.CharmBase', bound_event: 'ops.framework.EventSource',
                        link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
@@ -106,7 +101,7 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
+def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
@@ -128,7 +123,7 @@ def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
             _create_event_link(charm, bound_event, link_to)
 
 
-def _emit_charm_event(charm: 'CharmBase', event_name: str):
+def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
     """Emits a charm event based on a Juju event name.
 
     Args:
@@ -149,8 +144,8 @@ def _emit_charm_event(charm: 'CharmBase', event_name: str):
         event_to_emit.emit(*args, **kwargs)
 
 
-def _get_event_args(charm: 'CharmBase',
-                    bound_event: 'BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
+def _get_event_args(charm: 'ops.charm.CharmBase',
+                    bound_event: 'ops.framework.BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
 
@@ -189,7 +184,7 @@ def _get_event_args(charm: 'CharmBase',
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
-        relation: Optional[Relation] = model.get_relation(relation_name, relation_id)
+        relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
@@ -239,7 +234,7 @@ class _Dispatcher:
         else:
             self._init_legacy()
 
-    def ensure_event_links(self, charm: 'CharmBase'):
+    def ensure_event_links(self, charm: 'ops.charm.CharmBase'):
         """Make sure necessary symlinks are present on disk."""
         if self.is_dispatch_aware:
             # links aren't needed
