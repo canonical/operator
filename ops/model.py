@@ -469,16 +469,16 @@ class Unit:
     app: Application
     """Application the unit is part of."""
 
-    number: int
+    ordinal: int
     """Unit ID number, for example 0."""
 
     def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
                  backend: '_ModelBackend', cache: '_ModelCache'):
         self.name = name
 
-        app_name = name.split('/')[0]
+        app_name, ordinal = name.split('/')
         self.app = cache.get(Application, app_name)
-        self.number = int(name.split('/')[1])
+        self.ordinal = int(ordinal)
 
         self._backend = backend
         self._cache = cache
