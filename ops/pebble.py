@@ -200,7 +200,7 @@ if TYPE_CHECKING:
                                'done': int,
                                'total': int})
     _TaskDict = TypedDict('_TaskDict',
-                          {'id': 'TaskID',
+                          {'id': str,
                            'kind': str,
                            'summary': str,
                            'status': str,

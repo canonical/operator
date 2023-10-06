@@ -287,7 +287,7 @@ single log
 
     def test_task_from_dict(self):
         d: pebble._TaskDict = {
-            "id": typing.cast(pebble.TaskID, "78"),
+            "id": "78",
             "kind": "start",
             "progress": {
                 "done": 1,
