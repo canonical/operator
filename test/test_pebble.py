@@ -325,7 +325,7 @@ single log
 
     def test_change_init(self):
         change = pebble.Change(
-            id=typing.cast(pebble.ChangeID, '70'),
+            id=pebble.ChangeID('70'),
             kind='autostart',
             err='SILLY',
             ready=True,
@@ -1084,7 +1084,7 @@ class MockTime:
 
 def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     return {
-        "id": typing.cast(pebble.ChangeID, change_id),
+        "id": pebble.ChangeID(change_id),
         "kind": "autostart",
         "ready": True,
         "ready-time": "2021-01-28T14:37:04.291517768+13:00",
@@ -1093,7 +1093,7 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
         "summary": 'Autostart service "svc"',
         "tasks": [
             {
-                "id": typing.cast(pebble.TaskID, "78"),
+                "id": pebble.TaskID("78"),
                 "kind": "start",
                 "progress": {
                     "done": 1,
@@ -1399,7 +1399,7 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.get_change(typing.cast(pebble.ChangeID, '70'))
+        change = self.client.get_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/changes/70', None, None),
@@ -1425,7 +1425,7 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.abort_change(typing.cast(pebble.ChangeID, '70'))
+        change = self.client.abort_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/changes/70', None, {'action': 'abort'}),
@@ -1579,7 +1579,7 @@ class TestClient(unittest.TestCase):
             "type": "sync"
         })
 
-        response = self.client.wait_change(typing.cast(pebble.ChangeID, '70'), timeout=timeout)
+        response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout)
         self.assertEqual(response.id, '70')
         self.assertTrue(response.ready)
 
@@ -1605,7 +1605,7 @@ class TestClient(unittest.TestCase):
             "type": "sync"
         })
 
-        response = self.client.wait_change(typing.cast(pebble.ChangeID, '70'))
+        response = self.client.wait_change(pebble.ChangeID('70'))
         self.assertEqual(response.id, '70')
         self.assertTrue(response.ready)
 
@@ -1630,10 +1630,7 @@ class TestClient(unittest.TestCase):
                 "type": "sync"
             })
 
-        response = self.client.wait_change(
-            typing.cast(pebble.ChangeID, '70'),
-            timeout=timeout,
-            delay=1)
+        response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout, delay=1)
         self.assertEqual(response.id, '70')
         self.assertTrue(response.ready)
 
@@ -1658,7 +1655,7 @@ class TestClient(unittest.TestCase):
         self.client.responses.append(lambda: timeout_response(2))
 
         with self.assertRaises(pebble.TimeoutError) as cm:
-            self.client.wait_change(typing.cast(pebble.ChangeID, '70'), timeout=6)
+            self.client.wait_change(pebble.ChangeID('70'), timeout=6)
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertIsInstance(cm.exception, TimeoutError)
 
@@ -1684,7 +1681,7 @@ class TestClient(unittest.TestCase):
             })
 
         with self.assertRaises(pebble.TimeoutError) as cm:
-            self.client.wait_change(typing.cast(pebble.ChangeID, '70'), timeout=3, delay=1)
+            self.client.wait_change(pebble.ChangeID('70'), timeout=3, delay=1)
         self.assertIsInstance(cm.exception, pebble.Error)
         self.assertIsInstance(cm.exception, TimeoutError)
 
@@ -1707,7 +1704,7 @@ class TestClient(unittest.TestCase):
             "type": "sync"
         })
         # wait_change() itself shouldn't raise an error
-        response = self.client.wait_change(typing.cast(pebble.ChangeID, '70'))
+        response = self.client.wait_change(pebble.ChangeID('70'))
         self.assertEqual(response.id, '70')
         self.assertEqual(response.err, 'Some kind of service error')
 
