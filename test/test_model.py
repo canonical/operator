@@ -1443,7 +1443,7 @@ containers:
             containers['c3']
 
         with self.assertRaises(RuntimeError):
-            other_unit = self.model.get_unit('other')
+            other_unit = self.model.get_unit('other/0')
             other_unit.containers
 
     def test_unit_get_container(self):
@@ -1457,7 +1457,7 @@ containers:
             unit.get_container('c3')
 
         with self.assertRaises(RuntimeError):
-            other_unit = self.model.get_unit('other')
+            other_unit = self.model.get_unit('other/0')
             other_unit.get_container('foo')
 
 
@@ -3349,7 +3349,7 @@ class TestSecretClass(unittest.TestCase):
         backend = ops.model._ModelBackend('test', 'test', 'test')
         meta = ops.CharmMeta()
         cache = ops.model._ModelCache(meta, backend)
-        unit = ops.Unit('test', meta, backend, cache)
+        unit = ops.Unit('test/0', meta, backend, cache)
         rel123 = ops.Relation('test', 123, True, unit, backend, cache)
         rel234 = ops.Relation('test', 234, True, unit, backend, cache)
         secret.grant(rel123)
@@ -3379,7 +3379,7 @@ class TestSecretClass(unittest.TestCase):
         fake_script(self, 'secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
         secret = self.make_secret(id='x')
-        unit = ops.Unit('test', ops.CharmMeta(), self.model._backend, self.model._cache)
+        unit = ops.Unit('test/0', ops.CharmMeta(), self.model._backend, self.model._cache)
         rel123 = ops.Relation('test', 123, True, unit, self.model._backend, self.model._cache)
         rel234 = ops.Relation('test', 234, True, unit, self.model._backend, self.model._cache)
         secret.revoke(rel123)
