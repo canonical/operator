@@ -3596,5 +3596,15 @@ class TestPorts(unittest.TestCase):
         ])
 
 
+@pytest.mark.parametrize("name,ordinal", [("foo/3", 3), ("my-app-name/0", 0)])
+def test_unit_ordinal(name, ordinal):
+    meta = ops.CharmMeta.from_yaml("""
+    name: charm
+    """)
+    backend = _ModelBackend(name)
+    model = ops.Model(meta, backend)
+    assert model.unit.ordinal == ordinal
+
+
 if __name__ == "__main__":
     unittest.main()
