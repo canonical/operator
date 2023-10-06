@@ -278,10 +278,11 @@ class Model:
 
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
-        # (entity type, name): instance.
-        _weakcachetype = weakref.WeakValueDictionary[
-            Tuple['UnitOrApplicationType', str],
-            Optional[Union['Unit', 'Application']]]
+        if typing.TYPE_CHECKING:
+            # (entity type, name): instance.
+            _weakcachetype = weakref.WeakValueDictionary[
+                Tuple['UnitOrApplicationType', str],
+                Optional[Union['Unit', 'Application']]]
 
         self._meta = meta
         self._backend = backend
