@@ -82,7 +82,7 @@ _RawStatus = TypedDict('_RawStatus', {
     'status': _StatusName,
     'message': str,
 })
-RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
+_RawConfig = TypedDict("_RawConfig", {'options': Dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
@@ -538,7 +538,7 @@ class Harness(Generic[CharmType]):
 
         if not isinstance(config, dict):
             raise TypeError(config)
-        return cast('RawConfig', config)
+        return cast('_RawConfig', config)
 
     def add_oci_resource(self, resource_name: str,
                          contents: Optional[Mapping[str, str]] = None) -> None:
@@ -1794,7 +1794,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         'float': float
     }
 
-    def __init__(self, config: 'RawConfig'):
+    def __init__(self, config: '_RawConfig'):
         super().__init__()
         self._spec = config
         self._defaults = self._load_defaults(config)
@@ -1805,7 +1805,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
             self._config_set(key, value)
 
     @staticmethod
-    def _load_defaults(charm_config: 'RawConfig') -> Dict[str, Union[str, int, float, bool]]:
+    def _load_defaults(charm_config: '_RawConfig') -> Dict[str, Union[str, int, float, bool]]:
         """Load default values from config.yaml.
 
         Handle the case where a user doesn't supply explicit config snippets.
@@ -1892,7 +1892,7 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: 'RawConfig'):
+    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: '_RawConfig'):
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
