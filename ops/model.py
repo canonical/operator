@@ -2516,10 +2516,10 @@ class Container:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory, recursively deletes it and
-                       everything under it. If the path is a file, delete the file and
-                       do nothing if the file is non-existent. Behaviourally similar
-                       to ``rm -rf <file|dir>``.
+            recursive: If True, and path is a directory, recursively delete it and
+                       everything under it. If path is a file, delete the file. In
+                       either case, do nothing if the file or directory does not
+                       exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
