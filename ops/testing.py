@@ -33,7 +33,6 @@ from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
 from typing import (
-    TYPE_CHECKING,
     Any,
     AnyStr,
     BinaryIO,
@@ -59,39 +58,31 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError
+from ops.model import Container, RelationNotFoundError, _ConfigOption, _NetworkDict
 from ops.pebble import ExecProcess
 
-if TYPE_CHECKING:
-    from ops.model import _NetworkDict
+ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
+_StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
+_FileKwargs = TypedDict('_FileKwargs', {
+    'permissions': Optional[int],
+    'last_modified': datetime.datetime,
+    'user_id': Optional[int],
+    'user': Optional[str],
+    'group_id': Optional[int],
+    'group': Optional[str],
+})
 
-    ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
-    _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
-    _FileKwargs = TypedDict('_FileKwargs', {
-        'permissions': Optional[int],
-        'last_modified': datetime.datetime,
-        'user_id': Optional[int],
-        'user': Optional[str],
-        'group_id': Optional[int],
-        'group': Optional[str],
-    })
+_RelationEntities = TypedDict('_RelationEntities', {
+    'app': str,
+    'units': List[str]
+})
 
-    _RelationEntities = TypedDict('_RelationEntities', {
-        'app': str,
-        'units': List[str]
-    })
-
-    _ConfigOption = TypedDict('_ConfigOption', {
-        'type': Literal['string', 'int', 'float', 'boolean'],
-        'description': str,
-        'default': Union[str, int, float, bool],
-    })
-    _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
-    _RawStatus = TypedDict('_RawStatus', {
-        'status': _StatusName,
-        'message': str,
-    })
-    RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
+_StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
+_RawStatus = TypedDict('_RawStatus', {
+    'status': _StatusName,
+    'message': str,
+})
+RawConfig = TypedDict("RawConfig", {'options': Dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can

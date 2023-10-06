@@ -40,6 +40,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -60,38 +61,41 @@ from ops.jujuversion import JujuVersion
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
 
-if typing.TYPE_CHECKING:
-    from ops.testing import _ConfigOption
+_ConfigOption = TypedDict('_ConfigOption', {
+    'type': Literal['string', 'int', 'float', 'boolean'],
+    'description': str,
+    'default': Union[str, int, float, bool],
+})
 
-    _StorageDictType = Dict[str, Optional[List['Storage']]]
-    _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
+_StorageDictType = Dict[str, Optional[List['Storage']]]
+_BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
-    _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
+_StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
-    # mapping from relation name to a list of relation objects
-    _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
-    # mapping from container name to container metadata
-    _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
+# mapping from relation name to a list of relation objects
+_RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
+# mapping from container name to container metadata
+_ContainerMeta_Raw = Dict[str, 'ops.charm.ContainerMeta']
 
-    # relation data is a string key: string value mapping so far as the
-    # controller is concerned
-    _RelationDataContent_Raw = Dict[str, str]
-    UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
+# relation data is a string key: string value mapping so far as the
+# controller is concerned
+_RelationDataContent_Raw = Dict[str, str]
+UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
-    _AddressDict = TypedDict('_AddressDict', {
-        'address': str,  # Juju < 2.9
-        'value': str,  # Juju >= 2.9
-        'cidr': str
-    })
-    _BindAddressDict = TypedDict('_BindAddressDict', {
-        'interface-name': str,
-        'addresses': List[_AddressDict]
-    })
-    _NetworkDict = TypedDict('_NetworkDict', {
-        'bind-addresses': List[_BindAddressDict],
-        'ingress-addresses': List[str],
-        'egress-subnets': List[str]
-    })
+_AddressDict = TypedDict('_AddressDict', {
+    'address': str,  # Juju < 2.9
+    'value': str,  # Juju >= 2.9
+    'cidr': str
+})
+_BindAddressDict = TypedDict('_BindAddressDict', {
+    'interface-name': str,
+    'addresses': List[_AddressDict]
+})
+_NetworkDict = TypedDict('_NetworkDict', {
+    'bind-addresses': List[_BindAddressDict],
+    'ingress-addresses': List[str],
+    'egress-subnets': List[str]
+})
 
 
 logger = logging.getLogger(__name__)
@@ -274,11 +278,10 @@ class Model:
 
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
-        if typing.TYPE_CHECKING:
-            # (entity type, name): instance.
-            _weakcachetype = weakref.WeakValueDictionary[
-                Tuple['UnitOrApplicationType', str],
-                Optional[Union['Unit', 'Application']]]
+        # (entity type, name): instance.
+        _weakcachetype = weakref.WeakValueDictionary[
+            Tuple['UnitOrApplicationType', str],
+            Optional[Union['Unit', 'Application']]]
 
         self._meta = meta
         self._backend = backend
