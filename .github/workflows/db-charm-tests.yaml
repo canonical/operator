@@ -43,3 +43,7 @@ jobs:
 
       - name: Run the charm's unit tests
         run: tox -vve unit
+        env:
+          # This env var is only to indicate Juju version to "simulate" in the mysqk-k8s-operator
+          # unit tests. No libjuju is being actually used in unit testing.
+          LIBJUJU_VERSION_SPECIFIER: 3.1
