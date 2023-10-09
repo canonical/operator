@@ -193,7 +193,7 @@ class Secret(_DCBase):
 
 
 def normalize_name(s: str):
-    """Event names need underscores instead of dashes."""
+    """Event names, in Scenario, uniformly use underscores instead of dashes."""
     return s.replace("-", "_")
 
 
@@ -927,9 +927,6 @@ class Event(_DCBase):
         return self.replace(relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
-        if "-" in self.path:
-            logger.warning(f"Only use underscores in event paths. {self.path!r}")
-
         path = normalize_name(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, "path", path)

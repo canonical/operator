@@ -223,6 +223,42 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     )
 
 
+@pytest.mark.parametrize(
+    "evt_name",
+    ("changed", "broken", "departed", "joined", "created"),
+)
+def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
+    relation = Relation(
+        endpoint="foo",
+        interface="foo",
+        remote_units_data={},  # no units
+    )
+
+    def callback(charm: CharmBase, event):
+        assert event.app  # that's always present
+        assert not event.unit
+
+    mycharm._call = callback
+
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
+        getattr(relation, f"{evt_name}_event"),
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+            },
+        },
+    )
+
+    assert "remote unit ID unset; no remote unit data present" in caplog.text
+
+
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
 def test_relation_unit_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):

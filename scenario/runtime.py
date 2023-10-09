@@ -231,12 +231,17 @@ class Runtime:
                         "but you probably should be parametrizing the event with `remote_unit_id` "
                         "to be explicit.",
                     )
-                else:
+                elif len(remote_unit_ids) > 1:
                     remote_unit_id = remote_unit_ids[0]
                     logger.warning(
                         "remote unit ID unset, and multiple remote unit IDs are present; "
                         "We will pick the first one and hope for the best. You should be passing "
                         "`remote_unit_id` to the Event constructor.",
+                    )
+                else:
+                    logger.warning(
+                        "remote unit ID unset; no remote unit data present. "
+                        "Is this a realistic scenario?",  # TODO: is it?
                     )
 
             if remote_unit_id is not None:
