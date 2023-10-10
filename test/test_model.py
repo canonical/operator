@@ -3596,7 +3596,7 @@ class TestPorts(unittest.TestCase):
         ])
 
 
-class TestContainer(unittest.TestCase):
+class TestUnit(unittest.TestCase):
     def setUp(self):
         self.model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
         self.unit = self.model.unit
