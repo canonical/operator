@@ -695,9 +695,9 @@ class Unit:
         """Reboot the host machine, after stopping all containers hosted on the machine.
 
         Normally, the reboot will only take place after the current hook successfully
-        completes. Use the ``now`` argument when multiple reboots are required, to
-        reboot immediately without waiting for the hook to complete, and to restart the
-        hook after rebooting.
+        completes. Use ``now=True`` to reboot immediately without waiting for the
+        hook to complete; this is useful when multiple restarts are required (Juju
+        will re-run the hook after rebooting).
 
         This will silently fail for Kubernetes charms.
 
