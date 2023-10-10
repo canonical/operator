@@ -362,7 +362,6 @@ containers:
         self.assertEqual(charm.count, 2)
 
     def test_relations_meta(self):
-
         # language=YAML
         self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -373,15 +372,18 @@ requires:
     scope: container
   metrics:
     interface: prometheus-scraping
+    optional: true
 ''')
 
         self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
         self.assertEqual(self.meta.requires['database'].limit, 1)
         self.assertEqual(self.meta.requires['database'].scope, 'container')
+        self.assertFalse(self.meta.requires['database'].optional)
 
         self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
         self.assertIsNone(self.meta.requires['metrics'].limit)
         self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
+        self.assertTrue(self.meta.requires['metrics'].optional)
 
     def test_relations_meta_limit_type_validation(self):
         with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):

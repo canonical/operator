@@ -52,6 +52,7 @@ if TYPE_CHECKING:
         '_RelationMetaDict', {
             'interface': Required[str],
             'limit': int,
+            'optional': bool,
             'scope': _Scopes},
         total=False)
 
@@ -1300,6 +1301,14 @@ class RelationMeta:
     Will be either ``"global"`` or ``"container"``.
     """
 
+    optional: bool
+    """If True, the relation is considered optional.
+
+    This value is informational only and is not used by Juju itself (all
+    relations are optional from Juju's perspective), but it may be set in
+    ``metadata.yaml`` and used by the charm code if appropriate.
+    """
+
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
@@ -1318,6 +1327,8 @@ class RelationMeta:
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
                 ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
+
+        self.optional = raw.get('optional', False)
 
 
 class StorageMeta:
