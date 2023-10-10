@@ -691,6 +691,32 @@ class Unit:
         for protocol, port in desired - existing:
             self._backend.open_port(protocol, port)
 
+    def reboot(self, now: bool = False) -> None:
+        """Reboot the host machine, after stopping all containers hosted on the machine.
+
+        Normally, the reboot will only take place after the current hook successfully
+        completes. Use the ``now`` argument when multiple reboots are required, to
+        reboot immediately without waiting for the hook to complete, and to restart the
+        hook after rebooting.
+
+        This will silently fail for Kubernetes charms.
+
+        This can only be called for the current unit, and cannot be used in an action
+        hook.
+
+        Args:
+            now: terminate immediately without waiting for the current hook to complete,
+                restarting the hook after reboot.
+
+        Raises:
+            RuntimeError: if called on a remote unit.
+            :class:`ModelError`: if used in an action hook.
+
+        """
+        if not self._is_our_unit:
+            raise RuntimeError(f'cannot reboot a remote unit {self}')
+        self._backend.reboot(now)
+
 
 @dataclasses.dataclass(frozen=True)
 class Port:
@@ -3348,6 +3374,12 @@ class _ModelBackend:
             logger.warning('Ignoring opened-ports port range: %s', port_str)
         protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
         return Port(protocol_lit, int(port))
+
+    def reboot(self, now: bool = False):
+        if now:
+            self._run("juju-reboot", "--now")
+        else:
+            self._run("juju-reboot")
 
 
 class _ModelBackendValidator:

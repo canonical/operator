@@ -1882,6 +1882,10 @@ class _Secret:
     grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
 
 
+class RebootingMachineError(Exception):
+    """Raised when the machine would reboot."""
+
+
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -2502,6 +2506,14 @@ class _TestingModelBackend:
                 raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # NOQA: test_quote_backslashes
         else:
             raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # NOQA: test_quote_backslashes
+
+    def reboot(self, now: bool = False):
+        if not now:
+            # We can't simulate the reboot, so just do nothing.
+            return
+        # This should exit, reboot, and re-emit the event, but we'll need the caller
+        # to handle that. We raise an exception so that they can simulate the exit.
+        raise RebootingMachineError()
 
 
 @_copy_docstrings(pebble.ExecProcess)
