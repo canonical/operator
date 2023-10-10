@@ -28,25 +28,31 @@ from typing import (
     Optional,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
     cast,
 )
 
 from ops import model
 from ops._private import yaml
-from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
+from ops.framework import (
+    EventBase,
+    EventSource,
+    Framework,
+    Handle,
+    Object,
+    ObjectEvents,
+)
 
 if TYPE_CHECKING:
-    from typing_extensions import Required, TypedDict
-
-    from ops.framework import Handle
-    from ops.model import Container, Relation, Storage
+    from typing_extensions import Required
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
         '_RelationMetaDict', {
             'interface': Required[str],
             'limit': int,
+            'optional': bool,
             'scope': _Scopes},
         total=False)
 
@@ -368,7 +374,7 @@ class RelationEvent(HookEvent):
     relations with the same name.
     """
 
-    relation: 'Relation'
+    relation: 'model.Relation'
     """The relation involved in this event."""
 
     app: model.Application
@@ -381,7 +387,7 @@ class RelationEvent(HookEvent):
     :class:`Application <model.Application>`-level event.
     """
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None):
         super().__init__(handle)
@@ -508,7 +514,7 @@ class RelationDepartedEvent(RelationEvent):
     unit: model.Unit
     """The remote unit that has triggered this event."""
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None,
                  departing_unit_name: Optional[str] = None):
@@ -575,10 +581,10 @@ class StorageEvent(HookEvent):
     of :class:`StorageEvent`.
     """
 
-    storage: 'Storage'
+    storage: 'model.Storage'
     """Storage instance this event refers to."""
 
-    def __init__(self, handle: 'Handle', storage: 'Storage'):
+    def __init__(self, handle: 'Handle', storage: 'model.Storage'):
         super().__init__(handle)
         self.storage = storage
 
@@ -657,7 +663,7 @@ class WorkloadEvent(HookEvent):
     a :class:`PebbleReadyEvent`.
     """
 
-    workload: 'Container'
+    workload: 'model.Container'
     """The workload involved in this event.
 
     Workload currently only can be a :class:`Container <model.Container>`, but
@@ -665,7 +671,7 @@ class WorkloadEvent(HookEvent):
     for example a machine.
     """
 
-    def __init__(self, handle: 'Handle', workload: 'Container'):
+    def __init__(self, handle: 'Handle', workload: 'model.Container'):
         super().__init__(handle)
 
         self.workload = workload
@@ -1308,6 +1314,14 @@ class RelationMeta:
     Will be either ``"global"`` or ``"container"``.
     """
 
+    optional: bool
+    """If True, the relation is considered optional.
+
+    This value is informational only and is not used by Juju itself (all
+    relations are optional from Juju's perspective), but it may be set in
+    ``metadata.yaml`` and used by the charm code if appropriate.
+    """
+
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
@@ -1326,6 +1340,8 @@ class RelationMeta:
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
                 ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
+
+        self.optional = raw.get('optional', False)
 
 
 class StorageMeta:

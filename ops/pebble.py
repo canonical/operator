@@ -53,10 +53,13 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     Optional,
+    Protocol,
     Sequence,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
 )
 
@@ -133,79 +136,88 @@ PlanDict = typing.TypedDict('PlanDict',
                              'checks': Dict[str, CheckDict]},
                             total=False)
 
+_AuthDict = TypedDict('_AuthDict',
+                      {'permissions': Optional[str],
+                       'user-id': Optional[int],
+                       'user': Optional[str],
+                       'group-id': Optional[int],
+                       'group': Optional[str],
+                       'path': Optional[str],
+                       'make-dirs': Optional[bool],
+                       'make-parents': Optional[bool],
+                       }, total=False)
+
+_ServiceInfoDict = TypedDict('_ServiceInfoDict',
+                             {'startup': Union['ServiceStartup', str],
+                                 'current': Union['ServiceStatus', str],
+                                 'name': str})
+
+# Callback types for _MultiParser header and body handlers
+
+
+class _BodyHandler(Protocol):
+    def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
+
+
+_HeaderHandler = Callable[[bytes], None]
+
+# tempfile.NamedTemporaryFile has an odd interface because of that
+# 'name' attribute, so we need to make a Protocol for it.
+
+
+class _Tempfile(Protocol):
+    name = ''
+    def write(self, data: bytes): ...  # noqa
+    def close(self): ...  # noqa
+
+
+class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
+    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
+    def write(self, __s: typing.AnyStr) -> int: ...  # noqa
+    def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
+
+
+_AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
+_TextOrBinaryIO = Union[TextIO, BinaryIO]
+_IOSource = Union[str, bytes, _AnyStrFileLikeIO]
+
+_SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
+
 if TYPE_CHECKING:
-    from typing_extensions import Literal, Protocol, TypedDict
+    from typing_extensions import NotRequired
 
-    # callback types for _MultiParser header and body handlers
-    class _BodyHandler(Protocol):
-        def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
-
-    _HeaderHandler = Callable[[bytes], None]
-
-    # tempfile.NamedTemporaryFile has an odd interface because of that
-    # 'name' attribute, so we need to make a Protocol for it.
-    class _Tempfile(Protocol):
-        name = ''
-        def write(self, data: bytes): ...  # noqa
-        def close(self): ...  # noqa
-
-    class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-        def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
-        def write(self, __s: typing.AnyStr) -> int: ...  # noqa
-        def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
-
-    _AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
-    _TextOrBinaryIO = Union[TextIO, BinaryIO]
-    _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
-
-    _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
     _CheckInfoDict = TypedDict('_CheckInfoDict',
                                {"name": str,
-                                "level": Optional[Union['CheckLevel', str]],
+                                "level": NotRequired[Optional[Union['CheckLevel', str]]],
                                 "status": Union['CheckStatus', str],
-                                "failures": int,
+                                "failures": NotRequired[int],
                                 "threshold": int})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
-                               "size": Optional[int],
+                               "size": NotRequired[Optional[int]],
                                "permissions": str,
                                "last-modified": str,
-                               "user-id": Optional[int],
-                               "user": Optional[str],
-                               "group-id": Optional[int],
-                               "group": Optional[str],
+                               "user-id": NotRequired[Optional[int]],
+                               "user": NotRequired[Optional[str]],
+                               "group-id": NotRequired[Optional[int]],
+                               "group": NotRequired[Optional[str]],
                                "type": Union['FileType', str]})
-
-    _AuthDict = TypedDict('_AuthDict',
-                          {'permissions': Optional[str],
-                           'user-id': Optional[int],
-                           'user': Optional[str],
-                           'group-id': Optional[int],
-                           'group': Optional[str],
-                           'path': Optional[str],
-                           'make-dirs': Optional[bool],
-                           'make-parents': Optional[bool],
-                           }, total=False)
-    _ServiceInfoDict = TypedDict('_ServiceInfoDict',
-                                 {'startup': Union['ServiceStartup', str],
-                                  'current': Union['ServiceStatus', str],
-                                  'name': str})
 
     _ProgressDict = TypedDict('_ProgressDict',
                               {'label': str,
                                'done': int,
                                'total': int})
     _TaskDict = TypedDict('_TaskDict',
-                          {'id': 'TaskID',
+                          {'id': str,
                            'kind': str,
                            'summary': str,
                            'status': str,
-                           'log': Optional[List[str]],
+                           'log': NotRequired[Optional[List[str]]],
                            'progress': _ProgressDict,
                            'spawn-time': str,
-                           'ready-time': str,
-                           'data': Optional[Dict[str, Any]]})
+                           'ready-time': NotRequired[Optional[str]],
+                           'data': NotRequired[Optional[Dict[str, Any]]]})
     _ChangeDict = TypedDict('_ChangeDict',
                             {'id': str,
                              'kind': str,
@@ -213,17 +225,17 @@ if TYPE_CHECKING:
                              'status': str,
                              'ready': bool,
                              'spawn-time': str,
-                             'tasks': Optional[List[_TaskDict]],
-                             'err': Optional[str],
-                             'ready-time': Optional[str],
-                             'data': Optional[Dict[str, Any]]})
+                             'tasks': NotRequired[Optional[List[_TaskDict]]],
+                             'err': NotRequired[Optional[str]],
+                             'ready-time': NotRequired[Optional[str]],
+                             'data': NotRequired[Optional[Dict[str, Any]]]})
 
     _Error = TypedDict('_Error',
                        {'kind': str,
                         'message': str})
     _Item = TypedDict('_Item',
                       {'path': str,
-                       'error': _Error})
+                       'error': NotRequired[_Error]})
     _FilesResponse = TypedDict('_FilesResponse',
                                {'result': List[_Item]})
 
@@ -231,16 +243,18 @@ if TYPE_CHECKING:
                              {'message': str,
                               'first-added': str,
                               'last-added': str,
-                              'last-shown': Optional[str],
+                              'last-shown': NotRequired[Optional[str]],
                               'expire-after': str,
                               'repeat-after': str})
 
-    class _WebSocket(Protocol):
-        def connect(self, url: str, socket: socket.socket): ...  # noqa
-        def shutdown(self): ...                                  # noqa
-        def send(self, payload: str): ...                        # noqa
-        def send_binary(self, payload: bytes): ...               # noqa
-        def recv(self) -> Union[str, bytes]: ...                 # noqa
+
+class _WebSocket(Protocol):
+    def connect(self, url: str, socket: socket.socket): ...  # noqa
+    def shutdown(self): ...                                  # noqa
+    def send(self, payload: str): ...                        # noqa
+    def send_binary(self, payload: bytes): ...               # noqa
+    def recv(self) -> Union[str, bytes]: ...                 # noqa
+
 
 logger = logging.getLogger(__name__)
 
@@ -603,7 +617,7 @@ class Task:
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
-            ready_time=(timeconv.parse_rfc3339(d['ready-time'])
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
@@ -1899,6 +1913,14 @@ class Client:
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
+    @typing.overload
+    def pull(self, path: str, *, encoding: None) -> BinaryIO:  # noqa
+        ...
+
+    @typing.overload
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:  # noqa
+        ...
+
     def pull(self,
              path: str,
              *,
@@ -2142,10 +2164,14 @@ class Client:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory recursively deletes it and
-                       everything under it. If the path is a file, delete the file and
-                       do nothing if the file is non-existent. Behaviourally similar
-                       to ``rm -rf <file|dir>``.
+            recursive: If True, and path is a directory, recursively delete it and
+                       everything under it. If path is a file, delete the file. In
+                       either case, do nothing if the file or directory does not
+                       exist. Behaviourally similar to ``rm -rf <file|dir>``.
+
+        Raises:
+            pebble.PathError: If a relative path is provided, or if `recursive` is False
+                and the file or directory cannot be removed (it does not exist or is not empty).
 
         """
         info: Dict[str, Any] = {'path': path}

@@ -40,6 +40,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -48,6 +49,7 @@ from typing import (
     TextIO,
     Tuple,
     Type,
+    TypedDict,
     Union,
 )
 
@@ -59,40 +61,41 @@ from ops.jujuversion import JujuVersion
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
 
-if typing.TYPE_CHECKING:
-    from typing_extensions import TypedDict
+_ConfigOption = TypedDict('_ConfigOption', {
+    'type': Literal['string', 'int', 'float', 'boolean'],
+    'description': str,
+    'default': Union[str, int, float, bool],
+})
 
-    from ops.testing import _ConfigOption
+_StorageDictType = Dict[str, Optional[List['Storage']]]
+_BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
-    _StorageDictType = Dict[str, Optional[List['Storage']]]
-    _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
+_StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
-    _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
+# mapping from relation name to a list of relation objects
+_RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
+# mapping from container name to container metadata
+_ContainerMeta_Raw = Dict[str, 'ops.charm.ContainerMeta']
 
-    # mapping from relation name to a list of relation objects
-    _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
-    # mapping from container name to container metadata
-    _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
+# relation data is a string key: string value mapping so far as the
+# controller is concerned
+_RelationDataContent_Raw = Dict[str, str]
+UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
-    # relation data is a string key: string value mapping so far as the
-    # controller is concerned
-    _RelationDataContent_Raw = Dict[str, str]
-    UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
-
-    _AddressDict = TypedDict('_AddressDict', {
-        'address': str,  # Juju < 2.9
-        'value': str,  # Juju >= 2.9
-        'cidr': str
-    })
-    _BindAddressDict = TypedDict('_BindAddressDict', {
-        'interface-name': str,
-        'addresses': List[_AddressDict]
-    })
-    _NetworkDict = TypedDict('_NetworkDict', {
-        'bind-addresses': List[_BindAddressDict],
-        'ingress-addresses': List[str],
-        'egress-subnets': List[str]
-    })
+_AddressDict = TypedDict('_AddressDict', {
+    'address': str,  # Juju < 2.9
+    'value': str,  # Juju >= 2.9
+    'cidr': str
+})
+_BindAddressDict = TypedDict('_BindAddressDict', {
+    'interface-name': str,
+    'addresses': List[_AddressDict]
+})
+_NetworkDict = TypedDict('_NetworkDict', {
+    'bind-addresses': List[_BindAddressDict],
+    'ingress-addresses': List[str],
+    'egress-subnets': List[str]
+})
 
 
 logger = logging.getLogger(__name__)
@@ -2143,6 +2146,14 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
+    @typing.overload
+    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:  # noqa
+        ...
+
+    @typing.overload
+    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:  # noqa
+        ...
+
     def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
@@ -2369,7 +2380,7 @@ class Container:
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(typing.cast(BinaryIO, src), dst)
+                            shutil.copyfileobj(src, dst)
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
@@ -2509,7 +2520,15 @@ class Container:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, recursively delete path and everything under it.
+            recursive: If True, and path is a directory, recursively delete it and
+                       everything under it. If path is a file, delete the file. In
+                       either case, do nothing if the file or directory does not
+                       exist. Behaviourally similar to ``rm -rf <file|dir>``.
+
+        Raises:
+            pebble.PathError: If a relative path is provided, or if `recursive` is False
+                and the file or directory cannot be removed (it does not exist or is not empty).
+
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 

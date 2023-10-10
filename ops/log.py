@@ -16,19 +16,16 @@
 
 import logging
 import sys
+import types
 import typing
 
-if typing.TYPE_CHECKING:
-    from types import TracebackType
-    from typing import Type
-
-    from ops.model import _ModelBackend
+from ops.model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
     """A handler for sending logs to Juju via juju-log."""
 
-    def __init__(self, model_backend: "_ModelBackend", level: int = logging.DEBUG):
+    def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
         self.model_backend = model_backend
 
@@ -41,7 +38,7 @@ class JujuLogHandler(logging.Handler):
         self.model_backend.juju_log(record.levelname, self.format(record))
 
 
-def setup_root_logging(model_backend: "_ModelBackend", debug: bool = False):
+def setup_root_logging(model_backend: _ModelBackend, debug: bool = False):
     """Setup python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
@@ -62,7 +59,9 @@ def setup_root_logging(model_backend: "_ModelBackend", debug: bool = False):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    def except_hook(etype: "Type[BaseException]", value: BaseException, tb: "TracebackType"):
+    def except_hook(etype: typing.Type[BaseException],
+                    value: BaseException,
+                    tb: types.TracebackType):
         logger.error(
             "Uncaught exception while in charm code:",
             exc_info=(etype, value, tb))

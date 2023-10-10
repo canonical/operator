@@ -28,22 +28,7 @@ per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
 docstring-convention = "google"
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py",
-    "test/charms/test_main/src/*.py",
-    "test/charms/test_smoke/src/*.py",
-    "test/test_private.py",
-    "test/test_infra.py",
-    "test/test_jujuversion.py",
-    "test/test_log.py",
-    "test/test_helpers.py",
-    "test/test_lib.py",
-    "test/test_model.py",
-    "test/test_testing.py",
-    "test/test_storage.py",
-    "test/test_charm.py",
-    "test/test_framework.py",
-    "test/test_main.py",
-]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]
 pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
