@@ -1883,7 +1883,21 @@ class _Secret:
 
 
 class RebootingMachineError(Exception):
-    """Raised when the machine would reboot."""
+    """Raised when the machine would reboot.
+    
+    When :meth:`Unit.reboot` is called with ``now=True`` in a machine charm, the
+    unit's machine is rebooted, interrupting the execution of the event hook. To
+    simulate that when using the testing harness, write a test that expects a
+    ``RebootingMachineError`` to be raised, for example::
+
+        def test_installation(self):
+            self.harness.begin()
+            with self.assertRaises(ops.testing.RebootMachineError):
+                self.harness.charm.on.install.emit()
+                # More asserts here that the first part of installation was done.
+            self.harness.charm.on.install.emit()
+            # More asserts here that the installation continued appropriately.
+    """
 
 
 @_copy_docstrings(model._ModelBackend)
