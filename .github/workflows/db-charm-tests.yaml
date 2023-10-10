@@ -43,6 +43,7 @@ jobs:
 
       - name: Run the charm's unit tests
         run: tox -vve unit
+        # TODO: remove this once https://github.com/canonical/mysql-k8s-operator/pull/316 is fixed
         env:
           # This env var is only to indicate Juju version to "simulate" in the mysqk-k8s-operator
           # unit tests. No libjuju is being actually used in unit testing.
