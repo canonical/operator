@@ -1884,7 +1884,7 @@ class _Secret:
 
 class RebootingMachineError(Exception):
     """Raised when the machine would reboot.
-    
+
     When :meth:`Unit.reboot` is called with ``now=True`` in a machine charm, the
     unit's machine is rebooted, interrupting the execution of the event hook. To
     simulate that when using the testing harness, write a test that expects a
