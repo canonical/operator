@@ -1,5 +1,6 @@
 # 2.8.0
 
+* Added Unit.reboot()
 * The type of a `Handle`'s `key` was expanded from `str` to `str|None`
 
 # 2.7.0
