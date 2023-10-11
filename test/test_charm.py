@@ -190,17 +190,20 @@ peers:
         self.assertIn('pro_2_relation_broken', repr(charm.on))
 
         rel = charm.framework.model.get_relation('req1', 1)
+        app = charm.framework.model.get_app('remote')
         unit = charm.framework.model.get_unit('remote/0')
-        charm.on['req1'].relation_joined.emit(rel, unit)
-        charm.on['req1'].relation_changed.emit(rel, unit)
-        charm.on['req-2'].relation_changed.emit(rel, unit)
-        charm.on['pro1'].relation_departed.emit(rel, unit)
-        charm.on['pro-2'].relation_departed.emit(rel, unit)
-        charm.on['peer1'].relation_broken.emit(rel)
-        charm.on['peer-2'].relation_broken.emit(rel)
+        charm.on['req1'].relation_joined.emit(rel, app, unit)
+        charm.on['req1'].relation_changed.emit(rel, app, unit)
+        charm.on['req1'].relation_changed.emit(rel, app)
+        charm.on['req-2'].relation_changed.emit(rel, app, unit)
+        charm.on['pro1'].relation_departed.emit(rel, app, unit)
+        charm.on['pro-2'].relation_departed.emit(rel, app, unit)
+        charm.on['peer1'].relation_broken.emit(rel, app)
+        charm.on['peer-2'].relation_broken.emit(rel, app)
 
         self.assertEqual(charm.seen, [
             'RelationJoinedEvent',
+            'RelationChangedEvent',
             'RelationChangedEvent',
             'RelationChangedEvent',
             'RelationDepartedEvent',

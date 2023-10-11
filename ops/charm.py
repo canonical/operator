@@ -377,8 +377,7 @@ class RelationEvent(HookEvent):
     relation: 'model.Relation'
     """The relation involved in this event."""
 
-    # TODO(benhoyt): I *think* app should never be None, but confirm and update type
-    app: Optional[model.Application]
+    app: model.Application
     """The remote application that has triggered this event."""
 
     unit: Optional[model.Unit]
@@ -398,7 +397,12 @@ class RelationEvent(HookEvent):
                 f'cannot create RelationEvent with application {app} and unit {unit}')
 
         self.relation = relation
-        self.app = app
+        if app is None:
+            logger.warning("'app' expected but not received.")
+            # Do an explicit assignment here so that we can contain the type: ignore.
+            self.app = None  # type: ignore
+        else:
+            self.app = app
         self.unit = unit
 
     def snapshot(self) -> Dict[str, Any]:
@@ -433,7 +437,8 @@ class RelationEvent(HookEvent):
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         else:
-            self.app = None
+            logger.warning("'app_name' expected in snapshot but not found.")
+            self.app = None  # type: ignore
 
         unit_name = snapshot.get('unit_name')
         if unit_name:
@@ -449,6 +454,8 @@ class RelationCreatedEvent(RelationEvent):
     can occur before units for those applications have started. All existing
     relations should be established before start.
     """
+    unit: None
+    """Always ``None``."""
 
 
 class RelationJoinedEvent(RelationEvent):
@@ -462,6 +469,8 @@ class RelationJoinedEvent(RelationEvent):
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
+    unit: model.Unit
+    """The remote unit that has triggered this event."""
 
 
 class RelationChangedEvent(RelationEvent):
@@ -502,6 +511,8 @@ class RelationDepartedEvent(RelationEvent):
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
+    unit: model.Unit
+    """The remote unit that has triggered this event."""
 
     def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
@@ -557,6 +568,8 @@ class RelationBrokenEvent(RelationEvent):
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
+    unit: None
+    """Always ``None``."""
 
 
 class StorageEvent(HookEvent):
