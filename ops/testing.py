@@ -1731,7 +1731,7 @@ class Harness(Generic[CharmType]):
     def last_rebooted(self) -> Optional[datetime.datetime]:
         """The time that the charm last called :meth:`ops.Unit.reboot` (with or without *now*).
 
-        Returns None if :meth:`ops.Unit.reboot` has not been called.
+        Returns ``None`` if :meth:`ops.Unit.reboot` has not been called.
         """
         return self._backend._last_reboot
 
