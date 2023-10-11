@@ -2530,7 +2530,7 @@ class _TestingModelBackend:
         raise RebootNow()
 
 
-@_copy_docstrings(pebble.ExecProcRebootingMachineErroress)
+@_copy_docstrings(pebble.ExecProcess)
 class _TestingExecProcess:
     def __init__(self,
                  command: List[str],
