@@ -1882,7 +1882,7 @@ class _Secret:
     grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
 
 
-class RebootNow(Exception):
+class RebootNow(Exception):  # noqa
     """Raised when the machine would reboot.
 
     When :meth:`ops.Unit.reboot` is called with ``now=True`` in a machine charm, the
