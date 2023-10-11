@@ -3339,8 +3339,8 @@ class TestTestingModelBackend(unittest.TestCase):
 
     def test_reboot(self):
         class RebootingCharm(ops.CharmBase):
-            def __init__(self, *args, **kwargs):  # type: ignore
-                super().__init__(*args, **kwargs)  # type: ignore
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
                 self.framework.observe(self.on.install, self._reboot_now)
                 self.framework.observe(self.on.remove, self._reboot)
 
