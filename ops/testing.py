@@ -1895,8 +1895,8 @@ class RebootNow(Exception):  # noqa
 
     When :meth:`ops.Unit.reboot` is called with ``now=True`` in a machine charm, the
     unit's machine is rebooted, interrupting the execution of the event hook. To
-    simulate that when using the testing harness, write a test that expects a
-    this exception to be raised, for example::
+    simulate that when using the testing harness, write a test that expects this
+    exception to be raised, for example::
 
         def test_installation(self):
             self.harness.begin()
