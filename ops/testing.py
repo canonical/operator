@@ -1882,10 +1882,10 @@ class _Secret:
     grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
 
 
-class RebootingMachineError(Exception):
+class RebootNow(Exception):
     """Raised when the machine would reboot.
 
-    When :meth:`Unit.reboot` is called with ``now=True`` in a machine charm, the
+    When :meth:`ops.Unit.reboot` is called with ``now=True`` in a machine charm, the
     unit's machine is rebooted, interrupting the execution of the event hook. To
     simulate that when using the testing harness, write a test that expects a
     this exception to be raised, for example::
@@ -2527,10 +2527,10 @@ class _TestingModelBackend:
             return
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle that. We raise an exception so that they can simulate the exit.
-        raise RebootingMachineError()
+        raise RebootNow()
 
 
-@_copy_docstrings(pebble.ExecProcess)
+@_copy_docstrings(pebble.ExecProcRebootingMachineErroress)
 class _TestingExecProcess:
     def __init__(self,
                  command: List[str],
