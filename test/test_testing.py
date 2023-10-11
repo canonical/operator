@@ -3341,14 +3341,14 @@ class TestTestingModelBackend(unittest.TestCase):
         class RebootingCharm(ops.CharmBase):
             def __init__(self, *args, **kwargs):  # type: ignore
                 super().__init__(*args, **kwargs)  # type: ignore
-                self.framework.observe(self.on.install, self._reboot)
-                self.framework.observe(self.on.remove, self._reboot_now)
-
-            def _reboot(self, event: ops.RemoveEvent):
-                self.unit.reboot()
+                self.framework.observe(self.on.install, self._reboot_now)
+                self.framework.observe(self.on.remove, self._reboot)
 
             def _reboot_now(self, event: ops.InstallEvent):
                 self.unit.reboot(now=True)
+
+            def _reboot(self, event: ops.RemoveEvent):
+                self.unit.reboot()
 
         harness = ops.testing.Harness(RebootingCharm, meta='''
             name: test-app
@@ -3359,9 +3359,9 @@ class TestTestingModelBackend(unittest.TestCase):
         with self.assertRaises(ops.testing.RebootNow):
             backend.reboot(now=True)
         harness.begin()
-        harness.charm.on.install.emit()
         with self.assertRaises(ops.testing.RebootNow):
-            harness.charm.on.remove.emit()
+            harness.charm.on.install.emit()
+        harness.charm.on.remove.emit()
 
 
 class _TestingPebbleClientMixin:
