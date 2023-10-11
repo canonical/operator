@@ -699,10 +699,8 @@ class Unit:
         hook to complete; this is useful when multiple restarts are required (Juju
         will re-run the hook after rebooting).
 
-        This will silently fail for Kubernetes charms.
-
-        This can only be called for the current unit, and cannot be used in an action
-        hook.
+        This is not supported on Kubernetes charms, can only be called for the current unit,
+        and cannot be used in an action hook.
 
         Args:
             now: terminate immediately without waiting for the current hook to complete,
