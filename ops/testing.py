@@ -1727,6 +1727,14 @@ class Harness(Generic[CharmType]):
             handler=(lambda _: result) if handler is None else handler  # type: ignore
         )
 
+    @property
+    def last_rebooted(self) -> Optional[datetime.datetime]:
+        """The time that the charm last called :meth:`ops.Unit.reboot` (with or without *now*).
+
+        Returns None if :meth:`ops.Unit.reboot` has not been called.
+        """
+        return self._backend._last_reboot
+
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
@@ -1961,6 +1969,7 @@ class _TestingModelBackend:
         self._secrets: List[_Secret] = []
         self._opened_ports: Set[model.Port] = set()
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
+        self._last_reboot = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2522,8 +2531,8 @@ class _TestingModelBackend:
             raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # NOQA: test_quote_backslashes
 
     def reboot(self, now: bool = False):
+        self._last_reboot = datetime.datetime.now(datetime.timezone.utc)
         if not now:
-            # We can't simulate the reboot, so just do nothing.
             return
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle that. We raise an exception so that they can simulate the exit.
