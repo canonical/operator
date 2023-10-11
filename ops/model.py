@@ -692,7 +692,7 @@ class Unit:
             self._backend.open_port(protocol, port)
 
     def reboot(self, now: bool = False) -> None:
-        """Reboot the host machine, after stopping all containers hosted on the machine.
+        """Reboot the host machine.
 
         Normally, the reboot will only take place after the current hook successfully
         completes. Use ``now=True`` to reboot immediately without waiting for the
