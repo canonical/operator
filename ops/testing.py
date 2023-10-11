@@ -1900,7 +1900,7 @@ class RebootNow(Exception):  # noqa
 
         def test_installation(self):
             self.harness.begin()
-            with self.assertRaises(ops.testing.RebootMachineError):
+            with self.assertRaises(ops.testing.RebootNow):
                 self.harness.charm.on.install.emit()
                 # More asserts here that the first part of installation was done.
             self.harness.charm.on.install.emit()
