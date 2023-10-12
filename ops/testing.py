@@ -1066,7 +1066,7 @@ class Harness(Generic[CharmType]):
 
         Raises:
             KeyError: if no Pebble client exists for that container name (should only happen if
-            container is not present in ``metadata.yaml``).
+                container is not present in ``metadata.yaml``).
         """
         client = self._backend._pebble_clients.get(container_name)
         if client is None:
