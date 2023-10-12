@@ -436,7 +436,6 @@ class Application:
 
         Raises:
             ValueError: if the secret is empty, or the secret key is invalid.
-
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -1845,7 +1844,7 @@ class Resources:
         on disk, otherwise it raises a :class:`NameError`.
 
         Raises:
-            NameError: if the resource's path cannot be fetched.
+            NameError: if the resource’s path cannot be fetched.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -1917,7 +1916,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         via ``<storage-name>-storage-attached`` events when it becomes available.
 
         Raises:
-            ModelError: if the storage is not in the charm's metadata.
+            ModelError: if the storage is not in the charm’s metadata.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -2065,8 +2064,8 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
-            ChangeError: if one or more of the services didn't stop/start in time.
+            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn’t stop/start in time.
             TimeoutError: if pebble did not respond in time.
         """
         self._pebble.autostart_services()
@@ -2076,8 +2075,8 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
-            ChangeError: if one or more of the services didn't stop/start in time.
+            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn’t stop/start in time.
             TimeoutError: if pebble did not respond in time.
         """
         self._pebble.replan_services()
@@ -2087,8 +2086,8 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
-            ChangeError: if one or more of the services didn't stop/start in time.
+            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn’t stop/start in time.
             TimeoutError: if pebble did not respond in time.
             TypeError: if no services are specified.
         """
@@ -2102,8 +2101,8 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
-            ChangeError: if one or more of the services didn't stop/start in time.
+            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn’t stop/start in time.
             TimeoutError: if pebble did not respond in time.
             TypeError: if no services are specified.
         """
@@ -2127,8 +2126,8 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
-            ChangeError: if one or more of the services didn't stop/start in time.
+            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn’t stop/start in time.
             TimeoutError: if pebble did not respond in time.
             TypeError: if no services are specified.
         """
@@ -2154,7 +2153,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble, or if the layer is invalid
+            APIError: if an error occurred communicating with pebble, or if the layer is invalid
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
@@ -2167,7 +2166,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         return self._pebble.get_plan()
 
@@ -2179,7 +2178,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         names = service_names or None
         services = self._pebble.get_services(names)
@@ -2191,7 +2190,7 @@ class Container:
         Raises:
             ModelError: if service_name is not found.
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         services = self.get_services(service_name)
         if not services:
@@ -2213,7 +2212,7 @@ class Container:
                 all checks.
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
@@ -2224,7 +2223,7 @@ class Container:
         Raises:
             ModelError: if ``check_name`` is not found.
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2259,7 +2258,7 @@ class Container:
             PathError: If there was an error reading the file at path, for example, if the file
                 doesn't exist or is a directory.
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
@@ -2295,7 +2294,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         self._pebble.push(str(path), source, encoding=encoding,
                           make_dirs=make_dirs,
@@ -2320,7 +2319,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         return self._pebble.list_files(str(path),
                                        pattern=pattern, itself=itself)
@@ -2376,7 +2375,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2465,7 +2464,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2576,7 +2575,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         try:
             self._pebble.list_files(str(path), itself=True)
@@ -2591,7 +2590,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         try:
             files = self._pebble.list_files(str(path), itself=True)
@@ -2627,7 +2626,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
@@ -2648,7 +2647,7 @@ class Container:
             PathError: If a relative path is provided, or if `recursive` is False and the file or
                 directory cannot be removed (it does not exist or is not empty).
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
@@ -2721,7 +2720,7 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble, or if the command is not found.
+            APIError: if an error occurred communicating with pebble, or if the command is not found.
             ChangeError: if the command did not execute in time.
             ExecError: if the command exits with a non-zero exit code.
             RuntimeError: if ``service_context`` is used with a version of Juju that does have this
@@ -2762,7 +2761,7 @@ class Container:
         Raises:
             APIError: if any of the services are not in the plan or are not currently running.
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occured communicating with pebble.
+            APIError: if an error occurred communicating with pebble.
             TypeError: if no service names are provided.
         """
         if not service_names:
