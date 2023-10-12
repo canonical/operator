@@ -2042,7 +2042,7 @@ class _TestingModelBackend:
     def relation_ids(self, relation_name: str) -> List[int]:
         try:
             return self._relation_ids_map[relation_name]
-        except KeyError as e:
+        except KeyError:
             if relation_name not in self._meta.relations:
                 raise model.ModelError(f'{relation_name} is not a known relation') from None
             no_ids: List[int] = []
@@ -2051,7 +2051,7 @@ class _TestingModelBackend:
     def relation_list(self, relation_id: int):
         try:
             return self._relation_list_map[relation_id]
-        except KeyError as e:
+        except KeyError:
             raise model.RelationNotFoundError from None
 
     def relation_remote_app_name(self, relation_id: int) -> Optional[str]:

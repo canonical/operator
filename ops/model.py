@@ -2210,6 +2210,7 @@ class Container:
                 are specified, return checks with any name.
             level: Optional check level to query for. If not specified, fetch
                 all checks.
+
         Raises:
             ConnectionError: if pebble cannot be reached.
             APIError: if an error occurred communicating with pebble.
@@ -2720,7 +2721,8 @@ class Container:
 
         Raises:
             ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble, or if the command is not found.
+            APIError: if an error occurred communicating with pebble, or if the command is not
+                found.
             ChangeError: if the command did not execute in time.
             ExecError: if the command exits with a non-zero exit code.
             RuntimeError: if ``service_context`` is used with a version of Juju that does have this
