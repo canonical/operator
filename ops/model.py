@@ -354,7 +354,7 @@ class Application:
 
         Example::
 
-            self.model.app.status = BlockedStatus('I need a human to come help me')
+            self.model.app.status = ops.BlockedStatus('I need a human to come help me')
         """
         if not self._is_our_app:
             return UnknownStatus()
@@ -401,6 +401,8 @@ class Application:
         This method only returns data for this charm's application -- the Juju agent isn't
         able to see planned unit counts for other applications in the model.
 
+        Raises:
+            RuntimeError: on trying to get the planned units for a remote application.
         """
         if not self._is_our_app:
             raise RuntimeError(
@@ -431,6 +433,10 @@ class Application:
             rotate: Rotation policy/time. Every time this elapses, Juju will
                 notify the charm by sending a SecretRotate event. None (the
                 default) means to use the Juju default, which is never rotate.
+
+        Raises:
+            ValueError: if the secret is empty, or the secret key is invalid.
+
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -506,9 +512,10 @@ class Unit:
             RuntimeError: if setting the status of a unit other than the current unit
             InvalidStatusError: if setting the status to something other than
                 a :class:`StatusBase`
+
         Example::
 
-            self.model.unit.status = MaintenanceStatus('reconfiguring the frobnicators')
+            self.model.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
         """
         if not self._is_our_unit:
             return UnknownStatus()
@@ -567,7 +574,11 @@ class Unit:
 
     @property
     def containers(self) -> Mapping[str, 'Container']:
-        """Return a mapping of containers indexed by name."""
+        """Return a mapping of containers indexed by name.
+
+        Raises:
+            RuntimeError: if called for another unit
+        """
         if not self._is_our_unit:
             raise RuntimeError(f'cannot get container for a remote unit {self}')
         return self._containers
@@ -581,7 +592,7 @@ class Unit:
         try:
             return self.containers[container_name]
         except KeyError:
-            raise ModelError(f'container {container_name!r} not found')
+            raise ModelError(f'container {container_name!r} not found') from None
 
     def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -591,6 +602,9 @@ class Unit:
         """Create a :class:`Secret` owned by this unit.
 
         See :meth:`Application.add_secret` for parameter details.
+
+        Raises:
+            ValueError: if the secret is empty, or the secret key is invalid.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -676,6 +690,11 @@ class Unit:
         Args:
             ports: The ports to open. Provide an int to open a TCP port, or
                 a :class:`Port` to open a port for another protocol.
+
+        Raises:
+            ModelError: if a :class:`Port` is provided where ``protocol`` is 'icmp' but
+                ``port`` is not ``None``, or where ``protocol`` is 'tcp' or 'udp' and ``port``
+                is ``None``.
         """
         # Normalise to get easier comparisons.
         existing = {
@@ -1300,6 +1319,9 @@ class Secret:
             expire: New expiration time (or timedelta from now) to apply.
             rotate: New rotation policy to apply. The new policy will take
                 effect only after the currently-scheduled rotation.
+
+        Raises:
+            TypeError: if no information is provided (all of the arguments are ``None``).
         """
         if label is None and description is None and expire is None and rotate is None:
             raise TypeError('Must provide a label, description, expiration time, '
@@ -1821,6 +1843,9 @@ class Resources:
 
         If successfully fetched, this returns the path where the resource is stored
         on disk, otherwise it raises a :class:`NameError`.
+
+        Raises:
+            NameError: if the resource's path cannot be fetched.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -1890,6 +1915,9 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
         via ``<storage-name>-storage-attached`` events when it becomes available.
+
+        Raises:
+            :class:`ModelError`: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -2033,22 +2061,56 @@ class Container:
         return True
 
     def autostart(self) -> None:
-        """Autostart all services marked as ``startup: enabled``."""
+        """Autostart all services marked as ``startup: enabled``.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
+                time.
+            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+        """
         self._pebble.autostart_services()
 
     def replan(self) -> None:
-        """Replan all services: restart changed services and start startup-enabled services."""
+        """Replan all services: restart changed services and start startup-enabled services.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
+                time.
+            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+        """
         self._pebble.replan_services()
 
     def start(self, *service_names: str):
-        """Start given service(s) by name."""
+        """Start given service(s) by name.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
+                time.
+            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            TypeError: if no services are specified.
+        """
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
 
         self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
-        """Restart the given service(s) by name."""
+        """Restart the given service(s) by name.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
+                time.
+            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            TypeError: if no services are specified.
+        """
         if not service_names:
             raise TypeError('restart expected at least 1 argument, got 0')
 
@@ -2065,7 +2127,16 @@ class Container:
             self._pebble.start_services(service_names)
 
     def stop(self, *service_names: str):
-        """Stop given service(s) by name."""
+        """Stop given service(s) by name.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
+                time.
+            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            TypeError: if no services are specified.
+        """
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
 
@@ -2085,6 +2156,11 @@ class Container:
                 combine is True and the label already exists, the two layers
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble, or if the
+                layer is invalid
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
@@ -2094,6 +2170,10 @@ class Container:
         This will immediately reflect changes from any previous
         :meth:`add_layer` calls, regardless of whether :meth:`replan` or
         :meth:`restart` have been called.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         return self._pebble.get_plan()
 
@@ -2102,6 +2182,10 @@ class Container:
 
         If no service names are specified, return status information for all
         services, otherwise return information for only the given services.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         names = service_names or None
         services = self._pebble.get_services(names)
@@ -2110,7 +2194,10 @@ class Container:
     def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
-        Raises :class:`ModelError` if service_name is not found.
+        Raises:
+            :class:`ModelError`: if service_name is not found.
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         services = self.get_services(service_name)
         if not services:
@@ -2130,6 +2217,9 @@ class Container:
                 are specified, return checks with any name.
             level: Optional check level to query for. If not specified, fetch
                 all checks.
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
@@ -2137,7 +2227,10 @@ class Container:
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
-        Raises :class:`ModelError` if ``check_name`` is not found.
+        Raises:
+            :class:`ModelError`: if ``check_name`` is not found.
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2169,8 +2262,10 @@ class Container:
             encoding is ``None``.
 
         Raises:
-            pebble.PathError: If there was an error reading the file at path,
+            :class:`ops.pebble.PathError`: If there was an error reading the file at path,
                 for example, if the file doesn't exist or is a directory.
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
@@ -2203,6 +2298,10 @@ class Container:
             group_id: Group ID (GID) for file.
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         self._pebble.push(str(path), source, encoding=encoding,
                           make_dirs=make_dirs,
@@ -2224,6 +2323,10 @@ class Container:
                 for example ``*.txt``.
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         return self._pebble.list_files(str(path),
                                        pattern=pattern, itself=itself)
@@ -2276,6 +2379,10 @@ class Container:
                 *contents* placed inside the destination directory.
             dest_dir: Remote destination directory inside which the source
                 dir/files will be placed. This must be an absolute path.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2361,6 +2468,10 @@ class Container:
                 destination directory.
             dest_dir: Local destination directory inside which the source
                 dir/files will be placed.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2467,7 +2578,12 @@ class Container:
         return dest_dir / path_suffix
 
     def exists(self, path: Union[str, PurePath]) -> bool:
-        """Report whether a path exists on the container filesystem."""
+        """Report whether a path exists on the container filesystem.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+        """
         try:
             self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
@@ -2477,7 +2593,12 @@ class Container:
         return True
 
     def isdir(self, path: Union[str, PurePath]) -> bool:
-        """Report whether a directory exists at the given path on the container filesystem."""
+        """Report whether a directory exists at the given path on the container filesystem.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+        """
         try:
             files = self._pebble.list_files(str(path), itself=True)
         except pebble.APIError as err:
@@ -2509,6 +2630,10 @@ class Container:
             group_id: Group ID (GID) for directory.
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
@@ -2526,9 +2651,11 @@ class Container:
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If a relative path is provided, or if `recursive` is False
-                and the file or directory cannot be removed (it does not exist or is not empty).
-
+            :class:`ops.pebble.PathError`: If a relative path is provided, or if `recursive` is
+                False and the file or directory cannot be removed (it does not exist or is not
+                empty).
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
@@ -2598,6 +2725,17 @@ class Container:
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
+
+        Raises:
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble, or if the
+                command is not found.
+            :class:`ops.pebble.ChangeError`: if the command did not execute in time.
+            :class:`ops.pebble.ExecError`: if the command exits with a non-zero exit code.
+            RuntimeError: if ``service_context`` is used with a version of Juju that does have this
+                functionality.
+            ValueError: If no command is provided, or if ``combine_stderr`` is true, and a value is
+                provided for ``stderr``.
         """
         if service_context is not None:
             version = JujuVersion.from_environ()
@@ -2630,8 +2768,11 @@ class Container:
             service_names: Name(s) of the service(s) to send the signal to.
 
         Raises:
-            pebble.APIError: If any of the services are not in the plan or are
+            :class:`ops.pebble.APIError`: if any of the services are not in the plan or are
                 not currently running.
+            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            TypeError: if no service names are provided.
         """
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')
@@ -2873,7 +3014,7 @@ class _ModelBackend:
         try:
             result = subprocess.run(args, **kwargs)  # type: ignore
         except subprocess.CalledProcessError as e:
-            raise ModelError(e.stderr)
+            raise ModelError(e.stderr) from e
         if return_output:
             if result.stdout is None:  # type: ignore
                 return ''
