@@ -1344,7 +1344,7 @@ class ExecProcess(Generic[AnyStr]):
         Raises:
             ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
-            TypeError: if :meth:`exec` was called with the ``stdout`` argument.
+            TypeError: if :meth:`Client.exec` was called with the ``stdout`` argument.
         """
         if self.stdout is None:
             raise TypeError(
