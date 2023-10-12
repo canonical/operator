@@ -18,6 +18,7 @@ import enum
 import logging
 import os
 import pathlib
+from typing import NoReturn  # Use Never in Python 3.11+
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,7 +26,6 @@ from typing import (
     List,
     Literal,
     Mapping,
-    NoReturn,  # Use Never in Python 3.11+
     Optional,
     TextIO,
     Tuple,
@@ -185,6 +185,7 @@ class ActionEvent(EventBase):
             ValueError: if ``results`` has a mix of dotted/non-dotted keys that expand out to
                 result in duplicate keys, for example: {'a': {'b': 1}, 'a.b': 2}. Also raised if
                 a dict is passed with a key that fails to meet the format requirements.
+            OSError: if extremely large (>100KB) results are provided.
         """
         self.framework.model._backend.action_set(results)
 
