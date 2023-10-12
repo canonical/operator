@@ -445,6 +445,10 @@ class ObjectEvents(Object):
                         event. Must be a valid Python identifier, not be a keyword
                         or an existing attribute.
             event_type: A type of the event to define.
+
+        Raises:
+            RuntimeError: if the same event is defined twice, or if ``event_kind``
+                is an invalid name.
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
@@ -710,7 +714,7 @@ class Framework(Object):
             marshal.dumps(data)
         except ValueError:
             msg = "unable to save the data for {}, it must contain only simple types: {!r}"
-            raise ValueError(msg.format(value.__class__.__name__, data))
+            raise ValueError(msg.format(value.__class__.__name__, data)) from None
 
         self._storage.save_snapshot(value.handle.path, data)
 
@@ -954,6 +958,9 @@ class Framework(Object):
         stop execution when a hook event is about to be handled.
 
         For those reasons, the "all" and "hook" breakpoint names are reserved.
+
+        Raises:
+            ValueError: if the breakpoint name is invalid.
         """
         # If given, validate the name comply with all the rules
         if name is not None:
