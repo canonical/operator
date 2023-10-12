@@ -1917,7 +1917,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         via ``<storage-name>-storage-attached`` events when it becomes available.
 
         Raises:
-            :class:`ModelError`: if the storage is not in the charm's metadata.
+            ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -2064,11 +2064,10 @@ class Container:
         """Autostart all services marked as ``startup: enabled``.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
-            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
-                time.
-            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start in time.
+            TimeoutError: if pebble did not respond in time.
         """
         self._pebble.autostart_services()
 
@@ -2076,11 +2075,10 @@ class Container:
         """Replan all services: restart changed services and start startup-enabled services.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
-            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
-                time.
-            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start in time.
+            TimeoutError: if pebble did not respond in time.
         """
         self._pebble.replan_services()
 
@@ -2088,11 +2086,10 @@ class Container:
         """Start given service(s) by name.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
-            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
-                time.
-            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start in time.
+            TimeoutError: if pebble did not respond in time.
             TypeError: if no services are specified.
         """
         if not service_names:
@@ -2104,11 +2101,10 @@ class Container:
         """Restart the given service(s) by name.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
-            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
-                time.
-            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start in time.
+            TimeoutError: if pebble did not respond in time.
             TypeError: if no services are specified.
         """
         if not service_names:
@@ -2130,11 +2126,10 @@ class Container:
         """Stop given service(s) by name.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
-            :class:`ops.pebble.ChangeError`: if one or more of the services didn't stop/start in
-                time.
-            :class:`ops.pebble.TimeoutError`: if pebble did not respond in time.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start in time.
+            TimeoutError: if pebble did not respond in time.
             TypeError: if no services are specified.
         """
         if not service_names:
@@ -2158,9 +2153,8 @@ class Container:
                 rules; if the layer doesn't exist, it is added as usual.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble, or if the
-                layer is invalid
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble, or if the layer is invalid
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
@@ -2172,8 +2166,8 @@ class Container:
         :meth:`restart` have been called.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._pebble.get_plan()
 
@@ -2184,8 +2178,8 @@ class Container:
         services, otherwise return information for only the given services.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         names = service_names or None
         services = self._pebble.get_services(names)
@@ -2195,9 +2189,9 @@ class Container:
         """Get status information for a single named service.
 
         Raises:
-            :class:`ModelError`: if service_name is not found.
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ModelError: if service_name is not found.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         services = self.get_services(service_name)
         if not services:
@@ -2218,8 +2212,8 @@ class Container:
             level: Optional check level to query for. If not specified, fetch
                 all checks.
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
@@ -2228,9 +2222,9 @@ class Container:
         """Get check information for a single named check.
 
         Raises:
-            :class:`ModelError`: if ``check_name`` is not found.
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ModelError: if ``check_name`` is not found.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2262,10 +2256,10 @@ class Container:
             encoding is ``None``.
 
         Raises:
-            :class:`ops.pebble.PathError`: If there was an error reading the file at path,
-                for example, if the file doesn't exist or is a directory.
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            PathError: If there was an error reading the file at path, for example, if the file
+                doesn't exist or is a directory.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
@@ -2300,8 +2294,8 @@ class Container:
                 both are specified.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         self._pebble.push(str(path), source, encoding=encoding,
                           make_dirs=make_dirs,
@@ -2325,8 +2319,8 @@ class Container:
                 directory itself, rather than its contents.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._pebble.list_files(str(path),
                                        pattern=pattern, itself=itself)
@@ -2381,8 +2375,8 @@ class Container:
                 dir/files will be placed. This must be an absolute path.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2470,8 +2464,8 @@ class Container:
                 dir/files will be placed.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
@@ -2581,8 +2575,8 @@ class Container:
         """Report whether a path exists on the container filesystem.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         try:
             self._pebble.list_files(str(path), itself=True)
@@ -2596,8 +2590,8 @@ class Container:
         """Report whether a directory exists at the given path on the container filesystem.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         try:
             files = self._pebble.list_files(str(path), itself=True)
@@ -2632,8 +2626,8 @@ class Container:
                 if both are specified.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         self._pebble.make_dir(str(path), make_parents=make_parents,
                               permissions=permissions,
@@ -2651,11 +2645,10 @@ class Container:
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            :class:`ops.pebble.PathError`: If a relative path is provided, or if `recursive` is
-                False and the file or directory cannot be removed (it does not exist or is not
-                empty).
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            PathError: If a relative path is provided, or if `recursive` is False and the file or
+                directory cannot be removed (it does not exist or is not empty).
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
@@ -2727,11 +2720,10 @@ class Container:
         and return value, as well as examples.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble, or if the
-                command is not found.
-            :class:`ops.pebble.ChangeError`: if the command did not execute in time.
-            :class:`ops.pebble.ExecError`: if the command exits with a non-zero exit code.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble, or if the command is not found.
+            ChangeError: if the command did not execute in time.
+            ExecError: if the command exits with a non-zero exit code.
             RuntimeError: if ``service_context`` is used with a version of Juju that does have this
                 functionality.
             ValueError: If no command is provided, or if ``combine_stderr`` is true, and a value is
@@ -2768,10 +2760,9 @@ class Container:
             service_names: Name(s) of the service(s) to send the signal to.
 
         Raises:
-            :class:`ops.pebble.APIError`: if any of the services are not in the plan or are
-                not currently running.
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            APIError: if any of the services are not in the plan or are not currently running.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
             TypeError: if no service names are provided.
         """
         if not service_names:

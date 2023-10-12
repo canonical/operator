@@ -181,10 +181,10 @@ class ActionEvent(EventBase):
             results: The result of the action as a Dict
 
         Raises:
-            :class:`ops.ModelError`: if a reserved key is used.
+            ModelError: if a reserved key is used.
             ValueError: if ``results`` has a mix of dotted/non-dotted keys that expand out to
-                result in duplicate keys, for example: {'a': {'b': 1}, 'a.b': 2}. Also raised if
-                a dict is passed with a key that fails to meet the format requirements.
+                result in duplicate keys, for example: :code:`{'a': {'b': 1}, 'a.b': 2}`. Also
+                raised if a dict is passed with a key that fails to meet the format requirements.
             OSError: if extremely large (>100KB) results are provided.
         """
         self.framework.model._backend.action_set(results)
@@ -372,7 +372,7 @@ class CollectMetricsEvent(HookEvent):
             labels: Key-value labels applied to the metrics.
 
         Raises:
-            :class:`ops.ModelError`: if invalid keys or values are provided.
+            ModelError: if invalid keys or values are provided.
         """
         self.framework.model._backend.add_metrics(metrics, labels)
 

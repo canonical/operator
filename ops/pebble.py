@@ -1632,8 +1632,8 @@ class Client:
         """Get system info.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         resp = self._request('GET', '/v1/system-info')
         return SystemInfo.from_dict(resp['result'])
@@ -1642,8 +1642,8 @@ class Client:
         """Get list of warnings in given state (pending or all).
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         query = {'select': select.value}
         resp = self._request('GET', '/v1/warnings', query)
@@ -1653,8 +1653,8 @@ class Client:
         """Acknowledge warnings up to given timestamp, return number acknowledged.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
         resp = self._request('POST', '/v1/warnings', body=body)
@@ -1666,8 +1666,8 @@ class Client:
         """Get list of changes in given state, filter by service name if given.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         query: Dict[str, Union[str, int]] = {'select': select.value}
         if service is not None:
@@ -1679,8 +1679,8 @@ class Client:
         """Get single change by ID.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         resp = self._request('GET', f'/v1/changes/{change_id}')
         return Change.from_dict(resp['result'])
@@ -1689,8 +1689,8 @@ class Client:
         """Abort change with given ID.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         body = {'action': 'abort'}
         resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
@@ -1700,18 +1700,18 @@ class Client:
         """Start the startup-enabled services and wait (poll) for them to be started.
 
         Args:
-            timeout: Seconds before autostart change is considered timed out (float).
+            timeout: Seconds before autostart change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change ID
+                immediately.
             delay: Seconds before executing the autostart change (float).
 
         Returns:
             ChangeID of the autostart change.
 
         Raises:
-            :class:`ChangeError`: if one or more of the services didn't start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't start, and ``timeout`` is non-zero.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -1719,18 +1719,19 @@ class Client:
         """Replan by (re)starting changed and startup-enabled services and wait for them to start.
 
         Args:
-            timeout: Seconds before replan change is considered timed out (float).
+            timeout: Seconds before replan change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the replan change (float).
 
         Returns:
             ChangeID of the replan change.
 
         Raises:
-            :class:`ChangeError`: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
+                non-zero.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._services_action('replan', [], timeout, delay)
 
@@ -1741,20 +1742,19 @@ class Client:
 
         Args:
             services: Non-empty list of services to start.
-            timeout: Seconds before start change is considered timed out (float).
+            timeout: Seconds before start change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the start change (float).
 
         Returns:
             ChangeID of the start change.
 
         Raises:
-            :class:`ChangeError`: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
-
-        Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
+                non-zero.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -1765,20 +1765,19 @@ class Client:
 
         Args:
             services: Non-empty list of services to stop.
-            timeout: Seconds before stop change is considered timed out (float).
+            timeout: Seconds before stop change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the stop change (float).
 
         Returns:
             ChangeID of the stop change.
 
         Raises:
-            :class:`ChangeError`: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
-
-        Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
+                non-zero.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._services_action('stop', services, timeout, delay)
 
@@ -1796,13 +1795,11 @@ class Client:
             ChangeID of the restart change.
 
         Raises:
-            :class:`ChangeError`: if one or more of the services didn't stop/start. If
+            ChangeError: if one or more of the services didn't stop/start. If
                 timeout is 0, submit the action but don't wait; just return the change
                 ID immediately.
-
-        Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         return self._services_action('restart', services, timeout, delay)
 
@@ -1922,8 +1919,8 @@ class Client:
         layer override rules; if the layer doesn't exist, it is added as usual.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         if not isinstance(label, str):
             raise TypeError(f'label must be a str, not {type(label).__name__}')
@@ -1951,8 +1948,8 @@ class Client:
         """Get the Pebble plan (contains combined layer configuration).
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(resp['result'])
@@ -1964,8 +1961,8 @@ class Client:
         named.
 
         Raises:
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         query = None
         if names is not None:
@@ -1998,10 +1995,10 @@ class Client:
             encoding is None.
 
         Raises:
-            :class:`PathError`: If there was an error reading the file at path, for
+            PathError: If there was an error reading the file at path, for
                 example, if the file doesn't exist or is a directory.
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         query = {
             'action': 'read',
@@ -2081,10 +2078,10 @@ class Client:
                 both are specified.
 
         Raises:
-            :class:`PathError`: if the destination path does not exist, and ``make_dirs`` is not
-                used.
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            PathError: If there was an error writing the file to the path, for example, if the
+                destination path doesn’t exist and ``make_dirs`` is not used.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2184,9 +2181,10 @@ class Client:
                 directory itself, rather than its contents.
 
         Raises:
-            :class:`PathError`: if the path does not exist.
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            PathError: if there was an error listing the directory, for example, if the directory
+                does not exist.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         query = {
             'action': 'list',
@@ -2222,10 +2220,10 @@ class Client:
                 if both are specified.
 
         Raises:
-            :class:`PathError`: if the parent path does not exist, and ``make_parents`` is not
-                used.
-            :class:`ConnectionError`: if pebble cannot be reached.
-            :class:`APIError`: if an error occured communicating with pebble.
+            PathError: if there was an error making the directory, for example, if the parent path
+                does not exist, and ``make_parents`` is not used.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2444,11 +2442,10 @@ class Client:
             not.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble, or if the
-                command is not found.
-            :class:`ops.pebble.ChangeError`: if the command did not execute in time.
-            :class:`ops.pebble.ExecError`: if the command exits with a non-zero exit code.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble, or if the command is not found.
+            ChangeError: if the command did not execute in time.
+            ExecError: if the command exits with a non-zero exit code.
             RuntimeError: if ``service_context`` is used with a version of Juju that does have this
                 functionality.
             ValueError: If no command is provided, or if ``combine_stderr`` is true, and a value is
@@ -2591,9 +2588,8 @@ class Client:
             services: Non-empty list of service names to send the signal to.
 
         Raises:
-            :class:`APIError`: If any of the services are not in the plan or are not
-                currently running.
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
+            APIError: If any of the services are not in the plan or are not currently running.
+            ConnectionError: if pebble cannot be reached.
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError('services must be of type Iterable[str], '
@@ -2627,8 +2623,8 @@ class Client:
             List of :class:`CheckInfo` objects.
 
         Raises:
-            :class:`ops.pebble.ConnectionError`: if pebble cannot be reached.
-            :class:`ops.pebble.APIError`: if an error occured communicating with pebble.
+            ConnectionError: if pebble cannot be reached.
+            APIError: if an error occured communicating with pebble.
         """
         query = {}
         if level is not None:

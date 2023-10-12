@@ -263,11 +263,11 @@ class EventSource:
 
     It is generally used as::
 
-        class SomethingHappened(EventBase):
+        class SomethingHappened(ops.EventBase):
             pass
 
         class SomeObject(Object):
-            something_happened = EventSource(SomethingHappened)
+            something_happened = ops.EventSource(SomethingHappened)
 
     With that, instances of that type will offer the ``someobj.something_happened``
     attribute which is a :class:`BoundEvent`, and may be used to emit and observe
@@ -1106,15 +1106,15 @@ class StoredState:
 
     Example::
 
-        class MyClass(Object):
-            _stored = StoredState()
+        class MyClass(ops.Object):
+            _stored = ops.StoredState()
 
     Instances of ``MyClass`` can transparently save state between invocations by
     setting attributes on ``_stored``. Initial state should be set with
     ``set_default`` on the bound object, that is::
 
-        class MyClass(Object):
-            _stored = StoredState()
+        class MyClass(ops.Object):
+            _stored = ops.StoredState()
 
             def __init__(self, parent, key):
                 super().__init__(parent, key)
