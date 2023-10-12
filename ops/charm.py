@@ -25,6 +25,7 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NoReturn,  # Use Never in Python 3.11+
     Optional,
     TextIO,
     Tuple,
@@ -120,11 +121,14 @@ class ActionEvent(EventBase):
     params: Dict[str, Any]
     """The parameters passed to the action."""
 
-    def defer(self) -> None:
+    def defer(self) -> NoReturn:
         """Action events are not deferrable like other events.
 
         This is because an action runs synchronously and the administrator
         is waiting for the result.
+
+        Raises:
+            RuntimeError: always.
         """
         raise RuntimeError('cannot defer action events')
 
@@ -175,6 +179,12 @@ class ActionEvent(EventBase):
 
         Args:
             results: The result of the action as a Dict
+
+        Raises:
+            :class:`ops.ModelError`: if a reserved key is used.
+            ValueError: if ``results`` has a mix of dotted/non-dotted keys that expand out to
+                result in duplicate keys, for example: {'a': {'b': 1}, 'a.b': 2}. Also raised if
+                a dict is passed with a key that fails to meet the format requirements.
         """
         self.framework.model._backend.action_set(results)
 
@@ -359,8 +369,11 @@ class CollectMetricsEvent(HookEvent):
         Args:
             metrics: Key-value mapping of metrics that have been gathered.
             labels: Key-value labels applied to the metrics.
+
+        Raises:
+            :class:`ops.ModelError`: if invalid keys or values are provided.
         """
-        self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
+        self.framework.model._backend.add_metrics(metrics, labels)
 
 
 class RelationEvent(HookEvent):
@@ -762,8 +775,12 @@ class SecretRotateEvent(SecretEvent):
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
-    def defer(self) -> None:
-        """Secret rotation events are not deferrable (Juju handles re-invocation)."""
+    def defer(self) -> NoReturn:
+        """Secret rotation events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
         raise RuntimeError(
             'Cannot defer secret rotation events. Juju will keep firing this '
             'event until you create a new revision.')
@@ -842,8 +859,12 @@ class SecretExpiredEvent(SecretEvent):
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
 
-    def defer(self) -> None:
-        """Secret expiration events are not deferrable (Juju handles re-invocation)."""
+    def defer(self) -> NoReturn:
+        """Secret expiration events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
         raise RuntimeError(
             'Cannot defer secret expiration events. Juju will keep firing '
             'this event until you create a new revision.')
@@ -912,6 +933,10 @@ class CollectStatusEvent(EventBase):
         """Add a status for evaluation.
 
         See :class:`CollectStatusEvent` for a description of how to use this.
+
+        Raises:
+            TypeError: if ``status`` is not a :class:`model.StatusBase` instance.
+
         """
         if not isinstance(status, model.StatusBase):
             raise TypeError(f'status should be a StatusBase, not {type(status).__name__}')
