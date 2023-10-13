@@ -500,7 +500,7 @@ remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
 remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
 ```
 
-## Containers
+# Containers
 
 When testing a kubernetes charm, you can mock container interactions. When using the null state (`State()`), there will
 be no containers. So if the charm were to `self.unit.containers`, it would get back an empty dict.
@@ -586,7 +586,7 @@ need to associate the container with the event is that the Framework uses an env
 pebble-ready event is about (it does not use the event name). Scenario needs that information, similarly, for injecting
 that envvar into the charm's runtime.
 
-### Container filesystem post-mortem
+## Container filesystem post-mortem
 If the charm writes files to a container (to a location you didn't Mount as a temporary folder you have access to), you will be able to inspect them using the `get_filesystem` api.
 
 ```python
@@ -623,7 +623,7 @@ def test_pebble_push():
     assert cfg_file.read_text() == "TEST"
 ```
 
-### `Container.exec` mocks
+## `Container.exec` mocks
 
 `container.exec` is a tad more complicated, but if you get to this low a level of simulation, you probably will have far
 worse issues to deal with. You need to specify, for each possible command the charm might run on the container, what the
@@ -670,6 +670,77 @@ def test_pebble_exec():
         state_in,
     )
 ```
+
+# Storage
+
+If your charm defines `storage` in its metadata, you can use `scenario.state.Storage` to instruct Scenario to make (mocked) filesystem storage available to the charm at runtime.
+
+Using the same `get_filesystem` API as `Container`, you can access the tempdir used by Scenario to mock the filesystem root before and after the scenario runs.
+
+```python
+from scenario import Storage, Context, State
+# some charm with a 'foo' filesystem-type storage defined in metadata.yaml 
+ctx = Context(MyCharm)
+storage = Storage("foo")
+# setup storage with some content
+(storage.get_filesystem(ctx) / "myfile.txt").write_text("helloworld")
+
+with ctx.manager("update-status", State(storage=[storage])) as mgr:
+    foo = mgr.charm.model.storages["foo"][0]
+    loc = foo.location
+    path = loc / "myfile.txt"
+    assert path.exists()
+    assert path.read_text() == "helloworld"
+
+    myfile = loc / "path.py"
+    myfile.write_text("helloworlds")
+
+# post-mortem: inspect fs contents.
+assert (
+    storage.get_filesystem(ctx) / "path.py"
+).read_text() == "helloworlds"
+```
+
+Note that State only wants to know about **attached** storages. A storage which is not attached to the charm can simply be omitted from State and the charm will be none the wiser.
+
+## Storage-add
+
+If a charm requests adding more storage instances while handling some event, you can inspect that from the `Context.requested_storage` API.
+
+```python
+# in MyCharm._on_foo:
+# the charm requests two new "foo" storage instances to be provisioned 
+self.model.storages.request("foo", 2)
+```
+
+From test code, you can inspect that:
+
+```python
+from scenario import Context, State
+
+ctx = Context(MyCharm)
+ctx.run('some-event-that-will-cause_on_foo-to-be-called', State())
+
+# the charm has requested two 'foo' storages to be provisioned
+assert ctx.requested_storages['foo'] == 2
+```
+
+Requesting storages has no other consequence in Scenario. In real life, this request will trigger Juju to provision the storage and execute the charm again with `foo-storage-attached`.
+So a natural follow-up Scenario test suite for this case would be:
+
+```python
+from scenario import Context, State, Storage
+
+ctx = Context(MyCharm)
+foo_0 = Storage('foo')
+# the charm is notified that one of the storages it has requested is ready
+ctx.run(foo_0.attached_event, State(storage=[foo_0]))
+
+foo_1 = Storage('foo')
+# the charm is notified that the other storage is also ready
+ctx.run(foo_1.attached_event, State(storage=[foo_0, foo_1]))
+```
+
 
 # Ports
 

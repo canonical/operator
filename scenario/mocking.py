@@ -6,10 +6,11 @@ import random
 import shutil
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 from ops import pebble
 from ops.model import (
+    ModelError,
     SecretInfo,
     SecretRotate,
     _format_action_result_dict,
@@ -19,7 +20,7 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
-from scenario.state import JujuLogLine, Mount, PeerRelation, Port
+from scenario.state import JujuLogLine, Mount, PeerRelation, Port, Storage
 
 if TYPE_CHECKING:
     from scenario.context import Context
@@ -382,21 +383,46 @@ class _MockModelBackend(_ModelBackend):
             )
         return action.params
 
-    # TODO:
-    def storage_add(self, *args, **kwargs):  # noqa: U100
-        raise NotImplementedError("storage_add")
+    def storage_add(self, name: str, count: int = 1):
+        if "/" in name:
+            raise ModelError('storage name cannot contain "/"')
 
+        self._context.requested_storages[name] = count
+
+    def storage_list(self, name: str) -> List[int]:
+        return [
+            storage.index for storage in self._state.storage if storage.name == name
+        ]
+
+    def storage_get(self, storage_name_id: str, attribute: str) -> str:
+        if attribute == "location":
+            name, index = storage_name_id.split("/")
+            index = int(index)
+            try:
+                storage: Storage = next(
+                    filter(
+                        lambda s: s.name == name and s.index == index,
+                        self._state.storage,
+                    ),
+                )
+            except StopIteration as e:
+                raise RuntimeError(
+                    f"Storage not found with name={name} and index={index}.",
+                ) from e
+
+            fs_path = storage.get_filesystem(self._context)
+            return str(fs_path)
+
+        raise NotImplementedError(
+            f"storage-get not implemented for attribute={attribute}",
+        )
+
+    def planned_units(self) -> int:
+        return self._state.planned_units
+
+    # TODO:
     def resource_get(self, *args, **kwargs):  # noqa: U100
         raise NotImplementedError("resource_get")
-
-    def storage_list(self, *args, **kwargs):  # noqa: U100
-        raise NotImplementedError("storage_list")
-
-    def storage_get(self, *args, **kwargs):  # noqa: U100
-        raise NotImplementedError("storage_get")
-
-    def planned_units(self, *args, **kwargs):  # noqa: U100
-        raise NotImplementedError("planned_units")
 
 
 class _MockPebbleClient(_TestingPebbleClient):
