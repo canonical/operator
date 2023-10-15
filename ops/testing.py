@@ -1634,6 +1634,9 @@ class Harness(Generic[CharmType]):
         Tests should normally call this and then assert that ``self.model.app.status``
         or ``self.model.unit.status`` is the value expected.
         """
+        if self._backend._is_leader:
+            self.charm.app._collected_statuses = []
+        self.charm.unit._collected_statuses = []
         charm._evaluate_status(self.charm)
 
     def handle_exec(self,
