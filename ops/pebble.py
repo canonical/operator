@@ -20,10 +20,10 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 import binascii
 import copy
 import datetime
-import errno
 import email.message
 import email.parser
 import enum
+import errno
 import http.client
 import io
 import json
