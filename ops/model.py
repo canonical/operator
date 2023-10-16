@@ -2637,7 +2637,7 @@ class Container:
         :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
 
         Raises:
-            APIError: if an error occurred communicating with pebble, or if the command is not
+            APIError: if an error occurred communicating with Pebble, or if the command is not
                 found.
             ExecError: if the command exits with a non-zero exit code.
         """
@@ -2672,7 +2672,7 @@ class Container:
             service_names: Name(s) of the service(s) to send the signal to.
 
         Raises:
-            pebble.APIError: if any of the services are not in the plan or are
+            pebble.APIError: If any of the services are not in the plan or are
                 not currently running.
         """
         if not service_names:

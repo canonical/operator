@@ -2033,7 +2033,7 @@ class Client:
                 both are specified.
 
         Raises:
-            PathError: If there was an error writing the file to the path, for example, if the
+            PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
@@ -2134,7 +2134,7 @@ class Client:
                 directory itself, rather than its contents.
 
         Raises:
-            PathError: if there was an error listing the directory, for example, if the directory
+            PathError: if there was an error listing the directory; for example, if the directory
                 does not exist.
         """
         query = {
@@ -2171,7 +2171,7 @@ class Client:
                 if both are specified.
 
         Raises:
-            PathError: if there was an error making the directory, for example, if the parent path
+            PathError: if there was an error making the directory; for example, if the parent path
                 does not exist, and ``make_parents`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
