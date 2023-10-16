@@ -1531,7 +1531,7 @@ class Client:
     unless a custom opener is provided).
 
     :class:`ChangeError` and :class:`TimeoutError` may be raised by Pebble
-    operations that wait for changes such as :meth:`start` and :meth:`replan`.
+    operations that wait for changes such as :meth:`start_services` and :meth:`replan_services`.
     If Pebble cannot be reached, or an error occurred communicating with Pebble,
     :class:`ConnectionError` or :class:`APIError` may be raised.
     """
@@ -1764,7 +1764,7 @@ class Client:
             ChangeID of the restart change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start and ``timeout is
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
                 non-zero.
         """
         return self._services_action('restart', services, timeout, delay)

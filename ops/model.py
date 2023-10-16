@@ -2008,10 +2008,10 @@ class Container:
     This class should not be instantiated directly, instead use :meth:`Unit.get_container`
     or :attr:`Unit.containers`.
 
-    :class:`ChangeError` and :class:`TimeoutError` may be raised by Pebble
+    :class:`ops.pebble.ChangeError` and :class:`ops.pebble.TimeoutError` may be raised by Pebble
     operations that wait for changes such as :meth:`start` and :meth:`replan`.
     If Pebble cannot be reached, or an error occurred communicating with Pebble,
-    :class:`ConnectionError` or :class:`APIError` may be raised.
+    :class:`ops.pebble.ConnectionError` or :class:`ops.pebble.APIError` may be raised.
     """
 
     name: str
