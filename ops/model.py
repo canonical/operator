@@ -1913,7 +1913,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         via ``<storage-name>-storage-attached`` events when it becomes available.
 
         Raises:
-            ModelError: if the storage is not in the charm’s metadata.
+            ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -2116,7 +2116,7 @@ class Container:
                 rules; if the layer doesn't exist, it is added as usual.
 
         Raises:
-            APIError: if an error occurred communicating with pebble, or if the layer is invalid.
+            APIError: if an error occurred communicating with Pebble, or if the layer is invalid.
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
@@ -2203,8 +2203,8 @@ class Container:
             encoding is ``None``.
 
         Raises:
-            PathError: If there was an error reading the file at path, for example, if the file
-                doesn't exist or is a directory.
+            pebble.PathError: If there was an error reading the file at path,
+                for example, if the file doesn't exist or is a directory.
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
@@ -2560,8 +2560,8 @@ class Container:
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            PathError: If a relative path is provided, or if `recursive` is False and the file or
-                directory cannot be removed (it does not exist or is not empty).
+            pebble.PathError: If a relative path is provided, or if `recursive` is False
+                and the file or directory cannot be removed (it does not exist or is not empty).
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
@@ -2672,7 +2672,8 @@ class Container:
             service_names: Name(s) of the service(s) to send the signal to.
 
         Raises:
-            APIError: if any of the services are not in the plan or are not currently running.
+            pebble.APIError: if any of the services are not in the plan or are
+                not currently running.
         """
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')

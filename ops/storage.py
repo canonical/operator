@@ -230,7 +230,7 @@ class JujuStorage:
             handle_path: The string identifying the snapshot.
 
         Raises:
-            :class:`NoSnapshotError`: if there is no snapshot for the given handle_path.
+            NoSnapshotError: if there is no snapshot for the given handle_path.
         """
         try:
             content = self._backend.get(handle_path)
@@ -246,15 +246,13 @@ class JujuStorage:
         self._backend.delete(handle_path)
 
     def save_notice(self, event_path: str, observer_path: str, method_name: str):
-        """Part of the Storage API, record a notice (event and observer).
-        """
+        """Part of the Storage API, record a notice (event and observer)."""
         notice_list = self._load_notice_list()
         notice_list.append((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
     def drop_notice(self, event_path: str, observer_path: str, method_name: str):
-        """Part of the Storage API, remove a notice that was previously recorded.
-        """
+        """Part of the Storage API, remove a notice that was previously recorded."""
         notice_list = self._load_notice_list()
         notice_list.remove((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)

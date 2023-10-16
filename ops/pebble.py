@@ -2528,7 +2528,8 @@ class Client:
             services: Non-empty list of service names to send the signal to.
 
         Raises:
-            APIError: If any of the services are not in the plan or are not currently running.
+            APIError: If any of the services are not in the plan or are not
+                currently running.
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError('services must be of type Iterable[str], '
