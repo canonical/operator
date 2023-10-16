@@ -1626,7 +1626,7 @@ class Client:
         except urllib.error.URLError as e:
             if e.errno == errno.ENOENT:
                 raise ConnectionError(
-                    f"Could not connect to Pebble: socket not found at '{self.socket_path}' "
+                    f"Could not connect to Pebble: socket not found at {self.socket_path!r} "
                     "(container restarted?)") from None
             raise ConnectionError(e.reason)
 
