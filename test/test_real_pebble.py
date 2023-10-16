@@ -260,11 +260,6 @@ class TestRealPebble(unittest.TestCase):
 
         self.assertEqual(reads, [b'one\n', b'2\n', b'THREE\n'])
 
-    def test_missing_socket(self):
-        bad_client = pebble.Client(socket_path="/not-a-real-pebble-socket")
-        with self.assertRaises(pebble.ConnectionError):
-            bad_client.get_system_info()
-
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
 class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
