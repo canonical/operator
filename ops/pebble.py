@@ -20,6 +20,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 import binascii
 import copy
 import datetime
+import errno
 import email.message
 import email.parser
 import enum
@@ -1623,6 +1624,10 @@ class Client:
                 message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message)
         except urllib.error.URLError as e:
+            if e.errno == errno.ENOENT:
+                raise ConnectionError(
+                    f"Could not connect to Pebble: socket not found at '{self.socket_path}' "
+                    "(container restarted?)") from None
             raise ConnectionError(e.reason)
 
         return response
