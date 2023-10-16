@@ -199,6 +199,7 @@ def _check_action_param_types(
     to_python_type = {
         "string": str,
         "boolean": bool,
+        "integer": int,
         "number": Number,
         "array": Sequence,
         "object": dict,
