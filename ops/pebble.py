@@ -1629,6 +1629,10 @@ class Client:
                 message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
+            if e.args and isinstance(e.args[0], FileNotFoundError):
+                raise ConnectionError(
+                    f"Could not connect to Pebble: socket not found at {self.socket_path!r} "
+                    "(container restarted?)") from None
             raise ConnectionError(e.reason) from e
 
         return response
