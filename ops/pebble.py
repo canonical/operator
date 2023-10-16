@@ -1529,6 +1529,11 @@ class Client:
 
     Defaults to using a Unix socket at socket_path (which must be specified
     unless a custom opener is provided).
+
+    :class:`ChangeError` and :class:`TimeoutError` may be raised by Pebble
+    operations that wait for changes such as :meth:`start` and :meth:`replan`.
+    If Pebble cannot be reached, or an error occurred communicating with Pebble,
+    :class:`ConnectionError` or :class:`APIError` may be raised.
     """
 
     _chunk_size = 8192
@@ -1629,33 +1634,18 @@ class Client:
         return response
 
     def get_system_info(self) -> SystemInfo:
-        """Get system info.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Get system info."""
         resp = self._request('GET', '/v1/system-info')
         return SystemInfo.from_dict(resp['result'])
 
     def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
-        """Get list of warnings in given state (pending or all).
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Get list of warnings in given state (pending or all)."""
         query = {'select': select.value}
         resp = self._request('GET', '/v1/warnings', query)
         return [Warning.from_dict(w) for w in resp['result']]
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
-        """Acknowledge warnings up to given timestamp, return number acknowledged.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Acknowledge warnings up to given timestamp, return number acknowledged."""
         body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
         resp = self._request('POST', '/v1/warnings', body=body)
         return resp['result']
@@ -1663,12 +1653,7 @@ class Client:
     def get_changes(
         self, select: ChangeState = ChangeState.IN_PROGRESS, service: Optional[str] = None,
     ) -> List[Change]:
-        """Get list of changes in given state, filter by service name if given.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Get list of changes in given state, filter by service name if given."""
         query: Dict[str, Union[str, int]] = {'select': select.value}
         if service is not None:
             query['for'] = service
@@ -1676,22 +1661,12 @@ class Client:
         return [Change.from_dict(c) for c in resp['result']]
 
     def get_change(self, change_id: ChangeID) -> Change:
-        """Get single change by ID.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Get single change by ID."""
         resp = self._request('GET', f'/v1/changes/{change_id}')
         return Change.from_dict(resp['result'])
 
     def abort_change(self, change_id: ChangeID) -> Change:
-        """Abort change with given ID.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Abort change with given ID."""
         body = {'action': 'abort'}
         resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
         return Change.from_dict(resp['result'])
@@ -1709,9 +1684,7 @@ class Client:
             ChangeID of the autostart change.
 
         Raises:
-            ChangeError: if one or more of the services didn’t start, and ``timeout`` is non-zero.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn't start, and ``timeout`` is non-zero.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -1728,10 +1701,8 @@ class Client:
             ChangeID of the replan change.
 
         Raises:
-            ChangeError: if one or more of the services didn’t stop/start, and ``timeout`` is
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
                 non-zero.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         return self._services_action('replan', [], timeout, delay)
 
@@ -1751,10 +1722,8 @@ class Client:
             ChangeID of the start change.
 
         Raises:
-            ChangeError: if one or more of the services didn’t stop/start, and ``timeout`` is
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
                 non-zero.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -1774,10 +1743,8 @@ class Client:
             ChangeID of the stop change.
 
         Raises:
-            ChangeError: if one or more of the services didn’t stop/start and ``timeout`` is
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
                 non-zero.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         return self._services_action('stop', services, timeout, delay)
 
@@ -1788,18 +1755,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to restart.
-            timeout: Seconds before restart change is considered timed out (float).
+            timeout: Seconds before restart change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the restart change (float).
 
         Returns:
             ChangeID of the restart change.
 
         Raises:
-            ChangeError: if one or more of the services didn’t stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
+            ChangeError: if one or more of the services didn't stop/start and ``timeout is
+                non-zero.
         """
         return self._services_action('restart', services, timeout, delay)
 
@@ -1917,10 +1883,6 @@ class Client:
         layer with the given label. If combine is True and the label already
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         if not isinstance(label, str):
             raise TypeError(f'label must be a str, not {type(label).__name__}')
@@ -1945,12 +1907,7 @@ class Client:
         self._request('POST', '/v1/layers', body=body)
 
     def get_plan(self) -> Plan:
-        """Get the Pebble plan (contains combined layer configuration).
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
-        """
+        """Get the Pebble plan (contains combined layer configuration)."""
         resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(resp['result'])
 
@@ -1959,10 +1916,6 @@ class Client:
 
         If names is specified, only fetch the service status for the services
         named.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         query = None
         if names is not None:
@@ -1997,8 +1950,6 @@ class Client:
         Raises:
             PathError: If there was an error reading the file at path, for
                 example, if the file doesn't exist or is a directory.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         query = {
             'action': 'read',
@@ -2079,9 +2030,7 @@ class Client:
 
         Raises:
             PathError: If there was an error writing the file to the path, for example, if the
-                destination path doesn’t exist and ``make_dirs`` is not used.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
+                destination path doesn't exist and ``make_dirs`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2183,8 +2132,6 @@ class Client:
         Raises:
             PathError: if there was an error listing the directory, for example, if the directory
                 does not exist.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         query = {
             'action': 'list',
@@ -2222,8 +2169,6 @@ class Client:
         Raises:
             PathError: if there was an error making the directory, for example, if the parent path
                 does not exist, and ``make_parents`` is not used.
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2442,15 +2387,9 @@ class Client:
             not.
 
         Raises:
-            ConnectionError: if pebble cannot be reached.
             APIError: if an error occurred communicating with pebble, or if the command is not
                 found.
-            ChangeError: if the command did not execute in time.
             ExecError: if the command exits with a non-zero exit code.
-            RuntimeError: if ``service_context`` is used with a version of Juju that does have this
-                functionality.
-            ValueError: If no command is provided, or if ``combine_stderr`` is true, and a value is
-                provided for ``stderr``.
         """
         if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
             raise TypeError(f'command must be a list of str, not {type(command).__name__}')
@@ -2590,7 +2529,6 @@ class Client:
 
         Raises:
             APIError: If any of the services are not in the plan or are not currently running.
-            ConnectionError: if pebble cannot be reached.
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError('services must be of type Iterable[str], '
@@ -2622,10 +2560,6 @@ class Client:
 
         Returns:
             List of :class:`CheckInfo` objects.
-
-        Raises:
-            ConnectionError: if pebble cannot be reached.
-            APIError: if an error occurred communicating with pebble.
         """
         query = {}
         if level is not None:
