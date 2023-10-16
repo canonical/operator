@@ -1318,9 +1318,6 @@ class Secret:
             expire: New expiration time (or timedelta from now) to apply.
             rotate: New rotation policy to apply. The new policy will take
                 effect only after the currently-scheduled rotation.
-
-        Raises:
-            TypeError: if no information is provided (all of the arguments are ``None``).
         """
         if label is None and description is None and expire is None and rotate is None:
             raise TypeError('Must provide a label, description, expiration time, '
@@ -1844,7 +1841,7 @@ class Resources:
         on disk, otherwise it raises a :class:`NameError`.
 
         Raises:
-            NameError: if the resource’s path cannot be fetched.
+            NameError: if the resource's path cannot be fetched.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -2719,14 +2716,16 @@ class Container:
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
 
+        Note that older versions of Juju do not support the ``service_content`` parameter, so if
+        the Charm is to be used on those versions, then
+        :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
+
         Raises:
             ConnectionError: if pebble cannot be reached.
             APIError: if an error occurred communicating with pebble, or if the command is not
                 found.
             ChangeError: if the command did not execute in time.
             ExecError: if the command exits with a non-zero exit code.
-            RuntimeError: if ``service_context`` is used with a version of Juju that does have this
-                functionality.
             ValueError: If no command is provided, or if ``combine_stderr`` is true, and a value is
                 provided for ``stderr``.
         """
@@ -2764,7 +2763,6 @@ class Container:
             APIError: if any of the services are not in the plan or are not currently running.
             ConnectionError: if pebble cannot be reached.
             APIError: if an error occurred communicating with pebble.
-            TypeError: if no service names are provided.
         """
         if not service_names:
             raise TypeError('send_signal expected at least 1 service name, got 0')

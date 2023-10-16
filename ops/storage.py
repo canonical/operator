@@ -220,9 +220,6 @@ class JujuStorage:
             handle_path: The string identifying the snapshot.
             snapshot_data: The data to be persisted. (as returned by Object.snapshot()). This
                 might be a dict/tuple/int, but must only contain 'simple' python types.
-
-        Raises:
-            :class:`CalledProcessError`: if Juju returns an error.
         """
         self._backend.set(handle_path, snapshot_data)
 
@@ -234,7 +231,6 @@ class JujuStorage:
 
         Raises:
             :class:`NoSnapshotError`: if there is no snapshot for the given handle_path.
-            :class:`CalledProcessError`: if Juju returns an error.
         """
         try:
             content = self._backend.get(handle_path)
@@ -246,17 +242,11 @@ class JujuStorage:
         """Part of the Storage API, remove a snapshot that was previously saved.
 
         Dropping a snapshot that doesn't exist is treated as a no-op.
-
-        Raises:
-            :class:`CalledProcessError`: if Juju returns an error.
         """
         self._backend.delete(handle_path)
 
     def save_notice(self, event_path: str, observer_path: str, method_name: str):
         """Part of the Storage API, record a notice (event and observer).
-
-        Raises:
-            :class:`CalledProcessError`: if Juju returns an error.
         """
         notice_list = self._load_notice_list()
         notice_list.append((event_path, observer_path, method_name))
@@ -264,9 +254,6 @@ class JujuStorage:
 
     def drop_notice(self, event_path: str, observer_path: str, method_name: str):
         """Part of the Storage API, remove a notice that was previously recorded.
-
-        Raises:
-            :class:`CalledProcessError`: if Juju returns an error.
         """
         notice_list = self._load_notice_list()
         notice_list.remove((event_path, observer_path, method_name))
@@ -281,9 +268,6 @@ class JujuStorage:
 
         Returns:
             Iterable of (event_path, observer_path, method_name) tuples
-
-        Raises:
-            :class:`CalledProcessError`: if Juju returns an error.
         """
         notice_list = self._load_notice_list()
         for row in notice_list:

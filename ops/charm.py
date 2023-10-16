@@ -18,7 +18,6 @@ import enum
 import logging
 import os
 import pathlib
-from typing import NoReturn  # Use Never in Python 3.11+
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,6 +25,7 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NoReturn,
     Optional,
     TextIO,
     Tuple,
