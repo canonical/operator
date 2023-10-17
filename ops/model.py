@@ -2114,9 +2114,6 @@ class Container:
                 combine is True and the label already exists, the two layers
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
-
-        Raises:
-            APIError: if an error occurred communicating with Pebble, or if the layer is invalid.
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
@@ -2637,8 +2634,6 @@ class Container:
         :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
 
         Raises:
-            APIError: if an error occurred communicating with Pebble, or if the command is not
-                found.
             ExecError: if the command exits with a non-zero exit code.
         """
         if service_context is not None:

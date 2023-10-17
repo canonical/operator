@@ -939,9 +939,6 @@ class CollectStatusEvent(EventBase):
         """Add a status for evaluation.
 
         See :class:`CollectStatusEvent` for a description of how to use this.
-
-        Raises:
-            TypeError: if ``status`` is not a :class:`model.StatusBase` instance.
         """
         if not isinstance(status, model.StatusBase):
             raise TypeError(f'status should be a StatusBase, not {type(status).__name__}')
