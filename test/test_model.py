@@ -3607,7 +3607,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['juju-reboot', ''],
         ])
-        self.unit.reboot(now=True)
+        with self.assertRaises(SystemExit):
+            self.unit.reboot(now=True)
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['juju-reboot', '--now'],
         ])

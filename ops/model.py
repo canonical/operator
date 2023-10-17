@@ -26,6 +26,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import typing
@@ -3388,6 +3389,10 @@ class _ModelBackend:
     def reboot(self, now: bool = False):
         if now:
             self._run("juju-reboot", "--now")
+            # Juju will kill the Charm process, and in testing no code after
+            # this point would execute. However, we want to guarantee that for
+            # Charmers, so we force that to be the case.
+            sys.exit()
         else:
             self._run("juju-reboot")
 

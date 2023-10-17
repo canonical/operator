@@ -2538,6 +2538,9 @@ class _TestingModelBackend:
             return
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle that. We raise an exception so that they can simulate the exit.
+        # We have a custom exception, rather than using SystemExit like the real call
+        # does, because we don't want to terminate someone's tests if they miss
+        # catching it, or if it happens unexpectedly.
         raise RebootNow()
 
 
