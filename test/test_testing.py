@@ -3362,27 +3362,19 @@ class TestTestingModelBackend(unittest.TestCase):
             name: test-app
             ''')
         self.addCleanup(harness.cleanup)
-        self.assertIsNone(harness.last_rebooted)
+        self.assertEqual(harness.reboot_count, 0)
         backend = harness._backend
         backend.reboot()
-        reboot1 = harness.last_rebooted
-        assert reboot1 is not None
-        self.assertTrue(reboot1)
+        self.assertEqual(harness.reboot_count, 1)
         with self.assertRaises(ops.testing.RebootNow):
             backend.reboot(now=True)
-        reboot2 = harness.last_rebooted
-        assert reboot2 is not None
-        self.assertGreater(reboot2, reboot1)
+        self.assertEqual(harness.reboot_count, 2)
         harness.begin()
         with self.assertRaises(ops.testing.RebootNow):
             harness.charm.on.install.emit()
-        reboot3 = harness.last_rebooted
-        assert reboot3 is not None
-        self.assertGreater(reboot3, reboot2)
+        self.assertEqual(harness.reboot_count, 3)
         harness.charm.on.remove.emit()
-        reboot4 = harness.last_rebooted
-        assert reboot4 is not None
-        self.assertGreater(reboot4, reboot3)
+        self.assertEqual(harness.reboot_count, 4)
 
 
 class _TestingPebbleClientMixin:
