@@ -162,6 +162,11 @@ class ActionEvent(EventBase):
         alphanumeric, and can only contain lowercase alphanumeric, hyphens
         and periods.
 
+        Because results are passed to Juju using the command line, the maximum
+        size is around 100KB. However, actions results are designed to be
+        small: a few key-value pairs shown in the Juju CLI. If larger content
+        is needed, store it in a file and use something like ``juju scp``.
+
         If any exceptions occur whilst the action is being handled, juju will
         gather any stdout/stderr data (and the return code) and inject them into the
         results object. Thus, the results object might contain the following keys,

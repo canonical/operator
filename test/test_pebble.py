@@ -2579,6 +2579,7 @@ class TestSocketClient(unittest.TestCase):
         with self.assertRaises(pebble.ConnectionError) as cm:
             client.get_system_info()
         self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIn("Could not connect to Pebble", str(cm.exception))
 
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
