@@ -284,9 +284,6 @@ class Harness(Generic[CharmType]):
 
         Note that the Charm is not instantiated until :meth:`.begin()` is called.
         Until then, attempting to access this property will raise an exception.
-
-        Raises:
-            RuntimeError: if :meth:`begin` has not been called.
         """
         if self._charm is None:
             raise RuntimeError('The charm instance is not available yet. '
@@ -309,8 +306,7 @@ class Harness(Generic[CharmType]):
         Before calling :meth:`begin`, there is no Charm instance, so changes to the Model won't
         emit events. Call :meth:`.begin` for :attr:`.charm` to be valid.
 
-        Raises:
-            RuntimeError: if called multiple times.
+        Should only be called once.
         """
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
@@ -694,12 +690,12 @@ class Harness(Generic[CharmType]):
         It will trigger a storage-detaching hook if the storage unit in question exists
         and is presently marked as attached.
 
+        Note that the Charm is not instantiated until :meth:`begin` is called.
+        Until then, attempting to use this method will raise an exception.
+
         Args:
             storage_id: The full storage ID of the storage unit being detached, including the
                 storage key, e.g. my-storage/0.
-
-        Raises:
-            RuntimeError: if called before the harness is initialised.
         """
         if self._charm is None:
             raise RuntimeError('cannot detach storage before Harness is initialised')
@@ -1111,9 +1107,6 @@ class Harness(Generic[CharmType]):
 
         Cannot be called once :meth:`begin` has been called. Use it to set the
         value that will be returned by :attr:`Model.name <ops.Model.name>`.
-
-        Raises:
-            RuntimeError: if called after :meth:`begin`.
         """
         if self._charm is not None:
             raise RuntimeError('cannot set the Model name after begin()')
@@ -1124,9 +1117,6 @@ class Harness(Generic[CharmType]):
 
         Cannot be called once :meth:`begin` has been called. Use it to set the
         value that will be returned by :attr:`Model.uuid <ops.Model.uuid>`.
-
-        Raises:
-            RuntimeError: if called after :meth:`begin`.
         """
         if self._charm is not None:
             raise RuntimeError('cannot set the Model uuid after begin()')
