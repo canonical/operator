@@ -2008,10 +2008,16 @@ class Container:
     This class should not be instantiated directly, instead use :meth:`Unit.get_container`
     or :attr:`Unit.containers`.
 
-    :class:`ops.pebble.ChangeError` and :class:`ops.pebble.TimeoutError` may be raised by Pebble
-    operations that wait for changes such as :meth:`start` and :meth:`replan`.
-    If Pebble cannot be reached, or an error occurred communicating with Pebble,
-    :class:`ops.pebble.ConnectionError` or :class:`ops.pebble.APIError` may be raised.
+    For methods that make changes to the container, if the change fails or times out, then a
+    :class:`ops.pebble.ChangeError` or :class:`ops.pebble.TimeoutError` will be raised.
+
+    Interactions with the container use Pebble, so all methods may raise exceptions when there are
+    problems communicating with Pebble. Problems connecting to or transferring data with Pebble
+    will raise a :class:`ops.pebble.ConnectionError` - generally you can guard against these by
+    first checking :meth:`can_connect`, but it is possible for problems to occur after
+    :meth:`can_connect` has succeeded. When an error occurs executing the request, such as trying
+    to add an invalid layer or execute a command that does not exist, an
+    :class:`ops.pebble.APIError` is raised.
     """
 
     name: str

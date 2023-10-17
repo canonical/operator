@@ -1530,10 +1530,14 @@ class Client:
     Defaults to using a Unix socket at socket_path (which must be specified
     unless a custom opener is provided).
 
-    :class:`ChangeError` and :class:`TimeoutError` may be raised by Pebble
-    operations that wait for changes such as :meth:`start_services` and :meth:`replan_services`.
-    If Pebble cannot be reached, or an error occurred communicating with Pebble,
-    :class:`ConnectionError` or :class:`APIError` may be raised.
+    For methods that wait for changes, such as :meth:`start_services` and :meth:`replan_services`,
+    if the change fails or times out, then a :class:`ChangeError` or :class:`TimeoutError` will be
+    raised.
+
+    All methods may raise exceptions when there are problems communicating with Pebble. Problems
+    connecting to or transferring data with Pebble will raise a :class:`ConnectionError`. When an
+    error occurs executing the request, such as trying to add an invalid layer or execute a command
+    that does not exist, an :class:`APIError` is raised.
     """
 
     _chunk_size = 8192
