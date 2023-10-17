@@ -2828,20 +2828,28 @@ class TestHarness(unittest.TestCase):
                 super().__init__(framework)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
                 self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+                self.app_status_to_add = ops.BlockedStatus('blocked app')
+                self.unit_status_to_add = ops.BlockedStatus('blocked unit')
 
             def _on_collect_app_status(self, event: ops.CollectStatusEvent):
-                event.add_status(ops.ActiveStatus())
+                event.add_status(self.app_status_to_add)
 
             def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
-                event.add_status(ops.BlockedStatus('bar'))
+                event.add_status(self.unit_status_to_add)
 
         harness = ops.testing.Harness(TestCharm)
         harness.set_leader(True)
         harness.begin()
         # Tests for the behaviour of status evaluation are in test_charm.py
         harness.evaluate_status()
-        self.assertEqual(harness.model.app.status, ops.ActiveStatus())
-        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('bar'))
+        self.assertEqual(harness.model.app.status, ops.BlockedStatus('blocked app'))
+        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('blocked unit'))
+
+        harness.charm.app_status_to_add = ops.ActiveStatus('active app')
+        harness.charm.unit_status_to_add = ops.ActiveStatus('active unit')
+        harness.evaluate_status()
+        self.assertEqual(harness.model.app.status, ops.ActiveStatus('active app'))
+        self.assertEqual(harness.model.unit.status, ops.ActiveStatus('active unit'))
 
 
 class TestNetwork(unittest.TestCase):
