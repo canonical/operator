@@ -865,7 +865,7 @@ class CollectStatusEvent(EventBase):
 
     The framework will trigger these events after the hook code runs
     successfully (``collect_app_status`` will only be triggered on the leader
-    unit). If any statuses were added by the event handlers using
+    unit). If any statuses were added by the event handler using
     :meth:`add_status`, the framework will choose the highest-priority status
     and set that as the status (application status for ``collect_app_status``,
     or unit status for ``collect_unit_status``).
