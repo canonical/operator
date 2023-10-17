@@ -1632,8 +1632,10 @@ class Harness(Generic[CharmType]):
         statuses were added.
 
         Tests should normally call this and then assert that ``self.model.app.status``
-        or ``self.model.unit.status`` is the value expected. This method resets the
-        added statuses before triggering the collect-status events.
+        or ``self.model.unit.status`` is the value expected.
+
+        Evaluation is not "additive"; this method resets the added statuses before
+        triggering each collect-status event.
         """
         self.charm.app._collected_statuses = []
         self.charm.unit._collected_statuses = []
