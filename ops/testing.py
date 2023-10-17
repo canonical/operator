@@ -1734,7 +1734,7 @@ class Harness(Generic[CharmType]):
 
     @property
     def reboot_count(self) -> int:
-        """Count of times that the charm has called :meth:`ops.Unit.reboot`."""
+        """Number of times the charm has called :meth:`ops.Unit.reboot`."""
         return self._backend._reboot_count
 
 
