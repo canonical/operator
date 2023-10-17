@@ -3366,11 +3366,11 @@ class TestTestingModelBackend(unittest.TestCase):
         backend = harness._backend
         backend.reboot()
         self.assertEqual(harness.reboot_count, 1)
-        with self.assertRaises(ops.testing.RebootNow):
+        with self.assertRaises(SystemExit):
             backend.reboot(now=True)
         self.assertEqual(harness.reboot_count, 2)
         harness.begin()
-        with self.assertRaises(ops.testing.RebootNow):
+        with self.assertRaises(SystemExit):
             harness.charm.on.install.emit()
         self.assertEqual(harness.reboot_count, 3)
         harness.charm.on.remove.emit()

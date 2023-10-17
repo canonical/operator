@@ -1892,24 +1892,6 @@ class _Secret:
     grants: Dict[int, Set[str]] = dataclasses.field(default_factory=dict)
 
 
-class RebootNow(Exception):  # noqa
-    """Raised when the machine would reboot.
-
-    When :meth:`ops.Unit.reboot` is called with ``now=True`` in a machine charm, the
-    unit's machine is rebooted, interrupting the execution of the event hook. To
-    simulate that when using the testing harness, write a test that expects this
-    exception to be raised, for example::
-
-        def test_installation(self):
-            self.harness.begin()
-            with self.assertRaises(ops.testing.RebootNow):
-                self.harness.charm.on.install.emit()
-                # More asserts here that the first part of installation was done.
-            self.harness.charm.on.install.emit()
-            # More asserts here that the installation continued appropriately.
-    """
-
-
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -2537,11 +2519,8 @@ class _TestingModelBackend:
         if not now:
             return
         # This should exit, reboot, and re-emit the event, but we'll need the caller
-        # to handle that. We raise an exception so that they can simulate the exit.
-        # We have a custom exception, rather than using SystemExit like the real call
-        # does, because we don't want to terminate someone's tests if they miss
-        # catching it, or if it happens unexpectedly.
-        raise RebootNow()
+        # to handle everything after the exit.
+        raise SystemExit()
 
 
 @_copy_docstrings(pebble.ExecProcess)
