@@ -544,18 +544,15 @@ class Harness(Generic[CharmType]):
 
     def add_oci_resource(self, resource_name: str,
                          contents: Optional[Mapping[str, str]] = None) -> None:
-        """Add oci resources to the backend.
+        """Add OCI resources to the backend.
 
-        This will register an oci resource and create a temporary file for processing metadata
+        This will register an OCI resource and create a temporary file for processing metadata
         about the resource. A default set of values will be used for all the file contents
         unless a specific contents dict is provided.
 
         Args:
             resource_name: Name of the resource to add custom contents to.
             contents: Optional custom dict to write for the named resource.
-
-        Raises:
-            RuntimeError: if the resource is not defined, or is not an OCI image.
         """
         if not contents:
             contents = {'registrypath': 'registrypath',
@@ -580,9 +577,6 @@ class Harness(Generic[CharmType]):
             resource_name: The name of the resource being added
             content: Either string or bytes content, which will be the content of the filename
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
-
-        Raises:
-            RuntimeError: if the resource is not defined, or is not a file.
         """
         if resource_name not in self._meta.resources.keys():
             raise RuntimeError(f'Resource {resource_name} is not a defined resource')
@@ -665,9 +659,6 @@ class Harness(Generic[CharmType]):
 
         Return:
             A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
-
-        Raises:
-            RuntimeError: if the storage is missing from the metadata.
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
@@ -910,12 +901,6 @@ class Harness(Generic[CharmType]):
         Args:
             relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
             remote_unit_name: A string representing the remote unit that is being added.
-
-        Return:
-            None
-
-        Raises:
-            RuntimeError: if no matching relation is found.
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         # we can write remote unit data iff we are not in a hook env
@@ -968,9 +953,6 @@ class Harness(Generic[CharmType]):
         Args:
             relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
             remote_unit_name: A string representing the remote unit that is being removed.
-
-        Raises:
-            RuntimeError: if no matching relation is found.
         """
         relation_name = self._backend._relation_names[relation_id]
 
@@ -1141,9 +1123,6 @@ class Harness(Generic[CharmType]):
             app_or_unit: The unit or application name that is being updated.
                 This can be the local or remote application.
             key_values: Each key/value will be updated in the relation data.
-
-        Raises:
-            RuntimeError: if no matching relation is found.
         """
         relation_name = self._backend._relation_names[relation_id]
         relation = self._model.get_relation(relation_name, relation_id)
@@ -1310,9 +1289,6 @@ class Harness(Generic[CharmType]):
         event. Typically, a charm author would check planned units during a
         config or install hook, or after receiving a peer relation joined
         event.
-
-        Raises:
-            TypeError: if ``num_units`` is not 0 or a positive integer.
         """
         if num_units < 0:
             raise TypeError("num_units must be 0 or a positive integer.")
@@ -1461,9 +1437,6 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret to update. This should normally be
                 the return value of :meth:`add_model_secret`.
             content: A key-value mapping containing the new payload.
-
-        Raises:
-            RuntimeError: if the secret is owned by the charm under test.
         """
         model.Secret._validate_content(content)
         secret = self._ensure_secret(secret_id)
@@ -1489,9 +1462,6 @@ class Harness(Generic[CharmType]):
             observer: The name of the application (or specific unit) to grant
                 access to. A relation between this application and the charm
                 under test must already have been created.
-
-        Raises:
-            RuntimeError: if the secret is owned by the charm under test.
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
@@ -1515,9 +1485,6 @@ class Harness(Generic[CharmType]):
             observer: The name of the application (or specific unit) to revoke
                 access to. A relation between this application and the charm under
                 test must have already been created.
-
-        Raises:
-            RuntimeError: if the secret is owned by the charm under test.
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
