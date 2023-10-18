@@ -395,27 +395,28 @@ class _MockModelBackend(_ModelBackend):
         ]
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
-        if attribute == "location":
-            name, index = storage_name_id.split("/")
-            index = int(index)
-            try:
-                storage: Storage = next(
-                    filter(
-                        lambda s: s.name == name and s.index == index,
-                        self._state.storage,
-                    ),
-                )
-            except StopIteration as e:
-                raise RuntimeError(
-                    f"Storage not found with name={name} and index={index}.",
-                ) from e
+        if attribute != "location":
+            raise NotImplementedError(
+                f"storage-get not implemented for attribute={attribute}",
+            )
 
-            fs_path = storage.get_filesystem(self._context)
-            return str(fs_path)
+        name, index = storage_name_id.split("/")
+        index = int(index)
+        storages: List[Storage] = [
+            s for s in self._state.storage if s.name == name and s.index == index
+        ]
+        if not storages:
+            raise RuntimeError(f"Storage with name={name} and index={index} not found.")
+        if len(storages) > 1:
+            # should not really happen: sanity check.
+            raise RuntimeError(
+                f"Multiple Storage instances with name={name} and index={index} found. "
+                f"Inconsistent state.",
+            )
 
-        raise NotImplementedError(
-            f"storage-get not implemented for attribute={attribute}",
-        )
+        storage = storages[0]
+        fs_path = storage.get_filesystem(self._context)
+        return str(fs_path)
 
     def planned_units(self) -> int:
         return self._state.planned_units

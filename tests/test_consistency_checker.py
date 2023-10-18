@@ -374,11 +374,42 @@ def test_storage_event():
             MyCharm, meta={"name": "rupert", "storage": {"foo": {"type": "filesystem"}}}
         ),
     )
-
     assert_consistent(
         State(storage=[storage]),
         storage.attached_event,
         _CharmSpec(
             MyCharm, meta={"name": "rupert", "storage": {"foo": {"type": "filesystem"}}}
+        ),
+    )
+
+
+def test_storage_states():
+    storage1 = Storage("foo", index=1)
+    storage2 = Storage("foo", index=1)
+
+    assert_inconsistent(
+        State(storage=[storage1, storage2]),
+        Event("start"),
+        _CharmSpec(MyCharm, meta={"name": "everett"}),
+    )
+    assert_consistent(
+        State(storage=[storage1, storage2.replace(index=2)]),
+        Event("start"),
+        _CharmSpec(
+            MyCharm, meta={"name": "frank", "storage": {"foo": {"type": "filesystem"}}}
+        ),
+    )
+    assert_consistent(
+        State(storage=[storage1, storage2.replace(name="marx")]),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "engels",
+                "storage": {
+                    "foo": {"type": "filesystem"},
+                    "marx": {"type": "filesystem"},
+                },
+            },
         ),
     )
