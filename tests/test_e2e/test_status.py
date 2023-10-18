@@ -1,10 +1,17 @@
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.model import ActiveStatus, BlockedStatus, UnknownStatus, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    ErrorStatus,
+    MaintenanceStatus,
+    UnknownStatus,
+    WaitingStatus,
+)
 
 from scenario import Context
-from scenario.state import State
+from scenario.state import State, _status_to_entitystatus
 from tests.helpers import trigger
 
 
@@ -118,3 +125,21 @@ def test_workload_history(mycharm):
 
     assert ctx.workload_version_history == ["1", "1.1"]
     assert out.workload_version == "1.2"
+
+
+@pytest.mark.parametrize(
+    "status",
+    (
+        ActiveStatus("foo"),
+        WaitingStatus("bar"),
+        BlockedStatus("baz"),
+        MaintenanceStatus("qux"),
+        ErrorStatus("fiz"),
+        UnknownStatus(),
+    ),
+)
+def test_status_comparison(status):
+    entitystatus = _status_to_entitystatus(status)
+    assert entitystatus == entitystatus == status
+    assert isinstance(entitystatus, type(status))
+    assert repr(entitystatus) == repr(status)

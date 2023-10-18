@@ -253,6 +253,9 @@ class Runtime:
         if container := event.container:
             env.update({"JUJU_WORKLOAD_NAME": container.name})
 
+        if storage := event.storage:
+            env.update({"JUJU_STORAGE_ID": f"{storage.name}/{storage.index}"})
+
         if secret := event.secret:
             env.update(
                 {

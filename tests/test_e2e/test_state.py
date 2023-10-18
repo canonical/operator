@@ -183,6 +183,7 @@ def test_relation_set(mycharm):
 
     def pre_event(charm: CharmBase):
         assert charm.model.get_relation("foo")
+        assert charm.model.app.planned_units() == 4
 
         # this would NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
@@ -201,6 +202,7 @@ def test_relation_set(mycharm):
     )
     state = State(
         leader=True,
+        planned_units=4,
         relations=[relation],
     )
 
