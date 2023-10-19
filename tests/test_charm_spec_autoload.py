@@ -1,6 +1,7 @@
 import importlib
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Type
 
@@ -18,20 +19,26 @@ class MyCharm(CharmBase): pass
 """
 
 
+@contextmanager
 def import_name(name: str, source: Path) -> Type[CharmType]:
     pkg_path = str(source.parent)
     sys.path.append(pkg_path)
     charm = importlib.import_module("charm")
     obj = getattr(charm, name)
     sys.path.remove(pkg_path)
-    return obj
+    yield obj
+    del sys.modules["charm"]
 
 
+@contextmanager
 def create_tempcharm(
-    charm: str = CHARM, meta=None, actions=None, config=None, name: str = "MyCharm"
+    root: Path,
+    charm: str = CHARM,
+    meta=None,
+    actions=None,
+    config=None,
+    name: str = "MyCharm",
 ):
-    root = Path(tempfile.TemporaryDirectory().name)
-
     src = root / "src"
     src.mkdir(parents=True)
     charmpy = src / "charm.py"
@@ -46,35 +53,40 @@ def create_tempcharm(
     if config is not None:
         (root / "config.yaml").write_text(yaml.safe_dump(config))
 
-    return import_name(name, charmpy)
+    with import_name(name, charmpy) as charm:
+        yield charm
 
 
 def test_meta_autoload(tmp_path):
-    charm = create_tempcharm(meta={"name": "foo"})
-    ctx = Context(charm)
-    ctx.run("start", State())
+    with create_tempcharm(tmp_path, meta={"name": "foo"}) as charm:
+        ctx = Context(charm)
+        ctx.run("start", State())
 
 
 def test_no_meta_raises(tmp_path):
-    charm = create_tempcharm()
-    with pytest.raises(ContextSetupError):
-        Context(charm)
+    with create_tempcharm(
+        tmp_path,
+    ) as charm:
+        # metadata not found:
+        with pytest.raises(ContextSetupError):
+            Context(charm)
 
 
 def test_relations_ok(tmp_path):
-    charm = create_tempcharm(
-        meta={"name": "josh", "requires": {"cuddles": {"interface": "arms"}}}
-    )
-    # this would fail if there were no 'cuddles' relation defined in meta
-    Context(charm).run("start", State(relations=[Relation("cuddles")]))
+    with create_tempcharm(
+        tmp_path, meta={"name": "josh", "requires": {"cuddles": {"interface": "arms"}}}
+    ) as charm:
+        # this would fail if there were no 'cuddles' relation defined in meta
+        Context(charm).run("start", State(relations=[Relation("cuddles")]))
 
 
 def test_config_defaults(tmp_path):
-    charm = create_tempcharm(
+    with create_tempcharm(
+        tmp_path,
         meta={"name": "josh"},
         config={"options": {"foo": {"type": "bool", "default": True}}},
-    )
-    # this would fail if there were no 'cuddles' relation defined in meta
-    with Context(charm).manager("start", State()) as mgr:
-        mgr.run()
-        assert mgr.charm.config["foo"] is True
+    ) as charm:
+        # this would fail if there were no 'cuddles' relation defined in meta
+        with Context(charm).manager("start", State()) as mgr:
+            mgr.run()
+            assert mgr.charm.config["foo"] is True

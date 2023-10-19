@@ -646,7 +646,7 @@ class _EntityStatus(_DCBase):
                 "Comparing Status with Tuples is deprecated and will be removed soon.",
             )
             return (self.name, self.message) == other
-        if isinstance(other, StatusBase):
+        if isinstance(other, (StatusBase, _EntityStatus)):
             return (self.name, self.message) == (other.name, other.message)
         logger.warning(
             f"Comparing Status with {other} is not stable and will be forbidden soon."
@@ -659,12 +659,21 @@ class _EntityStatus(_DCBase):
 
     def __repr__(self):
         status_type_name = self.name.title() + "Status"
+        if self.name == "unknown":
+            return f"{status_type_name}()"
         return f"{status_type_name}('{self.message}')"
 
 
 def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
     """Convert StatusBase to _EntityStatus."""
-    return _EntityStatus(obj.name, obj.message)
+    statusbase_subclass = type(StatusBase.from_name(obj.name, obj.message))
+
+    class _MyClass(_EntityStatus, statusbase_subclass):
+        # Custom type inheriting from a specific StatusBase subclass to support instance checks:
+        #  isinstance(state.unit_status, ops.ActiveStatus)
+        pass
+
+    return _MyClass(obj.name, obj.message)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -709,6 +718,52 @@ class Port(_DCBase):
             )
 
 
+_next_storage_index_counter = 0  # storage indices start at 0
+
+
+def next_storage_index(update=True):
+    """Get the index (used to be called ID) the next Storage to be created will get.
+
+    Pass update=False if you're only inspecting it.
+    Pass update=True if you also want to bump it.
+    """
+    global _next_storage_index_counter
+    cur = _next_storage_index_counter
+    if update:
+        _next_storage_index_counter += 1
+    return cur
+
+
+@dataclasses.dataclass(frozen=True)
+class Storage(_DCBase):
+    """Represents an (attached!) storage made available to the charm container."""
+
+    name: str
+
+    index: int = dataclasses.field(default_factory=next_storage_index)
+    # Every new Storage instance gets a new one, if there's trouble, override.
+
+    def get_filesystem(self, ctx: "Context") -> Path:
+        """Simulated filesystem root in this context."""
+        return ctx._get_storage_root(self.name, self.index)
+
+    @property
+    def attached_event(self) -> "Event":
+        """Sugar to generate a <this storage>-storage-attached event."""
+        return Event(
+            path=normalize_name(self.name + "-storage-attached"),
+            storage=self,
+        )
+
+    @property
+    def detached_event(self) -> "Event":
+        """Sugar to generate a <this storage>-storage-detached event."""
+        return Event(
+            path=normalize_name(self.name + "-storage-detached"),
+            storage=self,
+        )
+
+
 @dataclasses.dataclass(frozen=True)
 class State(_DCBase):
     """Represents the juju-owned portion of a unit's state.
@@ -721,30 +776,48 @@ class State(_DCBase):
     config: Dict[str, Union[str, int, float, bool]] = dataclasses.field(
         default_factory=dict,
     )
+    """The present configuration of this charm."""
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
+    """All relations that currently exist for this charm."""
     networks: List[Network] = dataclasses.field(default_factory=list)
+    """All networks currently provisioned for this charm."""
     containers: List[Container] = dataclasses.field(default_factory=list)
+    """All containers (whether they can connect or not) that this charm is aware of."""
+    storage: List[Storage] = dataclasses.field(default_factory=list)
+    """All ATTACHED storage instances for this charm.
+    If a storage is not attached, omit it from this listing."""
 
     # we don't use sets to make json serialization easier
     opened_ports: List[Port] = dataclasses.field(default_factory=list)
+    """Ports opened by juju on this charm."""
     leader: bool = False
+    """Whether this charm has leadership."""
     model: Model = Model()
+    """The model this charm lives in."""
     secrets: List[Secret] = dataclasses.field(default_factory=list)
+    """The secrets this charm has access to (as an owner, or as a grantee)."""
 
+    planned_units: int = 1
+    """Number of non-dying planned units that are expected to be running this application.
+    Use with caution."""
     unit_id: int = 0
+    """ID of the unit hosting this charm."""
     # represents the OF's event queue. These events will be emitted before the event being
     # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
+    """Events that have been deferred on this charm by some previous execution."""
     stored_state: List["StoredState"] = dataclasses.field(default_factory=list)
-
-    """Represents the 'juju statuses' of the application/unit being tested."""
+    """Contents of a charm's stored state."""
 
     # the current statuses. Will be cast to _EntitiyStatus in __post_init__
     app_status: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    """Status of the application."""
     unit_status: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    """Status of the unit."""
     workload_version: str = ""
+    """Workload version."""
 
     def __post_init__(self):
         for name in ["app_status", "unit_status"]:
@@ -897,6 +970,8 @@ class Event(_DCBase):
     args: Tuple[Any] = ()
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
+    # if this is a storage event, the storage it refers to
+    storage: Optional["Storage"] = None
     # if this is a relation event, the relation it refers to
     relation: Optional["AnyRelation"] = None
     # and the name of the remote unit this relation event is about

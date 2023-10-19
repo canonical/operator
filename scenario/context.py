@@ -246,6 +246,7 @@ class Context:
         self.unit_status_history: List["_EntityStatus"] = []
         self.workload_version_history: List[str] = []
         self.emitted_events: List[EventBase] = []
+        self.requested_storages: Dict[str, int] = {}
 
         # set by Runtime.exec() in self._run()
         self._output_state: Optional["State"] = None
@@ -263,6 +264,13 @@ class Context:
         """Get the path to a tempdir where this container's simulated root will live."""
         return Path(self._tmp.name) / "containers" / container_name
 
+    def _get_storage_root(self, name: str, index: int) -> Path:
+        """Get the path to a tempdir where this storage's simulated root will live."""
+        storage_root = Path(self._tmp.name) / "storages" / f"{name}-{index}"
+        # in the case of _get_container_root, _MockPebbleClient will ensure the dir exists.
+        storage_root.mkdir(parents=True, exist_ok=True)
+        return storage_root
+
     def clear(self):
         """Cleanup side effects histories."""
         self.juju_log = []
@@ -270,6 +278,7 @@ class Context:
         self.unit_status_history = []
         self.workload_version_history = []
         self.emitted_events = []
+        self.requested_storages = {}
         self._action_logs = []
         self._action_results = None
         self._action_failure = ""

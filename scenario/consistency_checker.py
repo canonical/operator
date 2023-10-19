@@ -66,6 +66,7 @@ def check_consistency(
         check_config_consistency,
         check_event_consistency,
         check_secrets_consistency,
+        check_storages_consistency,
         check_relation_consistency,
     ):
         results = check(
@@ -122,6 +123,9 @@ def check_event_consistency(
 
     if event._is_action_event:
         _check_action_event(charm_spec, event, errors, warnings)
+
+    if event._is_storage_event:
+        _check_storage_event(charm_spec, event, errors, warnings)
 
     return Results(errors, warnings)
 
@@ -190,6 +194,30 @@ def _check_action_event(
     _check_action_param_types(charm_spec, action, errors, warnings)
 
 
+def _check_storage_event(
+    charm_spec: _CharmSpec,
+    event: "Event",
+    errors: List[str],
+    warnings: List[str],  # noqa: U100
+):
+    storage = event.storage
+    if not storage:
+        errors.append(
+            "cannot construct a storage event without the Storage instance. "
+            "Please pass one.",
+        )
+    elif not event.name.startswith(normalize_name(storage.name)):
+        errors.append(
+            f"storage event should start with storage name. {event.name} does "
+            f"not start with {storage.name}.",
+        )
+    elif storage.name not in charm_spec.meta["storage"]:
+        errors.append(
+            f"storage event {event.name} refers to storage {storage.name} "
+            f"which is not declared in the charm metadata (metadata.yaml) under 'storage'.",
+        )
+
+
 def _check_action_param_types(
     charm_spec: _CharmSpec,
     action: Action,
@@ -235,6 +263,37 @@ def _check_action_param_types(
                 f"param {provided_param_name} is of type {type(provided_param_value)}: "
                 f"expecting {expected_type}",
             )
+
+
+def check_storages_consistency(
+    *,
+    state: "State",
+    charm_spec: "_CharmSpec",
+    **_kwargs,  # noqa: U101
+) -> Results:
+    """Check the consistency of the state.storages with the charm_spec.metadata (metadata.yaml)."""
+    state_storage = state.storage
+    meta_storage = (charm_spec.meta or {}).get("storage", {})
+    errors = []
+
+    if missing := {s.name for s in state.storage}.difference(
+        set(meta_storage.keys()),
+    ):
+        errors.append(
+            f"some storages passed to State were not defined in metadata.yaml: {missing}",
+        )
+
+    seen = []
+    for s in state_storage:
+        tag = (s.name, s.index)
+        if tag in seen:
+            errors.append(
+                f"duplicate storage in State: storage {s.name} with index {s.index} "
+                f"occurs multiple times in State.storage.",
+            )
+        seen.append(tag)
+
+    return Results(errors, [])
 
 
 def check_config_consistency(

@@ -12,6 +12,7 @@ from scenario.state import (
     Relation,
     Secret,
     State,
+    Storage,
     SubordinateRelation,
     _CharmSpec,
 )
@@ -355,7 +356,7 @@ def test_relation_without_endpoint():
             relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
         ),
         Event("start"),
-        _CharmSpec(MyCharm, meta={}),
+        _CharmSpec(MyCharm, meta={"name": "charlemagne"}),
     )
 
     assert_consistent(
@@ -367,6 +368,61 @@ def test_relation_without_endpoint():
             MyCharm,
             meta={
                 "requires": {"foo": {"interface": "foo"}, "bar": {"interface": "bar"}}
+            },
+        ),
+    )
+
+
+def test_storage_event():
+    storage = Storage("foo")
+    assert_inconsistent(
+        State(storage=[storage]),
+        Event("foo-storage-attached"),
+        _CharmSpec(MyCharm, meta={"name": "rupert"}),
+    )
+    assert_inconsistent(
+        State(storage=[storage]),
+        Event("foo-storage-attached"),
+        _CharmSpec(
+            MyCharm, meta={"name": "rupert", "storage": {"foo": {"type": "filesystem"}}}
+        ),
+    )
+    assert_consistent(
+        State(storage=[storage]),
+        storage.attached_event,
+        _CharmSpec(
+            MyCharm, meta={"name": "rupert", "storage": {"foo": {"type": "filesystem"}}}
+        ),
+    )
+
+
+def test_storage_states():
+    storage1 = Storage("foo", index=1)
+    storage2 = Storage("foo", index=1)
+
+    assert_inconsistent(
+        State(storage=[storage1, storage2]),
+        Event("start"),
+        _CharmSpec(MyCharm, meta={"name": "everett"}),
+    )
+    assert_consistent(
+        State(storage=[storage1, storage2.replace(index=2)]),
+        Event("start"),
+        _CharmSpec(
+            MyCharm, meta={"name": "frank", "storage": {"foo": {"type": "filesystem"}}}
+        ),
+    )
+    assert_consistent(
+        State(storage=[storage1, storage2.replace(name="marx")]),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "engels",
+                "storage": {
+                    "foo": {"type": "filesystem"},
+                    "marx": {"type": "filesystem"},
+                },
             },
         ),
     )
