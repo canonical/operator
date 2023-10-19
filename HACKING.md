@@ -105,6 +105,8 @@ Currently we don't publish separate versions of documentation for separate relea
 
 next to the relevant content (e.g. headings, etc.).
 
+Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
+
 
 ## Dependencies
 
