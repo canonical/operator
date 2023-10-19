@@ -1642,7 +1642,12 @@ class Harness(Generic[CharmType]):
 
         Tests should normally call this and then assert that ``self.model.app.status``
         or ``self.model.unit.status`` is the value expected.
+
+        Evaluation is not "additive"; this method resets the added statuses before
+        triggering each collect-status event.
         """
+        self.charm.app._collected_statuses = []
+        self.charm.unit._collected_statuses = []
         charm._evaluate_status(self.charm)
 
     def handle_exec(self,
