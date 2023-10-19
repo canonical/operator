@@ -3,7 +3,7 @@ import datetime
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.model import SecretRotate
+from ops.model import SecretNotFoundError, SecretRotate
 
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
@@ -25,9 +25,9 @@ def mycharm():
 
 def test_get_secret_no_secret(mycharm):
     def post_event(charm: CharmBase):
-        with pytest.raises(RuntimeError):
+        with pytest.raises(SecretNotFoundError):
             assert charm.model.get_secret(id="foo")
-        with pytest.raises(RuntimeError):
+        with pytest.raises(SecretNotFoundError):
             assert charm.model.get_secret(label="foo")
 
     trigger(
