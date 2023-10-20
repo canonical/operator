@@ -13,6 +13,7 @@ from ops.model import (
     ModelError,
     RelationNotFoundError,
     SecretInfo,
+    SecretNotFoundError,
     SecretRotate,
     _format_action_result_dict,
     _ModelBackend,
@@ -142,12 +143,12 @@ class _MockModelBackend(_ModelBackend):
             try:
                 return next(filter(lambda s: s.id == id, self._state.secrets))
             except StopIteration:
-                raise RuntimeError(f"not found: secret with id={id}.")
+                raise SecretNotFoundError()
         elif label:
             try:
                 return next(filter(lambda s: s.label == label, self._state.secrets))
             except StopIteration:
-                raise RuntimeError(f"not found: secret with label={label}.")
+                raise SecretNotFoundError()
         else:
             raise RuntimeError("need id or label.")
 
