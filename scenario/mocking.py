@@ -6,9 +6,9 @@ import random
 import shutil
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set, Tuple, Union
 
-from ops import pebble
+from ops import JujuVersion, pebble
 from ops.model import (
     ModelError,
     RelationNotFoundError,
@@ -131,8 +131,8 @@ class _MockModelBackend(_ModelBackend):
             return next(
                 filter(lambda r: r.relation_id == rel_id, self._state.relations),
             )
-        except StopIteration as e:
-            raise RelationNotFoundError(f"Not found: relation with id={rel_id}.") from e
+        except StopIteration:
+            raise RelationNotFoundError()
 
     def _get_secret(self, id=None, label=None):
         # cleanup id:
@@ -150,6 +150,8 @@ class _MockModelBackend(_ModelBackend):
             except StopIteration:
                 raise SecretNotFoundError()
         else:
+            # if all goes well, this should never be reached. ops.model.Secret will check upon
+            # instantiation that either an id or a label are set, and raise a TypeError if not.
             raise RuntimeError("need id or label.")
 
     @staticmethod
@@ -157,16 +159,28 @@ class _MockModelBackend(_ModelBackend):
         id = "".join(map(str, [random.choice(list(range(10))) for _ in range(20)]))
         return f"secret:{id}"
 
-    def relation_get(self, rel_id, obj_name, app):
-        relation = self._get_relation_by_id(rel_id)
-        if app and obj_name == self.app_name:
+    def _check_app_data_access(self, is_app: bool):
+        if not isinstance(is_app, bool):
+            raise TypeError("is_app parameter to relation_get must be a boolean")
+
+        if is_app:
+            version = JujuVersion(self._context.juju_version)
+            if not version.has_app_data():
+                raise RuntimeError(
+                    f"setting application data is not supported on Juju version {version}",
+                )
+
+    def relation_get(self, relation_id: int, member_name: str, is_app: bool):
+        self._check_app_data_access(is_app)
+        relation = self._get_relation_by_id(relation_id)
+        if is_app and member_name == self.app_name:
             return relation.local_app_data
-        elif app:
+        elif is_app:
             return relation.remote_app_data
-        elif obj_name == self.unit_name:
+        elif member_name == self.unit_name:
             return relation.local_unit_data
 
-        unit_id = int(obj_name.split("/")[-1])
+        unit_id = int(member_name.split("/")[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
 
     def is_leader(self):
@@ -214,6 +228,10 @@ class _MockModelBackend(_ModelBackend):
         if relation_id:
             logger.warning("network-get -r not implemented")
 
+        relations = self._state.get_relations(binding_name)
+        if not relations:
+            raise RelationNotFoundError()
+
         network = next(filter(lambda r: r.name == binding_name, self._state.networks))
         return network.hook_tool_output_fmt()
 
@@ -233,9 +251,12 @@ class _MockModelBackend(_ModelBackend):
         self._context.juju_log.append(JujuLogLine(level, message))
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+        self._check_app_data_access(is_app)
         relation = self._get_relation_by_id(relation_id)
         if is_app:
             if not self._state.leader:
+                # will in practice not be reached because RelationData will check leadership
+                # and raise RelationDataAccessError upstream on this path
                 raise RuntimeError("needs leadership to set app data")
             tgt = relation.local_app_data
         else:
@@ -356,8 +377,12 @@ class _MockModelBackend(_ModelBackend):
         else:
             secret.contents.clear()
 
-    def relation_remote_app_name(self, relation_id: int):
-        relation = self._get_relation_by_id(relation_id)
+    def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
+        # ops catches relationnotfounderrors and returns None:
+        try:
+            relation = self._get_relation_by_id(relation_id)
+        except RelationNotFoundError:
+            return None
         return relation.remote_app_name
 
     def action_set(self, results: Dict[str, Any]):
@@ -367,7 +392,8 @@ class _MockModelBackend(_ModelBackend):
             )
         # let ops validate the results dict
         _format_action_result_dict(results)
-        # but then we will store it in its unformatted, original form
+        # but then we will store it in its unformatted,
+        # original form for testing ease
         self._context._action_results = results
 
     def action_fail(self, message: str = ""):
@@ -393,7 +419,13 @@ class _MockModelBackend(_ModelBackend):
         return action.params
 
     def storage_add(self, name: str, count: int = 1):
+        if not isinstance(count, int) or isinstance(count, bool):
+            raise TypeError(
+                f"storage count must be integer, got: {count} ({type(count)})",
+            )
+
         if "/" in name:
+            # this error is raised by ops.testing but not by ops at runtime
             raise ModelError('storage name cannot contain "/"')
 
         self._context.requested_storages[name] = count
@@ -403,8 +435,23 @@ class _MockModelBackend(_ModelBackend):
             storage.index for storage in self._state.storage if storage.name == name
         ]
 
+    def _storage_event_details(self) -> Tuple[int, str]:
+        storage = self._event.storage
+        if not storage:
+            # only occurs if this method is called when outside the scope of a storage event
+            raise RuntimeError('unable to find storage key in ""')
+        fs_path = storage.get_filesystem(self._context)
+        return storage.index, str(fs_path)
+
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
+        if not len(attribute) > 0:  # assume it's an empty string.
+            raise RuntimeError(
+                'calling storage_get with `attribute=""` will return a dict '
+                "and not a string. This usage is not supported.",
+            )
+
         if attribute != "location":
+            # this should not happen: in ops it's hardcoded to be "location"
             raise NotImplementedError(
                 f"storage-get not implemented for attribute={attribute}",
             )
@@ -414,10 +461,11 @@ class _MockModelBackend(_ModelBackend):
         storages: List[Storage] = [
             s for s in self._state.storage if s.name == name and s.index == index
         ]
+
+        # should not really happen: sanity checks. In practice, ops will guard against these paths.
         if not storages:
             raise RuntimeError(f"Storage with name={name} and index={index} not found.")
         if len(storages) > 1:
-            # should not really happen: sanity check.
             raise RuntimeError(
                 f"Multiple Storage instances with name={name} and index={index} found. "
                 f"Inconsistent state.",
@@ -430,9 +478,37 @@ class _MockModelBackend(_ModelBackend):
     def planned_units(self) -> int:
         return self._state.planned_units
 
-    # TODO:
-    def resource_get(self, *args, **kwargs):  # noqa: U100
-        raise NotImplementedError("resource_get")
+    # legacy ops API that we don't intend to mock:
+    def pod_spec_set(
+        self,
+        spec: Mapping[str, Any],  # noqa: U100
+        k8s_resources: Optional[Mapping[str, Any]] = None,  # noqa: U100
+    ):
+        raise NotImplementedError(
+            "pod-spec-set is not implemented in Scenario (and probably never will be: "
+            "it's deprecated API)",
+        )
+
+    def add_metrics(
+        self,
+        metrics: Mapping[str, Union[int, float]],  # noqa: U100
+        labels: Optional[Mapping[str, str]] = None,  # noqa: U100
+    ) -> None:
+        raise NotImplementedError(
+            "add-metrics is not implemented in Scenario (and probably never will be: "
+            "it's deprecated API)",
+        )
+
+    def resource_get(self, resource_name: str) -> str:
+        try:
+            return str(self._state.resources[resource_name])
+        except KeyError:
+            # ops will not let us get there if the resource name is unknown from metadata.
+            # but if the user forgot to add it in State, then we remind you of that.
+            raise RuntimeError(
+                f"Inconsistent state: "
+                f"resource {resource_name} not found in State. please pass it.",
+            )
 
 
 class _MockPebbleClient(_TestingPebbleClient):

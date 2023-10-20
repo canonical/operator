@@ -64,6 +64,7 @@ def check_consistency(
     for check in (
         check_containers_consistency,
         check_config_consistency,
+        check_resource_consistency,
         check_event_consistency,
         check_secrets_consistency,
         check_storages_consistency,
@@ -90,6 +91,27 @@ def check_consistency(
             f"warning if you're sure. "
             f"The following warnings were found: {err_fmt}",
         )
+
+
+def check_resource_consistency(
+    *,
+    state: "State",
+    charm_spec: "_CharmSpec",
+    **_kwargs,  # noqa: U101
+) -> Results:
+    """Check the internal consistency of the resources from metadata and in State."""
+    errors = []
+    warnings = []
+
+    resources_from_meta = set(charm_spec.meta.get("resources", {}).keys())
+    resources_from_state = set(state.resources.keys())
+    if not resources_from_meta.issuperset(resources_from_state):
+        errors.append(
+            f"any and all resources passed to State.resources need to have been defined in "
+            f"metadata.yaml. Metadata resources: {resources_from_meta}; "
+            f"State.resources: {resources_from_state}.",
+        )
+    return Results(errors, warnings)
 
 
 def check_event_consistency(

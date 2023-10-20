@@ -756,10 +756,10 @@ class Storage(_DCBase):
         )
 
     @property
-    def detached_event(self) -> "Event":
+    def detaching_event(self) -> "Event":
         """Sugar to generate a <this storage>-storage-detached event."""
         return Event(
-            path=normalize_name(self.name + "-storage-detached"),
+            path=normalize_name(self.name + "-storage-detaching"),
             storage=self,
         )
 
@@ -796,6 +796,8 @@ class State(_DCBase):
     """The model this charm lives in."""
     secrets: List[Secret] = dataclasses.field(default_factory=list)
     """The secrets this charm has access to (as an owner, or as a grantee)."""
+    resources: Dict[str, "PathLike"] = dataclasses.field(default_factory=dict)
+    """Mapping from resource name to path at which the resource can be found."""
 
     planned_units: int = 1
     """Number of non-dying planned units that are expected to be running this application.
@@ -876,12 +878,13 @@ class State(_DCBase):
         except StopIteration as e:
             raise ValueError(f"container: {name}") from e
 
-    def get_relations(self, endpoint: str) -> Tuple["AnyRelation"]:
-        """Get relation from this State, based on an input relation or its endpoint name."""
-        try:
-            return tuple(filter(lambda c: c.endpoint == endpoint, self.relations))
-        except StopIteration as e:
-            raise ValueError(f"relation: {endpoint}") from e
+    def get_relations(self, endpoint: str) -> Tuple["AnyRelation", ...]:
+        """Get all relations on this endpoint from the current state."""
+        return tuple(filter(lambda c: c.endpoint == endpoint, self.relations))
+
+    def get_storages(self, name: str) -> Tuple["Storage", ...]:
+        """Get all storages with this name."""
+        return tuple(filter(lambda s: s.name == name, self.storage))
 
     # FIXME: not a great way to obtain a delta, but is "complete". todo figure out a better way.
     def jsonpatch_delta(self, other: "State"):
@@ -1094,6 +1097,9 @@ class Event(_DCBase):
         For example, a relation event initialized without a Relation instance will search for
         a suitable relation in the provided state and return a copy of itself with that
         relation attached.
+
+        In case of ambiguity (e.g. multiple relations found on 'foo' for event
+        'foo-relation-changed', we pop a warning and bind the first one. Use with care!
         """
         entity_name = self.name.split("_")[0]
 
@@ -1112,6 +1118,19 @@ class Event(_DCBase):
                     f"too many secrets found in state: cannot automatically bind {self}",
                 )
             return self.replace(secret=state.secrets[0])
+
+        if self._is_storage_event and not self.storage:
+            storages = state.get_storages(entity_name)
+            if len(storages) < 1:
+                raise BindFailedError(
+                    f"no storages called {entity_name} found in state",
+                )
+            if len(storages) > 1:
+                logger.warning(
+                    f"too many storages called {entity_name}: binding to first one",
+                )
+            storage = storages[0]
+            return self.replace(storage=storage)
 
         if self._is_relation_event and not self.relation:
             ep_name = entity_name
