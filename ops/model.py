@@ -26,6 +26,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import typing
@@ -686,6 +687,8 @@ class Unit:
         Use :meth:`open_port` and :meth:`close_port` to manage ports
         individually.
 
+        *New in version 2.7*
+
         Args:
             ports: The ports to open. Provide an int to open a TCP port, or
                 a :class:`Port` to open a port for another protocol.
@@ -708,6 +711,32 @@ class Unit:
             self._backend.close_port(protocol, port)
         for protocol, port in desired - existing:
             self._backend.open_port(protocol, port)
+
+    def reboot(self, now: bool = False) -> None:
+        """Reboot the host machine.
+
+        Normally, the reboot will only take place after the current hook successfully
+        completes. Use ``now=True`` to reboot immediately without waiting for the
+        hook to complete; this is useful when multiple restarts are required (Juju
+        will re-run the hook after rebooting).
+
+        This is not supported on Kubernetes charms, can only be called for the current unit,
+        and cannot be used in an action hook.
+
+        *New in version 2.8*
+
+        Args:
+            now: terminate immediately without waiting for the current hook to complete,
+                restarting the hook after reboot.
+
+        Raises:
+            RuntimeError: if called on a remote unit.
+            :class:`ModelError`: if used in an action hook.
+
+        """
+        if not self._is_our_unit:
+            raise RuntimeError(f'cannot reboot a remote unit {self}')
+        self._backend.reboot(now)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -3399,6 +3428,16 @@ class _ModelBackend:
             logger.warning('Ignoring opened-ports port range: %s', port_str)
         protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
         return Port(protocol_lit, int(port))
+
+    def reboot(self, now: bool = False):
+        if now:
+            self._run("juju-reboot", "--now")
+            # Juju will kill the Charm process, and in testing no code after
+            # this point would execute. However, we want to guarantee that for
+            # Charmers, so we force that to be the case.
+            sys.exit()
+        else:
+            self._run("juju-reboot")
 
 
 class _ModelBackendValidator:

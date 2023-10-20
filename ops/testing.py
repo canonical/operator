@@ -1741,6 +1741,11 @@ class Harness(Generic[CharmType]):
             handler=(lambda _: result) if handler is None else handler  # type: ignore
         )
 
+    @property
+    def reboot_count(self) -> int:
+        """Number of times the charm has called :meth:`ops.Unit.reboot`."""
+        return self._backend._reboot_count
+
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
@@ -1957,6 +1962,7 @@ class _TestingModelBackend:
         self._secrets: List[_Secret] = []
         self._opened_ports: Set[model.Port] = set()
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
+        self._reboot_count = 0
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2516,6 +2522,14 @@ class _TestingModelBackend:
                 raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # NOQA: test_quote_backslashes
         else:
             raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # NOQA: test_quote_backslashes
+
+    def reboot(self, now: bool = False):
+        self._reboot_count += 1
+        if not now:
+            return
+        # This should exit, reboot, and re-emit the event, but we'll need the caller
+        # to handle everything after the exit.
+        raise SystemExit()
 
 
 @_copy_docstrings(pebble.ExecProcess)

@@ -3345,6 +3345,37 @@ class TestTestingModelBackend(unittest.TestCase):
         client = backend.get_pebble('/custom/socket/path')
         self.assertIsInstance(client, _TestingPebbleClient)
 
+    def test_reboot(self):
+        class RebootingCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.install, self._reboot_now)
+                self.framework.observe(self.on.remove, self._reboot)
+
+            def _reboot_now(self, event: ops.InstallEvent):
+                self.unit.reboot(now=True)
+
+            def _reboot(self, event: ops.RemoveEvent):
+                self.unit.reboot()
+
+        harness = ops.testing.Harness(RebootingCharm, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        self.assertEqual(harness.reboot_count, 0)
+        backend = harness._backend
+        backend.reboot()
+        self.assertEqual(harness.reboot_count, 1)
+        with self.assertRaises(SystemExit):
+            backend.reboot(now=True)
+        self.assertEqual(harness.reboot_count, 2)
+        harness.begin()
+        with self.assertRaises(SystemExit):
+            harness.charm.on.install.emit()
+        self.assertEqual(harness.reboot_count, 3)
+        harness.charm.on.remove.emit()
+        self.assertEqual(harness.reboot_count, 4)
+
 
 class _TestingPebbleClientMixin:
     def get_testing_client(self):
