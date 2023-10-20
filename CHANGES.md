@@ -1,6 +1,7 @@
 # 2.8.0
 
 * The type of a `Handle`'s `key` was expanded from `str` to `str|None`
+* Added `Harness.run_output()`, `testing.ActionOutput`, and `testing.ActionFailed`
 
 # 2.7.0
 

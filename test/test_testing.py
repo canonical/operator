@@ -5193,3 +5193,117 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(args_history[-1].group, "test_group")
         self.assertEqual(args_history[-1].group_id, 4)
         self.assertDictEqual(args_history[-1].environment, {"foo": "hello", "foobar": "barfoo"})
+
+
+class TestActions(unittest.TestCase):
+    def setUp(self):
+        class ActionCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.test_action, self._on_test_action)
+                self.framework.observe(self.on.fail_action, self._on_fail_action)
+                self.framework.observe(self.on.test3_action, self._on_test3_action)
+                self.framework.observe(self.on.bad_results_action, self._on_bad_results_action)
+
+            def _on_test_action(self, event: ops.ActionEvent):
+                pass
+
+            def _on_fail_action(self, event: ops.ActionEvent):
+                event.fail("this will be ignored")
+                event.log("some progress")
+                event.fail("something went wrong")
+                event.log("more progress")
+                event.set_results({"partial": "foo"})
+
+            def _on_test3_action(self, event: ops.ActionEvent):
+                event.log("Step 1")
+                event.set_results({"result1": event.params["foo"]})
+                event.log("Step 2")
+                event.set_results({"result2": event.params.get("bar")})
+
+            def _on_bad_results_action(self, event: ops.ActionEvent):
+                event.set_results({"a": {"b": 1}, "a.b": 2})
+
+        self.harness = ops.testing.Harness(ActionCharm, meta='''
+            name: test
+            ''', actions='''
+            test:
+              description: lorem ipsum
+            fail:
+              description: dolor sit amet
+            test2:
+              description: consectetur adipiscing elit
+              params:
+                foo
+                bar
+              required: [foo]
+              additionalProperties: false
+            test3:
+              description: sed do eiusmod tempor
+              params:
+                foo:
+                  type: string
+                  default: foo-default
+                bar:
+                  type: integer
+            bad-results:
+              description: incididunt ut labore
+            ''')
+        self.harness.begin()
+
+    def test_with_hooks_disabled(self):
+        with self.harness.hooks_disabled():
+            out = self.harness.run_action("fail")
+            self.assertEqual(out.logs, [])
+            self.assertEqual(out.results, {})
+
+    def test_invalid_action(self):
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("another-action")
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("bad_results")
+
+    def test_run_action(self):
+        out = self.harness.run_action("test")
+        self.assertEqual(out.logs, [])
+        self.assertEqual(out.results, {})
+
+    def test_fail_action(self):
+        with self.assertRaises(ops.testing.ActionFailed) as cm:
+            self.harness.run_action("fail")
+        self.assertEqual(cm.exception.message, "something went wrong")
+        self.assertEqual(cm.exception.output.logs, ["some progress", "more progress"])
+        self.assertEqual(cm.exception.output.results, {"partial": "foo"})
+
+    def test_required_param(self):
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("test2")
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("test2", {"bar": "baz"})
+        self.harness.run_action("test2", {"foo": "baz"})
+        self.harness.run_action("test2", {"foo": "baz", "bar": "qux"})
+
+    def test_additional_params(self):
+        self.harness.run_action("test", {"foo": "bar"})
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("test2", {"foo": "bar", "qux": "baz"})
+        self.harness.run_action("test", {
+            "string": "hello",
+            "number": 28.8,
+            "object": {"a": "b"},
+            "array": [1, 2, 3],
+            "boolean": True,
+            "null": None})
+
+    def test_logs_and_results(self):
+        out = self.harness.run_action("test3")
+        self.assertEqual(out.logs, ["Step 1", "Step 2"])
+        self.assertEqual(out.results, {"result1": "foo-default", "result2": None})
+        out = self.harness.run_action("test3", {"foo": "baz", "bar": 28})
+        self.assertEqual(out.results, {"result1": "baz", "result2": 28})
+
+    def test_bad_results(self):
+        with self.assertRaises(ValueError):
+            self.harness.run_action("bad-results")
+
+    # TODO: tests for the action_get, action_set, action_log, action_fail methods.
