@@ -39,7 +39,7 @@ logger = scenario_logger.getChild("runtime")
 class ActionOutput:
     """Wraps the results of running an action event with `run_action`."""
 
-    state: State
+    state: "State"
     """The charm state after the action has been handled.
     In most cases, actions are not expected to be affecting it."""
     logs: List[str]
