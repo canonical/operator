@@ -46,13 +46,13 @@ class ActionOutput:
     """Any logs associated with the action output, set by the charm."""
     results: Dict[str, str]
     """Key-value mapping assigned by the charm as a result of the action."""
-    failure: Optional[str]
+    failure: Optional[str] = None
     """If the action is not a success: the message the charm set when failing the action."""
 
     @property
     def success(self) -> bool:
         """Return whether this action was a success."""
-        return self.failure is not None
+        return self.failure is None
 
 
 class InvalidEventError(RuntimeError):
@@ -272,7 +272,7 @@ class Context:
         # ephemeral side effects from running an action
         self._action_logs = []
         self._action_results = None
-        self._action_failure = ""
+        self._action_failure = None
 
     def _set_output_state(self, output_state: "State"):
         """Hook for Runtime to set the output state."""
@@ -299,7 +299,7 @@ class Context:
         self.requested_storages = {}
         self._action_logs = []
         self._action_results = None
-        self._action_failure = ""
+        self._action_failure = None
         self._output_state = None
 
     def _record_status(self, state: "State", is_app: bool):
@@ -481,7 +481,7 @@ class Context:
         # reset all action-related state
         self._action_logs = []
         self._action_results = None
-        self._action_failure = ""
+        self._action_failure = None
 
         return ao
 
