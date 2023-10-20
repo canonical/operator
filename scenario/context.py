@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import dataclasses
 import tempfile
-from collections import namedtuple
 from contextlib import contextmanager
 from pathlib import Path
 from typing import (
@@ -34,7 +34,25 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("runtime")
 
-ActionOutput = namedtuple("ActionOutput", ("state", "logs", "results", "failure"))
+
+@dataclasses.dataclass
+class ActionOutput:
+    """Wraps the results of running an action event with `run_action`."""
+
+    state: State
+    """The charm state after the action has been handled.
+    In most cases, actions are not expected to be affecting it."""
+    logs: List[str]
+    """Any logs associated with the action output, set by the charm."""
+    results: Dict[str, str]
+    """Key-value mapping assigned by the charm as a result of the action."""
+    failure: Optional[str]
+    """If the action is not a successL: the message the charm set when failing the action."""
+
+    @property
+    def success(self) -> bool:
+        """Return whether this action was a success."""
+        return self.failure is not None
 
 
 class InvalidEventError(RuntimeError):
