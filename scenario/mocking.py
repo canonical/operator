@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 from ops import pebble
 from ops.model import (
     ModelError,
+    RelationNotFoundError,
     SecretInfo,
     SecretRotate,
     _format_action_result_dict,
@@ -35,6 +36,13 @@ if TYPE_CHECKING:
     )
 
 logger = scenario_logger.getChild("mocking")
+
+
+class ActionMissingFromContextError(Exception):
+    """Raised when the user attempts to action-related hook tools when not handling an action."""
+
+    # This is not an ops error: in ops, you'd have to go exceptionally out of your way to trigger
+    # this flow.
 
 
 class _MockExecProcess:
@@ -123,7 +131,7 @@ class _MockModelBackend(_ModelBackend):
                 filter(lambda r: r.relation_id == rel_id, self._state.relations),
             )
         except StopIteration as e:
-            raise RuntimeError(f"Not found: relation with id={rel_id}.") from e
+            raise RelationNotFoundError(f"Not found: relation with id={rel_id}.") from e
 
     def _get_secret(self, id=None, label=None):
         # cleanup id:
@@ -353,7 +361,7 @@ class _MockModelBackend(_ModelBackend):
 
     def action_set(self, results: Dict[str, Any]):
         if not self._event.action:
-            raise RuntimeError(
+            raise ActionMissingFromContextError(
                 "not in the context of an action event: cannot action-set",
             )
         # let ops validate the results dict
@@ -363,14 +371,14 @@ class _MockModelBackend(_ModelBackend):
 
     def action_fail(self, message: str = ""):
         if not self._event.action:
-            raise RuntimeError(
+            raise ActionMissingFromContextError(
                 "not in the context of an action event: cannot action-fail",
             )
         self._context._action_failure = message
 
     def action_log(self, message: str):
         if not self._event.action:
-            raise RuntimeError(
+            raise ActionMissingFromContextError(
                 "not in the context of an action event: cannot action-log",
             )
         self._context._action_logs.append(message)
@@ -378,7 +386,7 @@ class _MockModelBackend(_ModelBackend):
     def action_get(self):
         action = self._event.action
         if not action:
-            raise RuntimeError(
+            raise ActionMissingFromContextError(
                 "not in the context of an action event: cannot action-get",
             )
         return action.params
