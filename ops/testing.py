@@ -305,6 +305,8 @@ class Harness(Generic[CharmType]):
 
         Before calling :meth:`begin`, there is no Charm instance, so changes to the Model won't
         emit events. Call :meth:`.begin` for :attr:`.charm` to be valid.
+
+        Should only be called once.
         """
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
@@ -542,9 +544,9 @@ class Harness(Generic[CharmType]):
 
     def add_oci_resource(self, resource_name: str,
                          contents: Optional[Mapping[str, str]] = None) -> None:
-        """Add oci resources to the backend.
+        """Add OCI resources to the backend.
 
-        This will register an oci resource and create a temporary file for processing metadata
+        This will register an OCI resource and create a temporary file for processing metadata
         about the resource. A default set of values will be used for all the file contents
         unless a specific contents dict is provided.
 
@@ -577,7 +579,7 @@ class Harness(Generic[CharmType]):
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
         if resource_name not in self._meta.resources.keys():
-            raise RuntimeError(f'Resource {resource_name} is not a defined resources')
+            raise RuntimeError(f'Resource {resource_name} is not a defined resource')
         record = self._meta.resources[resource_name]
         if record.type != "file":
             raise RuntimeError(
@@ -679,6 +681,9 @@ class Harness(Generic[CharmType]):
         It will trigger a storage-detaching hook if the storage unit in question exists
         and is presently marked as attached.
 
+        Note that the Charm is not instantiated until :meth:`begin` is called.
+        Until then, attempting to use this method will raise an exception.
+
         Args:
             storage_id: The full storage ID of the storage unit being detached, including the
                 storage key, e.g. my-storage/0.
@@ -735,6 +740,9 @@ class Harness(Generic[CharmType]):
         Args:
             storage_id: The full storage ID of the storage unit being removed, including the
                 storage key, e.g. my-storage/0.
+
+        Raises:
+            RuntimeError: if the storage is not in the metadata.
         """
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
@@ -893,9 +901,6 @@ class Harness(Generic[CharmType]):
         Args:
             relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
             remote_unit_name: A string representing the remote unit that is being added.
-
-        Return:
-            None
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         # we can write remote unit data iff we are not in a hook env
@@ -1035,9 +1040,11 @@ class Harness(Generic[CharmType]):
         Return:
             The Pebble plan for this container. Use
             :meth:`Plan.to_yaml <ops.pebble.Plan.to_yaml>` to get a string
-            form for the content. Will raise ``KeyError`` if no Pebble client
-            exists for that container name (should only happen if container is
-            not present in ``metadata.yaml``).
+            form for the content.
+
+        Raises:
+            KeyError: if no Pebble client exists for that container name (should only happen if
+                container is not present in ``metadata.yaml``).
         """
         client = self._backend._pebble_clients.get(container_name)
         if client is None:
@@ -1241,6 +1248,9 @@ class Harness(Generic[CharmType]):
             unset: An iterable of keys to remove from config.
                 This sets the value to the default if defined,
                 otherwise removes the key altogether.
+
+        Raises:
+            ValueError: if the key is not present in the config.
         """
         self._update_config(key_values, unset)
         if self._charm is None or not self._hooks_enabled:
@@ -1290,7 +1300,6 @@ class Harness(Generic[CharmType]):
         This allows the harness to fall through to the built in methods that will try to
         guess at a value for planned units, based on the number of peer relations that
         have been setup in the testing harness.
-
         """
         self._backend._planned_units = None
 
@@ -2001,17 +2010,17 @@ class _TestingModelBackend:
     def relation_ids(self, relation_name: str) -> List[int]:
         try:
             return self._relation_ids_map[relation_name]
-        except KeyError as e:
+        except KeyError:
             if relation_name not in self._meta.relations:
-                raise model.ModelError(f'{relation_name} is not a known relation') from e
+                raise model.ModelError(f'{relation_name} is not a known relation') from None
             no_ids: List[int] = []
             return no_ids
 
     def relation_list(self, relation_id: int):
         try:
             return self._relation_list_map[relation_id]
-        except KeyError as e:
-            raise model.RelationNotFoundError from e
+        except KeyError:
+            raise model.RelationNotFoundError from None
 
     def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
         if relation_id not in self._relation_app_and_units:
@@ -2136,7 +2145,7 @@ class _TestingModelBackend:
                 return self._storage_list[name][index][attribute]
         except KeyError:
             raise model.ModelError(
-                f'ERROR invalid value "{name}/{index}" for option -s: storage not found')
+                f'ERROR invalid value "{name}/{index}" for option -s: storage not found') from None
 
     def storage_add(self, name: str, count: int = 1) -> List[int]:
         if '/' in name:
@@ -2945,10 +2954,10 @@ class _TestingPebbleClient:
             else:
                 try:
                     file_path.rmdir()
-                except OSError:
+                except OSError as e:
                     raise pebble.PathError(
                         'generic-file-error',
-                        'cannot remove non-empty directory without recursive=True')
+                        'cannot remove non-empty directory without recursive=True') from e
         else:
             file_path.unlink()
 
@@ -3055,7 +3064,7 @@ class _TestingPebbleClient:
                 raise RuntimeError(
                     "a TimeoutError occurred in the execution handler, "
                     "but no timeout value was provided in the execution arguments."
-                )
+                ) from None
         if result is None:
             exit_code = 0
             proc_stdout = self._transform_exec_handler_output(b'', encoding)
@@ -3119,7 +3128,7 @@ class _TestingPebbleClient:
                 body=body,
                 code=500,
                 status='Internal Server Error',
-                message=message)
+                message=message) from None
 
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore

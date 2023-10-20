@@ -355,7 +355,7 @@ class Application:
 
         Example::
 
-            self.model.app.status = BlockedStatus('I need a human to come help me')
+            self.model.app.status = ops.BlockedStatus('I need a human to come help me')
         """
         if not self._is_our_app:
             return UnknownStatus()
@@ -402,6 +402,8 @@ class Application:
         This method only returns data for this charm's application -- the Juju agent isn't
         able to see planned unit counts for other applications in the model.
 
+        Raises:
+            RuntimeError: on trying to get the planned units for a remote application.
         """
         if not self._is_our_app:
             raise RuntimeError(
@@ -432,6 +434,9 @@ class Application:
             rotate: Rotation policy/time. Every time this elapses, Juju will
                 notify the charm by sending a SecretRotate event. None (the
                 default) means to use the Juju default, which is never rotate.
+
+        Raises:
+            ValueError: if the secret is empty, or the secret key is invalid.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -507,9 +512,10 @@ class Unit:
             RuntimeError: if setting the status of a unit other than the current unit
             InvalidStatusError: if setting the status to something other than
                 a :class:`StatusBase`
+
         Example::
 
-            self.model.unit.status = MaintenanceStatus('reconfiguring the frobnicators')
+            self.model.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
         """
         if not self._is_our_unit:
             return UnknownStatus()
@@ -568,7 +574,11 @@ class Unit:
 
     @property
     def containers(self) -> Mapping[str, 'Container']:
-        """Return a mapping of containers indexed by name."""
+        """Return a mapping of containers indexed by name.
+
+        Raises:
+            RuntimeError: if called for another unit
+        """
         if not self._is_our_unit:
             raise RuntimeError(f'cannot get container for a remote unit {self}')
         return self._containers
@@ -582,7 +592,7 @@ class Unit:
         try:
             return self.containers[container_name]
         except KeyError:
-            raise ModelError(f'container {container_name!r} not found')
+            raise ModelError(f'container {container_name!r} not found') from None
 
     def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -592,6 +602,9 @@ class Unit:
         """Create a :class:`Secret` owned by this unit.
 
         See :meth:`Application.add_secret` for parameter details.
+
+        Raises:
+            ValueError: if the secret is empty, or the secret key is invalid.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -679,6 +692,11 @@ class Unit:
         Args:
             ports: The ports to open. Provide an int to open a TCP port, or
                 a :class:`Port` to open a port for another protocol.
+
+        Raises:
+            ModelError: if a :class:`Port` is provided where ``protocol`` is 'icmp' but
+                ``port`` is not ``None``, or where ``protocol`` is 'tcp' or 'udp' and ``port``
+                is ``None``.
         """
         # Normalise to get easier comparisons.
         existing = {
@@ -1850,6 +1868,9 @@ class Resources:
 
         If successfully fetched, this returns the path where the resource is stored
         on disk, otherwise it raises a :class:`NameError`.
+
+        Raises:
+            NameError: if the resource's path cannot be fetched.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -1919,6 +1940,9 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
         via ``<storage-name>-storage-attached`` events when it becomes available.
+
+        Raises:
+            ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -2012,6 +2036,17 @@ class Container:
 
     This class should not be instantiated directly, instead use :meth:`Unit.get_container`
     or :attr:`Unit.containers`.
+
+    For methods that make changes to the container, if the change fails or times out, then a
+    :class:`ops.pebble.ChangeError` or :class:`ops.pebble.TimeoutError` will be raised.
+
+    Interactions with the container use Pebble, so all methods may raise exceptions when there are
+    problems communicating with Pebble. Problems connecting to or transferring data with Pebble
+    will raise a :class:`ops.pebble.ConnectionError` - generally you can guard against these by
+    first checking :meth:`can_connect`, but it is possible for problems to occur after
+    :meth:`can_connect` has succeeded. When an error occurs executing the request, such as trying
+    to add an invalid layer or execute a command that does not exist, an
+    :class:`ops.pebble.APIError` is raised.
     """
 
     name: str
@@ -2139,7 +2174,8 @@ class Container:
     def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
-        Raises :class:`ModelError` if service_name is not found.
+        Raises:
+            ModelError: if service_name is not found.
         """
         services = self.get_services(service_name)
         if not services:
@@ -2166,7 +2202,8 @@ class Container:
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
-        Raises :class:`ModelError` if ``check_name`` is not found.
+        Raises:
+            ModelError: if ``check_name`` is not found.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2557,7 +2594,6 @@ class Container:
         Raises:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
-
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
@@ -2627,6 +2663,13 @@ class Container:
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
+
+        Note that older versions of Juju do not support the ``service_content`` parameter, so if
+        the Charm is to be used on those versions, then
+        :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
+
+        Raises:
+            ExecError: if the command exits with a non-zero exit code.
         """
         if service_context is not None:
             version = JujuVersion.from_environ()
@@ -2902,7 +2945,7 @@ class _ModelBackend:
         try:
             result = subprocess.run(args, **kwargs)  # type: ignore
         except subprocess.CalledProcessError as e:
-            raise ModelError(e.stderr)
+            raise ModelError(e.stderr) from e
         if return_output:
             if result.stdout is None:  # type: ignore
                 return ''
