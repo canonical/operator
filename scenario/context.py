@@ -47,7 +47,7 @@ class ActionOutput:
     results: Dict[str, str]
     """Key-value mapping assigned by the charm as a result of the action."""
     failure: Optional[str]
-    """If the action is not a successL: the message the charm set when failing the action."""
+    """If the action is not a success: the message the charm set when failing the action."""
 
     @property
     def success(self) -> bool:

@@ -850,9 +850,15 @@ def test_backup_action():
     out: ActionOutput = ctx.run_action("do_backup_action", State())
 
     # you can assert action results, logs, failure using the ActionOutput interface
-    assert out.results == {'foo': 'bar'}
     assert out.logs == ['baz', 'qux']
-    assert out.failure == 'boo-hoo'
+    
+    if out.success:
+      # if the action did not fail, we can read the results:
+      assert out.results == {'foo': 'bar'}
+
+    else:
+      # if the action fails, we can read a failure message
+      assert out.failure == 'boo-hoo'
 ```
 
 ## Parametrized Actions
