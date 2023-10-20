@@ -11,6 +11,13 @@ def test_bind_relation():
     assert event.bind(state).relation is foo_relation
 
 
+def test_bind_relation_complex_name():
+    event = Event("foo-bar-baz-relation-changed")
+    foo_relation = Relation("foo_bar_baz")
+    state = State(relations=[foo_relation])
+    assert event.bind(state).relation is foo_relation
+
+
 def test_bind_relation_notfound():
     event = Event("foo-relation-changed")
     state = State(relations=[])

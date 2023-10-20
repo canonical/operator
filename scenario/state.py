@@ -8,7 +8,7 @@ import inspect
 import re
 import typing
 from collections import namedtuple
-from itertools import chain
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
@@ -18,7 +18,6 @@ from ops import pebble
 from ops.charm import CharmEvents
 from ops.model import SecretRotate, StatusBase
 
-# from scenario.fs_mocks import _MockFileSystem, _MockStorageMount
 from scenario.logger import logger as scenario_logger
 
 JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
@@ -46,6 +45,26 @@ BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
 DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
 
 ACTION_EVENT_SUFFIX = "_action"
+# all builtin events except secret events. They're special because they carry secret metadata.
+BUILTIN_EVENTS = {
+    "start",
+    "stop",
+    "install",
+    "install",
+    "start",
+    "stop",
+    "remove",
+    "update_status",
+    "config_changed",
+    "upgrade_charm",
+    "pre_series_upgrade",
+    "post_series_upgrade",
+    "leader_elected",
+    "leader_settings_changed",
+    "collect_metrics",
+    "collect_app_status",
+    "collect_unit_status",
+}
 PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
 RELATION_EVENTS_SUFFIX = {
     "_relation_changed",
@@ -880,7 +899,19 @@ class State(_DCBase):
 
     def get_relations(self, endpoint: str) -> Tuple["AnyRelation", ...]:
         """Get all relations on this endpoint from the current state."""
-        return tuple(filter(lambda c: c.endpoint == endpoint, self.relations))
+
+        # we rather normalize the endpoint than worry about cursed metadata situations such as:
+        # requires:
+        #   foo-bar: ...
+        #   foo_bar: ...
+
+        normalized_endpoint = normalize_name(endpoint)
+        return tuple(
+            filter(
+                lambda c: normalize_name(c.endpoint) == normalized_endpoint,
+                self.relations,
+            ),
+        )
 
     def get_storages(self, name: str) -> Tuple["Storage", ...]:
         """Get all storages with this name."""
@@ -967,6 +998,62 @@ class DeferredEvent(_DCBase):
         return self.handle_path.split("/")[-1].split("[")[0]
 
 
+class _EventType(str, Enum):
+    builtin = "builtin"
+    relation = "relation"
+    action = "action"
+    secret = "secret"
+    storage = "storage"
+    workload = "workload"
+    custom = "custom"
+
+
+class _EventPath(str):
+    def __new__(cls, string):
+        string = normalize_name(string)
+        instance = super().__new__(cls, string)
+
+        instance.name = name = string.split(".")[-1]
+        instance.owner_path = string.split(".")[:-1] or ["on"]
+
+        instance.suffix, instance.type = suffix, _ = _EventPath._get_suffix_and_type(
+            name,
+        )
+        if suffix:
+            instance.prefix, _ = string.rsplit(suffix)
+        else:
+            instance.prefix = string
+
+        instance.is_custom = suffix == ""
+        return instance
+
+    @staticmethod
+    def _get_suffix_and_type(s: str):
+        for suffix in RELATION_EVENTS_SUFFIX:
+            if s.endswith(suffix):
+                return suffix, _EventType.relation
+
+        if s.endswith(ACTION_EVENT_SUFFIX):
+            return ACTION_EVENT_SUFFIX, _EventType.action
+
+        if s in SECRET_EVENTS:
+            return s, _EventType.secret
+
+        # Whether the event name indicates that this is a storage event.
+        for suffix in STORAGE_EVENTS_SUFFIX:
+            if s.endswith(suffix):
+                return suffix, _EventType.storage
+
+        # Whether the event name indicates that this is a workload event.
+        if s.endswith(PEBBLE_READY_EVENT_SUFFIX):
+            return PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
+
+        if s in BUILTIN_EVENTS:
+            return "", _EventType.builtin
+
+        return "", _EventType.custom
+
+
 @dataclasses.dataclass(frozen=True)
 class Event(_DCBase):
     path: str
@@ -1005,14 +1092,27 @@ class Event(_DCBase):
         return self.replace(relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
-        path = normalize_name(self.path)
+        path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, "path", path)
 
     @property
+    def _path(self) -> _EventPath:
+        # we converted it in __post_init__, but the type checker doesn't know about that
+        return typing.cast(_EventPath, self.path)
+
+    @property
     def name(self) -> str:
-        """Event name."""
-        return self.path.split(".")[-1]
+        """Full event name.
+
+        Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of the event, the
+        prefix the name of the entity the event is about.
+
+        "foo-relation-changed":
+         - "foo"=prefix (name of a relation),
+         - "-relation-changed"=suffix (relation event)
+        """
+        return self._path.name
 
     @property
     def owner_path(self) -> List[str]:
@@ -1020,32 +1120,32 @@ class Event(_DCBase):
 
         If this event is defined on the toplevel charm class, it should be ['on'].
         """
-        return self.path.split(".")[:-1] or ["on"]
+        return self._path.owner_path
 
     @property
     def _is_relation_event(self) -> bool:
         """Whether the event name indicates that this is a relation event."""
-        return any(self.name.endswith(suffix) for suffix in RELATION_EVENTS_SUFFIX)
+        return self._path.type is _EventType.relation
 
     @property
     def _is_action_event(self) -> bool:
         """Whether the event name indicates that this is a relation event."""
-        return self.name.endswith(ACTION_EVENT_SUFFIX)
+        return self._path.type is _EventType.action
 
     @property
     def _is_secret_event(self) -> bool:
         """Whether the event name indicates that this is a secret event."""
-        return self.name in SECRET_EVENTS
+        return self._path.type is _EventType.secret
 
     @property
     def _is_storage_event(self) -> bool:
         """Whether the event name indicates that this is a storage event."""
-        return any(self.name.endswith(suffix) for suffix in STORAGE_EVENTS_SUFFIX)
+        return self._path.type is _EventType.storage
 
     @property
     def _is_workload_event(self) -> bool:
         """Whether the event name indicates that this is a workload event."""
-        return self.name.endswith("_pebble_ready")
+        return self._path.type is _EventType.workload
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.
@@ -1065,31 +1165,8 @@ class Event(_DCBase):
         # `charm.lib.on.foo_relation_created` and therefore be  unique and the Framework is happy.
         # However, our Event data structure ATM has no knowledge of which Object/Handle it is
         # owned by. So the only thing we can do right now is: check whether the event name,
-        # assuming it is owned by the charm, is that of a builtin event or not.
-        builtins = []
-        for relation_name in chain(
-            charm_spec.meta.get("requires", ()),
-            charm_spec.meta.get("provides", ()),
-            charm_spec.meta.get("peers", ()),
-        ):
-            relation_name = relation_name.replace("-", "_")
-            for relation_evt_suffix in RELATION_EVENTS_SUFFIX:
-                builtins.append(relation_name + relation_evt_suffix)
-
-        for storage_name in charm_spec.meta.get("storages", ()):
-            storage_name = storage_name.replace("-", "_")
-            for storage_evt_suffix in STORAGE_EVENTS_SUFFIX:
-                builtins.append(storage_name + storage_evt_suffix)
-
-        for action_name in charm_spec.actions or ():
-            action_name = action_name.replace("-", "_")
-            builtins.append(action_name + ACTION_EVENT_SUFFIX)
-
-        for container_name in charm_spec.meta.get("containers", ()):
-            container_name = container_name.replace("-", "_")
-            builtins.append(container_name + PEBBLE_READY_EVENT_SUFFIX)
-
-        return event_name in builtins
+        # assuming it is owned by the charm, LOOKS LIKE that of a builtin event or not.
+        return self._path.type is not _EventType.custom
 
     def bind(self, state: State):
         """Attach to this event the state component it needs.
@@ -1101,7 +1178,7 @@ class Event(_DCBase):
         In case of ambiguity (e.g. multiple relations found on 'foo' for event
         'foo-relation-changed', we pop a warning and bind the first one. Use with care!
         """
-        entity_name = self.name.split("_")[0]
+        entity_name = self._path.prefix
 
         if self._is_workload_event and not self.container:
             try:

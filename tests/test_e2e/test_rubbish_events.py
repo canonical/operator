@@ -79,7 +79,7 @@ def test_custom_events_sub_raise(mycharm, evt_name):
         ("install", True),
         ("config-changed", True),
         ("foo-relation-changed", True),
-        ("bar-relation-changed", False),
+        ("bar-relation-changed", True),
     ),
 )
 def test_is_custom_event(mycharm, evt_name, expected):
