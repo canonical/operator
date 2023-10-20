@@ -1438,6 +1438,7 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+        self.additional_properties = raw.get('additionalProperties', True)
 
 
 class ContainerMeta:

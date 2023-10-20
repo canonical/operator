@@ -431,6 +431,7 @@ foo-bar:
   title: foo-bar
 start:
   description: "Start the unit."
+  additionalProperties: false
 ''')
 
     def _setup_test_action(self):
