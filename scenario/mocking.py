@@ -40,7 +40,7 @@ logger = scenario_logger.getChild("mocking")
 
 
 class ActionMissingFromContextError(Exception):
-    """Raised when the user attempts to action-related hook tools when not handling an action."""
+    """Raised when the user attempts to invoke action hook tools outside an action context."""
 
     # This is not an ops error: in ops, you'd have to go exceptionally out of your way to trigger
     # this flow.
