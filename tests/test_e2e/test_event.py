@@ -1,7 +1,7 @@
 import pytest
 from ops import CharmBase
 
-from scenario.state import _EventType, Event, _CharmSpec
+from scenario.state import Event, _CharmSpec, _EventType
 
 
 @pytest.mark.parametrize(

@@ -82,7 +82,7 @@ available. The charm has no config, no relations, no networks, no leadership, an
 With that, we can write the simplest possible scenario test:
 
 ```python
-from scenario import State, Context
+from scenario import State, Context, Event
 from ops.charm import CharmBase
 from ops.model import UnknownStatus
 
@@ -93,7 +93,7 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     ctx = Context(MyCharm, meta={"name": "foo"})
-    out = ctx.run('start', State())
+    out = ctx.run(Event("start"), State())
     assert out.unit_status == UnknownStatus()
 ```
 
