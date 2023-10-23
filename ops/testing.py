@@ -170,6 +170,13 @@ class ActionFailed(Exception):  # noqa
         self.output = output
 
 
+@dataclasses.dataclass()
+class _Operation:
+    output: ActionOutput
+    parameters: Dict[str, Any]
+    failure_message: Optional[str] = None
+
+
 # noinspection PyProtectedMember
 class Harness(Generic[CharmType]):
     """This class represents a way to build up the model that will drive a test suite.
@@ -1812,20 +1819,16 @@ class Harness(Generic[CharmType]):
                         f'additional property "{key}" is not allowed, '
                         f'given {{"{key}":{params[key]!r}}}')
         # Set environment variable
-        # TODO: do we reset this?
         os.environ["JUJU_ACTION_NAME"] = action_name
-        # TODO: Do we reset this at the start or the end or both?
-        self._backend._action_failure_message = None
-        self._backend._action_logs.clear()
-        self._backend._action_results.clear()
-        self._backend._action_params = params
         if self._charm is None or not self._hooks_enabled:
             return ActionOutput([], {})
+        op = _Operation(ActionOutput([], {}), params)
+        self._backend._operation = op
         getattr(self.charm.on, f"{action_name.replace('-', '_')}_action").emit()
-        out = ActionOutput(self._backend._action_logs, self._backend._action_results)
-        if self._backend._action_failure_message is not None:
-            raise ActionFailed(message=self._backend._action_failure_message, output=out)
-        return out
+        del os.environ["JUJU_ACTION_NAME"]
+        if op.failure_message is not None:
+            raise ActionFailed(message=op.failure_message, output=op.output)
+        return op.output
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
@@ -2043,10 +2046,7 @@ class _TestingModelBackend:
         self._secrets: List[_Secret] = []
         self._opened_ports: Set[model.Port] = set()
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
-        self._action_failure_message = None
-        self._action_logs: List[str] = []
-        self._action_results: Dict[str, Any] = {}
-        self._action_params: Dict[str, Any] = {}
+        self._operation = _Operation(ActionOutput([], {}), {})
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2306,7 +2306,7 @@ class _TestingModelBackend:
         for name, action_meta in self._meta.actions[action_name].parameters.items():
             if "default" in action_meta:
                 params[name] = action_meta["default"]
-        params.update(self._action_params)
+        params.update(self._operation.parameters)
         return params
 
     def action_set(self, results: Dict[str, Any]):
@@ -2320,14 +2320,14 @@ class _TestingModelBackend:
         # This also does some validation on keys to make sure that they fit the
         # Juju constraints.
         model._format_action_result_dict(results)
-        self._action_results.update(results)
+        self._operation.output.results.update(results)
 
     def action_log(self, message: str):
-        self._action_logs.append(message)
+        self._operation.output.logs.append(message)
 
     def action_fail(self, message: str = ''):
         # If fail is called multiple times, Juju only retains the most recent failure message.
-        self._action_failure_message = message
+        self._operation.failure_message = message
 
     def network_get(self, endpoint_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
         data = self._networks.get((endpoint_name, relation_id))
