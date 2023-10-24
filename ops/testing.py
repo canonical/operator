@@ -1819,17 +1819,21 @@ class Harness(Generic[CharmType]):
                     raise RuntimeError(
                         f'additional property "{key}" is not allowed, '
                         f'given {{"{key}":{params[key]!r}}}')
-        os.environ["JUJU_ACTION_NAME"] = action_name
-        if not self._hooks_enabled:
-            return ActionOutput([], {})
-        self._backend._operation = _Operation(ActionOutput([], {}), params)
-        getattr(self.charm.on, f"{action_name.replace('-', '_')}_action").emit()
-        del os.environ["JUJU_ACTION_NAME"]
-        if self._backend._operation.failure_message is not None:
-            raise ActionFailed(
-                message=self._backend._operation.failure_message,
-                output=self._backend._operation.output)
-        return self._backend._operation.output
+        prev_env_action = os.environ["JUJU_ACTION_NAME"]
+        try:
+            os.environ["JUJU_ACTION_NAME"] = action_name
+            if not self._hooks_enabled:
+                return ActionOutput([], {})
+            self._backend._operation = _Operation(ActionOutput([], {}), params)
+            getattr(self.charm.on, f"{action_name.replace('-', '_')}_action").emit()
+            del os.environ["JUJU_ACTION_NAME"]
+            if self._backend._operation.failure_message is not None:
+                raise ActionFailed(
+                    message=self._backend._operation.failure_message,
+                    output=self._backend._operation.output)
+            return self._backend._operation.output
+        finally:
+            os.environ["JUJU_ACTION_NAME"] = prev_env_action
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
