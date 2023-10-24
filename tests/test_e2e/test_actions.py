@@ -110,6 +110,7 @@ def test_action_event_results_valid(mycharm, res_value):
     out = ctx.run_action(action, State())
 
     assert out.results == res_value
+    assert out.success is True
 
 
 @pytest.mark.parametrize("res_value", ({"a": {"b": {"c"}}}, {"d": "e"}))
@@ -128,3 +129,4 @@ def test_action_event_outputs(mycharm, res_value):
 
     assert out.failure == "failed becozz"
     assert out.logs == ["log1", "log2"]
+    assert out.success is False
