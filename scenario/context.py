@@ -44,7 +44,7 @@ class ActionOutput:
     In most cases, actions are not expected to be affecting it."""
     logs: List[str]
     """Any logs associated with the action output, set by the charm."""
-    results: Dict[str, str]
+    results: Dict[str, Any]
     """Key-value mapping assigned by the charm as a result of the action."""
     failure: Optional[str] = None
     """If the action is not a success: the message the charm set when failing the action."""
