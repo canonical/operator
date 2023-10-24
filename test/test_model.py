@@ -3596,5 +3596,28 @@ class TestPorts(unittest.TestCase):
         ])
 
 
+class TestUnit(unittest.TestCase):
+    def setUp(self):
+        self.model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        self.unit = self.model.unit
+
+    def test_reboot(self):
+        fake_script(self, 'juju-reboot', 'exit 0')
+        self.unit.reboot()
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['juju-reboot', ''],
+        ])
+        with self.assertRaises(SystemExit):
+            self.unit.reboot(now=True)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['juju-reboot', '--now'],
+        ])
+
+        with self.assertRaises(RuntimeError):
+            self.model.get_unit('other').reboot()
+        with self.assertRaises(RuntimeError):
+            self.model.get_unit('other').reboot(now=True)
+
+
 if __name__ == "__main__":
     unittest.main()
