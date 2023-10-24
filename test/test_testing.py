@@ -5272,6 +5272,8 @@ class TestActions(unittest.TestCase):
                 self.harness._backend.action_set({key: "foo"})
         with self.assertRaises(ValueError):
             self.harness._backend.action_set({"a": {"b": "c"}, "a.b": "c"})
+        with self.assertRaises(ValueError):
+            self.harness._backend.action_set({"A": "b"})
         out = ops.testing.ActionOutput([], {})
         op = ops.testing._Operation(out, {})
         self.harness._backend._operation = op
@@ -5294,6 +5296,14 @@ class TestActions(unittest.TestCase):
         self.assertEqual(op.failure_message, "foo")
         self.harness._backend.action_fail("bar")
         self.assertEqual(op.failure_message, "bar")
+
+    def test_before_begin(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test
+            ''')
+        out = harness.run_action("fail")
+        self.assertEqual(out.logs, [])
+        self.assertEqual(out.results, {})
 
     def test_with_hooks_disabled(self):
         with self.harness.hooks_disabled():
@@ -5334,7 +5344,7 @@ class TestActions(unittest.TestCase):
         self.harness.run_action("test", {
             "string": "hello",
             "number": 28.8,
-            "object": {"a": "b"},
+            "object": {"a": {"b": "c"}},
             "array": [1, 2, 3],
             "boolean": True,
             "null": None})
