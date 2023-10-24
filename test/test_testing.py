@@ -5251,6 +5251,50 @@ class TestActions(unittest.TestCase):
             ''')
         self.harness.begin()
 
+    def test_action_get(self):
+        op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {})
+        self.harness._backend._operation = op
+        os.environ["JUJU_ACTION_NAME"] = "test"
+        params = self.harness._backend.action_get()
+        self.assertEqual(params, {})
+        os.environ["JUJU_ACTION_NAME"] = "test3"
+        params = self.harness._backend.action_get()
+        self.assertEqual(params, {"foo": "foo-default"})
+        op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {"extra": "param"})
+        self.harness._backend._operation = op
+        params = self.harness._backend.action_get()
+        self.assertEqual(params, {"foo": "foo-default", "extra": "param"})
+
+    def test_action_set(self):
+        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
+        for key in prohibited_keys:
+            with self.assertRaises(ops.ModelError):
+                self.harness._backend.action_set({key: "foo"})
+        with self.assertRaises(ValueError):
+            self.harness._backend.action_set({"a": {"b": "c"}, "a.b": "c"})
+        out = ops.testing.ActionOutput([], {})
+        op = ops.testing._Operation(out, {})
+        self.harness._backend._operation = op
+        self.harness._backend.action_set({"foo": "bar"})
+        self.assertEqual(out.results, {"foo": "bar"})
+        self.harness._backend.action_set({"baz": "qux"})
+        self.assertEqual(out.results, {"foo": "bar", "baz": "qux"})
+
+    def test_action_log(self):
+        out = ops.testing.ActionOutput([], {})
+        op = ops.testing._Operation(out, {})
+        self.harness._backend._operation = op
+        self.harness._backend.action_log("hello world!")
+        self.assertEqual(out.logs, ["hello world!"])
+
+    def test_action_fail(self):
+        op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {})
+        self.harness._backend._operation = op
+        self.harness._backend.action_fail("foo")
+        self.assertEqual(op.failure_message, "foo")
+        self.harness._backend.action_fail("bar")
+        self.assertEqual(op.failure_message, "bar")
+
     def test_with_hooks_disabled(self):
         with self.harness.hooks_disabled():
             out = self.harness.run_action("fail")
@@ -5305,5 +5349,3 @@ class TestActions(unittest.TestCase):
     def test_bad_results(self):
         with self.assertRaises(ValueError):
             self.harness.run_action("bad-results")
-
-    # TODO: tests for the action_get, action_set, action_log, action_fail methods.
