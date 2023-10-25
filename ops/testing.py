@@ -1789,7 +1789,7 @@ class Harness(Generic[CharmType]):
 
     def run_action(self, action_name: str,
                    params: Optional[Dict[str, Any]] = None) -> ActionOutput:
-        """Simulates a `juju run` command.
+        """Simulates running a charm action, as with ``juju run``.
 
         Validates that no required parameters are missing, and that additional
         parameters are not provided if that is not permitted. Does not validate
