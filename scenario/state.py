@@ -906,7 +906,11 @@ class State(_DCBase):
         #   foo_bar: ...
 
         normalized_endpoint = normalize_name(endpoint)
-        return tuple(r for r in self.relations if normalize_name(r.endpoint) == normalized_endpoint)
+        return tuple(
+            r
+            for r in self.relations
+            if normalize_name(r.endpoint) == normalized_endpoint
+        )
 
     def get_storages(self, name: str) -> Tuple["Storage", ...]:
         """Get all storages with this name."""

@@ -103,8 +103,8 @@ def check_resource_consistency(
     errors = []
     warnings = []
 
-    resources_from_meta = set(charm_spec.meta.get("resources", {}).keys())
-    resources_from_state = set(state.resources.keys())
+    resources_from_meta = set(charm_spec.meta.get("resources", {}))
+    resources_from_state = set(state.resources)
     if not resources_from_meta.issuperset(resources_from_state):
         errors.append(
             f"any and all resources passed to State.resources need to have been defined in "
