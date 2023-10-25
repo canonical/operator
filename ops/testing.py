@@ -2335,7 +2335,7 @@ class _TestingModelBackend:
         return params
 
     def action_set(self, results: Dict[str, Any]):
-        for key in "stdout", "stderr", "stdout-encoding", "stderr-encoding":
+        for key in ("stdout", "stderr", "stdout-encoding", "stderr-encoding"):
             if key in results:
                 # Match Juju's error message.
                 raise model.ModelError(f'ERROR cannot set reserved action key "{key}"')
