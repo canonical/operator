@@ -915,7 +915,7 @@ class State(_DCBase):
 
     def get_storages(self, name: str) -> Tuple["Storage", ...]:
         """Get all storages with this name."""
-        return tuple(filter(lambda s: s.name == name, self.storage))
+        return tuple(s for s in self.storage if s.name == name)
 
     # FIXME: not a great way to obtain a delta, but is "complete". todo figure out a better way.
     def jsonpatch_delta(self, other: "State"):
