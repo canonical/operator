@@ -418,7 +418,7 @@ def check_relation_consistency(
 
     known_endpoints = [a[0] for a in all_relations_meta]
     for relation in state.relations:
-        if not (ep := relation.endpoint) in known_endpoints:
+        if (ep := relation.endpoint) not in known_endpoints:
             errors.append(f"relation endpoint {ep} is not declared in metadata.")
 
     seen_ids = set()
