@@ -5340,9 +5340,8 @@ class TestActions(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test
             ''')
-        out = harness.run_action("fail")
-        self.assertEqual(out.logs, [])
-        self.assertEqual(out.results, {})
+        with self.assertRaises(RuntimeError):
+            harness.run_action("fail")
 
     def test_with_hooks_disabled(self):
         with self.harness.hooks_disabled():

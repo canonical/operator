@@ -1791,6 +1791,8 @@ class Harness(Generic[CharmType]):
                    params: Optional[Dict[str, Any]] = None) -> ActionOutput:
         """Simulates running a charm action, as with ``juju run``.
 
+        Use this only after calling :meth:`begin`.
+
         Validates that no required parameters are missing, and that additional
         parameters are not provided if that is not permitted. Does not validate
         the types of the parameters - you can use the
@@ -1818,8 +1820,6 @@ class Harness(Generic[CharmType]):
               be raised at the end of the ``run_action`` call, not immediately when
               :code:`fail()` is called, to match the run-time behaviour.
         """
-        if self._charm is None:
-            return ActionOutput([], {})
         try:
             action_meta = self.charm.meta.actions[action_name]
         except KeyError:
