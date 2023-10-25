@@ -163,12 +163,14 @@ class _MockModelBackend(_ModelBackend):
         if not isinstance(is_app, bool):
             raise TypeError("is_app parameter to relation_get must be a boolean")
 
-        if is_app:
-            version = JujuVersion(self._context.juju_version)
-            if not version.has_app_data():
-                raise RuntimeError(
-                    f"setting application data is not supported on Juju version {version}",
-                )
+        if not is_app:
+            return
+
+        version = JujuVersion(self._context.juju_version)
+        if not version.has_app_data():
+            raise RuntimeError(
+                f"setting application data is not supported on Juju version {version}",
+            )
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         self._check_app_data_access(is_app)
