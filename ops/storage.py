@@ -104,7 +104,7 @@ class SQLiteStorage:
         Args:
             handle_path: The string identifying the snapshot.
             snapshot_data: The data to be persisted. (as returned by Object.snapshot()). This
-            might be a dict/tuple/int, but must only contain 'simple' python types.
+            might be a dict/tuple/int, but must only contain 'simple' Python types.
         """
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(snapshot_data)
@@ -235,7 +235,7 @@ class JujuStorage:
         try:
             content = self._backend.get(handle_path)
         except KeyError:
-            raise NoSnapshotError(handle_path)
+            raise NoSnapshotError(handle_path) from None
         return content
 
     def drop_snapshot(self, handle_path: str):

@@ -1344,6 +1344,7 @@ class ExecProcess(Generic[AnyStr]):
         Raises:
             ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
+            TypeError: if :meth:`Client.exec` was called with the ``stdout`` argument.
         """
         if self.stdout is None:
             raise TypeError(
@@ -1528,6 +1529,15 @@ class Client:
 
     Defaults to using a Unix socket at socket_path (which must be specified
     unless a custom opener is provided).
+
+    For methods that wait for changes, such as :meth:`start_services` and :meth:`replan_services`,
+    if the change fails or times out, then a :class:`ChangeError` or :class:`TimeoutError` will be
+    raised.
+
+    All methods may raise exceptions when there are problems communicating with Pebble. Problems
+    connecting to or transferring data with Pebble will raise a :class:`ConnectionError`. When an
+    error occurs executing the request, such as trying to add an invalid layer or execute a command
+    that does not exist, an :class:`APIError` is raised.
     """
 
     _chunk_size = 8192
@@ -1621,9 +1631,13 @@ class Client:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body: Dict[str, Any] = {}
                 message = f'{type(e2).__name__} - {e2}'
-            raise APIError(body, code, status, message)
+            raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
-            raise ConnectionError(e.reason)
+            if e.args and isinstance(e.args[0], FileNotFoundError):
+                raise ConnectionError(
+                    f"Could not connect to Pebble: socket not found at {self.socket_path!r} "
+                    "(container restarted?)") from None
+            raise ConnectionError(e.reason) from e
 
         return response
 
@@ -1669,16 +1683,16 @@ class Client:
         """Start the startup-enabled services and wait (poll) for them to be started.
 
         Args:
-            timeout: Seconds before autostart change is considered timed out (float).
+            timeout: Seconds before autostart change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change ID
+                immediately.
             delay: Seconds before executing the autostart change (float).
 
         Returns:
             ChangeID of the autostart change.
 
         Raises:
-            ChangeError: if one or more of the services didn't start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't start, and ``timeout`` is non-zero.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -1686,16 +1700,17 @@ class Client:
         """Replan by (re)starting changed and startup-enabled services and wait for them to start.
 
         Args:
-            timeout: Seconds before replan change is considered timed out (float).
+            timeout: Seconds before replan change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the replan change (float).
 
         Returns:
             ChangeID of the replan change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
+                non-zero.
         """
         return self._services_action('replan', [], timeout, delay)
 
@@ -1706,16 +1721,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to start.
-            timeout: Seconds before start change is considered timed out (float).
+            timeout: Seconds before start change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the start change (float).
 
         Returns:
             ChangeID of the start change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
+                non-zero.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -1726,16 +1742,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to stop.
-            timeout: Seconds before stop change is considered timed out (float).
+            timeout: Seconds before stop change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the stop change (float).
 
         Returns:
             ChangeID of the stop change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
+                non-zero.
         """
         return self._services_action('stop', services, timeout, delay)
 
@@ -1746,16 +1763,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to restart.
-            timeout: Seconds before restart change is considered timed out (float).
+            timeout: Seconds before restart change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the restart change (float).
 
         Returns:
             ChangeID of the restart change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
+                non-zero.
         """
         return self._services_action('restart', services, timeout, delay)
 
@@ -2017,6 +2035,10 @@ class Client:
             group_id: Group ID (GID) for file.
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
+
+        Raises:
+            PathError: If there was an error writing the file to the path; for example, if the
+                destination path doesn't exist and ``make_dirs`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2114,6 +2136,10 @@ class Client:
                 for example ``*.txt``.
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
+
+        Raises:
+            PathError: if there was an error listing the directory; for example, if the directory
+                does not exist.
         """
         query = {
             'action': 'list',
@@ -2147,6 +2173,10 @@ class Client:
             group_id: Group ID (GID) for directory.
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
+
+        Raises:
+            PathError: if there was an error making the directory; for example, if the parent path
+                does not exist, and ``make_parents`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2172,7 +2202,6 @@ class Client:
         Raises:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
-
         """
         info: Dict[str, Any] = {'path': path}
         if recursive:
@@ -2364,6 +2393,11 @@ class Client:
             :meth:`ExecProcess.wait` if stdout/stderr were provided as
             arguments to :meth:`exec`, or :meth:`ExecProcess.wait_output` if
             not.
+
+        Raises:
+            APIError: if an error occurred communicating with pebble, or if the command is not
+                found.
+            ExecError: if the command exits with a non-zero exit code.
         """
         if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
             raise TypeError(f'command must be a list of str, not {type(command).__name__}')
