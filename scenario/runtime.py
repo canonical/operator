@@ -22,7 +22,7 @@ from typing import (
 
 import yaml
 from ops.framework import EventBase, _event_regex
-from ops.storage import SQLiteStorage
+from ops.storage import NoSnapshotError, SQLiteStorage
 
 from scenario.capture_events import capture_events
 from scenario.logger import logger as scenario_logger
@@ -100,10 +100,16 @@ class UnitStateDB:
             if EVENT_REGEX.match(handle_path):
                 notices = db.notices(handle_path)
                 for handle, owner, observer in notices:
+                    try:
+                        snapshot_data = db.load_snapshot(handle)
+                    except NoSnapshotError:
+                        snapshot_data = {}
+
                     event = DeferredEvent(
                         handle_path=handle,
                         owner=owner,
                         observer=observer,
+                        snapshot_data=snapshot_data,
                     )
                     deferred.append(event)
 

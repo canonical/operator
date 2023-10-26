@@ -1,4 +1,5 @@
 import pytest
+from ops import RelationNotFoundError
 from ops.charm import CharmBase
 from ops.framework import Framework
 
@@ -32,6 +33,36 @@ def test_ip_get(mycharm):
     def fetch_unit_address(charm: CharmBase):
         rel = charm.model.get_relation("metrics-endpoint")
         assert str(charm.model.get_binding(rel).network.bind_address) == "1.1.1.1"
+
+    trigger(
+        State(
+            relations=[
+                Relation(
+                    interface="foo",
+                    remote_app_name="remote",
+                    endpoint="metrics-endpoint",
+                    relation_id=1,
+                ),
+            ],
+            networks=[Network.default("metrics-endpoint")],
+        ),
+        "update_status",
+        mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"metrics-endpoint": {"interface": "foo"}},
+        },
+        post_event=fetch_unit_address,
+    )
+
+
+def test_no_relation_error(mycharm):
+    """Attempting to call get_binding on a non-existing relation -> RelationNotFoundError"""
+    mycharm._call = lambda *_: True
+
+    def fetch_unit_address(charm: CharmBase):
+        with pytest.raises(RelationNotFoundError):
+            _ = charm.model.get_binding("foo").network
 
     trigger(
         State(

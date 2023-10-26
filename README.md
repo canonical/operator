@@ -82,7 +82,7 @@ available. The charm has no config, no relations, no networks, no leadership, an
 With that, we can write the simplest possible scenario test:
 
 ```python
-from scenario import State, Context
+from scenario import State, Context, Event
 from ops.charm import CharmBase
 from ops.model import UnknownStatus
 
@@ -93,7 +93,7 @@ class MyCharm(CharmBase):
 
 def test_scenario_base():
     ctx = Context(MyCharm, meta={"name": "foo"})
-    out = ctx.run('start', State())
+    out = ctx.run(Event("start"), State())
     assert out.unit_status == UnknownStatus()
 ```
 
@@ -1050,6 +1050,23 @@ state = State(stored_state=[
 
 And the charm's runtime will see `self.stored_State.foo` and `.baz` as expected. Also, you can run assertions on it on
 the output side the same as any other bit of state.
+
+# Resources
+
+If your charm requires access to resources, you can make them available to it through `State.resources`.
+From the perspective of a 'real' deployed charm, if your charm _has_ resources defined in `metadata.yaml`, they _must_ be made available to the charm. That is a Juju-enforced constraint: you can't deploy a charm without attaching all resources it needs to it.
+However, when testing, this constraint is unnecessarily strict (and it would also mean the great majority of all existing tests would break) since a charm will only notice that a resource is not available when it explicitly asks for it, which not many charms do.
+
+So, the only consistency-level check we enforce in Scenario when it comes to resource is that if a resource is provided in State, it needs to have been declared in metadata.
+
+```python
+from scenario import State, Context
+ctx = Context(MyCharm, meta={'name': 'juliette', "resources": {"foo": {"type": "oci-image"}}})
+with ctx.manager("start", State(resources={'foo': '/path/to/resource.tar'})) as mgr:
+    # if the charm, at runtime, were to call self.model.resources.fetch("foo"), it would get '/path/to/resource.tar' back.
+    path = mgr.charm.model.resources.fetch('foo')
+    assert path == '/path/to/resource.tar' 
+```
 
 # Emitting custom events
 

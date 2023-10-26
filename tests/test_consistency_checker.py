@@ -426,3 +426,44 @@ def test_storage_states():
             },
         ),
     )
+
+
+def test_resource_states():
+    # happy path
+    assert_consistent(
+        State(resources={"foo": "/foo/bar.yaml"}),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "yamlman", "resources": {"foo": {"type": "oci-image"}}},
+        ),
+    )
+
+    # no resources in state but some in meta: OK. Not realistic wrt juju but fine for testing
+    assert_consistent(
+        State(),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "yamlman", "resources": {"foo": {"type": "oci-image"}}},
+        ),
+    )
+
+    # resource not defined in meta
+    assert_inconsistent(
+        State(resources={"bar": "/foo/bar.yaml"}),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "yamlman", "resources": {"foo": {"type": "oci-image"}}},
+        ),
+    )
+
+    assert_inconsistent(
+        State(resources={"bar": "/foo/bar.yaml"}),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "yamlman"},
+        ),
+    )

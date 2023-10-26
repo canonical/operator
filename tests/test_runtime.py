@@ -103,7 +103,8 @@ def test_env_cleanup_on_charm_error():
             state=State(),
             event=Event("box_relation_changed", relation=Relation("box")),
             context=Context(my_charm_type, meta=meta),
-        ) as charm:
+        ):
             assert os.getenv("JUJU_REMOTE_APP")
+            _ = 1 / 0  # raise some error
 
     assert os.getenv("JUJU_REMOTE_APP", None) is None

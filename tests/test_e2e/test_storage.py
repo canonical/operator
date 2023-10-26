@@ -79,3 +79,13 @@ def test_storage_usage(storage_ctx):
     assert (
         storage.get_filesystem(storage_ctx) / "path.py"
     ).read_text() == "helloworlds"
+
+
+def test_storage_attached_event(storage_ctx):
+    storage = Storage("foo")
+    storage_ctx.run(storage.attached_event, State(storage=[storage]))
+
+
+def test_storage_detaching_event(storage_ctx):
+    storage = Storage("foo")
+    storage_ctx.run(storage.detaching_event, State(storage=[storage]))
