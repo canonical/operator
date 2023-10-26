@@ -9,6 +9,7 @@ pytest~=7.2
 pyright==1.1.317
 pytest-operator~=0.23
 coverage[toml]~=7.0
+setuptools~=68.2
 typing_extensions~=4.2
 
 -r requirements.txt
