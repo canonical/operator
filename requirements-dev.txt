@@ -1,9 +1,9 @@
 isort~=5.11
 autopep8~=1.6
-flake8~=4.0
-flake8-docstrings~=1.6
+flake8~=6.1
+flake8-docstrings~=1.7
 flake8-builtins~=2.1
-pyproject-flake8~=4.0
+pyproject-flake8~=6.1
 pep8-naming~=0.13
 pytest~=7.2
 pyright==1.1.317
