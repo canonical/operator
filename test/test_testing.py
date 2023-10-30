@@ -5293,10 +5293,8 @@ class TestActions(unittest.TestCase):
     def test_action_get(self):
         op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {})
         self.harness._backend._operation = op
-        os.environ["JUJU_ACTION_NAME"] = "test"
         params = self.harness._backend.action_get()
         self.assertEqual(params, {})
-        os.environ["JUJU_ACTION_NAME"] = "test3"
         params = self.harness._backend.action_get()
         self.assertEqual(params, {"foo": "foo-default"})
         op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {"extra": "param"})
