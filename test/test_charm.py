@@ -435,7 +435,6 @@ start:
 ''')
 
     def _setup_test_action(self):
-        os.environ['JUJU_ACTION_NAME'] = 'foo-bar'
         fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")
         fake_script(self, 'action-set', "")
         fake_script(self, 'action-log', "")
