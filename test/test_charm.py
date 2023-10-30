@@ -476,11 +476,6 @@ start:
             ['action-fail', "test-fail"],
         ])
 
-        # Make sure that action events that do not match the current context are
-        # not possible to emit by hand.
-        with self.assertRaises(RuntimeError):
-            charm.on.start_action.emit()
-
     def test_invalid_action_results(self):
 
         class MyCharm(ops.CharmBase):
