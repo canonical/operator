@@ -1826,7 +1826,7 @@ class Harness(Generic[CharmType]):
             for key in params:
                 if key not in action_meta.parameters:
                     # Match Juju's error message.
-                    raise RuntimeError(
+                    raise model.ModelError(
                         f'additional property "{key}" is not allowed, '
                         f'given {{"{key}":{params[key]!r}}}')
         prev_env_action = os.environ["JUJU_ACTION_NAME"]
