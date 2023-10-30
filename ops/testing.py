@@ -1830,7 +1830,7 @@ class Harness(Generic[CharmType]):
             # Juju requires that the key is in the passed parameters, even if there is a default
             # value in actions.yaml.
             if key not in params:
-                raise RuntimeError(f"{key!r} property is missing and required.")
+                raise RuntimeError(f"{key!r} parameter is required, but missing.")
         if not action_meta.additional_properties:
             for key in params:
                 if key not in action_meta.parameters:
