@@ -1844,7 +1844,8 @@ class Harness(Generic[CharmType]):
             if not self._hooks_enabled:
                 return ActionOutput([], {})
             self._backend._operation = _Operation(ActionOutput([], {}), params)
-            getattr(self.charm.on, f"{action_name.replace('-', '_')}_action").emit()
+            handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
+            handler.emit()
             del os.environ["JUJU_ACTION_NAME"]
             if self._backend._operation.failure_message is not None:
                 raise ActionFailed(
