@@ -1814,7 +1814,7 @@ class Harness(Generic[CharmType]):
         try:
             action_meta = self.charm.meta.actions[action_name]
         except KeyError:
-            raise RuntimeError(f"{self.charm} does not have a {action_name!r} action.")
+            raise RuntimeError(f"Charm does not have a {action_name!r} action.")
         if params is None:
             params = {}
         for key in action_meta.required:
