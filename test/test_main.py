@@ -436,7 +436,7 @@ class _TestMain(abc.ABC):
             if event_spec.env_var == 'JUJU_ACTION_NAME':
                 event_dir = 'actions'
             else:
-                raise RuntimeError('invalid envar name specified for a action event')
+                raise RuntimeError('invalid envar name specified for an action event')
         else:
             event_filename = event_spec.event_name.replace('_', '-')
             event_dir = 'hooks'
