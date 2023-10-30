@@ -5343,12 +5343,6 @@ class TestActions(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             harness.run_action("fail")
 
-    def test_with_hooks_disabled(self):
-        with self.harness.hooks_disabled():
-            out = self.harness.run_action("fail")
-            self.assertEqual(out.logs, [])
-            self.assertEqual(out.results, {})
-
     def test_invalid_action(self):
         with self.assertRaises(RuntimeError):
             self.harness.run_action("another-action")

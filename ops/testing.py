@@ -1832,8 +1832,6 @@ class Harness(Generic[CharmType]):
         prev_env_action = os.environ.get("JUJU_ACTION_NAME")
         try:
             os.environ["JUJU_ACTION_NAME"] = action_name
-            if not self._hooks_enabled:
-                return ActionOutput([], {})
             self._backend._operation = _Operation(ActionOutput([], {}), params)
             handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
             handler.emit()
