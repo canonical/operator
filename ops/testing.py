@@ -1829,7 +1829,7 @@ class Harness(Generic[CharmType]):
                     raise model.ModelError(
                         f'additional property "{key}" is not allowed, '
                         f'given {{"{key}":{params[key]!r}}}')
-        prev_env_action = os.environ["JUJU_ACTION_NAME"]
+        prev_env_action = os.environ.get("JUJU_ACTION_NAME")
         try:
             os.environ["JUJU_ACTION_NAME"] = action_name
             if not self._hooks_enabled:
@@ -1844,7 +1844,8 @@ class Harness(Generic[CharmType]):
                     output=self._backend._operation.output)
             return self._backend._operation.output
         finally:
-            os.environ["JUJU_ACTION_NAME"] = prev_env_action
+            if prev_env_action is not None:
+                os.environ["JUJU_ACTION_NAME"] = prev_env_action
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
