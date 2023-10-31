@@ -5247,10 +5247,11 @@ class TestActions(unittest.TestCase):
                 self.framework.observe(self.on.results_action, self._on_results_action)
                 self.framework.observe(
                     self.on.log_and_results_action, self._on_log_and_results_action)
+                self.simple_was_called = False
 
             def _on_simple_action(self, event: ops.ActionEvent):
                 """An action that doesn't generate logs, have any results, or fail."""
-                pass
+                self.simple_was_called = True
 
             def _on_fail_action(self, event: ops.ActionEvent):
                 event.fail("this will be ignored")
@@ -5314,6 +5315,7 @@ class TestActions(unittest.TestCase):
         out = self.harness.run_action("simple")
         self.assertEqual(out.logs, [])
         self.assertEqual(out.results, {})
+        self.assertTrue(self.harness.charm.simple_was_called)
 
     def test_fail_action(self):
         self._action_results.clear()
