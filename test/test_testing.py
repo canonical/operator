@@ -5236,15 +5236,20 @@ class TestHandleExec(unittest.TestCase):
 
 class TestActions(unittest.TestCase):
     def setUp(self):
+        action_results: typing.Dict[str, typing.Any] = {}
+        self._action_results = action_results
+
         class ActionCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.framework.observe(self.on.test_action, self._on_test_action)
+                self.framework.observe(self.on.simple_action, self._on_simple_action)
                 self.framework.observe(self.on.fail_action, self._on_fail_action)
-                self.framework.observe(self.on.test3_action, self._on_test3_action)
-                self.framework.observe(self.on.bad_results_action, self._on_bad_results_action)
+                self.framework.observe(self.on.results_action, self._on_results_action)
+                self.framework.observe(
+                    self.on.log_and_results_action, self._on_log_and_results_action)
 
-            def _on_test_action(self, event: ops.ActionEvent):
+            def _on_simple_action(self, event: ops.ActionEvent):
+                """An action that doesn't generate logs, have any results, or fail."""
                 pass
 
             def _on_fail_action(self, event: ops.ActionEvent):
@@ -5252,32 +5257,32 @@ class TestActions(unittest.TestCase):
                 event.log("some progress")
                 event.fail("something went wrong")
                 event.log("more progress")
-                event.set_results({"partial": "foo"})
+                event.set_results(action_results)
 
-            def _on_test3_action(self, event: ops.ActionEvent):
+            def _on_log_and_results_action(self, event: ops.ActionEvent):
                 event.log("Step 1")
                 event.set_results({"result1": event.params["foo"]})
                 event.log("Step 2")
                 event.set_results({"result2": event.params.get("bar")})
 
-            def _on_bad_results_action(self, event: ops.ActionEvent):
-                event.set_results({"a": {"b": 1}, "a.b": 2})
+            def _on_results_action(self, event: ops.ActionEvent):
+                event.set_results(action_results)
 
         self.harness = ops.testing.Harness(ActionCharm, meta='''
             name: test
             ''', actions='''
-            test:
+            simple:
               description: lorem ipsum
             fail:
               description: dolor sit amet
-            test2:
+            unobserved-param-tester:
               description: consectetur adipiscing elit
               params:
                 foo
                 bar
               required: [foo]
               additionalProperties: false
-            test3:
+            log-and-results:
               description: sed do eiusmod tempor
               params:
                 foo:
@@ -5285,54 +5290,10 @@ class TestActions(unittest.TestCase):
                   default: foo-default
                 bar:
                   type: integer
-            bad-results:
+            results:
               description: incididunt ut labore
             ''')
         self.harness.begin()
-
-    def test_action_get(self):
-        op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {})
-        self.harness._backend._operation = op
-        params = self.harness._backend.action_get()
-        self.assertEqual(params, {})
-        params = self.harness._backend.action_get()
-        self.assertEqual(params, {"foo": "foo-default"})
-        op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {"extra": "param"})
-        self.harness._backend._operation = op
-        params = self.harness._backend.action_get()
-        self.assertEqual(params, {"foo": "foo-default", "extra": "param"})
-
-    def test_action_set(self):
-        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
-        for key in prohibited_keys:
-            with self.assertRaises(ops.ModelError):
-                self.harness._backend.action_set({key: "foo"})
-        with self.assertRaises(ValueError):
-            self.harness._backend.action_set({"a": {"b": "c"}, "a.b": "c"})
-        with self.assertRaises(ValueError):
-            self.harness._backend.action_set({"A": "b"})
-        out = ops.testing.ActionOutput([], {})
-        op = ops.testing._Operation(out, {})
-        self.harness._backend._operation = op
-        self.harness._backend.action_set({"foo": "bar"})
-        self.assertEqual(out.results, {"foo": "bar"})
-        self.harness._backend.action_set({"baz": "qux"})
-        self.assertEqual(out.results, {"foo": "bar", "baz": "qux"})
-
-    def test_action_log(self):
-        out = ops.testing.ActionOutput([], {})
-        op = ops.testing._Operation(out, {})
-        self.harness._backend._operation = op
-        self.harness._backend.action_log("hello world!")
-        self.assertEqual(out.logs, ["hello world!"])
-
-    def test_action_fail(self):
-        op = ops.testing._Operation(ops.testing.ActionOutput([], {}), {})
-        self.harness._backend._operation = op
-        self.harness._backend.action_fail("foo")
-        self.assertEqual(op.failure_message, "foo")
-        self.harness._backend.action_fail("bar")
-        self.assertEqual(op.failure_message, "bar")
 
     def test_before_begin(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -5342,17 +5303,21 @@ class TestActions(unittest.TestCase):
             harness.run_action("fail")
 
     def test_invalid_action(self):
+        # This action isn't in the metadata at all.
         with self.assertRaises(RuntimeError):
             self.harness.run_action("another-action")
+        # Also check that we're not exposing the action with the dash to underscore replacement.
         with self.assertRaises(RuntimeError):
-            self.harness.run_action("bad_results")
+            self.harness.run_action("log_and_results")
 
     def test_run_action(self):
-        out = self.harness.run_action("test")
+        out = self.harness.run_action("simple")
         self.assertEqual(out.logs, [])
         self.assertEqual(out.results, {})
 
     def test_fail_action(self):
+        self._action_results.clear()
+        self._action_results["partial"] = "foo"
         with self.assertRaises(ops.testing.ActionFailed) as cm:
             self.harness.run_action("fail")
         self.assertEqual(cm.exception.message, "something went wrong")
@@ -5361,17 +5326,17 @@ class TestActions(unittest.TestCase):
 
     def test_required_param(self):
         with self.assertRaises(RuntimeError):
-            self.harness.run_action("test2")
+            self.harness.run_action("unobserved-param-tester")
         with self.assertRaises(RuntimeError):
-            self.harness.run_action("test2", {"bar": "baz"})
-        self.harness.run_action("test2", {"foo": "baz"})
-        self.harness.run_action("test2", {"foo": "baz", "bar": "qux"})
+            self.harness.run_action("tunobserved-param-tester", {"bar": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz", "bar": "qux"})
 
     def test_additional_params(self):
-        self.harness.run_action("test", {"foo": "bar"})
-        with self.assertRaises(RuntimeError):
-            self.harness.run_action("test2", {"foo": "bar", "qux": "baz"})
-        self.harness.run_action("test", {
+        self.harness.run_action("simple", {"foo": "bar"})
+        with self.assertRaises(ops.ModelError):
+            self.harness.run_action("unobserved-param-tester", {"foo": "bar", "qux": "baz"})
+        self.harness.run_action("simple", {
             "string": "hello",
             "number": 28.8,
             "object": {"a": {"b": "c"}},
@@ -5380,12 +5345,28 @@ class TestActions(unittest.TestCase):
             "null": None})
 
     def test_logs_and_results(self):
-        out = self.harness.run_action("test3")
+        out = self.harness.run_action("log-and-results")
         self.assertEqual(out.logs, ["Step 1", "Step 2"])
         self.assertEqual(out.results, {"result1": "foo-default", "result2": None})
-        out = self.harness.run_action("test3", {"foo": "baz", "bar": 28})
+        out = self.harness.run_action("log-and-results", {"foo": "baz", "bar": 28})
         self.assertEqual(out.results, {"result1": "baz", "result2": 28})
 
     def test_bad_results(self):
+        # We can't have results that collide when flattened.
+        self._action_results.clear()
+        self._action_results["a"] = {"b": 1}
+        self._action_results["a.b"] = 2
         with self.assertRaises(ValueError):
-            self.harness.run_action("bad-results")
+            self.harness.run_action("results")
+        # There are some result key names we cannot use.
+        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
+        for key in prohibited_keys:
+            self._action_results.clear()
+            self._action_results[key] = "foo"
+            with self.assertRaises(ops.ModelError):
+                self.harness.run_action("results")
+        # There are some additional rules around what result keys are valid.
+        self._action_results.clear()
+        self._action_results["A"] = "foo"
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")

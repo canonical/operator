@@ -161,7 +161,8 @@ class ActionFailed(Exception):  # noqa
 
 
 @dataclasses.dataclass()
-class _Operation:
+class _RunningAction:
+    action_name: str
     output: ActionOutput
     parameters: Dict[str, Any]
     failure_message: Optional[str] = None
@@ -1829,20 +1830,14 @@ class Harness(Generic[CharmType]):
                     raise model.ModelError(
                         f'additional property "{key}" is not allowed, '
                         f'given {{"{key}":{params[key]!r}}}')
-        prev_env_action = os.environ.get("JUJU_ACTION_NAME")
-        try:
-            os.environ["JUJU_ACTION_NAME"] = action_name
-            self._backend._operation = _Operation(ActionOutput([], {}), params)
-            handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
-            handler.emit()
-            if self._backend._operation.failure_message is not None:
-                raise ActionFailed(
-                    message=self._backend._operation.failure_message,
-                    output=self._backend._operation.output)
-            return self._backend._operation.output
-        finally:
-            if prev_env_action is not None:
-                os.environ["JUJU_ACTION_NAME"] = prev_env_action
+        self._backend._running_action = _RunningAction(action_name, ActionOutput([], {}), params)
+        handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
+        handler.emit()
+        if self._backend._running_action.failure_message is not None:
+            raise ActionFailed(
+                message=self._backend._running_action.failure_message,
+                output=self._backend._running_action.output)
+        return self._backend._running_action.output
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
@@ -2061,7 +2056,7 @@ class _TestingModelBackend:
         self._opened_ports: Set[model.Port] = set()
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
-        self._operation = _Operation(ActionOutput([], {}), {})
+        self._running_action = _RunningAction("", ActionOutput([], {}), {})
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2316,12 +2311,12 @@ class _TestingModelBackend:
         self._storage_list[name].pop(index, None)
 
     def action_get(self) -> Dict[str, Any]:
-        action_name = os.environ["JUJU_ACTION_NAME"]
         params: Dict[str, Any] = {}
-        for name, action_meta in self._meta.actions[action_name].parameters.items():
+        action_meta = self._meta.actions[self._running_action.action_name]
+        for name, action_meta in action_meta.parameters.items():
             if "default" in action_meta:
                 params[name] = action_meta["default"]
-        params.update(self._operation.parameters)
+        params.update(self._running_action.parameters)
         return params
 
     def action_set(self, results: Dict[str, Any]):
@@ -2334,15 +2329,15 @@ class _TestingModelBackend:
         # are setting results that will not work.
         # This also does some validation on keys to make sure that they fit the
         # Juju constraints.
-        model._format_action_result_dict(results)
-        self._operation.output.results.update(results)
+        model._format_action_result_dict(results)  # Validate, but ignore returned value.
+        self._running_action.output.results.update(results)
 
     def action_log(self, message: str):
-        self._operation.output.logs.append(message)
+        self._running_action.output.logs.append(message)
 
     def action_fail(self, message: str = ''):
         # If fail is called multiple times, Juju only retains the most recent failure message.
-        self._operation.failure_message = message
+        self._running_action.failure_message = message
 
     def network_get(self, endpoint_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
         data = self._networks.get((endpoint_name, relation_id))
