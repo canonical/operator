@@ -1830,14 +1830,16 @@ class Harness(Generic[CharmType]):
                     raise model.ModelError(
                         f'additional property "{key}" is not allowed, '
                         f'given {{"{key}":{params[key]!r}}}')
-        self._backend._running_action = _RunningAction(action_name, ActionOutput([], {}), params)
+        action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
         handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
+        self._backend._running_action = action_under_test
         handler.emit()
-        if self._backend._running_action.failure_message is not None:
+        self._backend._running_action = None
+        if action_under_test.failure_message is not None:
             raise ActionFailed(
-                message=self._backend._running_action.failure_message,
-                output=self._backend._running_action.output)
-        return self._backend._running_action.output
+                message=action_under_test.failure_message,
+                output=action_under_test.output)
+        return action_under_test.output
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
@@ -2056,7 +2058,7 @@ class _TestingModelBackend:
         self._opened_ports: Set[model.Port] = set()
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
-        self._running_action = _RunningAction("", ActionOutput([], {}), {})
+        self._running_action: Optional[_RunningAction] = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2312,6 +2314,7 @@ class _TestingModelBackend:
 
     def action_get(self) -> Dict[str, Any]:
         params: Dict[str, Any] = {}
+        assert self._running_action is not None
         action_meta = self._meta.actions[self._running_action.action_name]
         for name, action_meta in action_meta.parameters.items():
             if "default" in action_meta:
@@ -2320,6 +2323,7 @@ class _TestingModelBackend:
         return params
 
     def action_set(self, results: Dict[str, Any]):
+        assert self._running_action is not None
         for key in ("stdout", "stderr", "stdout-encoding", "stderr-encoding"):
             if key in results:
                 # Match Juju's error message.
@@ -2333,9 +2337,11 @@ class _TestingModelBackend:
         self._running_action.output.results.update(results)
 
     def action_log(self, message: str):
+        assert self._running_action is not None
         self._running_action.output.logs.append(message)
 
     def action_fail(self, message: str = ''):
+        assert self._running_action is not None
         # If fail is called multiple times, Juju only retains the most recent failure message.
         self._running_action.failure_message = message
 
