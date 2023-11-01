@@ -1950,7 +1950,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
                 'Incorrectly formatted `options.yaml`: `type` needs to be one '
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
 
-        if type(value) != self._supported_types[declared_type]:
+        if type(value) is not self._supported_types[declared_type]:
             raise RuntimeError('Config option {} is supposed to be of type '
                                '{}, not `{}`.'.format(key, declared_type,
                                                       type(value).__name__))
