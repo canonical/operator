@@ -5330,7 +5330,7 @@ class TestActions(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.harness.run_action("unobserved-param-tester")
         with self.assertRaises(RuntimeError):
-            self.harness.run_action("tunobserved-param-tester", {"bar": "baz"})
+            self.harness.run_action("unobserved-param-tester", {"bar": "baz"})
         self.harness.run_action("unobserved-param-tester", {"foo": "baz"})
         self.harness.run_action("unobserved-param-tester", {"foo": "baz", "bar": "qux"})
 
