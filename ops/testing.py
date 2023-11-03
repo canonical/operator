@@ -162,7 +162,7 @@ class ActionFailed(Exception):  # noqa
 
 @dataclasses.dataclass()
 class _RunningAction:
-    action_name: str
+    name: str
     output: ActionOutput
     parameters: Dict[str, Any]
     failure_message: Optional[str] = None
@@ -2315,7 +2315,7 @@ class _TestingModelBackend:
     def action_get(self) -> Dict[str, Any]:
         params: Dict[str, Any] = {}
         assert self._running_action is not None
-        action_meta = self._meta.actions[self._running_action.action_name]
+        action_meta = self._meta.actions[self._running_action.name]
         for name, action_meta in action_meta.parameters.items():
             if "default" in action_meta:
                 params[name] = action_meta["default"]
