@@ -5232,3 +5232,143 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(args_history[-1].group, "test_group")
         self.assertEqual(args_history[-1].group_id, 4)
         self.assertDictEqual(args_history[-1].environment, {"foo": "hello", "foobar": "barfoo"})
+
+
+class TestActions(unittest.TestCase):
+    def setUp(self):
+        action_results: typing.Dict[str, typing.Any] = {}
+        self._action_results = action_results
+
+        class ActionCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.simple_action, self._on_simple_action)
+                self.framework.observe(self.on.fail_action, self._on_fail_action)
+                self.framework.observe(self.on.results_action, self._on_results_action)
+                self.framework.observe(
+                    self.on.log_and_results_action, self._on_log_and_results_action)
+                self.simple_was_called = False
+
+            def _on_simple_action(self, event: ops.ActionEvent):
+                """An action that doesn't generate logs, have any results, or fail."""
+                self.simple_was_called = True
+
+            def _on_fail_action(self, event: ops.ActionEvent):
+                event.fail("this will be ignored")
+                event.log("some progress")
+                event.fail("something went wrong")
+                event.log("more progress")
+                event.set_results(action_results)
+
+            def _on_log_and_results_action(self, event: ops.ActionEvent):
+                event.log("Step 1")
+                event.set_results({"result1": event.params["foo"]})
+                event.log("Step 2")
+                event.set_results({"result2": event.params.get("bar")})
+
+            def _on_results_action(self, event: ops.ActionEvent):
+                event.set_results(action_results)
+
+        self.harness = ops.testing.Harness(ActionCharm, meta='''
+            name: test
+            ''', actions='''
+            simple:
+              description: lorem ipsum
+            fail:
+              description: dolor sit amet
+            unobserved-param-tester:
+              description: consectetur adipiscing elit
+              params:
+                foo
+                bar
+              required: [foo]
+              additionalProperties: false
+            log-and-results:
+              description: sed do eiusmod tempor
+              params:
+                foo:
+                  type: string
+                  default: foo-default
+                bar:
+                  type: integer
+            results:
+              description: incididunt ut labore
+            ''')
+        self.harness.begin()
+
+    def test_before_begin(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test
+            ''')
+        with self.assertRaises(RuntimeError):
+            harness.run_action("fail")
+
+    def test_invalid_action(self):
+        # This action isn't in the metadata at all.
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("another-action")
+        # Also check that we're not exposing the action with the dash to underscore replacement.
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("log_and_results")
+
+    def test_run_action(self):
+        out = self.harness.run_action("simple")
+        self.assertEqual(out.logs, [])
+        self.assertEqual(out.results, {})
+        self.assertTrue(self.harness.charm.simple_was_called)
+
+    def test_fail_action(self):
+        self._action_results.clear()
+        self._action_results["partial"] = "foo"
+        with self.assertRaises(ops.testing.ActionFailed) as cm:
+            self.harness.run_action("fail")
+        self.assertEqual(cm.exception.message, "something went wrong")
+        self.assertEqual(cm.exception.output.logs, ["some progress", "more progress"])
+        self.assertEqual(cm.exception.output.results, {"partial": "foo"})
+
+    def test_required_param(self):
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("unobserved-param-tester")
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("unobserved-param-tester", {"bar": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz", "bar": "qux"})
+
+    def test_additional_params(self):
+        self.harness.run_action("simple", {"foo": "bar"})
+        with self.assertRaises(ops.ModelError):
+            self.harness.run_action("unobserved-param-tester", {"foo": "bar", "qux": "baz"})
+        self.harness.run_action("simple", {
+            "string": "hello",
+            "number": 28.8,
+            "object": {"a": {"b": "c"}},
+            "array": [1, 2, 3],
+            "boolean": True,
+            "null": None})
+
+    def test_logs_and_results(self):
+        out = self.harness.run_action("log-and-results")
+        self.assertEqual(out.logs, ["Step 1", "Step 2"])
+        self.assertEqual(out.results, {"result1": "foo-default", "result2": None})
+        out = self.harness.run_action("log-and-results", {"foo": "baz", "bar": 28})
+        self.assertEqual(out.results, {"result1": "baz", "result2": 28})
+
+    def test_bad_results(self):
+        # We can't have results that collide when flattened.
+        self._action_results.clear()
+        self._action_results["a"] = {"b": 1}
+        self._action_results["a.b"] = 2
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")
+        # There are some result key names we cannot use.
+        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
+        for key in prohibited_keys:
+            self._action_results.clear()
+            self._action_results[key] = "foo"
+            with self.assertRaises(ops.ModelError):
+                self.harness.run_action("results")
+        # There are some additional rules around what result keys are valid.
+        self._action_results.clear()
+        self._action_results["A"] = "foo"
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")

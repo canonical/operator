@@ -16,7 +16,6 @@
 
 import enum
 import logging
-import os
 import pathlib
 from typing import (
     TYPE_CHECKING,
@@ -137,12 +136,6 @@ class ActionEvent(EventBase):
 
         Not meant to be called directly by charm code.
         """
-        env_action_name = os.environ.get('JUJU_ACTION_NAME')
-        event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
-        if event_action_name != env_action_name:
-            # This could only happen if the dev manually emits the action, or from a bug.
-            raise RuntimeError('action event kind ({}) does not match current '
-                               'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
@@ -1465,6 +1458,7 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+        self.additional_properties = raw.get('additionalProperties', True)
 
 
 class ContainerMeta:
