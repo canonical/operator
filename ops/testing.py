@@ -1799,7 +1799,7 @@ class Harness(Generic[CharmType]):
                 ...
             harness.run_action("action-name", params)
 
-        *New in version 2.8*
+        *New in version 2.9*
 
         Args:
             action_name: the name of the action to run, as found in ``actions.yaml``.
