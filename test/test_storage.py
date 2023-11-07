@@ -17,8 +17,8 @@ import gc
 import io
 import os
 import pathlib
-import sys
 import stat
+import sys
 import tempfile
 import typing
 import unittest
@@ -229,6 +229,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             storage.close()
         finally:
             os.remove(filename)
+
 
 def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
     """Create fake scripts for pretending to be state-set and state-get."""
