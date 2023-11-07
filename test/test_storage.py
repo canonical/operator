@@ -225,7 +225,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             os.close(fd)
             os.remove(filename)
             storage = ops.storage.SQLiteStorage(filename)
-            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IREAD | stat.S_IWRITE)
+            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
             storage.close()
         finally:
             os.remove(filename)
