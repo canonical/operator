@@ -18,6 +18,7 @@ import os
 import pickle
 import shutil
 import sqlite3
+import stat
 import subprocess
 from datetime import timedelta
 from pathlib import Path
@@ -62,6 +63,8 @@ class SQLiteStorage:
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
                                    timeout=self.DB_LOCK_TIMEOUT.total_seconds())
+        if filename != ":memory:":
+            os.chmod(filename, stat.S_IRUSR | stat.S_IWUSR)
         self._setup()
 
     def _setup(self):

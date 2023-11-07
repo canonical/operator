@@ -18,6 +18,7 @@ import io
 import os
 import pathlib
 import sys
+import stat
 import tempfile
 import typing
 import unittest
@@ -218,6 +219,16 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
     def create_storage(self):
         return ops.storage.SQLiteStorage(':memory:')
 
+    def test_permissions(self):
+        fd, filename = tempfile.mkstemp()
+        try:
+            os.close(fd)
+            os.remove(filename)
+            storage = ops.storage.SQLiteStorage(filename)
+            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IREAD | stat.S_IWRITE)
+            storage.close()
+        finally:
+            os.remove(filename)
 
 def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
     """Create fake scripts for pretending to be state-set and state-get."""
