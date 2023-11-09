@@ -3289,7 +3289,7 @@ class _ModelBackend:
         args: List[str] = []
         if id is not None:
             args.append(id)
-        if label is not None:
+        elif label is not None:
             args.extend(['--label', label])
         if refresh:
             args.append('--refresh')
