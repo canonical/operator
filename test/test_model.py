@@ -3061,8 +3061,9 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.label, 'l')
         self.assertEqual(secret.get_content(), {'foo': 'h'})
 
+        # Juju needs either an ID or a label with secret-get, but won't accept both.
         self.assertEqual(fake_script_calls(self, clear=True),
-                         [['secret-get', 'secret:123', '--label', 'l', '--format=json']])
+                         [['secret-get', 'secret:123', '--format=json']])
 
     def test_get_secret_no_args(self):
         with self.assertRaises(TypeError):
@@ -3254,8 +3255,9 @@ class TestSecretClass(unittest.TestCase):
         content = secret.peek_content()
         self.assertEqual(content, {'foo': 'peeked'})
 
+        # Juju needs either an ID or a label with secret-get, but won't accept both.
         self.assertEqual(fake_script_calls(self, clear=True),
-                         [['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']])
+                         [['secret-get', 'secret:a', '--peek', '--format=json']])
 
     def test_get_info(self):
         fake_script(self, 'secret-info-get', """echo '{"x": {"label": "y", "revision": 7}}'""")
