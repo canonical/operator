@@ -14,6 +14,8 @@ jobs:
   build-n-publish:
     name: Build and Publish to PyPI
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v3
@@ -27,5 +29,3 @@ jobs:
         run: python setup.py sdist bdist_wheel
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
