@@ -220,15 +220,11 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
         return ops.storage.SQLiteStorage(':memory:')
 
     def test_permissions(self):
-        fd, filename = tempfile.mkstemp()
-        try:
-            os.close(fd)
-            os.remove(filename)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, "framework.data")
             storage = ops.storage.SQLiteStorage(filename)
             self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
             storage.close()
-        finally:
-            os.remove(filename)
 
 
 def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
