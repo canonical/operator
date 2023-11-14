@@ -9,7 +9,7 @@ jobs:
   hello-charm-tests:
     uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
-    name: Build and Publish to PyPI
+    name: Build and Publish to Test PyPI
     runs-on: ubuntu-latest
     permissions:
       id-token: write
