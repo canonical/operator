@@ -1,4 +1,4 @@
-name: Test Publishing
+name: Test Publish
 on: [workflow_dispatch, workflow_call]
 
 jobs:
