@@ -61,26 +61,25 @@ class SQLiteStorage:
             logger.debug(f"Initializing SQLite local storage: {filename}.")
 
         if filename != ":memory:":
-            self._ensure_db_permissions(filename)
+            self._ensure_db_permissions(str(filename))
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
                                    timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
 
-    def _ensure_db_permissions(self, filename: Union[Path, str]):
+    def _ensure_db_permissions(self, filename: str):
         """Make sure that the DB file has appropriately secure permissions."""
         mode = stat.S_IRUSR | stat.S_IWUSR
-        filepath = Path(filename)
-        if filepath.exists():
+        if os.path.exists(filename):
             try:
                 os.chmod(filename, mode)
             except OSError as e:
-                logger.warning(f"Unable to adjust permissions of storage file {filename}: {e}")
+                logger.warning(f"Unable to adjust permissions of storage file {filename!r}: {e}")
             return
         try:
             fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
         except OSError as e:
-            logger.warning(f"Unable to ensure permissions of storage file {filename}: {e}")
+            logger.warning(f"Unable to ensure permissions of storage file {filename!r}: {e}")
         else:
             os.close(fd)
 
