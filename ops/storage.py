@@ -60,12 +60,29 @@ class SQLiteStorage:
             # sqlite3.connect creates the file silently if it does not exist
             logger.debug(f"Initializing SQLite local storage: {filename}.")
 
+        if filename != ":memory:":
+            self._ensure_db_permissions(filename)
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
                                    timeout=self.DB_LOCK_TIMEOUT.total_seconds())
-        if filename != ":memory:":
-            os.chmod(filename, stat.S_IRUSR | stat.S_IWUSR)
         self._setup()
+
+    def _ensure_db_permissions(self, filename: Union[Path, str]):
+        """Make sure that the DB file has appropriately secure permissions."""
+        mode = stat.S_IRUSR | stat.S_IWUSR
+        filepath = Path(filename)
+        if filepath.exists():
+            try:
+                os.chmod(filename, mode)
+            except OSError as e:
+                logger.warning(f"Unable to adjust permissions of storage file {filename}: {e}")
+            return
+        try:
+            fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
+        except OSError as e:
+            logger.warning(f"Unable to ensure permissions of storage file {filename}: {e}")
+        else:
+            os.close(fd)
 
     def _setup(self):
         """Make the database ready to be used as storage."""
