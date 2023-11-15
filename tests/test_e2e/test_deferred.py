@@ -3,6 +3,7 @@ from dataclasses import asdict
 import pytest
 from ops.charm import (
     CharmBase,
+    CollectStatusEvent,
     RelationChangedEvent,
     StartEvent,
     UpdateStatusEvent,
@@ -65,8 +66,8 @@ def test_deferred_evt_emitted(mycharm):
     assert out.deferred[1].name == "update_status"
 
     # we saw start and update-status.
-    assert len(mycharm.captured) == 2
-    upstat, start = mycharm.captured
+    assert len(mycharm.captured) == 3
+    upstat, start, _ = mycharm.captured
     assert isinstance(upstat, UpdateStatusEvent)
     assert isinstance(start, StartEvent)
 
@@ -123,8 +124,8 @@ def test_deferred_relation_event(mycharm):
     assert out.deferred[1].name == "start"
 
     # we saw start and relation-changed.
-    assert len(mycharm.captured) == 2
-    upstat, start = mycharm.captured
+    assert len(mycharm.captured) == 3
+    upstat, start, _ = mycharm.captured
     assert isinstance(upstat, RelationChangedEvent)
     assert isinstance(start, StartEvent)
 
@@ -156,10 +157,11 @@ def test_deferred_relation_event_from_relation(mycharm):
     assert out.deferred[1].name == "start"
 
     # we saw start and foo_relation_changed.
-    assert len(mycharm.captured) == 2
-    upstat, start = mycharm.captured
+    assert len(mycharm.captured) == 3
+    upstat, start, collect_status = mycharm.captured
     assert isinstance(upstat, RelationChangedEvent)
     assert isinstance(start, StartEvent)
+    assert isinstance(collect_status, CollectStatusEvent)
 
 
 def test_deferred_workload_event(mycharm):
@@ -183,14 +185,15 @@ def test_deferred_workload_event(mycharm):
     assert out.deferred[1].name == "start"
 
     # we saw start and foo_pebble_ready.
-    assert len(mycharm.captured) == 2
-    upstat, start = mycharm.captured
+    assert len(mycharm.captured) == 3
+    upstat, start, collect_status = mycharm.captured
     assert isinstance(upstat, WorkloadEvent)
     assert isinstance(start, StartEvent)
+    assert isinstance(collect_status, CollectStatusEvent)
 
 
 def test_defer_reemit_lifecycle_event(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
+    ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)
 
     mycharm.defer_next = 1
     state_1 = ctx.run("update-status", State())
@@ -208,7 +211,7 @@ def test_defer_reemit_lifecycle_event(mycharm):
 
 
 def test_defer_reemit_relation_event(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
+    ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)
 
     rel = Relation("foo")
     mycharm.defer_next = 1

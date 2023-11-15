@@ -2,7 +2,7 @@ from dataclasses import asdict
 from typing import Type
 
 import pytest
-from ops.charm import CharmBase, CharmEvents
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
@@ -74,7 +74,10 @@ def test_leader_get(state, mycharm):
 
 
 def test_status_setting(state, mycharm):
-    def call(charm: CharmBase, _):
+    def call(charm: CharmBase, e):
+        if isinstance(e, CollectStatusEvent):
+            return
+
         assert isinstance(charm.unit.status, UnknownStatus)
         charm.unit.status = ActiveStatus("foo test")
         charm.app.status = WaitingStatus("foo barz")

@@ -167,6 +167,8 @@ class Context:
         config: Optional[Dict[str, Any]] = None,
         charm_root: "PathLike" = None,
         juju_version: str = "3.0",
+        capture_deferred_events: bool = False,
+        capture_framework_events: bool = False,
     ):
         """Represents a simulated charm's execution context.
 
@@ -257,6 +259,10 @@ class Context:
         self.charm_root = charm_root
         self.juju_version = juju_version
         self._tmp = tempfile.TemporaryDirectory()
+
+        # config for what events to be captured in emitted_events.
+        self.capture_deferred_events = capture_deferred_events
+        self.capture_framework_events = capture_framework_events
 
         # streaming side effects from running an event
         self.juju_log: List["JujuLogLine"] = []

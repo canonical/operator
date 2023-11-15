@@ -1,5 +1,5 @@
 import pytest
-from ops.charm import CharmBase
+from ops.charm import CharmBase, CollectStatusEvent
 from ops.framework import Framework
 
 from scenario.sequences import check_builtin_sequences
@@ -27,6 +27,9 @@ def mycharm():
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, event):
+            if isinstance(event, CollectStatusEvent):
+                return
+
             global CHARM_CALLED
             CHARM_CALLED += 1
 

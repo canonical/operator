@@ -1,7 +1,7 @@
 from typing import Type
 
 import pytest
-from ops.charm import CharmBase, CharmEvents, RelationDepartedEvent
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, RelationDepartedEvent
 from ops.framework import EventBase, Framework
 
 from scenario.state import (
@@ -155,6 +155,9 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
     )
 
     def callback(charm: CharmBase, event):
+        if isinstance(event, CollectStatusEvent):
+            return
+
         assert event.app
         assert event.unit
         if isinstance(event, RelationDepartedEvent):
@@ -196,6 +199,9 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     )
 
     def callback(charm: CharmBase, event):
+        if isinstance(event, CollectStatusEvent):
+            return
+
         assert event.app  # that's always present
         assert event.unit
         assert (evt_name == "departed") is bool(getattr(event, "departing_unit", False))
@@ -235,6 +241,9 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
     )
 
     def callback(charm: CharmBase, event):
+        if isinstance(event, CollectStatusEvent):
+            return
+
         assert event.app  # that's always present
         assert not event.unit
 

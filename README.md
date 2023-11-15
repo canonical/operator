@@ -238,7 +238,7 @@ assert ctx.workload_version_history == ['1', '1.2', '1.5']
 
 If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
 can be hard to examine the resulting control flow. In these situations it can be useful to verify that, as a result of a
-given juju event triggering (say, 'start'), a specific chain of deferred and custom events is emitted on the charm. The
+given juju event triggering (say, 'start'), a specific chain of events is emitted on the charm. The
 resulting state, black-box as it is, gives little insight into how exactly it was obtained.
 
 ```python
@@ -253,6 +253,33 @@ def test_foo():
     assert len(ctx.emitted_events) == 1
     assert isinstance(ctx.emitted_events[0], StartEvent)
 ```
+
+You can configure what events will be captured by passing the following arguments to `Context`:
+-  `capture_deferred_events`: If you want to include re-emitted deferred events.
+-  `capture_deferred_events`: If you want to include framework events (`pre-commit`, `commit`, and `collect-status`). 
+
+For example:
+```python
+from scenario import Context, Event, State
+
+def test_emitted_full():
+    ctx = Context(
+        MyCharm,
+        capture_deferred_events=True,
+        capture_framework_events=True,
+    )
+    ctx.run("start", State(deferred=[Event("update-status").deferred(MyCharm._foo)]))
+
+    assert len(ctx.emitted_events) == 5
+    assert [e.handle.kind for e in ctx.emitted_events] == [
+        "update_status",
+        "start",
+        "collect_unit_status",
+        "pre_commit",
+        "commit",
+    ]
+```
+
 
 ### Low-level access: using directly `capture_events`
 
@@ -299,7 +326,7 @@ Configuration:
 - By default, **framework events** (`PreCommit`, `Commit`) are not considered for inclusion in the output list even if
   they match the instance check. You can toggle that by passing: `capture_events(include_framework=True)`.
 - By default, **deferred events** are included in the listing if they match the instance check. You can toggle that by
-  passing: `capture_events(include_deferred=True)`.
+  passing: `capture_events(include_deferred=False)`.
 
 ## Relations
 
