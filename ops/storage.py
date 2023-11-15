@@ -74,12 +74,13 @@ class SQLiteStorage:
             try:
                 os.chmod(filename, mode)
             except OSError as e:
-                logger.warning(f"Unable to adjust permissions of storage file {filename!r}: {e}")
+                raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
             return
+
         try:
             fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
         except OSError as e:
-            logger.warning(f"Unable to ensure permissions of storage file {filename!r}: {e}")
+            raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
         else:
             os.close(fd)
 
