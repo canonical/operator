@@ -1646,12 +1646,15 @@ class Harness(Generic[CharmType]):
                     self.hostname = event.workload.pull("/etc/hostname").read()
 
             # test_charm.py
-            harness = Harness(ExampleCharm)
-            root = harness.get_filesystem_root("mycontainer")
-            (root / "etc").mkdir()
-            (root / "etc" / "hostname").write_text("hostname.example.com")
-            harness.begin_with_initial_hooks()
-            assert harness.charm.hostname == "hostname.example.com"
+            class TestCharm(unittest.TestCase):
+                def test_hostname(self):
+                    harness = Harness(ExampleCharm)
+                    self.addCleanup(harness.cleanup)
+                    root = harness.get_filesystem_root("mycontainer")
+                    (root / "etc").mkdir()
+                    (root / "etc" / "hostname").write_text("hostname.example.com")
+                    harness.begin_with_initial_hooks()
+                    assert harness.charm.hostname == "hostname.example.com"
 
         Args:
             container: The name of the container or the container instance.
