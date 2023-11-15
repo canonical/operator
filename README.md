@@ -1256,25 +1256,6 @@ If you have a clear false negative, are explicitly testing 'edge', inconsistent 
 checker is in your way, you can set the `SCENARIO_SKIP_CONSISTENCY_CHECKS` envvar and skip it altogether. Hopefully you
 don't need that.
 
-# Snapshot
+# Jhack integrations
 
-Scenario comes with a cli tool called `snapshot`. Assuming you've pip-installed `ops-scenario`, you should be able to
-reach the entry point by typing `scenario snapshot` in a shell so long as the install dir is in your `PATH`.
-
-Snapshot's purpose is to gather the `State` data structure from a real, live charm running in some cloud your local juju
-client has access to. This is handy in case:
-
-- you want to write a test about the state the charm you're developing is currently in
-- your charm is bork or in some inconsistent state, and you want to write a test to check the charm will handle it
-  correctly the next time around (aka regression testing)
-- you are new to Scenario and want to quickly get started with a real-life example.
-
-Suppose you have a Juju model with a `prometheus-k8s` unit deployed as `prometheus-k8s/0`. If you type
-`scenario snapshot prometheus-k8s/0`, you will get a printout of the State object. Pipe that out into some file, import
-all you need from `scenario`, and you have a working `State` that you can `Context.run` events with.
-
-You can also pass a `--format` flag to obtain instead:
-
-- a jsonified `State` data structure, for portability
-- a full-fledged pytest test case (with imports and all), where you only have to fill in the charm type and the event
-  that you wish to trigger.
+The [`Jhack scenario`](todo link to jhack) subcommand offers some utilities to work with Scenario.

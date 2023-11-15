@@ -39,8 +39,6 @@ classifiers = [
 "Homepage" = "https://github.com/canonical/ops-scenario"
 "Bug Tracker" = "https://github.com/canonical/ops-scenario/issues"
 
-[project.scripts]
-scenario = "scenario.scripts.main:main"
 
 [tool.setuptools.package-dir]
 scenario = "scenario"
