@@ -81,8 +81,7 @@ class SQLiteStorage:
             fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
         except OSError as e:
             raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
-        else:
-            os.close(fd)
+        os.close(fd)
 
     def _setup(self):
         """Make the database ready to be used as storage."""
