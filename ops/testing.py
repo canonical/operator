@@ -1636,18 +1636,25 @@ class Harness(Generic[CharmType]):
         Example usage::
 
             # charm.py
-            import ops
             class ExampleCharm(ops.CharmBase):
                 def __init__(self, *args):
                     super().__init__(*args)
-                    self.hostname = open("/etc/hostname").read()
+                    self.framework.observe(self.on["mycontainer"].pebble_ready,
+                                           self._on_pebble_ready)
+
+                def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+                    self.hostname = event.workload.pull("/etc/hostname").read()
 
             # test_charm.py
-            from ops.testing import Harness
-            harness = Harness(ExampleCharm)
-            root = harness.get_filesystem_root("mycontainer")
-            (root / "etc" / "hostname").write_text("hostname.example.com")
-            harness.begin()
+            class TestCharm(unittest.TestCase):
+                def test_hostname(self):
+                    harness = Harness(ExampleCharm)
+                    self.addCleanup(harness.cleanup)
+                    root = harness.get_filesystem_root("mycontainer")
+                    (root / "etc").mkdir()
+                    (root / "etc" / "hostname").write_text("hostname.example.com")
+                    harness.begin_with_initial_hooks()
+                    assert harness.charm.hostname == "hostname.example.com"
 
         Args:
             container: The name of the container or the container instance.
