@@ -17,10 +17,12 @@ import gc
 import io
 import os
 import pathlib
+import stat
 import sys
 import tempfile
 import typing
 import unittest
+import unittest.mock
 from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
 from textwrap import dedent
 
@@ -217,6 +219,41 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
     def create_storage(self):
         return ops.storage.SQLiteStorage(':memory:')
+
+    def test_permissions_new(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            storage = ops.storage.SQLiteStorage(filename)
+            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            storage.close()
+
+    def test_permissions_existing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            ops.storage.SQLiteStorage(filename).close()
+            # Set the file to access that will need fixing for user, group, and other.
+            os.chmod(filename, 0o744)
+            storage = ops.storage.SQLiteStorage(filename)
+            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            storage.close()
+
+    @unittest.mock.patch("os.path.exists")
+    def test_permissions_race(self, exists: unittest.mock.MagicMock):
+        exists.return_value = False
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            # Create an existing file, but the mock will simulate a race condition saying that it
+            # does not exist.
+            open(filename, "w").close()
+            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+
+    @unittest.mock.patch("os.chmod")
+    def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
+        chmod.side_effect = OSError
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            open(filename, "w").close()
+            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
 
 def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
