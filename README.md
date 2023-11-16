@@ -238,7 +238,7 @@ assert ctx.workload_version_history == ['1', '1.2', '1.5']
 
 If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
 can be hard to examine the resulting control flow. In these situations it can be useful to verify that, as a result of a
-given juju event triggering (say, 'start'), a specific chain of events is emitted on the charm. The
+given Juju event triggering (say, 'start'), a specific chain of events is emitted on the charm. The
 resulting state, black-box as it is, gives little insight into how exactly it was obtained.
 
 ```python
