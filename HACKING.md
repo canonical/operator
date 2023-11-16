@@ -112,7 +112,7 @@ Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
 
 The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
-are listed in [requirements.txt](requirements.txt).
+are listed in [pyproject.toml](pyproject.toml) in the `[project] dependencies` section.
 
 
 # Publishing a Release
