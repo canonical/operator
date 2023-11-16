@@ -24,7 +24,7 @@ import unittest
 
 def get_python_filepaths(include_tests: bool = True):
     """Helper to retrieve paths of Python files."""
-    python_paths = []
+    python_paths: typing.List[str] = []
     roots = ['ops']
     if include_tests:
         roots.append('test')
