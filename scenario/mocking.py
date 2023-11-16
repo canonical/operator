@@ -72,6 +72,9 @@ class _MockExecProcess:
         raise NotImplementedError()
 
 
+_NOT_GIVEN = object()  # non-None default value sentinel
+
+
 class _MockModelBackend(_ModelBackend):
     def __init__(
         self,
@@ -221,8 +224,10 @@ class _MockModelBackend(_ModelBackend):
 
         for key, value in charm_config["options"].items():
             # if it has a default, and it's not overwritten from State, use it:
-            if key not in state_config and (default_value := value.get("default")):
-                state_config[key] = default_value
+            if key not in state_config:
+                default_value = value.get("default", _NOT_GIVEN)
+                if default_value is not _NOT_GIVEN:  # accept False as default value
+                    state_config[key] = default_value
 
         return state_config  # full config
 
