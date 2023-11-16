@@ -376,11 +376,14 @@ class Runtime:
         return state.replace(deferred=deferred, stored_state=stored_state)
 
     @contextmanager
-    def _exec_ctx(self) -> ContextManager[Tuple[Path, List[EventBase]]]:
+    def _exec_ctx(self, ctx: "Context") -> ContextManager[Tuple[Path, List[EventBase]]]:
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
             # todo allow customizing capture_events
-            with capture_events() as captured:
+            with capture_events(
+                include_deferred=ctx.capture_deferred_events,
+                include_framework=ctx.capture_framework_events,
+            ) as captured:
                 yield (temporary_charm_root, captured)
 
     @contextmanager
@@ -412,7 +415,7 @@ class Runtime:
         output_state = state.copy()
 
         logger.info(" - generating virtual charm root")
-        with self._exec_ctx() as (temporary_charm_root, captured):
+        with self._exec_ctx(context) as (temporary_charm_root, captured):
             logger.info(" - initializing storage")
             self._initialize_storage(state, temporary_charm_root)
 

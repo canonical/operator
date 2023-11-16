@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from ops import ActiveStatus
-from ops.charm import CharmBase
+from ops.charm import CharmBase, CollectStatusEvent
 
 from scenario import Action, Context, State
 from scenario.context import ActionOutput, AlreadyEmittedError, _EventManager
@@ -20,6 +20,9 @@ def mycharm():
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, e):
+            if isinstance(e, CollectStatusEvent):
+                return
+
             print("event!")
             self.unit.status = ActiveStatus(e.handle.kind)
 

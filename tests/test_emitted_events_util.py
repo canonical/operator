@@ -1,5 +1,5 @@
 import pytest
-from ops.charm import CharmBase, CharmEvents, StartEvent
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
 from scenario import Event, State
@@ -51,10 +51,11 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
     with capture_events(include_framework=True) as emitted:
         trigger(State(), "foo", MyCharm, meta=MyCharm.META)
 
-    assert len(emitted) == 3
+    assert len(emitted) == 4
     assert isinstance(emitted[0], Foo)
-    assert isinstance(emitted[1], PreCommitEvent)
-    assert isinstance(emitted[2], CommitEvent)
+    assert isinstance(emitted[1], CollectStatusEvent)
+    assert isinstance(emitted[2], PreCommitEvent)
+    assert isinstance(emitted[3], CommitEvent)
 
 
 def test_capture_juju_evt():

@@ -6,6 +6,7 @@ import typing
 from contextlib import contextmanager
 from typing import ContextManager, List, Type, TypeVar
 
+from ops import CollectStatusEvent
 from ops.framework import (
     CommitEvent,
     EventBase,
@@ -49,7 +50,10 @@ def capture_events(
     _real_reemit = Framework.reemit
 
     def _wrapped_emit(self, evt):
-        if not include_framework and isinstance(evt, (PreCommitEvent, CommitEvent)):
+        if not include_framework and isinstance(
+            evt,
+            (PreCommitEvent, CommitEvent, CollectStatusEvent),
+        ):
             return _real_emit(self, evt)
 
         if isinstance(evt, allowed_types):

@@ -97,7 +97,9 @@ def test_cannot_run_action_event(mycharm):
 
 @pytest.mark.parametrize("res_value", ({"a": {"b": {"c"}}}, {"d": "e"}))
 def test_action_event_results_valid(mycharm, res_value):
-    def handle_evt(charm: CharmBase, evt: ActionEvent):
+    def handle_evt(charm: CharmBase, evt):
+        if not isinstance(evt, ActionEvent):
+            return
         evt.set_results(res_value)
         evt.log("foo")
         evt.log("bar")
@@ -116,6 +118,9 @@ def test_action_event_results_valid(mycharm, res_value):
 @pytest.mark.parametrize("res_value", ({"a": {"b": {"c"}}}, {"d": "e"}))
 def test_action_event_outputs(mycharm, res_value):
     def handle_evt(charm: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+
         evt.set_results({"my-res": res_value})
         evt.log("log1")
         evt.log("log2")

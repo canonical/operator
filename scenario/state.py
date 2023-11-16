@@ -62,6 +62,10 @@ BUILTIN_EVENTS = {
     "leader_elected",
     "leader_settings_changed",
     "collect_metrics",
+}
+FRAMEWORK_EVENTS = {
+    "pre_commit",
+    "commit",
     "collect_app_status",
     "collect_unit_status",
 }
@@ -998,6 +1002,7 @@ class DeferredEvent(_DCBase):
 
 
 class _EventType(str, Enum):
+    framework = "framework"
     builtin = "builtin"
     relation = "relation"
     action = "action"
@@ -1037,6 +1042,9 @@ class _EventPath(str):
 
         if s in SECRET_EVENTS:
             return s, _EventType.secret
+
+        if s in FRAMEWORK_EVENTS:
+            return s, _EventType.framework
 
         # Whether the event name indicates that this is a storage event.
         for suffix in STORAGE_EVENTS_SUFFIX:
