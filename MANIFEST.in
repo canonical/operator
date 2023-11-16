@@ -1,0 +1,3 @@
+recursive-exclude .github/
+recursive-exclude docs/
+exclude .readthedocs.yaml
