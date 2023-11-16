@@ -1,5 +1,10 @@
 # The `ops` library
 
+![Charmcraft pack](https://github.com/canonical/actions/workflows/charmcraft.yml/badge.svg)
+![Compatibility: DB charms](https://github.com/canonical/actions/workflows/db-charm-tests.yml/badge.svg)
+![Compatibility: Basic charms](https://github.com/canonical/actions/workflows/hello-charm-tests.yml/badge.svg)
+![Compatibility: Observability charms](https://github.com/canonical/actions/workflows/observability-charm-tests.yml/badge.svg)
+![CI Status](https://github.com/canonical/actions/workflows/framework-tests.yml/badge.svg)
 
 The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://juju.is/docs/sdk/charmed-operators). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
 
