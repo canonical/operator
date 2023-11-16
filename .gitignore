@@ -1,10 +1,7 @@
 __pycache__
 /sandbox
-/build
-/dist
 /ops.egg-info
 .idea
-/docs/_build
 *~
 .venv
 venv
@@ -12,6 +9,12 @@ venv
 .vscode
 .coverage
 /.tox
+
+# Build artifacts
+/dist
+/build
+/docs/_build
+ops/version.py
 
 # Smoke test artifacts
 *.tar.gz
