@@ -1285,4 +1285,8 @@ don't need that.
 
 # Jhack integrations
 
-The [`Jhack scenario`](todo link to jhack) subcommand offers some utilities to work with Scenario.
+Up until `v5.6.0`, `scenario` shipped with a cli tool called `snapshot`, used to interact with a live charm's state.
+The functionality [has been moved over to `jhack`](https://github.com/PietroPasotti/jhack/pull/111), 
+to allow us to keep working on it independently, and to streamline 
+the profile of `scenario` itself as it becomes more broadly adopted and ready for widespread usage.
+
