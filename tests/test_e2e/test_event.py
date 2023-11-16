@@ -1,7 +1,9 @@
+import ops
 import pytest
-from ops import CharmBase
+from ops import CharmBase, StartEvent, UpdateStatusEvent
 
-from scenario.state import Event, _CharmSpec, _EventType
+from scenario import Context
+from scenario.state import Event, State, _CharmSpec, _EventType
 
 
 @pytest.mark.parametrize(
@@ -16,6 +18,10 @@ from scenario.state import Event, _CharmSpec, _EventType
         ("foo_pebble_ready", _EventType.workload),
         ("foo_bar_baz_pebble_ready", _EventType.workload),
         ("secret_removed", _EventType.secret),
+        ("pre_commit", _EventType.framework),
+        ("commit", _EventType.framework),
+        ("collect_unit_status", _EventType.framework),
+        ("collect_app_status", _EventType.framework),
         ("foo", _EventType.custom),
         ("kaboozle_bar_baz", _EventType.custom),
     ),
@@ -48,3 +54,43 @@ def test_event_type(evt, expected_type):
         },
     )
     assert event._is_builtin_event(spec) is (expected_type is not _EventType.custom)
+
+
+def test_emitted_framework():
+    class MyCharm(CharmBase):
+        META = {"name": "joop"}
+
+    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
+    ctx.run("update-status", State())
+    assert len(ctx.emitted_events) == 4
+    assert list(map(type, ctx.emitted_events)) == [
+        ops.UpdateStatusEvent,
+        ops.CollectStatusEvent,
+        ops.PreCommitEvent,
+        ops.CommitEvent,
+    ]
+
+
+def test_emitted_deferred():
+    class MyCharm(CharmBase):
+        META = {"name": "joop"}
+
+        def _foo(self, e):
+            pass
+
+    ctx = Context(
+        MyCharm,
+        meta=MyCharm.META,
+        capture_deferred_events=True,
+        capture_framework_events=True,
+    )
+    ctx.run("start", State(deferred=[Event("update-status").deferred(MyCharm._foo)]))
+
+    assert len(ctx.emitted_events) == 5
+    assert [e.handle.kind for e in ctx.emitted_events] == [
+        "update_status",
+        "start",
+        "collect_unit_status",
+        "pre_commit",
+        "commit",
+    ]

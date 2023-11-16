@@ -27,6 +27,8 @@ def charm_type():
                 self.framework.observe(evt, self._catchall)
 
         def _catchall(self, e):
+            if self._event:
+                return
             MyCharm._event = e
 
     return MyCharm

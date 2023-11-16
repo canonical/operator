@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from ops.charm import CharmBase
+from ops.charm import CharmBase, CollectStatusEvent
 
 from scenario import Context
 from scenario.state import JujuLogLine, State
@@ -21,6 +21,8 @@ def mycharm():
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, event):
+            if isinstance(event, CollectStatusEvent):
+                return
             print("foo!")
             logger.warning("bar!")
 

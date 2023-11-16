@@ -195,7 +195,11 @@ class Ops:
         if not self._has_emitted:
             raise RuntimeError("should .emit() before you .commit()")
 
+        # emit collect-status events
+        ops.charm._evaluate_status(self.charm)
+
         self._has_committed = True
+
         try:
             self.framework.commit()
         finally:
