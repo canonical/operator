@@ -18,6 +18,7 @@ import os
 import pickle
 import shutil
 import sqlite3
+import stat
 import subprocess
 from datetime import timedelta
 from pathlib import Path
@@ -59,10 +60,28 @@ class SQLiteStorage:
             # sqlite3.connect creates the file silently if it does not exist
             logger.debug(f"Initializing SQLite local storage: {filename}.")
 
+        if filename != ":memory:":
+            self._ensure_db_permissions(str(filename))
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
                                    timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
+
+    def _ensure_db_permissions(self, filename: str):
+        """Make sure that the DB file has appropriately secure permissions."""
+        mode = stat.S_IRUSR | stat.S_IWUSR
+        if os.path.exists(filename):
+            try:
+                os.chmod(filename, mode)
+            except OSError as e:
+                raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
+            return
+
+        try:
+            fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
+        except OSError as e:
+            raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
+        os.close(fd)
 
     def _setup(self):
         """Make the database ready to be used as storage."""
