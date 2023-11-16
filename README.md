@@ -256,7 +256,7 @@ def test_foo():
 
 You can configure what events will be captured by passing the following arguments to `Context`:
 -  `capture_deferred_events`: If you want to include re-emitted deferred events.
--  `capture_deferred_events`: If you want to include framework events (`pre-commit`, `commit`, and `collect-status`). 
+-  `capture_framework_events`: If you want to include framework events (`pre-commit`, `commit`, and `collect-status`). 
 
 For example:
 ```python
