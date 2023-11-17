@@ -5,6 +5,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import SecretNotFoundError, SecretRotate
 
+from scenario import Context
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
 
@@ -278,3 +279,21 @@ def test_grant_nonowner(mycharm):
         meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
         post_event=post_event,
     )
+
+
+class GrantingCharm(CharmBase):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, _):
+        secret = self.app.add_secret({"foo": "bar"})
+        secret.grant(self.model.relations["bar"][0])
+
+
+def test_grant_after_add():
+    context = Context(
+        GrantingCharm, meta={"name": "foo", "provides": {"bar": {"interface": "bar"}}}
+    )
+    state = State(relations=[Relation("bar")])
+    context.run("start", state)
