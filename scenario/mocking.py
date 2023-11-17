@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set, Tuple, Union
 
 from ops import JujuVersion, pebble
+from ops.model import ModelError, RelationNotFoundError
+from ops.model import Secret as Secret_Ops  # lol
 from ops.model import (
-    ModelError,
-    RelationNotFoundError,
     SecretInfo,
     SecretNotFoundError,
     SecretRotate,
@@ -135,13 +135,19 @@ class _MockModelBackend(_ModelBackend):
             raise RelationNotFoundError()
 
     def _get_secret(self, id=None, label=None):
-        # cleanup id:
-        if id and id.startswith("secret:"):
-            id = id[7:]
+        canonicalize_id = Secret_Ops._canonicalize_id
 
         if id:
+            # in scenario, you can create Secret(id="foo"),
+            # but ops.Secret will prepend a "secret:" prefix to that ID.
+            # we allow getting secret by either version.
             try:
-                return next(filter(lambda s: s.id == id, self._state.secrets))
+                return next(
+                    filter(
+                        lambda s: canonicalize_id(s.id) == canonicalize_id(id),
+                        self._state.secrets,
+                    ),
+                )
             except StopIteration:
                 raise SecretNotFoundError()
         elif label:
