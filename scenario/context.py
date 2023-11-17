@@ -296,7 +296,18 @@ class Context:
         return storage_root
 
     def clear(self):
-        """Cleanup side effects histories."""
+        """Deprecated.
+
+        Use cleanup instead.
+        """
+        logger.warning(
+            "Context.clear() is deprecated and will be nuked in v6. "
+            "Use Context.cleanup() instead.",
+        )
+        self.cleanup()
+
+    def cleanup(self):
+        """Cleanup side effects histories and reset the simulated filesystem state."""
         self.juju_log = []
         self.app_status_history = []
         self.unit_status_history = []
@@ -307,6 +318,9 @@ class Context:
         self._action_results = None
         self._action_failure = None
         self._output_state = None
+
+        self._tmp.cleanup()
+        self._tmp = tempfile.TemporaryDirectory()
 
     def _record_status(self, state: "State", is_app: bool):
         """Record the previous status before a status change."""
