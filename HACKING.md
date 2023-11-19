@@ -115,12 +115,66 @@ root project folder:
 pip-compile --extra=docs -o docs/requirements.txt pyproject.toml
 ```
 
-## Dependencies
+# Dependencies
 
 The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
 are listed in [pyproject.toml](pyproject.toml) in the `[project] dependencies` section.
 
+If the dependencies change, use [pip-tools](https://pypi.org/project/pip-tools/)
+to update the generated dependency lockfiles:
+
+```sh
+pip-compile -o requirements.txt pyproject.toml
+pip-compile --extra=dev -o requirements-dev.txt pyproject.toml
+```
+
+# Dev Tools
+
+## Formatting and Checking
+
+Test environments are managed with [tox](https://tox.wiki/) and executed with
+[pytest](https://pytest.org), with coverage measured by
+[coverage](https://coverage.readthedocs.io/en/7.3.2/).
+Static type checking is done using [pyright](https://github.com/microsoft/pyright),
+and extends the Python 3.8 type hinting support through the
+[typing_extensions](https://pypi.org/project/typing-extensions/) package.
+
+Formatting uses [isort](https://pypi.org/project/isort/) and
+[autopep8](https://pypi.org/project/autopep8/), with linting also using
+[flake8](https://github.com/PyCQA/flake8), including the
+[docstrings](https://pypi.org/project/flake8-docstrings/),
+[builtins](https://pypi.org/project/flake8-builtins/) and
+[pep8-naming](https://pypi.org/project/pep8-naming/) extensions.
+
+All tool configuration is kept in [project.toml](pyproject.toml).
+
+## Building
+
+The build backend is [setuptools](https://pypi.org/project/setuptools/), and
+the build frontend is [build](https://pypi.org/project/build/).
+
+The version number is automatically generated from Git metadata using the
+[setuptools-scm package](https://pypi.org/project/setuptools-scm/). During the
+build process, an ``ops/version.py`` is automatically generated so that if you
+are running from an installed package (including an editable install), you can
+statically access the version:
+
+```python
+import ops
+print(ops.__version__)
+import ops.version
+print(ops.version.version_tuple)
+```
+
+[This is pretty awful, and it seems like this cannot be the best way to do this]: #
+
+Importing `ops` outside of an install will fail because the generated version
+module does not exist. It can be generated using:
+
+```sh
+python -c 'import setuptools_scm;conf=setuptools_scm.Configuration.from_file();setuptools_scm.dump_version(conf.root,setuptools_scm.get_version(),conf.version_file,conf.version_file_template)'
+```
 
 # Publishing a Release
 
