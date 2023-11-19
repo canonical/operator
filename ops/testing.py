@@ -2445,12 +2445,7 @@ class _TestingModelBackend:
         secret = self._ensure_secret_id_or_label(id, label)
 
         # Check that caller has permission to get this secret
-        if secret.owner_name in [self.app_name, self.unit_name]:
-            # Owner or peer is calling, get latest revision
-            peek = True
-            if refresh:
-                raise ValueError('Secret owner cannot use refresh=True')
-        else:
+        if secret.owner_name not in [self.app_name, self.unit_name]:
             # Observer is calling: does secret have a grant on relation between
             # this charm (the observer) and the secret owner's app?
             owner_app = secret.owner_name.split('/')[0]
