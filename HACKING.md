@@ -107,6 +107,13 @@ next to the relevant content (e.g. headings, etc.).
 
 Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
 
+To update the requirements list for the documentation, ensure that
+[pip-tools](https://pypi.org/project/pip-tools/) is installed and run, in the
+root project folder:
+
+```sh
+pip-compile --extra=docs -o docs/requirements.txt pyproject.toml
+```
 
 ## Dependencies
 
@@ -126,7 +133,7 @@ To make a release of the ops library, do the following:
 4. Drop notes and a changelog in the description.
 5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
 
-This will trigger an automatic build for the Python package and publish it to PyPI (the API token/secret is already set up in the repository settings).
+This will trigger an automatic build for the Python package and publish it to PyPI (authorization is handled via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
 
 See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the GitHub actions, not the versions of the ops library.)
 
