@@ -81,6 +81,7 @@ version_file_template = """
 \"\"\"Package version.\"\"\"
 
 import typing
+
 version: str = {version!r}
 version_tuple: typing.Tuple[typing.Union[int, str], ...] = {version_tuple!r}
 """
