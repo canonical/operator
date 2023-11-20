@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         Event,
         ExecOutput,
         Relation,
+        Secret,
         State,
         SubordinateRelation,
         _CharmSpec,
@@ -302,6 +303,24 @@ class _MockModelBackend(_ModelBackend):
         self._state.secrets.append(secret)
         return id
 
+    @staticmethod
+    def _check_secret_data_access(
+        secret: "Secret",
+        read: bool = False,
+        write: bool = False,
+    ):
+        # FIXME: match real traceback
+        # TODO: different behaviours if ownership == 'app'/'unit'?
+        if read:
+            if secret.owner is None and secret.granted is False:
+                raise SecretNotFoundError(
+                    f"You must own secret {secret.id!r} to perform this operation",
+                )
+
+        if write:
+            if secret.owner is None:
+                raise SecretNotFoundError("this secret is not owned by this unit/app")
+
     def secret_get(
         self,
         *,
@@ -311,6 +330,8 @@ class _MockModelBackend(_ModelBackend):
         peek: bool = False,
     ) -> Dict[str, str]:
         secret = self._get_secret(id, label)
+        self._check_secret_data_access(secret, read=True)
+
         revision = secret.revision
         if peek or refresh:
             revision = max(secret.contents.keys())
@@ -326,8 +347,9 @@ class _MockModelBackend(_ModelBackend):
         label: Optional[str] = None,
     ) -> SecretInfo:
         secret = self._get_secret(id, label)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+
+        # only "manage"=write access level can read secret info
+        self._check_secret_data_access(secret, write=True)
 
         return SecretInfo(
             id=secret.id,
@@ -349,8 +371,7 @@ class _MockModelBackend(_ModelBackend):
         rotate: Optional[SecretRotate] = None,
     ):
         secret = self._get_secret(id, label)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_secret_data_access(secret, write=True)
 
         secret._update_metadata(
             content=content,
@@ -362,8 +383,7 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_secret_data_access(secret, write=True)
 
         grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
 
@@ -374,16 +394,14 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_secret_data_access(secret, write=True)
 
         grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
         secret.remote_grants[relation_id].remove(grantee)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         secret = self._get_secret(id)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_secret_data_access(secret, write=True)
 
         if revision:
             del secret.contents[revision]

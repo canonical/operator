@@ -3,9 +3,10 @@ import datetime
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.model import SecretNotFoundError, SecretRotate
+from ops.model import ModelError, SecretNotFoundError, SecretRotate
 
 from scenario import Context
+from scenario.runtime import UncaughtCharmError
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
 
@@ -41,7 +42,7 @@ def test_get_secret(mycharm):
         assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
 
     trigger(
-        State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
+        State(secrets=[Secret(id="foo", contents={0: {"a": "b"}}, granted="unit")]),
         "update_status",
         mycharm,
         meta={"name": "local"},
@@ -49,7 +50,23 @@ def test_get_secret(mycharm):
     )
 
 
-def test_get_secret_peek_update(mycharm):
+def test_get_secret_not_granted(mycharm):
+    def post_event(charm: CharmBase):
+        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
+
+    with pytest.raises(UncaughtCharmError) as e:
+        trigger(
+            State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
+            "update_status",
+            mycharm,
+            meta={"name": "local"},
+            post_event=post_event,
+        )
+
+
+@pytest.mark.parametrize("owner", ("app", "unit", "application"))
+# "application" is deprecated but still supported
+def test_get_secret_peek_update(mycharm, owner):
     def post_event(charm: CharmBase):
         assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
         assert charm.model.get_secret(id="foo").peek_content()["a"] == "c"
@@ -67,6 +84,7 @@ def test_get_secret_peek_update(mycharm):
                         0: {"a": "b"},
                         1: {"a": "c"},
                     },
+                    owner=owner,
                 )
             ]
         ),
@@ -77,7 +95,9 @@ def test_get_secret_peek_update(mycharm):
     )
 
 
-def test_secret_changed_owner_evt_fails(mycharm):
+@pytest.mark.parametrize("owner", ("app", "unit", "application"))
+# "application" is deprecated but still supported
+def test_secret_changed_owner_evt_fails(mycharm, owner):
     with pytest.raises(ValueError):
         _ = Secret(
             id="foo",
@@ -85,7 +105,7 @@ def test_secret_changed_owner_evt_fails(mycharm):
                 0: {"a": "b"},
                 1: {"a": "c"},
             },
-            owner="unit",
+            owner=owner,
         ).changed_event
 
 
@@ -150,11 +170,12 @@ def test_meta(mycharm):
     )
 
 
-def test_meta_nonowner(mycharm):
+@pytest.mark.parametrize("granted", ("app", "unit"))
+def test_meta_nonowner(mycharm, granted):
     def post_event(charm: CharmBase):
         secret = charm.model.get_secret(id="foo")
-        with pytest.raises(RuntimeError):
-            info = secret.get_info()
+        with pytest.raises(SecretNotFoundError):
+            secret.get_info()
 
     trigger(
         State(
@@ -164,6 +185,7 @@ def test_meta_nonowner(mycharm):
                     label="mylabel",
                     description="foobarbaz",
                     rotate=SecretRotate.HOURLY,
+                    granted=granted,
                     contents={
                         0: {"a": "b"},
                     },
@@ -253,13 +275,10 @@ def test_update_metadata(mycharm):
 
 def test_grant_nonowner(mycharm):
     def post_event(charm: CharmBase):
-        secret = charm.model.get_secret(id="foo")
-        with pytest.raises(RuntimeError):
-            secret = charm.model.get_secret(label="mylabel")
-            foo = charm.model.get_relation("foo")
-            secret.grant(relation=foo)
+        with pytest.raises(SecretNotFoundError):
+            charm.model.get_secret(id="foo")
 
-    out = trigger(
+    trigger(
         State(
             relations=[Relation("foo", "remote")],
             secrets=[
