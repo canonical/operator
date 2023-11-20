@@ -135,7 +135,7 @@ class Secret(_DCBase):
     contents: Dict[int, "RawSecretRevisionContents"]
 
     # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
-    owner: Literal["unit", "application", None] = None
+    owner: Literal["unit", "app", None] = None
 
     # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
     granted: Literal["unit", "app", False] = False
@@ -151,6 +151,14 @@ class Secret(_DCBase):
     description: Optional[str] = None
     expire: Optional[datetime.datetime] = None
     rotate: SecretRotate = SecretRotate.NEVER
+
+    def __post_init__(self):
+        if self.owner == "application":
+            logger.warning(
+                "Secret.owner='application' is deprecated in favour of 'app'.",
+            )
+            # bypass frozen dataclass
+            object.__setattr__(self, "owner", "app")
 
     # consumer-only events
     @property
