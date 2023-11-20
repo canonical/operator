@@ -41,6 +41,7 @@ def test_config_get_default_from_meta(mycharm):
     def check_cfg(charm: CharmBase):
         assert charm.config["foo"] == "bar"
         assert charm.config["baz"] == 2
+        assert charm.config["qux"] is False
 
     trigger(
         State(
@@ -53,6 +54,7 @@ def test_config_get_default_from_meta(mycharm):
             "options": {
                 "foo": {"type": "string"},
                 "baz": {"type": "integer", "default": 2},
+                "qux": {"type": "boolean", "default": False},
             },
         },
         post_event=check_cfg,

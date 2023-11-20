@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set, Tuple, Union
 
 from ops import JujuVersion, pebble
+from ops.model import ModelError, RelationNotFoundError
+from ops.model import Secret as Secret_Ops  # lol
 from ops.model import (
-    ModelError,
-    RelationNotFoundError,
     SecretInfo,
     SecretNotFoundError,
     SecretRotate,
@@ -70,6 +70,9 @@ class _MockExecProcess:
 
     def send_signal(self, sig: Union[int, str]):  # noqa: U100
         raise NotImplementedError()
+
+
+_NOT_GIVEN = object()  # non-None default value sentinel
 
 
 class _MockModelBackend(_ModelBackend):
@@ -135,13 +138,19 @@ class _MockModelBackend(_ModelBackend):
             raise RelationNotFoundError()
 
     def _get_secret(self, id=None, label=None):
-        # cleanup id:
-        if id and id.startswith("secret:"):
-            id = id[7:]
+        canonicalize_id = Secret_Ops._canonicalize_id
 
         if id:
+            # in scenario, you can create Secret(id="foo"),
+            # but ops.Secret will prepend a "secret:" prefix to that ID.
+            # we allow getting secret by either version.
             try:
-                return next(filter(lambda s: s.id == id, self._state.secrets))
+                return next(
+                    filter(
+                        lambda s: canonicalize_id(s.id) == canonicalize_id(id),
+                        self._state.secrets,
+                    ),
+                )
             except StopIteration:
                 raise SecretNotFoundError()
         elif label:
@@ -221,8 +230,10 @@ class _MockModelBackend(_ModelBackend):
 
         for key, value in charm_config["options"].items():
             # if it has a default, and it's not overwritten from State, use it:
-            if key not in state_config and (default_value := value.get("default")):
-                state_config[key] = default_value
+            if key not in state_config:
+                default_value = value.get("default", _NOT_GIVEN)
+                if default_value is not _NOT_GIVEN:  # accept False as default value
+                    state_config[key] = default_value
 
         return state_config  # full config
 

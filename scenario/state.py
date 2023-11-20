@@ -126,6 +126,10 @@ class _DCBase:
 @dataclasses.dataclass(frozen=True)
 class Secret(_DCBase):
     id: str
+    # CAUTION: ops-created Secrets (via .add_secret()) will have a canonicalized
+    #  secret id (`secret:` prefix)
+    #  but user-created ones will not. Using post-init to patch it in feels bad, but requiring the user to
+    #  add the prefix manually every time seems painful as well.
 
     # mapping from revision IDs to each revision's contents
     contents: Dict[int, "RawSecretRevisionContents"]
