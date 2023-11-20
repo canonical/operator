@@ -303,23 +303,35 @@ class _MockModelBackend(_ModelBackend):
         self._state.secrets.append(secret)
         return id
 
-    @staticmethod
     def _check_secret_data_access(
+        self,
         secret: "Secret",
         read: bool = False,
         write: bool = False,
     ):
-        # FIXME: match real traceback
-        # TODO: different behaviours if ownership == 'app'/'unit'?
+        # FIXME: match real tracebacks
+        self_is_leader = self.is_leader()
+
         if read:
-            if secret.owner is None and secret.granted is False:
-                raise SecretNotFoundError(
-                    f"You must own secret {secret.id!r} to perform this operation",
-                )
+            if secret.owner is None:
+                if secret.granted is False:
+                    raise SecretNotFoundError(
+                        f"You must own secret {secret.id!r} to perform this operation",
+                    )
+                if secret.granted == "app" and not self_is_leader:
+                    raise SecretNotFoundError(
+                        f"Only the leader can read secret {secret.id!r} since it was "
+                        f"granted to this app.",
+                    )
 
         if write:
             if secret.owner is None:
                 raise SecretNotFoundError("this secret is not owned by this unit/app")
+            if secret.owner == "app" and not self_is_leader:
+                raise SecretNotFoundError(
+                    f"App-owned secret {secret.id!r} can only be "
+                    f"managed by the leader.",
+                )
 
     def secret_get(
         self,

@@ -170,33 +170,42 @@ def test_meta(mycharm):
     )
 
 
+@pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("granted", ("app", "unit"))
-def test_meta_nonowner(mycharm, granted):
+def test_meta_nonowner(mycharm, granted, leader):
     def post_event(charm: CharmBase):
         secret = charm.model.get_secret(id="foo")
         with pytest.raises(SecretNotFoundError):
             secret.get_info()
 
-    trigger(
-        State(
-            secrets=[
-                Secret(
-                    id="foo",
-                    label="mylabel",
-                    description="foobarbaz",
-                    rotate=SecretRotate.HOURLY,
-                    granted=granted,
-                    contents={
-                        0: {"a": "b"},
-                    },
-                )
-            ]
-        ),
-        "update_status",
-        mycharm,
-        meta={"name": "local"},
-        post_event=post_event,
-    )
+    try:
+        trigger(
+            State(
+                leader=leader,
+                secrets=[
+                    Secret(
+                        id="foo",
+                        label="mylabel",
+                        description="foobarbaz",
+                        rotate=SecretRotate.HOURLY,
+                        granted=granted,
+                        contents={
+                            0: {"a": "b"},
+                        },
+                    )
+                ],
+            ),
+            "update_status",
+            mycharm,
+            meta={"name": "local"},
+            post_event=post_event,
+        )
+    except UncaughtCharmError as e:
+        if not leader and granted == "app":
+            # expected failure
+            pass
+        else:
+            raise
 
 
 @pytest.mark.parametrize("app", (True, False))
@@ -300,19 +309,22 @@ def test_grant_nonowner(mycharm):
     )
 
 
-class GrantingCharm(CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.framework.observe(self.on.start, self._on_start)
+@pytest.mark.parametrize("leader", (True, False))
+def test_grant_after_add(leader):
+    class GrantingCharm(CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.framework.observe(self.on.start, self._on_start)
 
-    def _on_start(self, _):
-        secret = self.app.add_secret({"foo": "bar"})
-        secret.grant(self.model.relations["bar"][0])
+        def _on_start(self, _):
+            if leader:
+                secret = self.app.add_secret({"foo": "bar"})
+            else:
+                secret = self.unit.add_secret({"foo": "bar"})
+            secret.grant(self.model.relations["bar"][0])
 
-
-def test_grant_after_add():
     context = Context(
         GrantingCharm, meta={"name": "foo", "provides": {"bar": {"interface": "bar"}}}
     )
-    state = State(relations=[Relation("bar")])
+    state = State(leader=leader, relations=[Relation("bar")])
     context.run("start", state)
