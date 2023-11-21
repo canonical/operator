@@ -307,7 +307,7 @@ class _MockModelBackend(_ModelBackend):
         self,
         secret: "Secret",
         read: bool = False,
-        write: bool = False,
+        manage: bool = False,
     ):
         # FIXME: match real tracebacks
         self_is_leader = self.is_leader()
@@ -324,7 +324,7 @@ class _MockModelBackend(_ModelBackend):
                         f"granted to this app.",
                     )
 
-        if write:
+        if manage:
             if secret.owner is None:
                 raise SecretNotFoundError("this secret is not owned by this unit/app")
             if secret.owner == "app" and not self_is_leader:
@@ -344,6 +344,11 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id, label)
         self._check_secret_data_access(secret, read=True)
 
+        if self._context.juju_version <= "3.2":
+            # in juju<3.2, secret owners always track the latest revision.
+            if secret.owner is not None:
+                refresh = True
+
         revision = secret.revision
         if peek or refresh:
             revision = max(secret.contents.keys())
@@ -361,7 +366,7 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id, label)
 
         # only "manage"=write access level can read secret info
-        self._check_secret_data_access(secret, write=True)
+        self._check_secret_data_access(secret, read=True)
 
         return SecretInfo(
             id=secret.id,
@@ -383,7 +388,7 @@ class _MockModelBackend(_ModelBackend):
         rotate: Optional[SecretRotate] = None,
     ):
         secret = self._get_secret(id, label)
-        self._check_secret_data_access(secret, write=True)
+        self._check_secret_data_access(secret, manage=True)
 
         secret._update_metadata(
             content=content,
@@ -395,7 +400,7 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
-        self._check_secret_data_access(secret, write=True)
+        self._check_secret_data_access(secret, manage=True)
 
         grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
 
@@ -406,14 +411,14 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
-        self._check_secret_data_access(secret, write=True)
+        self._check_secret_data_access(secret, manage=True)
 
         grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
         secret.remote_grants[relation_id].remove(grantee)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         secret = self._get_secret(id)
-        self._check_secret_data_access(secret, write=True)
+        self._check_secret_data_access(secret, manage=True)
 
         if revision:
             del secret.contents[revision]

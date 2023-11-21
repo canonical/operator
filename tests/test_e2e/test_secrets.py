@@ -3,12 +3,10 @@ import datetime
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.model import ModelError, SecretNotFoundError, SecretRotate
+from ops.model import SecretNotFoundError, SecretRotate
 
 from scenario import Context
-from scenario.runtime import UncaughtCharmError
 from scenario.state import Relation, Secret, State
-from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")
@@ -26,56 +24,39 @@ def mycharm():
 
 
 def test_get_secret_no_secret(mycharm):
-    def post_event(charm: CharmBase):
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status", State()
+    ) as mgr:
         with pytest.raises(SecretNotFoundError):
-            assert charm.model.get_secret(id="foo")
+            assert mgr.charm.model.get_secret(id="foo")
         with pytest.raises(SecretNotFoundError):
-            assert charm.model.get_secret(label="foo")
-
-    trigger(
-        State(), "update_status", mycharm, meta={"name": "local"}, post_event=post_event
-    )
+            assert mgr.charm.model.get_secret(label="foo")
 
 
 def test_get_secret(mycharm):
-    def post_event(charm: CharmBase):
-        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
-
-    trigger(
-        State(secrets=[Secret(id="foo", contents={0: {"a": "b"}}, granted="unit")]),
-        "update_status",
-        mycharm,
-        meta={"name": "local"},
-        post_event=post_event,
-    )
+    with Context(mycharm, meta={"name": "local"}).manager(
+        state=State(
+            secrets=[Secret(id="foo", contents={0: {"a": "b"}}, granted="unit")]
+        ),
+        event="update_status",
+    ) as mgr:
+        assert mgr.charm.model.get_secret(id="foo").get_content()["a"] == "b"
 
 
 def test_get_secret_not_granted(mycharm):
-    def post_event(charm: CharmBase):
-        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
-
-    with pytest.raises(UncaughtCharmError) as e:
-        trigger(
-            State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
-            "update_status",
-            mycharm,
-            meta={"name": "local"},
-            post_event=post_event,
-        )
+    with Context(mycharm, meta={"name": "local"}).manager(
+        state=State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
+        event="update_status",
+    ) as mgr:
+        with pytest.raises(SecretNotFoundError) as e:
+            assert mgr.charm.model.get_secret(id="foo").get_content()["a"] == "b"
 
 
 @pytest.mark.parametrize("owner", ("app", "unit", "application"))
 # "application" is deprecated but still supported
-def test_get_secret_peek_update(mycharm, owner):
-    def post_event(charm: CharmBase):
-        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
-        assert charm.model.get_secret(id="foo").peek_content()["a"] == "c"
-        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
-
-        assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
-        assert charm.model.get_secret(id="foo").get_content()["a"] == "c"
-
-    trigger(
+def test_get_secret_get_refresh(mycharm, owner):
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
         State(
             secrets=[
                 Secret(
@@ -88,11 +69,60 @@ def test_get_secret_peek_update(mycharm, owner):
                 )
             ]
         ),
+    ) as mgr:
+        charm = mgr.charm
+        assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
+
+
+@pytest.mark.parametrize("app", (True, False))
+def test_get_secret_nonowner_peek_update(mycharm, app):
+    with Context(mycharm, meta={"name": "local"}).manager(
         "update_status",
-        mycharm,
-        meta={"name": "local"},
-        post_event=post_event,
-    )
+        State(
+            leader=app,
+            secrets=[
+                Secret(
+                    id="foo",
+                    contents={
+                        0: {"a": "b"},
+                        1: {"a": "c"},
+                    },
+                    granted="app" if app else "unit",
+                ),
+            ],
+        ),
+    ) as mgr:
+        charm = mgr.charm
+        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
+        assert charm.model.get_secret(id="foo").peek_content()["a"] == "c"
+        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
+
+        assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
+        assert charm.model.get_secret(id="foo").get_content()["a"] == "c"
+
+
+@pytest.mark.parametrize("owner", ("app", "unit", "application"))
+# "application" is deprecated but still supported
+def test_get_secret_owner_peek_update(mycharm, owner):
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
+        State(
+            secrets=[
+                Secret(
+                    id="foo",
+                    contents={
+                        0: {"a": "b"},
+                        1: {"a": "c"},
+                    },
+                    owner=owner,
+                )
+            ]
+        ),
+    ) as mgr:
+        charm = mgr.charm
+        assert charm.model.get_secret(id="foo").get_content()["a"] == "c"
+        assert charm.model.get_secret(id="foo").peek_content()["a"] == "c"
+        assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
 
 
 @pytest.mark.parametrize("owner", ("app", "unit", "application"))
@@ -124,35 +154,32 @@ def test_consumer_events_failures(mycharm, evt_prefix):
         )
 
 
-def test_add(mycharm):
-    def post_event(charm: CharmBase):
-        charm.unit.add_secret({"foo": "bar"}, label="mylabel")
+@pytest.mark.parametrize("app", (True, False))
+def test_add(mycharm, app):
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
+        State(leader=app),
+    ) as mgr:
+        charm = mgr.charm
+        if app:
+            charm.app.add_secret({"foo": "bar"}, label="mylabel")
+        else:
+            charm.unit.add_secret({"foo": "bar"}, label="mylabel")
 
-    out = trigger(
-        State(), "update_status", mycharm, meta={"name": "local"}, post_event=post_event
-    )
-    assert out.secrets
-    secret = out.secrets[0]
+    assert mgr.output.secrets
+    secret = mgr.output.secrets[0]
     assert secret.contents[0] == {"foo": "bar"}
     assert secret.label == "mylabel"
 
 
-def test_meta(mycharm):
-    def post_event(charm: CharmBase):
-        assert charm.model.get_secret(label="mylabel")
-
-        secret = charm.model.get_secret(id="foo")
-        info = secret.get_info()
-
-        assert secret.label is None
-        assert info.label == "mylabel"
-        assert info.rotation == SecretRotate.HOURLY
-
-    trigger(
+@pytest.mark.parametrize("app", (True, False))
+def test_meta(mycharm, app):
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
         State(
             secrets=[
                 Secret(
-                    owner="unit",
+                    owner="app" if app else "unit",
                     id="foo",
                     label="mylabel",
                     description="foobarbaz",
@@ -163,62 +190,55 @@ def test_meta(mycharm):
                 )
             ]
         ),
-        "update_status",
-        mycharm,
-        meta={"name": "local"},
-        post_event=post_event,
-    )
+    ) as mgr:
+        charm = mgr.charm
+        assert charm.model.get_secret(label="mylabel")
+
+        secret = charm.model.get_secret(id="foo")
+        info = secret.get_info()
+
+        assert secret.label is None
+        assert info.label == "mylabel"
+        assert info.rotation == SecretRotate.HOURLY
 
 
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("granted", ("app", "unit"))
 def test_meta_nonowner(mycharm, granted, leader):
-    def post_event(charm: CharmBase):
-        secret = charm.model.get_secret(id="foo")
-        with pytest.raises(SecretNotFoundError):
-            secret.get_info()
-
-    try:
-        trigger(
-            State(
-                leader=leader,
-                secrets=[
-                    Secret(
-                        id="foo",
-                        label="mylabel",
-                        description="foobarbaz",
-                        rotate=SecretRotate.HOURLY,
-                        granted=granted,
-                        contents={
-                            0: {"a": "b"},
-                        },
-                    )
-                ],
-            ),
-            "update_status",
-            mycharm,
-            meta={"name": "local"},
-            post_event=post_event,
-        )
-    except UncaughtCharmError as e:
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
+        State(
+            leader=leader,
+            secrets=[
+                Secret(
+                    id="foo",
+                    label="mylabel",
+                    description="foobarbaz",
+                    rotate=SecretRotate.HOURLY,
+                    granted=granted,
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ],
+        ),
+    ) as mgr:
         if not leader and granted == "app":
-            # expected failure
-            pass
+            with pytest.raises(SecretNotFoundError):
+                mgr.charm.model.get_secret(id="foo")
+            return
         else:
-            raise
+            secret = mgr.charm.model.get_secret(id="foo")
+
+        secret.get_info()
 
 
 @pytest.mark.parametrize("app", (True, False))
 def test_grant(mycharm, app):
-    def post_event(charm: CharmBase):
-        secret = charm.model.get_secret(label="mylabel")
-        foo = charm.model.get_relation("foo")
-        if app:
-            secret.grant(relation=foo)
-        else:
-            secret.grant(relation=foo, unit=foo.units.pop())
-
-    out = trigger(
+    with Context(
+        mycharm, meta={"name": "local", "requires": {"foo": {"interface": "bar"}}}
+    ).manager(
+        "update_status",
         State(
             relations=[Relation("foo", "remote")],
             secrets=[
@@ -234,21 +254,37 @@ def test_grant(mycharm, app):
                 )
             ],
         ),
-        "update_status",
-        mycharm,
-        meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
-        post_event=post_event,
-    )
-
-    vals = list(out.secrets[0].remote_grants.values())
+    ) as mgr:
+        charm = mgr.charm
+        secret = charm.model.get_secret(label="mylabel")
+        foo = charm.model.get_relation("foo")
+        if app:
+            secret.grant(relation=foo)
+        else:
+            secret.grant(relation=foo, unit=foo.units.pop())
+    vals = list(mgr.output.secrets[0].remote_grants.values())
     assert vals == [{"remote"}] if app else [{"remote/0"}]
 
 
 def test_update_metadata(mycharm):
     exp = datetime.datetime(2050, 12, 12)
 
-    def post_event(charm: CharmBase):
-        secret = charm.model.get_secret(label="mylabel")
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
+        State(
+            secrets=[
+                Secret(
+                    owner="unit",
+                    id="foo",
+                    label="mylabel",
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ],
+        ),
+    ) as mgr:
+        secret = mgr.charm.model.get_secret(label="mylabel")
         secret.set_info(
             label="babbuccia",
             description="blu",
@@ -256,26 +292,7 @@ def test_update_metadata(mycharm):
             rotate=SecretRotate.DAILY,
         )
 
-    out = trigger(
-        State(
-            secrets=[
-                Secret(
-                    owner="unit",
-                    id="foo",
-                    label="mylabel",
-                    contents={
-                        0: {"a": "b"},
-                    },
-                )
-            ],
-        ),
-        "update_status",
-        mycharm,
-        meta={"name": "local"},
-        post_event=post_event,
-    )
-
-    secret_out = out.secrets[0]
+    secret_out = mgr.output.secrets[0]
     assert secret_out.label == "babbuccia"
     assert secret_out.rotate == SecretRotate.DAILY
     assert secret_out.description == "blu"
@@ -283,11 +300,10 @@ def test_update_metadata(mycharm):
 
 
 def test_grant_nonowner(mycharm):
-    def post_event(charm: CharmBase):
-        with pytest.raises(SecretNotFoundError):
-            charm.model.get_secret(id="foo")
-
-    trigger(
+    with Context(
+        mycharm, meta={"name": "local", "requires": {"foo": {"interface": "bar"}}}
+    ).manager(
+        "update_status",
         State(
             relations=[Relation("foo", "remote")],
             secrets=[
@@ -302,11 +318,9 @@ def test_grant_nonowner(mycharm):
                 )
             ],
         ),
-        "update_status",
-        mycharm,
-        meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
-        post_event=post_event,
-    )
+    ) as mgr:
+        with pytest.raises(SecretNotFoundError):
+            mgr.charm.model.get_secret(id="foo")
 
 
 @pytest.mark.parametrize("leader", (True, False))
