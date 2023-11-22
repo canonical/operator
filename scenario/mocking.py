@@ -314,16 +314,10 @@ class _MockModelBackend(_ModelBackend):
 
         if read:
             if secret.owner is None:
-                if secret.granted is False:
+                if secret.granted is None:
                     raise SecretNotFoundError(
                         f"You must own secret {secret.id!r} to perform this operation",
                     )
-                if secret.granted == "app" and not self_is_leader:
-                    raise SecretNotFoundError(
-                        f"Only the leader can read secret {secret.id!r} since it was "
-                        f"granted to this app.",
-                    )
-
         if manage:
             if secret.owner is None:
                 raise SecretNotFoundError("this secret is not owned by this unit/app")
@@ -366,7 +360,7 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id, label)
 
         # only "manage"=write access level can read secret info
-        self._check_secret_data_access(secret, read=True)
+        self._check_secret_data_access(secret, manage=True)
 
         return SecretInfo(
             id=secret.id,

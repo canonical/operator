@@ -138,7 +138,7 @@ class Secret(_DCBase):
     owner: Literal["unit", "app", None] = None
 
     # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
-    granted: Literal["unit", "app", False] = False
+    granted: Literal["unit", "app", None] = None
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
@@ -213,8 +213,9 @@ class Secret(_DCBase):
     ):
         """Update the metadata."""
         revision = max(self.contents.keys())
+        self.contents[revision + 1] = content
+
         # bypass frozen dataclass
-        object.__setattr__(self, "contents"[revision + 1], content)
         if label:
             object.__setattr__(self, "label", label)
         if description:

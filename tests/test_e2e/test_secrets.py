@@ -3,6 +3,7 @@ import datetime
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
+from ops.model import Secret as ops_Secret
 from ops.model import SecretNotFoundError, SecretRotate
 
 from scenario import Context
@@ -172,11 +173,79 @@ def test_add(mycharm, app):
     assert secret.label == "mylabel"
 
 
+def test_set(mycharm):
+    rev1, rev2, rev3 = {"foo": "bar"}, {"foo": "baz"}, {"foo": "baz", "qux": "roz"}
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
+        State(),
+    ) as mgr:
+        charm = mgr.charm
+        secret: ops_Secret = charm.unit.add_secret(rev1, label="mylabel")
+        assert (
+            secret.get_content()
+            == secret.peek_content()
+            == secret.get_content(refresh=True)
+            == rev1
+        )
+
+        secret.set_content(rev2)
+        assert (
+            secret.get_content()
+            == secret.peek_content()
+            == secret.get_content(refresh=True)
+            == rev2
+        )
+
+        secret.set_content(rev3)
+        state_out = mgr.run()
+        assert (
+            secret.get_content()
+            == secret.peek_content()
+            == secret.get_content(refresh=True)
+            == rev3
+        )
+
+    assert state_out.secrets[0].contents == {
+        0: rev1,
+        1: rev2,
+        2: rev3,
+    }
+
+
+def test_set_juju33(mycharm):
+    rev1, rev2, rev3 = {"foo": "bar"}, {"foo": "baz"}, {"foo": "baz", "qux": "roz"}
+    with Context(mycharm, meta={"name": "local"}, juju_version="3.3").manager(
+        "update_status",
+        State(),
+    ) as mgr:
+        charm = mgr.charm
+        secret: ops_Secret = charm.unit.add_secret(rev1, label="mylabel")
+        assert secret.get_content() == rev1
+
+        secret.set_content(rev2)
+        assert secret.get_content() == rev1
+        assert secret.peek_content() == rev2
+        assert secret.get_content(refresh=True) == rev2
+
+        secret.set_content(rev3)
+        state_out = mgr.run()
+        assert secret.get_content() == rev2
+        assert secret.peek_content() == rev3
+        assert secret.get_content(refresh=True) == rev3
+
+    assert state_out.secrets[0].contents == {
+        0: rev1,
+        1: rev2,
+        2: rev3,
+    }
+
+
 @pytest.mark.parametrize("app", (True, False))
 def test_meta(mycharm, app):
     with Context(mycharm, meta={"name": "local"}).manager(
         "update_status",
         State(
+            leader=True,
             secrets=[
                 Secret(
                     owner="app" if app else "unit",
@@ -188,7 +257,7 @@ def test_meta(mycharm, app):
                         0: {"a": "b"},
                     },
                 )
-            ]
+            ],
         ),
     ) as mgr:
         charm = mgr.charm
@@ -203,8 +272,29 @@ def test_meta(mycharm, app):
 
 
 @pytest.mark.parametrize("leader", (True, False))
-@pytest.mark.parametrize("granted", ("app", "unit"))
-def test_meta_nonowner(mycharm, granted, leader):
+@pytest.mark.parametrize("owner", ("app", "unit", None))
+@pytest.mark.parametrize("granted", ("app", "unit", None))
+def test_secret_permission_model(mycharm, granted, leader, owner):
+    if granted:
+        owner = None
+
+    expect_view = bool(
+        # if you (or your app) owns the secret, you can always view it
+        (owner is not None)
+        # can read secrets you don't own if you've been granted them
+        or granted
+    )
+
+    expect_manage = bool(
+        # if you're the leader and own this app secret
+        (owner == "app" and leader)
+        # you own this secret
+        or (owner == "unit")
+    )
+
+    if expect_manage:
+        assert expect_view
+
     with Context(mycharm, meta={"name": "local"}).manager(
         "update_status",
         State(
@@ -216,6 +306,7 @@ def test_meta_nonowner(mycharm, granted, leader):
                     description="foobarbaz",
                     rotate=SecretRotate.HOURLY,
                     granted=granted,
+                    owner=owner,
                     contents={
                         0: {"a": "b"},
                     },
@@ -223,14 +314,34 @@ def test_meta_nonowner(mycharm, granted, leader):
             ],
         ),
     ) as mgr:
-        if not leader and granted == "app":
+        if expect_view:
+            secret = mgr.charm.model.get_secret(id="foo")
+            assert secret.get_content()["a"] == "b"
+            assert secret.peek_content()
+            assert secret.get_content(refresh=True)
+
+        else:
             with pytest.raises(SecretNotFoundError):
                 mgr.charm.model.get_secret(id="foo")
-            return
-        else:
-            secret = mgr.charm.model.get_secret(id="foo")
 
-        secret.get_info()
+            # nothing else to do directly if you can't get a hold of the Secret instance
+            # but we can try some raw backend calls
+            with pytest.raises(SecretNotFoundError):
+                mgr.charm.model._backend.secret_info_get(id="foo")
+
+            with pytest.raises(SecretNotFoundError):
+                mgr.charm.model._backend.secret_set(id="foo", content={"bo": "fo"})
+
+        if expect_manage:
+            secret: ops_Secret = mgr.charm.model.get_secret(id="foo")
+            assert secret.get_content()
+            assert secret.peek_content()
+            assert secret.get_content(refresh=True)
+
+            assert secret.get_info()
+            secret.set_content({"foo": "boo"})
+            assert secret.get_content()["foo"] == "boo"
+            secret.remove_all_revisions()
 
 
 @pytest.mark.parametrize("app", (True, False))
