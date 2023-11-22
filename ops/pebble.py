@@ -751,7 +751,7 @@ class Plan:
 
     @property
     def log_targets(self) -> Dict[str, 'LogTarget']:
-        """This plan's log targets mapping (maps log targer name to :class:`LogTarget`).
+        """This plan's log targets mapping (maps log target name to :class:`LogTarget`).
 
         This property is currently read-only.
         """
