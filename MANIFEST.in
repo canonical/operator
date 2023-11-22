@@ -3,3 +3,16 @@ recursive-exclude docs/
 exclude .readthedocs.yaml
 exclude .gitignore
 
+recursive-include test/
+recursive-include ops/
+
+include .pyproject.toml
+include CHANGES.md
+include HACKING.md
+include README.md
+include CODE_OF_CONDUCT.md
+include LICENSE.txt
+include MANIFEST.in
+include requirements.txt
+include requirements-dev.txt
+include tox.ini
