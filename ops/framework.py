@@ -338,7 +338,7 @@ class BoundEvent:
         other words, custom events are not queued, but rather nested. For
         example::
 
-            1. Main hook (emits custom_event_1)
+            1. Main hook handler (emits custom_event_1)
             2.   Custom event 1 handler (emits custom_event_2)
             3.     Custom event 2 handler
             4.   Resume custom event 1 handler
