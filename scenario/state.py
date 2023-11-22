@@ -135,10 +135,8 @@ class Secret(_DCBase):
     contents: Dict[int, "RawSecretRevisionContents"]
 
     # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
+    # if None, the implication is that the secret has been granted to this unit.
     owner: Literal["unit", "app", None] = None
-
-    # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
-    granted: Literal["unit", "app", None] = None
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
@@ -831,10 +829,11 @@ class State(_DCBase):
     model: Model = Model()
     """The model this charm lives in."""
     secrets: List[Secret] = dataclasses.field(default_factory=list)
-    """The secrets this charm has access to (as an owner, or as a grantee)."""
+    """The secrets this charm has access to (as an owner, or as a grantee).
+    The presence of a secret in this list entails that the charm can read it.
+    Whether it can manage it or not depends on the individual secret's `owner` flag."""
     resources: Dict[str, "PathLike"] = dataclasses.field(default_factory=dict)
     """Mapping from resource name to path at which the resource can be found."""
-
     planned_units: int = 1
     """Number of non-dying planned units that are expected to be running this application.
     Use with caution."""

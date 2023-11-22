@@ -36,9 +36,7 @@ def test_get_secret_no_secret(mycharm):
 
 def test_get_secret(mycharm):
     with Context(mycharm, meta={"name": "local"}).manager(
-        state=State(
-            secrets=[Secret(id="foo", contents={0: {"a": "b"}}, granted="unit")]
-        ),
+        state=State(secrets=[Secret(id="foo", contents={0: {"a": "b"}}, granted=True)]),
         event="update_status",
     ) as mgr:
         assert mgr.charm.model.get_secret(id="foo").get_content()["a"] == "b"
@@ -88,7 +86,6 @@ def test_get_secret_nonowner_peek_update(mycharm, app):
                         0: {"a": "b"},
                         1: {"a": "c"},
                     },
-                    granted="app" if app else "unit",
                 ),
             ],
         ),
@@ -273,27 +270,13 @@ def test_meta(mycharm, app):
 
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("owner", ("app", "unit", None))
-@pytest.mark.parametrize("granted", ("app", "unit", None))
-def test_secret_permission_model(mycharm, granted, leader, owner):
-    if granted:
-        owner = None
-
-    expect_view = bool(
-        # if you (or your app) owns the secret, you can always view it
-        (owner is not None)
-        # can read secrets you don't own if you've been granted them
-        or granted
-    )
-
+def test_secret_permission_model(mycharm, leader, owner):
     expect_manage = bool(
         # if you're the leader and own this app secret
         (owner == "app" and leader)
         # you own this secret
         or (owner == "unit")
     )
-
-    if expect_manage:
-        assert expect_view
 
     with Context(mycharm, meta={"name": "local"}).manager(
         "update_status",
@@ -305,7 +288,6 @@ def test_secret_permission_model(mycharm, granted, leader, owner):
                     label="mylabel",
                     description="foobarbaz",
                     rotate=SecretRotate.HOURLY,
-                    granted=granted,
                     owner=owner,
                     contents={
                         0: {"a": "b"},
@@ -314,26 +296,15 @@ def test_secret_permission_model(mycharm, granted, leader, owner):
             ],
         ),
     ) as mgr:
-        if expect_view:
-            secret = mgr.charm.model.get_secret(id="foo")
-            assert secret.get_content()["a"] == "b"
-            assert secret.peek_content()
-            assert secret.get_content(refresh=True)
+        secret = mgr.charm.model.get_secret(id="foo")
+        assert secret.get_content()["a"] == "b"
+        assert secret.peek_content()
+        assert secret.get_content(refresh=True)
 
-        else:
-            with pytest.raises(SecretNotFoundError):
-                mgr.charm.model.get_secret(id="foo")
-
-            # nothing else to do directly if you can't get a hold of the Secret instance
-            # but we can try some raw backend calls
-            with pytest.raises(SecretNotFoundError):
-                mgr.charm.model._backend.secret_info_get(id="foo")
-
-            with pytest.raises(SecretNotFoundError):
-                mgr.charm.model._backend.secret_set(id="foo", content={"bo": "fo"})
+        # can always view
+        secret: ops_Secret = mgr.charm.model.get_secret(id="foo")
 
         if expect_manage:
-            secret: ops_Secret = mgr.charm.model.get_secret(id="foo")
             assert secret.get_content()
             assert secret.peek_content()
             assert secret.get_content(refresh=True)
@@ -342,6 +313,15 @@ def test_secret_permission_model(mycharm, granted, leader, owner):
             secret.set_content({"foo": "boo"})
             assert secret.get_content()["foo"] == "boo"
             secret.remove_all_revisions()
+
+        else:  # cannot manage
+            # nothing else to do directly if you can't get a hold of the Secret instance
+            # but we can try some raw backend calls
+            with pytest.raises(SecretNotFoundError):
+                secret.get_info()
+
+            with pytest.raises(SecretNotFoundError):
+                secret.set_content(content={"boo": "foo"})
 
 
 @pytest.mark.parametrize("app", (True, False))
