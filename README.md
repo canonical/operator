@@ -811,11 +811,16 @@ state = State(
 ```
 
 The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping
-from revision numbers (integers) to a str:str dict representing the payload of the revision.
+from revision numbers (integers) to a `str:str` dict representing the payload of the revision.
 
-By default, the secret is not owned by **this charm** nor is it granted to it.
-Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to
-this charm, nor we specified that the secret is owned by it.
+There are three cases:
+- the secret is owned by this app, in which case only the leader unit can manage it
+- the secret is owned by this unit, in which case this charm can always manage it (leader or not)
+- (default) the secret is not owned by this app nor unit, which means we can't manage it but only view it
+
+Thus by default, the secret is not owned by **this charm**, but, implicitly, by some unknown 'other charm', and that other charm has granted us view rights.
+
+The presence of the secret in `State.secrets` entails that we have access to it, either as owners or as grantees. Therefore, if we're not owners, we must be grantees. Absence of a Secret from the known secrets list means we are not entitled to obtaining it in any way. The charm, indeed, shouldn't even know it exists.
 
 To specify a secret owned by this unit (or app):
 
@@ -826,7 +831,7 @@ state = State(
     secrets=[
         Secret(
             id='foo',
-            contents={0: {'key': 'public'}},
+            contents={0: {'key': 'private'}},
             owner='unit',  # or 'app'
             remote_grants={0: {"remote"}}
             # the secret owner has granted access to the "remote" app over some relation with ID 0
@@ -846,7 +851,6 @@ state = State(
             id='foo',
             contents={0: {'key': 'public'}},
             # owner=None, which is the default
-            granted="unit",  # or "app",
             revision=0,  # the revision that this unit (or app) is currently tracking
         )
     ]
