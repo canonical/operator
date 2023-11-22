@@ -432,9 +432,7 @@ oauthlib==3.2.2 \
 packaging==23.2 \
     --hash=sha256:048fb0e9405036518eaaf48a55953c750c11e1a1b68e0dd1a9d62ed0c092cfc5 \
     --hash=sha256:8c491190033a9af7e1d931d0b5dacc2ef47509b34dd0de67ed209b5203fc88c7
-    # via
-    #   pytest
-    #   setuptools-scm
+    # via pytest
 paramiko==2.12.0 \
     --hash=sha256:376885c05c5d6aa6e1f4608aac2a6b5b0548b1add40274477324605903d9cd49 \
     --hash=sha256:b2df1a6325f6996ef55a8789d0462f5b502ea83b3c990cbb5bbe57345c6812c4
@@ -652,10 +650,6 @@ rsa==4.9 \
     --hash=sha256:90260d9058e514786967344d0ef75fa8727eed8a7d2e43ce9f4bcf1b536174f7 \
     --hash=sha256:e38464a49c6c85d7f1351b0126661487a7e0a14a50f1675ec50eb34d4f20ef21
     # via google-auth
-setuptools-scm==8.0.4 \
-    --hash=sha256:b47844cd2a84b83b3187a5782c71128c28b4c94cad8bfb871da2784a5cb54c4f \
-    --hash=sha256:b5f43ff6800669595193fd09891564ee9d1d7dcb196cab4b2506d53a2e1c95c7
-    # via ops (pyproject.toml)
 six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
@@ -693,7 +687,6 @@ typing-extensions==4.8.0 \
     --hash=sha256:df8e4339e9cb77357558cbdbceca33c303714cf861d1eef15e1070055ae8b7ef
     # via
     #   ops (pyproject.toml)
-    #   setuptools-scm
     #   typing-inspect
 typing-inspect==0.9.0 \
     --hash=sha256:9ee6fc59062311ef8547596ab6b955e1b8aa46242d854bfc78f4f6b0eff35f9f \
@@ -794,7 +787,4 @@ websockets==12.0 \
 setuptools==68.2.2 \
     --hash=sha256:4ac1475276d2f1c48684874089fefcd83bd7162ddaafb81fac866ba0db282a87 \
     --hash=sha256:b454a35605876da60632df1a60f736524eb73cc47bbc9f3f1ef1b644de74fd2a
-    # via
-    #   nodeenv
-    #   ops (pyproject.toml)
-    #   setuptools-scm
+    # via nodeenv

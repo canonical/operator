@@ -14,7 +14,6 @@ venv
 /dist
 /build
 /docs/_build
-ops/version.py
 
 # Smoke test artifacts
 *.tar.gz

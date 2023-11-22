@@ -154,38 +154,22 @@ All tool configuration is kept in [project.toml](pyproject.toml).
 The build backend is [setuptools](https://pypi.org/project/setuptools/), and
 the build frontend is [build](https://pypi.org/project/build/).
 
-The version number is automatically generated from Git metadata using the
-[setuptools-scm package](https://pypi.org/project/setuptools-scm/). During the
-build process, an ``ops/version.py`` is automatically generated so that if you
-are running from an installed package (including an editable install), you can
-statically access the version:
-
-```python
-import ops
-print(ops.__version__)
-import ops.version
-print(ops.version.version_tuple)
-```
-
-[This is pretty awful, and it seems like this cannot be the best way to do this]: #
-
-Importing `ops` outside of an install will fail because the generated version
-module does not exist. It can be generated using:
-
-```sh
-python -c 'import setuptools_scm;conf=setuptools_scm.Configuration.from_file();setuptools_scm.dump_version(conf.root,setuptools_scm.get_version(),conf.version_file,conf.version_file_template)'
-```
-
 # Publishing a Release
 
 To make a release of the ops library, do the following:
 
-1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
-2. Click "Draft a new release"
-3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
-   E.g. 2.3.12
-4. Drop notes and a changelog in the description.
-5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+1. Open a PR to change [version.py][ops/version.py]'s `version` to the
+   [appropriate string](https://semver.org/), and get that merged to main.
+2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
+3. Click "Draft a new release"
+4. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+   and a brief summary of the main changes in the release
+   E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
+5. Drop notes and a changelog in the description.
+6. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+7. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
+   next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
+   `'3.14.1.dev0'`).
 
 This will trigger an automatic build for the Python package and publish it to PyPI (authorization is handled via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
 
