@@ -58,6 +58,9 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.dynamic]
+version = {attr = "ops.__version__"}
+
 [tool.pip-tools]
 generate-hashes = true
 strip-extras = true
