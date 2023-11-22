@@ -55,6 +55,8 @@ dev = [
 [build-system]
 requires = [
     "setuptools>=60",
+    "PyYAML==6.*",
+    "websocket-client==1.*",
 ]
 build-backend = "setuptools.build_meta"
 
