@@ -138,6 +138,9 @@ class Secret(_DCBase):
     # if None, the implication is that the secret has been granted to this unit.
     owner: Literal["unit", "app", None] = None
 
+    # deprecated!
+    granted: Literal["unit", "app", False] = "<DEPRECATED>"
+
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
 
@@ -151,9 +154,16 @@ class Secret(_DCBase):
     rotate: SecretRotate = SecretRotate.NEVER
 
     def __post_init__(self):
+        if self.granted != "<DEPRECATED>":
+            logger.warning(
+                "``state.Secret.granted`` is deprecated and will be removed in Scenario 6. "
+                "If a Secret is not owned by the app/unit you are testing, nor has been granted to "
+                "it by the (remote) owner, then omit it from ``State.secrets`` altogether.",
+            )
         if self.owner == "application":
             logger.warning(
-                "Secret.owner='application' is deprecated in favour of 'app'.",
+                "Secret.owner='application' is deprecated in favour of 'app' "
+                "and will be removed in Scenario 6.",
             )
             # bypass frozen dataclass
             object.__setattr__(self, "owner", "app")

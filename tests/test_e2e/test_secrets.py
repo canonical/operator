@@ -44,7 +44,7 @@ def test_get_secret(mycharm):
 
 def test_get_secret_not_granted(mycharm):
     with Context(mycharm, meta={"name": "local"}).manager(
-        state=State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
+        state=State(secrets=[]),
         event="update_status",
     ) as mgr:
         with pytest.raises(SecretNotFoundError) as e:
@@ -388,30 +388,6 @@ def test_update_metadata(mycharm):
     assert secret_out.rotate == SecretRotate.DAILY
     assert secret_out.description == "blu"
     assert secret_out.expire == exp
-
-
-def test_grant_nonowner(mycharm):
-    with Context(
-        mycharm, meta={"name": "local", "requires": {"foo": {"interface": "bar"}}}
-    ).manager(
-        "update_status",
-        State(
-            relations=[Relation("foo", "remote")],
-            secrets=[
-                Secret(
-                    id="foo",
-                    label="mylabel",
-                    description="foobarbaz",
-                    rotate=SecretRotate.HOURLY,
-                    contents={
-                        0: {"a": "b"},
-                    },
-                )
-            ],
-        ),
-    ) as mgr:
-        with pytest.raises(SecretNotFoundError):
-            mgr.charm.model.get_secret(id="foo")
 
 
 @pytest.mark.parametrize("leader", (True, False))
