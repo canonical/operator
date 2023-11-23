@@ -2486,10 +2486,13 @@ class _TestingModelBackend:
         # secrets, the leader has manage permissions and other units only have
         # view permissions.
         # https://discourse.charmhub.io/t/secret-access-permissions/12627
-        if (secret.owner_name != self.unit_name
-                and (secret.owner_name != self.app_name or not self.is_leader())):
-            raise model.SecretNotFoundError(
-                f'You must own secret {secret.id!r} to perform this operation')
+        unit_secret = secret.owner_name == self.unit_name
+        app_secret = secret.owner_name == self.app_name
+
+        if unit_secret or (app_secret and self.is_leader()):
+            return
+        raise model.SecretNotFoundError(
+            f'You must own secret {secret.id!r} to perform this operation')
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,
