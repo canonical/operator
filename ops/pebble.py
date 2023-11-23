@@ -129,8 +129,8 @@ LogTargetDict = typing.TypedDict('LogTargetDict',
                                  {'override': Union[Literal['merge'], Literal['replace']],
                                   'type': Literal['loki'],
                                   'location': str,
-                                  'services': Optional[List[str]],
-                                  'labels': Optional[Dict[str, str]]},
+                                  'services': List[str],
+                                  'labels': Dict[str, str]},
                                  total=False)
 
 LayerDict = typing.TypedDict('LayerDict',
@@ -1063,12 +1063,9 @@ class LogTarget:
         self.name = name
         dct: LogTargetDict = raw or {}
         self.override: str = dct.get('override', '')
-        self.type_ = dct.get('type', '')
+        self.type = dct.get('type', '')
         self.location = dct.get('location', '')
-        services = dct.get('services')
-        if services:
-            services = services[:]
-        self.services: Optional[List[str]] = services
+        self.services: List[str] = list(dct.get('services', []))
         labels = dct.get('labels')
         if labels is not None:
             labels = copy.deepcopy(labels)
@@ -1078,7 +1075,7 @@ class LogTarget:
         """Convert this log target object to its dict representation."""
         fields = [
             ('override', self.override),
-            ('type', self.type_),
+            ('type', self.type),
             ('location', self.location),
             ('services', self.services),
             ('labels', self.labels),
