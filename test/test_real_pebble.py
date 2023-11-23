@@ -259,6 +259,33 @@ class TestRealPebble(unittest.TestCase):
 
         self.assertEqual(reads, [b'one\n', b'2\n', b'THREE\n'])
 
+    def test_log_forwarding(self):
+        self.client.add_layer("log-forwarder", {
+            "services": {
+                "tired": {
+                    "override": "replace",
+                    "command": "sleep 1",
+                },
+            },
+            "log-targets": {
+                "pretend-loki": {
+                    "type": "loki",
+                    "override": "replace",
+                    "location": "https://example.com",
+                    "services": ["all"],
+                    "labels": {"foo": "bar"},
+                },
+            },
+        }, combine=True)
+        self.client.replan_services()
+        plan = self.client.get_plan()
+        self.assertEqual(len(plan.log_targets), 1)
+        self.assertEqual(plan.log_targets["pretend-loki"].type, "loki")
+        self.assertEqual(plan.log_targets["pretend-loki"].override, "replace")
+        self.assertEqual(plan.log_targets["pretend-loki"].location, "https://example.com")
+        self.assertEqual(plan.log_targets["pretend-loki"].services, ["all"])
+        self.assertEqual(plan.log_targets["pretend-loki"].labels, {"foo": "bar"})
+
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
 class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
