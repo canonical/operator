@@ -2482,7 +2482,12 @@ class _TestingModelBackend:
         return None
 
     def _ensure_secret_owner(self, secret: _Secret):
-        if secret.owner_name not in [self.app_name, self.unit_name]:
+        # For unit secrets, the owner unit has manage permissions. For app
+        # secrets, the leader has manage permissions and other units only have
+        # view permissions.
+        # https://discourse.charmhub.io/t/secret-access-permissions/12627
+        if (secret.owner_name != self.unit_name
+                and (secret.owner_name != self.app_name or not self.is_leader())):
             raise model.SecretNotFoundError(
                 f'You must own secret {secret.id!r} to perform this operation')
 

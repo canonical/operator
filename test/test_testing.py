@@ -4819,6 +4819,7 @@ class TestSecrets(unittest.TestCase):
         harness.add_relation_unit(relation_id, 'webapp/0')
         assert harness is not None
 
+        harness.set_leader(True)
         secret = harness.model.app.add_secret({'foo': 'x'})
         assert secret.id is not None
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
@@ -4913,6 +4914,39 @@ class TestSecrets(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
+
+    def test_secret_permissions(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # The charm can always manage a local unit secret.
+        secret_id = harness.charm.unit.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        info = secret.get_info()
+        self.assertEqual(info.id, secret_id)
+        secret.set_content({"password": "5678"})
+        secret.remove_all_revisions()
+        # The leader can manage an application secret.
+        harness.set_leader(True)
+        secret_id = harness.charm.app.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        info = secret.get_info()
+        self.assertEqual(info.id, secret_id)
+        secret.set_content({"password": "5678"})
+        secret.remove_all_revisions()
+        # Non-leaders can only view an application secret.
+        harness.set_leader(False)
+        secret_id = harness.charm.app.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.get_info()
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.set_content({"password": "5678"})
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.remove_all_revisions()
 
 
 class EventRecorder(ops.CharmBase):
