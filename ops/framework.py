@@ -331,7 +331,18 @@ class BoundEvent:
     def emit(self, *args: Any, **kwargs: Any):
         """Emit event to all registered observers.
 
-        The current storage state is committed before and after each observer is notified.
+        The current storage state is committed before and after each observer
+        is notified.
+
+        Note that the emission of custom events is handled immediately. In
+        other words, custom events are not queued, but rather nested. For
+        example::
+
+            1. Main hook handler (emits custom_event_1)
+            2.   Custom event 1 handler (emits custom_event_2)
+            3.     Custom event 2 handler
+            4.   Resume custom event 1 handler
+            5. Resume main hook handler
         """
         framework = self.emitter.framework
         key = framework._next_event_key()
