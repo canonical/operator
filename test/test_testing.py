@@ -4915,10 +4915,11 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
 
-    def test_secret_permissions(self):
+    def test_secret_permissions_unit(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
         self.addCleanup(harness.cleanup)
         harness.begin()
+
         # The charm can always manage a local unit secret.
         secret_id = harness.charm.unit.add_secret({"password": "1234"}).id
         secret = harness.charm.model.get_secret(id=secret_id)
@@ -4927,6 +4928,12 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(info.id, secret_id)
         secret.set_content({"password": "5678"})
         secret.remove_all_revisions()
+
+    def test_secret_permissions_leader(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
         # The leader can manage an application secret.
         harness.set_leader(True)
         secret_id = harness.charm.app.add_secret({"password": "1234"}).id
@@ -4936,6 +4943,12 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(info.id, secret_id)
         secret.set_content({"password": "5678"})
         secret.remove_all_revisions()
+
+    def test_secret_permissions_nonleader(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
         # Non-leaders can only view an application secret.
         harness.set_leader(False)
         secret_id = harness.charm.app.add_secret({"password": "1234"}).id
