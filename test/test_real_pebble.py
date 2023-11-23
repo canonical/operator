@@ -277,7 +277,6 @@ class TestRealPebble(unittest.TestCase):
                 },
             },
         }, combine=True)
-        self.client.replan_services()
         plan = self.client.get_plan()
         self.assertEqual(len(plan.log_targets), 1)
         self.assertEqual(plan.log_targets["pretend-loki"].type, "loki")
