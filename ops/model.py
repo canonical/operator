@@ -1291,8 +1291,7 @@ class Secret:
         Args:
             refresh: If true, fetch the latest revision's content and tell
                 Juju to update to tracking that revision. The default is to
-                get the content of the currently-tracked revision. This
-                parameter is only meaningful for secret observers, not owners.
+                get the content of the currently-tracked revision.
         """
         if refresh or self._content is None:
             self._content = self._backend.secret_get(
