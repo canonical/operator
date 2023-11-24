@@ -34,7 +34,14 @@ from typing import (
 
 from ops import model
 from ops._private import yaml
-from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
+from ops.framework import (
+    EventBase,
+    EventSource,
+    Framework,
+    LifecycleEvent,
+    Object,
+    ObjectEvents,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import Required, TypedDict
@@ -830,7 +837,7 @@ class SecretExpiredEvent(SecretEvent):
             'this event until you create a new revision.')
 
 
-class CollectStatusEvent(EventBase):
+class CollectStatusEvent(LifecycleEvent):
     """Event triggered at the end of every hook to collect statuses for evaluation.
 
     If the charm wants to provide application or unit status in a consistent

@@ -906,11 +906,11 @@ class Framework(Object):
                 if single_event_path is None:
                     logger.debug("Re-emitting deferred event %s.", event)
                 elif isinstance(event, LifecycleEvent):
-                    # Ignore Lifecycle events: they are "private" and not interesting.
-                    pass
+                    logger.debug("Emitting lifecycle event %s.", event.handle.kind)
                 elif self._event_name and self._event_name != event.handle.kind:
                     # if the event we are emitting now is not the event being
                     # dispatched, and it also is not an event we have deferred,
+                    # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
                     logger.debug("Emitting custom event %s.", event)
 

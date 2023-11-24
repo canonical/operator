@@ -625,6 +625,7 @@ class _TestMain(abc.ABC):
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
             ['is-leader', '--format=json'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting lifecycle event commit.']
         ]
         calls = fake_script_calls(self)
 
@@ -645,6 +646,7 @@ class _TestMain(abc.ABC):
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event update_status.'],
             ['juju-log', '--log-level', 'DEBUG', '--', custom_event_prefix],
             ['is-leader', '--format=json'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting lifecycle event commit.']
         ]
         # Remove the "[key]>" suffix from the end of the event string
         self.assertRegex(calls[2][-1], re.escape(custom_event_prefix) + '.*')
@@ -791,9 +793,13 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = [f"hooks/{name.replace('_', '-')}"
-                           for name, event_source in self.charm_module.Charm.on.events().items()
-                           if issubclass(event_source.event_type, ops.LifecycleEvent)]
+        # Fixme: this is always an empty list, is this test outdated?
+        all_event_hooks = [
+            f"hooks/{name.replace('_', '-')}" for name,
+            event_source in self.charm_module.Charm.on.events().items() if issubclass(
+                event_source.event_type,
+                (ops.CommitEvent,
+                 ops.PreCommitEvent))]
 
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
@@ -909,9 +915,10 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting lifecycle event commit.']
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-4)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_non_executable_hook_and_dispatch(self):
@@ -929,9 +936,10 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting lifecycle event commit.']
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-4)), 'Initializing SQLite local storage: ')
         self.assertEqual(calls, expected)
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -1012,9 +1020,10 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'DEBUG', '--',
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
+            ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting lifecycle event commit.']
         ]
         calls = fake_script_calls(self)
-        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
+        self.assertRegex(' '.join(calls.pop(-4)), 'Initializing SQLite local storage: ')
 
         self.assertEqual(calls, expected)
 
