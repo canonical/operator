@@ -32,7 +32,8 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     that Go's encoding/json package produces for time.Time values.
 
     Unfortunately we can't use datetime.fromisoformat(), as that does not
-    support more than 6 digits for the fractional second, nor the 'Z' for UTC.
+    support more than 6 digits for the fractional second, nor the 'Z' for UTC,
+    in Python 3.8 (Python 3.11+ has the required functionality).
     """
     match = _TIMESTAMP_RE.match(s)
     if not match:
@@ -50,6 +51,8 @@ def parse_rfc3339(s: str) -> datetime.datetime:
         tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
 
     microsecond = round(float(sfrac or '0') * 1000000)
+    carry, microsecond = divmod(microsecond, 1000000)
+    ss = int(ss) + carry
 
-    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
+    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), ss,
                              microsecond=microsecond, tzinfo=tz)
