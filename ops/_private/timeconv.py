@@ -52,7 +52,9 @@ def parse_rfc3339(s: str) -> datetime.datetime:
 
     microsecond = round(float(sfrac or '0') * 1000000)
     carry, microsecond = divmod(microsecond, 1000000)
-    ss = int(ss) + carry
 
-    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), ss,
-                             microsecond=microsecond, tzinfo=tz)
+    parsed = datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
+                               microsecond=microsecond, tzinfo=tz)
+    if carry:
+        return parsed + datetime.timedelta(seconds=carry)
+    return parsed
