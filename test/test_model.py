@@ -24,7 +24,7 @@ import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
 from textwrap import dedent
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -968,6 +968,28 @@ class TestModel(unittest.TestCase):
             _ = model.unit.status.message
         self.assertEqual(str(cm.exception), 'ERROR cannot get status\n')
         self.assertEqual(cm.exception.args[0], 'ERROR cannot get status\n')
+
+    @patch("pwd.getpwuid")
+    @patch("grp.getgrgid")
+    def test_push_path_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+        getpwuid.side_effect = KeyError
+        getgrgid.side_effect = KeyError
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        harness.begin()
+        harness.set_can_connect('foo', True)
+        c = harness.model.unit.containers['foo']
+
+        with tempfile.TemporaryDirectory() as push_src:
+            push_path = pathlib.Path(push_src) / 'src.txt'
+            with push_path.open('w') as f:
+                f.write('hello')
+            c.push_path(push_path, "/")
+        assert c.exists("/src.txt"), 'push_path failed: file "src.txt" missing at destination'
 
 
 class PushPullCase:
