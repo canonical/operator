@@ -988,7 +988,7 @@ class TestModel(unittest.TestCase):
             push_path = pathlib.Path(push_src) / 'src.txt'
             push_path.write_text('hello')
             container.push_path(push_path, "/")
-        assert container.exists("/src.txt"), 'push_path failed: file "src.txt" missing at destination'
+        assert container.exists("/src.txt"), 'push_path failed: file "src.txt" missing'
 
 
 class PushPullCase:
