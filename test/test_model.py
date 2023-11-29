@@ -982,14 +982,13 @@ class TestModel(unittest.TestCase):
             ''')
         harness.begin()
         harness.set_can_connect('foo', True)
-        c = harness.model.unit.containers['foo']
+        container = harness.model.unit.containers['foo']
 
         with tempfile.TemporaryDirectory() as push_src:
             push_path = pathlib.Path(push_src) / 'src.txt'
-            with push_path.open('w') as f:
-                f.write('hello')
-            c.push_path(push_path, "/")
-        assert c.exists("/src.txt"), 'push_path failed: file "src.txt" missing at destination'
+            push_path.write_text('hello')
+            container.push_path(push_path, "/")
+        assert container.exists("/src.txt"), 'push_path failed: file "src.txt" missing at destination'
 
 
 class PushPullCase:
