@@ -72,11 +72,11 @@ class TestStrconv(unittest.TestCase):
         self.assertEqual(timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789+00:00'),
                          datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=utc))
 
-        self.assertEqual(timeconv.parse_rfc3339('2006-08-28T13:20:00.99999999Z'),
-                         datetime.datetime(2006, 8, 28, 13, 20, 1, 0, tzinfo=utc))
+        self.assertEqual(timeconv.parse_rfc3339('2006-08-28T13:20:00.9999999Z'),
+                         datetime.datetime(2006, 8, 28, 13, 20, 0, 999999, tzinfo=utc))
 
-        self.assertEqual(timeconv.parse_rfc3339('2006-12-31T23:59:59.99999999Z'),
-                         datetime.datetime(2007, 1, 1, 0, 0, 0, 0, tzinfo=utc))
+        self.assertEqual(timeconv.parse_rfc3339('2006-12-31T23:59:59.9999999Z'),
+                         datetime.datetime(2006, 12, 31, 23, 59, 59, 999999, tzinfo=utc))
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=-11, minutes=-30))
         self.assertEqual(timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789-11:30'),

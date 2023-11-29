@@ -51,10 +51,9 @@ def parse_rfc3339(s: str) -> datetime.datetime:
         tz = datetime.timezone(tz_delta if sign == '+' else -tz_delta)
 
     microsecond = round(float(sfrac or '0') * 1000000)
-    carry, microsecond = divmod(microsecond, 1000000)
+    # Ignore any overflow into the seconds - this aligns with the Python
+    # standard library behaviour.
+    microsecond = min(microsecond, 999999)
 
-    parsed = datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
-                               microsecond=microsecond, tzinfo=tz)
-    if carry:
-        return parsed + datetime.timedelta(seconds=carry)
-    return parsed
+    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
+                             microsecond=microsecond, tzinfo=tz)
