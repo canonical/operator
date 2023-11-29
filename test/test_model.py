@@ -969,8 +969,8 @@ class TestModel(unittest.TestCase):
         self.assertEqual(str(cm.exception), 'ERROR cannot get status\n')
         self.assertEqual(cm.exception.args[0], 'ERROR cannot get status\n')
 
-    @patch("pwd.getpwuid")
     @patch("grp.getgrgid")
+    @patch("pwd.getpwuid")
     def test_push_path_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
