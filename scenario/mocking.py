@@ -22,7 +22,7 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
-from scenario.state import JujuLogLine, Mount, PeerRelation, Port, Storage
+from scenario.state import JujuLogLine, Mount, Network, PeerRelation, Port, Storage
 
 if TYPE_CHECKING:
     from scenario.context import Context
@@ -238,15 +238,31 @@ class _MockModelBackend(_ModelBackend):
         return state_config  # full config
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None):
-        if relation_id:
-            logger.warning("network-get -r not implemented")
+        # is this an extra-binding-provided network?
+        if binding_name in self._charm_spec.meta.get("extra-bindings", ()):
+            network = self._state.extra_bindings.get(binding_name, Network.default())
+            return network.hook_tool_output_fmt()
 
+        # Is this a network attached to a relation?
         relations = self._state.get_relations(binding_name)
-        if not relations:
-            raise RelationNotFoundError()
-
-        network = next(filter(lambda r: r.name == binding_name, self._state.networks))
-        return network.hook_tool_output_fmt()
+        if relation_id:
+            try:
+                relation = next(
+                    filter(
+                        lambda r: r.relation_id == relation_id,
+                        relations,
+                    ),
+                )
+            except StopIteration as e:
+                logger.error(
+                    f"network-get error: "
+                    f"No relation found with endpoint={binding_name} and id={relation_id}.",
+                )
+                raise RelationNotFoundError() from e
+        else:
+            # TODO: is this accurate?
+            relation = relations[0]
+        return relation.network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):

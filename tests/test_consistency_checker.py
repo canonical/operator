@@ -15,6 +15,7 @@ from scenario.state import (
     Storage,
     SubordinateRelation,
     _CharmSpec,
+    Network,
 )
 
 
@@ -465,5 +466,42 @@ def test_resource_states():
         _CharmSpec(
             MyCharm,
             meta={"name": "yamlman"},
+        ),
+    )
+
+
+def test_networks_consistency():
+    assert_inconsistent(
+        State(extra_bindings={"foo": Network.default()}),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "wonky"},
+        ),
+    )
+
+    assert_inconsistent(
+        State(extra_bindings={"foo": Network.default()}),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "pinky",
+                "extra-bindings": {"foo": {}},
+                "requires": {"foo": {"interface": "bar"}},
+            },
+        ),
+    )
+
+    assert_consistent(
+        State(extra_bindings={"foo": Network.default()}),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "pinky",
+                "extra-bindings": {"foo": {}},
+                "requires": {"bar": {"interface": "bar"}},
+            },
         ),
     )

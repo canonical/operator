@@ -527,6 +527,12 @@ remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
 remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
 ```
 
+### Networks
+
+Each relation a charm has will 
+A charm can define some `extra-bindings`
+
+
 # Containers
 
 When testing a kubernetes charm, you can mock container interactions. When using the null state (`State()`), there will

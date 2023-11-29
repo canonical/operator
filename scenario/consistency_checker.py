@@ -24,6 +24,15 @@ if TYPE_CHECKING:
 logger = scenario_logger.getChild("consistency_checker")
 
 
+def get_all_relations(charm_spec: "_CharmSpec"):
+    nonpeer_relations_meta = chain(
+        charm_spec.meta.get("requires", {}).items(),
+        charm_spec.meta.get("provides", {}).items(),
+    )
+    peer_relations_meta = charm_spec.meta.get("peers", {}).items()
+    return list(chain(nonpeer_relations_meta, peer_relations_meta))
+
+
 class Results(NamedTuple):
     """Consistency checkers return type."""
 
@@ -69,6 +78,7 @@ def check_consistency(
         check_secrets_consistency,
         check_storages_consistency,
         check_relation_consistency,
+        check_network_consistency,
     ):
         results = check(
             state=state,
@@ -381,6 +391,31 @@ def check_secrets_consistency(
         errors.append(
             f"secrets are not supported in the specified juju version {juju_version}. "
             f"Should be at least 3.0.",
+        )
+
+    return Results(errors, [])
+
+
+def check_network_consistency(
+    *,
+    state: "State",
+    event: "Event",  # noqa: U100
+    charm_spec: "_CharmSpec",
+    **_kwargs,  # noqa: U101
+) -> Results:
+    errors = []
+
+    meta_bindings = set(charm_spec.meta.get("extra-bindings", ()))
+    state_bindings = set(state.extra_bindings)
+    if diff := state_bindings.difference(meta_bindings):
+        errors.append(
+            f"Some extra-bindings defined in State are not in metadata.yaml: {diff}.",
+        )
+
+    endpoints = {i[0] for i in get_all_relations(charm_spec)}
+    if collisions := endpoints.intersection(meta_bindings):
+        errors.append(
+            f"Extra bindings and integration endpoints cannot share the same name: {collisions}.",
         )
 
     return Results(errors, [])

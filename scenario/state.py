@@ -224,6 +224,73 @@ def normalize_name(s: str):
     return s.replace("-", "_")
 
 
+@dataclasses.dataclass(frozen=True)
+class Address(_DCBase):
+    hostname: str
+    value: str
+    cidr: str
+    address: str = ""  # legacy
+
+
+@dataclasses.dataclass(frozen=True)
+class BindAddress(_DCBase):
+    interface_name: str
+    addresses: List[Address]
+    mac_address: Optional[str] = None
+
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
+        dct = {
+            "interface-name": self.interface_name,
+            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
+        }
+        if self.mac_address:
+            dct["mac-address"] = self.mac_address
+        return dct
+
+
+@dataclasses.dataclass(frozen=True)
+class Network(_DCBase):
+    bind_addresses: List[BindAddress]
+    ingress_addresses: List[str]
+    egress_subnets: List[str]
+
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        return {
+            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
+            "egress-subnets": self.egress_subnets,
+            "ingress-addresses": self.ingress_addresses,
+        }
+
+    @classmethod
+    def default(
+        cls,
+        private_address: str = "1.1.1.1",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        mac_address: Optional[str] = None,
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
+    ) -> "Network":
+        """Helper to create a minimal, heavily defaulted Network."""
+        return cls(
+            bind_addresses=[
+                BindAddress(
+                    interface_name=interface_name,
+                    mac_address=mac_address,
+                    addresses=[
+                        Address(hostname=hostname, value=private_address, cidr=cidr),
+                    ],
+                ),
+            ],
+            egress_subnets=list(egress_subnets),
+            ingress_addresses=list(ingress_addresses),
+        )
+
+
 _next_relation_id_counter = 1
 
 
@@ -238,15 +305,27 @@ def next_relation_id(update=True):
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_DCBase):
     endpoint: str
+    """Relation endpoint name. Must match some endpoint name defined in metadata.yaml."""
 
-    # we can derive this from the charm's metadata
     interface: str = None
+    """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
+    If left empty, it will be automatically derived from metadata.yaml."""
 
-    # Every new Relation instance gets a new one, if there's trouble, override.
     relation_id: int = dataclasses.field(default_factory=next_relation_id)
+    """Juju relation ID. Every new Relation instance gets a unique one,
+    if there's trouble, override."""
 
     local_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    """This application's databag for this relation."""
+
     local_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    """This unit's databag for this relation."""
+
+    # TODO should we parametrize/randomize this default value to make each
+    #  relation have a different network?
+    network: Network = dataclasses.field(default=None)
+    """Network associated with this relation.
+    If left empty, a default network will be assigned automatically."""
 
     @property
     def _databags(self):
@@ -275,6 +354,9 @@ class RelationBase(_DCBase):
 
         for databag in self._databags:
             self._validate_databag(databag)
+
+        if self.network is None:
+            object.__setattr__(self, "network", Network.default())
 
     def _validate_databag(self, databag: dict):
         if not isinstance(databag, dict):
@@ -588,77 +670,6 @@ class Container(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
-class Address(_DCBase):
-    hostname: str
-    value: str
-    cidr: str
-    address: str = ""  # legacy
-
-
-@dataclasses.dataclass(frozen=True)
-class BindAddress(_DCBase):
-    interface_name: str
-    addresses: List[Address]
-    mac_address: Optional[str] = None
-
-    def hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
-        dct = {
-            "interface-name": self.interface_name,
-            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
-        }
-        if self.mac_address:
-            dct["mac-address"] = self.mac_address
-        return dct
-
-
-@dataclasses.dataclass(frozen=True)
-class Network(_DCBase):
-    name: str
-
-    bind_addresses: List[BindAddress]
-    ingress_addresses: List[str]
-    egress_subnets: List[str]
-
-    def hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        return {
-            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
-            "egress-subnets": self.egress_subnets,
-            "ingress-addresses": self.ingress_addresses,
-        }
-
-    @classmethod
-    def default(
-        cls,
-        name,
-        private_address: str = "1.1.1.1",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        mac_address: Optional[str] = None,
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
-    ) -> "Network":
-        """Helper to create a minimal, heavily defaulted Network."""
-        return cls(
-            name=name,
-            bind_addresses=[
-                BindAddress(
-                    interface_name=interface_name,
-                    mac_address=mac_address,
-                    addresses=[
-                        Address(hostname=hostname, value=private_address, cidr=cidr),
-                    ],
-                ),
-            ],
-            egress_subnets=list(egress_subnets),
-            ingress_addresses=list(ingress_addresses),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
 class _EntityStatus(_DCBase):
     """This class represents StatusBase and should not be interacted with directly."""
 
@@ -806,8 +817,9 @@ class State(_DCBase):
     """The present configuration of this charm."""
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     """All relations that currently exist for this charm."""
-    networks: List[Network] = dataclasses.field(default_factory=list)
-    """All networks currently provisioned for this charm."""
+    extra_bindings: Dict[str, Network] = dataclasses.field(default_factory=dict)
+    """All extra bindings currently provisioned for this charm.
+    If a metadata-defined extra-binding is left empty, it will be defaulted."""
     containers: List[Container] = dataclasses.field(default_factory=list)
     """All containers (whether they can connect or not) that this charm is aware of."""
     storage: List[Storage] = dataclasses.field(default_factory=list)
