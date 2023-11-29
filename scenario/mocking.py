@@ -5,6 +5,7 @@ import datetime
 import random
 import shutil
 from io import StringIO
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set, Tuple, Union
 
@@ -240,8 +241,29 @@ class _MockModelBackend(_ModelBackend):
     def network_get(self, binding_name: str, relation_id: Optional[int] = None):
         # is this an extra-binding-provided network?
         if binding_name in self._charm_spec.meta.get("extra-bindings", ()):
+            if relation_id is not None:
+                # this should not happen
+                raise RuntimeError(
+                    "cannot pass relation_id to network_get if the binding name is "
+                    "that of an extra-binding. Extra-bindings are not mapped to relation IDs.",
+                )
             network = self._state.extra_bindings.get(binding_name, Network.default())
             return network.hook_tool_output_fmt()
+
+        # is binding_name a valid relation binding name?
+        meta = self._charm_spec.meta
+        if binding_name not in set(
+            chain(
+                meta.get("peers", ()),
+                meta.get("requires", ()),
+                meta.get("provides", ()),
+            ),
+        ):
+            logger.error(
+                f"cannot get network binding for {binding_name}: is not a valid relation "
+                f"endpoint name nor an extra-binding.",
+            )
+            raise RelationNotFoundError()
 
         # Is this a network attached to a relation?
         relations = self._state.get_relations(binding_name)
@@ -260,8 +282,23 @@ class _MockModelBackend(_ModelBackend):
                 )
                 raise RelationNotFoundError() from e
         else:
-            # TODO: is this accurate?
+            if not relations:
+                logger.warning(
+                    "Requesting the network for an endpoint with no active relations "
+                    "will return a defaulted network.",
+                )
+                return Network.default().hook_tool_output_fmt()
+
+            # TODO: is this accurate? Any relation in particular?
             relation = relations[0]
+
+        from scenario.state import SubordinateRelation  # avoid cyclic imports
+
+        if isinstance(relation, SubordinateRelation):
+            raise RuntimeError(
+                "Subordinate relation has no associated network binding.",
+            )
+
         return relation.network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.

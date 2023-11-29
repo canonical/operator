@@ -8,6 +8,7 @@ from scenario.state import (
     Action,
     Container,
     Event,
+    Network,
     PeerRelation,
     Relation,
     Secret,
@@ -15,7 +16,6 @@ from scenario.state import (
     Storage,
     SubordinateRelation,
     _CharmSpec,
-    Network,
 )
 
 

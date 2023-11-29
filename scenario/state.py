@@ -325,7 +325,8 @@ class RelationBase(_DCBase):
     #  relation have a different network?
     network: Network = dataclasses.field(default=None)
     """Network associated with this relation.
-    If left empty, a default network will be assigned automatically."""
+    If left empty, a default network will be assigned automatically
+    (except for subordinate relations)."""
 
     @property
     def _databags(self):
@@ -355,7 +356,7 @@ class RelationBase(_DCBase):
         for databag in self._databags:
             self._validate_databag(databag)
 
-        if self.network is None:
+        if type(self) is not SubordinateRelation and self.network is None:
             object.__setattr__(self, "network", Network.default())
 
     def _validate_databag(self, databag: dict):

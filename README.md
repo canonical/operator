@@ -529,7 +529,7 @@ remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation
 
 ### Networks
 
-Each relation a charm has will 
+Each relation a charm has is associated with  
 A charm can define some `extra-bindings`
 
 

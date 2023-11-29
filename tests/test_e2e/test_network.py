@@ -4,7 +4,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 
 from scenario import Context
-from scenario.state import Network, Relation, State
+from scenario.state import Network, Relation, State, SubordinateRelation
 from tests.helpers import trigger
 
 
@@ -33,7 +33,10 @@ def test_ip_get(mycharm):
         mycharm,
         meta={
             "name": "foo",
-            "requires": {"metrics-endpoint": {"interface": "foo"}},
+            "requires": {
+                "metrics-endpoint": {"interface": "foo"},
+                "deadnodead": {"interface": "bar"},
+            },
             "extra-bindings": {"foo": {}},
         },
     )
@@ -56,19 +59,52 @@ def test_ip_get(mycharm):
         rel = mgr.charm.model.get_relation("metrics-endpoint")
         assert str(mgr.charm.model.get_binding(rel).network.bind_address) == "1.1.1.1"
 
+        # we have a network for a binding without relations on it
+        assert (
+            str(mgr.charm.model.get_binding("deadnodead").network.bind_address)
+            == "1.1.1.1"
+        )
+
         # and an extra binding
         assert str(mgr.charm.model.get_binding("foo").network.bind_address) == "4.4.4.4"
 
 
+def test_no_sub_binding(mycharm):
+    ctx = Context(
+        mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"bar": {"interface": "foo", "scope": "container"}},
+        },
+    )
+
+    with ctx.manager(
+        "update_status",
+        State(
+            relations=[
+                SubordinateRelation("bar"),
+            ]
+        ),
+    ) as mgr:
+        with pytest.raises(RuntimeError):
+            # sub relations have no network
+            mgr.charm.model.get_binding("bar").network
+
+
 def test_no_relation_error(mycharm):
     """Attempting to call get_binding on a non-existing relation -> RelationNotFoundError"""
-    mycharm._call = lambda *_: True
 
-    def fetch_unit_address(charm: CharmBase):
-        with pytest.raises(RelationNotFoundError):
-            _ = charm.model.get_binding("foo").network
+    ctx = Context(
+        mycharm,
+        meta={
+            "name": "foo",
+            "requires": {"metrics-endpoint": {"interface": "foo"}},
+            "extra-bindings": {"bar": {}},
+        },
+    )
 
-    trigger(
+    with ctx.manager(
+        "update_status",
         State(
             relations=[
                 Relation(
@@ -78,13 +114,8 @@ def test_no_relation_error(mycharm):
                     relation_id=1,
                 ),
             ],
-            extra_bindings={"foo": Network.default()},
+            extra_bindings={"bar": Network.default()},
         ),
-        "update_status",
-        mycharm,
-        meta={
-            "name": "foo",
-            "requires": {"metrics-endpoint": {"interface": "foo"}},
-        },
-        post_event=fetch_unit_address,
-    )
+    ) as mgr:
+        with pytest.raises(RelationNotFoundError):
+            net = mgr.charm.model.get_binding("foo").network
