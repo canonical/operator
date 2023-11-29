@@ -30,7 +30,7 @@ import textwrap
 import typing
 import unittest
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -4096,6 +4096,7 @@ class PebbleStorageAPIsTestMixin:
 
     assertEqual = unittest.TestCase.assertEqual  # noqa
     assertIn = unittest.TestCase.assertIn  # noqa
+    assertIs = unittest.TestCase.assertIs  # noqa
     assertIsInstance = unittest.TestCase.assertIsInstance  # noqa
     assertRaises = unittest.TestCase.assertRaises  # noqa
 
@@ -4571,6 +4572,18 @@ class TestPebbleStorageAPIsUsingMocks(
             client.make_dir(f"{self.prefix}/dir{idx}", **case)
             dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
             self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
+
+    @patch("grp.getgrgid")
+    @patch("pwd.getpwuid")
+    def test_list_files_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+        getpwuid.side_effect = KeyError
+        getgrgid.side_effect = KeyError
+        data = 'data'
+        self.client.push(f"{self.prefix}/file", data)
+        files = self.client.list_files(f"{self.prefix}/")
+        self.assertEqual(len(files), 1)
+        self.assertIs(files[0].user, None)
+        self.assertIs(files[0].group, None)
 
 
 class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
