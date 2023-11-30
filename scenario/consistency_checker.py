@@ -4,7 +4,6 @@
 import os
 from collections import Counter
 from collections.abc import Sequence
-from itertools import chain
 from numbers import Number
 from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple
 
@@ -22,15 +21,6 @@ if TYPE_CHECKING:
     from scenario.state import Event, State
 
 logger = scenario_logger.getChild("consistency_checker")
-
-
-def get_all_relations(charm_spec: "_CharmSpec"):
-    nonpeer_relations_meta = chain(
-        charm_spec.meta.get("requires", {}).items(),
-        charm_spec.meta.get("provides", {}).items(),
-    )
-    peer_relations_meta = charm_spec.meta.get("peers", {}).items()
-    return list(chain(nonpeer_relations_meta, peer_relations_meta))
 
 
 class Results(NamedTuple):
@@ -406,13 +396,20 @@ def check_network_consistency(
     errors = []
 
     meta_bindings = set(charm_spec.meta.get("extra-bindings", ()))
-    state_bindings = set(state.extra_bindings)
-    if diff := state_bindings.difference(meta_bindings):
+    all_relations = charm_spec.get_all_relations()
+    non_sub_relations = {
+        endpoint
+        for endpoint, metadata in all_relations
+        if metadata.get("scope") != "container"  # mark of a sub
+    }
+
+    state_bindings = set(state.networks)
+    if diff := state_bindings.difference(meta_bindings.union(non_sub_relations)):
         errors.append(
-            f"Some extra-bindings defined in State are not in metadata.yaml: {diff}.",
+            f"Some network bindings defined in State are not in metadata.yaml: {diff}.",
         )
 
-    endpoints = {i[0] for i in get_all_relations(charm_spec)}
+    endpoints = {endpoint for endpoint, metadata in all_relations}
     if collisions := endpoints.intersection(meta_bindings):
         errors.append(
             f"Extra bindings and integration endpoints cannot share the same name: {collisions}.",
@@ -429,12 +426,8 @@ def check_relation_consistency(
     **_kwargs,  # noqa: U101
 ) -> Results:
     errors = []
-    nonpeer_relations_meta = chain(
-        charm_spec.meta.get("requires", {}).items(),
-        charm_spec.meta.get("provides", {}).items(),
-    )
     peer_relations_meta = charm_spec.meta.get("peers", {}).items()
-    all_relations_meta = list(chain(nonpeer_relations_meta, peer_relations_meta))
+    all_relations_meta = charm_spec.get_all_relations()
 
     def _get_relations(r):
         try:

@@ -529,7 +529,7 @@ remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation
 
 ### Networks
 
-Each relation a charm has is associated with  
+Simplifying a bit the Juju "spaces" model, each integration endpoint a charm defines in its metadata is associated with a network. Regardless of whether there is a living relation over that endpoint, that is.  
 A charm can define some `extra-bindings`
 
 

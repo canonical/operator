@@ -52,7 +52,7 @@ def test_ip_get(mycharm):
                     relation_id=1,
                 ),
             ],
-            extra_bindings={"foo": Network.default(private_address="4.4.4.4")},
+            networks={"foo": Network.default(private_address="4.4.4.4")},
         ),
     ) as mgr:
         # we have a network for the relation
@@ -86,7 +86,7 @@ def test_no_sub_binding(mycharm):
             ]
         ),
     ) as mgr:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RelationNotFoundError):
             # sub relations have no network
             mgr.charm.model.get_binding("bar").network
 
@@ -114,7 +114,7 @@ def test_no_relation_error(mycharm):
                     relation_id=1,
                 ),
             ],
-            extra_bindings={"bar": Network.default()},
+            networks={"bar": Network.default()},
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):

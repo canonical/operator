@@ -9,6 +9,7 @@ import re
 import typing
 from collections import namedtuple
 from enum import Enum
+from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
@@ -321,13 +322,6 @@ class RelationBase(_DCBase):
     local_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
     """This unit's databag for this relation."""
 
-    # TODO should we parametrize/randomize this default value to make each
-    #  relation have a different network?
-    network: Network = dataclasses.field(default=None)
-    """Network associated with this relation.
-    If left empty, a default network will be assigned automatically
-    (except for subordinate relations)."""
-
     @property
     def _databags(self):
         """Yield all databags in this relation."""
@@ -355,9 +349,6 @@ class RelationBase(_DCBase):
 
         for databag in self._databags:
             self._validate_databag(databag)
-
-        if type(self) is not SubordinateRelation and self.network is None:
-            object.__setattr__(self, "network", Network.default())
 
     def _validate_databag(self, databag: dict):
         if not isinstance(databag, dict):
@@ -818,9 +809,14 @@ class State(_DCBase):
     """The present configuration of this charm."""
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     """All relations that currently exist for this charm."""
-    extra_bindings: Dict[str, Network] = dataclasses.field(default_factory=dict)
-    """All extra bindings currently provisioned for this charm.
-    If a metadata-defined extra-binding is left empty, it will be defaulted."""
+    networks: Dict[str, Network] = dataclasses.field(default_factory=dict)
+    """Manual overrides for any relation and extra bindings currently provisioned for this charm.
+    If a metadata-defined relation endpoint is not explicitly mapped to a Network in this field,
+    it will be defaulted.
+    [CAVEAT: `extra-bindings` is a deprecated, regretful feature in juju/ops. For completeness we
+    support it, but use at your own risk.] If a metadata-defined extra-binding is left empty,
+    it will be defaulted.
+    """
     containers: List[Container] = dataclasses.field(default_factory=list)
     """All containers (whether they can connect or not) that this charm is aware of."""
     storage: List[Storage] = dataclasses.field(default_factory=list)
@@ -912,11 +908,13 @@ class State(_DCBase):
 
     def get_container(self, container: Union[str, Container]) -> Container:
         """Get container from this State, based on an input container or its name."""
-        name = container.name if isinstance(container, Container) else container
-        try:
-            return next(filter(lambda c: c.name == name, self.containers))
-        except StopIteration as e:
-            raise ValueError(f"container: {name}") from e
+        container_name = (
+            container.name if isinstance(container, Container) else container
+        )
+        containers = [c for c in self.containers if c.name == container_name]
+        if not containers:
+            raise ValueError(f"container: {container_name} not found in the State")
+        return containers[0]
 
     def get_relations(self, endpoint: str) -> Tuple["AnyRelation", ...]:
         """Get all relations on this endpoint from the current state."""
@@ -997,6 +995,16 @@ class _CharmSpec(_DCBase):
             actions=actions,
             config=config,
             is_autoloaded=True,
+        )
+
+    def get_all_relations(self) -> List[Tuple[str, Dict[str, str]]]:
+        """A list of all relation endpoints defined in the metadata."""
+        return list(
+            chain(
+                self.meta.get("requires", {}).items(),
+                self.meta.get("provides", {}).items(),
+                self.meta.get("peers", {}).items(),
+            ),
         )
 
 

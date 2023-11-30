@@ -5,7 +5,6 @@ import datetime
 import random
 import shutil
 from io import StringIO
-from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set, Tuple, Union
 
@@ -145,20 +144,21 @@ class _MockModelBackend(_ModelBackend):
             # in scenario, you can create Secret(id="foo"),
             # but ops.Secret will prepend a "secret:" prefix to that ID.
             # we allow getting secret by either version.
-            try:
-                return next(
-                    filter(
-                        lambda s: canonicalize_id(s.id) == canonicalize_id(id),
-                        self._state.secrets,
-                    ),
-                )
-            except StopIteration:
-                raise SecretNotFoundError()
+            secrets = [
+                s
+                for s in self._state.secrets
+                if canonicalize_id(s.id) == canonicalize_id(id)
+            ]
+            if not secrets:
+                raise SecretNotFoundError(id)
+            return secrets[0]
+
         elif label:
-            try:
-                return next(filter(lambda s: s.label == label, self._state.secrets))
-            except StopIteration:
-                raise SecretNotFoundError()
+            secrets = [s for s in self._state.secrets if s.label == label]
+            if not secrets:
+                raise SecretNotFoundError(label)
+            return secrets[0]
+
         else:
             # if all goes well, this should never be reached. ops.model.Secret will check upon
             # instantiation that either an id or a label are set, and raise a TypeError if not.
@@ -239,67 +239,35 @@ class _MockModelBackend(_ModelBackend):
         return state_config  # full config
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None):
-        # is this an extra-binding-provided network?
-        if binding_name in self._charm_spec.meta.get("extra-bindings", ()):
+        # validation:
+        extra_bindings = self._charm_spec.meta.get("extra-bindings", ())
+        all_endpoints = self._charm_spec.get_all_relations()
+        non_sub_relations = {
+            name for name, meta in all_endpoints if meta.get("scope") != "container"
+        }
+
+        # - is binding_name a valid binding name?
+        if binding_name in extra_bindings:
+            logger.warning("extra-bindings is a deprecated feature")  # fyi
+
+            # - verify that if the binding is an extra binding, we're not ignoring a relation_id
             if relation_id is not None:
                 # this should not happen
-                raise RuntimeError(
+                logger.error(
                     "cannot pass relation_id to network_get if the binding name is "
                     "that of an extra-binding. Extra-bindings are not mapped to relation IDs.",
                 )
-            network = self._state.extra_bindings.get(binding_name, Network.default())
-            return network.hook_tool_output_fmt()
-
-        # is binding_name a valid relation binding name?
-        meta = self._charm_spec.meta
-        if binding_name not in set(
-            chain(
-                meta.get("peers", ()),
-                meta.get("requires", ()),
-                meta.get("provides", ()),
-            ),
-        ):
+        # - verify that the binding is a relation endpoint name, but not a subordinate one
+        elif binding_name not in non_sub_relations:
             logger.error(
                 f"cannot get network binding for {binding_name}: is not a valid relation "
                 f"endpoint name nor an extra-binding.",
             )
             raise RelationNotFoundError()
 
-        # Is this a network attached to a relation?
-        relations = self._state.get_relations(binding_name)
-        if relation_id:
-            try:
-                relation = next(
-                    filter(
-                        lambda r: r.relation_id == relation_id,
-                        relations,
-                    ),
-                )
-            except StopIteration as e:
-                logger.error(
-                    f"network-get error: "
-                    f"No relation found with endpoint={binding_name} and id={relation_id}.",
-                )
-                raise RelationNotFoundError() from e
-        else:
-            if not relations:
-                logger.warning(
-                    "Requesting the network for an endpoint with no active relations "
-                    "will return a defaulted network.",
-                )
-                return Network.default().hook_tool_output_fmt()
-
-            # TODO: is this accurate? Any relation in particular?
-            relation = relations[0]
-
-        from scenario.state import SubordinateRelation  # avoid cyclic imports
-
-        if isinstance(relation, SubordinateRelation):
-            raise RuntimeError(
-                "Subordinate relation has no associated network binding.",
-            )
-
-        return relation.network.hook_tool_output_fmt()
+        # We look in State.networks for an override. If not given, we return a default network.
+        network = self._state.networks.get(binding_name, Network.default())
+        return network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
