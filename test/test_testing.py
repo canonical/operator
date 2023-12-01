@@ -27,12 +27,14 @@ import shutil
 import sys
 import tempfile
 import textwrap
+import typing
 import unittest
 import uuid
 from unittest.mock import MagicMock
 
 import pytest
 import yaml
+from typing_extensions import Required
 
 import ops
 import ops.testing
@@ -47,45 +49,46 @@ is_linux = platform.system() == 'Linux'
 class SetLeaderErrorTester(ops.CharmBase):
     """Sets peer relation data inside leader-elected."""
 
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._peer_name = 'peer'
         self.framework.observe(self.on.leader_elected,
                                self._on_leader_elected)
 
-    def _on_leader_elected(self, event):
+    def _on_leader_elected(self, event: ops.EventBase):
         peers = self.model.get_relation(self._peer_name)
+        assert peers is not None
         peers.data[self.app]["foo"] = "bar"
 
 
 class StorageTester(ops.CharmBase):
     """Record the relation-changed events."""
 
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.observed_events = []
+        self.observed_events: typing.List[ops.EventBase] = []
         self.framework.observe(self.on.test_storage_attached,
                                self._on_test_storage_attached)
         self.framework.observe(self.on.test_storage_detaching,
                                self._on_test_storage_detaching)
 
-    def _on_test_storage_attached(self, event):
+    def _on_test_storage_attached(self, event: ops.EventBase):
         self.observed_events.append(event)
 
-    def _on_test_storage_detaching(self, event):
+    def _on_test_storage_detaching(self, event: ops.EventBase):
         self.observed_events.append(event)
 
 
 class StorageWithHyphensHelper(ops.Object):
-    def __init__(self, parent, key):
+    def __init__(self, parent: ops.Object, key: str):
         super().__init__(parent, key)
-        self.changes = []
+        self.changes: typing.List[ops.EventBase] = []
         parent.framework.observe(parent.on.test_with_hyphens_storage_attached,
                                  self.on_storage_changed)
         parent.framework.observe(parent.on.test_with_hyphens_storage_detaching,
                                  self.on_storage_changed)
 
-    def on_storage_changed(self, event):
+    def on_storage_changed(self, event: ops.EventBase):
         self.changes.append(event)
 
 
@@ -167,10 +170,10 @@ class TestHarness(unittest.TestCase):
         c.get_plan()  # shouldn't raise ConnectionError
 
     def test_can_connect_begin_with_initial_hooks(self):
-        pebble_ready_calls = collections.defaultdict(int)
+        pebble_ready_calls: collections.defaultdict[str, int] = collections.defaultdict(int)
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
                 self.framework.observe(self.on.bar_pebble_ready, self._on_pebble_ready)
@@ -243,12 +246,12 @@ class TestHarness(unittest.TestCase):
         class InitialDataTester(ops.CharmBase):
             """Record the relation-changed events."""
 
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.observed_events = []
+                self.observed_events: typing.List[ops.EventBase] = []
                 self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
 
-            def _on_db_relation_changed(self, event):
+            def _on_db_relation_changed(self, event: ops.EventBase):
                 self.observed_events.append(event)
 
         # language=YAML
@@ -293,13 +296,13 @@ class TestHarness(unittest.TestCase):
         class InitialDataTester(ops.CharmBase):
             """Record the relation-changed events."""
 
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.observed_events = []
+                self.observed_events: typing.List[ops.EventBase] = []
                 self.framework.observe(self.on.cluster_relation_changed,
                                        self._on_cluster_relation_changed)
 
-            def _on_cluster_relation_changed(self, event):
+            def _on_cluster_relation_changed(self, event: ops.EventBase):
                 self.observed_events.append(event)
 
         # language=YAML
@@ -354,7 +357,7 @@ class TestHarness(unittest.TestCase):
 
         # relation remote app is None to mirror production Juju behavior where Juju doesn't
         # communicate the remote app to ops.
-        rel_id = harness.add_relation('foo', None)
+        rel_id = harness.add_relation('foo', None)  # type: ignore
 
         with pytest.raises(KeyError, match='trying to access remote app data'):
             harness.remove_relation(rel_id)
@@ -497,6 +500,7 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(backend.relation_list(rel_id), ['postgresql/0'])
         harness.charm.get_changes(reset=True)  # ignore relation created events
         relation = harness.charm.model.get_relation('db')
+        assert relation is not None
         self.assertEqual(len(relation.units), 1)
         # Check relation data is correct
         rel_unit = harness.charm.model.get_unit('postgresql/0')
@@ -510,8 +514,10 @@ class TestHarness(unittest.TestCase):
         # Check removed unit does not exist
         self.assertEqual(backend.relation_list(rel_id), [])
         # Check the unit is actually removed from the relations the model knows about
-        self.assertEqual(len(harness.charm.model.get_relation('db').units), 0)
-        self.assertFalse(rel_unit in harness.charm.model.get_relation('db').data)
+        rel = harness.charm.model.get_relation('db')
+        assert rel is not None
+        self.assertEqual(len(rel.units), 0)
+        self.assertFalse(rel_unit in rel.data)
         # Check relation departed was raised with correct data
         self.assertEqual({'name': 'relation-departed',
                           'relation': 'db',
@@ -577,7 +583,10 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id)
         self.assertIsNone(self._find_relation_in_model_by_id(harness, rel_id))
 
-    def _find_relation_in_model_by_id(self, harness, rel_id):
+    def _find_relation_in_model_by_id(
+            self,
+            harness: ops.testing.Harness['RelationEventCharm'],
+            rel_id: int):
         for relations in harness.charm.model.relations.values():
             for relation in relations:
                 if rel_id == relation.id:
@@ -744,13 +753,14 @@ class TestHarness(unittest.TestCase):
             harness.get_relation_data(99, 'postgresql')
 
         meta = yaml.safe_load(charm_meta)
-        t_app = ops.Application('test-app', meta, harness._backend, None)
-        t_unit0 = ops.Unit('test-app/0', meta, harness._backend, {ops.Application: t_app})
-        t_unit1 = ops.Unit('test-app/1', meta, harness._backend, {ops.Application: t_app})
+        t_cache = ops.model._ModelCache(meta, harness._backend)
+        t_app = ops.Application('test-app', meta, harness._backend, t_cache)
+        t_unit0 = ops.Unit('test-app/0', meta, harness._backend, t_cache)
+        t_unit1 = ops.Unit('test-app/1', meta, harness._backend, t_cache)
         self.assertEqual(harness.get_relation_data(rel_id, t_app), {})
         self.assertEqual(harness.get_relation_data(rel_id, t_unit0), {})
         self.assertEqual(harness.get_relation_data(rel_id, t_unit1), None)
-        pg_app = ops.Application('postgresql', meta, harness._backend, None)
+        pg_app = ops.Application('postgresql', meta, harness._backend, t_cache)
         self.assertEqual(harness.get_relation_data(rel_id, pg_app), {'remote': 'data'})
 
     def test_create_harness_twice(self):
@@ -818,6 +828,7 @@ class TestHarness(unittest.TestCase):
         helper = DBRelationChangedHelper(harness.charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db')
+        assert rel is not None
         rel.data[harness.charm.model.unit]['key'] = 'value'
         # there should be no event for updating our own data
         harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
@@ -844,8 +855,10 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
 
         rel = harness.charm.model.get_relation('db')
+        assert rel is not None
         rel.data[harness.charm.model.unit]['key'] = 'value'
         rel = harness.charm.model.get_relation('db')
+        assert rel is not None
         harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v1'})
         self.assertEqual({'key': 'v1'}, rel.data[harness.charm.model.unit])
         # Make sure there was no event
@@ -896,6 +909,7 @@ class TestHarness(unittest.TestCase):
         helper = DBRelationChangedHelper(harness.charm, "helper")
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db')
+        assert rel is not None
         rel.data[harness.charm.app]['key'] = 'value'
         harness.update_relation_data(rel_id, 'postgresql', {'key': 'v1'})
         self.assertEqual({'key': 'v1'}, rel.data[harness.charm.app])
@@ -932,6 +946,7 @@ class TestHarness(unittest.TestCase):
 
         harness.update_relation_data(rel_id, 'my-charm', {'new': 'value'})
         rel = harness.charm.model.get_relation('db')
+        assert rel is not None
         self.assertEqual(rel.data[harness.charm.app]['new'], 'value')
 
         # Our app data bag got updated.
@@ -1170,6 +1185,7 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
         harness.add_relation_unit(rel_id, 'postgresql/0')
         rel = harness.charm.model.get_relation('db')
+        assert rel is not None
         with harness._event_context('foo'):
             with self.assertRaises(ops.ModelError):
                 rel.data[harness.charm.app]['foo'] = 'bar'
@@ -1765,7 +1781,7 @@ class TestHarness(unittest.TestCase):
         self.assertIn(self._extract_storage_index(stor_ids[0]), attached_storage_ids)
         self.assertNotIn(self._extract_storage_index(stor_ids[1]), attached_storage_ids)
 
-    def _extract_storage_index(self, stor_id):
+    def _extract_storage_index(self, stor_id: str):
         return int(stor_id.split('/')[-1])
 
     def test_remove_detached_storage(self):
@@ -1830,14 +1846,14 @@ class TestHarness(unittest.TestCase):
         # The charm_dir also gets set
         self.assertEqual(harness.framework.charm_dir, tmp)
 
-    def _get_dummy_charm_harness(self, tmp):
+    def _get_dummy_charm_harness(self, tmp: pathlib.Path):
         self._write_dummy_charm(tmp)
         charm_mod = importlib.import_module('testcharm')
         harness = ops.testing.Harness(charm_mod.MyTestingCharm)
         self.addCleanup(harness.cleanup)
         return harness
 
-    def _write_dummy_charm(self, tmp):
+    def _write_dummy_charm(self, tmp: pathlib.Path):
         srcdir = tmp / 'src'
         srcdir.mkdir(0o755)
         charm_filename = srcdir / 'testcharm.py'
@@ -1872,8 +1888,10 @@ class TestHarness(unittest.TestCase):
 
     def test_event_context(self):
         class MyCharm(ops.CharmBase):
-            def event_handler(self, evt):
-                evt.relation.data[evt.relation.app]['foo'] = 'bar'
+            def event_handler(self, evt: ops.RelationEvent):
+                rel = evt.relation
+                assert rel is not None and rel.app is not None
+                rel.data[rel.app]['foo'] = 'bar'
 
         harness = ops.testing.Harness(MyCharm, meta='''
             name: test-charm
@@ -1899,7 +1917,7 @@ class TestHarness(unittest.TestCase):
                 self.framework.observe(self.on.db_relation_joined,
                                        self._join_db)
 
-            def _join_db(self, event):
+            def _join_db(self, event: ops.EventBase) -> None:
                 # do things with APIs we cannot easily mock
                 raise NotImplementedError
 
@@ -1911,19 +1929,20 @@ class TestHarness(unittest.TestCase):
             ''')
         harness.begin()
 
-        def mock_join_db(event):
+        def mock_join_db(event: ops.EventBase):
             # the harness thinks we're inside a db_relation_joined hook
             # but we want to mock the remote data here:
+            assert isinstance(event, ops.RelationEvent)
             with harness._event_context(''):
                 # pretend for a moment we're not in a hook context,
                 # so the harness will let us:
-                print(event.relation.app)
                 event.relation.data[harness.charm.app]['foo'] = 'bar'
 
         harness.charm._join_db = mock_join_db
         rel_id = harness.add_relation('db', 'remote')
         harness.add_relation_unit(rel_id, 'remote/0')
         rel = harness.charm.model.get_relation('db', rel_id)
+        assert rel is not None
         self.assertEqual({'foo': 'bar'},
                          harness.get_relation_data(rel_id, 'test-charm'))
 
@@ -1945,6 +1964,7 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         harness.add_relation_unit(rel_id, 'postgresql/0')
         rel = harness.charm.model.get_relation('db', rel_id)
+        assert rel is not None
         del rel.data[harness.charm.model.unit]['foo']
         self.assertEqual({}, harness.get_relation_data(rel_id, 'test-charm/0'))
 
@@ -1959,10 +1979,10 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
-        for invalid_value in (1, 1.2, {}, [], set(), True, object(), type):
+        for invalid_value in (1, 1.2, {}, [], set(), True, object(), type):  # type: ignore
             with self.assertRaises(ops.RelationDataError):
                 harness.update_relation_data(rel_id, 'test-charm/0',
-                                             {'foo': invalid_value})
+                                             {'foo': invalid_value})  # type: ignore
 
     def test_set_workload_version(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -2319,7 +2339,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_with_peer_relation(self):
         class PeerCharm(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('peer')
         harness = ops.testing.Harness(PeerCharm, meta='''
@@ -2339,7 +2359,9 @@ class TestHarness(unittest.TestCase):
             _ = harness.charm
         harness.begin_with_initial_hooks()
         self.assertIsNotNone(harness.charm)
-        rel_id = harness.model.get_relation('peer').id
+        rel = harness.model.get_relation('peer')
+        assert rel is not None
+        rel_id = rel.id
         self.assertEqual(
             harness.charm.changes,
             [
@@ -2359,7 +2381,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_peer_relation_pre_defined(self):
         class PeerCharm(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('peer')
         harness = ops.testing.Harness(PeerCharm, meta='''
@@ -2391,7 +2413,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_relation_charm_with_no_relation(self):
         class CharmWithDB(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('db')
         harness = ops.testing.Harness(CharmWithDB, meta='''
@@ -2414,7 +2436,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_with_one_relation(self):
         class CharmWithDB(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('db')
         harness = ops.testing.Harness(CharmWithDB, meta='''
@@ -2461,7 +2483,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_with_application_data(self):
         class CharmWithDB(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('db')
         harness = ops.testing.Harness(CharmWithDB, meta='''
@@ -2516,7 +2538,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_with_multiple_units(self):
         class CharmWithDB(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('db')
         harness = ops.testing.Harness(CharmWithDB, meta='''
@@ -2579,7 +2601,7 @@ class TestHarness(unittest.TestCase):
 
     def test_begin_with_initial_hooks_multiple_relation_same_endpoint(self):
         class CharmWithDB(RelationEventCharm):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.observe_relation_events('db')
         harness = ops.testing.Harness(CharmWithDB, meta='''
@@ -2625,7 +2647,7 @@ class TestHarness(unittest.TestCase):
                                          expected_relation_created[0]]
         self.assertEqual(changes[:2], expected_relation_created)
         changes = changes[2:]
-        expected_middle = [
+        expected_middle: typing.List[RecordedChange] = [
             {'name': 'leader-elected'},
             {'name': 'config-changed', 'data': {}},
             {'name': 'start'},
@@ -2802,24 +2824,32 @@ class TestHarness(unittest.TestCase):
 
     def test_evaluate_status(self):
         class TestCharm(ops.CharmBase):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
                 self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+                self.app_status_to_add = ops.BlockedStatus('blocked app')
+                self.unit_status_to_add = ops.BlockedStatus('blocked unit')
 
-            def _on_collect_app_status(self, event):
-                event.add_status(ops.ActiveStatus())
+            def _on_collect_app_status(self, event: ops.CollectStatusEvent):
+                event.add_status(self.app_status_to_add)
 
-            def _on_collect_unit_status(self, event):
-                event.add_status(ops.BlockedStatus('bar'))
+            def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
+                event.add_status(self.unit_status_to_add)
 
         harness = ops.testing.Harness(TestCharm)
         harness.set_leader(True)
         harness.begin()
         # Tests for the behaviour of status evaluation are in test_charm.py
         harness.evaluate_status()
-        self.assertEqual(harness.model.app.status, ops.ActiveStatus())
-        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('bar'))
+        self.assertEqual(harness.model.app.status, ops.BlockedStatus('blocked app'))
+        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('blocked unit'))
+
+        harness.charm.app_status_to_add = ops.ActiveStatus('active app')
+        harness.charm.unit_status_to_add = ops.ActiveStatus('active unit')
+        harness.evaluate_status()
+        self.assertEqual(harness.model.app.status, ops.ActiveStatus('active app'))
+        self.assertEqual(harness.model.unit.status, ops.ActiveStatus('active unit'))
 
 
 class TestNetwork(unittest.TestCase):
@@ -2838,6 +2868,7 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.0.10')
 
         binding = self.harness.model.get_binding('db')
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2861,7 +2892,9 @@ class TestNetwork(unittest.TestCase):
                                  egress_subnets=['10.0.0.0/8', '10.10.0.0/16'])
 
         relation = self.harness.model.get_relation('db', relation_id)
+        assert relation is not None
         binding = self.harness.model.get_binding(relation)
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2882,12 +2915,15 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.2.1', endpoint='db')
 
         binding = self.harness.model.get_binding('db')
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.2.1'))
 
         # Ensure binding for the other interface is still on the default value
-        self.assertEqual(self.harness.model.get_binding('foo').network.bind_address,
+        foo_binding = self.harness.model.get_binding('foo')
+        assert foo_binding is not None
+        self.assertEqual(foo_binding.network.bind_address,
                          ipaddress.IPv4Address('10.0.0.1'))
 
     def test_add_network_specific_relation(self):
@@ -2897,13 +2933,17 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id)
 
         relation = self.harness.model.get_relation('db', relation_id)
+        assert relation is not None
         binding = self.harness.model.get_binding(relation)
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('35.0.0.1'))
 
         # Ensure binding for the other interface is still on the default value
-        self.assertEqual(self.harness.model.get_binding('foo').network.bind_address,
+        foo_binding = self.harness.model.get_binding('foo')
+        assert foo_binding is not None
+        self.assertEqual(foo_binding.network.bind_address,
                          ipaddress.IPv4Address('10.0.0.1'))
 
     def test_add_network_endpoint_fallback(self):
@@ -2911,7 +2951,9 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.0.10', endpoint='db')
 
         relation = self.harness.model.get_relation('db', relation_id)
+        assert relation is not None
         binding = self.harness.model.get_binding(relation)
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2920,6 +2962,7 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('10.0.0.10')
 
         binding = self.harness.model.get_binding('db')
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv4Address('10.0.0.10'))
@@ -2928,6 +2971,7 @@ class TestNetwork(unittest.TestCase):
         self.harness.add_network('2001:0db8::a:0:0:1')
 
         binding = self.harness.model.get_binding('db')
+        assert binding is not None
         self.assertEqual(binding.name, 'db')
         network = binding.network
         self.assertEqual(network.bind_address, ipaddress.IPv6Address('2001:0db8::a:0:0:1'))
@@ -2942,7 +2986,9 @@ class TestNetwork(unittest.TestCase):
 
     def test_network_get_relation_not_found(self):
         with self.assertRaises(ops.RelationNotFoundError):
-            self.harness.model.get_binding('db').network
+            binding = self.harness.model.get_binding('db')
+            assert binding is not None
+            binding.network
 
     def test_add_network_endpoint_not_in_meta(self):
         with self.assertRaises(ops.ModelError):
@@ -2965,40 +3011,51 @@ class TestNetwork(unittest.TestCase):
 
 
 class DBRelationChangedHelper(ops.Object):
-    def __init__(self, parent, key):
+    def __init__(self, parent: ops.Object, key: str):
         super().__init__(parent, key)
-        self.changes = []
+        self.changes: typing.List[typing.Tuple[int, str]] = []
         parent.framework.observe(parent.on.db_relation_changed, self.on_relation_changed)
 
-    def on_relation_changed(self, event):
+    def on_relation_changed(self, event: ops.RelationEvent):
         if event.unit is not None:
             self.changes.append((event.relation.id, event.unit.name))
         else:
-            self.changes.append((event.relation.id, event.app.name))
+            app = event.app
+            assert app is not None
+            self.changes.append((event.relation.id, app.name))
 
 
 class RelationChangedViewer(ops.Object):
     """Track relation_changed events and saves the data seen in the relation bucket."""
 
-    def __init__(self, charm, relation_name):
+    def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
-        self.changes = []
+        self.changes: typing.List[typing.Dict[str, str]] = []
         charm.framework.observe(charm.on[relation_name].relation_changed, self.on_relation_changed)
 
-    def on_relation_changed(self, event):
+    def on_relation_changed(self, event: ops.RelationEvent):
         if event.unit is not None:
             data = event.relation.data[event.unit]
         else:
-            data = event.relation.data[event.app]
+            app = event.app
+            assert app is not None
+            data = event.relation.data[app]
         self.changes.append(dict(data))
+
+
+class RecordedChange(typing.TypedDict, total=False):
+    name: Required[str]
+    data: typing.Dict[str, typing.Any]
+    relation: str
+    container: typing.Optional[str]
 
 
 class RecordingCharm(ops.CharmBase):
     """Record the events that we see, and any associated data."""
 
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.changes = []
+        self.changes: typing.List[RecordedChange] = []
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.leader_settings_changed, self._on_leader_settings_changed)
@@ -3009,53 +3066,53 @@ class RecordingCharm(ops.CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.update_status, self._on_update_status)
 
-    def get_changes(self, reset=True):
+    def get_changes(self, reset: bool = True):
         changes = self.changes
         if reset:
             self.changes = []
         return changes
 
-    def _on_install(self, _):
+    def _on_install(self, _: ops.InstallEvent):
         if self.config.get('set_status'):
             self.unit.status = ops.MaintenanceStatus("Status set on install")
-        self.changes.append(dict(name='install'))
+        self.changes.append({'name': 'install'})
 
-    def _on_start(self, _):
-        self.changes.append(dict(name='start'))
+    def _on_start(self, _: ops.StartEvent):
+        self.changes.append({'name': 'start'})
 
-    def _on_stop(self, _):
-        self.changes.append(dict(name='stop'))
+    def _on_stop(self, _: ops.StopEvent):
+        self.changes.append({'name': 'stop'})
 
-    def _on_remove(self, _):
-        self.changes.append(dict(name='remove'))
+    def _on_remove(self, _: ops.RemoveEvent):
+        self.changes.append({'name': 'remove'})
 
-    def _on_config_changed(self, _):
-        self.changes.append(dict(name='config-changed', data=dict(self.framework.model.config)))
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
+        self.changes.append({'name': 'config-changed', 'data': dict(self.framework.model.config)})
 
-    def _on_leader_elected(self, _):
-        self.changes.append(dict(name='leader-elected'))
+    def _on_leader_elected(self, _: ops.LeaderElectedEvent):
+        self.changes.append({'name': 'leader-elected'})
 
-    def _on_leader_settings_changed(self, _):
-        self.changes.append(dict(name='leader-settings-changed'))
+    def _on_leader_settings_changed(self, _: ops.LeaderSettingsChangedEvent):
+        self.changes.append({'name': 'leader-settings-changed'})
 
-    def _on_upgrade_charm(self, _):
-        self.changes.append(dict(name='upgrade-charm'))
+    def _on_upgrade_charm(self, _: ops.UpgradeCharmEvent):
+        self.changes.append({'name': 'upgrade-charm'})
 
-    def _on_update_status(self, _):
-        self.changes.append(dict(name='update-status'))
+    def _on_update_status(self, _: ops.UpdateStatusEvent):
+        self.changes.append({'name': 'update-status'})
 
 
 class RelationEventCharm(RecordingCharm):
     """Record events related to relation lifecycles."""
 
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         # When set, this instructs the charm to include a 'relation_data' field in the 'data'
         # section of each change it logs, which allows us to test which relation data was available
         # in each hook invocation
         self.record_relation_data_on_events = False
 
-    def observe_relation_events(self, relation_name):
+    def observe_relation_events(self, relation_name: str):
         self.relation_name = relation_name
         self.framework.observe(self.on[relation_name].relation_created, self._on_relation_created)
         self.framework.observe(self.on[relation_name].relation_joined, self._on_relation_joined)
@@ -3064,22 +3121,22 @@ class RelationEventCharm(RecordingCharm):
                                self._on_relation_departed)
         self.framework.observe(self.on[relation_name].relation_broken, self._on_relation_broken)
 
-    def _on_relation_created(self, event):
+    def _on_relation_created(self, event: ops.RelationCreatedEvent):
         self._observe_relation_event('relation-created', event)
 
-    def _on_relation_joined(self, event):
+    def _on_relation_joined(self, event: ops.RelationJoinedEvent):
         self._observe_relation_event('relation-joined', event)
 
-    def _on_relation_changed(self, event):
+    def _on_relation_changed(self, event: ops.RelationChangedEvent):
         self._observe_relation_event('relation-changed', event)
 
-    def _on_relation_departed(self, event):
+    def _on_relation_departed(self, event: ops.RelationDepartedEvent):
         self._observe_relation_event('relation-departed', event)
 
-    def _on_relation_broken(self, event):
+    def _on_relation_broken(self, event: ops.RelationBrokenEvent):
         self._observe_relation_event('relation-broken', event)
 
-    def _observe_relation_event(self, event_name, event):
+    def _observe_relation_event(self, event_name: str, event: ops.RelationEvent):
         unit_name = None
         if event.unit is not None:
             unit_name = event.unit.name
@@ -3089,9 +3146,13 @@ class RelationEventCharm(RecordingCharm):
 
         data = dict(app=app_name, unit=unit_name, relation_id=event.relation.id)
         if isinstance(event, ops.RelationDepartedEvent):
+            assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
-        recording = dict(name=event_name, relation=event.relation.name, data=data)
+        recording: RecordedChange = {
+            'name': event_name,
+            'relation': event.relation.name,
+            'data': data}
 
         if self.record_relation_data_on_events:
             recording["data"].update({'relation_data': {
@@ -3105,36 +3166,31 @@ class RelationEventCharm(RecordingCharm):
 class RelationBrokenTester(RelationEventCharm):
     """Access inaccessible relation data."""
 
-    def __init__(self, framework):
-        super().__init__(framework)
-
-    def _on_relation_broken(self, event):
-        print(event.relation.data[event.relation.app]['bar'])
+    def _on_relation_broken(self, event: ops.RelationBrokenEvent):
+        # We expect this to fail, because the relation has broken.
+        event.relation.data[event.relation.app]['bar']  # type: ignore
 
 
 class ContainerEventCharm(RecordingCharm):
     """Record events related to container lifecycles."""
 
-    def __init__(self, framework):
-        super().__init__(framework)
-
-    def observe_container_events(self, container_name):
+    def observe_container_events(self, container_name: str):
         self.framework.observe(self.on[container_name].pebble_ready, self._on_pebble_ready)
 
-    def _on_pebble_ready(self, event):
+    def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
         self._observe_container_event('pebble-ready', event)
 
-    def _observe_container_event(self, event_name, event: ops.PebbleReadyEvent):
+    def _observe_container_event(self, event_name: str, event: ops.PebbleReadyEvent):
         container_name = None
         if event.workload is not None:
             container_name = event.workload.name
         self.changes.append(
-            dict(name=event_name, container=container_name))
+            {'name': event_name, 'container': container_name})
 
 
-def get_public_methods(obj):
+def get_public_methods(obj: object):
     """Get the public attributes of obj to compare to another object."""
-    public = set()
+    public: typing.Set[str] = set()
     members = inspect.getmembers(obj)
     for name, member in members:
         if name.startswith('_'):
@@ -3289,6 +3345,37 @@ class TestTestingModelBackend(unittest.TestCase):
         client = backend.get_pebble('/custom/socket/path')
         self.assertIsInstance(client, _TestingPebbleClient)
 
+    def test_reboot(self):
+        class RebootingCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.install, self._reboot_now)
+                self.framework.observe(self.on.remove, self._reboot)
+
+            def _reboot_now(self, event: ops.InstallEvent):
+                self.unit.reboot(now=True)
+
+            def _reboot(self, event: ops.RemoveEvent):
+                self.unit.reboot()
+
+        harness = ops.testing.Harness(RebootingCharm, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        self.assertEqual(harness.reboot_count, 0)
+        backend = harness._backend
+        backend.reboot()
+        self.assertEqual(harness.reboot_count, 1)
+        with self.assertRaises(SystemExit):
+            backend.reboot(now=True)
+        self.assertEqual(harness.reboot_count, 2)
+        harness.begin()
+        with self.assertRaises(SystemExit):
+            harness.charm.on.install.emit()
+        self.assertEqual(harness.reboot_count, 3)
+        harness.charm.on.remove.emit()
+        self.assertEqual(harness.reboot_count, 4)
+
 
 class _TestingPebbleClientMixin:
     def get_testing_client(self):
@@ -3297,7 +3384,7 @@ class _TestingPebbleClientMixin:
             containers:
               mycontainer: {}
             ''')
-        self.addCleanup(harness.cleanup)
+        self.addCleanup(harness.cleanup)  # type: ignore
         backend = harness._backend
 
         client = backend.get_pebble('/charm/containers/mycontainer/pebble.socket')
@@ -3999,10 +4086,18 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
 # For testing file-ops of the pebble client.  This is refactored into a
 # separate mixin so we can run these tests against both the mock client as
 # well as a real pebble server instance.
-class _PebbleStorageAPIsTestMixin:
+class PebbleStorageAPIsTestMixin:
     # Override this in classes using this mixin.
     # This should be set to any non-empty path, but without a trailing /.
-    prefix = None
+    prefix: str
+
+    # Override this in classes using this mixin.
+    client: ops.pebble.Client
+
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertIn = unittest.TestCase.assertIn  # noqa
+    assertIsInstance = unittest.TestCase.assertIsInstance  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
 
     def test_push_and_pull_bytes(self):
         self._test_push_and_pull_data(
@@ -4016,16 +4111,30 @@ class _PebbleStorageAPIsTestMixin:
             encoding='sjis',
             stream_class=io.StringIO)
 
-    def _test_push_and_pull_data(self, original_data, encoding, stream_class):
+    def _test_push_and_pull_data(self,
+                                 original_data: typing.Union[str, bytes],
+                                 encoding: typing.Optional[str],
+                                 stream_class: typing.Union[typing.Type[io.BytesIO],
+                                                            typing.Type[io.StringIO]]):
         client = self.client
-        client.push(f"{self.prefix}/test", original_data, encoding=encoding)
+        # We separate out the calls to make it clearer to type checkers what's happening.
+        if encoding is None:
+            client.push(f"{self.prefix}/test", original_data)
+        else:
+            client.push(f"{self.prefix}/test", original_data, encoding=encoding)
         with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
 
         # We also support file-like objects as input, so let's test that case as well.
-        small_file = stream_class(original_data)
-        client.push(f"{self.prefix}/test", small_file, encoding=encoding)
+        if encoding is None:
+            stream_class = typing.cast(typing.Type[io.BytesIO], stream_class)
+            small_file = stream_class(typing.cast(bytes, original_data))
+            client.push(f"{self.prefix}/test", small_file)
+        else:
+            stream_class = typing.cast(typing.Type[io.StringIO], stream_class)
+            small_file = stream_class(typing.cast(str, original_data))
+            client.push(f"{self.prefix}/test", small_file, encoding=encoding)
         with client.pull(f"{self.prefix}/test", encoding=encoding) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
@@ -4054,7 +4163,7 @@ class _PebbleStorageAPIsTestMixin:
         original_data = os.urandom(data_size)
 
         client = self.client
-        client.push(f"{self.prefix}/test", original_data, encoding=None)
+        client.push(f"{self.prefix}/test", original_data)
         with client.pull(f"{self.prefix}/test", encoding=None) as infile:
             received_data = infile.read()
         self.assertEqual(original_data, received_data)
@@ -4090,7 +4199,7 @@ class _PebbleStorageAPIsTestMixin:
         ):
             with self.assertRaises(pebble.PathError) as cm:
                 client.push(f"{self.prefix}/file", data, permissions=bad_permission)
-        self.assertEqual(cm.exception.kind, 'generic-file-error')
+            self.assertEqual(cm.exception.kind, 'generic-file-error')
 
     def test_push_files_and_list(self):
         data = 'data'
@@ -4291,10 +4400,17 @@ class _PebbleStorageAPIsTestMixin:
     #   nuance.
 
 
+class _MakedirArgs(typing.TypedDict):
+    user_id: typing.Optional[int]
+    user: typing.Optional[str]
+    group_id: typing.Optional[int]
+    group: typing.Optional[str]
+
+
 class TestPebbleStorageAPIsUsingMocks(
         unittest.TestCase,
         _TestingPebbleClientMixin,
-        _PebbleStorageAPIsTestMixin):
+        PebbleStorageAPIsTestMixin):
     def setUp(self):
         self.prefix = '/prefix'
         self.client = self.get_testing_client()
@@ -4379,7 +4495,7 @@ class TestPebbleStorageAPIsUsingMocks(
         data = 'data'
         client = self.client
         user, group = self._select_testing_user_group()
-        cases = [
+        cases: typing.List[_MakedirArgs] = [
             {
                 "user_id": user.pw_uid,
                 "user": None,
@@ -4419,7 +4535,7 @@ class TestPebbleStorageAPIsUsingMocks(
     def test_make_dir_with_ownership(self):
         client = self.client
         user, group = self._select_testing_user_group()
-        cases = [
+        cases: typing.List[_MakedirArgs] = [
             {
                 "user_id": user.pw_uid,
                 "user": None,
@@ -4455,28 +4571,6 @@ class TestPebbleStorageAPIsUsingMocks(
             client.make_dir(f"{self.prefix}/dir{idx}", **case)
             dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
             self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
-
-
-@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
-class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, _PebbleStorageAPIsTestMixin):
-    def setUp(self):
-        socket_path = os.getenv('PEBBLE_SOCKET')
-        pebble_dir = os.getenv('PEBBLE')
-        if not socket_path and pebble_dir:
-            socket_path = os.path.join(pebble_dir, '.pebble.socket')
-        assert socket_path and pebble_dir, 'PEBBLE must be set if RUN_REAL_PEBBLE_TESTS set'
-
-        self.prefix = tempfile.mkdtemp(dir=pebble_dir)
-        self.client = pebble.Client(socket_path=socket_path)
-
-    def tearDown(self):
-        shutil.rmtree(self.prefix)
-
-    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
-    # test mixin class.
-    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
-    def test_make_dir_with_permission_mask(self):
-        pass
 
 
 class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
@@ -4516,11 +4610,13 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
             (tempdir / "foo/bar").mkdir(parents=True)
             (tempdir / "foo/test").write_text("test")
             (tempdir / "foo/bar/foobar").write_text("foobar")
+            (tempdir / "foo/baz").mkdir(parents=True)
             self.container.push_path(tempdir / "foo", "/tmp")
 
             self.assertTrue((self.root / "tmp").is_dir())
             self.assertTrue((self.root / "tmp/foo").is_dir())
             self.assertTrue((self.root / "tmp/foo/bar").is_dir())
+            self.assertTrue((self.root / "tmp/foo/baz").is_dir())
             self.assertEqual((self.root / "tmp/foo/test").read_text(), "test")
             self.assertEqual((self.root / "tmp/foo/bar/foobar").read_text(), "foobar")
 
@@ -4537,16 +4633,14 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
     def test_pull_path(self):
         (self.root / "foo").mkdir()
         (self.root / "foo/bar").write_text("bar")
-        # TODO: pull_path doesn't pull empty directories
-        # https://github.com/canonical/operator/issues/968
-        # (self.root / "foobar").mkdir()
+        (self.root / "foobar").mkdir()
         (self.root / "test").write_text("test")
         with tempfile.TemporaryDirectory() as temp:
             tempdir = pathlib.Path(temp)
             self.container.pull_path("/", tempdir)
             self.assertTrue((tempdir / "foo").is_dir())
             self.assertEqual((tempdir / "foo/bar").read_text(), "bar")
-            # self.assertTrue((tempdir / "foobar").is_dir())
+            self.assertTrue((tempdir / "foobar").is_dir())
             self.assertEqual((tempdir / "test").read_text(), "test")
 
     def test_list_files(self):
@@ -4639,7 +4733,8 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 1)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretChangedEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretChangedEvent)
         self.assertEqual(event.secret.get_content(), {'foo': '1'})
         self.assertEqual(event.secret.get_content(refresh=True), {'foo': '2'})
         self.assertEqual(event.secret.get_content(), {'foo': '2'})
@@ -4652,6 +4747,7 @@ class TestSecrets(unittest.TestCase):
 
         secret = harness.model.app.add_secret({'foo': 'bar'})
         with self.assertRaises(RuntimeError):
+            assert secret.id is not None
             harness.set_secret_content(secret.id, {'bar': 'foo'})
 
     def test_set_secret_content_invalid_secret_id(self):
@@ -4721,15 +4817,19 @@ class TestSecrets(unittest.TestCase):
 
         relation_id = harness.add_relation('db', 'webapp')
         harness.add_relation_unit(relation_id, 'webapp/0')
+        assert harness is not None
 
         secret = harness.model.app.add_secret({'foo': 'x'})
+        assert secret.id is not None
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
-        secret.grant(harness.model.get_relation('db'))
+        rel = harness.model.get_relation('db')
+        assert rel is not None
+        secret.grant(rel)
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp'})
 
-        secret.revoke(harness.model.get_relation('db'))
+        secret.revoke(rel)
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
-        secret.grant(harness.model.get_relation('db'), unit=harness.model.get_unit('webapp/0'))
+        secret.grant(rel, unit=harness.model.get_unit('webapp/0'))
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), {'webapp/0'})
 
     def test_trigger_secret_rotation(self):
@@ -4737,6 +4837,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        assert secret.id is not None
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_rotate, harness.charm.record_event)
         harness.trigger_secret_rotation(secret.id)
@@ -4744,11 +4845,13 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 2)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretRotateEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRotateEvent)
         self.assertEqual(event.secret.label, 'lbl')
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
         event = harness.charm.events[1]
-        self.assertIsInstance(event, ops.SecretRotateEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRotateEvent)
         self.assertEqual(event.secret.label, 'override')
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
 
@@ -4760,6 +4863,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        assert secret.id is not None
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
         harness.trigger_secret_removal(secret.id, 1)
@@ -4767,12 +4871,14 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 2)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'lbl')
         self.assertEqual(event.revision, 1)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
         event = harness.charm.events[1]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'override')
         self.assertEqual(event.revision, 42)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
@@ -4785,6 +4891,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'x'}, label='lbl')
+        assert secret.id is not None
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_remove, harness.charm.record_event)
         harness.trigger_secret_removal(secret.id, 1)
@@ -4792,12 +4899,14 @@ class TestSecrets(unittest.TestCase):
 
         self.assertEqual(len(harness.charm.events), 2)
         event = harness.charm.events[0]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'lbl')
         self.assertEqual(event.revision, 1)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
         event = harness.charm.events[1]
-        self.assertIsInstance(event, ops.SecretRemoveEvent)
+        # Not assertIsInstance to help type checkers.
+        assert isinstance(event, ops.SecretRemoveEvent)
         self.assertEqual(event.secret.label, 'override')
         self.assertEqual(event.revision, 42)
         self.assertEqual(event.secret.get_content(), {'foo': 'x'})
@@ -4807,11 +4916,11 @@ class TestSecrets(unittest.TestCase):
 
 
 class EventRecorder(ops.CharmBase):
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.events = []
+        self.events: typing.List[ops.EventBase] = []
 
-    def record_event(self, event):
+    def record_event(self, event: ops.EventBase):
         self.events.append(event)
 
 
@@ -4829,13 +4938,12 @@ class TestPorts(unittest.TestCase):
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 3)
-        self.assertIsInstance(ports[0], ops.OpenedPort)
+        self.assertIsInstance(ports[0], ops.Port)
         self.assertEqual(ports[0].protocol, 'icmp')
         self.assertIsNone(ports[0].port)
-        self.assertIsInstance(ports[1], ops.OpenedPort)
         self.assertEqual(ports[1].protocol, 'tcp')
         self.assertEqual(ports[1].port, 8080)
-        self.assertIsInstance(ports[2], ops.OpenedPort)
+        self.assertIsInstance(ports[1], ops.Port)
         self.assertEqual(ports[2].protocol, 'udp')
         self.assertEqual(ports[2].port, 4000)
 
@@ -4847,7 +4955,7 @@ class TestPorts(unittest.TestCase):
         self.assertIsInstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
         self.assertEqual(len(ports), 1)
-        self.assertIsInstance(ports[0], ops.OpenedPort)
+        self.assertIsInstance(ports[0], ops.Port)
         self.assertEqual(ports[0].protocol, 'icmp')
         self.assertIsNone(ports[0].port)
 
@@ -4864,7 +4972,7 @@ class TestPorts(unittest.TestCase):
         with self.assertRaises(ops.ModelError):
             unit.open_port('icmp', 8080)  # icmp cannot have port
         with self.assertRaises(ops.ModelError):
-            unit.open_port('ftp', 8080)  # invalid protocol
+            unit.open_port('ftp', 8080)  # invalid protocol  # type: ignore
         with self.assertRaises(ops.ModelError):
             unit.open_port('tcp')  # tcp must have port
         with self.assertRaises(ops.ModelError):
@@ -4957,10 +5065,10 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stderr, "")
 
     def test_register_with_handler(self):
-        args_history = []
+        args_history: typing.List[ops.testing.ExecArgs] = []
         return_value = None
 
-        def handler(args):
+        def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
             return return_value
 
@@ -4998,7 +5106,7 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(args_history[-1].group_id, 2)
 
     def test_exec_timeout(self):
-        def handler(_):
+        def handler(_: ops.testing.ExecArgs):
             raise TimeoutError
 
         self.harness.handle_exec(self.container, [], handler=handler)
@@ -5019,9 +5127,9 @@ class TestHandleExec(unittest.TestCase):
             self.container.exec(["ls"], combine_stderr=True).wait_output()
 
     def test_exec_stdin(self):
-        args_history = []
+        args_history: typing.List[ops.testing.ExecArgs] = []
 
-        def handler(args):
+        def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
 
         self.harness.handle_exec(self.container, [], handler=handler)
@@ -5047,8 +5155,8 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "error")
 
         proc = self.container.exec(["ls"])
-        self.assertIsNotNone(proc.stdout)
-        self.assertIsNotNone(proc.stderr)
+        assert proc.stdout is not None  # Not assertIsNotNone to help type checkers.
+        assert proc.stderr is not None  # Not assertIsNotNone to help type checkers.
         proc.wait()
         self.assertEqual(proc.stdout.read(), "output")
         self.assertEqual(proc.stderr.read(), "error")
@@ -5062,6 +5170,8 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "output")
         self.assertEqual(stderr.getvalue(), "error")
         proc = self.container.exec(["ls"])
+        assert proc.stdout is not None  # Not assertIsNotNone to help type checkers.
+        assert proc.stderr is not None  # Not assertIsNotNone to help type checkers.
         self.assertEqual(proc.stdout.read(), "output")
         self.assertEqual(proc.stderr.read(), "error")
 
@@ -5071,11 +5181,13 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), b"output")
         self.assertEqual(stderr.getvalue(), b"error")
         proc = self.container.exec(["ls"], encoding=None)
+        assert proc.stdout is not None  # Not assertIsNotNone to help type checkers.
+        assert proc.stderr is not None  # Not assertIsNotNone to help type checkers.
         self.assertEqual(proc.stdout.read(), b"output")
         self.assertEqual(proc.stderr.read(), b"error")
 
     def test_exec_service_context(self):
-        service = {
+        service: ops.pebble.ServiceDict = {
             "command": "test",
             "working-dir": "/tmp",
             "user": "foo",
@@ -5084,12 +5196,15 @@ class TestHandleExec(unittest.TestCase):
             "group-id": 2,
             "environment": {"foo": "bar", "foobar": "barfoo"}
         }
-        self.container.add_layer(label="test", layer={
-            "summary": "", "description": "", "services": {"test": service}
-        })
-        args_history = []
+        layer: ops.pebble.LayerDict = {
+            'summary': "",
+            'description': "",
+            'services': {
+                "test": service}}
+        self.container.add_layer(label="test", layer=ops.pebble.Layer(layer))
+        args_history: typing.List[ops.testing.ExecArgs] = []
 
-        def handler(args):
+        def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
 
         os.environ["JUJU_VERSION"] = "3.2.1"
@@ -5117,3 +5232,143 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(args_history[-1].group, "test_group")
         self.assertEqual(args_history[-1].group_id, 4)
         self.assertDictEqual(args_history[-1].environment, {"foo": "hello", "foobar": "barfoo"})
+
+
+class TestActions(unittest.TestCase):
+    def setUp(self):
+        action_results: typing.Dict[str, typing.Any] = {}
+        self._action_results = action_results
+
+        class ActionCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.simple_action, self._on_simple_action)
+                self.framework.observe(self.on.fail_action, self._on_fail_action)
+                self.framework.observe(self.on.results_action, self._on_results_action)
+                self.framework.observe(
+                    self.on.log_and_results_action, self._on_log_and_results_action)
+                self.simple_was_called = False
+
+            def _on_simple_action(self, event: ops.ActionEvent):
+                """An action that doesn't generate logs, have any results, or fail."""
+                self.simple_was_called = True
+
+            def _on_fail_action(self, event: ops.ActionEvent):
+                event.fail("this will be ignored")
+                event.log("some progress")
+                event.fail("something went wrong")
+                event.log("more progress")
+                event.set_results(action_results)
+
+            def _on_log_and_results_action(self, event: ops.ActionEvent):
+                event.log("Step 1")
+                event.set_results({"result1": event.params["foo"]})
+                event.log("Step 2")
+                event.set_results({"result2": event.params.get("bar")})
+
+            def _on_results_action(self, event: ops.ActionEvent):
+                event.set_results(action_results)
+
+        self.harness = ops.testing.Harness(ActionCharm, meta='''
+            name: test
+            ''', actions='''
+            simple:
+              description: lorem ipsum
+            fail:
+              description: dolor sit amet
+            unobserved-param-tester:
+              description: consectetur adipiscing elit
+              params:
+                foo
+                bar
+              required: [foo]
+              additionalProperties: false
+            log-and-results:
+              description: sed do eiusmod tempor
+              params:
+                foo:
+                  type: string
+                  default: foo-default
+                bar:
+                  type: integer
+            results:
+              description: incididunt ut labore
+            ''')
+        self.harness.begin()
+
+    def test_before_begin(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test
+            ''')
+        with self.assertRaises(RuntimeError):
+            harness.run_action("fail")
+
+    def test_invalid_action(self):
+        # This action isn't in the metadata at all.
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("another-action")
+        # Also check that we're not exposing the action with the dash to underscore replacement.
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("log_and_results")
+
+    def test_run_action(self):
+        out = self.harness.run_action("simple")
+        self.assertEqual(out.logs, [])
+        self.assertEqual(out.results, {})
+        self.assertTrue(self.harness.charm.simple_was_called)
+
+    def test_fail_action(self):
+        self._action_results.clear()
+        self._action_results["partial"] = "foo"
+        with self.assertRaises(ops.testing.ActionFailed) as cm:
+            self.harness.run_action("fail")
+        self.assertEqual(cm.exception.message, "something went wrong")
+        self.assertEqual(cm.exception.output.logs, ["some progress", "more progress"])
+        self.assertEqual(cm.exception.output.results, {"partial": "foo"})
+
+    def test_required_param(self):
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("unobserved-param-tester")
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("unobserved-param-tester", {"bar": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz", "bar": "qux"})
+
+    def test_additional_params(self):
+        self.harness.run_action("simple", {"foo": "bar"})
+        with self.assertRaises(ops.ModelError):
+            self.harness.run_action("unobserved-param-tester", {"foo": "bar", "qux": "baz"})
+        self.harness.run_action("simple", {
+            "string": "hello",
+            "number": 28.8,
+            "object": {"a": {"b": "c"}},
+            "array": [1, 2, 3],
+            "boolean": True,
+            "null": None})
+
+    def test_logs_and_results(self):
+        out = self.harness.run_action("log-and-results")
+        self.assertEqual(out.logs, ["Step 1", "Step 2"])
+        self.assertEqual(out.results, {"result1": "foo-default", "result2": None})
+        out = self.harness.run_action("log-and-results", {"foo": "baz", "bar": 28})
+        self.assertEqual(out.results, {"result1": "baz", "result2": 28})
+
+    def test_bad_results(self):
+        # We can't have results that collide when flattened.
+        self._action_results.clear()
+        self._action_results["a"] = {"b": 1}
+        self._action_results["a.b"] = 2
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")
+        # There are some result key names we cannot use.
+        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
+        for key in prohibited_keys:
+            self._action_results.clear()
+            self._action_results[key] = "foo"
+            with self.assertRaises(ops.ModelError):
+                self.harness.run_action("results")
+        # There are some additional rules around what result keys are valid.
+        self._action_results.clear()
+        self._action_results["A"] = "foo"
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")

@@ -41,7 +41,7 @@ class TestJujuVersion(unittest.TestCase):
             self.assertEqual(v.patch, patch)
             self.assertEqual(v.build, build)
 
-    @unittest.mock.patch('os.environ', new={})
+    @unittest.mock.patch('os.environ', new={})  # type: ignore
     def test_from_environ(self):
         # JUJU_VERSION is not set
         v = ops.JujuVersion.from_environ()

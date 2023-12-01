@@ -16,7 +16,6 @@
 
 import enum
 import logging
-import os
 import pathlib
 from typing import (
     TYPE_CHECKING,
@@ -25,28 +24,35 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NoReturn,
     Optional,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
     cast,
 )
 
 from ops import model
 from ops._private import yaml
-from ops.framework import EventBase, EventSource, Framework, Object, ObjectEvents
+from ops.framework import (
+    EventBase,
+    EventSource,
+    Framework,
+    Handle,
+    Object,
+    ObjectEvents,
+)
 
 if TYPE_CHECKING:
-    from typing_extensions import Required, TypedDict
-
-    from ops.framework import Handle
-    from ops.model import Container, Relation, Storage
+    from typing_extensions import Required
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
         '_RelationMetaDict', {
             'interface': Required[str],
             'limit': int,
+            'optional': bool,
             'scope': _Scopes},
         total=False)
 
@@ -60,7 +66,7 @@ if TYPE_CHECKING:
         'location': str,
         'multiple-range': str,
         'multiple': _MultipleRange
-    })
+    }, total=False)
 
     _ResourceMetaDict = TypedDict(
         '_ResourceMetaDict', {
@@ -114,11 +120,14 @@ class ActionEvent(EventBase):
     params: Dict[str, Any]
     """The parameters passed to the action."""
 
-    def defer(self) -> None:
+    def defer(self) -> NoReturn:
         """Action events are not deferrable like other events.
 
         This is because an action runs synchronously and the administrator
         is waiting for the result.
+
+        Raises:
+            RuntimeError: always.
         """
         raise RuntimeError('cannot defer action events')
 
@@ -127,12 +136,6 @@ class ActionEvent(EventBase):
 
         Not meant to be called directly by charm code.
         """
-        env_action_name = os.environ.get('JUJU_ACTION_NAME')
-        event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
-        if event_action_name != env_action_name:
-            # This could only happen if the dev manually emits the action, or from a bug.
-            raise RuntimeError('action event kind ({}) does not match current '
-                               'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
@@ -156,6 +159,11 @@ class ActionEvent(EventBase):
         alphanumeric, and can only contain lowercase alphanumeric, hyphens
         and periods.
 
+        Because results are passed to Juju using the command line, the maximum
+        size is around 100KB. However, actions results are designed to be
+        small: a few key-value pairs shown in the Juju CLI. If larger content
+        is needed, store it in a file and use something like ``juju scp``.
+
         If any exceptions occur whilst the action is being handled, juju will
         gather any stdout/stderr data (and the return code) and inject them into the
         results object. Thus, the results object might contain the following keys,
@@ -169,6 +177,13 @@ class ActionEvent(EventBase):
 
         Args:
             results: The result of the action as a Dict
+
+        Raises:
+            ModelError: if a reserved key is used.
+            ValueError: if ``results`` has a mix of dotted/non-dotted keys that expand out to
+                result in duplicate keys, for example: :code:`{'a': {'b': 1}, 'a.b': 2}`. Also
+                raised if a dict is passed with a key that fails to meet the format requirements.
+            OSError: if extremely large (>100KB) results are provided.
         """
         self.framework.model._backend.action_set(results)
 
@@ -241,7 +256,7 @@ class ConfigChangedEvent(HookEvent):
       This event notifies the charm of its initial configuration.
       Typically, this event will fire between an :class:`install <InstallEvent>`
       and a :class:`start <StartEvent>` during the startup sequence
-      (when you first deploy a unit), but in general it will fire whenever
+      (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
     - As a specific instance of the above point: when networking changes
@@ -353,8 +368,11 @@ class CollectMetricsEvent(HookEvent):
         Args:
             metrics: Key-value mapping of metrics that have been gathered.
             labels: Key-value labels applied to the metrics.
+
+        Raises:
+            ModelError: if invalid keys or values are provided.
         """
-        self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
+        self.framework.model._backend.add_metrics(metrics, labels)
 
 
 class RelationEvent(HookEvent):
@@ -368,11 +386,10 @@ class RelationEvent(HookEvent):
     relations with the same name.
     """
 
-    relation: 'Relation'
+    relation: 'model.Relation'
     """The relation involved in this event."""
 
-    # TODO(benhoyt): I *think* app should never be None, but confirm and update type
-    app: Optional[model.Application]
+    app: model.Application
     """The remote application that has triggered this event."""
 
     unit: Optional[model.Unit]
@@ -382,7 +399,7 @@ class RelationEvent(HookEvent):
     :class:`Application <model.Application>`-level event.
     """
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None):
         super().__init__(handle)
@@ -392,7 +409,12 @@ class RelationEvent(HookEvent):
                 f'cannot create RelationEvent with application {app} and unit {unit}')
 
         self.relation = relation
-        self.app = app
+        if app is None:
+            logger.warning("'app' expected but not received.")
+            # Do an explicit assignment here so that we can contain the type: ignore.
+            self.app = None  # type: ignore
+        else:
+            self.app = app
         self.unit = unit
 
     def snapshot(self) -> Dict[str, Any]:
@@ -427,7 +449,8 @@ class RelationEvent(HookEvent):
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         else:
-            self.app = None
+            logger.warning("'app_name' expected in snapshot but not found.")
+            self.app = None  # type: ignore
 
         unit_name = snapshot.get('unit_name')
         if unit_name:
@@ -443,6 +466,8 @@ class RelationCreatedEvent(RelationEvent):
     can occur before units for those applications have started. All existing
     relations should be established before start.
     """
+    unit: None
+    """Always ``None``."""
 
 
 class RelationJoinedEvent(RelationEvent):
@@ -456,6 +481,8 @@ class RelationJoinedEvent(RelationEvent):
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
+    unit: model.Unit
+    """The remote unit that has triggered this event."""
 
 
 class RelationChangedEvent(RelationEvent):
@@ -496,8 +523,10 @@ class RelationDepartedEvent(RelationEvent):
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
+    unit: model.Unit
+    """The remote unit that has triggered this event."""
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None,
                  departing_unit_name: Optional[str] = None):
@@ -519,8 +548,8 @@ class RelationDepartedEvent(RelationEvent):
     def departing_unit(self) -> Optional[model.Unit]:
         """The :class:`ops.Unit` that is departing, if any.
 
-        You can use this to determine (for example) whether *you* are the
-        departing unit.
+        Use this method to determine (for example) whether this unit is the
+        departing one.
         """
         # doing this on init would fail because `framework` gets patched in
         # post-init
@@ -551,6 +580,8 @@ class RelationBrokenEvent(RelationEvent):
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
+    unit: None
+    """Always ``None``."""
 
 
 class StorageEvent(HookEvent):
@@ -562,10 +593,10 @@ class StorageEvent(HookEvent):
     of :class:`StorageEvent`.
     """
 
-    storage: 'Storage'
+    storage: 'model.Storage'
     """Storage instance this event refers to."""
 
-    def __init__(self, handle: 'Handle', storage: 'Storage'):
+    def __init__(self, handle: 'Handle', storage: 'model.Storage'):
         super().__init__(handle)
         self.storage = storage
 
@@ -644,7 +675,7 @@ class WorkloadEvent(HookEvent):
     a :class:`PebbleReadyEvent`.
     """
 
-    workload: 'Container'
+    workload: 'model.Container'
     """The workload involved in this event.
 
     Workload currently only can be a :class:`Container <model.Container>`, but
@@ -652,7 +683,7 @@ class WorkloadEvent(HookEvent):
     for example a machine.
     """
 
-    def __init__(self, handle: 'Handle', workload: 'Container'):
+    def __init__(self, handle: 'Handle', workload: 'model.Container'):
         super().__init__(handle)
 
         self.workload = workload
@@ -729,7 +760,7 @@ class SecretChangedEvent(SecretEvent):
     a new secret revision, and all applications or units that are tracking this
     secret will be notified via this event that a new revision is available.
 
-    Typically, you will want to fetch the new content by calling
+    Typically, the charm will fetch the new content by calling
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
     """
@@ -743,8 +774,12 @@ class SecretRotateEvent(SecretEvent):
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
-    def defer(self) -> None:
-        """Secret rotation events are not deferrable (Juju handles re-invocation)."""
+    def defer(self) -> NoReturn:
+        """Secret rotation events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
         raise RuntimeError(
             'Cannot defer secret rotation events. Juju will keep firing this '
             'event until you create a new revision.')
@@ -757,7 +792,7 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call
+    Typically, the charm will call
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision.
     """
@@ -823,8 +858,12 @@ class SecretExpiredEvent(SecretEvent):
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
 
-    def defer(self) -> None:
-        """Secret expiration events are not deferrable (Juju handles re-invocation)."""
+    def defer(self) -> NoReturn:
+        """Secret expiration events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
         raise RuntimeError(
             'Cannot defer secret expiration events. Juju will keep firing '
             'this event until you create a new revision.')
@@ -841,7 +880,7 @@ class CollectStatusEvent(EventBase):
 
     The framework will trigger these events after the hook code runs
     successfully (``collect_app_status`` will only be triggered on the leader
-    unit). If any statuses were added by the event handlers using
+    unit). If any statuses were added by the event handler using
     :meth:`add_status`, the framework will choose the highest-priority status
     and set that as the status (application status for ``collect_app_status``,
     or unit status for ``collect_unit_status``).
@@ -1005,7 +1044,7 @@ class CharmBase(Object):
 
     :code:`CharmBase` is used to create a charm. This is done by inheriting
     from :code:`CharmBase` and customising the subclass as required. So to
-    create your own charm, say ``MyCharm``, define a charm class and set up the
+    create a charm called ``MyCharm``, define a charm class and set up the
     required event handlers (“hooks”) in its constructor::
 
         import logging
@@ -1295,6 +1334,14 @@ class RelationMeta:
     Will be either ``"global"`` or ``"container"``.
     """
 
+    optional: bool
+    """If True, the relation is considered optional.
+
+    This value is informational only and is not used by Juju itself (all
+    relations are optional from Juju's perspective), but it may be set in
+    ``metadata.yaml`` and used by the charm code if appropriate.
+    """
+
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
@@ -1313,6 +1360,8 @@ class RelationMeta:
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
                 ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
+
+        self.optional = raw.get('optional', False)
 
 
 class StorageMeta:
@@ -1409,6 +1458,7 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+        self.additional_properties = raw.get('additionalProperties', True)
 
 
 class ContainerMeta:

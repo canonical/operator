@@ -15,6 +15,7 @@ import functools
 import os
 import shutil
 import tempfile
+import typing
 import unittest
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from .test_helpers import fake_script, fake_script_calls
 class TestCharm(unittest.TestCase):
 
     def setUp(self):
-        def restore_env(env):
+        def restore_env(env: typing.Dict[str, str]):
             os.environ.clear()
             os.environ.update(env)
         self.addCleanup(restore_env, os.environ.copy())
@@ -51,10 +52,10 @@ class TestCharm(unittest.TestCase):
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
-        ops.CharmBase.on = TestCharmEvents()
+        ops.CharmBase.on = TestCharmEvents()  # type: ignore
 
         def cleanup():
-            ops.CharmBase.on = ops.CharmEvents()
+            ops.CharmBase.on = ops.CharmEvents()  # type: ignore
         self.addCleanup(cleanup)
 
     def create_framework(self):
@@ -69,16 +70,16 @@ class TestCharm(unittest.TestCase):
 
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
 
                 self.started = False
                 framework.observe(self.on.start, self._on_start)
 
-            def _on_start(self, event):
+            def _on_start(self, event: ops.EventBase):
                 self.started = True
 
-        events = list(MyCharm.on.events())
+        events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
         self.assertIn('install', events)
         self.assertIn('custom', events)
 
@@ -89,7 +90,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(charm.started, True)
 
         with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
-            framework.observe(charm.on.start, charm)
+            framework.observe(charm.on.start, charm)  # type: ignore
 
     def test_observe_decorated_method(self):
         # we test that charm methods decorated with @functools.wraps(wrapper)
@@ -98,25 +99,26 @@ class TestCharm(unittest.TestCase):
         # is more careful and it still works, this test is here to ensure that
         # it keeps working in future releases, as this is presently the only
         # way we know of to cleanly decorate charm event observers.
-        events = []
+        events: typing.List[ops.EventBase] = []
 
-        def dec(fn):
+        def dec(fn: typing.Callable[['MyCharm', ops.EventBase], None]  # noqa: F821
+                ) -> typing.Callable[..., None]:
             # simple decorator that appends to the nonlocal
             # `events` list all events it receives
             @functools.wraps(fn)
-            def wrapper(charm, evt):
+            def wrapper(charm: 'MyCharm', evt: ops.EventBase):
                 events.append(evt)
                 fn(charm, evt)
             return wrapper
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 framework.observe(self.on.start, self._on_start)
                 self.seen = None
 
             @dec
-            def _on_start(self, event):
+            def _on_start(self, event: ops.EventBase):
                 self.seen = event
 
         framework = self.create_framework()
@@ -147,9 +149,9 @@ class TestCharm(unittest.TestCase):
     def test_relation_events(self):
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                self.seen = []
+                self.seen: typing.List[str] = []
                 for rel in ('req1', 'req-2', 'pro1', 'pro-2', 'peer1', 'peer-2'):
                     # Hook up relation events to generic handler.
                     self.framework.observe(self.on[rel].relation_joined, self.on_any_relation)
@@ -157,8 +159,9 @@ class TestCharm(unittest.TestCase):
                     self.framework.observe(self.on[rel].relation_departed, self.on_any_relation)
                     self.framework.observe(self.on[rel].relation_broken, self.on_any_relation)
 
-            def on_any_relation(self, event):
+            def on_any_relation(self, event: ops.RelationEvent):
                 assert event.relation.name == 'req1'
+                assert event.relation.app is not None
                 assert event.relation.app.name == 'remote'
                 self.seen.append(type(event).__name__)
 
@@ -187,17 +190,20 @@ peers:
         self.assertIn('pro_2_relation_broken', repr(charm.on))
 
         rel = charm.framework.model.get_relation('req1', 1)
+        app = charm.framework.model.get_app('remote')
         unit = charm.framework.model.get_unit('remote/0')
-        charm.on['req1'].relation_joined.emit(rel, unit)
-        charm.on['req1'].relation_changed.emit(rel, unit)
-        charm.on['req-2'].relation_changed.emit(rel, unit)
-        charm.on['pro1'].relation_departed.emit(rel, unit)
-        charm.on['pro-2'].relation_departed.emit(rel, unit)
-        charm.on['peer1'].relation_broken.emit(rel)
-        charm.on['peer-2'].relation_broken.emit(rel)
+        charm.on['req1'].relation_joined.emit(rel, app, unit)
+        charm.on['req1'].relation_changed.emit(rel, app, unit)
+        charm.on['req1'].relation_changed.emit(rel, app)
+        charm.on['req-2'].relation_changed.emit(rel, app, unit)
+        charm.on['pro1'].relation_departed.emit(rel, app, unit)
+        charm.on['pro-2'].relation_departed.emit(rel, app, unit)
+        charm.on['peer1'].relation_broken.emit(rel, app)
+        charm.on['peer-2'].relation_broken.emit(rel, app)
 
         self.assertEqual(charm.seen, [
             'RelationJoinedEvent',
+            'RelationChangedEvent',
             'RelationChangedEvent',
             'RelationChangedEvent',
             'RelationDepartedEvent',
@@ -210,25 +216,25 @@ peers:
         this = self
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                self.seen = []
+                self.seen: typing.List[str] = []
                 self.framework.observe(self.on['stor1'].storage_attached, self._on_stor1_attach)
                 self.framework.observe(self.on['stor2'].storage_detaching, self._on_stor2_detach)
                 self.framework.observe(self.on['stor3'].storage_attached, self._on_stor3_attach)
                 self.framework.observe(self.on['stor-4'].storage_attached, self._on_stor4_attach)
 
-            def _on_stor1_attach(self, event):
+            def _on_stor1_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
                 this.assertEqual(event.storage.location, Path("/var/srv/stor1/0"))
 
-            def _on_stor2_detach(self, event):
+            def _on_stor2_detach(self, event: ops.StorageDetachingEvent):
                 self.seen.append(type(event).__name__)
 
-            def _on_stor3_attach(self, event):
+            def _on_stor3_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
 
-            def _on_stor4_attach(self, event):
+            def _on_stor4_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
 
         # language=YAML
@@ -320,9 +326,9 @@ storage:
     def test_workload_events(self):
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                self.seen = []
+                self.seen: typing.List[str] = []
                 self.count = 0
                 for workload in ('container-a', 'containerb'):
                     # Hook up relation events to generic handler.
@@ -330,7 +336,7 @@ storage:
                         self.on[workload].pebble_ready,
                         self.on_any_pebble_ready)
 
-            def on_any_pebble_ready(self, event):
+            def on_any_pebble_ready(self, event: ops.PebbleReadyEvent):
                 self.seen.append(type(event).__name__)
                 self.count += 1
 
@@ -359,7 +365,6 @@ containers:
         self.assertEqual(charm.count, 2)
 
     def test_relations_meta(self):
-
         # language=YAML
         self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -370,15 +375,18 @@ requires:
     scope: container
   metrics:
     interface: prometheus-scraping
+    optional: true
 ''')
 
         self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
         self.assertEqual(self.meta.requires['database'].limit, 1)
         self.assertEqual(self.meta.requires['database'].scope, 'container')
+        self.assertFalse(self.meta.requires['database'].optional)
 
         self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
         self.assertIsNone(self.meta.requires['metrics'].limit)
         self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
+        self.assertTrue(self.meta.requires['metrics'].optional)
 
     def test_relations_meta_limit_type_validation(self):
         with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
@@ -423,10 +431,10 @@ foo-bar:
   title: foo-bar
 start:
   description: "Start the unit."
+  additionalProperties: false
 ''')
 
     def _setup_test_action(self):
-        os.environ['JUJU_ACTION_NAME'] = 'foo-bar'
         fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")
         fake_script(self, 'action-set', "")
         fake_script(self, 'action-log', "")
@@ -437,25 +445,25 @@ start:
 
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
                 framework.observe(self.on.start_action, self._on_start_action)
 
-            def _on_foo_bar_action(self, event):
+            def _on_foo_bar_action(self, event: ops.ActionEvent):
                 self.seen_action_params = event.params
                 event.log('test-log')
                 event.set_results({'res': 'val with spaces'})
                 event.fail('test-fail')
 
-            def _on_start_action(self, event):
+            def _on_start_action(self, event: ops.ActionEvent):
                 pass
 
         self._setup_test_action()
         framework = self.create_framework()
         charm = MyCharm(framework)
 
-        events = list(MyCharm.on.events())
+        events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
         self.assertIn('foo_bar_action', events)
         self.assertIn('start_action', events)
 
@@ -468,21 +476,16 @@ start:
             ['action-fail', "test-fail"],
         ])
 
-        # Make sure that action events that do not match the current context are
-        # not possible to emit by hand.
-        with self.assertRaises(RuntimeError):
-            charm.on.start_action.emit()
-
     def test_invalid_action_results(self):
 
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                self.res = {}
+                self.res: typing.Dict[str, typing.Any] = {}
                 framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
 
-            def _on_foo_bar_action(self, event):
+            def _on_foo_bar_action(self, event: ops.ActionEvent):
                 event.set_results(self.res)
 
         self._setup_test_action()
@@ -500,15 +503,15 @@ start:
             with self.assertRaises(ValueError):
                 charm.on.foo_bar_action.emit()
 
-    def _test_action_event_defer_fails(self, cmd_type):
+    def _test_action_event_defer_fails(self, cmd_type: str):
 
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 framework.observe(self.on.start_action, self._on_start_action)
 
-            def _on_start_action(self, event):
+            def _on_start_action(self, event: ops.ActionEvent):
                 event.defer()
 
         fake_script(self, f"{cmd_type}-get", """echo '{"foo-name": "name", "silent": true}'""")
@@ -588,31 +591,31 @@ containers:
 
     def test_secret_events(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                self.seen = []
+                self.seen: typing.List[str] = []
                 self.framework.observe(self.on.secret_changed, self.on_secret_changed)
                 self.framework.observe(self.on.secret_rotate, self.on_secret_rotate)
                 self.framework.observe(self.on.secret_remove, self.on_secret_remove)
                 self.framework.observe(self.on.secret_expired, self.on_secret_expired)
 
-            def on_secret_changed(self, event):
+            def on_secret_changed(self, event: ops.SecretChangedEvent):
                 assert event.secret.id == 'secret:changed'
                 assert event.secret.label is None
                 self.seen.append(type(event).__name__)
 
-            def on_secret_rotate(self, event):
+            def on_secret_rotate(self, event: ops.SecretRotateEvent):
                 assert event.secret.id == 'secret:rotate'
                 assert event.secret.label == 'rot'
                 self.seen.append(type(event).__name__)
 
-            def on_secret_remove(self, event):
+            def on_secret_remove(self, event: ops.SecretRemoveEvent):
                 assert event.secret.id == 'secret:remove'
                 assert event.secret.label == 'rem'
                 assert event.revision == 7
                 self.seen.append(type(event).__name__)
 
-            def on_secret_expired(self, event):
+            def on_secret_expired(self, event: ops.SecretExpiredEvent):
                 assert event.secret.id == 'secret:expired'
                 assert event.secret.label == 'exp'
                 assert event.revision == 42
@@ -635,11 +638,11 @@ containers:
 
     def test_collect_app_status_leader(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
-            def _on_collect_status(self, event):
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
                 event.add_status(ops.ActiveStatus())
                 event.add_status(ops.BlockedStatus('first'))
                 event.add_status(ops.WaitingStatus('waiting'))
@@ -658,11 +661,11 @@ containers:
 
     def test_collect_app_status_no_statuses(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
-            def _on_collect_status(self, event):
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
                 pass
 
         fake_script(self, 'is-leader', 'echo true')
@@ -676,11 +679,11 @@ containers:
 
     def test_collect_app_status_non_leader(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
-            def _on_collect_status(self, event):
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
                 raise Exception  # shouldn't be called
 
         fake_script(self, 'is-leader', 'echo false')
@@ -694,11 +697,11 @@ containers:
 
     def test_collect_unit_status(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
-            def _on_collect_status(self, event):
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
                 event.add_status(ops.ActiveStatus())
                 event.add_status(ops.BlockedStatus('first'))
                 event.add_status(ops.WaitingStatus('waiting'))
@@ -717,11 +720,11 @@ containers:
 
     def test_collect_unit_status_no_statuses(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
-            def _on_collect_status(self, event):
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
                 pass
 
         fake_script(self, 'is-leader', 'echo false')  # called only for collecting app statuses
@@ -735,15 +738,15 @@ containers:
 
     def test_collect_app_and_unit_status(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
                 self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
 
-            def _on_collect_app_status(self, event):
+            def _on_collect_app_status(self, event: ops.CollectStatusEvent):
                 event.add_status(ops.ActiveStatus())
 
-            def _on_collect_unit_status(self, event):
+            def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
                 event.add_status(ops.WaitingStatus('blah'))
 
         fake_script(self, 'is-leader', 'echo true')
@@ -760,12 +763,12 @@ containers:
 
     def test_add_status_type_error(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
+            def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
-            def _on_collect_status(self, event):
-                event.add_status('active')
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
+                event.add_status('active')  # type: ignore
 
         fake_script(self, 'is-leader', 'echo true')
 
@@ -775,12 +778,12 @@ containers:
 
     def test_collect_status_priority(self):
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args, statuses=None):
+            def __init__(self, *args: typing.Any, statuses: typing.List[str]):
                 super().__init__(*args)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_status)
                 self.statuses = statuses
 
-            def _on_collect_status(self, event):
+            def _on_collect_status(self, event: ops.CollectStatusEvent):
                 for status in self.statuses:
                     event.add_status(ops.StatusBase.from_name(status, ''))
 

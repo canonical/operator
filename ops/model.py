@@ -26,6 +26,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import typing
@@ -40,6 +41,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -48,6 +50,7 @@ from typing import (
     TextIO,
     Tuple,
     Type,
+    TypedDict,
     Union,
 )
 
@@ -59,40 +62,41 @@ from ops.jujuversion import JujuVersion
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
 
-if typing.TYPE_CHECKING:
-    from typing_extensions import TypedDict
+_ConfigOption = TypedDict('_ConfigOption', {
+    'type': Literal['string', 'int', 'float', 'boolean'],
+    'description': str,
+    'default': Union[str, int, float, bool],
+})
 
-    from ops.testing import _ConfigOption
+_StorageDictType = Dict[str, Optional[List['Storage']]]
+_BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
-    _StorageDictType = Dict[str, Optional[List['Storage']]]
-    _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
+_StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
 
-    _StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
+# mapping from relation name to a list of relation objects
+_RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
+# mapping from container name to container metadata
+_ContainerMeta_Raw = Dict[str, 'ops.charm.ContainerMeta']
 
-    # mapping from relation name to a list of relation objects
-    _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
-    # mapping from container name to container metadata
-    _ContainerMeta_Raw = Dict[str, ops.charm.ContainerMeta]
+# relation data is a string key: string value mapping so far as the
+# controller is concerned
+_RelationDataContent_Raw = Dict[str, str]
+UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
 
-    # relation data is a string key: string value mapping so far as the
-    # controller is concerned
-    _RelationDataContent_Raw = Dict[str, str]
-    UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
-
-    _AddressDict = TypedDict('_AddressDict', {
-        'address': str,  # Juju < 2.9
-        'value': str,  # Juju >= 2.9
-        'cidr': str
-    })
-    _BindAddressDict = TypedDict('_BindAddressDict', {
-        'interface-name': str,
-        'addresses': List[_AddressDict]
-    })
-    _NetworkDict = TypedDict('_NetworkDict', {
-        'bind-addresses': List[_BindAddressDict],
-        'ingress-addresses': List[str],
-        'egress-subnets': List[str]
-    })
+_AddressDict = TypedDict('_AddressDict', {
+    'address': str,  # Juju < 2.9
+    'value': str,  # Juju >= 2.9
+    'cidr': str
+})
+_BindAddressDict = TypedDict('_BindAddressDict', {
+    'interface-name': str,
+    'addresses': List[_AddressDict]
+})
+_NetworkDict = TypedDict('_NetworkDict', {
+    'bind-addresses': List[_BindAddressDict],
+    'ingress-addresses': List[str],
+    'egress-subnets': List[str]
+})
 
 
 logger = logging.getLogger(__name__)
@@ -123,7 +127,7 @@ class Model:
 
     @property
     def unit(self) -> 'Unit':
-        """The unit that is running this code (that is, yourself).
+        """The unit that is running this code.
 
         Use :meth:`get_unit` to get an arbitrary unit by name.
         """
@@ -195,7 +199,7 @@ class Model:
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
-        Use :attr:`unit` to get your own unit.
+        Use :attr:`unit` to get the current unit.
 
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
@@ -205,7 +209,7 @@ class Model:
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
 
-        Use :attr:`app` to get your own application.
+        Use :attr:`app` to get this charm's application.
 
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
@@ -305,8 +309,8 @@ class _ModelCache:
 class Application:
     """Represents a named application in the model.
 
-    This might be your application, or might be an application that you are related to.
-    Charmers should not instantiate Application objects directly, but should use
+    This might be this charm's application, or might be an application this charm is related
+    to. Charmers should not instantiate Application objects directly, but should use
     :attr:`Model.app` to get the application this unit is part of, or
     :meth:`Model.get_app` if they need a reference to a given application.
     """
@@ -332,23 +336,26 @@ class Application:
     def status(self) -> 'StatusBase':
         """Used to report or read the status of the overall application.
 
+        Changes to status take effect immediately, unlike other Juju operations
+        such as modifying relation data or secrets, which only take effect after
+        a successful event.
+
         Can only be read and set by the lead unit of the application.
 
         The status of remote units is always Unknown.
 
-        You can also use the :attr:`collect_app_status <CharmEvents.collect_app_status>`
-        event if you want to evaluate and set application status consistently
-        at the end of every hook.
+        Alternatively, use the :attr:`collect_app_status <CharmEvents.collect_app_status>`
+        event to evaluate and set application status consistently at the end of every hook.
 
         Raises:
-            RuntimeError: if you try to set the status of another application, or if you try to
-                set the status of this application as a unit that is not the leader.
-            InvalidStatusError: if you try to set the status to something that is not a
+            RuntimeError: if setting the status of another application, or if setting the
+                status of this application as a unit that is not the leader.
+            InvalidStatusError: if setting the status to something that is not a
                 :class:`StatusBase`
 
         Example::
 
-            self.model.app.status = BlockedStatus('I need a human to come help me')
+            self.model.app.status = ops.BlockedStatus('I need a human to come help me')
         """
         if not self._is_our_app:
             return UnknownStatus()
@@ -395,6 +402,8 @@ class Application:
         This method only returns data for this charm's application -- the Juju agent isn't
         able to see planned unit counts for other applications in the model.
 
+        Raises:
+            RuntimeError: on trying to get the planned units for a remote application.
         """
         if not self._is_our_app:
             raise RuntimeError(
@@ -425,6 +434,9 @@ class Application:
             rotate: Rotation policy/time. Every time this elapses, Juju will
                 notify the charm by sending a SecretRotate event. None (the
                 default) means to use the Juju default, which is never rotate.
+
+        Raises:
+            ValueError: if the secret is empty, or the secret key is invalid.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -453,8 +465,8 @@ def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedel
 class Unit:
     """Represents a named unit in the model.
 
-    This might be your unit, another unit of your application, or a unit of another application
-    that you are related to.
+    This might be the current unit, another unit of the charm's application, or a unit of
+    another application that the charm is related to.
     """
 
     name: str
@@ -487,19 +499,23 @@ class Unit:
     def status(self) -> 'StatusBase':
         """Used to report or read the status of a specific unit.
 
-        The status of any unit other than yourself is always Unknown.
+        Changes to status take effect immediately, unlike other Juju operations
+        such as modifying relation data or secrets, which only take effect after
+        a successful event.
 
-        You can also use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
-        event if you want to evaluate and set unit status consistently at the
-        end of every hook.
+        The status of any unit other than the current unit is always Unknown.
+
+        Alternatively, use the :attr:`collect_unit_status <CharmEvents.collect_unit_status>`
+        event to evaluate and set unit status consistently at the end of every hook.
 
         Raises:
-            RuntimeError: if you try to set the status of a unit other than yourself.
-            InvalidStatusError: if you try to set the status to something other than
+            RuntimeError: if setting the status of a unit other than the current unit
+            InvalidStatusError: if setting the status to something other than
                 a :class:`StatusBase`
+
         Example::
 
-            self.model.unit.status = MaintenanceStatus('reconfiguring the frobnicators')
+            self.model.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
         """
         if not self._is_our_unit:
             return UnknownStatus()
@@ -531,10 +547,10 @@ class Unit:
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
 
-        This can only be called for your own unit.
+        This can only be called for the current unit.
 
         Raises:
-            RuntimeError: if called for a unit that is not yourself
+            RuntimeError: if called for another unit
         """
         if self._is_our_unit:
             # This value is not cached as it is not guaranteed to persist for the whole duration
@@ -558,7 +574,11 @@ class Unit:
 
     @property
     def containers(self) -> Mapping[str, 'Container']:
-        """Return a mapping of containers indexed by name."""
+        """Return a mapping of containers indexed by name.
+
+        Raises:
+            RuntimeError: if called for another unit
+        """
         if not self._is_our_unit:
             raise RuntimeError(f'cannot get container for a remote unit {self}')
         return self._containers
@@ -572,7 +592,7 @@ class Unit:
         try:
             return self.containers[container_name]
         except KeyError:
-            raise ModelError(f'container {container_name!r} not found')
+            raise ModelError(f'container {container_name!r} not found') from None
 
     def add_secret(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -582,6 +602,9 @@ class Unit:
         """Create a :class:`Secret` owned by this unit.
 
         See :meth:`Application.add_secret` for parameter details.
+
+        Raises:
+            ValueError: if the secret is empty, or the secret key is invalid.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -594,17 +617,17 @@ class Unit:
         return Secret(self._backend, id=id, label=label, content=content)
 
     def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
-                  port: Optional[int] = None):
+                  port: Optional[int] = None) -> None:
         """Open a port with the given protocol for this unit.
 
-        Calling this registers intent with Juju that the application should be
-        accessed on the given port, but the port isn't actually opened
-        externally until the admin runs "juju expose".
+        Some behaviour, such as whether the port is opened externally without
+        using "juju expose" and whether the opened ports are per-unit, differs
+        between Kubernetes and machine charms. See the
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--open-port>`__
+        for more detail.
 
-        On Kubernetes sidecar charms, the ports opened are not strictly
-        per-unit: Juju will open the union of ports from all units.
-        However, normally charms should make the same open_port() call from
-        every unit.
+        Use :meth:`set_ports` for a more declarative approach where all of
+        the ports that should be open are provided in a single call.
 
         Args:
             protocol: String representing the protocol; must be one of
@@ -612,17 +635,27 @@ class Unit:
                 uppercase is also supported).
             port: The port to open. Required for TCP and UDP; not allowed
                 for ICMP.
+
+        Raises:
+            ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
+                or ``port`` is not provided when ``protocol`` is 'tcp' or
+                'udp'.
         """
         self._backend.open_port(protocol.lower(), port)
 
     def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
-                   port: Optional[int] = None):
+                   port: Optional[int] = None) -> None:
         """Close a port with the given protocol for this unit.
 
-        On Kubernetes sidecar charms, Juju will only close the port once the
-        last unit that opened that port has closed it. However, this is
-        usually not an issue; normally charms should make the same
-        close_port() call from every unit.
+        Some behaviour, such as whether the port is closed externally without
+        using "juju unexpose", differs between Kubernetes and machine charms.
+        See the
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--close-port>`__
+        for more detail.
+
+        Use :meth:`set_ports` for a more declarative approach where all
+        of the ports that should be open are provided in a single call.
+        For example, ``set_ports()`` will close all open ports.
 
         Args:
             protocol: String representing the protocol; must be one of
@@ -630,23 +663,94 @@ class Unit:
                 uppercase is also supported).
             port: The port to open. Required for TCP and UDP; not allowed
                 for ICMP.
+
+        Raises:
+            ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
+                or ``port`` is not provided when ``protocol`` is 'tcp' or
+                'udp'.
         """
         self._backend.close_port(protocol.lower(), port)
 
-    def opened_ports(self) -> Set['OpenedPort']:
+    def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
+    def set_ports(self, *ports: Union[int, 'Port']) -> None:
+        """Set the open ports for this unit, closing any others that are open.
+
+        Some behaviour, such as whether the port is opened or closed externally without
+        using Juju's ``expose`` and ``unexpose`` commands, differs between Kubernetes
+        and machine charms. See the
+        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--networking>`__
+        for more detail.
+
+        Use :meth:`open_port` and :meth:`close_port` to manage ports
+        individually.
+
+        *New in version 2.7*
+
+        Args:
+            ports: The ports to open. Provide an int to open a TCP port, or
+                a :class:`Port` to open a port for another protocol.
+
+        Raises:
+            ModelError: if a :class:`Port` is provided where ``protocol`` is 'icmp' but
+                ``port`` is not ``None``, or where ``protocol`` is 'tcp' or 'udp' and ``port``
+                is ``None``.
+        """
+        # Normalise to get easier comparisons.
+        existing = {
+            (port.protocol, port.port)
+            for port in self._backend.opened_ports()
+        }
+        desired = {
+            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
+            for port in ports
+        }
+        for protocol, port in existing - desired:
+            self._backend.close_port(protocol, port)
+        for protocol, port in desired - existing:
+            self._backend.open_port(protocol, port)
+
+    def reboot(self, now: bool = False) -> None:
+        """Reboot the host machine.
+
+        Normally, the reboot will only take place after the current hook successfully
+        completes. Use ``now=True`` to reboot immediately without waiting for the
+        hook to complete; this is useful when multiple restarts are required (Juju
+        will re-run the hook after rebooting).
+
+        This is not supported on Kubernetes charms, can only be called for the current unit,
+        and cannot be used in an action hook.
+
+        *New in version 2.8*
+
+        Args:
+            now: terminate immediately without waiting for the current hook to complete,
+                restarting the hook after reboot.
+
+        Raises:
+            RuntimeError: if called on a remote unit.
+            :class:`ModelError`: if used in an action hook.
+
+        """
+        if not self._is_our_unit:
+            raise RuntimeError(f'cannot reboot a remote unit {self}')
+        self._backend.reboot(now)
+
 
 @dataclasses.dataclass(frozen=True)
-class OpenedPort:
-    """Represents a port opened by :meth:`Unit.open_port`."""
+class Port:
+    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
 
     protocol: typing.Literal['tcp', 'udp', 'icmp']
     """The IP protocol."""
 
     port: Optional[int]
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
+
+
+OpenedPort = Port  # Alias for backwards compatibility.
 
 
 class LazyMapping(Mapping[str, str], ABC):
@@ -852,8 +956,8 @@ class Network:
 
     interfaces: List['NetworkInterface']
     """A list of network interface details. This includes the information
-    about how your application should be configured (for example, what IP
-    addresses you should bind to).
+    about how the application should be configured (for example, what IP
+    addresses should be bound to).
 
     Multiple addresses for a single interface are represented as multiple
     interfaces, for example::
@@ -862,11 +966,11 @@ class Network:
     """
 
     ingress_addresses: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]
-    """A list of IP addresses that other units should use to get in touch with you."""
+    """A list of IP addresses that other units should use to get in touch with the charm."""
 
     egress_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]
     """A list of networks representing the subnets that other units will see
-    you connecting from. Due to things like NAT it isn't always possible to
+    the charm connecting from. Due to things like NAT it isn't always possible to
     narrow it down to a single address, but when it is clear, the CIDRs will
     be constrained to a single address (for example, 10.0.0.1/32).
     """
@@ -897,10 +1001,10 @@ class Network:
 
     @property
     def bind_address(self) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
-        """A single address that your application should bind() to.
+        """A single address that the charm's application should bind() to.
 
         For the common case where there is a single answer. This represents a single
-        address from :attr:`.interfaces` that can be used to configure where your
+        address from :attr:`.interfaces` that can be used to configure where the charm's
         application should bind() and listen().
         """
         if self.interfaces:
@@ -911,11 +1015,11 @@ class Network:
     @property
     def ingress_address(self) -> Optional[
             Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
-        """The address other applications should use to connect to your unit.
+        """The address other applications should use to connect to the current unit.
 
-        Due to things like public/private addresses, NAT and tunneling, the address you bind()
-        to is not always the address other people can use to connect() to you.
-        This is just the first address from :attr:`.ingress_addresses`.
+        Due to things like public/private addresses, NAT and tunneling, the address the charm
+        will bind() to is not always the address other people can use to connect() to the
+        charm. This is just the first address from :attr:`.ingress_addresses`.
         """
         if self.ingress_addresses:
             return self.ingress_addresses[0]
@@ -1105,12 +1209,12 @@ class Secret:
         may not include the model UUID (for cross-model secrets).
 
         Charms should treat this as an opaque string for looking up secrets
-        and sharing them via relation data. If you need a charm-local "name"
+        and sharing them via relation data. If a charm-local "name" is needed
         for a secret, use a :attr:`label`. (If a charm needs a truly unique
         identifier for identifying one secret in a set of secrets of arbitrary
         size, use :attr:`unique_identifier` -- this should be rare.)
 
-        This will be None if you obtained the secret using
+        This will be None if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         return self._id
@@ -1129,7 +1233,7 @@ class Secret:
         cases where the charm has a set of secrets of arbitrary size, for
         example, a group of 10 or 20 TLS certificates.
 
-        This will be None if you obtained the secret using
+        This will be None if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         if self._id is None:
@@ -1173,7 +1277,7 @@ class Secret:
         Juju will ensure that the entity (the owner or observer) only has one
         secret with this label at once.
 
-        This will be None if you obtained the secret using
+        This will be None if the secret was obtained using
         :meth:`Model.get_secret` with an ID but no label.
         """
         return self._label
@@ -1764,6 +1868,9 @@ class Resources:
 
         If successfully fetched, this returns the path where the resource is stored
         on disk, otherwise it raises a :class:`NameError`.
+
+        Raises:
+            NameError: if the resource's path cannot be fetched.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -1833,6 +1940,9 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
         Uses storage-add tool to request additional storage. Juju will notify the unit
         via ``<storage-name>-storage-attached`` events when it becomes available.
+
+        Raises:
+            ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
             raise ModelError(('cannot add storage {!r}:'
@@ -1926,6 +2036,17 @@ class Container:
 
     This class should not be instantiated directly, instead use :meth:`Unit.get_container`
     or :attr:`Unit.containers`.
+
+    For methods that make changes to the container, if the change fails or times out, then a
+    :class:`ops.pebble.ChangeError` or :class:`ops.pebble.TimeoutError` will be raised.
+
+    Interactions with the container use Pebble, so all methods may raise exceptions when there are
+    problems communicating with Pebble. Problems connecting to or transferring data with Pebble
+    will raise a :class:`ops.pebble.ConnectionError` - generally you can guard against these by
+    first checking :meth:`can_connect`, but it is possible for problems to occur after
+    :meth:`can_connect` has succeeded. When an error occurs executing the request, such as trying
+    to add an invalid layer or execute a command that does not exist, an
+    :class:`ops.pebble.APIError` is raised.
     """
 
     name: str
@@ -2053,7 +2174,8 @@ class Container:
     def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
-        Raises :class:`ModelError` if service_name is not found.
+        Raises:
+            ModelError: if service_name is not found.
         """
         services = self.get_services(service_name)
         if not services:
@@ -2080,7 +2202,8 @@ class Container:
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
-        Raises :class:`ModelError` if ``check_name`` is not found.
+        Raises:
+            ModelError: if ``check_name`` is not found.
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2088,6 +2211,14 @@ class Container:
         if len(checks) > 1:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
+
+    @typing.overload
+    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:  # noqa
+        ...
+
+    @typing.overload
+    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:  # noqa
+        ...
 
     def pull(self, path: Union[str, PurePath], *,
              encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
@@ -2179,7 +2310,7 @@ class Container:
         * /foo/foobar.txt
         * /quux.txt
 
-        You could push the following ways::
+        These are various push examples::
 
             # copy one file
             container.push_path('/foo/foobar.txt', '/dst')
@@ -2229,6 +2360,9 @@ class Container:
             try:
                 for info in Container._list_recursive(local_list, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    if info.type is pebble.FileType.DIRECTORY:
+                        self.make_dir(dstpath, make_parents=True)
+                        continue
                     with open(info.path) as src:
                         self.push(
                             dstpath,
@@ -2260,7 +2394,7 @@ class Container:
         * /foo/foobar.txt
         * /quux.txt
 
-        You could pull the following ways::
+        These are various pull examples::
 
             # copy one file
             container.pull_path('/foo/foobar.txt', '/dst')
@@ -2306,10 +2440,13 @@ class Container:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    if info.type is pebble.FileType.DIRECTORY:
+                        dstpath.mkdir(parents=True, exist_ok=True)
+                        continue
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(typing.cast(BinaryIO, src), dst)
+                            shutil.copyfileobj(src, dst)
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
@@ -2360,6 +2497,9 @@ class Container:
 
         for info in list_func(path):
             if info.type is pebble.FileType.DIRECTORY:
+                # Yield the directory to ensure empty directories are created, then
+                # all of the contained files.
+                yield info
                 yield from Container._list_recursive(list_func, Path(info.path))
             elif info.type in (pebble.FileType.FILE, pebble.FileType.SYMLINK):
                 yield info
@@ -2446,7 +2586,14 @@ class Container:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, recursively delete path and everything under it.
+            recursive: If True, and path is a directory, recursively delete it and
+                       everything under it. If path is a file, delete the file. In
+                       either case, do nothing if the file or directory does not
+                       exist. Behaviourally similar to ``rm -rf <file|dir>``.
+
+        Raises:
+            pebble.PathError: If a relative path is provided, or if `recursive` is False
+                and the file or directory cannot be removed (it does not exist or is not empty).
         """
         self._pebble.remove_path(str(path), recursive=recursive)
 
@@ -2516,6 +2663,13 @@ class Container:
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
+
+        Note that older versions of Juju do not support the ``service_content`` parameter, so if
+        the Charm is to be used on those versions, then
+        :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
+
+        Raises:
+            ExecError: if the command exits with a non-zero exit code.
         """
         if service_context is not None:
             version = JujuVersion.from_environ()
@@ -2651,9 +2805,9 @@ class TooManyRelatedAppsError(ModelError):
 class RelationDataError(ModelError):
     """Raised when a relation data read/write is invalid.
 
-    This is raised if you're either trying to set a value to something that isn't a string,
-    or if you are trying to set a value in a bucket that you don't have access to. (For example,
-    another application/unit, or setting your application data without being the leader.)
+    This is raised either when trying to set a value to something that isn't a string,
+    or when trying to set a value in a bucket without the required access. (For example,
+    another application/unit, or setting application data without being the leader.)
     """
 
 
@@ -2662,9 +2816,9 @@ class RelationDataTypeError(RelationDataError):
 
 
 class RelationDataAccessError(RelationDataError):
-    """Raised by ``Relation.data[entity][key] = value`` if you don't have access.
+    """Raised by ``Relation.data[entity][key] = value`` if unable to access.
 
-    This typically means that you don't have permission to write read/write the databag,
+    This typically means that permission to write read/write the databag is missing,
     but in some cases it is raised when attempting to read/write from a deceased remote entity.
     """
 
@@ -2791,7 +2945,7 @@ class _ModelBackend:
         try:
             result = subprocess.run(args, **kwargs)  # type: ignore
         except subprocess.CalledProcessError as e:
-            raise ModelError(e.stderr)
+            raise ModelError(e.stderr) from e
         if return_output:
             if result.stdout is None:  # type: ignore
                 return ''
@@ -3245,13 +3399,13 @@ class _ModelBackend:
         arg = f'{port}/{protocol}' if port is not None else protocol
         self._run('close-port', arg)
 
-    def opened_ports(self) -> Set[OpenedPort]:
+    def opened_ports(self) -> Set[Port]:
         # We could use "opened-ports --format=json", but it's not really
         # structured; it's just an array of strings which are the lines of the
         # text output, like ["icmp","8081/udp"]. So it's probably just as
         # likely to change as the text output, and doesn't seem any better.
         output = typing.cast(str, self._run('opened-ports', return_output=True))
-        ports: Set[OpenedPort] = set()
+        ports: Set[Port] = set()
         for line in output.splitlines():
             line = line.strip()
             if not line:
@@ -3262,9 +3416,9 @@ class _ModelBackend:
         return ports
 
     @classmethod
-    def _parse_opened_port(cls, port_str: str) -> Optional[OpenedPort]:
+    def _parse_opened_port(cls, port_str: str) -> Optional[Port]:
         if port_str == 'icmp':
-            return OpenedPort('icmp', None)
+            return Port('icmp', None)
         port_range, slash, protocol = port_str.partition('/')
         if not slash or protocol not in ['tcp', 'udp']:
             logger.warning('Unexpected opened-ports protocol: %s', port_str)
@@ -3273,7 +3427,17 @@ class _ModelBackend:
         if hyphen:
             logger.warning('Ignoring opened-ports port range: %s', port_str)
         protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
-        return OpenedPort(protocol_lit, int(port))
+        return Port(protocol_lit, int(port))
+
+    def reboot(self, now: bool = False):
+        if now:
+            self._run("juju-reboot", "--now")
+            # Juju will kill the Charm process, and in testing no code after
+            # this point would execute. However, we want to guarantee that for
+            # Charmers, so we force that to be the case.
+            sys.exit()
+        else:
+            self._run("juju-reboot")
 
 
 class _ModelBackendValidator:

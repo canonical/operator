@@ -27,7 +27,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import yaml
 
@@ -38,11 +38,6 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
-
-if TYPE_CHECKING:
-    from ops.charm import CharmBase
-    from ops.framework import BoundEvent, EventSource, Framework
-    from ops.model import Relation
 
 logger = logging.getLogger()
 
@@ -58,7 +53,7 @@ def _exe_path(path: Path) -> Optional[Path]:
     return Path(p)
 
 
-def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
+def _create_event_link(charm: "ops.charm.CharmBase", bound_event: "ops.framework.EventSource",
                        link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
@@ -96,7 +91,7 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
+def _setup_event_links(charm_dir: Path, charm: "ops.charm.CharmBase"):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
@@ -118,8 +113,8 @@ def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
             _create_event_link(charm, bound_event, link_to)
 
 
-def _get_event_args(charm: 'CharmBase',
-                    bound_event: 'BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
+def _get_event_args(charm: "ops.charm.CharmBase",
+                    bound_event: 'ops.framework.BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
 
@@ -158,7 +153,7 @@ def _get_event_args(charm: 'CharmBase',
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
-        relation: Optional[Relation] = model.get_relation(relation_name, relation_id)
+        relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
@@ -208,7 +203,7 @@ class _Dispatcher:
         else:
             self._init_legacy()
 
-    def ensure_event_links(self, charm: 'CharmBase'):
+    def ensure_event_links(self, charm: "ops.charm.CharmBase"):
         """Make sure necessary symlinks are present on disk."""
         if self.is_dispatch_aware:
             # links aren't needed
@@ -309,7 +304,7 @@ class _Dispatcher:
 
 def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     """Figure out whether we want to use controller storage or not."""
-    # if you've previously used local state, carry on using that
+    # if local state has been used previously, carry on using that
     if db_path.exists():
         return False
 
@@ -334,7 +329,7 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
 class _CharmSpec:
     """Charm spec."""
 
-    charm_type: Type["CharmBase"]
+    charm_type: Type["ops.charm.CharmBase"]
     charm_root: Path
     meta: Optional[Dict[str, Any]]
     actions: Optional[Dict[str, Any]] = None
@@ -351,7 +346,7 @@ class _CharmSpec:
         return charm_dir
 
     @staticmethod
-    def autoload(charm_type: Type["CharmBase"]):
+    def autoload(charm_type: Type["ops.charm.CharmBase"]):
         charm_root = _CharmSpec._get_charm_dir()
 
         metadata_path = charm_root / "metadata.yaml"
@@ -412,14 +407,14 @@ class Ops:
 
         # set by setup()
         self.dispatcher: Optional[_Dispatcher] = None
-        self.framework: Optional["Framework"] = None
-        self.charm: Optional[ops.CharmBase] = None
+        self.framework: Optional["ops.framework.Framework"] = None
+        self.charm: Optional["ops.charm.CharmBase"] = None
 
         self._has_setup = False
         self._has_emitted = False
         self._has_committed = False
 
-    def _setup_charm(self, framework: "Framework", dispatcher: _Dispatcher):
+    def _setup_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
         charm_type = self.charm_spec.charm_type
         sig = inspect.signature(charm_type)
         sig.bind(framework)  # signature check
@@ -516,7 +511,7 @@ class Ops:
         Args:
             event_name: A Juju event name to emit on a charm.
         """
-        charm = cast("CharmBase", self.charm)  # by now we have initialized.
+        charm = cast("ops.charm.CharmBase", self.charm)  # by now we have initialized.
         owner = charm.on
 
         try:
@@ -536,7 +531,7 @@ class Ops:
         self._has_emitted = True
 
         # we have initialized already
-        framework = cast("Framework", self.framework)
+        framework = cast("ops.framework.Framework", self.framework)
         dispatcher = cast(_Dispatcher, self.dispatcher)
 
         try:
@@ -555,8 +550,8 @@ class Ops:
             raise RuntimeError("should .emit() before you .commit()")
 
         # we have initialized already
-        charm = cast("CharmBase", self.charm)
-        framework = cast("Framework", self.framework)
+        charm = cast("ops.charm.CharmBase", self.charm)
+        framework = cast("ops.framework.Framework", self.framework)
 
         # emit collect-status events
         ops.charm._evaluate_status(charm)
@@ -583,7 +578,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     The event name is based on the way this executable was called (argv[0]).
 
     Args:
-        charm_class: your charm class.
+        charm_class: the charm class to instantiate and receive the event.
         use_juju_for_storage: whether to use controller-side storage. If not specified
             then kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
