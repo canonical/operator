@@ -30,7 +30,7 @@ from unittest.mock import patch
 import logassert
 
 import ops
-from ops.main import CHARM_STATE_FILE, _should_use_controller_storage
+from ops.main import Ops, _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
@@ -74,7 +74,7 @@ class EventSpec:
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
-@patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)
+@patch('ops.main.Ops._emit_charm_event', new=lambda *a, **kw: None)
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
 class CharmInitTestCase(unittest.TestCase):
 
@@ -110,7 +110,7 @@ class CharmInitTestCase(unittest.TestCase):
         if extra_environ is not None:
             fake_environ.update(extra_environ)
         with patch.dict(os.environ, fake_environ):
-            with patch('ops.main._get_charm_dir') as mock_charmdir:
+            with patch('ops.main._CharmSpec._get_charm_dir') as mock_charmdir:
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     tmpdirname = Path(tmpdirname)
                     fake_metadata = tmpdirname / 'metadata.yaml'
@@ -175,7 +175,7 @@ class CharmInitTestCase(unittest.TestCase):
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
+@patch('ops.main.Ops._setup_root_logging', new=lambda *a, **kw: None)
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
 class TestDispatch(unittest.TestCase):
     def _check(self, *, with_dispatch=False, dispatch_path=''):
@@ -205,13 +205,13 @@ class TestDispatch(unittest.TestCase):
                 dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
-                with patch('ops.main._emit_charm_event') as mock_charm_event:
-                    with patch('ops.main._get_charm_dir') as mock_charmdir:
+                with patch('ops.main.Ops._emit_charm_event') as mock_charm_event:
+                    with patch('ops.main._CharmSpec._get_charm_dir') as mock_charmdir:
                         mock_charmdir.return_value = tmpdir
                         ops.main(MyCharm)
 
         self.assertEqual(mock_charm_event.call_count, 1)
-        return mock_charm_event.call_args[0][1]
+        return mock_charm_event.call_args[0][0]
 
     def test_most_legacy(self):
         """Without dispatch, sys.argv[0] is used."""
@@ -279,7 +279,7 @@ class _TestMain(abc.ABC):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
         self.addCleanup(shutil.rmtree, str(self._tmpdir))
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
-        self.CHARM_STATE_FILE = self.JUJU_CHARM_DIR / CHARM_STATE_FILE
+        self.CHARM_STATE_FILE = self.JUJU_CHARM_DIR / Ops.CHARM_STATE_FILE
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
         charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
         self.charm_exec_path = os.path.relpath(charm_path, str(self.hooks_dir))
