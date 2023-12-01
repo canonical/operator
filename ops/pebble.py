@@ -124,16 +124,27 @@ CheckDict = typing.TypedDict('CheckDict',
                               'threshold': Optional[int]},
                              total=False)
 
+# In Python 3.11+ 'services' and 'labels' should be NotRequired, and total=True.
+LogTargetDict = typing.TypedDict('LogTargetDict',
+                                 {'override': Union[Literal['merge'], Literal['replace']],
+                                  'type': Literal['loki'],
+                                  'location': str,
+                                  'services': List[str],
+                                  'labels': Dict[str, str]},
+                                 total=False)
+
 LayerDict = typing.TypedDict('LayerDict',
                              {'summary': str,
                               'description': str,
                               'services': Dict[str, ServiceDict],
-                              'checks': Dict[str, CheckDict]},
+                              'checks': Dict[str, CheckDict],
+                              'log-targets': Dict[str, LogTargetDict]},
                              total=False)
 
 PlanDict = typing.TypedDict('PlanDict',
                             {'services': Dict[str, ServiceDict],
-                             'checks': Dict[str, CheckDict]},
+                             'checks': Dict[str, CheckDict],
+                             'log-targets': Dict[str, LogTargetDict]},
                             total=False)
 
 _AuthDict = TypedDict('_AuthDict',
@@ -718,6 +729,9 @@ class Plan:
                                               for name, service in d.get('services', {}).items()}
         self._checks: Dict[str, Check] = {name: Check(name, check)
                                           for name, check in d.get('checks', {}).items()}
+        self._log_targets: Dict[str, LogTarget] = {
+            name: LogTarget(name, target)
+            for name, target in d.get('log-targets', {}).items()}
 
     @property
     def services(self) -> Dict[str, 'Service']:
@@ -735,11 +749,20 @@ class Plan:
         """
         return self._checks
 
+    @property
+    def log_targets(self) -> Dict[str, 'LogTarget']:
+        """This plan's log targets mapping (maps log target name to :class:`LogTarget`).
+
+        This property is currently read-only.
+        """
+        return self._log_targets
+
     def to_dict(self) -> 'PlanDict':
         """Convert this plan to its dict representation."""
         fields = [
             ('services', {name: service.to_dict() for name, service in self._services.items()}),
             ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
+            ('log-targets', {name: target.to_dict() for name, target in self._log_targets.items()})
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('PlanDict', dct)
@@ -766,6 +789,8 @@ class Layer:
     services: Dict[str, 'Service']
     #: Mapping of check to :class:`Check` defined by this layer.
     checks: Dict[str, 'Check']
+    #: Mapping of target to :class:`LogTarget` defined by this layer.
+    log_targets: Dict[str, 'LogTarget']
 
     def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
         if isinstance(raw, str):
@@ -780,6 +805,8 @@ class Layer:
                          for name, service in d.get('services', {}).items()}
         self.checks = {name: Check(name, check)
                        for name, check in d.get('checks', {}).items()}
+        self.log_targets = {name: LogTarget(name, target)
+                            for name, target in d.get('log-targets', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -792,6 +819,7 @@ class Layer:
             ('description', self.description),
             ('services', {name: service.to_dict() for name, service in self.services.items()}),
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
+            ('log-targets', {name: target.to_dict() for name, target in self.log_targets.items()})
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('LayerDict', dct)
@@ -1026,6 +1054,45 @@ class CheckStatus(enum.Enum):
 
     UP = 'up'
     DOWN = 'down'
+
+
+class LogTarget:
+    """Represents a log target in a Pebble configuration layer."""
+
+    def __init__(self, name: str, raw: Optional['LogTargetDict'] = None):
+        self.name = name
+        dct: LogTargetDict = raw or {}
+        self.override: str = dct.get('override', '')
+        self.type = dct.get('type', '')
+        self.location = dct.get('location', '')
+        self.services: List[str] = list(dct.get('services', []))
+        labels = dct.get('labels')
+        if labels is not None:
+            labels = copy.deepcopy(labels)
+        self.labels: Optional[Dict[str, str]] = labels
+
+    def to_dict(self) -> 'LogTargetDict':
+        """Convert this log target object to its dict representation."""
+        fields = [
+            ('override', self.override),
+            ('type', self.type),
+            ('location', self.location),
+            ('services', self.services),
+            ('labels', self.labels),
+        ]
+        dct = {name: value for name, value in fields if value}
+        return typing.cast('LogTargetDict', dct)
+
+    def __repr__(self):
+        return f'LogTarget({self.to_dict()!r})'
+
+    def __eq__(self, other: Union['LogTargetDict', 'LogTarget']):
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, LogTarget):
+            return self.to_dict() == other.to_dict()
+        else:
+            return NotImplemented
 
 
 class FileType(enum.Enum):
