@@ -82,9 +82,9 @@ class EventSpec:
         self.secret_revision = secret_revision
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)
-@patch('ops.main.Ops._emit_charm_event', new=lambda *a, **kw: None)
-@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)
+@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.main.Ops._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class CharmInitTestCase(unittest.TestCase):
 
     @patch('sys.stderr', new_callable=io.StringIO)
