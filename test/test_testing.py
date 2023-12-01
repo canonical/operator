@@ -30,7 +30,7 @@ import textwrap
 import typing
 import unittest
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -4096,6 +4096,7 @@ class PebbleStorageAPIsTestMixin:
 
     assertEqual = unittest.TestCase.assertEqual  # noqa
     assertIn = unittest.TestCase.assertIn  # noqa
+    assertIs = unittest.TestCase.assertIs  # noqa
     assertIsInstance = unittest.TestCase.assertIsInstance  # noqa
     assertRaises = unittest.TestCase.assertRaises  # noqa
 
@@ -4572,6 +4573,18 @@ class TestPebbleStorageAPIsUsingMocks(
             dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
             self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
 
+    @patch("grp.getgrgid")
+    @patch("pwd.getpwuid")
+    def test_list_files_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+        getpwuid.side_effect = KeyError
+        getgrgid.side_effect = KeyError
+        data = 'data'
+        self.client.push(f"{self.prefix}/file", data)
+        files = self.client.list_files(f"{self.prefix}/")
+        self.assertEqual(len(files), 1)
+        self.assertIs(files[0].user, None)
+        self.assertIs(files[0].group, None)
+
 
 class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
     def setUp(self) -> None:
@@ -4712,6 +4725,59 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.id, secret_id)
         self.assertEqual(secret.get_content(), {'password': 'hunter4'})
 
+    def test_get_secret_as_owner(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # App secret.
+        secret_id = harness.charm.app.add_secret({'password': 'hunter5'}).id
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter5'})
+        # Unit secret.
+        secret_id = harness.charm.unit.add_secret({'password': 'hunter6'}).id
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter6'})
+
+    def test_get_secret_and_refresh(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        secret = harness.charm.app.add_secret({'password': 'hunter6'})
+        secret.set_content({"password": "hunter7"})
+        retrieved_secret = harness.model.get_secret(id=secret.id)
+        self.assertEqual(retrieved_secret.id, secret.id)
+        self.assertEqual(retrieved_secret.get_content(), {'password': 'hunter6'})
+        self.assertEqual(retrieved_secret.peek_content(), {'password': 'hunter7'})
+        self.assertEqual(retrieved_secret.get_content(refresh=True), {'password': 'hunter7'})
+        self.assertEqual(retrieved_secret.get_content(), {'password': 'hunter7'})
+
+    def test_get_secret_removed(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        secret = harness.charm.app.add_secret({'password': 'hunter8'})
+        secret.set_content({"password": "hunter9"})
+        secret.remove_revision(secret.get_info().revision)
+        with self.assertRaises(ops.SecretNotFoundError):
+            harness.model.get_secret(id=secret.id)
+
+    def test_get_secret_by_label(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.charm.app.add_secret({'password': 'hunter9'}, label="my-pass").id
+        secret = harness.model.get_secret(label="my-pass")
+        self.assertEqual(secret.label, "my-pass")
+        self.assertEqual(secret.get_content(), {'password': 'hunter9'})
+        secret = harness.model.get_secret(id=secret_id, label="other-name")
+        self.assertEqual(secret.get_content(), {'password': 'hunter9'})
+        secret = harness.model.get_secret(label="other-name")
+        self.assertEqual(secret.get_content(), {'password': 'hunter9'})
+
     def test_add_model_secret_invalid_content(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
@@ -4819,6 +4885,7 @@ class TestSecrets(unittest.TestCase):
         harness.add_relation_unit(relation_id, 'webapp/0')
         assert harness is not None
 
+        harness.set_leader(True)
         secret = harness.model.app.add_secret({'foo': 'x'})
         assert secret.id is not None
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
@@ -4913,6 +4980,52 @@ class TestSecrets(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
+
+    def test_secret_permissions_unit(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        # The charm can always manage a local unit secret.
+        secret_id = harness.charm.unit.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        info = secret.get_info()
+        self.assertEqual(info.id, secret_id)
+        secret.set_content({"password": "5678"})
+        secret.remove_all_revisions()
+
+    def test_secret_permissions_leader(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        # The leader can manage an application secret.
+        harness.set_leader(True)
+        secret_id = harness.charm.app.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        info = secret.get_info()
+        self.assertEqual(info.id, secret_id)
+        secret.set_content({"password": "5678"})
+        secret.remove_all_revisions()
+
+    def test_secret_permissions_nonleader(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        # Non-leaders can only view an application secret.
+        harness.set_leader(False)
+        secret_id = harness.charm.app.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.get_info()
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.set_content({"password": "5678"})
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.remove_all_revisions()
 
 
 class EventRecorder(ops.CharmBase):
