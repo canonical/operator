@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from ops import CharmBase
 
 from scenario import Action, Context, Event, State
@@ -50,3 +51,13 @@ def test_clear():
 
     ctx.clear()
     assert not ctx.emitted_events  # and others...
+
+
+@pytest.mark.parametrize("app_name", ("foo", "bar", "george"))
+@pytest.mark.parametrize("unit_id", (1, 2, 42))
+def test_app_name(app_name, unit_id):
+    with Context(
+        MyCharm, meta={"name": "foo"}, app_name=app_name, unit_id=unit_id
+    ).manager("start", State()) as mgr:
+        assert mgr.charm.app.name == app_name
+        assert mgr.charm.unit.name == f"{app_name}/{unit_id}"

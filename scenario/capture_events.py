@@ -4,7 +4,7 @@
 
 import typing
 from contextlib import contextmanager
-from typing import ContextManager, List, Type, TypeVar
+from typing import Type, TypeVar
 
 from ops import CollectStatusEvent
 from ops.framework import (
@@ -24,7 +24,7 @@ def capture_events(
     *types: Type[EventBase],
     include_framework=False,
     include_deferred=True,
-) -> ContextManager[List[EventBase]]:
+):
     """Capture all events of type `*types` (using instance checks).
 
     Arguments exposed so that you can define your own fixtures if you want to.

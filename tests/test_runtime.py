@@ -78,10 +78,12 @@ def test_unit_name(app_name, unit_id):
             my_charm_type,
             meta=meta,
         ),
+        unit_id=unit_id,
+        app_name=app_name,
     )
 
     with runtime.exec(
-        state=State(unit_id=unit_id),
+        state=State(),
         event=Event("start"),
         context=Context(my_charm_type, meta=meta),
     ) as ops:
