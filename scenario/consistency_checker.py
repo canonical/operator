@@ -17,7 +17,7 @@ from scenario.state import (
     normalize_name,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import Event, State
 
 logger = scenario_logger.getChild("consistency_checker")

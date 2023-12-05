@@ -37,6 +37,7 @@ from scenario.logger import logger as scenario_logger
 from scenario.state import (
     JujuLogLine,
     Mount,
+    Network,
     PeerRelation,
     Port,
     Storage,
@@ -44,7 +45,7 @@ from scenario.state import (
     _RawStatusLiteral,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import Container as ContainerSpec
     from scenario.state import (
@@ -346,9 +347,9 @@ class _MockModelBackend(_ModelBackend):
     ) -> str:
         from scenario.state import Secret
 
-        id = self._generate_secret_id()
+        secret_id = self._generate_secret_id()
         secret = Secret(
-            id=id,
+            id=secret_id,
             contents={0: content},
             label=label,
             description=description,
@@ -357,7 +358,7 @@ class _MockModelBackend(_ModelBackend):
             owner=owner,
         )
         self._state.secrets.append(secret)
-        return id
+        return secret_id
 
     def secret_get(
         self,
@@ -442,6 +443,8 @@ class _MockModelBackend(_ModelBackend):
             _raise_on_error=True,
         )
         secret.remote_grants[relation_id].remove(cast(str, grantee))
+        if not secret.remote_grants[relation_id]:
+            del secret.remote_grants[relation_id]
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         secret = self._get_secret(id)

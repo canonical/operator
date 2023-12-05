@@ -5,7 +5,6 @@ from ops.framework import Framework
 
 from scenario import Context
 from scenario.state import Network, Relation, State, SubordinateRelation
-from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")

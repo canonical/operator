@@ -13,7 +13,7 @@ from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import Action, Event, MetadataNotFoundError, _CharmSpec
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.ops_main_mock import Ops
@@ -123,7 +123,7 @@ class _Manager:
 
 
 class _EventManager(_Manager):
-    if TYPE_CHECKING:
+    if TYPE_CHECKING:  # pragma: no cover
         output: State
 
         def run(self) -> "State":
@@ -137,7 +137,7 @@ class _EventManager(_Manager):
 
 
 class _ActionManager(_Manager):
-    if TYPE_CHECKING:
+    if TYPE_CHECKING:  # pragma: no cover
         output: ActionOutput
 
         def run(self) -> "ActionOutput":

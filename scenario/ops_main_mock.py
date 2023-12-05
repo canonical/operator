@@ -17,7 +17,7 @@ from ops.log import setup_root_logging
 from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_args
 from ops.main import logger as ops_logger
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import Event, State, _CharmSpec
 

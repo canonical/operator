@@ -19,7 +19,7 @@ from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
 from scenario.state import DeferredEvent, PeerRelation, StoredState
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.context import Context
@@ -452,6 +452,5 @@ class Runtime:
             output_state = self._close_storage(output_state, temporary_charm_root)
 
         context.emitted_events.extend(captured)
-
         logger.info("event dispatched. done.")
         context._set_output_state(output_state)

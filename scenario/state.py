@@ -37,7 +37,7 @@ from scenario.logger import logger as scenario_logger
 
 JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     try:
         from typing import Self  # type: ignore
     except ImportError:
@@ -676,77 +676,6 @@ class Container(_DCBase):
         return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
 
 
-@dataclasses.dataclass(frozen=True)
-class Address(_DCBase):
-    hostname: str
-    value: str
-    cidr: str
-    address: str = ""  # legacy
-
-
-@dataclasses.dataclass(frozen=True)
-class BindAddress(_DCBase):
-    interface_name: str
-    addresses: List[Address]
-    mac_address: Optional[str] = None
-
-    def hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
-        dct = {
-            "interface-name": self.interface_name,
-            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
-        }
-        if self.mac_address:
-            dct["mac-address"] = self.mac_address
-        return dct
-
-
-@dataclasses.dataclass(frozen=True)
-class Network(_DCBase):
-    name: str
-
-    bind_addresses: List[BindAddress]
-    ingress_addresses: List[str]
-    egress_subnets: List[str]
-
-    def hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        return {
-            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
-            "egress-subnets": self.egress_subnets,
-            "ingress-addresses": self.ingress_addresses,
-        }
-
-    @classmethod
-    def default(
-        cls,
-        name,
-        private_address: str = "1.1.1.1",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        mac_address: Optional[str] = None,
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
-    ) -> "Network":
-        """Helper to create a minimal, heavily defaulted Network."""
-        return cls(
-            name=name,
-            bind_addresses=[
-                BindAddress(
-                    interface_name=interface_name,
-                    mac_address=mac_address,
-                    addresses=[
-                        Address(hostname=hostname, value=private_address, cidr=cidr),
-                    ],
-                ),
-            ],
-            egress_subnets=list(egress_subnets),
-            ingress_addresses=list(ingress_addresses),
-        )
-
-
 _RawStatusLiteral = Literal[
     "waiting",
     "blocked",
@@ -1133,7 +1062,7 @@ class _EventType(str, Enum):
 
 
 class _EventPath(str):
-    if TYPE_CHECKING:
+    if TYPE_CHECKING:  # pragma: no cover
         name: str
         owner_path: List[str]
         suffix: str
