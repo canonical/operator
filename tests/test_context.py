@@ -33,7 +33,9 @@ def test_run_action():
     state = State()
 
     with patch.object(ctx, "_run_action") as p:
-        ctx._output_state = "foo"  # would normally be set within the _run_action call scope
+        ctx._output_state = (
+            "foo"  # would normally be set within the _run_action call scope
+        )
         output = ctx.run_action("do-foo", state)
         assert output.state == "foo"
 
