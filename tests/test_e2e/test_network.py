@@ -57,12 +57,12 @@ def test_ip_get(mycharm):
     ) as mgr:
         # we have a network for the relation
         rel = mgr.charm.model.get_relation("metrics-endpoint")
-        assert str(mgr.charm.model.get_binding(rel).network.bind_address) == "1.1.1.1"
+        assert str(mgr.charm.model.get_binding(rel).network.bind_address) == "192.0.2.0"
 
         # we have a network for a binding without relations on it
         assert (
             str(mgr.charm.model.get_binding("deadnodead").network.bind_address)
-            == "1.1.1.1"
+            == "192.0.2.0"
         )
 
         # and an extra binding
