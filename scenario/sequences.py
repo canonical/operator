@@ -22,7 +22,6 @@ if typing.TYPE_CHECKING:
     from ops.testing import CharmType
 
 CharmMeta = Optional[Union[str, TextIO, dict]]
-
 logger = scenario_logger.getChild("scenario")
 
 

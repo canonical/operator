@@ -51,7 +51,7 @@ def check_consistency(
     So a State declaring some config keys that are not in the charm's config.yaml is nonsense,
     and the combination of the two is inconsistent.
     """
-    juju_version: Tuple[int, ...] = tuple(map(int, juju_version.split(".")))
+    juju_version_: Tuple[int, ...] = tuple(map(int, juju_version.split(".")))
 
     if os.getenv("SCENARIO_SKIP_CONSISTENCY_CHECKS"):
         logger.info("skipping consistency checks.")
@@ -74,7 +74,7 @@ def check_consistency(
             state=state,
             event=event,
             charm_spec=charm_spec,
-            juju_version=juju_version,
+            juju_version=juju_version_,
         )
         errors.extend(results.errors)
         warnings.extend(results.warnings)
@@ -201,12 +201,14 @@ def _check_action_event(
             "cannot construct a workload event without the container instance. "
             "Please pass one.",
         )
+        return
+
     elif not event.name.startswith(normalize_name(action.name)):
         errors.append(
             f"action event should start with action name. {event.name} does "
             f"not start with {action.name}.",
         )
-    if action.name not in charm_spec.actions:
+    if action.name not in (charm_spec.actions or ()):
         errors.append(
             f"action event {event.name} refers to action {action.name} "
             f"which is not declared in the charm metadata (actions.yaml).",
@@ -223,6 +225,8 @@ def _check_storage_event(
     warnings: List[str],  # noqa: U100
 ):
     storage = event.storage
+    meta = charm_spec.meta
+
     if not storage:
         errors.append(
             "cannot construct a storage event without the Storage instance. "
@@ -233,7 +237,7 @@ def _check_storage_event(
             f"storage event should start with storage name. {event.name} does "
             f"not start with {storage.name}.",
         )
-    elif storage.name not in charm_spec.meta["storage"]:
+    elif storage.name not in meta["storage"]:
         errors.append(
             f"storage event {event.name} refers to storage {storage.name} "
             f"which is not declared in the charm metadata (metadata.yaml) under 'storage'.",
@@ -246,6 +250,10 @@ def _check_action_param_types(
     errors: List[str],
     warnings: List[str],
 ):
+    actions = charm_spec.actions
+    if not actions:
+        return
+
     to_python_type = {
         "string": str,
         "boolean": bool,
@@ -255,7 +263,7 @@ def _check_action_param_types(
         "object": dict,
     }
     expected_param_type = {}
-    for par_name, par_spec in charm_spec.actions[action.name].get("params", {}).items():
+    for par_name, par_spec in actions[action.name].get("params", {}).items():
         value = par_spec.get("type")
         if not value:
             errors.append(
@@ -343,7 +351,7 @@ def check_config_consistency(
             "integer": int,  # fixme: which one is it?
             "number": float,
             "boolean": bool,
-            "attrs": NotImplemented,  # fixme: wot?
+            # "attrs": NotImplemented,  # fixme: wot?
         }
 
         expected_type_name = meta_config[key].get("type", None)
@@ -352,7 +360,12 @@ def check_config_consistency(
             continue
 
         expected_type = converters.get(expected_type_name)
-        if not isinstance(value, expected_type):
+        if not expected_type:
+            errors.append(
+                f"config invalid for option {key!r}: 'type' {expected_type_name} unknown",
+            )
+
+        elif not isinstance(value, expected_type):
             errors.append(
                 f"config invalid; option {key!r} should be of type {expected_type} "
                 f"but is of type {type(value)}.",
@@ -426,6 +439,7 @@ def check_relation_consistency(
     **_kwargs,  # noqa: U101
 ) -> Results:
     errors = []
+
     peer_relations_meta = charm_spec.meta.get("peers", {}).items()
     all_relations_meta = charm_spec.get_all_relations()
 
@@ -496,7 +510,8 @@ def check_containers_consistency(
     """Check the consistency of `state.containers` vs. `charm_spec.meta`."""
 
     # event names will be normalized; need to compare against normalized container names.
-    meta_containers = list(map(normalize_name, charm_spec.meta.get("containers", {})))
+    meta = charm_spec.meta
+    meta_containers = list(map(normalize_name, meta.get("containers", {})))
     state_containers = [normalize_name(c.name) for c in state.containers]
     errors = []
 

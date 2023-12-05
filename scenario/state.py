@@ -6,29 +6,42 @@ import dataclasses
 import datetime
 import inspect
 import re
-import typing
 from collections import namedtuple
 from enum import Enum
 from itertools import chain
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import uuid4
 
 import yaml
 from ops import pebble
-from ops.charm import CharmEvents
+from ops.charm import CharmBase, CharmEvents
 from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 
 JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     try:
-        from typing import Self
+        from typing import Self  # type: ignore
     except ImportError:
         from typing_extensions import Self
-    from ops.testing import CharmType
 
     from scenario import Context
 
@@ -37,6 +50,8 @@ if typing.TYPE_CHECKING:
     AnyJson = Union[str, bool, dict, int, float, list]
     RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
     UnitID = int
+
+CharmType = TypeVar("CharmType", bound=CharmBase)
 
 logger = scenario_logger.getChild("state")
 
@@ -151,7 +166,7 @@ class Secret(_DCBase):
     label: Optional[str] = None
     description: Optional[str] = None
     expire: Optional[datetime.datetime] = None
-    rotate: SecretRotate = SecretRotate.NEVER
+    rotate: Optional[SecretRotate] = None
 
     # consumer-only events
     @property
@@ -161,7 +176,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-changed for a secret it owns.",
             )
-        return Event(name="secret_changed", secret=self)
+        return Event("secret_changed", secret=self)
 
     # owner-only events
     @property
@@ -171,7 +186,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-rotate for a secret it does not own.",
             )
-        return Event(name="secret_rotate", secret=self)
+        return Event("secret_rotate", secret=self)
 
     @property
     def expired_event(self):
@@ -180,7 +195,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-expire for a secret it does not own.",
             )
-        return Event(name="secret_expire", secret=self)
+        return Event("secret_expire", secret=self)
 
     @property
     def remove_event(self):
@@ -189,7 +204,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-removed for a secret it does not own.",
             )
-        return Event(name="secret_removed", secret=self)
+        return Event("secret_removed", secret=self)
 
     def _set_revision(self, revision: int):
         """Set a new tracked revision."""
@@ -308,7 +323,7 @@ class RelationBase(_DCBase):
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in metadata.yaml."""
 
-    interface: str = None
+    interface: Optional[str] = None
     """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
     If left empty, it will be automatically derived from metadata.yaml."""
 
@@ -367,7 +382,7 @@ class RelationBase(_DCBase):
         """Sugar to generate a <this relation>-relation-changed event."""
         return Event(
             path=normalize_name(self.endpoint + "-relation-changed"),
-            relation=self,
+            relation=cast("AnyRelation", self),
         )
 
     @property
@@ -375,7 +390,7 @@ class RelationBase(_DCBase):
         """Sugar to generate a <this relation>-relation-joined event."""
         return Event(
             path=normalize_name(self.endpoint + "-relation-joined"),
-            relation=self,
+            relation=cast("AnyRelation", self),
         )
 
     @property
@@ -383,7 +398,7 @@ class RelationBase(_DCBase):
         """Sugar to generate a <this relation>-relation-created event."""
         return Event(
             path=normalize_name(self.endpoint + "-relation-created"),
-            relation=self,
+            relation=cast("AnyRelation", self),
         )
 
     @property
@@ -391,7 +406,7 @@ class RelationBase(_DCBase):
         """Sugar to generate a <this relation>-relation-departed event."""
         return Event(
             path=normalize_name(self.endpoint + "-relation-departed"),
-            relation=self,
+            relation=cast("AnyRelation", self),
         )
 
     @property
@@ -399,7 +414,7 @@ class RelationBase(_DCBase):
         """Sugar to generate a <this relation>-relation-broken event."""
         return Event(
             path=normalize_name(self.endpoint + "-relation-broken"),
-            relation=self,
+            relation=cast("AnyRelation", self),
         )
 
 
@@ -421,11 +436,11 @@ class Relation(RelationBase):
         return self.remote_app_name
 
     @property
-    def _remote_unit_ids(self) -> Tuple[int]:
+    def _remote_unit_ids(self) -> Tuple["UnitID", ...]:
         """Ids of the units on the other end of this relation."""
         return tuple(self.remote_units_data)
 
-    def _get_databag_for_remote(self, unit_id: int) -> "RawDataBagContents":
+    def _get_databag_for_remote(self, unit_id: "UnitID") -> "RawDataBagContents":
         """Return the databag for some remote unit ID."""
         return self.remote_units_data[unit_id]
 
@@ -490,11 +505,11 @@ class PeerRelation(RelationBase):
         yield from self.peers_data.values()
 
     @property
-    def _remote_unit_ids(self) -> Tuple[int]:
+    def _remote_unit_ids(self) -> Tuple["UnitID", ...]:
         """Ids of the units on the other end of this relation."""
         return tuple(self.peers_data)
 
-    def _get_databag_for_remote(self, unit_id: int) -> "RawDataBagContents":
+    def _get_databag_for_remote(self, unit_id: "UnitID") -> "RawDataBagContents":
         """Return the databag for some remote unit ID."""
         return self.peers_data[unit_id]
 
@@ -662,12 +677,93 @@ class Container(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
+class Address(_DCBase):
+    hostname: str
+    value: str
+    cidr: str
+    address: str = ""  # legacy
+
+
+@dataclasses.dataclass(frozen=True)
+class BindAddress(_DCBase):
+    interface_name: str
+    addresses: List[Address]
+    mac_address: Optional[str] = None
+
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
+        dct = {
+            "interface-name": self.interface_name,
+            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
+        }
+        if self.mac_address:
+            dct["mac-address"] = self.mac_address
+        return dct
+
+
+@dataclasses.dataclass(frozen=True)
+class Network(_DCBase):
+    name: str
+
+    bind_addresses: List[BindAddress]
+    ingress_addresses: List[str]
+    egress_subnets: List[str]
+
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        return {
+            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
+            "egress-subnets": self.egress_subnets,
+            "ingress-addresses": self.ingress_addresses,
+        }
+
+    @classmethod
+    def default(
+        cls,
+        name,
+        private_address: str = "1.1.1.1",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        mac_address: Optional[str] = None,
+        egress_subnets=("1.1.1.2/32",),
+        ingress_addresses=("1.1.1.2",),
+    ) -> "Network":
+        """Helper to create a minimal, heavily defaulted Network."""
+        return cls(
+            name=name,
+            bind_addresses=[
+                BindAddress(
+                    interface_name=interface_name,
+                    mac_address=mac_address,
+                    addresses=[
+                        Address(hostname=hostname, value=private_address, cidr=cidr),
+                    ],
+                ),
+            ],
+            egress_subnets=list(egress_subnets),
+            ingress_addresses=list(ingress_addresses),
+        )
+
+
+_RawStatusLiteral = Literal[
+    "waiting",
+    "blocked",
+    "active",
+    "unknown",
+    "error",
+    "maintenance",
+]
+
+
+@dataclasses.dataclass(frozen=True)
 class _EntityStatus(_DCBase):
     """This class represents StatusBase and should not be interacted with directly."""
 
     # Why not use StatusBase directly? Because that's not json-serializable.
 
-    name: Literal["waiting", "blocked", "active", "unknown", "error", "maintenance"]
+    name: _RawStatusLiteral
     message: str = ""
 
     def __eq__(self, other):
@@ -683,9 +779,6 @@ class _EntityStatus(_DCBase):
             f"Please compare with StatusBase directly.",
         )
         return super().__eq__(other)
-
-    def __iter__(self):
-        return iter([self.name, self.message])
 
     def __repr__(self):
         status_type_name = self.name.title() + "Status"
@@ -703,7 +796,7 @@ def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
         #  isinstance(state.unit_status, ops.ActiveStatus)
         pass
 
-    return _MyClass(obj.name, obj.message)
+    return _MyClass(cast(_RawStatusLiteral, obj.name), obj.message)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -722,11 +815,14 @@ class StoredState(_DCBase):
         return f"{self.owner_path or ''}/{self.data_type_name}[{self.name}]"
 
 
+_RawPortProtocolLiteral = Literal["tcp", "udp", "icmp"]
+
+
 @dataclasses.dataclass(frozen=True)
 class Port(_DCBase):
     """Represents a port on the charm host."""
 
-    protocol: Literal["tcp", "udp", "icmp"]
+    protocol: _RawPortProtocolLiteral
     port: Optional[int] = None
     """The port to open. Required for TCP and UDP; not allowed for ICMP."""
 
@@ -838,8 +934,7 @@ class State(_DCBase):
     planned_units: int = 1
     """Number of non-dying planned units that are expected to be running this application.
     Use with caution."""
-    unit_id: int = 0
-    """ID of the unit hosting this charm."""
+
     # represents the OF's event queue. These events will be emitted before the event being
     # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
@@ -877,7 +972,7 @@ class State(_DCBase):
 
     def _update_status(
         self,
-        new_status: str,
+        new_status: _RawStatusLiteral,
         new_message: str = "",
         is_app: bool = False,
     ):
@@ -901,7 +996,7 @@ class State(_DCBase):
     def with_unit_status(self, status: StatusBase) -> "State":
         return self.replace(
             status=dataclasses.replace(
-                self.unit_status,
+                cast(_EntityStatus, self.unit_status),
                 unit=_status_to_entitystatus(status),
             ),
         )
@@ -938,7 +1033,7 @@ class State(_DCBase):
     # FIXME: not a great way to obtain a delta, but is "complete". todo figure out a better way.
     def jsonpatch_delta(self, other: "State"):
         try:
-            import jsonpatch
+            import jsonpatch  # type: ignore
         except ModuleNotFoundError:
             logger.error(
                 "cannot import jsonpatch: using the .delta() "
@@ -954,20 +1049,20 @@ class State(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
-class _CharmSpec(_DCBase):
+class _CharmSpec(_DCBase, Generic[CharmType]):
     """Charm spec."""
 
-    charm_type: Type["CharmType"]
-    meta: Optional[Dict[str, Any]]
+    charm_type: Type[CharmBase]
+    meta: Dict[str, Any]
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
 
-    # autoloaded means: trigger() is being invoked on a 'real' charm class, living in some
+    # autoloaded means: we are running a 'real' charm class, living in some
     # /src/charm.py, and the metadata files are 'real' metadata files.
     is_autoloaded: bool = False
 
     @staticmethod
-    def autoload(charm_type: Type["CharmType"]):
+    def autoload(charm_type: Type[CharmBase]) -> "_CharmSpec[CharmType]":
         charm_source_path = Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
 
@@ -1038,6 +1133,14 @@ class _EventType(str, Enum):
 
 
 class _EventPath(str):
+    if TYPE_CHECKING:
+        name: str
+        owner_path: List[str]
+        suffix: str
+        prefix: str
+        is_custom: bool
+        type: _EventType
+
     def __new__(cls, string):
         string = normalize_name(string)
         instance = super().__new__(cls, string)
@@ -1057,7 +1160,7 @@ class _EventPath(str):
         return instance
 
     @staticmethod
-    def _get_suffix_and_type(s: str):
+    def _get_suffix_and_type(s: str) -> Tuple[str, _EventType]:
         for suffix in RELATION_EVENTS_SUFFIX:
             if s.endswith(suffix):
                 return suffix, _EventType.relation
@@ -1089,7 +1192,7 @@ class _EventPath(str):
 @dataclasses.dataclass(frozen=True)
 class Event(_DCBase):
     path: str
-    args: Tuple[Any] = ()
+    args: Tuple[Any, ...] = ()
     kwargs: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     # if this is a storage event, the storage it refers to
@@ -1131,7 +1234,7 @@ class Event(_DCBase):
     @property
     def _path(self) -> _EventPath:
         # we converted it in __post_init__, but the type checker doesn't know about that
-        return typing.cast(_EventPath, self.path)
+        return cast(_EventPath, self.path)
 
     @property
     def name(self) -> str:
@@ -1281,17 +1384,26 @@ class Event(_DCBase):
         #  relation event but not *be* one.
         if self._is_workload_event:
             # this is a WorkloadEvent. The snapshot:
+            container = cast(Container, self.container)
             snapshot_data = {
-                "container_name": self.container.name,
+                "container_name": container.name,
             }
 
         elif self._is_relation_event:
-            # this is a RelationEvent. The snapshot:
+            # this is a RelationEvent.
+            relation = cast("AnyRelation", self.relation)
+            if isinstance(relation, PeerRelation):
+                # FIXME: relation.unit for peers should point to <this unit>, but we
+                #  don't have access to the local app name in this context.
+                remote_app = "local"
+            else:
+                remote_app = relation.remote_app_name
+
             snapshot_data = {
-                "relation_name": self.relation.endpoint,
-                "relation_id": self.relation.relation_id,
-                "app_name": self.relation.remote_app_name,
-                "unit_name": f"{self.relation.remote_app_name}/{self.relation_remote_unit_id}",
+                "relation_name": relation.endpoint,
+                "relation_id": relation.relation_id,
+                "app_name": remote_app,
+                "unit_name": f"{remote_app}/{self.relation_remote_unit_id}",
             }
 
         return DeferredEvent(
@@ -1318,8 +1430,8 @@ def deferred(
     event: Union[str, Event],
     handler: Callable,
     event_id: int = 1,
-    relation: "Relation" = None,
-    container: "Container" = None,
+    relation: Optional["Relation"] = None,
+    container: Optional["Container"] = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
