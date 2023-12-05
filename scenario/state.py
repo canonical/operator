@@ -241,7 +241,7 @@ class BindAddress(_DCBase):
 
     def hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
-        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
+        # todo support for legacy (deprecated) `interfacename` and `macaddress` fields?
         dct = {
             "interface-name": self.interface_name,
             "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
@@ -268,13 +268,13 @@ class Network(_DCBase):
     @classmethod
     def default(
         cls,
-        private_address: str = "1.1.1.1",
+        private_address: str = "192.0.2.0",
         hostname: str = "",
         cidr: str = "",
         interface_name: str = "",
         mac_address: Optional[str] = None,
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
+        egress_subnets=("192.0.2.0/24",),
+        ingress_addresses=("192.0.2.0",),
     ) -> "Network":
         """Helper to create a minimal, heavily defaulted Network."""
         return cls(
