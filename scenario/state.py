@@ -9,6 +9,7 @@ import re
 import typing
 from collections import namedtuple
 from enum import Enum
+from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Literal, Optional, Set, Tuple, Type, Union
 from uuid import uuid4
@@ -224,6 +225,73 @@ def normalize_name(s: str):
     return s.replace("-", "_")
 
 
+@dataclasses.dataclass(frozen=True)
+class Address(_DCBase):
+    hostname: str
+    value: str
+    cidr: str
+    address: str = ""  # legacy
+
+
+@dataclasses.dataclass(frozen=True)
+class BindAddress(_DCBase):
+    interface_name: str
+    addresses: List[Address]
+    mac_address: Optional[str] = None
+
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        # todo support for legacy (deprecated) `interfacename` and `macaddress` fields?
+        dct = {
+            "interface-name": self.interface_name,
+            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
+        }
+        if self.mac_address:
+            dct["mac-address"] = self.mac_address
+        return dct
+
+
+@dataclasses.dataclass(frozen=True)
+class Network(_DCBase):
+    bind_addresses: List[BindAddress]
+    ingress_addresses: List[str]
+    egress_subnets: List[str]
+
+    def hook_tool_output_fmt(self):
+        # dumps itself to dict in the same format the hook tool would
+        return {
+            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
+            "egress-subnets": self.egress_subnets,
+            "ingress-addresses": self.ingress_addresses,
+        }
+
+    @classmethod
+    def default(
+        cls,
+        private_address: str = "192.0.2.0",
+        hostname: str = "",
+        cidr: str = "",
+        interface_name: str = "",
+        mac_address: Optional[str] = None,
+        egress_subnets=("192.0.2.0/24",),
+        ingress_addresses=("192.0.2.0",),
+    ) -> "Network":
+        """Helper to create a minimal, heavily defaulted Network."""
+        return cls(
+            bind_addresses=[
+                BindAddress(
+                    interface_name=interface_name,
+                    mac_address=mac_address,
+                    addresses=[
+                        Address(hostname=hostname, value=private_address, cidr=cidr),
+                    ],
+                ),
+            ],
+            egress_subnets=list(egress_subnets),
+            ingress_addresses=list(ingress_addresses),
+        )
+
+
 _next_relation_id_counter = 1
 
 
@@ -238,15 +306,21 @@ def next_relation_id(update=True):
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_DCBase):
     endpoint: str
+    """Relation endpoint name. Must match some endpoint name defined in metadata.yaml."""
 
-    # we can derive this from the charm's metadata
     interface: str = None
+    """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
+    If left empty, it will be automatically derived from metadata.yaml."""
 
-    # Every new Relation instance gets a new one, if there's trouble, override.
     relation_id: int = dataclasses.field(default_factory=next_relation_id)
+    """Juju relation ID. Every new Relation instance gets a unique one,
+    if there's trouble, override."""
 
     local_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    """This application's databag for this relation."""
+
     local_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    """This unit's databag for this relation."""
 
     @property
     def _databags(self):
@@ -588,77 +662,6 @@ class Container(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
-class Address(_DCBase):
-    hostname: str
-    value: str
-    cidr: str
-    address: str = ""  # legacy
-
-
-@dataclasses.dataclass(frozen=True)
-class BindAddress(_DCBase):
-    interface_name: str
-    addresses: List[Address]
-    mac_address: Optional[str] = None
-
-    def hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        # todo support for legacy (deprecated `interfacename` and `macaddress` fields?
-        dct = {
-            "interface-name": self.interface_name,
-            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
-        }
-        if self.mac_address:
-            dct["mac-address"] = self.mac_address
-        return dct
-
-
-@dataclasses.dataclass(frozen=True)
-class Network(_DCBase):
-    name: str
-
-    bind_addresses: List[BindAddress]
-    ingress_addresses: List[str]
-    egress_subnets: List[str]
-
-    def hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        return {
-            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
-            "egress-subnets": self.egress_subnets,
-            "ingress-addresses": self.ingress_addresses,
-        }
-
-    @classmethod
-    def default(
-        cls,
-        name,
-        private_address: str = "1.1.1.1",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        mac_address: Optional[str] = None,
-        egress_subnets=("1.1.1.2/32",),
-        ingress_addresses=("1.1.1.2",),
-    ) -> "Network":
-        """Helper to create a minimal, heavily defaulted Network."""
-        return cls(
-            name=name,
-            bind_addresses=[
-                BindAddress(
-                    interface_name=interface_name,
-                    mac_address=mac_address,
-                    addresses=[
-                        Address(hostname=hostname, value=private_address, cidr=cidr),
-                    ],
-                ),
-            ],
-            egress_subnets=list(egress_subnets),
-            ingress_addresses=list(ingress_addresses),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
 class _EntityStatus(_DCBase):
     """This class represents StatusBase and should not be interacted with directly."""
 
@@ -806,8 +809,14 @@ class State(_DCBase):
     """The present configuration of this charm."""
     relations: List["AnyRelation"] = dataclasses.field(default_factory=list)
     """All relations that currently exist for this charm."""
-    networks: List[Network] = dataclasses.field(default_factory=list)
-    """All networks currently provisioned for this charm."""
+    networks: Dict[str, Network] = dataclasses.field(default_factory=dict)
+    """Manual overrides for any relation and extra bindings currently provisioned for this charm.
+    If a metadata-defined relation endpoint is not explicitly mapped to a Network in this field,
+    it will be defaulted.
+    [CAVEAT: `extra-bindings` is a deprecated, regretful feature in juju/ops. For completeness we
+    support it, but use at your own risk.] If a metadata-defined extra-binding is left empty,
+    it will be defaulted.
+    """
     containers: List[Container] = dataclasses.field(default_factory=list)
     """All containers (whether they can connect or not) that this charm is aware of."""
     storage: List[Storage] = dataclasses.field(default_factory=list)
@@ -899,11 +908,13 @@ class State(_DCBase):
 
     def get_container(self, container: Union[str, Container]) -> Container:
         """Get container from this State, based on an input container or its name."""
-        name = container.name if isinstance(container, Container) else container
-        try:
-            return next(filter(lambda c: c.name == name, self.containers))
-        except StopIteration as e:
-            raise ValueError(f"container: {name}") from e
+        container_name = (
+            container.name if isinstance(container, Container) else container
+        )
+        containers = [c for c in self.containers if c.name == container_name]
+        if not containers:
+            raise ValueError(f"container: {container_name} not found in the State")
+        return containers[0]
 
     def get_relations(self, endpoint: str) -> Tuple["AnyRelation", ...]:
         """Get all relations on this endpoint from the current state."""
@@ -984,6 +995,16 @@ class _CharmSpec(_DCBase):
             actions=actions,
             config=config,
             is_autoloaded=True,
+        )
+
+    def get_all_relations(self) -> List[Tuple[str, Dict[str, str]]]:
+        """A list of all relation endpoints defined in the metadata."""
+        return list(
+            chain(
+                self.meta.get("requires", {}).items(),
+                self.meta.get("provides", {}).items(),
+                self.meta.get("peers", {}).items(),
+            ),
         )
 
 
