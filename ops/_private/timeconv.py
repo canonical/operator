@@ -101,7 +101,11 @@ def parse_duration(s: str) -> datetime.timedelta:
         number, unit = match.groups()
         if unit not in _DURATION_UNITS:
             raise ValueError(f'invalid duration: invalid unit {unit!r}')
-        seconds += float(number) * _DURATION_UNITS[unit]
+        try:
+            seconds += float(number) * _DURATION_UNITS[unit]
+        except ValueError:
+            # Same exception type, but a slightly more specific error message
+            raise ValueError(f'invalid duration: {number!r} is not a valid float') from None
 
     duration = datetime.timedelta(seconds=seconds)
     return -duration if negative else duration
