@@ -1058,6 +1058,12 @@ class Harness(Generic[CharmType]):
         self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
 
+    def pebble_notify(self, container_name: str, notice_key: str, *, notice_type: str = 'custom'):
+        """TODO."""
+        container = self.model.unit.get_container(container_name)
+        self.set_can_connect(container, True)  # TODO: want this?
+        self.charm.on[container_name].pebble_custom_notice.emit(container, notice_type, notice_key)
+
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
         return self._backend._workload_version

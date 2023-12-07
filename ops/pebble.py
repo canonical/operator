@@ -19,6 +19,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 
 import binascii
 import copy
+import dataclasses
 import datetime
 import email.message
 import email.parser
@@ -246,6 +247,21 @@ if TYPE_CHECKING:
                               'last-shown': NotRequired[Optional[str]],
                               'expire-after': str,
                               'repeat-after': str})
+
+    _NoticeDict = TypedDict('_NoticeDict', {
+        'id': str,
+        'user-id': int,
+        'type': str,
+        'key': str,
+        'visibility': str,
+        'first-occurred': str,
+        'last-occurred': str,
+        'last-repeated': str,
+        'occurrences': int,
+        'last-data': NotRequired[Optional[Dict[str, str]]],
+        'repeat-after': NotRequired[str],
+        'expire-after': NotRequired[str],
+    })
 
 
 class _WebSocket(Protocol):
@@ -1208,6 +1224,98 @@ class CheckInfo:
                 'failures={self.failures}, '
                 'threshold={self.threshold!r})'
                 ).format(self=self)
+
+
+class NoticeType(enum.Enum):
+    """Enum of notice types."""
+
+    CUSTOM = 'custom'
+
+
+class NoticeVisibility(enum.Enum):
+    """Enum of notice visibilities."""
+
+    PRIVATE = 'private'
+    PUBLIC = 'public'
+
+
+class NoticeSpecialUser(enum.Enum):
+    """Enum of notice "special user" values."""
+
+    ALL = 'all'
+    SELF = 'self'
+
+
+@dataclasses.dataclass(frozen=True)
+class Notice:
+    """Information about a single notice."""
+
+    id: str
+    """Server-generated unique ID for this notice."""
+
+    user_id: int
+    """UID of the user who may view this notice (often its creator)."""
+
+    type: Union[NoticeType, str]
+    """Type of the notice."""
+
+    key: str
+    """The notice key, a string that differentiates notices of this type.
+
+    This is in the format ``domain.com/path``.
+    """
+
+    visibility: NoticeVisibility
+    """The notice's visibility."""
+
+    first_occurred: datetime.datetime
+    """The first time one of these notices (type and key combination) occurs."""
+
+    last_occurred: datetime.datetime
+    """The last time one of these notices occurred."""
+
+    last_repeated: datetime.datetime
+    """The time this notice was last repeated.
+
+    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    for an explanation of what "repeated" means.
+    """
+
+    occurrences: int
+    """The number of times one of these notices has occurred."""
+
+    last_data: Dict[str, str]
+    """Additional data captured from the last occurrence of one of these notices."""
+
+    repeat_after: Optional[datetime.timedelta] = None
+    """How long after one of these was last repeated should we allow it to repeat."""
+
+    expire_after: Optional[datetime.timedelta] = None
+    """How long since one of these last occurred until we should drop the notice."""
+
+    @classmethod
+    def from_dict(cls, d: '_NoticeDict') -> 'Notice':
+        """Create new Notice object from dict parsed from JSON."""
+        try:
+            notice_type = NoticeType(d['type'])
+        except ValueError:
+            notice_type = d['type']
+        return cls(
+            id=d['id'],
+            user_id=d['user-id'],
+            type=notice_type,
+            key=d['key'],
+            visibility=NoticeVisibility(d['visibility']),
+            first_occurred=timeconv.parse_rfc3339(d['first-occurred']),
+            last_occurred=timeconv.parse_rfc3339(d['last-occurred']),
+            last_repeated=timeconv.parse_rfc3339(d['last-repeated']),
+            occurrences=d['occurrences'],
+            last_data=d.get('last-data') or {},
+            repeat_after=timeconv.parse_duration(d['repeat-after'])
+            if 'repeat-after' in d else None,
+            expire_after=timeconv.parse_duration(d['expire-after'])
+            if 'expire-after' in d else None,
+        )
 
 
 class ExecProcess(Generic[AnyStr]):
@@ -2543,6 +2651,60 @@ class Client:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def get_notice(self, id: str) -> Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            APIError: if a notice with the given ID is not found (``code`` 404)
+        """
+        resp = self._request('GET', f'/v1/notices/{id}')
+        return Notice.from_dict(resp['result'])
+
+    def get_notices(
+        self,
+        user_ids: Optional[Iterable[int]] = None,
+        special_user: Optional[NoticeSpecialUser] = None,
+        types: Optional[Iterable[str]] = None,
+        keys: Optional[Iterable[str]] = None,
+        visibilities: Optional[Iterable[NoticeVisibility]] = None,
+        after: Optional[datetime.datetime] = None,
+    ) -> List[Notice]:
+        """Query for notices that match the provided filters.
+
+        If no filters are specified, return all notices viewable by the
+        requesting user (notices whose ``user_id`` matches the requester UID
+        as well as public notices).
+
+        Args:
+            user_ids: filter for notices with any of the specified UIDs (but
+                only include notices the requester has permission to view)
+            special_user: special UID filtering: "self" means filter for
+                notices with the UID of the requester, "all" means return
+                notices with any UID (only valid for an admin)
+            types: filter for notices with any of the specified types
+            keys: filter for notices with any of the specified keys
+            visibilities: filter for notices with any of the specified
+                visibilities
+            after: filter for notices that were last repeated after this time
+        """
+        query = {}
+        if user_ids is not None:
+            query['user-ids'] = [str(u) for u in user_ids]
+        if special_user is not None:
+            if user_ids is not None:
+                raise TypeError('may not specify both user_ids and special_user')
+            query['user-ids'] = special_user.value
+        if types is not None:
+            query['types'] = list(types)
+        if keys is not None:
+            query['keys'] = list(keys)
+        if visibilities is not None:
+            query['visibilities'] = [v.value for v in visibilities]
+        if after is not None:
+            query['after'] = after.isoformat()
+        resp = self._request('GET', '/v1/notices', query)
+        return [Notice.from_dict(info) for info in resp['result']]
 
 
 class _FilesParser:

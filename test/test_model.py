@@ -3596,5 +3596,44 @@ class TestPorts(unittest.TestCase):
         ])
 
 
+class LazyNoticeTest(unittest.TestCase):
+    def test_lazy(self):
+        calls = 0
+
+        class FakeWorkload:
+            def get_notice(self, id: str):
+                nonlocal calls
+                calls += 1
+                print(f'Calling get_notice({id!r})')
+                return ops.pebble.Notice(
+                    id=id,
+                    user_id=1000,
+                    type='CUSTOM',
+                    key='KEY',
+                    visibility=ops.pebble.NoticeVisibility.PRIVATE,
+                    first_occurred=datetime.datetime.now(),
+                    last_occurred=datetime.datetime.now(),
+                    last_repeated=datetime.datetime.now(),
+                    occurrences=7,
+                    last_data={'key': 'val'},
+                )
+
+        workload = typing.cast(ops.Container, FakeWorkload())
+        n = ops.model.LazyNotice(workload, 'ID', 'CUSTOM', 'KEY')
+        assert n.id == 'ID'
+        assert n.type == 'CUSTOM'
+        assert n.key == 'KEY'
+        assert calls == 0
+        assert n.occurrences == 7
+        assert calls == 1
+        assert n.user_id == 1000
+        assert n.last_data == {'key': 'val'}
+        assert calls == 1
+        assert repr(n) == "LazyNotice(id='ID', type='CUSTOM', key='KEY')"
+
+        with self.assertRaises(AttributeError):
+            assert n.not_exist
+
+
 if __name__ == "__main__":
     unittest.main()

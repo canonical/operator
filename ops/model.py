@@ -2110,7 +2110,8 @@ class Container:
     def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
-        Raises :class:`ModelError` if service_name is not found.
+        Raises:
+            ModelError: if a service with the given name is not found
         """
         services = self.get_services(service_name)
         if not services:
@@ -2137,7 +2138,8 @@ class Container:
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
-        Raises :class:`ModelError` if ``check_name`` is not found.
+        Raises:
+            ModelError: if a check with the given name is not found
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2637,6 +2639,43 @@ class Container:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
         self._pebble.send_signal(sig, service_names)
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            ModelError: if a notice with the given ID is not found
+        """
+        try:
+            return self._pebble.get_notice(id)
+        except pebble.APIError as e:
+            if e.code == 404:
+                raise ModelError(f'notice {id!r} not found')
+            raise
+
+    def get_notices(
+        self,
+        user_ids: Optional[Iterable[int]] = None,
+        special_user: Optional[pebble.NoticeSpecialUser] = None,
+        types: Optional[Iterable[str]] = None,
+        keys: Optional[Iterable[str]] = None,
+        visibilities: Optional[Iterable[pebble.NoticeVisibility]] = None,
+        after: Optional[datetime.datetime] = None,
+    ) -> List[pebble.Notice]:
+        """Query for notices that match the provided filters.
+
+        See :meth:`ops.pebble.Client.get_notices` for documentation of the
+        parameters.
+        """
+        notices = self._pebble.get_notices(
+            user_ids=user_ids,
+            special_user=special_user,
+            types=types,
+            keys=keys,
+            visibilities=visibilities,
+            after=after,
+        )
+        return notices
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
@@ -3398,3 +3437,48 @@ class _ModelBackendValidator:
         if re.search('[,=]', v) is not None:
             raise ModelError(
                 f'metric label values must not contain "," or "=": {label}={value!r}')
+
+
+class LazyNotice:
+    """Provide lazily-loaded access to a Pebble notice's details.
+
+    The attributes provided by this class are the same as those of
+    :class:`ops.pebble.Notice`, however, the notice details are only fetched
+    from Pebble if necessary (and cached on the instance).
+    """
+
+    id: str
+    user_id: int
+    type: Union[pebble.NoticeType, str]
+    key: str
+    visibility: pebble.NoticeVisibility
+    first_occurred: datetime.datetime
+    last_occurred: datetime.datetime
+    last_repeated: datetime.datetime
+    occurrences: int
+    last_data: Dict[str, str]
+    repeat_after: Optional[datetime.timedelta] = None
+    expire_after: Optional[datetime.timedelta] = None
+
+    def __init__(self, container: Container, id: str, type: str, key: str):
+        self._container = container
+        self.id = id
+        self.type = type
+        self.key = key
+
+        self._notice: Optional[ops.pebble.Notice] = None
+
+    def __repr__(self):
+        return f'LazyNotice(id={self.id!r}, type={self.type!r}, key={self.key!r})'
+
+    def __getattr__(self, item: str):
+        # Note: not called for defined attributes (id, type, key)
+        self._ensure_loaded()
+        return getattr(self._notice, item)
+
+    def _ensure_loaded(self):
+        if self._notice is not None:
+            return
+        self._notice = self._container.get_notice(self.id)
+        assert self._notice.type == self.type
+        assert self._notice.key == self.key

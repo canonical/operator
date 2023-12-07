@@ -94,3 +94,8 @@ class TestStrconv(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777-99:99')
+
+    def test_parse_duration(self):
+        pass
+        # 0, +0, -0
+        # X3h 3hY X3hY

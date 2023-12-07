@@ -24,6 +24,21 @@ _TIMESTAMP_RE = re.compile(
 # Matches [-+]HH:MM
 _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 
+# Matches n.n<unit> (allow U+00B5 micro symbol as well as U+03BC Greek letter mu)
+_DURATION_RE = re.compile(r'([0-9.]+)([a-zµμ]+)')
+
+# Mapping of unit to float seconds
+_DURATION_UNITS = {
+    'ns': 0.000_000_001,
+    'us': 0.000_001,
+    'µs': 0.000_001,  # U+00B5 = micro symbol
+    'μs': 0.000_001,  # U+03BC = Greek letter mu
+    'ms': 0.001,
+    's': 1,
+    'm': 60,
+    'h': 60 * 60,
+}
+
 
 def parse_rfc3339(s: str) -> datetime.datetime:
     """Parse an RFC3339 timestamp.
@@ -53,3 +68,36 @@ def parse_rfc3339(s: str) -> datetime.datetime:
 
     return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
                              microsecond=microsecond, tzinfo=tz)
+
+
+def parse_duration(s: str) -> datetime.timedelta:
+    """Parse a formatted Go duration.
+
+    This is similar to Go's time.ParseDuration function: it parses the output
+    of Go's time.Duration.String method, for example "72h3m0.5s". Units are
+    required after each number part, and valid units are "ns", "us", "µs",
+    "ms", "s", "m", and "h".
+    """
+    negative = False
+    if s and s[0] in '+-':
+        negative = s[0] == '-'
+        s = s[1:]
+
+    if s == '0':  # no unit is only okay for "0", "+0", and "-0"
+        return datetime.timedelta(seconds=0)
+
+    matches = list(_DURATION_RE.finditer(s))
+    if not matches:
+        raise ValueError('invalid duration: no number-unit groups')
+    if matches[0].start() != 0 or matches[-1].end() != len(s):
+        raise ValueError('invalid duration: extra input at start or end')
+
+    seconds = 0
+    for match in matches:
+        number, unit = match.groups()
+        if unit not in _DURATION_UNITS:
+            raise ValueError(f'invalid duration: invalid unit {unit!r}')
+        seconds += float(number) * _DURATION_UNITS[unit]
+
+    duration = datetime.timedelta(seconds=seconds)
+    return -duration if negative else duration
