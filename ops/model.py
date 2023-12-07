@@ -2736,7 +2736,7 @@ class Container:
         self,
         user_ids: Optional[Iterable[int]] = None,
         special_user: Optional[pebble.NoticeSpecialUser] = None,
-        types: Optional[Iterable[str]] = None,
+        types: Optional[Iterable[pebble.NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
         visibilities: Optional[Iterable[pebble.NoticeVisibility]] = None,
         after: Optional[datetime.datetime] = None,
@@ -3546,8 +3546,8 @@ class LazyNotice:
     last_repeated: datetime.datetime
     occurrences: int
     last_data: Dict[str, str]
-    repeat_after: Optional[datetime.timedelta] = None
-    expire_after: Optional[datetime.timedelta] = None
+    repeat_after: Optional[datetime.timedelta]
+    expire_after: Optional[datetime.timedelta]
 
     def __init__(self, container: Container, id: str, type: str, key: str):
         self._container = container

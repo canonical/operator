@@ -1351,7 +1351,7 @@ class Notice:
     occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: Dict[str, str]
+    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: Optional[datetime.timedelta] = None
@@ -2766,7 +2766,7 @@ class Client:
         self,
         user_ids: Optional[Iterable[int]] = None,
         special_user: Optional[NoticeSpecialUser] = None,
-        types: Optional[Iterable[str]] = None,
+        types: Optional[Iterable[NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
         visibilities: Optional[Iterable[NoticeVisibility]] = None,
         after: Optional[datetime.datetime] = None,
@@ -2789,15 +2789,16 @@ class Client:
                 visibilities
             after: filter for notices that were last repeated after this time
         """
-        query = {}
+        query: Dict[str, Union[str, List[str]]] = {}
         if user_ids is not None:
             query['user-ids'] = [str(u) for u in user_ids]
         if special_user is not None:
-            if user_ids is not None:
-                raise TypeError('may not specify both user_ids and special_user')
-            query['user-ids'] = special_user.value
+            if 'user-ids' not in query:
+                query['user-ids'] = []
+            query_user_ids = typing.cast(List[str], query['user-ids'])
+            query_user_ids.append(special_user.value)
         if types is not None:
-            query['types'] = list(types)
+            query['types'] = [t.value for t in types]
         if keys is not None:
             query['keys'] = list(keys)
         if visibilities is not None:
