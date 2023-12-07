@@ -537,16 +537,26 @@ class TestFramework(BaseTestCase):
         with self.assertRaises(RuntimeError) as cm:
             class OtherEvents(ops.ObjectEvents):  # type: ignore
                 foo = event
+        # Python 3.12+ raises the original exception with a note, but earlier
+        # Python chains the exceptions.
+        if hasattr(cm.exception, "__notes__"):
+            cause = str(cm.exception)
+        else:
+            cause = str(cm.exception.__cause__)
         self.assertEqual(
-            str(cm.exception.__cause__),
+            cause,
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo")
 
         with self.assertRaises(RuntimeError) as cm:
             class MyNotifier(ops.Object):  # type: ignore
                 on = MyEvents()  # type: ignore
                 bar = event
+        if hasattr(cm.exception, "__notes__"):
+            cause = str(cm.exception)
+        else:
+            cause = str(cm.exception.__cause__)
         self.assertEqual(
-            str(cm.exception.__cause__),
+            cause,
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar")
 
     def test_reemit_ignores_unknown_event_type(self):
@@ -1799,8 +1809,7 @@ class DebugHookTests(BaseTestCase):
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                with patch.dict(os.environ, {'JUJU_ACTION_NAME': 'foobar'}):
-                    publisher.foobar_action.emit()
+                publisher.foobar_action.emit()
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(observer.called)
@@ -1820,8 +1829,7 @@ class DebugHookTests(BaseTestCase):
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                with patch.dict(os.environ, {'JUJU_ACTION_NAME': 'foobar'}):
-                    publisher.foobar_action.emit()
+                publisher.foobar_action.emit()
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(observer.called)

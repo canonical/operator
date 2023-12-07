@@ -30,7 +30,7 @@ import textwrap
 import typing
 import unittest
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -2828,20 +2828,28 @@ class TestHarness(unittest.TestCase):
                 super().__init__(framework)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
                 self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+                self.app_status_to_add = ops.BlockedStatus('blocked app')
+                self.unit_status_to_add = ops.BlockedStatus('blocked unit')
 
             def _on_collect_app_status(self, event: ops.CollectStatusEvent):
-                event.add_status(ops.ActiveStatus())
+                event.add_status(self.app_status_to_add)
 
             def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
-                event.add_status(ops.BlockedStatus('bar'))
+                event.add_status(self.unit_status_to_add)
 
         harness = ops.testing.Harness(TestCharm)
         harness.set_leader(True)
         harness.begin()
         # Tests for the behaviour of status evaluation are in test_charm.py
         harness.evaluate_status()
-        self.assertEqual(harness.model.app.status, ops.ActiveStatus())
-        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('bar'))
+        self.assertEqual(harness.model.app.status, ops.BlockedStatus('blocked app'))
+        self.assertEqual(harness.model.unit.status, ops.BlockedStatus('blocked unit'))
+
+        harness.charm.app_status_to_add = ops.ActiveStatus('active app')
+        harness.charm.unit_status_to_add = ops.ActiveStatus('active unit')
+        harness.evaluate_status()
+        self.assertEqual(harness.model.app.status, ops.ActiveStatus('active app'))
+        self.assertEqual(harness.model.unit.status, ops.ActiveStatus('active unit'))
 
 
 class TestNetwork(unittest.TestCase):
@@ -3336,6 +3344,37 @@ class TestTestingModelBackend(unittest.TestCase):
 
         client = backend.get_pebble('/custom/socket/path')
         self.assertIsInstance(client, _TestingPebbleClient)
+
+    def test_reboot(self):
+        class RebootingCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.install, self._reboot_now)
+                self.framework.observe(self.on.remove, self._reboot)
+
+            def _reboot_now(self, event: ops.InstallEvent):
+                self.unit.reboot(now=True)
+
+            def _reboot(self, event: ops.RemoveEvent):
+                self.unit.reboot()
+
+        harness = ops.testing.Harness(RebootingCharm, meta='''
+            name: test-app
+            ''')
+        self.addCleanup(harness.cleanup)
+        self.assertEqual(harness.reboot_count, 0)
+        backend = harness._backend
+        backend.reboot()
+        self.assertEqual(harness.reboot_count, 1)
+        with self.assertRaises(SystemExit):
+            backend.reboot(now=True)
+        self.assertEqual(harness.reboot_count, 2)
+        harness.begin()
+        with self.assertRaises(SystemExit):
+            harness.charm.on.install.emit()
+        self.assertEqual(harness.reboot_count, 3)
+        harness.charm.on.remove.emit()
+        self.assertEqual(harness.reboot_count, 4)
 
 
 class _TestingPebbleClientMixin:
@@ -4057,6 +4096,7 @@ class PebbleStorageAPIsTestMixin:
 
     assertEqual = unittest.TestCase.assertEqual  # noqa
     assertIn = unittest.TestCase.assertIn  # noqa
+    assertIs = unittest.TestCase.assertIs  # noqa
     assertIsInstance = unittest.TestCase.assertIsInstance  # noqa
     assertRaises = unittest.TestCase.assertRaises  # noqa
 
@@ -4533,6 +4573,18 @@ class TestPebbleStorageAPIsUsingMocks(
             dir_ = client.list_files(f"{self.prefix}/dir{idx}", itself=True)[0]
             self.assertEqual(dir_.path, f"{self.prefix}/dir{idx}")
 
+    @patch("grp.getgrgid")
+    @patch("pwd.getpwuid")
+    def test_list_files_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+        getpwuid.side_effect = KeyError
+        getgrgid.side_effect = KeyError
+        data = 'data'
+        self.client.push(f"{self.prefix}/file", data)
+        files = self.client.list_files(f"{self.prefix}/")
+        self.assertEqual(len(files), 1)
+        self.assertIs(files[0].user, None)
+        self.assertIs(files[0].group, None)
+
 
 class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
     def setUp(self) -> None:
@@ -4673,6 +4725,59 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.id, secret_id)
         self.assertEqual(secret.get_content(), {'password': 'hunter4'})
 
+    def test_get_secret_as_owner(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # App secret.
+        secret_id = harness.charm.app.add_secret({'password': 'hunter5'}).id
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter5'})
+        # Unit secret.
+        secret_id = harness.charm.unit.add_secret({'password': 'hunter6'}).id
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter6'})
+
+    def test_get_secret_and_refresh(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        secret = harness.charm.app.add_secret({'password': 'hunter6'})
+        secret.set_content({"password": "hunter7"})
+        retrieved_secret = harness.model.get_secret(id=secret.id)
+        self.assertEqual(retrieved_secret.id, secret.id)
+        self.assertEqual(retrieved_secret.get_content(), {'password': 'hunter6'})
+        self.assertEqual(retrieved_secret.peek_content(), {'password': 'hunter7'})
+        self.assertEqual(retrieved_secret.get_content(refresh=True), {'password': 'hunter7'})
+        self.assertEqual(retrieved_secret.get_content(), {'password': 'hunter7'})
+
+    def test_get_secret_removed(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        secret = harness.charm.app.add_secret({'password': 'hunter8'})
+        secret.set_content({"password": "hunter9"})
+        secret.remove_revision(secret.get_info().revision)
+        with self.assertRaises(ops.SecretNotFoundError):
+            harness.model.get_secret(id=secret.id)
+
+    def test_get_secret_by_label(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.charm.app.add_secret({'password': 'hunter9'}, label="my-pass").id
+        secret = harness.model.get_secret(label="my-pass")
+        self.assertEqual(secret.label, "my-pass")
+        self.assertEqual(secret.get_content(), {'password': 'hunter9'})
+        secret = harness.model.get_secret(id=secret_id, label="other-name")
+        self.assertEqual(secret.get_content(), {'password': 'hunter9'})
+        secret = harness.model.get_secret(label="other-name")
+        self.assertEqual(secret.get_content(), {'password': 'hunter9'})
+
     def test_add_model_secret_invalid_content(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
@@ -4780,6 +4885,7 @@ class TestSecrets(unittest.TestCase):
         harness.add_relation_unit(relation_id, 'webapp/0')
         assert harness is not None
 
+        harness.set_leader(True)
         secret = harness.model.app.add_secret({'foo': 'x'})
         assert secret.id is not None
         self.assertEqual(harness.get_secret_grants(secret.id, relation_id), set())
@@ -4874,6 +4980,52 @@ class TestSecrets(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
+
+    def test_secret_permissions_unit(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        # The charm can always manage a local unit secret.
+        secret_id = harness.charm.unit.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        info = secret.get_info()
+        self.assertEqual(info.id, secret_id)
+        secret.set_content({"password": "5678"})
+        secret.remove_all_revisions()
+
+    def test_secret_permissions_leader(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        # The leader can manage an application secret.
+        harness.set_leader(True)
+        secret_id = harness.charm.app.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        info = secret.get_info()
+        self.assertEqual(info.id, secret_id)
+        secret.set_content({"password": "5678"})
+        secret.remove_all_revisions()
+
+    def test_secret_permissions_nonleader(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        # Non-leaders can only view an application secret.
+        harness.set_leader(False)
+        secret_id = harness.charm.app.add_secret({"password": "1234"}).id
+        secret = harness.charm.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {"password": "1234"})
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.get_info()
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.set_content({"password": "5678"})
+        with self.assertRaises(ops.model.SecretNotFoundError):
+            secret.remove_all_revisions()
 
 
 class EventRecorder(ops.CharmBase):
@@ -5193,3 +5345,143 @@ class TestHandleExec(unittest.TestCase):
         self.assertEqual(args_history[-1].group, "test_group")
         self.assertEqual(args_history[-1].group_id, 4)
         self.assertDictEqual(args_history[-1].environment, {"foo": "hello", "foobar": "barfoo"})
+
+
+class TestActions(unittest.TestCase):
+    def setUp(self):
+        action_results: typing.Dict[str, typing.Any] = {}
+        self._action_results = action_results
+
+        class ActionCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.simple_action, self._on_simple_action)
+                self.framework.observe(self.on.fail_action, self._on_fail_action)
+                self.framework.observe(self.on.results_action, self._on_results_action)
+                self.framework.observe(
+                    self.on.log_and_results_action, self._on_log_and_results_action)
+                self.simple_was_called = False
+
+            def _on_simple_action(self, event: ops.ActionEvent):
+                """An action that doesn't generate logs, have any results, or fail."""
+                self.simple_was_called = True
+
+            def _on_fail_action(self, event: ops.ActionEvent):
+                event.fail("this will be ignored")
+                event.log("some progress")
+                event.fail("something went wrong")
+                event.log("more progress")
+                event.set_results(action_results)
+
+            def _on_log_and_results_action(self, event: ops.ActionEvent):
+                event.log("Step 1")
+                event.set_results({"result1": event.params["foo"]})
+                event.log("Step 2")
+                event.set_results({"result2": event.params.get("bar")})
+
+            def _on_results_action(self, event: ops.ActionEvent):
+                event.set_results(action_results)
+
+        self.harness = ops.testing.Harness(ActionCharm, meta='''
+            name: test
+            ''', actions='''
+            simple:
+              description: lorem ipsum
+            fail:
+              description: dolor sit amet
+            unobserved-param-tester:
+              description: consectetur adipiscing elit
+              params:
+                foo
+                bar
+              required: [foo]
+              additionalProperties: false
+            log-and-results:
+              description: sed do eiusmod tempor
+              params:
+                foo:
+                  type: string
+                  default: foo-default
+                bar:
+                  type: integer
+            results:
+              description: incididunt ut labore
+            ''')
+        self.harness.begin()
+
+    def test_before_begin(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test
+            ''')
+        with self.assertRaises(RuntimeError):
+            harness.run_action("fail")
+
+    def test_invalid_action(self):
+        # This action isn't in the metadata at all.
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("another-action")
+        # Also check that we're not exposing the action with the dash to underscore replacement.
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("log_and_results")
+
+    def test_run_action(self):
+        out = self.harness.run_action("simple")
+        self.assertEqual(out.logs, [])
+        self.assertEqual(out.results, {})
+        self.assertTrue(self.harness.charm.simple_was_called)
+
+    def test_fail_action(self):
+        self._action_results.clear()
+        self._action_results["partial"] = "foo"
+        with self.assertRaises(ops.testing.ActionFailed) as cm:
+            self.harness.run_action("fail")
+        self.assertEqual(cm.exception.message, "something went wrong")
+        self.assertEqual(cm.exception.output.logs, ["some progress", "more progress"])
+        self.assertEqual(cm.exception.output.results, {"partial": "foo"})
+
+    def test_required_param(self):
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("unobserved-param-tester")
+        with self.assertRaises(RuntimeError):
+            self.harness.run_action("unobserved-param-tester", {"bar": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz"})
+        self.harness.run_action("unobserved-param-tester", {"foo": "baz", "bar": "qux"})
+
+    def test_additional_params(self):
+        self.harness.run_action("simple", {"foo": "bar"})
+        with self.assertRaises(ops.ModelError):
+            self.harness.run_action("unobserved-param-tester", {"foo": "bar", "qux": "baz"})
+        self.harness.run_action("simple", {
+            "string": "hello",
+            "number": 28.8,
+            "object": {"a": {"b": "c"}},
+            "array": [1, 2, 3],
+            "boolean": True,
+            "null": None})
+
+    def test_logs_and_results(self):
+        out = self.harness.run_action("log-and-results")
+        self.assertEqual(out.logs, ["Step 1", "Step 2"])
+        self.assertEqual(out.results, {"result1": "foo-default", "result2": None})
+        out = self.harness.run_action("log-and-results", {"foo": "baz", "bar": 28})
+        self.assertEqual(out.results, {"result1": "baz", "result2": 28})
+
+    def test_bad_results(self):
+        # We can't have results that collide when flattened.
+        self._action_results.clear()
+        self._action_results["a"] = {"b": 1}
+        self._action_results["a.b"] = 2
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")
+        # There are some result key names we cannot use.
+        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
+        for key in prohibited_keys:
+            self._action_results.clear()
+            self._action_results[key] = "foo"
+            with self.assertRaises(ops.ModelError):
+                self.harness.run_action("results")
+        # There are some additional rules around what result keys are valid.
+        self._action_results.clear()
+        self._action_results["A"] = "foo"
+        with self.assertRaises(ValueError):
+            self.harness.run_action("results")

@@ -10,7 +10,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Set up Python 3
         uses: actions/setup-python@v2
-
+        with:
+          python-version: '3.11'
       - name: Install tox
         run: pip install tox~=4.2
 
@@ -76,7 +77,7 @@ jobs:
         run: pip install tox~=4.2
 
       - name: Install Pebble
-        run: go install github.com/canonical/pebble/cmd/pebble@latest
+        run: go install github.com/canonical/pebble/cmd/pebble@master
 
       - name: Start Pebble
         run: |
@@ -98,6 +99,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Set up Python 3
         uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
 
       - name: Build
         run: python setup.py sdist

@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # Copyright 2021 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -453,7 +452,12 @@ class TestPlan(unittest.TestCase):
         plan = pebble.Plan('')
         self.assertEqual(plan.services, {})
 
-        plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
+        plan = pebble.Plan("""
+services:
+  foo:
+    override: replace
+    command: echo foo
+""")
 
         self.assertEqual(len(plan.services), 1)
         self.assertEqual(plan.services['foo'].name, 'foo')
@@ -468,8 +472,13 @@ class TestPlan(unittest.TestCase):
         plan = pebble.Plan('')
         self.assertEqual(plan.checks, {})
 
-        plan = pebble.Plan(
-            'checks:\n bar:\n  override: replace\n  http:\n   url: https://example.com/')
+        plan = pebble.Plan("""
+checks:
+  bar:
+    override: replace
+    http:
+      url: https://example.com/
+""")
 
         self.assertEqual(len(plan.checks), 1)
         self.assertEqual(plan.checks['bar'].name, 'bar')
@@ -479,6 +488,29 @@ class TestPlan(unittest.TestCase):
         # Should be read-only ("can't set attribute")
         with self.assertRaises(AttributeError):
             plan.checks = {}  # type: ignore
+
+    def test_log_targets(self):
+        plan = pebble.Plan('')
+        self.assertEqual(plan.log_targets, {})
+
+        location = "https://example.com:3100/loki/api/v1/push"
+        plan = pebble.Plan(f"""
+log-targets:
+  baz:
+    override: replace
+    type: loki
+    location: {location}
+""")
+
+        self.assertEqual(len(plan.log_targets), 1)
+        self.assertEqual(plan.log_targets['baz'].name, 'baz')
+        self.assertEqual(plan.log_targets['baz'].override, 'replace')
+        self.assertEqual(plan.log_targets['baz'].type, "loki")
+        self.assertEqual(plan.log_targets['baz'].location, location)
+
+        # Should be read-only ("can't set attribute")
+        with self.assertRaises(AttributeError):
+            plan.log_targets = {}  # type: ignore
 
     def test_yaml(self):
         # Starting with nothing, we get the empty result
@@ -497,6 +529,12 @@ checks:
  bar:
   http:
    https://example.com/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3100/loki/api/v1/push
 '''
         plan = pebble.Plan(raw)
         reformed = yaml.safe_dump(yaml.safe_load(raw))
@@ -504,7 +542,12 @@ checks:
         self.assertEqual(str(plan), reformed)
 
     def test_service_equality(self):
-        plan = pebble.Plan('services:\n foo:\n  override: replace\n  command: echo foo')
+        plan = pebble.Plan("""
+services:
+  foo:
+    override: replace
+    command: echo foo
+""")
 
         old_service = pebble.Service(name="foo",
                                      raw={
@@ -525,6 +568,8 @@ class TestLayer(unittest.TestCase):
         self.assertEqual(layer.summary, '')
         self.assertEqual(layer.description, '')
         self.assertEqual(layer.services, {})
+        self.assertEqual(layer.checks, {})
+        self.assertEqual(layer.log_targets, {})
         self.assertEqual(layer.to_dict(), {})
 
     def test_no_args(self):
@@ -547,6 +592,17 @@ class TestLayer(unittest.TestCase):
                     'summary': 'Bar',
                     'command': 'echo bar',
                 },
+            },
+            'log-targets': {
+                'baz': {
+                    'override': 'merge',
+                    'type': 'loki',
+                    'location': 'https://example.com',
+                    'services': ['foo'],
+                    'labels': {
+                        'key': 'value $VAR',
+                    }
+                },
             }
         }
         s = pebble.Layer(d)
@@ -558,6 +614,12 @@ class TestLayer(unittest.TestCase):
         self.assertEqual(s.services['bar'].name, 'bar')
         self.assertEqual(s.services['bar'].summary, 'Bar')
         self.assertEqual(s.services['bar'].command, 'echo bar')
+        self.assertEqual(s.log_targets['baz'].name, 'baz')
+        self.assertEqual(s.log_targets['baz'].override, 'merge')
+        self.assertEqual(s.log_targets['baz'].type, 'loki')
+        self.assertEqual(s.log_targets['baz'].location, 'https://example.com')
+        self.assertEqual(s.log_targets['baz'].services, ['foo'])
+        self.assertEqual(s.log_targets['baz'].labels, {'key': 'value $VAR'})
 
         self.assertEqual(s.to_dict(), d)
 
@@ -570,6 +632,11 @@ class TestLayer(unittest.TestCase):
     http:
       url: https://example.com/
 description: The quick brown fox!
+log-targets:
+  baz:
+    location: https://example.com:3100
+    override: replace
+    type: loki
 services:
   bar:
     command: echo bar
@@ -604,6 +671,10 @@ summary: Sum Mary
 
         self.assertEqual(s.checks['chk'].name, 'chk')
         self.assertEqual(s.checks['chk'].http, {'url': 'https://example.com/'})
+
+        self.assertEqual(s.log_targets['baz'].name, 'baz')
+        self.assertEqual(s.log_targets['baz'].override, 'replace')
+        self.assertEqual(s.log_targets['baz'].location, 'https://example.com:3100')
 
         self.assertEqual(s.to_yaml(), yaml)
         self.assertEqual(str(s), yaml)
@@ -882,6 +953,65 @@ class TestCheck(unittest.TestCase):
         d['level'] = 'ready'
         self.assertNotEqual(one, d)
 
+        self.assertNotEqual(one, 5)
+
+
+class TestLogTarget(unittest.TestCase):
+    def _assert_empty(self, target: pebble.LogTarget, name: str):
+        self.assertEqual(target.name, name)
+        self.assertEqual(target.override, '')
+        self.assertEqual(target.type, '')
+        self.assertEqual(target.location, '')
+        self.assertEqual(target.services, [])
+        self.assertIs(target.labels, None)
+
+    def test_name_only(self):
+        target = pebble.LogTarget('tgt')
+        self._assert_empty(target, 'tgt')
+
+    def test_dict(self):
+        d: pebble.LogTargetDict = {
+            'override': 'replace',
+            'type': 'loki',
+            'location': 'https://example.com:3100/loki/api/v1/push',
+            'services': ['+all'],
+            'labels': {'key': 'val', 'key2': 'val2'}
+        }
+        target = pebble.LogTarget('tgt', d)
+        self.assertEqual(target.name, 'tgt')
+        self.assertEqual(target.override, 'replace')
+        self.assertEqual(target.type, 'loki')
+        self.assertEqual(target.location, 'https://example.com:3100/loki/api/v1/push')
+        self.assertEqual(target.services, ['+all'])
+        self.assertEqual(target.labels, {'key': 'val', 'key2': 'val2'})
+
+        self.assertEqual(target.to_dict(), d)
+
+        # Ensure pebble.Target has made copies of mutable objects.
+        assert target.services is not None and target.labels is not None
+        target.services[0] = '-all'
+        self.assertEqual(d['services'], ['+all'])
+        target.labels['key'] = 'val3'
+        assert d['labels'] is not None
+        self.assertEqual(d['labels']['key'], 'val')
+
+    def test_equality(self):
+        d: pebble.LogTargetDict = {
+            'override': 'replace',
+            'type': 'loki',
+            'location': 'https://example.com',
+            'services': ['foo', 'bar'],
+            'labels': {'k': 'v'}
+        }
+        one = pebble.LogTarget('one', d)
+        two = pebble.LogTarget('two', d)
+        self.assertEqual(one, two)
+        self.assertEqual(one, d)
+        self.assertEqual(two, d)
+        self.assertEqual(one, one.to_dict())
+        self.assertEqual(two, two.to_dict())
+        d['override'] = 'merge'
+        self.assertNotEqual(one, d)
         self.assertNotEqual(one, 5)
 
 
@@ -2579,6 +2709,7 @@ class TestSocketClient(unittest.TestCase):
         with self.assertRaises(pebble.ConnectionError) as cm:
             client.get_system_info()
         self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIn("Could not connect to Pebble", str(cm.exception))
 
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()

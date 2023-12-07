@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # Copyright 2019 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +24,7 @@ import unittest
 from collections import OrderedDict
 from test.test_helpers import fake_script, fake_script_calls
 from textwrap import dedent
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -969,6 +968,27 @@ class TestModel(unittest.TestCase):
             _ = model.unit.status.message
         self.assertEqual(str(cm.exception), 'ERROR cannot get status\n')
         self.assertEqual(cm.exception.args[0], 'ERROR cannot get status\n')
+
+    @patch("grp.getgrgid")
+    @patch("pwd.getpwuid")
+    def test_push_path_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+        getpwuid.side_effect = KeyError
+        getgrgid.side_effect = KeyError
+        harness = ops.testing.Harness(ops.CharmBase, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        harness.begin()
+        harness.set_can_connect('foo', True)
+        container = harness.model.unit.containers['foo']
+
+        with tempfile.TemporaryDirectory() as push_src:
+            push_path = pathlib.Path(push_src) / 'src.txt'
+            push_path.write_text('hello')
+            container.push_path(push_path, "/")
+        assert container.exists("/src.txt"), 'push_path failed: file "src.txt" missing'
 
 
 class PushPullCase:
@@ -3594,6 +3614,29 @@ class TestPorts(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['opened-ports', ''],
         ])
+
+
+class TestUnit(unittest.TestCase):
+    def setUp(self):
+        self.model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        self.unit = self.model.unit
+
+    def test_reboot(self):
+        fake_script(self, 'juju-reboot', 'exit 0')
+        self.unit.reboot()
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['juju-reboot', ''],
+        ])
+        with self.assertRaises(SystemExit):
+            self.unit.reboot(now=True)
+        self.assertEqual(fake_script_calls(self, clear=True), [
+            ['juju-reboot', '--now'],
+        ])
+
+        with self.assertRaises(RuntimeError):
+            self.model.get_unit('other').reboot()
+        with self.assertRaises(RuntimeError):
+            self.model.get_unit('other').reboot(now=True)
 
 
 class LazyNoticeTest(unittest.TestCase):

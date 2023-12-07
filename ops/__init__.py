@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: The text below is also at the top of README.md. Keep in sync!
-
 """The ops library: a Python framework for writing Juju charms.
 
 The ops library is a Python framework (`available on PyPI`_) for developing
