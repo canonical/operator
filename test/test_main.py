@@ -63,6 +63,9 @@ class EventSpec:
                  set_in_env: typing.Optional[typing.Dict[str,
                                                          str]] = None,
                  workload_name: typing.Optional[str] = None,
+                 notice_id: typing.Optional[str] = None,
+                 notice_type: typing.Optional[str] = None,
+                 notice_key: typing.Optional[str] = None,
                  departing_unit_name: typing.Optional[str] = None,
                  secret_id: typing.Optional[str] = None,
                  secret_label: typing.Optional[str] = None,
@@ -77,6 +80,9 @@ class EventSpec:
         self.model_name = model_name
         self.set_in_env = set_in_env
         self.workload_name = workload_name
+        self.notice_id = notice_id
+        self.notice_type = notice_type
+        self.notice_key = notice_key
         self.secret_id = secret_id
         self.secret_label = secret_label
         self.secret_revision = secret_revision
@@ -427,6 +433,15 @@ class _TestMain(abc.ABC):
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
             })
+        if issubclass(event_spec.event_type, ops.PebbleNoticeEvent):
+            assert event_spec.notice_id is not None
+            assert event_spec.notice_type is not None
+            assert event_spec.notice_key is not None
+            env.update({
+                'JUJU_NOTICE_ID': event_spec.notice_id,
+                'JUJU_NOTICE_TYPE': event_spec.notice_type,
+                'JUJU_NOTICE_KEY': event_spec.notice_key,
+            })
         if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
             assert event_spec.env_var is not None
@@ -581,6 +596,16 @@ class _TestMain(abc.ABC):
             EventSpec(ops.PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
+        ), (
+            EventSpec(ops.PebbleCustomNoticeEvent, 'test_pebble_custom_notice',
+                      workload_name='test',
+                      notice_id='123',
+                      notice_type='custom',
+                      notice_key='example.com/a'),
+            {'container_name': 'test',
+             'notice_id': '123',
+             'notice_type': 'custom',
+             'notice_key': 'example.com/a'},
         ), (
             EventSpec(ops.SecretChangedEvent, 'secret_changed',
                       secret_id='secret:12345',
