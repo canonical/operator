@@ -741,7 +741,8 @@ class PebbleNoticeEvent(WorkloadEvent):
         """
         d = super().snapshot()
         d['notice_id'] = self.notice.id
-        d['notice_type'] = self.notice.type
+        d['notice_type'] = (self.notice.type if isinstance(self.notice.type, str)
+                            else self.notice.type.value)
         d['notice_key'] = self.notice.key
         return d
 
@@ -750,11 +751,11 @@ class PebbleNoticeEvent(WorkloadEvent):
 
         Not meant to be called by charm code.
         """
+        super().restore(snapshot)
         notice_id = snapshot.pop('notice_id')
         notice_type = snapshot.pop('notice_type')
         notice_key = snapshot.pop('notice_key')
         self.notice = model.LazyNotice(self.workload, notice_id, notice_type, notice_key)
-        super().restore(snapshot)
 
 
 class PebbleCustomNoticeEvent(PebbleNoticeEvent):

@@ -329,16 +329,21 @@ storage:
             def __init__(self, *args: typing.Any):
                 super().__init__(*args)
                 self.seen: typing.List[str] = []
-                self.count = 0
                 for workload in ('container-a', 'containerb'):
                     # Hook up relation events to generic handler.
                     self.framework.observe(
                         self.on[workload].pebble_ready,
                         self.on_any_pebble_ready)
+                    self.framework.observe(
+                        self.on[workload].pebble_custom_notice,
+                        self.on_any_pebble_custom_notice,
+                    )
 
             def on_any_pebble_ready(self, event: ops.PebbleReadyEvent):
                 self.seen.append(type(event).__name__)
-                self.count += 1
+
+            def on_any_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+                self.seen.append(type(event).__name__)
 
         # language=YAML
         self.meta = ops.CharmMeta.from_yaml(metadata='''
@@ -358,11 +363,17 @@ containers:
         charm.on['containerb'].pebble_ready.emit(
             charm.framework.model.unit.get_container('containerb'))
 
+        charm.on['container-a'].pebble_custom_notice.emit(
+            charm.framework.model.unit.get_container('container-a'), '1', 'custom', 'x')
+        charm.on['containerb'].pebble_custom_notice.emit(
+            charm.framework.model.unit.get_container('containerb'), '2', 'custom', 'y')
+
         self.assertEqual(charm.seen, [
             'PebbleReadyEvent',
-            'PebbleReadyEvent'
+            'PebbleReadyEvent',
+            'PebbleCustomNoticeEvent',
+            'PebbleCustomNoticeEvent',
         ])
-        self.assertEqual(charm.count, 2)
 
     def test_relations_meta(self):
         # language=YAML
