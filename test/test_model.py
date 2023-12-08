@@ -1933,6 +1933,72 @@ containers:
         ])
         self.pebble.requests = []
 
+    def test_get_notice(self):
+        self.pebble.responses.append(pebble.Notice.from_dict({
+            'id': '123',
+            'user-id': 1000,
+            'type': 'custom',
+            'key': 'example.com/a',
+            'visibility': 'private',
+            'first-occurred': '2023-12-07T17:01:02.123456789Z',
+            'last-occurred': '2023-12-07T17:01:03.123456789Z',
+            'last-repeated': '2023-12-07T17:01:04.123456789Z',
+            'occurrences': 8,
+        }))
+
+        notice = self.container.get_notice('123')
+        self.assertEqual(notice.id, '123')
+        self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notice.key, 'example.com/a')
+
+        self.assertEqual(self.pebble.requests, [
+            ('get_notice', '123'),
+        ])
+
+    def test_get_notice_not_found(self):
+        def raise_error(id: str):
+            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
+        self.pebble.get_notice = raise_error
+        with self.assertRaises(ops.ModelError):
+            self.container.get_notice('123')
+
+    def test_get_notices(self):
+        self.pebble.responses.append([
+            pebble.Notice.from_dict({
+                'id': '124',
+                'user-id': 1000,
+                'type': 'custom',
+                'key': 'example.com/b',
+                'visibility': 'private',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 8,
+            }),
+        ])
+
+        notices = self.container.get_notices(
+            user_ids=[1000, 1001],
+            special_user=pebble.NoticeSpecialUser.SELF,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+            visibilities=[pebble.NoticeVisibility.PRIVATE, pebble.NoticeVisibility.PUBLIC],
+            after=datetime.datetime(2023, 12, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
+        )
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].id, '124')
+        self.assertEqual(notices[0].type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notices[0].key, 'example.com/b')
+
+        self.assertEqual(self.pebble.requests, [('get_notices', dict(
+            user_ids=[1000, 1001],
+            special_user=pebble.NoticeSpecialUser.SELF,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+            visibilities=[pebble.NoticeVisibility.PRIVATE, pebble.NoticeVisibility.PUBLIC],
+            after=datetime.datetime(2023, 12, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
+        ))])
+
 
 class MockPebbleBackend(_ModelBackend):
     def get_pebble(self, socket_path: str):
@@ -2032,6 +2098,14 @@ class MockPebbleClient:
 
     def send_signal(self, signal: typing.Union[str, int], service_names: str):
         self.requests.append(('send_signal', signal, service_names))
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        self.requests.append(('get_notice', id))
+        return self.responses.pop(0)
+
+    def get_notices(self, **kwargs: typing.Any):
+        self.requests.append(('get_notices', kwargs))
+        return self.responses.pop(0)
 
 
 class TestModelBindings(unittest.TestCase):
@@ -3639,40 +3713,62 @@ class TestUnit(unittest.TestCase):
             self.model.get_unit('other').reboot(now=True)
 
 
-class LazyNoticeTest(unittest.TestCase):
-    def test_lazy(self):
+class TestLazyNotice(unittest.TestCase):
+    def test_lazy_notice(self):
         calls = 0
+        timestamp = datetime.datetime.now()
 
         class FakeWorkload:
             def get_notice(self, id: str):
                 nonlocal calls
                 calls += 1
-                print(f'Calling get_notice({id!r})')
                 return ops.pebble.Notice(
                     id=id,
                     user_id=1000,
-                    type='CUSTOM',
-                    key='KEY',
+                    type=ops.pebble.NoticeType.CUSTOM,
+                    key='example.com/a',
                     visibility=ops.pebble.NoticeVisibility.PRIVATE,
-                    first_occurred=datetime.datetime.now(),
-                    last_occurred=datetime.datetime.now(),
-                    last_repeated=datetime.datetime.now(),
+                    first_occurred=timestamp,
+                    last_occurred=timestamp,
+                    last_repeated=timestamp,
                     occurrences=7,
                     last_data={'key': 'val'},
                 )
 
         workload = typing.cast(ops.Container, FakeWorkload())
-        n = ops.model.LazyNotice(workload, 'ID', 'CUSTOM', 'KEY')
-        assert n.id == 'ID'
-        assert n.type == 'CUSTOM'
-        assert n.key == 'KEY'
-        assert calls == 0
-        assert n.occurrences == 7
-        assert calls == 1
-        assert n.user_id == 1000
-        assert n.last_data == {'key': 'val'}
-        assert calls == 1
-        assert repr(n) == "LazyNotice(id='ID', type='CUSTOM', key='KEY')"
+        n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
+        self.assertEqual(n.id, '123')
+        self.assertEqual(n.type, ops.pebble.NoticeType.CUSTOM)
+        self.assertEqual(n.key, 'example.com/a')
+        self.assertEqual(calls, 0)
+
+        self.assertEqual(n.occurrences, 7)
+        self.assertEqual(calls, 1)
+
+        self.assertEqual(n.user_id, 1000)
+        self.assertEqual(n.last_data, {'key': 'val'})
+        self.assertEqual(calls, 1)
+
+        # We want to test the repr is what we expect
+        self.assertEqual(
+            repr(n),
+            "LazyNotice(id='123', type=NoticeType.CUSTOM, key='example.com/a')",
+        )
+        self.assertEqual(calls, 1)
+
+        self.assertEqual(n.notice, ops.pebble.Notice(
+            id='123',
+            user_id=1000,
+            type=ops.pebble.NoticeType.CUSTOM,
+            key='example.com/a',
+            visibility=ops.pebble.NoticeVisibility.PRIVATE,
+            first_occurred=timestamp,
+            last_occurred=timestamp,
+            last_repeated=timestamp,
+            occurrences=7,
+            last_data={'key': 'val'},
+        ))
+        self.assertEqual(calls, 1)
 
         with self.assertRaises(AttributeError):
             assert n.not_exist

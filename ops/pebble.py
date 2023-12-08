@@ -2764,6 +2764,7 @@ class Client:
 
     def get_notices(
         self,
+        *,
         user_ids: Optional[Iterable[int]] = None,
         special_user: Optional[NoticeSpecialUser] = None,
         types: Optional[Iterable[NoticeType]] = None,

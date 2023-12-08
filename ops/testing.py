@@ -3271,6 +3271,7 @@ class _TestingPebbleClient:
 
     def get_notices(
         self,
+        *,
         user_ids: Optional[Iterable[int]] = None,
         special_user: Optional[pebble.NoticeSpecialUser] = None,
         types: Optional[Iterable[str]] = None,

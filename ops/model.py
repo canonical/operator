@@ -2734,6 +2734,7 @@ class Container:
 
     def get_notices(
         self,
+        *,
         user_ids: Optional[Iterable[int]] = None,
         special_user: Optional[pebble.NoticeSpecialUser] = None,
         types: Optional[Iterable[pebble.NoticeType]] = None,
@@ -3552,13 +3553,23 @@ class LazyNotice:
     def __init__(self, container: Container, id: str, type: str, key: str):
         self._container = container
         self.id = id
-        self.type = type
+        try:
+            self.type = pebble.NoticeType(type)
+        except ValueError:
+            self.type = type
         self.key = key
 
         self._notice: Optional[ops.pebble.Notice] = None
 
+    @property
+    def notice(self) -> ops.pebble.Notice:
+        """The non-lazy :class:`ops.pebble.Notice` object (requires a call to Pebble)."""
+        self._ensure_loaded()
+        assert self._notice is not None
+        return self._notice
+
     def __repr__(self):
-        return f'LazyNotice(id={self.id!r}, type={self.type!r}, key={self.key!r})'
+        return f'LazyNotice(id={self.id!r}, type={self.type}, key={self.key!r})'
 
     def __getattr__(self, item: str):
         # Note: not called for defined attributes (id, type, key)
