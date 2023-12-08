@@ -376,7 +376,8 @@ def main(charm_class: Type[ops.charm.CharmBase],
     # For actions, there is a communication channel with the user running the
     # action, so we want to send exception details through stderr, rather than
     # only to juju-log as normal.
-    setup_root_logging(model_backend, debug=debug, exc_stderr='JUJU_ACTION_NAME' in os.environ)
+    handling_action = ('JUJU_ACTION_NAME' in os.environ)
+    setup_root_logging(model_backend, debug=debug, exc_stderr=handling_action)
     logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
