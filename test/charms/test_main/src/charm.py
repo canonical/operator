@@ -100,6 +100,7 @@ class Charm(ops.CharmBase):
             self.framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
             self.framework.observe(self.on.get_model_name_action, self._on_get_model_name_action)
             self.framework.observe(self.on.get_status_action, self._on_get_status_action)
+            self.framework.observe(self.on.keyerror_action, self._on_keyerror_action)
 
             self.framework.observe(self.on.log_critical_action, self._on_log_critical_action)
             self.framework.observe(self.on.log_error_action, self._on_log_error_action)
@@ -225,9 +226,14 @@ class Charm(ops.CharmBase):
         self._stored.on_foo_bar_action.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
-    def _on_get_status_action(self, event: ops.CollectStatusEvent):
+    def _on_get_status_action(self, event: ops.ActionEvent):
         self._stored.status_name = self.unit.status.name
         self._stored.status_message = self.unit.status.message
+
+    def _on_keyerror_action(self, event: ops.ActionEvent):
+        # Deliberately raise an uncaught exception, so that we can observe the
+        # behaviour when an action crashes.
+        raise KeyError("'foo' not found in 'bar'")
 
     def _on_collect_metrics(self, event: ops.CollectMetricsEvent):
         self._stored.on_collect_metrics.append(type(event).__name__)
