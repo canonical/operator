@@ -68,7 +68,7 @@ def setup_root_logging(model_backend: _ModelBackend, debug: bool = False,
             "Uncaught exception while in charm code:",
             exc_info=(etype, value, tb))
         if exc_stderr:
-            print(f"Uncaught exception while in charm code: {etype.__name__}: {value}",
+            print(f"Uncaught {etype.__name__} in charm code: {value}",
                   file=sys.stderr)
             print("Use `juju debug-log` to see the full traceback.", file=sys.stderr)
 
