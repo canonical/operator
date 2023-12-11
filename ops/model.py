@@ -1291,8 +1291,7 @@ class Secret:
         Args:
             refresh: If true, fetch the latest revision's content and tell
                 Juju to update to tracking that revision. The default is to
-                get the content of the currently-tracked revision. This
-                parameter is only meaningful for secret observers, not owners.
+                get the content of the currently-tracked revision.
         """
         if refresh or self._content is None:
             self._content = self._backend.secret_get(
@@ -2468,6 +2467,16 @@ class Container:
         import grp
         import pwd
         info = path.lstat()
+        try:
+            pw_name = pwd.getpwuid(info.st_uid).pw_name
+        except KeyError:
+            logger.warning("Could not get name for user %s", info.st_uid)
+            pw_name = None
+        try:
+            gr_name = grp.getgrgid(info.st_gid).gr_name
+        except KeyError:
+            logger.warning("Could not get name for group %s", info.st_gid)
+            gr_name = None
         return pebble.FileInfo(
             path=str(path),
             name=path.name,
@@ -2476,9 +2485,9 @@ class Container:
             permissions=stat.S_IMODE(info.st_mode),
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
-            user=pwd.getpwuid(info.st_uid).pw_name,
+            user=pw_name,
             group_id=info.st_gid,
-            group=grp.getgrgid(info.st_gid).gr_name)
+            group=gr_name)
 
     @staticmethod
     def _list_recursive(list_func: Callable[[Path], Iterable[pebble.FileInfo]],

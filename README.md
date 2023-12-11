@@ -1,5 +1,7 @@
 # The `ops` library
 
+![CI Status](https://github.com/canonical/operator/actions/workflows/framework-tests.yaml/badge.svg)
+![Publish](https://github.com/canonical/operator/actions/workflows/publish.yml/badge.svg)
 
 The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://juju.is/docs/sdk/charmed-operators). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
 
@@ -32,11 +34,30 @@ mkdir ops-example
 cd ops-example
 charmcraft init
 ```
-This has created a standard charm directory structure. Poke around. 
+This has created a standard charm directory structure:
+
+```shell-script
+$ ls -R
+.:
+CONTRIBUTING.md  README.md        pyproject.toml    src    tox.ini
+LICENSE          charmcraft.yaml  requirements.txt  tests
+
+./src:
+charm.py
+
+./tests:
+integration  unit
+
+./tests/integration:
+test_charm.py
+
+./tests/unit:
+test_charm.py
+```
 
 Things to note:
 
-- The `metadata.yaml` file shows that what we have is an example charm called `ops-example`, which uses an OCI image resource `httpbin` from `kennethreitz/httpbin`.
+- The `charmcraft.yaml` file shows that what we have is an example charm called `ops-example`, which uses an OCI image resource `httpbin` from `kennethreitz/httpbin`.
 
 - The `requirements.txt` file lists the version of `ops` to use.
 
