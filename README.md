@@ -36,7 +36,7 @@ charmcraft init
 ```
 This has created a standard charm directory structure:
 
-```
+```shell-script
 $ ls -R
 .:
 CONTRIBUTING.md  README.md        pyproject.toml    src    tox.ini
