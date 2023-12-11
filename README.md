@@ -34,11 +34,30 @@ mkdir ops-example
 cd ops-example
 charmcraft init
 ```
-This has created a standard charm directory structure. Poke around. 
+This has created a standard charm directory structure:
+
+```shell-script
+$ ls -R
+.:
+CONTRIBUTING.md  README.md        pyproject.toml    src    tox.ini
+LICENSE          charmcraft.yaml  requirements.txt  tests
+
+./src:
+charm.py
+
+./tests:
+integration  unit
+
+./tests/integration:
+test_charm.py
+
+./tests/unit:
+test_charm.py
+```
 
 Things to note:
 
-- The `metadata.yaml` file shows that what we have is an example charm called `ops-example`, which uses an OCI image resource `httpbin` from `kennethreitz/httpbin`.
+- The `charmcraft.yaml` file shows that what we have is an example charm called `ops-example`, which uses an OCI image resource `httpbin` from `kennethreitz/httpbin`.
 
 - The `requirements.txt` file lists the version of `ops` to use.
 
