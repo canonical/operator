@@ -52,20 +52,20 @@ pytest
 
 ## Pebble Tests
 
-The framework has some tests that interact with a real/live pebble server.  To
+The framework has some tests that interact with a real/live Pebble server.  To
 run these tests, you must have [pebble](https://github.com/canonical/pebble)
 installed and available in your path.  If you have the Go toolchain installed,
-you can run `go install github.com/canonical/pebble/cmd/pebble@latest`.  This will
+you can run `go install github.com/canonical/pebble/cmd/pebble@master`.  This will
 install pebble to `$GOBIN` if it is set or `$HOME/go/bin` otherwise.  Add
 `$GOBIN` to your path (e.g. `export PATH=$PATH:$GOBIN` or `export
 PATH=$PATH:$HOME/go/bin` in your `.bashrc`) and you are ready to run the real
-pebble tests:
+Pebble tests:
 
 ```sh
 tox -e pebble
 ```
 
-To do this even more manually, you could start the pebble server yourself:
+To do this even more manually, you could start the Pebble server yourself:
 
 ```sh
 export PEBBLE=$HOME/pebble

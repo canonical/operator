@@ -2445,12 +2445,7 @@ class _TestingModelBackend:
         secret = self._ensure_secret_id_or_label(id, label)
 
         # Check that caller has permission to get this secret
-        if secret.owner_name in [self.app_name, self.unit_name]:
-            # Owner or peer is calling, get latest revision
-            peek = True
-            if refresh:
-                raise ValueError('Secret owner cannot use refresh=True')
-        else:
+        if secret.owner_name not in [self.app_name, self.unit_name]:
             # Observer is calling: does secret have a grant on relation between
             # this charm (the observer) and the secret owner's app?
             owner_app = secret.owner_name.split('/')[0]
@@ -2482,9 +2477,17 @@ class _TestingModelBackend:
         return None
 
     def _ensure_secret_owner(self, secret: _Secret):
-        if secret.owner_name not in [self.app_name, self.unit_name]:
-            raise model.SecretNotFoundError(
-                f'You must own secret {secret.id!r} to perform this operation')
+        # For unit secrets, the owner unit has manage permissions. For app
+        # secrets, the leader has manage permissions and other units only have
+        # view permissions.
+        # https://discourse.charmhub.io/t/secret-access-permissions/12627
+        unit_secret = secret.owner_name == self.unit_name
+        app_secret = secret.owner_name == self.app_name
+
+        if unit_secret or (app_secret and self.is_leader()):
+            return
+        raise model.SecretNotFoundError(
+            f'You must own secret {secret.id!r} to perform this operation')
 
     def secret_info_get(self, *,
                         id: Optional[str] = None,
