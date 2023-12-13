@@ -3272,11 +3272,10 @@ class _TestingPebbleClient:
     def get_notices(
         self,
         *,
-        user_ids: Optional[Iterable[int]] = None,
-        special_user: Optional[pebble.NoticeSpecialUser] = None,
-        types: Optional[Iterable[str]] = None,
+        select: Optional[pebble.NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[pebble.NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
-        visibilities: Optional[Iterable[pebble.NoticeVisibility]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
         raise NotImplementedError(self.get_notices)

@@ -2735,11 +2735,10 @@ class Container:
     def get_notices(
         self,
         *,
-        user_ids: Optional[Iterable[int]] = None,
-        special_user: Optional[pebble.NoticeSpecialUser] = None,
+        select: Optional[pebble.NoticesSelect] = None,
+        user_id: Optional[int] = None,
         types: Optional[Iterable[pebble.NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
-        visibilities: Optional[Iterable[pebble.NoticeVisibility]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
         """Query for notices that match the provided filters.
@@ -2748,11 +2747,10 @@ class Container:
         parameters.
         """
         notices = self._pebble.get_notices(
-            user_ids=user_ids,
-            special_user=special_user,
+            select=select,
+            user_id=user_id,
             types=types,
             keys=keys,
-            visibilities=visibilities,
             after=after,
         )
         return notices
@@ -3538,10 +3536,9 @@ class LazyNotice:
     """
 
     id: str
-    user_id: int
+    user_id: Optional[int]
     type: Union[pebble.NoticeType, str]
     key: str
-    visibility: pebble.NoticeVisibility
     first_occurred: datetime.datetime
     last_occurred: datetime.datetime
     last_repeated: datetime.datetime

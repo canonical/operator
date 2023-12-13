@@ -448,7 +448,6 @@ single log
             'user-id': 1000,
             'type': 'custom',
             'key': 'example.com/a',
-            'visibility': 'private',
             'first-occurred': '2023-12-07T17:01:02.123456789Z',
             'last-occurred': '2023-12-07T17:01:03.123456789Z',
             'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -462,7 +461,6 @@ single log
             user_id=1000,
             type=pebble.NoticeType.CUSTOM,
             key='example.com/a',
-            visibility=pebble.NoticeVisibility.PRIVATE,
             first_occurred=datetime_utc(2023, 12, 7, 17, 1, 2, 123457),
             last_occurred=datetime_utc(2023, 12, 7, 17, 1, 3, 123457),
             last_repeated=datetime_utc(2023, 12, 7, 17, 1, 4, 123457),
@@ -474,10 +472,8 @@ single log
 
         notice = pebble.Notice.from_dict({
             'id': '124',
-            'user-id': 1001,
             'type': 'other',
             'key': 'example.com/b',
-            'visibility': 'public',
             'first-occurred': '2023-12-07T17:01:02.123456789Z',
             'last-occurred': '2023-12-07T17:01:03.123456789Z',
             'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -485,10 +481,9 @@ single log
         })
         self.assertEqual(notice, pebble.Notice(
             id='124',
-            user_id=1001,
+            user_id=None,
             type='other',
             key='example.com/b',
-            visibility=pebble.NoticeVisibility.PUBLIC,
             first_occurred=datetime_utc(2023, 12, 7, 17, 1, 2, 123457),
             last_occurred=datetime_utc(2023, 12, 7, 17, 1, 3, 123457),
             last_repeated=datetime_utc(2023, 12, 7, 17, 1, 4, 123457),
@@ -2762,7 +2757,6 @@ bad path\r
                 'user-id': 1000,
                 'type': 'custom',
                 'key': 'example.com/a',
-                'visibility': 'private',
                 'first-occurred': '2023-12-07T17:01:02.123456789Z',
                 'last-occurred': '2023-12-07T17:01:03.123456789Z',
                 'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -2800,17 +2794,14 @@ bad path\r
                 'user-id': 1000,
                 'type': 'custom',
                 'key': 'example.com/a',
-                'visibility': 'private',
                 'first-occurred': '2023-12-07T17:01:02.123456789Z',
                 'last-occurred': '2023-12-07T17:01:03.123456789Z',
                 'last-repeated': '2023-12-07T17:01:04.123456789Z',
                 'occurrences': 7,
             }, {
                 'id': '124',
-                'user-id': 1001,
                 'type': 'other',
                 'key': 'example.com/b',
-                'visibility': 'public',
                 'first-occurred': '2023-12-07T17:01:02.123456789Z',
                 'last-occurred': '2023-12-07T17:01:03.123456789Z',
                 'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -2837,17 +2828,14 @@ bad path\r
                 'user-id': 1000,
                 'type': 'custom',
                 'key': 'example.com/a',
-                'visibility': 'private',
                 'first-occurred': '2023-12-07T17:01:02.123456789Z',
                 'last-occurred': '2023-12-07T17:01:03.123456789Z',
                 'last-repeated': '2023-12-07T17:01:04.123456789Z',
                 'occurrences': 7,
             }, {
                 'id': '124',
-                'user-id': 1001,
                 'type': 'other',
                 'key': 'example.com/b',
-                'visibility': 'public',
                 'first-occurred': '2023-12-07T17:01:02.123456789Z',
                 'last-occurred': '2023-12-07T17:01:03.123456789Z',
                 'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -2859,11 +2847,10 @@ bad path\r
         })
 
         notices = self.client.get_notices(
-            user_ids=[1000, 1001],
-            special_user=pebble.NoticeSpecialUser.SELF,
+            user_id=1000,
+            select=pebble.NoticesSelect.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
-            visibilities=[pebble.NoticeVisibility.PRIVATE, pebble.NoticeVisibility.PUBLIC],
             after=datetime_utc(2023, 12, 1, 2, 3, 4, 5),
         )
         self.assertEqual(len(notices), 2)
@@ -2871,29 +2858,14 @@ bad path\r
         self.assertEqual(notices[1].id, '124')
 
         query = {
-            'user-ids': ['1000', '1001', 'self'],
+            'user-id': '1000',
+            'select': 'all',
             'types': ['custom'],
             'keys': ['example.com/a', 'example.com/b'],
-            'visibilities': ['private', 'public'],
             'after': '2023-12-01T02:03:04.000005+00:00',
         }
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/notices', query, None),
-        ])
-
-    def test_get_notices_special_user_only(self):
-        self.client.responses.append({
-            'result': [],
-            'status': 'OK',
-            'status-code': 200,
-            'type': 'sync',
-        })
-
-        notices = self.client.get_notices(special_user=pebble.NoticeSpecialUser.ALL)
-        self.assertEqual(notices, [])
-
-        self.assertEqual(self.client.requests, [
-            ('GET', '/v1/notices', {'user-ids': ['all']}, None),
         ])
 
 

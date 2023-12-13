@@ -1939,7 +1939,6 @@ containers:
             'user-id': 1000,
             'type': 'custom',
             'key': 'example.com/a',
-            'visibility': 'private',
             'first-occurred': '2023-12-07T17:01:02.123456789Z',
             'last-occurred': '2023-12-07T17:01:03.123456789Z',
             'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -1969,7 +1968,6 @@ containers:
                 'user-id': 1000,
                 'type': 'custom',
                 'key': 'example.com/b',
-                'visibility': 'private',
                 'first-occurred': '2023-12-07T17:01:02.123456789Z',
                 'last-occurred': '2023-12-07T17:01:03.123456789Z',
                 'last-repeated': '2023-12-07T17:01:04.123456789Z',
@@ -1978,11 +1976,10 @@ containers:
         ])
 
         notices = self.container.get_notices(
-            user_ids=[1000, 1001],
-            special_user=pebble.NoticeSpecialUser.SELF,
+            user_id=1000,
+            select=pebble.NoticesSelect.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
-            visibilities=[pebble.NoticeVisibility.PRIVATE, pebble.NoticeVisibility.PUBLIC],
             after=datetime.datetime(2023, 12, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
         )
         self.assertEqual(len(notices), 1)
@@ -1991,11 +1988,10 @@ containers:
         self.assertEqual(notices[0].key, 'example.com/b')
 
         self.assertEqual(self.pebble.requests, [('get_notices', dict(
-            user_ids=[1000, 1001],
-            special_user=pebble.NoticeSpecialUser.SELF,
+            user_id=1000,
+            select=pebble.NoticesSelect.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
-            visibilities=[pebble.NoticeVisibility.PRIVATE, pebble.NoticeVisibility.PUBLIC],
             after=datetime.datetime(2023, 12, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
         ))])
 
@@ -3727,7 +3723,6 @@ class TestLazyNotice(unittest.TestCase):
                     user_id=1000,
                     type=ops.pebble.NoticeType.CUSTOM,
                     key='example.com/a',
-                    visibility=ops.pebble.NoticeVisibility.PRIVATE,
                     first_occurred=timestamp,
                     last_occurred=timestamp,
                     last_repeated=timestamp,
@@ -3761,7 +3756,6 @@ class TestLazyNotice(unittest.TestCase):
             user_id=1000,
             type=ops.pebble.NoticeType.CUSTOM,
             key='example.com/a',
-            visibility=ops.pebble.NoticeVisibility.PRIVATE,
             first_occurred=timestamp,
             last_occurred=timestamp,
             last_repeated=timestamp,

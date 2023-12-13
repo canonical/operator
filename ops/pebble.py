@@ -261,10 +261,9 @@ if TYPE_CHECKING:
 
     _NoticeDict = TypedDict('_NoticeDict', {
         'id': str,
-        'user-id': int,
+        'user-id': NotRequired[Optional[int]],
         'type': str,
         'key': str,
-        'visibility': str,
         'first-occurred': str,
         'last-occurred': str,
         'last-repeated': str,
@@ -1299,18 +1298,14 @@ class NoticeType(enum.Enum):
     CUSTOM = 'custom'
 
 
-class NoticeVisibility(enum.Enum):
-    """Enum of notice visibilities."""
-
-    PRIVATE = 'private'
-    PUBLIC = 'public'
-
-
-class NoticeSpecialUser(enum.Enum):
-    """Enum of notice "special user" values."""
+class NoticesSelect(enum.Enum):
+    """Enum of get_notices() ``select`` values."""
 
     ALL = 'all'
-    SELF = 'self'
+    """Select notices from all users (any user ID, including public notices).
+
+    This only works for Pebble admin users (for example, root).
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1320,8 +1315,8 @@ class Notice:
     id: str
     """Server-generated unique ID for this notice."""
 
-    user_id: int
-    """UID of the user who may view this notice (often its creator)."""
+    user_id: Optional[int]
+    """UID of the user who may view this notice (None means notice is public)."""
 
     type: Union[NoticeType, str]
     """Type of the notice."""
@@ -1331,9 +1326,6 @@ class Notice:
 
     This is in the format ``domain.com/path``.
     """
-
-    visibility: NoticeVisibility
-    """The notice's visibility."""
 
     first_occurred: datetime.datetime
     """The first time one of these notices (type and key combination) occurs."""
@@ -1369,10 +1361,9 @@ class Notice:
             notice_type = d['type']
         return cls(
             id=d['id'],
-            user_id=d['user-id'],
+            user_id=d.get('user-id'),
             type=notice_type,
             key=d['key'],
-            visibility=NoticeVisibility(d['visibility']),
             first_occurred=timeconv.parse_rfc3339(d['first-occurred']),
             last_occurred=timeconv.parse_rfc3339(d['last-occurred']),
             last_repeated=timeconv.parse_rfc3339(d['last-repeated']),
@@ -2765,45 +2756,34 @@ class Client:
     def get_notices(
         self,
         *,
-        user_ids: Optional[Iterable[int]] = None,
-        special_user: Optional[NoticeSpecialUser] = None,
+        select: Optional[NoticesSelect] = None,
+        user_id: Optional[int] = None,
         types: Optional[Iterable[NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
-        visibilities: Optional[Iterable[NoticeVisibility]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[Notice]:
         """Query for notices that match the provided filters.
 
-        If no filters are specified, return all notices viewable by the
-        requesting user (notices whose ``user_id`` matches the requester UID
-        as well as public notices).
+        If no filters are specified, return notices viewable by the requesting
+        user (notices whose ``user_id`` matches the requester UID as well as
+        public notices).
 
         Args:
-            user_ids: filter for notices with any of the specified UIDs (but
-                only include notices the requester has permission to view)
-            special_user: special UID filtering: "self" means filter for
-                notices with the UID of the requester, "all" means return
-                notices with any UID (only valid for an admin)
+            select: select which notices to return (instead of returning
+                notices for the current user)
             types: filter for notices with any of the specified types
             keys: filter for notices with any of the specified keys
-            visibilities: filter for notices with any of the specified
-                visibilities
             after: filter for notices that were last repeated after this time
         """
         query: Dict[str, Union[str, List[str]]] = {}
-        if user_ids is not None:
-            query['user-ids'] = [str(u) for u in user_ids]
-        if special_user is not None:
-            if 'user-ids' not in query:
-                query['user-ids'] = []
-            query_user_ids = typing.cast(List[str], query['user-ids'])
-            query_user_ids.append(special_user.value)
+        if select is not None:
+            query['select'] = select.value
+        if user_id is not None:
+            query['user-id'] = str(user_id)
         if types is not None:
             query['types'] = [t.value for t in types]
         if keys is not None:
             query['keys'] = list(keys)
-        if visibilities is not None:
-            query['visibilities'] = [v.value for v in visibilities]
         if after is not None:
             query['after'] = after.isoformat()
         resp = self._request('GET', '/v1/notices', query)
