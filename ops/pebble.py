@@ -1304,7 +1304,7 @@ class NoticesSelect(enum.Enum):
     ALL = 'all'
     """Select notices from all users (any user ID, including public notices).
 
-    This only works for Pebble admin users (for example, root).
+    This only works for Pebble admins (for example, root).
     """
 
 
@@ -2771,6 +2771,8 @@ class Client:
         Args:
             select: select which notices to return (instead of returning
                 notices for the current user)
+            user_id: filter for notices for the specified user, including
+                public notices (only works for Pebble admins)
             types: filter for notices with any of the specified types
             keys: filter for notices with any of the specified keys
             after: filter for notices that were last repeated after this time
