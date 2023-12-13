@@ -1299,7 +1299,7 @@ class NoticeType(enum.Enum):
 
 
 class NoticesSelect(enum.Enum):
-    """Enum of get_notices() ``select`` values."""
+    """Enum of :meth:`Client.get_notices` ``select`` values."""
 
     ALL = 'all'
     """Select notices from all users (any user ID, including public notices).
