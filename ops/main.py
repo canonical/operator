@@ -144,6 +144,10 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
         event_to_emit.emit(*args, **kwargs)
 
 
+def _get_juju_relation_id():
+    return int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+
+
 def _get_event_args(charm: 'ops.charm.CharmBase',
                     bound_event: 'ops.framework.BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
@@ -183,7 +187,7 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
         return [storage], {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
-        relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        relation_id = _get_juju_relation_id()
         relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
@@ -386,8 +390,14 @@ def main(charm_class: Type[ops.charm.CharmBase],
     else:
         actions_metadata = None
 
+    # If we are in a RelationBroken event, we want to know which relation is
+    # broken within the model, not only in the event's `.relation` attribute.
+    if os.environ.get("JUJU_DISPATCH_PATH", "").endswith("-relation-broken"):
+        broken_relation_id = _get_juju_relation_id()
+    else:
+        broken_relation_id = None
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
-    model = ops.model.Model(meta, model_backend)
+    model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
 

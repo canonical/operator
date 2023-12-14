@@ -3349,8 +3349,8 @@ class TestSecretClass(unittest.TestCase):
         meta = ops.CharmMeta()
         cache = ops.model._ModelCache(meta, backend)
         unit = ops.Unit('test', meta, backend, cache)
-        rel123 = ops.Relation('test', 123, True, unit, backend, cache)
-        rel234 = ops.Relation('test', 234, True, unit, backend, cache)
+        rel123 = ops.Relation('test', 123, True, unit, backend, cache, True)
+        rel234 = ops.Relation('test', 234, True, unit, backend, cache, True)
         secret.grant(rel123)
         unit = ops.Unit('app/0', meta, backend, cache)
         secret.grant(rel234, unit=unit)
@@ -3358,7 +3358,7 @@ class TestSecretClass(unittest.TestCase):
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
         secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
-        rel345 = ops.Relation('test', 345, True, unit, backend, cache)
+        rel345 = ops.Relation('test', 345, True, unit, backend, cache, True)
         secret.grant(rel345)
         self.assertEqual(secret.id, 'secret:z')
 
@@ -3379,8 +3379,10 @@ class TestSecretClass(unittest.TestCase):
 
         secret = self.make_secret(id='x')
         unit = ops.Unit('test', ops.CharmMeta(), self.model._backend, self.model._cache)
-        rel123 = ops.Relation('test', 123, True, unit, self.model._backend, self.model._cache)
-        rel234 = ops.Relation('test', 234, True, unit, self.model._backend, self.model._cache)
+        rel123 = ops.Relation('test', 123, True, unit, self.model._backend, self.model._cache,
+                              True)
+        rel234 = ops.Relation('test', 234, True, unit, self.model._backend, self.model._cache,
+                              True)
         secret.revoke(rel123)
         unit = ops.Unit('app/0', ops.CharmMeta(), self.model._backend, self.model._cache)
         secret.revoke(rel234, unit=unit)
@@ -3388,7 +3390,8 @@ class TestSecretClass(unittest.TestCase):
         # If secret doesn't have an ID, we'll run secret-info-get to fetch it
         secret = self.make_secret(label='y')
         self.assertIsNone(secret.id)
-        rel345 = ops.Relation('test', 345, True, unit, self.model._backend, self.model._cache)
+        rel345 = ops.Relation('test', 345, True, unit, self.model._backend, self.model._cache,
+                              True)
         secret.revoke(rel345)
         self.assertEqual(secret.id, 'secret:z')
 
