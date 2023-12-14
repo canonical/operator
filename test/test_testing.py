@@ -591,7 +591,7 @@ class TestHarness(unittest.TestCase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 framework.observe(self.on.db_relation_broken, self._db_relation_broken)
-            
+
             def _db_relation_broken(self, event: ops.RelationBrokenEvent):
                 nonlocal is_broken, relations
                 is_broken = not event.relation.active
