@@ -802,8 +802,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
     def __init__(self,
-                 relations_meta: Dict[str,
-                                      'ops.RelationMeta'],
+                 relations_meta: Dict[str, 'ops.RelationMeta'],
                  our_unit: 'Unit',
                  backend: '_ModelBackend',
                  cache: '_ModelCache',
