@@ -1,3 +1,7 @@
+# 2.10.0
+
+* Added `Relation.active`, and excluded inactive relations from `Model`.relations
+
 # 2.9.0
 
 * Added log target support to `ops.pebble` layers and plans.
