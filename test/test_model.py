@@ -3744,28 +3744,22 @@ class TestLazyNotice(unittest.TestCase):
         self.assertEqual(n.last_data, {'key': 'val'})
         self.assertEqual(calls, 1)
 
-        # We want to test the repr is what we expect
+        with self.assertRaises(AttributeError):
+            assert n.not_exist
+
+    def test_repr(self):
+        workload = typing.cast(ops.Container, None)
+        n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         self.assertEqual(
             repr(n),
             "LazyNotice(id='123', type=NoticeType.CUSTOM, key='example.com/a')",
         )
-        self.assertEqual(calls, 1)
 
-        self.assertEqual(n.notice, ops.pebble.Notice(
-            id='123',
-            user_id=1000,
-            type=ops.pebble.NoticeType.CUSTOM,
-            key='example.com/a',
-            first_occurred=timestamp,
-            last_occurred=timestamp,
-            last_repeated=timestamp,
-            occurrences=7,
-            last_data={'key': 'val'},
-        ))
-        self.assertEqual(calls, 1)
-
-        with self.assertRaises(AttributeError):
-            assert n.not_exist
+        n = ops.model.LazyNotice(workload, '123', 'foobar', 'example.com/a')
+        self.assertEqual(
+            repr(n),
+            "LazyNotice(id='123', type='foobar', key='example.com/a')",
+        )
 
 
 if __name__ == "__main__":

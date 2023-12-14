@@ -2729,7 +2729,7 @@ class Container:
             return self._pebble.get_notice(id)
         except pebble.APIError as e:
             if e.code == 404:
-                raise ModelError(f'notice {id!r} not found')
+                raise ModelError(f'notice {id!r} not found') from e
             raise
 
     def get_notices(
@@ -2737,23 +2737,22 @@ class Container:
         *,
         select: Optional[pebble.NoticesSelect] = None,
         user_id: Optional[int] = None,
-        types: Optional[Iterable[pebble.NoticeType]] = None,
+        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
-        """Query for notices that match the provided filters.
+        """Query for notices that match all of the provided filters.
 
         See :meth:`ops.pebble.Client.get_notices` for documentation of the
         parameters.
         """
-        notices = self._pebble.get_notices(
+        return self._pebble.get_notices(
             select=select,
             user_id=user_id,
             types=types,
             keys=keys,
             after=after,
         )
-        return notices
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
@@ -3558,15 +3557,9 @@ class LazyNotice:
 
         self._notice: Optional[ops.pebble.Notice] = None
 
-    @property
-    def notice(self) -> ops.pebble.Notice:
-        """The non-lazy :class:`ops.pebble.Notice` object (requires a call to Pebble)."""
-        self._ensure_loaded()
-        assert self._notice is not None
-        return self._notice
-
     def __repr__(self):
-        return f'LazyNotice(id={self.id!r}, type={self.type}, key={self.key!r})'
+        type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
+        return f'LazyNotice(id={self.id!r}, type={type_repr}, key={self.key!r})'
 
     def __getattr__(self, item: str):
         # Note: not called for defined attributes (id, type, key)

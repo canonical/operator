@@ -3268,7 +3268,7 @@ class _TestingPebbleClient:
         *,
         select: Optional[pebble.NoticesSelect] = None,
         user_id: Optional[int] = None,
-        types: Optional[Iterable[pebble.NoticeType]] = None,
+        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:

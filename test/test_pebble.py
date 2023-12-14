@@ -2767,13 +2767,13 @@ bad path\r
             'type': 'sync',
         })
 
-        notice = self.client.get_notice('124')
+        notice = self.client.get_notice('123')
 
-        # No need to re-test full Notice.from_dict behaviour
+        # No need to re-test full Notice.from_dict behaviour.
         self.assertEqual(notice.id, '123')
 
         self.assertEqual(self.client.requests, [
-            ('GET', '/v1/notices/124', None, None),
+            ('GET', '/v1/notices/123', None, None),
         ])
 
     def test_get_notice_not_found(self):

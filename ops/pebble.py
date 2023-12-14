@@ -1324,7 +1324,7 @@ class Notice:
     key: str
     """The notice key, a string that differentiates notices of this type.
 
-    This is in the format ``domain.com/path``.
+    This is in the format ``example.com/path``.
     """
 
     first_occurred: datetime.datetime
@@ -1347,10 +1347,10 @@ class Notice:
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: Optional[datetime.timedelta] = None
-    """How long after one of these was last repeated should we allow it to repeat."""
+    """Minimum time after one of these was last repeated before Pebble will repeat it again."""
 
     expire_after: Optional[datetime.timedelta] = None
-    """How long since one of these last occurred until we should drop the notice."""
+    """How long since one of these last occurred until Pebble will drop the notice."""
 
     @classmethod
     def from_dict(cls, d: '_NoticeDict') -> 'Notice':
@@ -2758,11 +2758,15 @@ class Client:
         *,
         select: Optional[NoticesSelect] = None,
         user_id: Optional[int] = None,
-        types: Optional[Iterable[NoticeType]] = None,
+        types: Optional[Iterable[Union[NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[Notice]:
-        """Query for notices that match the provided filters.
+        """Query for notices that match all of the provided filters.
+
+        Pebble returns notices that match all of the filters, for example, if
+        called with ``types=[NoticeType.CUSTOM], keys=["example.com/a"]``,
+        Pebble will only return custom notices that also have key "example.com/a".
 
         If no filters are specified, return notices viewable by the requesting
         user (notices whose ``user_id`` matches the requester UID as well as
@@ -2783,7 +2787,7 @@ class Client:
         if user_id is not None:
             query['user-id'] = str(user_id)
         if types is not None:
-            query['types'] = [t.value for t in types]
+            query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
         if keys is not None:
             query['keys'] = list(keys)
         if after is not None:
