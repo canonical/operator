@@ -881,10 +881,12 @@ class Harness(Generic[CharmType]):
         prev_broken_id = None  # Silence linter warning.
         if self._model is not None:
             prev_broken_id = self._model._relations._broken_relation_id
-            self._model._relations._broken_relation_id = relation_id
+            self._model.relations._broken_relation_id = relation_id
+            # Ensure that we don't offer a cached relation.
+            self._model.relations._invalidate(relation_name)
         self._emit_relation_broken(relation_name, relation_id, remote_app)
         if self._model is not None:
-            self._model._relations._broken_relation_id = prev_broken_id
+            self._model.relations._broken_relation_id = prev_broken_id
             self._model.relations._invalidate(relation_name)
 
         self._backend._relation_app_and_units.pop(relation_id)
