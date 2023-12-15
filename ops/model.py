@@ -835,7 +835,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 if rid == self._broken_relation_id:
                     continue
                 relation = Relation(relation_name, rid, is_peer,
-                                    self._our_unit, self._backend, self._cache, True)
+                                    self._our_unit, self._backend, self._cache)
                 relation_list.append(relation)
         return relation_list
 
@@ -861,7 +861,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
                 return Relation(relation_name, relation_id, is_peer,
-                                self._our_unit, self._backend, self._cache, False)
+                                self._our_unit, self._backend, self._cache, active=False)
         relations = self[relation_name]
         num_related = len(relations)
         self._backend._validate_relation_access(
@@ -1474,7 +1474,7 @@ class Relation:
 
     def __init__(
             self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
-            backend: '_ModelBackend', cache: '_ModelCache', active: bool):
+            backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
         self.app: Optional[Application] = None
