@@ -342,7 +342,7 @@ class _TestMain(abc.ABC):
         actions_dir_name = 'actions'
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
-        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
+        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status', 'keyerror'):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self,
@@ -1028,6 +1028,8 @@ class _TestMainWithDispatch(_TestMain):
 
         self.stdout.seek(0)
         self.assertEqual(self.stdout.read(), b'')
+        self.stderr.seek(0)
+        self.assertEqual(self.stderr.read(), b'')
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         hook = Path('hooks/install')
         expected = [
@@ -1153,9 +1155,23 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         )
         subprocess.run(
             [sys.executable, str(dispatch)],
-            # stdout=self.stdout,
-            # stderr=self.stderr,
+            stdout=self.stdout,
+            stderr=self.stderr,
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
+
+    def test_crash_action(self):
+        self._prepare_actions()
+        self.stderr = tempfile.TemporaryFile('w+t')
+        self.addCleanup(self.stderr.close)
+        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._simulate_event(EventSpec(
+                ops.ActionEvent, 'keyerror_action',
+                env_var='JUJU_ACTION_NAME'))
+        self.stderr.seek(0)
+        stderr = self.stderr.read()
+        self.assertIn('KeyError', stderr)
+        self.assertIn("'foo' not found in 'bar'", stderr)
 
 
 class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
