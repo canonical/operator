@@ -1,0 +1,10 @@
+name: Inclusive naming PR check
+on: pull_request
+
+jobs:
+  call-inclusive-naming-check:
+    name: Inclusive naming
+    uses: canonical-web-and-design/Inclusive-naming/.github/workflows/woke.yaml@main
+    with:
+      fail-on-error: 'true'
+      woke-args: '. /home/runner/work/_actions/canonical-web-and-design/inclusive-naming/main/config.yml -c .woke.yaml'

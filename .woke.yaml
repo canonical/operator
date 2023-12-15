@@ -1,0 +1,6 @@
+rules:
+ - name: dummy
+   enabled: false
+ - name: sanity
+   enabled: false
+
