@@ -157,7 +157,13 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
     if issubclass(event_type, ops.charm.WorkloadEvent):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
-        return [container], {}
+        args: List[Any] = [container]
+        if issubclass(event_type, ops.charm.PebbleNoticeEvent):
+            notice_id = os.environ['JUJU_NOTICE_ID']
+            notice_type = os.environ['JUJU_NOTICE_TYPE']
+            notice_key = os.environ['JUJU_NOTICE_KEY']
+            args.extend([notice_id, notice_type, notice_key])
+        return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
             os.environ['JUJU_SECRET_ID'],
@@ -377,7 +383,11 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     model_backend = ops.model._ModelBackend()
     debug = ('JUJU_DEBUG' in os.environ)
-    setup_root_logging(model_backend, debug=debug)
+    # For actions, there is a communication channel with the user running the
+    # action, so we want to send exception details through stderr, rather than
+    # only to juju-log as normal.
+    handling_action = ('JUJU_ACTION_NAME' in os.environ)
+    setup_root_logging(model_backend, debug=debug, exc_stderr=handling_action)
     logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
