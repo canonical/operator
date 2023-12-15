@@ -1469,7 +1469,8 @@ class Relation:
     """Indicates whether this relation is active.
 
     This will be ``False`` if the current event is a ``relation-broken`` event
-    assoeciated with this relation."""
+    associated with this relation.
+    """
 
     def __init__(
             self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
