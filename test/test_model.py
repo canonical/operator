@@ -3498,7 +3498,7 @@ class TestSecretClass(unittest.TestCase):
 
         secret = self.make_secret(id='x')
         unit = ops.Unit('test', ops.CharmMeta(), self.model._backend, self.model._cache)
-        rel123 = ops.Relation('test', 123, True, unit, self.model._backend, self.model._cache,)
+        rel123 = ops.Relation('test', 123, True, unit, self.model._backend, self.model._cache)
         rel234 = ops.Relation('test', 234, True, unit, self.model._backend, self.model._cache)
         secret.revoke(rel123)
         unit = ops.Unit('app/0', ops.CharmMeta(), self.model._backend, self.model._cache)
