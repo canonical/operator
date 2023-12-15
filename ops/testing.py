@@ -880,6 +880,9 @@ class Harness(Generic[CharmType]):
 
         prev_broken_id = None  # Silence linter warning.
         if self._model is not None:
+            # Let the model's RelationMapping know that this relation is broken.
+            # Normally, this is handled in `main`, but while testing we create
+            # the `Model` object and keep it around for multiple events.
             prev_broken_id = self._model._relations._broken_relation_id
             self._model.relations._broken_relation_id = relation_id
             # Ensure that we don't offer a cached relation.
