@@ -3259,3 +3259,17 @@ class _TestingPebbleClient:
 
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        raise NotImplementedError(self.get_notice)
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[pebble.NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+        after: Optional[datetime.datetime] = None,
+    ) -> List[pebble.Notice]:
+        raise NotImplementedError(self.get_notices)
