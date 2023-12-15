@@ -16,6 +16,7 @@
 
 import datetime
 import re
+from typing import Union
 
 # Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
 _TIMESTAMP_RE = re.compile(
@@ -26,18 +27,6 @@ _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
 
 # Matches n.n<unit> (allow U+00B5 micro symbol as well as U+03BC Greek letter mu)
 _DURATION_RE = re.compile(r'([0-9.]+)([a-zµμ]+)')
-
-# Mapping of unit to float seconds
-_DURATION_UNITS = {
-    'ns': 0.000_000_001,
-    'us': 0.000_001,
-    'µs': 0.000_001,  # U+00B5 = micro symbol
-    'μs': 0.000_001,  # U+03BC = Greek letter mu
-    'ms': 0.001,
-    's': 1,
-    'm': 60,
-    'h': 60 * 60,
-}
 
 
 def parse_rfc3339(s: str) -> datetime.datetime:
@@ -96,16 +85,45 @@ def parse_duration(s: str) -> datetime.timedelta:
     if matches[0].start() != 0 or matches[-1].end() != len(s):
         raise ValueError('invalid duration: extra input at start or end')
 
-    seconds = 0
+    hours, minutes, seconds, milliseconds, microseconds = 0, 0, 0, 0, 0
     for match in matches:
         number, unit = match.groups()
-        if unit not in _DURATION_UNITS:
+        if unit == 'ns':
+            microseconds += _duration_number(number) / 1000
+        elif unit in ('us', 'µs', 'μs'):  # U+00B5 (micro symbol), U+03BC (Greek letter mu)
+            microseconds += _duration_number(number)
+        elif unit == 'ms':
+            milliseconds += _duration_number(number)
+        elif unit == 's':
+            seconds += _duration_number(number)
+        elif unit == 'm':
+            minutes += _duration_number(number)
+        elif unit == 'h':
+            hours += _duration_number(number)
+        else:
             raise ValueError(f'invalid duration: invalid unit {unit!r}')
-        try:
-            seconds += float(number) * _DURATION_UNITS[unit]
-        except ValueError:
-            # Same exception type, but a slightly more specific error message
-            raise ValueError(f'invalid duration: {number!r} is not a valid float') from None
 
-    duration = datetime.timedelta(seconds=seconds)
+    duration = datetime.timedelta(
+        hours=hours,
+        minutes=minutes,
+        seconds=seconds,
+        milliseconds=milliseconds,
+        microseconds=microseconds,
+    )
+
     return -duration if negative else duration
+
+
+def _duration_number(s: str) -> Union[int, float]:
+    """Try converting s to int; if that fails, try float; otherwise raise ValueError.
+
+    This is to preserve precision where possible.
+    """
+    try:
+        try:
+            return int(s)
+        except ValueError:
+            return float(s)
+    except ValueError:
+        # Same exception type, but a slightly more specific error message
+        raise ValueError(f'invalid duration: {s!r} is not a valid float') from None

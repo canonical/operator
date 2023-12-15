@@ -147,6 +147,9 @@ class TestStrconv(unittest.TestCase):
             ('0.100000000000000000000h', datetime.timedelta(seconds=6 * 60)),
             # This value tests the first overflow check in leadingFraction.
             ('0.830103483285477580700h', datetime.timedelta(seconds=49 * 60 + 48.372_539_827)),
+
+            # Test precision handling
+            ('7200000h1us', datetime.timedelta(hours=7_200_000, microseconds=1))
         ]
 
         for input, expected in cases:
