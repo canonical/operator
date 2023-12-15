@@ -1,6 +1,10 @@
+# 2.10.0
+
+* Added support for Pebble Notices (`PebbleCustomNoticeEvent`, `get_notices`, and so on)
+
 # 2.9.0
 
-* Added log target support to `ops.pebble` layers and plans.
+* Added log target support to `ops.pebble` layers and plans
 * Added `Harness.run_action()`, `testing.ActionOutput`, and `testing.ActionFailed`
 
 # 2.8.0

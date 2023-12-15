@@ -711,7 +711,7 @@ class WorkloadEvent(HookEvent):
 
 
 class PebbleReadyEvent(WorkloadEvent):
-    """Event triggered when pebble is ready for a workload.
+    """Event triggered when Pebble is ready for a workload.
 
     This event is triggered when the Pebble process for a workload/container
     starts up, allowing the charm to configure how services should be launched.
@@ -721,6 +721,45 @@ class PebbleReadyEvent(WorkloadEvent):
     regarding what services should be started. The name prefix of the hook
     will depend on the container key defined in the ``metadata.yaml`` file.
     """
+
+
+class PebbleNoticeEvent(WorkloadEvent):
+    """Base class for Pebble notice events (each notice type is a subclass)."""
+
+    notice: model.LazyNotice
+    """Provide access to the event notice's details."""
+
+    def __init__(self, handle: 'Handle', workload: 'model.Container',
+                 notice_id: str, notice_type: str, notice_key: str):
+        super().__init__(handle, workload)
+        self.notice = model.LazyNotice(workload, notice_id, notice_type, notice_key)
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        d = super().snapshot()
+        d['notice_id'] = self.notice.id
+        d['notice_type'] = (self.notice.type if isinstance(self.notice.type, str)
+                            else self.notice.type.value)
+        d['notice_key'] = self.notice.key
+        return d
+
+    def restore(self, snapshot: Dict[str, Any]):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        super().restore(snapshot)
+        notice_id = snapshot.pop('notice_id')
+        notice_type = snapshot.pop('notice_type')
+        notice_key = snapshot.pop('notice_key')
+        self.notice = model.LazyNotice(self.workload, notice_id, notice_type, notice_key)
+
+
+class PebbleCustomNoticeEvent(PebbleNoticeEvent):
+    """Event triggered when a Pebble notice of type "custom" is created or repeats."""
 
 
 class SecretEvent(HookEvent):
@@ -1103,6 +1142,7 @@ class CharmBase(Object):
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
             self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
+            self.on.define_event(f"{container_name}_pebble_custom_notice", PebbleCustomNoticeEvent)
 
     @property
     def app(self) -> model.Application:

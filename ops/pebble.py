@@ -19,6 +19,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 
 import binascii
 import copy
+import dataclasses
 import datetime
 import email.message
 import email.parser
@@ -257,6 +258,20 @@ if TYPE_CHECKING:
                               'last-shown': NotRequired[Optional[str]],
                               'expire-after': str,
                               'repeat-after': str})
+
+    _NoticeDict = TypedDict('_NoticeDict', {
+        'id': str,
+        'user-id': NotRequired[Optional[int]],
+        'type': str,
+        'key': str,
+        'first-occurred': str,
+        'last-occurred': str,
+        'last-repeated': str,
+        'occurrences': int,
+        'last-data': NotRequired[Optional[Dict[str, str]]],
+        'repeat-after': NotRequired[str],
+        'expire-after': NotRequired[str],
+    })
 
 
 class _WebSocket(Protocol):
@@ -1275,6 +1290,90 @@ class CheckInfo:
                 'failures={self.failures}, '
                 'threshold={self.threshold!r})'
                 ).format(self=self)
+
+
+class NoticeType(enum.Enum):
+    """Enum of notice types."""
+
+    CUSTOM = 'custom'
+
+
+class NoticesSelect(enum.Enum):
+    """Enum of :meth:`Client.get_notices` ``select`` values."""
+
+    ALL = 'all'
+    """Select notices from all users (any user ID, including public notices).
+
+    This only works for Pebble admins (for example, root).
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class Notice:
+    """Information about a single notice."""
+
+    id: str
+    """Server-generated unique ID for this notice."""
+
+    user_id: Optional[int]
+    """UID of the user who may view this notice (None means notice is public)."""
+
+    type: Union[NoticeType, str]
+    """Type of the notice."""
+
+    key: str
+    """The notice key, a string that differentiates notices of this type.
+
+    This is in the format ``example.com/path``.
+    """
+
+    first_occurred: datetime.datetime
+    """The first time one of these notices (type and key combination) occurs."""
+
+    last_occurred: datetime.datetime
+    """The last time one of these notices occurred."""
+
+    last_repeated: datetime.datetime
+    """The time this notice was last repeated.
+
+    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    for an explanation of what "repeated" means.
+    """
+
+    occurrences: int
+    """The number of times one of these notices has occurred."""
+
+    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """Additional data captured from the last occurrence of one of these notices."""
+
+    repeat_after: Optional[datetime.timedelta] = None
+    """Minimum time after one of these was last repeated before Pebble will repeat it again."""
+
+    expire_after: Optional[datetime.timedelta] = None
+    """How long since one of these last occurred until Pebble will drop the notice."""
+
+    @classmethod
+    def from_dict(cls, d: '_NoticeDict') -> 'Notice':
+        """Create new Notice object from dict parsed from JSON."""
+        try:
+            notice_type = NoticeType(d['type'])
+        except ValueError:
+            notice_type = d['type']
+        return cls(
+            id=d['id'],
+            user_id=d.get('user-id'),
+            type=notice_type,
+            key=d['key'],
+            first_occurred=timeconv.parse_rfc3339(d['first-occurred']),
+            last_occurred=timeconv.parse_rfc3339(d['last-occurred']),
+            last_repeated=timeconv.parse_rfc3339(d['last-repeated']),
+            occurrences=d['occurrences'],
+            last_data=d.get('last-data') or {},
+            repeat_after=timeconv.parse_duration(d['repeat-after'])
+            if 'repeat-after' in d else None,
+            expire_after=timeconv.parse_duration(d['expire-after'])
+            if 'expire-after' in d else None,
+        )
 
 
 class ExecProcess(Generic[AnyStr]):
@@ -2644,6 +2743,57 @@ class Client:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def get_notice(self, id: str) -> Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            APIError: if a notice with the given ID is not found (``code`` 404)
+        """
+        resp = self._request('GET', f'/v1/notices/{id}')
+        return Notice.from_dict(resp['result'])
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+        after: Optional[datetime.datetime] = None,
+    ) -> List[Notice]:
+        """Query for notices that match all of the provided filters.
+
+        Pebble returns notices that match all of the filters, for example, if
+        called with ``types=[NoticeType.CUSTOM], keys=["example.com/a"]``,
+        Pebble will only return custom notices that also have key "example.com/a".
+
+        If no filters are specified, return notices viewable by the requesting
+        user (notices whose ``user_id`` matches the requester UID as well as
+        public notices).
+
+        Args:
+            select: select which notices to return (instead of returning
+                notices for the current user)
+            user_id: filter for notices for the specified user, including
+                public notices (only works for Pebble admins)
+            types: filter for notices with any of the specified types
+            keys: filter for notices with any of the specified keys
+            after: filter for notices that were last repeated after this time
+        """
+        query: Dict[str, Union[str, List[str]]] = {}
+        if select is not None:
+            query['select'] = select.value
+        if user_id is not None:
+            query['user-id'] = str(user_id)
+        if types is not None:
+            query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
+        if keys is not None:
+            query['keys'] = list(keys)
+        if after is not None:
+            query['after'] = after.isoformat()
+        resp = self._request('GET', '/v1/notices', query)
+        return [Notice.from_dict(info) for info in resp['result']]
 
 
 class _FilesParser:

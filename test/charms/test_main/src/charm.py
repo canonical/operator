@@ -57,6 +57,7 @@ class Charm(ops.CharmBase):
             _on_get_model_name_action=[],
             on_collect_metrics=[],
             on_test_pebble_ready=[],
+            on_test_pebble_custom_notice=[],
 
             on_log_critical_action=[],
             on_log_error_action=[],
@@ -88,6 +89,8 @@ class Charm(ops.CharmBase):
         self.framework.observe(self.on.mon_relation_departed, self._on_mon_relation_departed)
         self.framework.observe(self.on.ha_relation_broken, self._on_ha_relation_broken)
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
+        self.framework.observe(self.on.test_pebble_custom_notice,
+                               self._on_test_pebble_custom_notice)
 
         self.framework.observe(self.on.secret_remove, self._on_secret_remove)
         self.framework.observe(self.on.secret_rotate, self._on_secret_rotate)
@@ -177,6 +180,13 @@ class Charm(ops.CharmBase):
         self._stored.on_test_pebble_ready.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.test_pebble_ready_data = event.snapshot()
+
+    def _on_test_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+        assert event.workload is not None
+        assert isinstance(event.notice, ops.LazyNotice)
+        self._stored.on_test_pebble_custom_notice.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.test_pebble_custom_notice_data = event.snapshot()
 
     def _on_start_action(self, event: ops.ActionEvent):
         assert event.handle.kind == 'start_action', (

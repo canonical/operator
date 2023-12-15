@@ -153,7 +153,13 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
     if issubclass(event_type, ops.charm.WorkloadEvent):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
-        return [container], {}
+        args: List[Any] = [container]
+        if issubclass(event_type, ops.charm.PebbleNoticeEvent):
+            notice_id = os.environ['JUJU_NOTICE_ID']
+            notice_type = os.environ['JUJU_NOTICE_TYPE']
+            notice_key = os.environ['JUJU_NOTICE_KEY']
+            args.extend([notice_id, notice_type, notice_key])
+        return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
             os.environ['JUJU_SECRET_ID'],
