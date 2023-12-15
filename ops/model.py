@@ -1488,6 +1488,20 @@ class Relation:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
+    @property
+    def _cmr(self) -> bool:
+        """Temporary workaround for checking if the given relation is a cross-model relation.
+
+        Note that this property will return a false positive if a local related app happens to be
+        named in the same pattern juju names CMRs, e.g. "remote-abc".
+        """
+        # Units in cross model relations have names such as
+        # "remote-c87d7acb413449cd8097b523af7ff830/0".
+        if not self.units:
+            raise ModelError("No units in relation, so cannot determine if cross-model.")
+
+        return any(re.match(r"remote\-[a-f0-9]+/", unit.name) for unit in self.units)
+
 
 class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
