@@ -79,6 +79,79 @@ source .tox/unit/bin/activate
 pytest -v test/test_real_pebble.py
 ```
 
+## Using an `ops` branch in a charm
+
+When making changes to `ops`, you'll commonly want to try those changes out in
+a charm.
+
+### From a Git branch
+
+If your changes are in a Git branch, you can simply replace your `ops` version
+in `requirements.txt` (or `pyproject.toml`) with a reference to the branch, like:
+
+```
+#ops ~= 2.9
+git+https://github.com/{your-username}}/operator@{your-branch-name}}
+```
+
+`git` is not normally available when `charmcraft` is packing the charm, so you'll
+need to also tell `charmcraft` that it's required for the build, by adding
+something like this to your `charmcraft.yaml`:
+
+```yaml
+parts:
+  charm:
+    build-packages:
+      - git
+```
+
+### From local code
+
+If your changes are only on your local device, you can inject your local `ops`
+into the charm after it has packed, and before you deploy it, by unzipping the
+`.charm` file and replacing the `ops` folder in the virtualenv. This small
+script will handle that for you:
+
+```shell-script
+#!/usr/bin/env bash
+
+if [ "$#" -lt 2 ]
+then
+	echo "Inject local copy of Python Operator Framework source into charm"
+	echo
+    echo "usage: inject-ops.sh file.charm /path/to/ops/dir" >&2
+    exit 1
+fi
+
+if [ ! -f "$2/framework.py" ]; then
+    echo "$2/framework.py not found; arg 2 should be path to 'ops' directory"
+    exit 1
+fi
+
+set -ex
+
+mkdir inject-ops-tmp
+unzip -q $1 -d inject-ops-tmp
+rm -rf inject-ops-tmp/venv/ops
+cp -r $2 inject-ops-tmp/venv/ops
+cd inject-ops-tmp
+zip -q -r ../inject-ops-new.charm .
+cd ..
+rm -rf inject-ops-tmp
+rm $1
+mv inject-ops-new.charm $1
+```
+
+### Using a Juju branch
+
+If your `ops` change relies on a change in a Juju branch, you'll need to deploy
+your charm to a controller using that version of Juju. For example, with microk8s:
+
+1. [Build Juju and its dependencies](https://github.com/juju/juju/blob/3.4/CONTRIBUTING.md#build-juju-and-its-dependencies)
+2. Run `make microk8s-operator-update`
+3. Run `GOBIN=/path/to/your/juju/_build/bin:$GOBIN /path/to/your/juju bootstrap`
+4. Add a model and deploy your charm as normal
+
 # Documentation
 
 In general, new functionality
