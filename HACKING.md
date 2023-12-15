@@ -149,7 +149,7 @@ your charm to a controller using that version of Juju. For example, with microk8
 
 1. [Build Juju and its dependencies](https://github.com/juju/juju/blob/3.4/CONTRIBUTING.md#build-juju-and-its-dependencies)
 2. Run `make microk8s-operator-update`
-3. Run `GOBIN=/path/to/your/juju/_build/bin:$GOBIN /path/to/your/juju bootstrap`
+3. Run `GOBIN=/path/to/your/juju/_build/linux_amd64/bin:$GOBIN /path/to/your/juju bootstrap`
 4. Add a model and deploy your charm as normal
 
 # Documentation
