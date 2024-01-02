@@ -1468,8 +1468,8 @@ class Relation:
     active: bool
     """Indicates whether this relation is active.
 
-    This will be ``False`` if the current event is a ``relation-broken`` event
-    associated with this relation.
+    This is normally ``True``; it will be ``False`` if the current event is a
+    ``relation-broken`` event associated with this relation.
     """
 
     def __init__(
