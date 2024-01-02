@@ -176,7 +176,7 @@ class Charm(ops.CharmBase):
             'relation-broken events cannot have a reference to a remote application')
         assert event.unit is None, (
             'relation broken events cannot have a reference to a remote unit')
-        assert not event.relation.active, "relation broken events always have a broken relation"
+        assert not event.relation.active, 'relation broken events always have a broken relation'
         assert not self.model.relations['ha']
         self._stored.on_ha_relation_broken.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
