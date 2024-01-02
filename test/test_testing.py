@@ -607,8 +607,8 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         rel_id = harness.add_relation('db', 'postgresql')
         harness.remove_relation(rel_id)
-        self.assertTrue(is_broken, "event.relation.active not False in relation-broken event")
-        self.assertFalse(relations, "Model.relations contained broken relation")
+        self.assertTrue(is_broken, 'event.relation.active not False in relation-broken event')
+        self.assertFalse(relations, 'Model.relations contained broken relation')
 
     def _find_relation_in_model_by_id(
             self,

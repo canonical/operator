@@ -402,7 +402,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     # If we are in a RelationBroken event, we want to know which relation is
     # broken within the model, not only in the event's `.relation` attribute.
-    if os.environ.get("JUJU_DISPATCH_PATH", "").endswith("-relation-broken"):
+    if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
         broken_relation_id = _get_juju_relation_id()
     else:
         broken_relation_id = None
