@@ -91,7 +91,7 @@ in `requirements.txt` (or `pyproject.toml`) with a reference to the branch, like
 
 ```
 #ops ~= 2.9
-git+https://github.com/{your-username}}/operator@{your-branch-name}}
+git+https://github.com/{your-username}/operator@{your-branch-name}
 ```
 
 `git` is not normally available when `charmcraft` is packing the charm, so you'll
