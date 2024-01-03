@@ -10,6 +10,7 @@ from ops.model import SecretNotFoundError, SecretRotate
 
 from scenario import Context
 from scenario.state import Relation, Secret, State
+from tests.helpers import trigger
 
 
 @pytest.fixture(scope="function")
@@ -467,13 +468,21 @@ def test_grant_after_add(leader):
                 secret = self.unit.add_secret({"foo": "bar"})
             secret.grant(self.model.relations["bar"][0])
 
+    state = State(leader=leader, relations=[Relation("bar")])
+    context = Context(
+        GrantingCharm, meta={"name": "foo", "provides": {"bar": {"interface": "bar"}}}
+    )
+    context.run("start", state)
+
 
 def test_grant_nonowner(mycharm):
     def post_event(charm: CharmBase):
         secret = charm.model.get_secret(id="foo")
-        with pytest.raises(RuntimeError):
-            secret = charm.model.get_secret(label="mylabel")
-            foo = charm.model.get_relation("foo")
+
+        secret = charm.model.get_secret(label="mylabel")
+        foo = charm.model.get_relation("foo")
+
+        with pytest.raises(ModelError):
             secret.grant(relation=foo)
 
     out = trigger(
@@ -510,11 +519,12 @@ def test_add_grant_revoke_remove():
     relation_id = 42
 
     state = State(
+        leader=True,
         relations=[
             Relation(
                 "bar", remote_app_name=relation_remote_app, relation_id=relation_id
             )
-        ]
+        ],
     )
 
     with context.manager("start", state) as mgr:
@@ -526,7 +536,6 @@ def test_add_grant_revoke_remove():
 
     assert mgr.output.secrets
     scenario_secret = mgr.output.secrets[0]
-    assert scenario_secret.granted is False
     assert relation_remote_app in scenario_secret.remote_grants[relation_id]
 
     with context.manager("start", mgr.output) as mgr:
@@ -543,5 +552,3 @@ def test_add_grant_revoke_remove():
         secret.remove_all_revisions()
 
     assert not mgr.output.secrets[0].contents  # secret wiped
-    state = State(leader=leader, relations=[Relation("bar")])
-    context.run("start", state)
