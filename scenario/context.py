@@ -34,6 +34,8 @@ if TYPE_CHECKING:
 
 logger = scenario_logger.getChild("runtime")
 
+DEFAULT_JUJU_VERSION = "3.4"
+
 
 @dataclasses.dataclass
 class ActionOutput:
@@ -166,7 +168,7 @@ class Context:
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
         charm_root: "PathLike" = None,
-        juju_version: str = "3.0",
+        juju_version: str = DEFAULT_JUJU_VERSION,
         capture_deferred_events: bool = False,
         capture_framework_events: bool = False,
     ):

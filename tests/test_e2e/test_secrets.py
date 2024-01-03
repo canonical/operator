@@ -1,8 +1,10 @@
 import datetime
+import warnings
 
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
+from ops.model import ModelError
 from ops.model import Secret as ops_Secret
 from ops.model import SecretNotFoundError, SecretRotate
 
@@ -118,7 +120,7 @@ def test_get_secret_owner_peek_update(mycharm, owner):
         ),
     ) as mgr:
         charm = mgr.charm
-        assert charm.model.get_secret(id="foo").get_content()["a"] == "c"
+        assert charm.model.get_secret(id="foo").get_content()["a"] == "b"
         assert charm.model.get_secret(id="foo").peek_content()["a"] == "c"
         assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
 
@@ -170,9 +172,11 @@ def test_add(mycharm, app):
     assert secret.label == "mylabel"
 
 
-def test_set(mycharm):
+def test_set_legacy_behaviour(mycharm):
+    # in juju < 3.1.7, secret owners always used to track the latest revision.
+    # ref: https://bugs.launchpad.net/juju/+bug/2037120
     rev1, rev2, rev3 = {"foo": "bar"}, {"foo": "baz"}, {"foo": "baz", "qux": "roz"}
-    with Context(mycharm, meta={"name": "local"}).manager(
+    with Context(mycharm, meta={"name": "local"}, juju_version="3.1.6").manager(
         "update_status",
         State(),
     ) as mgr:
@@ -201,6 +205,37 @@ def test_set(mycharm):
             == secret.get_content(refresh=True)
             == rev3
         )
+
+    assert state_out.secrets[0].contents == {
+        0: rev1,
+        1: rev2,
+        2: rev3,
+    }
+
+
+def test_set(mycharm):
+    rev1, rev2, rev3 = {"foo": "bar"}, {"foo": "baz"}, {"foo": "baz", "qux": "roz"}
+    with Context(mycharm, meta={"name": "local"}).manager(
+        "update_status",
+        State(),
+    ) as mgr:
+        charm = mgr.charm
+        secret: ops_Secret = charm.unit.add_secret(rev1, label="mylabel")
+        assert (
+            secret.get_content()
+            == secret.peek_content()
+            == secret.get_content(refresh=True)
+            == rev1
+        )
+
+        secret.set_content(rev2)
+        assert secret.get_content() == rev1
+        assert secret.peek_content() == secret.get_content(refresh=True) == rev2
+
+        secret.set_content(rev3)
+        state_out = mgr.run()
+        assert secret.get_content() == rev2
+        assert secret.peek_content() == secret.get_content(refresh=True) == rev3
 
     assert state_out.secrets[0].contents == {
         0: rev1,
@@ -268,6 +303,32 @@ def test_meta(mycharm, app):
         assert info.rotation == SecretRotate.HOURLY
 
 
+def test_secret_deprecation_application(mycharm):
+    with warnings.catch_warnings(record=True) as captured:
+        s = Secret("123", {}, owner="application")
+        assert s.owner == "app"
+    msg = captured[0].message
+    assert isinstance(msg, DeprecationWarning)
+    assert msg.args[0] == (
+        "Secret.owner='application' is deprecated in favour of "
+        "'app' and will be removed in Scenario 7+."
+    )
+
+
+@pytest.mark.parametrize("granted", ("app", "unit", False))
+def test_secret_deprecation_granted(mycharm, granted):
+    with warnings.catch_warnings(record=True) as captured:
+        s = Secret("123", {}, granted=granted)
+        assert s.granted == granted
+    msg = captured[0].message
+    assert isinstance(msg, DeprecationWarning)
+    assert msg.args[0] == (
+        "``state.Secret.granted`` is deprecated and will be removed in Scenario 7+. "
+        "If a Secret is not owned by the app/unit you are testing, nor has been granted to "
+        "it by the (remote) owner, then omit it from ``State.secrets`` altogether."
+    )
+
+
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("owner", ("app", "unit", None))
 def test_secret_permission_model(mycharm, leader, owner):
@@ -311,16 +372,18 @@ def test_secret_permission_model(mycharm, leader, owner):
 
             assert secret.get_info()
             secret.set_content({"foo": "boo"})
-            assert secret.get_content()["foo"] == "boo"
+            assert secret.get_content() == {"a": "b"}  # rev1!
+            assert secret.get_content(refresh=True) == {"foo": "boo"}
+
             secret.remove_all_revisions()
 
         else:  # cannot manage
             # nothing else to do directly if you can't get a hold of the Secret instance
             # but we can try some raw backend calls
-            with pytest.raises(SecretNotFoundError):
+            with pytest.raises(ModelError):
                 secret.get_info()
 
-            with pytest.raises(SecretNotFoundError):
+            with pytest.raises(ModelError):
                 secret.set_content(content={"boo": "foo"})
 
 

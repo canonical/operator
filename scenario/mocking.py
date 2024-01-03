@@ -139,6 +139,14 @@ class _MockModelBackend(_ModelBackend):
             raise RelationNotFoundError()
 
     def _get_secret(self, id=None, label=None):
+        # FIXME: what error would a charm get IRL?
+        # ops 2.0 supports Secret, but juju only supports it from 3.0.2
+        if self._context.juju_version < "3.0.2":
+            raise RuntimeError(
+                "secrets are only available in juju >= 3.0.2."
+                "Set ``Context.juju_version`` to 3.0.2+ to use them.",
+            )
+
         canonicalize_id = Secret_Ops._canonicalize_id
 
         if id:
@@ -309,12 +317,16 @@ class _MockModelBackend(_ModelBackend):
     ):
         # FIXME: match real tracebacks
         if secret.owner is None:
-            raise SecretNotFoundError("this secret is not owned by this unit/app")
-        if secret.owner == "app" and not self.is_leader():
             raise SecretNotFoundError(
+                "this secret is not owned by this unit/app or granted to it",
+            )
+        if secret.owner == "app" and not self.is_leader():
+            understandable_error = SecretNotFoundError(
                 f"App-owned secret {secret.id!r} can only be "
                 f"managed by the leader.",
             )
+            # charm-facing side: respect ops error
+            raise ModelError("ERROR permission denied") from understandable_error
 
     def secret_get(
         self,
@@ -326,8 +338,10 @@ class _MockModelBackend(_ModelBackend):
     ) -> Dict[str, str]:
         secret = self._get_secret(id, label)
 
-        if self._context.juju_version <= "3.2":
-            # in juju<3.2, secret owners always track the latest revision.
+        if self._context.juju_version < "3.1.7":
+            # in this medieval juju chapter,
+            # secret owners always used to track the latest revision.
+            # ref: https://bugs.launchpad.net/juju/+bug/2037120
             if secret.owner is not None:
                 refresh = True
 

@@ -7,6 +7,7 @@ import datetime
 import inspect
 import re
 import typing
+import warnings
 from collections import namedtuple
 from enum import Enum
 from pathlib import Path, PurePosixPath
@@ -138,7 +139,8 @@ class Secret(_DCBase):
     # if None, the implication is that the secret has been granted to this unit.
     owner: Literal["unit", "app", None] = None
 
-    # deprecated!
+    # deprecated! if a secret is not granted to this unit, omit it from State.secrets altogether.
+    # this attribute will be removed in Scenario 7+
     granted: Literal["unit", "app", False] = "<DEPRECATED>"
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
@@ -155,16 +157,22 @@ class Secret(_DCBase):
 
     def __post_init__(self):
         if self.granted != "<DEPRECATED>":
-            logger.warning(
-                "``state.Secret.granted`` is deprecated and will be removed in Scenario 6. "
+            msg = (
+                "``state.Secret.granted`` is deprecated and will be removed in Scenario 7+. "
                 "If a Secret is not owned by the app/unit you are testing, nor has been granted to "
-                "it by the (remote) owner, then omit it from ``State.secrets`` altogether.",
+                "it by the (remote) owner, then omit it from ``State.secrets`` altogether."
             )
+            logger.warning(msg)
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
         if self.owner == "application":
-            logger.warning(
+            msg = (
                 "Secret.owner='application' is deprecated in favour of 'app' "
-                "and will be removed in Scenario 6.",
+                "and will be removed in Scenario 7+."
             )
+            logger.warning(msg)
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
             # bypass frozen dataclass
             object.__setattr__(self, "owner", "app")
 
@@ -176,7 +184,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-changed for a secret it owns.",
             )
-        return Event(name="secret_changed", secret=self)
+        return Event("secret_changed", secret=self)
 
     # owner-only events
     @property
@@ -186,7 +194,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-rotate for a secret it does not own.",
             )
-        return Event(name="secret_rotate", secret=self)
+        return Event("secret_rotate", secret=self)
 
     @property
     def expired_event(self):
@@ -195,7 +203,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-expire for a secret it does not own.",
             )
-        return Event(name="secret_expire", secret=self)
+        return Event("secret_expire", secret=self)
 
     @property
     def remove_event(self):
@@ -204,7 +212,7 @@ class Secret(_DCBase):
             raise ValueError(
                 "This unit will never receive secret-removed for a secret it does not own.",
             )
-        return Event(name="secret_removed", secret=self)
+        return Event("secret_removed", secret=self)
 
     def _set_revision(self, revision: int):
         """Set a new tracked revision."""
