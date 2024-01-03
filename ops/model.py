@@ -2174,7 +2174,7 @@ class Container:
         """Get status information for a single named service.
 
         Raises:
-            ModelError: if service_name is not found.
+            ModelError: if a service with the given name is not found
         """
         services = self.get_services(service_name)
         if not services:
@@ -2202,7 +2202,7 @@ class Container:
         """Get check information for a single named check.
 
         Raises:
-            ModelError: if ``check_name`` is not found.
+            ModelError: if a check with the given name is not found
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2251,6 +2251,11 @@ class Container:
              group_id: Optional[int] = None,
              group: Optional[str] = None):
         """Write content to a given file path on the remote system.
+
+        Note that if another process has the file open on the remote system,
+        or if the remote file is a bind mount, pushing will fail with a
+        :class:`pebble.PathError`. Use :meth:`Container.exec` for full
+        control.
 
         Args:
             path: Path of the file to write to on the remote system.
@@ -2718,6 +2723,41 @@ class Container:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
         self._pebble.send_signal(sig, service_names)
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            ModelError: if a notice with the given ID is not found
+        """
+        try:
+            return self._pebble.get_notice(id)
+        except pebble.APIError as e:
+            if e.code == 404:
+                raise ModelError(f'notice {id!r} not found') from e
+            raise
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[pebble.NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+        after: Optional[datetime.datetime] = None,
+    ) -> List[pebble.Notice]:
+        """Query for notices that match all of the provided filters.
+
+        See :meth:`ops.pebble.Client.get_notices` for documentation of the
+        parameters.
+        """
+        return self._pebble.get_notices(
+            select=select,
+            user_id=user_id,
+            types=types,
+            keys=keys,
+            after=after,
+        )
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
@@ -3489,3 +3529,51 @@ class _ModelBackendValidator:
         if re.search('[,=]', v) is not None:
             raise ModelError(
                 f'metric label values must not contain "," or "=": {label}={value!r}')
+
+
+class LazyNotice:
+    """Provide lazily-loaded access to a Pebble notice's details.
+
+    The attributes provided by this class are the same as those of
+    :class:`ops.pebble.Notice`, however, the notice details are only fetched
+    from Pebble if necessary (and cached on the instance).
+    """
+
+    id: str
+    user_id: Optional[int]
+    type: Union[pebble.NoticeType, str]
+    key: str
+    first_occurred: datetime.datetime
+    last_occurred: datetime.datetime
+    last_repeated: datetime.datetime
+    occurrences: int
+    last_data: Dict[str, str]
+    repeat_after: Optional[datetime.timedelta]
+    expire_after: Optional[datetime.timedelta]
+
+    def __init__(self, container: Container, id: str, type: str, key: str):
+        self._container = container
+        self.id = id
+        try:
+            self.type = pebble.NoticeType(type)
+        except ValueError:
+            self.type = type
+        self.key = key
+
+        self._notice: Optional[ops.pebble.Notice] = None
+
+    def __repr__(self):
+        type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
+        return f'LazyNotice(id={self.id!r}, type={type_repr}, key={self.key!r})'
+
+    def __getattr__(self, item: str):
+        # Note: not called for defined attributes (id, type, key)
+        self._ensure_loaded()
+        return getattr(self._notice, item)
+
+    def _ensure_loaded(self):
+        if self._notice is not None:
+            return
+        self._notice = self._container.get_notice(self.id)
+        assert self._notice.type == self.type
+        assert self._notice.key == self.key

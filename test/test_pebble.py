@@ -442,6 +442,54 @@ single log
         self.assertEqual(info.group_id, 34)
         self.assertEqual(info.group, 'staff')
 
+    def test_notice_from_dict(self):
+        notice = pebble.Notice.from_dict({
+            'id': '123',
+            'user-id': 1000,
+            'type': 'custom',
+            'key': 'example.com/a',
+            'first-occurred': '2023-12-07T17:01:02.123456789Z',
+            'last-occurred': '2023-12-07T17:01:03.123456789Z',
+            'last-repeated': '2023-12-07T17:01:04.123456789Z',
+            'occurrences': 7,
+            'last-data': {'k1': 'v1', 'k2': 'v2'},
+            'repeat-after': '30m',
+            'expire-after': '24h',
+        })
+        self.assertEqual(notice, pebble.Notice(
+            id='123',
+            user_id=1000,
+            type=pebble.NoticeType.CUSTOM,
+            key='example.com/a',
+            first_occurred=datetime_utc(2023, 12, 7, 17, 1, 2, 123457),
+            last_occurred=datetime_utc(2023, 12, 7, 17, 1, 3, 123457),
+            last_repeated=datetime_utc(2023, 12, 7, 17, 1, 4, 123457),
+            occurrences=7,
+            last_data={'k1': 'v1', 'k2': 'v2'},
+            repeat_after=datetime.timedelta(minutes=30),
+            expire_after=datetime.timedelta(hours=24),
+        ))
+
+        notice = pebble.Notice.from_dict({
+            'id': '124',
+            'type': 'other',
+            'key': 'example.com/b',
+            'first-occurred': '2023-12-07T17:01:02.123456789Z',
+            'last-occurred': '2023-12-07T17:01:03.123456789Z',
+            'last-repeated': '2023-12-07T17:01:04.123456789Z',
+            'occurrences': 8,
+        })
+        self.assertEqual(notice, pebble.Notice(
+            id='124',
+            user_id=None,
+            type='other',
+            key='example.com/b',
+            first_occurred=datetime_utc(2023, 12, 7, 17, 1, 2, 123457),
+            last_occurred=datetime_utc(2023, 12, 7, 17, 1, 3, 123457),
+            last_repeated=datetime_utc(2023, 12, 7, 17, 1, 4, 123457),
+            occurrences=8,
+        ))
+
 
 class TestPlan(unittest.TestCase):
     def test_no_args(self):
@@ -2700,6 +2748,124 @@ bad path\r
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
+        ])
+
+    def test_get_notice(self):
+        self.client.responses.append({
+            'result': {
+                'id': '123',
+                'user-id': 1000,
+                'type': 'custom',
+                'key': 'example.com/a',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 7,
+            },
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        notice = self.client.get_notice('123')
+
+        # No need to re-test full Notice.from_dict behaviour.
+        self.assertEqual(notice.id, '123')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/notices/123', None, None),
+        ])
+
+    def test_get_notice_not_found(self):
+        self.client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
+
+        with self.assertRaises(pebble.APIError) as cm:
+            self.client.get_notice('1')
+        self.assertEqual(cm.exception.code, 404)
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/notices/1', None, None),
+        ])
+
+    def test_get_notices_all(self):
+        self.client.responses.append({
+            'result': [{
+                'id': '123',
+                'user-id': 1000,
+                'type': 'custom',
+                'key': 'example.com/a',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 7,
+            }, {
+                'id': '124',
+                'type': 'other',
+                'key': 'example.com/b',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 8,
+            }],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        checks = self.client.get_notices()
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[0].id, '123')
+        self.assertEqual(checks[1].id, '124')
+
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/notices', {}, None),
+        ])
+
+    def test_get_notices_filters(self):
+        self.client.responses.append({
+            'result': [{
+                'id': '123',
+                'user-id': 1000,
+                'type': 'custom',
+                'key': 'example.com/a',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 7,
+            }, {
+                'id': '124',
+                'type': 'other',
+                'key': 'example.com/b',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 8,
+            }],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        notices = self.client.get_notices(
+            user_id=1000,
+            select=pebble.NoticesSelect.ALL,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+            after=datetime_utc(2023, 12, 1, 2, 3, 4, 5),
+        )
+        self.assertEqual(len(notices), 2)
+        self.assertEqual(notices[0].id, '123')
+        self.assertEqual(notices[1].id, '124')
+
+        query = {
+            'user-id': '1000',
+            'select': 'all',
+            'types': ['custom'],
+            'keys': ['example.com/a', 'example.com/b'],
+            'after': '2023-12-01T02:03:04.000005+00:00',
+        }
+        self.assertEqual(self.client.requests, [
+            ('GET', '/v1/notices', query, None),
         ])
 
 
