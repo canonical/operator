@@ -5,7 +5,7 @@ import pytest
 from ops import pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.pebble import ServiceStartup, ServiceStatus
+from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
 from scenario.state import Container, ExecOutput, Mount, Port, State
@@ -301,3 +301,67 @@ def test_pebble_plan(charm_cls, starting_service_status):
 
     assert container.services["barserv"].current == pebble.ServiceStatus.ACTIVE
     assert container.services["barserv"].startup == pebble.ServiceStartup.DISABLED
+
+
+def test_exec_wait_error(charm_cls):
+    state = State(
+        containers=[
+            Container(
+                name="foo",
+                can_connect=True,
+                exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
+            )
+        ]
+    )
+
+    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
+        "start", state
+    ) as mgr:
+        container = mgr.charm.unit.get_container("foo")
+        proc = container.exec(["foo"])
+        with pytest.raises(ExecError):
+            proc.wait()
+        assert proc.stdout.read() == "hello pebble"
+
+
+def test_exec_wait_output(charm_cls):
+    state = State(
+        containers=[
+            Container(
+                name="foo",
+                can_connect=True,
+                exec_mock={
+                    ("foo",): ExecOutput(stdout="hello pebble", stderr="oepsie")
+                },
+            )
+        ]
+    )
+
+    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
+        "start", state
+    ) as mgr:
+        container = mgr.charm.unit.get_container("foo")
+        proc = container.exec(["foo"])
+        out, err = proc.wait_output()
+        assert out == "hello pebble"
+        assert err == "oepsie"
+
+
+def test_exec_wait_output_error(charm_cls):
+    state = State(
+        containers=[
+            Container(
+                name="foo",
+                can_connect=True,
+                exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
+            )
+        ]
+    )
+
+    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
+        "start", state
+    ) as mgr:
+        container = mgr.charm.unit.get_container("foo")
+        proc = container.exec(["foo"])
+        with pytest.raises(ExecError):
+            proc.wait_output()

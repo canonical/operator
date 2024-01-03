@@ -77,7 +77,7 @@ A scenario test consists of three broad steps:
     - optionally, you can use a context manager to get a hold of the charm instance and run assertions on internal APIs and the internal state of the charm and operator framework.
 
 The most basic scenario is one in which all is defaulted and barely any data is
-available. The charm has no config, no relations, no networks, no leadership, and its status is `unknown`.
+available. The charm has no config, no relations, no leadership, and its status is `unknown`.
 
 With that, we can write the simplest possible scenario test:
 
@@ -526,6 +526,26 @@ remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
 # which is syntactic sugar for:
 remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
 ```
+
+### Networks
+
+Simplifying a bit the Juju "spaces" model, each integration endpoint a charm defines in its metadata is associated with a network. Regardless of whether there is a living relation over that endpoint, that is.  
+
+If your charm has a relation `"foo"` (defined in metadata.yaml), then the charm will be able at runtime to do `self.model.get_binding("foo").network`.
+The network you'll get by doing so is heavily defaulted (see `state.Network.default`) and good for most use-cases because the charm should typically not be concerned about what IP it gets. 
+
+On top of the relation-provided network bindings, a charm can also define some `extra-bindings` in its metadata.yaml and access them at runtime. Note that this is a deprecated feature that should not be relied upon. For completeness, we support it in Scenario.
+
+If you want to, you can override any of these relation or extra-binding associated networks with a custom one by passing it to `State.networks`.
+
+```python
+from scenario import State, Network
+state = State(networks={
+  'foo': Network.default(private_address='4.4.4.4')
+})
+```
+
+Where `foo` can either be the name of an `extra-bindings`-defined binding, or a relation endpoint.
 
 # Containers
 

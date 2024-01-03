@@ -467,8 +467,81 @@ def test_grant_after_add(leader):
                 secret = self.unit.add_secret({"foo": "bar"})
             secret.grant(self.model.relations["bar"][0])
 
+
+def test_grant_nonowner(mycharm):
+    def post_event(charm: CharmBase):
+        secret = charm.model.get_secret(id="foo")
+        with pytest.raises(RuntimeError):
+            secret = charm.model.get_secret(label="mylabel")
+            foo = charm.model.get_relation("foo")
+            secret.grant(relation=foo)
+
+    out = trigger(
+        State(
+            relations=[Relation("foo", "remote")],
+            secrets=[
+                Secret(
+                    id="foo",
+                    label="mylabel",
+                    description="foobarbaz",
+                    rotate=SecretRotate.HOURLY,
+                    contents={
+                        0: {"a": "b"},
+                    },
+                )
+            ],
+        ),
+        "update_status",
+        mycharm,
+        meta={"name": "local", "requires": {"foo": {"interface": "bar"}}},
+        post_event=post_event,
+    )
+
+
+def test_add_grant_revoke_remove():
+    class GrantingCharm(CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+
     context = Context(
         GrantingCharm, meta={"name": "foo", "provides": {"bar": {"interface": "bar"}}}
     )
+    relation_remote_app = "remote_secret_desirerer"
+    relation_id = 42
+
+    state = State(
+        relations=[
+            Relation(
+                "bar", remote_app_name=relation_remote_app, relation_id=relation_id
+            )
+        ]
+    )
+
+    with context.manager("start", state) as mgr:
+        charm = mgr.charm
+        secret = charm.app.add_secret({"foo": "bar"}, label="mylabel")
+        bar_relation = charm.model.relations["bar"][0]
+
+        secret.grant(bar_relation)
+
+    assert mgr.output.secrets
+    scenario_secret = mgr.output.secrets[0]
+    assert scenario_secret.granted is False
+    assert relation_remote_app in scenario_secret.remote_grants[relation_id]
+
+    with context.manager("start", mgr.output) as mgr:
+        charm: GrantingCharm = mgr.charm
+        secret = charm.model.get_secret(label="mylabel")
+        secret.revoke(bar_relation)
+
+    scenario_secret = mgr.output.secrets[0]
+    assert scenario_secret.remote_grants == {}
+
+    with context.manager("start", mgr.output) as mgr:
+        charm: GrantingCharm = mgr.charm
+        secret = charm.model.get_secret(label="mylabel")
+        secret.remove_all_revisions()
+
+    assert not mgr.output.secrets[0].contents  # secret wiped
     state = State(leader=leader, relations=[Relation("bar")])
     context.run("start", state)

@@ -14,7 +14,7 @@ from typing import (
 
 from scenario.context import Context
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.state import Event, State

@@ -6,7 +6,19 @@ import random
 import shutil
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 from ops import JujuVersion, pebble
 from ops.model import ModelError, RelationNotFoundError
@@ -22,9 +34,18 @@ from ops.pebble import Client, ExecError
 from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
-from scenario.state import JujuLogLine, Mount, PeerRelation, Port, Storage
+from scenario.state import (
+    JujuLogLine,
+    Mount,
+    Network,
+    PeerRelation,
+    Port,
+    Storage,
+    _RawPortProtocolLiteral,
+    _RawStatusLiteral,
+)
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import Container as ContainerSpec
     from scenario.state import (
@@ -48,7 +69,7 @@ class ActionMissingFromContextError(Exception):
 
 
 class _MockExecProcess:
-    def __init__(self, command: Tuple[str], change_id: int, out: "ExecOutput"):
+    def __init__(self, command: Tuple[str, ...], change_id: int, out: "ExecOutput"):
         self._command = command
         self._change_id = change_id
         self._out = out
@@ -93,19 +114,27 @@ class _MockModelBackend(_ModelBackend):
     def opened_ports(self) -> Set[Port]:
         return set(self._state.opened_ports)
 
-    def open_port(self, protocol: str, port: Optional[int] = None):
+    def open_port(
+        self,
+        protocol: "_RawPortProtocolLiteral",
+        port: Optional[int] = None,
+    ):
         # fixme: the charm will get hit with a StateValidationError
         #  here, not the expected ModelError...
-        port = Port(protocol, port)
+        port_ = Port(protocol, port)
         ports = self._state.opened_ports
-        if port not in ports:
-            ports.append(port)
+        if port_ not in ports:
+            ports.append(port_)
 
-    def close_port(self, protocol: str, port: Optional[int] = None):
-        port = Port(protocol, port)
+    def close_port(
+        self,
+        protocol: "_RawPortProtocolLiteral",
+        port: Optional[int] = None,
+    ):
+        _port = Port(protocol, port)
         ports = self._state.opened_ports
-        if port in ports:
-            ports.remove(port)
+        if _port in ports:
+            ports.remove(_port)
 
     def get_pebble(self, socket_path: str) -> "Client":
         container_name = socket_path.split("/")[
@@ -153,20 +182,21 @@ class _MockModelBackend(_ModelBackend):
             # in scenario, you can create Secret(id="foo"),
             # but ops.Secret will prepend a "secret:" prefix to that ID.
             # we allow getting secret by either version.
-            try:
-                return next(
-                    filter(
-                        lambda s: canonicalize_id(s.id) == canonicalize_id(id),
-                        self._state.secrets,
-                    ),
-                )
-            except StopIteration:
-                raise SecretNotFoundError()
+            secrets = [
+                s
+                for s in self._state.secrets
+                if canonicalize_id(s.id) == canonicalize_id(id)
+            ]
+            if not secrets:
+                raise SecretNotFoundError(id)
+            return secrets[0]
+
         elif label:
-            try:
-                return next(filter(lambda s: s.label == label, self._state.secrets))
-            except StopIteration:
-                raise SecretNotFoundError()
+            secrets = [s for s in self._state.secrets if s.label == label]
+            if not secrets:
+                raise SecretNotFoundError(label)
+            return secrets[0]
+
         else:
             # if all goes well, this should never be reached. ops.model.Secret will check upon
             # instantiation that either an id or a label are set, and raise a TypeError if not.
@@ -196,6 +226,8 @@ class _MockModelBackend(_ModelBackend):
         if is_app and member_name == self.app_name:
             return relation.local_app_data
         elif is_app:
+            if isinstance(relation, PeerRelation):
+                return relation.local_app_data
             return relation.remote_app_data
         elif member_name == self.unit_name:
             return relation.local_unit_data
@@ -207,8 +239,8 @@ class _MockModelBackend(_ModelBackend):
         return self._state.leader
 
     def status_get(self, *, is_app: bool = False):
-        status, message = self._state.app_status if is_app else self._state.unit_status
-        return {"status": status, "message": message}
+        status = self._state.app_status if is_app else self._state.unit_status
+        return {"status": status.name, "message": status.message}
 
     def relation_ids(self, relation_name):
         return [
@@ -217,16 +249,16 @@ class _MockModelBackend(_ModelBackend):
             if rel.endpoint == relation_name
         ]
 
-    def relation_list(self, relation_id: int) -> Tuple[str]:
+    def relation_list(self, relation_id: int) -> Tuple[str, ...]:
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
             return tuple(
                 f"{self.app_name}/{unit_id}" for unit_id in relation.peers_data
             )
+        remote_name = self.relation_remote_app_name(relation_id)
         return tuple(
-            f"{relation.remote_app_name}/{unit_id}"
-            for unit_id in relation._remote_unit_ids
+            f"{remote_name}/{unit_id}" for unit_id in relation._remote_unit_ids
         )
 
     def config_get(self):
@@ -247,14 +279,34 @@ class _MockModelBackend(_ModelBackend):
         return state_config  # full config
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None):
-        if relation_id:
-            logger.warning("network-get -r not implemented")
+        # validation:
+        extra_bindings = self._charm_spec.meta.get("extra-bindings", ())
+        all_endpoints = self._charm_spec.get_all_relations()
+        non_sub_relations = {
+            name for name, meta in all_endpoints if meta.get("scope") != "container"
+        }
 
-        relations = self._state.get_relations(binding_name)
-        if not relations:
+        # - is binding_name a valid binding name?
+        if binding_name in extra_bindings:
+            logger.warning("extra-bindings is a deprecated feature")  # fyi
+
+            # - verify that if the binding is an extra binding, we're not ignoring a relation_id
+            if relation_id is not None:
+                # this should not happen
+                logger.error(
+                    "cannot pass relation_id to network_get if the binding name is "
+                    "that of an extra-binding. Extra-bindings are not mapped to relation IDs.",
+                )
+        # - verify that the binding is a relation endpoint name, but not a subordinate one
+        elif binding_name not in non_sub_relations:
+            logger.error(
+                f"cannot get network binding for {binding_name}: is not a valid relation "
+                f"endpoint name nor an extra-binding.",
+            )
             raise RelationNotFoundError()
 
-        network = next(filter(lambda r: r.name == binding_name, self._state.networks))
+        # We look in State.networks for an override. If not given, we return a default network.
+        network = self._state.networks.get(binding_name, Network.default())
         return network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
@@ -265,7 +317,13 @@ class _MockModelBackend(_ModelBackend):
 
         self._state._update_workload_version(version)
 
-    def status_set(self, status: str, message: str = "", *, is_app: bool = False):
+    def status_set(
+        self,
+        status: _RawStatusLiteral,
+        message: str = "",
+        *,
+        is_app: bool = False,
+    ):
         self._context._record_status(self._state, is_app)
         self._state._update_status(status, message, is_app)
 
@@ -294,13 +352,13 @@ class _MockModelBackend(_ModelBackend):
         description: Optional[str] = None,
         expire: Optional[datetime.datetime] = None,
         rotate: Optional[SecretRotate] = None,
-        owner: Optional[str] = None,
+        owner: Optional[Literal["unit", "application"]] = None,
     ) -> str:
         from scenario.state import Secret
 
-        id = self._generate_secret_id()
+        secret_id = self._generate_secret_id()
         secret = Secret(
-            id=id,
+            id=secret_id,
             contents={0: content},
             label=label,
             description=description,
@@ -309,7 +367,7 @@ class _MockModelBackend(_ModelBackend):
             owner=owner,
         )
         self._state.secrets.append(secret)
-        return id
+        return secret_id
 
     def _check_can_manage_secret(
         self,
@@ -331,8 +389,8 @@ class _MockModelBackend(_ModelBackend):
     def secret_get(
         self,
         *,
-        id: str = None,
-        label: str = None,
+        id: Optional[str] = None,
+        label: Optional[str] = None,
         refresh: bool = False,
         peek: bool = False,
     ) -> Dict[str, str]:
@@ -398,19 +456,27 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
-        grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
+        grantee = unit or self.relation_remote_app_name(
+            relation_id,
+            _raise_on_error=True,
+        )
 
         if not secret.remote_grants.get(relation_id):
             secret.remote_grants[relation_id] = set()
 
-        secret.remote_grants[relation_id].add(grantee)
+        secret.remote_grants[relation_id].add(cast(str, grantee))
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
-        grantee = unit or self._get_relation_by_id(relation_id).remote_app_name
-        secret.remote_grants[relation_id].remove(grantee)
+        grantee = unit or self.relation_remote_app_name(
+            relation_id,
+            _raise_on_error=True,
+        )
+        secret.remote_grants[relation_id].remove(cast(str, grantee))
+        if not secret.remote_grants[relation_id]:
+            del secret.remote_grants[relation_id]
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         secret = self._get_secret(id)
@@ -421,13 +487,23 @@ class _MockModelBackend(_ModelBackend):
         else:
             secret.contents.clear()
 
-    def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
+    def relation_remote_app_name(
+        self,
+        relation_id: int,
+        _raise_on_error=False,
+    ) -> Optional[str]:
         # ops catches relationnotfounderrors and returns None:
         try:
             relation = self._get_relation_by_id(relation_id)
         except RelationNotFoundError:
+            if _raise_on_error:
+                raise
             return None
-        return relation.remote_app_name
+
+        if isinstance(relation, PeerRelation):
+            return self.app_name
+        else:
+            return relation.remote_app_name
 
     def action_set(self, results: Dict[str, Any]):
         if not self._event.action:
@@ -579,7 +655,8 @@ class _MockPebbleClient(_TestingPebbleClient):
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
         for _, mount in mounts.items():
-            mounting_dir = container_root / mount.location[1:]
+            path = Path(mount.location).parts
+            mounting_dir = container_root.joinpath(*path[1:])
             mounting_dir.parent.mkdir(parents=True, exist_ok=True)
             mounting_dir.symlink_to(mount.src)
 
@@ -610,7 +687,7 @@ class _MockPebbleClient(_TestingPebbleClient):
     def _service_status(self) -> Dict[str, pebble.ServiceStatus]:
         return self._container.service_status
 
-    def exec(self, *args, **kwargs):  # noqa: U100
+    def exec(self, *args, **kwargs):  # noqa: U100 type: ignore
         cmd = tuple(args[0])
         out = self._container.exec_mock.get(cmd)
         if not out:
@@ -625,7 +702,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         return _MockExecProcess(change_id=change_id, command=cmd, out=out)
 
     def _check_connection(self):
-        if not self._container.can_connect:  # pyright: reportPrivateUsage=false
+        if not self._container.can_connect:
             msg = (
                 f"Cannot connect to Pebble; did you forget to set "
                 f"can_connect=True for container {self._container.name}?"

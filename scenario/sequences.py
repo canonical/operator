@@ -18,11 +18,10 @@ from scenario.state import (
     State,
 )
 
-if typing.TYPE_CHECKING:
+if typing.TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
 CharmMeta = Optional[Union[str, TextIO, dict]]
-
 logger = scenario_logger.getChild("scenario")
 
 
