@@ -947,6 +947,8 @@ class _CharmSpec(_DCBase):
     """Charm spec."""
 
     charm_type: Type["CharmType"]
+
+    # TODO: consider unifying the data model since nowadays it's all in one file
     meta: Optional[Dict[str, Any]]
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
@@ -956,16 +958,10 @@ class _CharmSpec(_DCBase):
     is_autoloaded: bool = False
 
     @staticmethod
-    def autoload(charm_type: Type["CharmType"]):
-        charm_source_path = Path(inspect.getfile(charm_type))
-        charm_root = charm_source_path.parent.parent
-
+    def _load_metadata_legacy(charm_root: Path):
+        # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
+        # files for charm metadata.
         metadata_path = charm_root / "metadata.yaml"
-        if not metadata_path.exists():
-            raise MetadataNotFoundError(
-                f"invalid charm root {charm_root!r}; "
-                f"expected to contain at least a `metadata.yaml` file.",
-            )
         meta = yaml.safe_load(metadata_path.open())
 
         actions = config = None
@@ -977,6 +973,35 @@ class _CharmSpec(_DCBase):
         actions_path = charm_root / "actions.yaml"
         if actions_path.exists():
             actions = yaml.safe_load(actions_path.open())
+
+        return meta, config, actions
+
+    @staticmethod
+    def _load_metadata(charm_root: Path):
+        metadata_path = charm_root / "charmcraft.yaml"
+        meta = yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+        config = meta.get("config", None)
+        actions = meta.get("actions", None)
+        return meta, config, actions
+
+    @staticmethod
+    def autoload(charm_type: Type["CharmType"]):
+        charm_source_path = Path(inspect.getfile(charm_type))
+        charm_root = charm_source_path.parent.parent
+
+        metadata_path = charm_root / "metadata.yaml"
+
+        if metadata_path.exists():
+            meta, config, actions = _CharmSpec._load_metadata_legacy(charm_root)
+        else:
+            meta, config, actions = _CharmSpec._load_metadata(charm_root)
+
+        if not meta:
+            raise MetadataNotFoundError(
+                f"invalid charm root {charm_root!r}; "
+                f"expected to contain at least a `charmcraft.yaml` file "
+                f"(or a `metadata.yaml` file if it's an old charm).",
+            )
 
         return _CharmSpec(
             charm_type=charm_type,

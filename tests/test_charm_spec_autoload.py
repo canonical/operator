@@ -38,51 +38,69 @@ def create_tempcharm(
     actions=None,
     config=None,
     name: str = "MyCharm",
+    legacy: bool = True,
 ):
     src = root / "src"
     src.mkdir(parents=True)
     charmpy = src / "charm.py"
     charmpy.write_text(charm)
 
-    if meta is not None:
-        (root / "metadata.yaml").write_text(yaml.safe_dump(meta))
+    if legacy:
+        if meta is not None:
+            (root / "metadata.yaml").write_text(yaml.safe_dump(meta))
 
-    if actions is not None:
-        (root / "actions.yaml").write_text(yaml.safe_dump(actions))
+        if actions is not None:
+            (root / "actions.yaml").write_text(yaml.safe_dump(actions))
 
-    if config is not None:
-        (root / "config.yaml").write_text(yaml.safe_dump(config))
+        if config is not None:
+            (root / "config.yaml").write_text(yaml.safe_dump(config))
+    else:
+        unified_meta = meta or {}
+        if actions:
+            unified_meta["actions"] = actions
+        if config:
+            unified_meta["config"] = config
+        if unified_meta:
+            (root / "charmcraft.yaml").write_text(yaml.safe_dump(unified_meta))
 
     with import_name(name, charmpy) as charm:
         yield charm
 
 
-def test_meta_autoload(tmp_path):
-    with create_tempcharm(tmp_path, meta={"name": "foo"}) as charm:
+@pytest.mark.parametrize("legacy", (True, False))
+def test_meta_autoload(tmp_path, legacy):
+    with create_tempcharm(tmp_path, legacy=legacy, meta={"name": "foo"}) as charm:
         ctx = Context(charm)
         ctx.run("start", State())
 
 
-def test_no_meta_raises(tmp_path):
+@pytest.mark.parametrize("legacy", (True, False))
+def test_no_meta_raises(tmp_path, legacy):
     with create_tempcharm(
         tmp_path,
+        legacy=legacy,
     ) as charm:
         # metadata not found:
         with pytest.raises(ContextSetupError):
             Context(charm)
 
 
-def test_relations_ok(tmp_path):
+@pytest.mark.parametrize("legacy", (True, False))
+def test_relations_ok(tmp_path, legacy):
     with create_tempcharm(
-        tmp_path, meta={"name": "josh", "requires": {"cuddles": {"interface": "arms"}}}
+        tmp_path,
+        legacy=legacy,
+        meta={"name": "josh", "requires": {"cuddles": {"interface": "arms"}}},
     ) as charm:
         # this would fail if there were no 'cuddles' relation defined in meta
         Context(charm).run("start", State(relations=[Relation("cuddles")]))
 
 
-def test_config_defaults(tmp_path):
+@pytest.mark.parametrize("legacy", (True, False))
+def test_config_defaults(tmp_path, legacy):
     with create_tempcharm(
         tmp_path,
+        legacy=legacy,
         meta={"name": "josh"},
         config={"options": {"foo": {"type": "bool", "default": True}}},
     ) as charm:
