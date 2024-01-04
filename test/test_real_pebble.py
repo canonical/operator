@@ -306,3 +306,5 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsT
     @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
+
+# TODO(benhoyt): add some real Pebble tests for Notices here

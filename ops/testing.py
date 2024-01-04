@@ -1102,11 +1102,12 @@ class Harness(Generic[CharmType]):
     def pebble_notify(self, container_name: str, key: str, *,
                       data: Optional[Dict[str, str]] = None,
                       repeat_after: Optional[datetime.timedelta] = None,
-                      type: str = 'custom'):
+                      type: Union[pebble.NoticeType, str] = pebble.NoticeType.CUSTOM) -> str:
         """Record a Pebble notice with the specified key and data.
 
-        If the notice is new or was repeated, this will trigger a notice event
-        of the appropriate type, for example :class:`ops.PebbleCustomNoticeEvent`.
+        If :meth:`begin` has been called and the notice is new or was repeated,
+        this will trigger a notice event of the appropriate type, for example
+        :class:`ops.PebbleCustomNoticeEvent`.
 
         Args:
             container_name: Name of workload container
@@ -1114,16 +1115,21 @@ class Harness(Generic[CharmType]):
             data: Data fields for this notice
             repeat_after: Prevent notice with same type and key from
                 reoccurring within this duration
-            type: Notice type; should normally be "custom" means a custom notice
-        """
-        # TODO: behaviour if begin() has not been called?
+            type: Notice type (currently only "custom" notices are supported)
 
+        Returns:
+            The notice's ID.
+        """
         container = self.model.unit.get_container(container_name)
         client = self._backend._pebble_clients[container.name]
+        type_str = type.value if isinstance(type, pebble.NoticeType) else type
 
-        id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
-        if type == 'custom' and new_or_repeated:
-            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type, key)
+        id, new_or_repeated = client._notify(type_str, key, data=data, repeat_after=repeat_after)
+
+        if self._charm is not None and type_str == 'custom' and new_or_repeated:
+            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type_str, key)
+
+        return id
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -3277,6 +3283,10 @@ class _TestingPebbleClient:
 
         Return a tuple of (notice_id, new_or_repeated).
         """
+        if type != 'custom':
+            message = f'invalid type "{type}" (can only add "custom" notices)'
+            raise self._api_error(400, message) from None
+
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         uid = 0  # hard-code UID as root (Pebble and charms ran as root for now)
@@ -3290,7 +3300,7 @@ class _TestingPebbleClient:
             notice = pebble.Notice(
                 id=str(self._last_notice_id),
                 user_id=uid,
-                type=type,
+                type=pebble.NoticeType(type),
                 key=key,
                 first_occurred=now,
                 last_occurred=now,
@@ -3350,7 +3360,7 @@ class _TestingPebbleClient:
             filter_user_id = None
 
         if types is not None:
-            types = list(types)
+            types = [(t.value if isinstance(t, pebble.NoticeType) else t) for t in types]
         if keys is not None:
             keys = list(keys)
 
@@ -3360,13 +3370,13 @@ class _TestingPebbleClient:
                 continue
             notices.append(notice)
 
-        notices.sort(key=lambda notice: notice.last_repeated, reverse=True)
+        notices.sort(key=lambda notice: notice.last_repeated)
         return notices
 
     @staticmethod
     def _notice_matches(notice: pebble.Notice,
                         user_id: Optional[int] = None,
-                        types: Optional[List[Union[pebble.NoticeType, str]]] = None,
+                        types: Optional[List[str]] = None,
                         keys: Optional[List[str]] = None,
                         after: Optional[datetime.datetime] = None) -> bool:
         # Same logic as NoticeFilter.matches in Pebble.
