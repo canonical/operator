@@ -1106,12 +1106,14 @@ class Harness(Generic[CharmType]):
         """Record a Pebble notice with the specified key and data.
 
         If the notice is new or was repeated, this will trigger a notice event
-        of the appropriate type, for example :class:`PebbleCustomNoticeEvent`.
+        of the appropriate type, for example :class:`ops.PebbleCustomNoticeEvent`.
 
         Args:
             container_name: Name of workload container
             key: Notice key; must be in "domain.com/path" format
             data: Data fields for this notice
+            repeat_after: Prevent notice with same type and key from
+                reoccurring within this duration
             type: Notice type; should normally be "custom" means a custom notice
         """
         # TODO: behaviour if begin() has not been called?
@@ -1119,7 +1121,7 @@ class Harness(Generic[CharmType]):
         container = self.model.unit.get_container(container_name)
         client = self._backend._pebble_clients[container.name]
 
-        id, new_or_repeated = client._notify(type, key, data=data)
+        id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
         if type == 'custom' and new_or_repeated:
             self.charm.on[container_name].pebble_custom_notice.emit(container, id, type, key)
 
