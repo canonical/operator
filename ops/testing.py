@@ -18,6 +18,7 @@
 import dataclasses
 import datetime
 import fnmatch
+import http
 import inspect
 import io
 import ipaddress
@@ -1097,6 +1098,30 @@ class Harness(Generic[CharmType]):
         container = self.model.unit.get_container(container_name)
         self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
+
+    def pebble_notify(self, container_name: str, key: str, *,
+                      data: Optional[Dict[str, str]] = None,
+                      repeat_after: Optional[datetime.timedelta] = None,
+                      type: str = 'custom'):
+        """Record a Pebble notice with the specified key and data.
+
+        If the notice is new or was repeated, this will trigger a notice event
+        of the appropriate type, for example :class:`PebbleCustomNoticeEvent`.
+
+        Args:
+            container_name: Name of workload container
+            key: Notice key; must be in "domain.com/path" format
+            data: Data fields for this notice
+            type: Notice type; should normally be "custom" means a custom notice
+        """
+        # TODO: behaviour if begin() has not been called?
+
+        container = self.model.unit.get_container(container_name)
+        client = self._backend._pebble_clients[container.name]
+
+        id, new_or_repeated = client._notify(type, key, data=data)
+        if type == 'custom' and new_or_repeated:
+            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type, key)
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -2723,6 +2748,8 @@ class _TestingPebbleClient:
         self._root = container_root
         self._backend = backend
         self._exec_handlers: Dict[Tuple[str, ...], ExecHandler] = {}
+        self._notices: Dict[Tuple[Optional[int], str, str], pebble.Notice] = {}
+        self._last_notice_id = 0
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
@@ -3002,9 +3029,7 @@ class _TestingPebbleClient:
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if not file_path.exists():
-            raise pebble.APIError(
-                body={}, code=404, status='Not Found',
-                message=f"stat {path}: no such file or directory")
+            raise self._api_error(404, f"stat {path}: no such file or directory") from None
         files = [file_path]
         if not itself:
             try:
@@ -3133,19 +3158,13 @@ class _TestingPebbleClient:
         handler = self._find_exec_handler(command)
         if handler is None:
             message = "execution handler not found, please register one using Harness.handle_exec"
-            raise pebble.APIError(
-                body={}, code=500, status='Internal Server Error', message=message
-            )
+            raise self._api_error(500, message) from None
         environment = {} if environment is None else environment
         if service_context is not None:
             plan = self.get_plan()
             if service_context not in plan.services:
                 message = f'context service "{service_context}" not found'
-                body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
-                        'result': {'message': message}}
-                raise pebble.APIError(
-                    body=body, code=500, status='Internal Server Error', message=message
-                )
+                raise self._api_error(500, message) from None
             service = plan.services[service_context]
             environment = {**service.environment, **environment}
             working_dir = service.working_dir if working_dir is None else working_dir
@@ -3236,11 +3255,7 @@ class _TestingPebbleClient:
             if service not in plan.services or not self.get_services([service])[0].is_running():
                 # conform with the real pebble api
                 message = f'cannot send signal to "{service}": service is not running'
-                body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
-                        'result': {'message': message}}
-                raise pebble.APIError(
-                    body=body, code=500, status='Internal Server Error', message=message
-                )
+                raise self._api_error(500, message) from None
 
         # Check if signal name is valid
         try:
@@ -3249,19 +3264,69 @@ class _TestingPebbleClient:
             # conform with the real pebble api
             first_service = next(iter(service_names))
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
-            body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
-                    'result': {'message': message}}
-            raise pebble.APIError(
-                body=body,
-                code=500,
-                status='Internal Server Error',
-                message=message) from None
+            raise self._api_error(500, message) from None
 
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
 
+    def _notify(self, type: str, key: str, data: Optional[Dict[str, str]] = None,
+                repeat_after: Optional[datetime.timedelta] = None) -> Tuple[str, bool]:
+        """Record an occurrence of a notice with the specified details.
+
+        Return a tuple of (notice_id, new_or_repeated).
+        """
+        # The shape of the code below is taken from State.AddNotice in Pebble.
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        uid = 0  # hard-code UID as root (Pebble and charms ran as root for now)
+
+        new_or_repeated = False
+        unique_key = (uid, type, key)
+        notice = self._notices.get(unique_key)
+        if notice is None:
+            # First occurrence of this notice uid+type+key
+            self._last_notice_id += 1
+            notice = pebble.Notice(
+                id=str(self._last_notice_id),
+                user_id=uid,
+                type=type,
+                key=key,
+                first_occurred=now,
+                last_occurred=now,
+                last_repeated=now,
+                expire_after=datetime.timedelta(days=7),
+                occurrences=1,
+            )
+            self._notices[unique_key] = notice
+            new_or_repeated = True
+        else:
+            # Additional occurrence, update existing notice
+            notice.occurrences += 1
+            if repeat_after is None or now > notice.last_repeated + repeat_after:
+                # Update last repeated time if repeat-after time has elapsed (or is None)
+                notice.last_repeated = now
+                new_or_repeated = True
+
+        notice.last_occurred = now
+        notice.last_data = data or {}
+        notice.repeat_after = repeat_after
+
+        return notice.id, new_or_repeated
+
+    def _api_error(self, code: int, message: str) -> pebble.APIError:
+        status = http.HTTPStatus(code).phrase
+        body = {
+            'type': 'error',
+            'status-code': code,
+            'status': status,
+            'result': {'message': message},
+        }
+        return pebble.APIError(body, code, status, message)
+
     def get_notice(self, id: str) -> pebble.Notice:
-        raise NotImplementedError(self.get_notice)
+        for notice in self._notices.values():
+            if notice.id == id:
+                return notice
+        raise self._api_error(404, f'cannot find notice with ID "{id}"') from None
 
     def get_notices(
         self,
@@ -3272,4 +3337,43 @@ class _TestingPebbleClient:
         keys: Optional[Iterable[str]] = None,
         after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
-        raise NotImplementedError(self.get_notices)
+        # Similar logic as api_notices.go:v1GetNotices in Pebble.
+
+        filter_user_id = 0  # default is to filter by request UID (root)
+        if user_id is not None:
+            filter_user_id = user_id
+        if select is not None:
+            if user_id is not None:
+                raise self._api_error(400, 'cannot use both "select" and "user_id"') from None
+            filter_user_id = None
+
+        if types is not None:
+            types = list(types)
+        if keys is not None:
+            keys = list(keys)
+
+        notices: List[pebble.Notice] = []
+        for notice in self._notices.values():
+            if not self._notice_matches(notice, filter_user_id, types, keys, after):
+                continue
+            notices.append(notice)
+
+        notices.sort(key=lambda notice: notice.last_repeated, reverse=True)
+        return notices
+
+    @staticmethod
+    def _notice_matches(notice: pebble.Notice,
+                        user_id: Optional[int] = None,
+                        types: Optional[List[Union[pebble.NoticeType, str]]] = None,
+                        keys: Optional[List[str]] = None,
+                        after: Optional[datetime.datetime] = None) -> bool:
+        # Same logic as NoticeFilter.matches in Pebble.
+        if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
+            return False
+        if types is not None and notice.type not in types:
+            return False
+        if keys is not None and notice.key not in keys:
+            return False
+        if after is not None and not (notice.last_repeated > after):
+            return False
+        return True
