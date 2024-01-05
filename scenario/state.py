@@ -948,7 +948,6 @@ class _CharmSpec(_DCBase):
 
     charm_type: Type["CharmType"]
 
-    # TODO: consider unifying the data model since nowadays it's all in one file
     meta: Optional[Dict[str, Any]]
     actions: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
