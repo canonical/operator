@@ -5490,7 +5490,7 @@ class TestActions(unittest.TestCase):
             self.harness.run_action("results")
 
 
-class TestNotices(unittest.TestCase):
+class TestNotify(unittest.TestCase):
     def test_notify_basics(self):
         harness = ops.testing.Harness(ContainerEventCharm, meta="""
             name: notifier
@@ -5577,21 +5577,6 @@ class TestNotices(unittest.TestCase):
         }]
         self.assertEqual(harness.charm.changes, expected_changes)
 
-    def test_notify_unknown_type(self):
-        harness = ops.testing.Harness(ContainerEventCharm, meta="""
-            name: notifier
-            containers:
-              foo:
-                resource: foo-image
-        """)
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        harness.charm.observe_container_events('foo')
-
-        with self.assertRaises(pebble.APIError) as cm:
-            harness.pebble_notify('foo', 'example.com/n1', type='unknown')
-        self.assertEqual(cm.exception.code, 400)
-
     def test_notify_no_begin(self):
         num_notices = 0
 
@@ -5619,28 +5604,29 @@ class TestNotices(unittest.TestCase):
         self.assertNotEqual(id, '')
         self.assertEqual(num_notices, 0)
 
-    def test_get_notice(self):
-        harness = ops.testing.Harness(ContainerEventCharm, meta="""
-            name: notifier
-            containers:
-              foo:
-                resource: foo-image
-        """)
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        harness.charm.observe_container_events('foo')
 
-        id1 = harness.pebble_notify('foo', 'example.com/n1')
-        id2 = harness.pebble_notify('foo', 'example.com/n2', data={'x': 'y'})
+class PebbleNoticesMixin:
+    client: ops.pebble.Client
+
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertIsNone = unittest.TestCase.assertIsNone  # noqa
+    assertLess = unittest.TestCase.assertLess  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
+    assertGreaterEqual = unittest.TestCase.assertGreaterEqual  # noqa
+
+    def test_get_notice_by_id(self):
+        client = self.client
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        id1 = client.notify(pebble.NoticeType.CUSTOM, key1)
+        id2 = client.notify(pebble.NoticeType.CUSTOM, key2, data={'x': 'y'})
         time.sleep(0.01)
-        harness.pebble_notify('foo', 'example.com/n2', data={'k': 'v', 'foo': 'bar'})
+        client.notify(pebble.NoticeType.CUSTOM, key2, data={'k': 'v', 'foo': 'bar'})
 
-        container = harness.model.unit.containers['foo']
-        notice = container.get_notice(id1)
+        notice = client.get_notice(id1)
         self.assertEqual(notice.id, id1)
-        self.assertEqual(notice.user_id, 0)
         self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
-        self.assertEqual(notice.key, 'example.com/n1')
+        self.assertEqual(notice.key, key1)
         self.assertEqual(notice.first_occurred, notice.last_occurred)
         self.assertEqual(notice.first_occurred, notice.last_repeated)
         self.assertEqual(notice.occurrences, 1)
@@ -5648,11 +5634,10 @@ class TestNotices(unittest.TestCase):
         self.assertIsNone(notice.repeat_after)
         self.assertEqual(notice.expire_after, datetime.timedelta(days=7))
 
-        notice = container.get_notice(id2)
+        notice = client.get_notice(id2)
         self.assertEqual(notice.id, id2)
-        self.assertEqual(notice.user_id, 0)
         self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
-        self.assertEqual(notice.key, 'example.com/n2')
+        self.assertEqual(notice.key, key2)
         self.assertLess(notice.first_occurred, notice.last_occurred)
         self.assertLess(notice.first_occurred, notice.last_repeated)
         self.assertEqual(notice.last_occurred, notice.last_repeated)
@@ -5661,55 +5646,41 @@ class TestNotices(unittest.TestCase):
         self.assertIsNone(notice.repeat_after)
         self.assertEqual(notice.expire_after, datetime.timedelta(days=7))
 
-        with self.assertRaises(ops.ModelError):
-            container.get_notice(id1 + 'notfound')
-
     def test_get_notices(self):
-        harness = ops.testing.Harness(ContainerEventCharm, meta="""
-            name: notifier
-            containers:
-              foo:
-                resource: foo-image
-        """)
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        harness.charm.observe_container_events('foo')
+        client = self.client
 
-        id1 = harness.pebble_notify('foo', 'example.com/n1')
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        key3 = 'example.com/' + os.urandom(16).hex()
 
-        container = harness.model.unit.containers['foo']
-        notice = container.get_notice(id1)
-        after = notice.last_repeated
-
+        client.notify(pebble.NoticeType.CUSTOM, key1)
         time.sleep(0.01)
-        harness.pebble_notify('foo', 'example.com/n2')
+        client.notify(pebble.NoticeType.CUSTOM, key2)
         time.sleep(0.01)
-        harness.pebble_notify('foo', 'example.com/n3')
+        client.notify(pebble.NoticeType.CUSTOM, key3)
 
-        notices = container.get_notices()
+        notices = client.get_notices()
+        self.assertGreaterEqual(len(notices), 3)
+
+        notices = client.get_notices(keys=[key1, key2, key3])
         self.assertEqual(len(notices), 3)
-        self.assertEqual(notices[0].key, 'example.com/n1')
-        self.assertEqual(notices[1].key, 'example.com/n2')
-        self.assertEqual(notices[2].key, 'example.com/n3')
+        self.assertEqual(notices[0].key, key1)
+        self.assertEqual(notices[1].key, key2)
+        self.assertEqual(notices[2].key, key3)
         self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
         self.assertLess(notices[1].last_repeated, notices[2].last_repeated)
 
-        notices = container.get_notices(keys=['example.com/n2'])
+        notices = client.get_notices(keys=[key2])
         self.assertEqual(len(notices), 1)
-        self.assertEqual(notices[0].key, 'example.com/n2')
+        self.assertEqual(notices[0].key, key2)
 
-        notices = container.get_notices(keys=['example.com/n1', 'example.com/n3'])
+        notices = client.get_notices(keys=[key1, key3])
         self.assertEqual(len(notices), 2)
-        self.assertEqual(notices[0].key, 'example.com/n1')
-        self.assertEqual(notices[1].key, 'example.com/n3')
+        self.assertEqual(notices[0].key, key1)
+        self.assertEqual(notices[1].key, key3)
         self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
 
-        notices = container.get_notices(after=after)
-        self.assertEqual(len(notices), 2)
-        self.assertEqual(notices[0].key, 'example.com/n2')
-        self.assertEqual(notices[1].key, 'example.com/n3')
-        self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
 
-        notices = container.get_notices(keys=['example.com/n3'], after=after)
-        self.assertEqual(len(notices), 1)
-        self.assertEqual(notices[0].key, 'example.com/n3')
+class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMixin):
+    def setUp(self):
+        self.client = self.get_testing_client()

@@ -2744,7 +2744,6 @@ class Container:
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
-        after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
         """Query for notices that match all of the provided filters.
 
@@ -2756,7 +2755,6 @@ class Container:
             user_id=user_id,
             types=types,
             keys=keys,
-            after=after,
         )
 
     # Define this last to avoid clashes with the imported "pebble" module

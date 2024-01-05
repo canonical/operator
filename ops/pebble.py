@@ -2744,6 +2744,33 @@ class Client:
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
 
+    def notify(self, type: NoticeType, key: str, *,
+               data: Optional[Dict[str, str]] = None,
+               repeat_after: Optional[datetime.timedelta] = None) -> str:
+        """Record an occurrence of a notice with the specified options.
+
+        Args:
+            type: Notice type (currently only "custom" notices are supported)
+            key: Notice key; must be in "domain.com/path" format
+            data: Data fields for this notice
+            repeat_after: Prevent notice with same type and key from
+                reoccurring within this duration
+
+        Returns:
+            The notice's ID.
+        """
+        body: Dict[str, Any] = {
+            'action': 'add',
+            'type': type.value,
+            'key': key,
+        }
+        if data is not None:
+            body['data'] = data
+        if repeat_after is not None:
+            body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
+        resp = self._request('POST', '/v1/notices', body=body)
+        return resp['result']['id']
+
     def get_notice(self, id: str) -> Notice:
         """Get details about a single notice by ID.
 
@@ -2760,7 +2787,6 @@ class Client:
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
-        after: Optional[datetime.datetime] = None,
     ) -> List[Notice]:
         """Query for notices that match all of the provided filters.
 
@@ -2772,6 +2798,11 @@ class Client:
         user (notices whose ``user_id`` matches the requester UID as well as
         public notices).
 
+        Note that the "after" filter is not yet implemented, as it's not
+        needed right now and it's hard to implement correctly with Python's
+        datetime type, which only has microsecond precision (and Go's Time
+        type has nanosecond precision).
+
         Args:
             select: select which notices to return (instead of returning
                 notices for the current user)
@@ -2779,7 +2810,6 @@ class Client:
                 public notices (only works for Pebble admins)
             types: filter for notices with any of the specified types
             keys: filter for notices with any of the specified keys
-            after: filter for notices that were last repeated after this time
         """
         query: Dict[str, Union[str, List[str]]] = {}
         if select is not None:
@@ -2790,8 +2820,6 @@ class Client:
             query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
         if keys is not None:
             query['keys'] = list(keys)
-        if after is not None:
-            query['after'] = after.isoformat()
         resp = self._request('GET', '/v1/notices', query)
         return [Notice.from_dict(info) for info in resp['result']]
 

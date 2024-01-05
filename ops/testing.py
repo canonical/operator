@@ -1102,7 +1102,7 @@ class Harness(Generic[CharmType]):
     def pebble_notify(self, container_name: str, key: str, *,
                       data: Optional[Dict[str, str]] = None,
                       repeat_after: Optional[datetime.timedelta] = None,
-                      type: Union[pebble.NoticeType, str] = pebble.NoticeType.CUSTOM) -> str:
+                      type: pebble.NoticeType = pebble.NoticeType.CUSTOM) -> str:
         """Record a Pebble notice with the specified key and data.
 
         If :meth:`begin` has been called and the notice is new or was repeated,
@@ -1122,12 +1122,11 @@ class Harness(Generic[CharmType]):
         """
         container = self.model.unit.get_container(container_name)
         client = self._backend._pebble_clients[container.name]
-        type_str = type.value if isinstance(type, pebble.NoticeType) else type
 
-        id, new_or_repeated = client._notify(type_str, key, data=data, repeat_after=repeat_after)
+        id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
 
-        if self._charm is not None and type_str == 'custom' and new_or_repeated:
-            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type_str, key)
+        if self._charm is not None and type == pebble.NoticeType.CUSTOM and new_or_repeated:
+            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type.value, key)
 
         return id
 
@@ -3277,14 +3276,21 @@ class _TestingPebbleClient:
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
 
-    def _notify(self, type: str, key: str, data: Optional[Dict[str, str]] = None,
+    def notify(self, type: pebble.NoticeType, key: str, *,
+               data: Optional[Dict[str, str]] = None,
+               repeat_after: Optional[datetime.timedelta] = None) -> str:
+        notice_id, _ = self._notify(type, key, data=data, repeat_after=repeat_after)
+        return notice_id
+
+    def _notify(self, type: pebble.NoticeType, key: str, *,
+                data: Optional[Dict[str, str]] = None,
                 repeat_after: Optional[datetime.timedelta] = None) -> Tuple[str, bool]:
         """Record an occurrence of a notice with the specified details.
 
         Return a tuple of (notice_id, new_or_repeated).
         """
-        if type != 'custom':
-            message = f'invalid type "{type}" (can only add "custom" notices)'
+        if type != pebble.NoticeType.CUSTOM:
+            message = f'invalid type "{type.value}" (can only add "custom" notices)'
             raise self._api_error(400, message) from None
 
         # The shape of the code below is taken from State.AddNotice in Pebble.
@@ -3292,7 +3298,7 @@ class _TestingPebbleClient:
         uid = 0  # hard-code UID as root (Pebble and charms ran as root for now)
 
         new_or_repeated = False
-        unique_key = (uid, type, key)
+        unique_key = (uid, type.value, key)
         notice = self._notices.get(unique_key)
         if notice is None:
             # First occurrence of this notice uid+type+key
@@ -3347,7 +3353,6 @@ class _TestingPebbleClient:
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
-        after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
         # Similar logic as api_notices.go:v1GetNotices in Pebble.
 
@@ -3366,7 +3371,7 @@ class _TestingPebbleClient:
 
         notices: List[pebble.Notice] = []
         for notice in self._notices.values():
-            if not self._notice_matches(notice, filter_user_id, types, keys, after):
+            if not self._notice_matches(notice, filter_user_id, types, keys):
                 continue
             notices.append(notice)
 
@@ -3377,15 +3382,12 @@ class _TestingPebbleClient:
     def _notice_matches(notice: pebble.Notice,
                         user_id: Optional[int] = None,
                         types: Optional[List[str]] = None,
-                        keys: Optional[List[str]] = None,
-                        after: Optional[datetime.datetime] = None) -> bool:
+                        keys: Optional[List[str]] = None) -> bool:
         # Same logic as NoticeFilter.matches in Pebble.
         if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
             return False
         if types is not None and notice.type not in types:
             return False
         if keys is not None and notice.key not in keys:
-            return False
-        if after is not None and not (notice.last_repeated > after):
             return False
         return True
