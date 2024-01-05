@@ -2751,7 +2751,7 @@ class Client:
 
         Args:
             type: Notice type (currently only "custom" notices are supported)
-            key: Notice key; must be in "domain.com/path" format
+            key: Notice key; must be in "example.com/path" format
             data: Data fields for this notice
             repeat_after: Prevent notice with same type and key from
                 reoccurring within this duration

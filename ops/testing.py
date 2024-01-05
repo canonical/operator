@@ -1111,7 +1111,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             container_name: Name of workload container
-            key: Notice key; must be in "domain.com/path" format
+            key: Notice key; must be in "example.com/path" format
             data: Data fields for this notice
             repeat_after: Prevent notice with same type and key from
                 reoccurring within this duration
@@ -3036,7 +3036,7 @@ class _TestingPebbleClient:
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if not file_path.exists():
-            raise self._api_error(404, f"stat {path}: no such file or directory") from None
+            raise self._api_error(404, f"stat {path}: no such file or directory")
         files = [file_path]
         if not itself:
             try:
@@ -3165,13 +3165,13 @@ class _TestingPebbleClient:
         handler = self._find_exec_handler(command)
         if handler is None:
             message = "execution handler not found, please register one using Harness.handle_exec"
-            raise self._api_error(500, message) from None
+            raise self._api_error(500, message)
         environment = {} if environment is None else environment
         if service_context is not None:
             plan = self.get_plan()
             if service_context not in plan.services:
                 message = f'context service "{service_context}" not found'
-                raise self._api_error(500, message) from None
+                raise self._api_error(500, message)
             service = plan.services[service_context]
             environment = {**service.environment, **environment}
             working_dir = service.working_dir if working_dir is None else working_dir
@@ -3262,7 +3262,7 @@ class _TestingPebbleClient:
             if service not in plan.services or not self.get_services([service])[0].is_running():
                 # conform with the real pebble api
                 message = f'cannot send signal to "{service}": service is not running'
-                raise self._api_error(500, message) from None
+                raise self._api_error(500, message)
 
         # Check if signal name is valid
         try:
@@ -3271,7 +3271,7 @@ class _TestingPebbleClient:
             # conform with the real pebble api
             first_service = next(iter(service_names))
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
-            raise self._api_error(500, message) from None
+            raise self._api_error(500, message)
 
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
@@ -3291,7 +3291,7 @@ class _TestingPebbleClient:
         """
         if type != pebble.NoticeType.CUSTOM:
             message = f'invalid type "{type.value}" (can only add "custom" notices)'
-            raise self._api_error(400, message) from None
+            raise self._api_error(400, message)
 
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -3344,7 +3344,7 @@ class _TestingPebbleClient:
         for notice in self._notices.values():
             if notice.id == id:
                 return notice
-        raise self._api_error(404, f'cannot find notice with ID "{id}"') from None
+        raise self._api_error(404, f'cannot find notice with ID "{id}"')
 
     def get_notices(
         self,
@@ -3361,7 +3361,7 @@ class _TestingPebbleClient:
             filter_user_id = user_id
         if select is not None:
             if user_id is not None:
-                raise self._api_error(400, 'cannot use both "select" and "user_id"') from None
+                raise self._api_error(400, 'cannot use both "select" and "user_id"')
             filter_user_id = None
 
         if types is not None:
