@@ -21,11 +21,14 @@ profile = "black"
 max-line-length = 99
 max-doc-length = 99
 exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
-select = ["E", "W", "F", "C", "N", "R", "D", "H"]
+select = ["E", "W", "F", "C", "N", "R", "D", "H", "Q0"]
 ignore = ["D105", "D107", "W503"]
 # D100, D101, D102, D103, D104: Ignore missing docstrings in tests
 per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
 docstring-convention = "google"
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]
