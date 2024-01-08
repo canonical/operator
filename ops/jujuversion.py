@@ -30,11 +30,11 @@ class JujuVersion:
     operators.
     """
 
-    _pattern_re = re.compile(r'''^
+    _pattern_re = re.compile(r"""^
     (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
     ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
     (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
-    ''', re.VERBOSE)
+    """, re.VERBOSE)
 
     def __init__(self, version: str):
         m = self._pattern_re.match(version)

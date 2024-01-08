@@ -89,7 +89,7 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(charm.started, True)
 
-        with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
+        with self.assertRaisesRegex(TypeError, 'observer methods must now be explicitly provided'):
             framework.observe(charm.on.start, charm)  # type: ignore
 
     def test_observe_decorated_method(self):
@@ -166,7 +166,7 @@ class TestCharm(unittest.TestCase):
                 self.seen.append(type(event).__name__)
 
         # language=YAML
-        self.meta = ops.CharmMeta.from_yaml(metadata='''
+        self.meta = ops.CharmMeta.from_yaml(metadata="""
 name: my-charm
 requires:
  req1:
@@ -183,7 +183,7 @@ peers:
    interface: peer1
  peer-2:
    interface: peer2
-''')
+""")
 
         charm = MyCharm(self.create_framework())
 
@@ -226,7 +226,7 @@ peers:
 
             def _on_stor1_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
-                this.assertEqual(event.storage.location, Path("/var/srv/stor1/0"))
+                this.assertEqual(event.storage.location, Path('/var/srv/stor1/0'))
 
             def _on_stor2_detach(self, event: ops.StorageDetachingEvent):
                 self.seen.append(type(event).__name__)
@@ -238,7 +238,7 @@ peers:
                 self.seen.append(type(event).__name__)
 
         # language=YAML
-        self.meta = ops.CharmMeta.from_yaml('''
+        self.meta = ops.CharmMeta.from_yaml("""
 name: my-charm
 storage:
   stor-4:
@@ -259,11 +259,11 @@ storage:
     multiple:
       range: 2-
     type: filesystem
-''')
+""")
 
         fake_script(
             self,
-            "storage-get",
+            'storage-get',
             """
             if [ "$1" = "-s" ]; then
                 id=${2#*/}
@@ -296,7 +296,7 @@ storage:
         )
         fake_script(
             self,
-            "storage-list",
+            'storage-list',
             """
             echo '["disks/0"]'
             """,
@@ -309,12 +309,12 @@ storage:
 
         charm = MyCharm(self.create_framework())
 
-        charm.on['stor1'].storage_attached.emit(ops.Storage("stor1", 0, charm.model._backend))
-        charm.on['stor2'].storage_detaching.emit(ops.Storage("stor2", 0, charm.model._backend))
-        charm.on['stor3'].storage_attached.emit(ops.Storage("stor3", 0, charm.model._backend))
-        charm.on['stor-4'].storage_attached.emit(ops.Storage("stor-4", 0, charm.model._backend))
+        charm.on['stor1'].storage_attached.emit(ops.Storage('stor1', 0, charm.model._backend))
+        charm.on['stor2'].storage_detaching.emit(ops.Storage('stor2', 0, charm.model._backend))
+        charm.on['stor3'].storage_attached.emit(ops.Storage('stor3', 0, charm.model._backend))
+        charm.on['stor-4'].storage_attached.emit(ops.Storage('stor-4', 0, charm.model._backend))
         charm.on['stor-multiple-dashes'].storage_attached.emit(
-            ops.Storage("stor-multiple-dashes", 0, charm.model._backend))
+            ops.Storage('stor-multiple-dashes', 0, charm.model._backend))
 
         self.assertEqual(charm.seen, [
             'StorageAttachedEvent',
@@ -346,12 +346,12 @@ storage:
                 self.seen.append(type(event).__name__)
 
         # language=YAML
-        self.meta = ops.CharmMeta.from_yaml(metadata='''
+        self.meta = ops.CharmMeta.from_yaml(metadata="""
 name: my-charm
 containers:
   container-a:
   containerb:
-''')
+""")
 
         charm = MyCharm(self.create_framework())
 
@@ -377,7 +377,7 @@ containers:
 
     def test_relations_meta(self):
         # language=YAML
-        self.meta = ops.CharmMeta.from_yaml('''
+        self.meta = ops.CharmMeta.from_yaml("""
 name: my-charm
 requires:
   database:
@@ -387,7 +387,7 @@ requires:
   metrics:
     interface: prometheus-scraping
     optional: true
-''')
+""")
 
         self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
         self.assertEqual(self.meta.requires['database'].limit, 1)
@@ -402,32 +402,32 @@ requires:
     def test_relations_meta_limit_type_validation(self):
         with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
             # language=YAML
-            self.meta = ops.CharmMeta.from_yaml('''
+            self.meta = ops.CharmMeta.from_yaml("""
 name: my-charm
 requires:
   database:
     interface: mongodb
     limit: foobar
-''')
+""")
 
     def test_relations_meta_scope_type_validation(self):
         with self.assertRaisesRegex(TypeError,
                                     "scope should be one of 'global', 'container'; not 'foobar'"):
             # language=YAML
-            self.meta = ops.CharmMeta.from_yaml('''
+            self.meta = ops.CharmMeta.from_yaml("""
 name: my-charm
 requires:
   database:
     interface: mongodb
     scope: foobar
-''')
+""")
 
     @classmethod
     def _get_action_test_meta(cls):
         # language=YAML
-        return ops.CharmMeta.from_yaml(metadata='''
+        return ops.CharmMeta.from_yaml(metadata="""
 name: my-charm
-''', actions='''
+""", actions="""
 foo-bar:
   description: "Foos the bar."
   params:
@@ -443,13 +443,13 @@ foo-bar:
 start:
   description: "Start the unit."
   additionalProperties: false
-''')
+""")
 
     def _setup_test_action(self):
         fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")
-        fake_script(self, 'action-set', "")
-        fake_script(self, 'action-log', "")
-        fake_script(self, 'action-fail', "")
+        fake_script(self, 'action-set', '')
+        fake_script(self, 'action-log', '')
+        fake_script(self, 'action-fail', '')
         self.meta = self._get_action_test_meta()
 
     def test_action_events(self):
@@ -479,12 +479,12 @@ start:
         self.assertIn('start_action', events)
 
         charm.on.foo_bar_action.emit()
-        self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
+        self.assertEqual(charm.seen_action_params, {'foo-name': 'name', 'silent': True})
         self.assertEqual(fake_script_calls(self), [
             ['action-get', '--format=json'],
-            ['action-log', "test-log"],
-            ['action-set', "res=val with spaces"],
-            ['action-fail', "test-fail"],
+            ['action-log', 'test-log'],
+            ['action-set', 'res=val with spaces'],
+            ['action-fail', 'test-fail'],
         ])
 
     def test_invalid_action_results(self):
@@ -571,9 +571,9 @@ containers:
         location: /test/otherdata
 """)
         self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
-        self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
-        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
-        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
+        self.assertIsInstance(meta.containers['test1'].mounts['data'], ops.ContainerStorageMeta)
+        self.assertEqual(meta.containers['test1'].mounts['data'].location, '/test/storagemount')
+        self.assertEqual(meta.containers['test1'].mounts['other'].location, '/test/otherdata')
 
     def test_containers_storage_multiple_mounts(self):
         meta = ops.CharmMeta.from_yaml("""
@@ -591,14 +591,14 @@ containers:
         location: /test/otherdata
 """)
         self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
-        self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
+        self.assertIsInstance(meta.containers['test1'].mounts['data'], ops.ContainerStorageMeta)
         self.assertEqual(
-            meta.containers['test1'].mounts["data"].locations[0],
+            meta.containers['test1'].mounts['data'].locations[0],
             '/test/storagemount')
-        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
+        self.assertEqual(meta.containers['test1'].mounts['data'].locations[1], '/test/otherdata')
 
         with self.assertRaises(RuntimeError):
-            meta.containers["test1"].mounts["data"].location
+            meta.containers['test1'].mounts['data'].location
 
     def test_secret_events(self):
         class MyCharm(ops.CharmBase):

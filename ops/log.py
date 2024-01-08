@@ -65,11 +65,11 @@ def setup_root_logging(model_backend: _ModelBackend, debug: bool = False,
                     value: BaseException,
                     tb: types.TracebackType):
         logger.error(
-            "Uncaught exception while in charm code:",
+            'Uncaught exception while in charm code:',
             exc_info=(etype, value, tb))
         if exc_stderr:
             print(f"Uncaught {etype.__name__} in charm code: {value}",
                   file=sys.stderr)
-            print("Use `juju debug-log` to see the full traceback.", file=sys.stderr)
+            print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
 
     sys.excepthook = except_hook

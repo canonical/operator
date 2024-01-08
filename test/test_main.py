@@ -195,7 +195,7 @@ class CharmInitTestCase(unittest.TestCase):
                     self._check(ops.CharmBase, use_juju_for_storage=True)
 
 
-@patch('sys.argv', new=("hooks/config-changed",))
+@patch('sys.argv', new=('hooks/config-changed',))
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestDispatch(unittest.TestCase):
@@ -322,7 +322,7 @@ class _TestMain(abc.ABC):
         self.charm_exec_path = os.path.relpath(charm_path, str(self.hooks_dir))
         shutil.copytree(str(TEST_CHARM_DIR), str(self.JUJU_CHARM_DIR))
 
-        charm_spec = importlib.util.spec_from_file_location("charm", charm_path)
+        charm_spec = importlib.util.spec_from_file_location('charm', charm_path)
         assert charm_spec is not None
         self.charm_module = importlib.util.module_from_spec(charm_spec)
         assert charm_spec.loader is not None
@@ -706,7 +706,7 @@ class _TestMain(abc.ABC):
         # Clear the calls during 'install'
         fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
         self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status',
-                                       set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
+                                       set_in_env={'EMIT_CUSTOM_EVENT': '1'}))
 
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
 
@@ -767,7 +767,7 @@ class _TestMain(abc.ABC):
             '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
             'Traceback .most recent call last.:\n'
             '  .*'
-            '    raise RuntimeError."failing as requested".\n'
+            '    raise RuntimeError..failing as requested..\n'
             'RuntimeError: failing as requested'
         )
         self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
@@ -822,7 +822,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         # interpreter for the child process to support virtual environments.
         fake_script(
             self,
-            "storage-get",
+            'storage-get',
             """
             if [ "$1" = "-s" ]; then
                 id=${2#*/}
@@ -855,7 +855,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         )
         fake_script(
             self,
-            "storage-list",
+            'storage-list',
             """
             echo '["disks/0"]'
             """,
@@ -993,7 +993,7 @@ class _TestMainWithDispatch(_TestMain):
         self.assertEqual(calls, expected)
 
     def test_non_executable_hook_and_dispatch(self):
-        (self.hooks_dir / "install").write_text("")
+        (self.hooks_dir / 'install').write_text('')
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
 
@@ -1115,7 +1115,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
         fake_script(
             self,
-            "storage-get",
+            'storage-get',
             """
             if [ "$1" = "-s" ]; then
                 id=${2#*/}
@@ -1148,7 +1148,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         )
         fake_script(
             self,
-            "storage-list",
+            'storage-list',
             """
             echo '["disks/0"]'
             """,
@@ -1192,7 +1192,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
         env['JUJU_VERSION'] = '2.8.0'
         fake_script(
             self,
-            "storage-get",
+            'storage-get',
             """
             if [ "$1" = "-s" ]; then
                 id=${2#*/}
@@ -1225,7 +1225,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
         )
         fake_script(
             self,
-            "storage-list",
+            'storage-list',
             """
             echo '["disks/0"]'
             """,
@@ -1236,21 +1236,21 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
 
 class TestStorageHeuristics(unittest.TestCase):
     def test_fallback_to_current_juju_version__too_old(self):
-        meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
-        with patch.dict(os.environ, {"JUJU_VERSION": "1.0"}):
-            self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
+        meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
+        with patch.dict(os.environ, {'JUJU_VERSION': '1.0'}):
+            self.assertFalse(_should_use_controller_storage(Path('/xyzzy'), meta))
 
     def test_fallback_to_current_juju_version__new_enough(self):
-        meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
-        with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
-            self.assertTrue(_should_use_controller_storage(Path("/xyzzy"), meta))
+        meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
+        with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
+            self.assertTrue(_should_use_controller_storage(Path('/xyzzy'), meta))
 
     def test_not_if_not_in_k8s(self):
-        meta = ops.CharmMeta.from_yaml("series: [ecs]")
-        with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
-            self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
+        meta = ops.CharmMeta.from_yaml('series: [ecs]')
+        with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
+            self.assertFalse(_should_use_controller_storage(Path('/xyzzy'), meta))
 
     def test_not_if_already_local(self):
-        meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
-        with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}), tempfile.NamedTemporaryFile() as fd:
+        meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
+        with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
             self.assertFalse(_should_use_controller_storage(Path(fd.name), meta))

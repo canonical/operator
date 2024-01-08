@@ -34,7 +34,7 @@ def get_python_filepaths(include_tests: bool = True):
     for root in roots:
         for dirpath, _, filenames in os.walk(root):
             for filename in filenames:
-                if filename.endswith(".py"):
+                if filename.endswith('.py'):
                     python_paths.append(os.path.join(dirpath, filename))
     return python_paths
 
@@ -45,13 +45,13 @@ class InfrastructureTests(unittest.TestCase):
         # ensure we're not using unneeded backslash to escape strings
         issues: typing.List[typing.Tuple[str, int, str]] = []
         for filepath in get_python_filepaths():
-            with open(filepath, "rt", encoding="utf8") as fh:
+            with open(filepath, 'rt', encoding='utf8') as fh:
                 for idx, line in enumerate(fh, 1):
-                    if (r'\"' in line or r"\'" in line) and "NOQA" not in line:
+                    if (r'\"' in line or r"\'" in line) and 'NOQA' not in line:
                         issues.append((filepath, idx, line.rstrip()))
         if issues:
-            msgs = ["{}:{:d}:{}".format(*issue) for issue in issues]
-            self.fail("Spurious backslashes found, please fix these quotings:\n" + "\n".join(msgs))
+            msgs = ['{}:{:d}:{}'.format(*issue) for issue in issues]
+            self.fail('Spurious backslashes found, please fix these quotings:\n' + '\n'.join(msgs))
 
     def test_ensure_copyright(self):
         # all non-empty Python files must have a proper copyright somewhere in the first 5 lines
@@ -61,14 +61,14 @@ class InfrastructureTests(unittest.TestCase):
             if os.stat(filepath).st_size == 0:
                 continue
 
-            with open(filepath, "rt", encoding="utf8") as fh:
+            with open(filepath, 'rt', encoding='utf8') as fh:
                 for line in itertools.islice(fh, 5):
                     if regex.match(line):
                         break
                 else:
                     issues.append(filepath)
         if issues:
-            self.fail("Please add copyright headers to the following files:\n" + "\n".join(issues))
+            self.fail('Please add copyright headers to the following files:\n' + '\n'.join(issues))
 
     def _run_setup(self, *args: str) -> str:
         proc = subprocess.run(
@@ -84,7 +84,7 @@ class InfrastructureTests(unittest.TestCase):
         self.assertEqual(setup_version, ops.__version__)
 
     def test_setup_description(self):
-        with open("README.md", "rt", encoding="utf8") as fh:
+        with open('README.md', 'rt', encoding='utf8') as fh:
             disk_readme = fh.read().strip()
 
         setup_readme = self._run_setup('--long-description')
@@ -117,7 +117,7 @@ class InfrastructureTests(unittest.TestCase):
 
 class ImportersTestCase(unittest.TestCase):
 
-    template = "from ops import {module_name}"
+    template = 'from ops import {module_name}'
 
     def test_imports(self):
         mod_names = [

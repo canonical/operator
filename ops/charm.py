@@ -607,9 +607,9 @@ class StorageEvent(HookEvent):
         """
         snapshot: Dict[str, Any] = {}
         if isinstance(self.storage, model.Storage):
-            snapshot["storage_name"] = self.storage.name
-            snapshot["storage_index"] = self.storage.index
-            snapshot["storage_location"] = str(self.storage.location)
+            snapshot['storage_name'] = self.storage.name
+            snapshot['storage_index'] = self.storage.index
+            snapshot['storage_location'] = str(self.storage.location)
         return snapshot
 
     def restore(self, snapshot: Dict[str, Any]):
@@ -617,15 +617,15 @@ class StorageEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        storage_name = snapshot.get("storage_name")
-        storage_index = snapshot.get("storage_index")
-        storage_location = snapshot.get("storage_location")
+        storage_name = snapshot.get('storage_name')
+        storage_index = snapshot.get('storage_index')
+        storage_location = snapshot.get('storage_location')
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
             self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore # noqa
             if self.storage is None:
-                msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
+                msg = 'failed loading storage (name={!r}, index={!r}) from snapshot'\
                     .format(storage_name, storage_index)
                 raise RuntimeError(msg)
             if storage_location is None:
@@ -1547,8 +1547,8 @@ class ContainerMeta:
         under each key.
         """
         for mount in mounts:
-            storage = mount.get("storage", "")
-            mount = mount.get("location", "")
+            storage = mount.get('storage', '')
+            mount = mount.get('location', '')
 
             if not mount:
                 continue
@@ -1590,13 +1590,13 @@ class ContainerStorageMeta:
 
     def __getattr__(self, name: str):
         # TODO(benhoyt): this should just be a property "location"
-        if name == "location":
+        if name == 'location':
             if len(self._locations) == 1:
                 return self._locations[0]
             else:
                 raise RuntimeError(
-                    "container has more than one mount point with the same backing storage. "
-                    "Request .locations to see a list"
+                    'container has more than one mount point with the same backing storage. '
+                    'Request .locations to see a list'
                 )
         else:
             raise AttributeError(

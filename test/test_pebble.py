@@ -77,14 +77,14 @@ class TestTypes(unittest.TestCase):
 
     def test_api_error(self):
         body = {
-            "result": {
-                "message": "no services to start provided"
+            'result': {
+                'message': 'no services to start provided'
             },
-            "status": "Bad Request",
-            "status-code": 400,
-            "type": "error"
+            'status': 'Bad Request',
+            'status-code': 400,
+            'type': 'error'
         }
-        error = pebble.APIError(body, 400, "Bad Request", "no services")
+        error = pebble.APIError(body, 400, 'Bad Request', 'no services')
         self.assertIsInstance(error, pebble.Error)
         self.assertEqual(error.body, body)
         self.assertEqual(error.code, 400)
@@ -286,18 +286,18 @@ single log
 
     def test_task_from_dict(self):
         d: pebble._TaskDict = {
-            "id": "78",
-            "kind": "start",
-            "progress": {
-                "done": 1,
-                "label": "",
-                "total": 1,
+            'id': '78',
+            'kind': 'start',
+            'progress': {
+                'done': 1,
+                'label': '',
+                'total': 1,
             },
-            "ready-time": "2021-01-28T14:37:03.270218778+13:00",
-            "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
-            "status": "Done",
-            "summary": 'Start service "svc"',
-            "data": {"exit-code": 42},
+            'ready-time': '2021-01-28T14:37:03.270218778+13:00',
+            'spawn-time': '2021-01-28T14:37:02.247158162+13:00',
+            'status': 'Done',
+            'summary': 'Start service "svc"',
+            'data': {'exit-code': 42},
         }
         task = pebble.Task.from_dict(d)
         self.assertEqual(task.id, '78')
@@ -347,16 +347,16 @@ single log
 
     def test_change_from_dict(self):
         d: 'pebble._ChangeDict' = {
-            "id": "70",
-            "kind": "autostart",
-            "err": "SILLY",
-            "ready": True,
-            "ready-time": "2021-01-28T14:37:04.291517768+13:00",
-            "spawn-time": "2021-01-28T14:37:02.247202105+13:00",
-            "status": "Done",
-            "summary": 'Autostart service "svc"',
-            "tasks": [],
-            "data": {"exit-code": 42},
+            'id': '70',
+            'kind': 'autostart',
+            'err': 'SILLY',
+            'ready': True,
+            'ready-time': '2021-01-28T14:37:04.291517768+13:00',
+            'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
+            'status': 'Done',
+            'summary': 'Autostart service "svc"',
+            'tasks': [],
+            'data': {'exit-code': 42},
         }
         change = pebble.Change.from_dict(d)
         self.assertEqual(change.id, '70')
@@ -541,7 +541,7 @@ checks:
         plan = pebble.Plan('')
         self.assertEqual(plan.log_targets, {})
 
-        location = "https://example.com:3100/loki/api/v1/push"
+        location = 'https://example.com:3100/loki/api/v1/push'
         plan = pebble.Plan(f"""
 log-targets:
   baz:
@@ -553,7 +553,7 @@ log-targets:
         self.assertEqual(len(plan.log_targets), 1)
         self.assertEqual(plan.log_targets['baz'].name, 'baz')
         self.assertEqual(plan.log_targets['baz'].override, 'replace')
-        self.assertEqual(plan.log_targets['baz'].type, "loki")
+        self.assertEqual(plan.log_targets['baz'].type, 'loki')
         self.assertEqual(plan.log_targets['baz'].location, location)
 
         # Should be read-only ("can't set attribute")
@@ -567,7 +567,7 @@ log-targets:
         self.assertEqual(str(plan), '{}\n')
 
         # With a service, we return validated yaml content.
-        raw = '''\
+        raw = """\
 services:
  foo:
   override: replace
@@ -583,7 +583,7 @@ log-targets:
   override: replace
   type: loki
   location: https://example.com:3100/loki/api/v1/push
-'''
+"""
         plan = pebble.Plan(raw)
         reformed = yaml.safe_dump(yaml.safe_load(raw))
         self.assertEqual(plan.to_yaml(), reformed)
@@ -597,16 +597,16 @@ services:
     command: echo foo
 """)
 
-        old_service = pebble.Service(name="foo",
+        old_service = pebble.Service(name='foo',
                                      raw={
-                                          "override": "replace",
-                                          "command": "echo foo"
+                                          'override': 'replace',
+                                          'command': 'echo foo'
                                      })
-        old_services = {"foo": old_service}
+        old_services = {'foo': old_service}
         self.assertEqual(plan.services, old_services)
 
         services_as_dict = {
-            "foo": {"override": "replace", "command": "echo foo"}
+            'foo': {'override': 'replace', 'command': 'echo foo'}
         }
         self.assertEqual(plan.services, services_as_dict)
 
@@ -895,8 +895,8 @@ class TestService(unittest.TestCase):
             'group': 'staff',
             'group-id': 2000,
         }
-        one = pebble.Service("Name 1", d)
-        two = pebble.Service("Name 1", d)
+        one = pebble.Service('Name 1', d)
+        two = pebble.Service('Name 1', d)
         self.assertEqual(one, two)
 
         as_dict = {
@@ -1262,31 +1262,31 @@ class MockTime:
 
 def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     return {
-        "id": change_id,
-        "kind": "autostart",
-        "ready": True,
-        "ready-time": "2021-01-28T14:37:04.291517768+13:00",
-        "spawn-time": "2021-01-28T14:37:02.247202105+13:00",
-        "status": "Done",
-        "summary": 'Autostart service "svc"',
-        "tasks": [
+        'id': change_id,
+        'kind': 'autostart',
+        'ready': True,
+        'ready-time': '2021-01-28T14:37:04.291517768+13:00',
+        'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
+        'status': 'Done',
+        'summary': 'Autostart service "svc"',
+        'tasks': [
             {
-                "id": "78",
-                "kind": "start",
-                "progress": {
-                    "done": 1,
-                    "label": "",
-                    "total": 1,
-                    "extra-field": "foo",  # type: ignore
+                'id': '78',
+                'kind': 'start',
+                'progress': {
+                    'done': 1,
+                    'label': '',
+                    'total': 1,
+                    'extra-field': 'foo',  # type: ignore
                 },
-                "ready-time": "2021-01-28T14:37:03.270218778+13:00",
-                "spawn-time": "2021-01-28T14:37:02.247158162+13:00",
-                "status": "Done",
-                "summary": 'Start service "svc"',
-                "extra-field": "foo",
+                'ready-time': '2021-01-28T14:37:03.270218778+13:00',
+                'spawn-time': '2021-01-28T14:37:02.247158162+13:00',
+                'status': 'Done',
+                'summary': 'Start service "svc"',
+                'extra-field': 'foo',
             },
         ],
-        "extra-field": "foo",
+        'extra-field': 'foo',
     }
 
 
@@ -1459,13 +1459,13 @@ class TestClient(unittest.TestCase):
 
     def test_get_system_info(self):
         self.client.responses.append({
-            "result": {
-                "version": "1.2.3",
-                "extra-field": "foo",
+            'result': {
+                'version': '1.2.3',
+                'extra-field': 'foo',
             },
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         info = self.client.get_system_info()
         self.assertEqual(info.version, '1.2.3')
@@ -1475,10 +1475,10 @@ class TestClient(unittest.TestCase):
 
     def test_get_warnings(self):
         empty: typing.Dict[str, typing.Any] = {
-            "result": [],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': [],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         }
         self.client.responses.append(empty)
         warnings = self.client.get_warnings()
@@ -1495,10 +1495,10 @@ class TestClient(unittest.TestCase):
 
     def test_ack_warnings(self):
         self.client.responses.append({
-            "result": 0,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': 0,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         num = self.client.ack_warnings(datetime_nzdt(2021, 1, 28, 15, 11, 0))
         self.assertEqual(num, 0)
@@ -1534,10 +1534,10 @@ class TestClient(unittest.TestCase):
 
     def test_get_changes(self):
         empty: typing.Dict[str, typing.Any] = {
-            "result": [],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': [],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         }
         self.client.responses.append(empty)
         changes = self.client.get_changes()
@@ -1552,12 +1552,12 @@ class TestClient(unittest.TestCase):
         self.assertEqual(changes, [])
 
         self.client.responses.append({
-            "result": [
+            'result': [
                 build_mock_change_dict(),
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         changes = self.client.get_changes()
         self.assertEqual(len(changes), 1)
@@ -1572,10 +1572,10 @@ class TestClient(unittest.TestCase):
 
     def test_get_change(self):
         self.client.responses.append({
-            "result": build_mock_change_dict(),
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': build_mock_change_dict(),
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         change = self.client.get_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
@@ -1585,10 +1585,10 @@ class TestClient(unittest.TestCase):
 
     def test_get_change_str(self):
         self.client.responses.append({
-            "result": build_mock_change_dict(),
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': build_mock_change_dict(),
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         change = self.client.get_change('70')  # type: ignore
         self.assert_mock_change(change)
@@ -1598,10 +1598,10 @@ class TestClient(unittest.TestCase):
 
     def test_abort_change(self):
         self.client.responses.append({
-            "result": build_mock_change_dict(),
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': build_mock_change_dict(),
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         change = self.client.abort_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
@@ -1615,19 +1615,19 @@ class TestClient(unittest.TestCase):
             api_func: typing.Callable[[], str],
             services: typing.List[str]):
         self.client.responses.append({
-            "change": "70",
-            "result": None,
-            "status": "Accepted",
-            "status-code": 202,
-            "type": "async"
+            'change': '70',
+            'result': None,
+            'status': 'Accepted',
+            'status-code': 202,
+            'type': 'async'
         })
         change = build_mock_change_dict()
         change['ready'] = True
         self.client.responses.append({
-            "result": change,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': change,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         change_id = api_func()
         self.assertEqual(change_id, '70')
@@ -1639,11 +1639,11 @@ class TestClient(unittest.TestCase):
     def _services_action_async_helper(
             self, action: str, api_func: typing.Callable[..., str], services: typing.List[str]):
         self.client.responses.append({
-            "change": "70",
-            "result": None,
-            "status": "Accepted",
-            "status-code": 202,
-            "type": "async"
+            'change': '70',
+            'result': None,
+            'status': 'Accepted',
+            'status-code': 202,
+            'type': 'async'
         })
         change_id = api_func(timeout=0)
         self.assertEqual(change_id, '70')
@@ -1722,19 +1722,19 @@ class TestClient(unittest.TestCase):
 
     def test_change_error(self):
         self.client.responses.append({
-            "change": "70",
-            "result": None,
-            "status": "Accepted",
-            "status-code": 202,
-            "type": "async"
+            'change': '70',
+            'result': None,
+            'status': 'Accepted',
+            'status-code': 202,
+            'type': 'async'
         })
         change = build_mock_change_dict()
         change['err'] = 'Some kind of service error'
         self.client.responses.append({
-            "result": change,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': change,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         with self.assertRaises(pebble.ChangeError) as cm:
             self.client.autostart_services()
@@ -1751,10 +1751,10 @@ class TestClient(unittest.TestCase):
     def test_wait_change_success(self, timeout: typing.Optional[float] = 30.0):
         change = build_mock_change_dict()
         self.client.responses.append({
-            "result": change,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': change,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
 
         response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout)
@@ -1771,16 +1771,16 @@ class TestClient(unittest.TestCase):
     def test_wait_change_success_multiple_calls(self):
         def timeout_response(n: float):
             self.time.sleep(n)  # simulate passing of time due to wait_change call
-            raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
+            raise pebble.APIError({}, 504, 'Gateway Timeout', 'timed out')
 
         self.client.responses.append(lambda: timeout_response(4))
 
         change = build_mock_change_dict()
         self.client.responses.append({
-            "result": change,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': change,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
 
         response = self.client.wait_change(pebble.ChangeID('70'))
@@ -1796,16 +1796,16 @@ class TestClient(unittest.TestCase):
 
     def test_wait_change_success_polled(self, timeout: typing.Optional[float] = 30.0):
         # Trigger polled mode
-        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+        self.client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
 
         for i in range(3):
             change = build_mock_change_dict()
             change['ready'] = i == 2
             self.client.responses.append({
-                "result": change,
-                "status": "OK",
-                "status-code": 200,
-                "type": "sync"
+                'result': change,
+                'status': 'OK',
+                'status-code': 200,
+                'type': 'sync'
             })
 
         response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout, delay=1)
@@ -1827,7 +1827,7 @@ class TestClient(unittest.TestCase):
     def test_wait_change_timeout(self):
         def timeout_response(n: float):
             self.time.sleep(n)  # simulate passing of time due to wait_change call
-            raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
+            raise pebble.APIError({}, 504, 'Gateway Timeout', 'timed out')
 
         self.client.responses.append(lambda: timeout_response(4))
         self.client.responses.append(lambda: timeout_response(2))
@@ -1846,16 +1846,16 @@ class TestClient(unittest.TestCase):
 
     def test_wait_change_timeout_polled(self):
         # Trigger polled mode
-        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+        self.client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
 
         change = build_mock_change_dict()
         change['ready'] = False
         for _ in range(3):
             self.client.responses.append({
-                "result": change,
-                "status": "OK",
-                "status-code": 200,
-                "type": "sync"
+                'result': change,
+                'status': 'OK',
+                'status-code': 200,
+                'type': 'sync'
             })
 
         with self.assertRaises(pebble.TimeoutError) as cm:
@@ -1876,10 +1876,10 @@ class TestClient(unittest.TestCase):
         change = build_mock_change_dict()
         change['err'] = 'Some kind of service error'
         self.client.responses.append({
-            "result": change,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': change,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         # wait_change() itself shouldn't raise an error
         response = self.client.wait_change(pebble.ChangeID('70'))
@@ -1892,10 +1892,10 @@ class TestClient(unittest.TestCase):
 
     def test_add_layer(self):
         okay_response = {
-            "result": True,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': True,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         }
         self.client.responses.append(okay_response)
         self.client.responses.append(okay_response)
@@ -1949,10 +1949,10 @@ services:
     override: replace
 """[1:]
         self.client.responses.append({
-            "result": plan_yaml,
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'result': plan_yaml,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         plan = self.client.get_plan()
         self.assertEqual(plan.to_yaml(), plan_yaml)
@@ -1966,21 +1966,21 @@ services:
 
     def test_get_services_all(self):
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
-                    "current": "inactive",
-                    "name": "svc1",
-                    "startup": "disabled"
+                    'current': 'inactive',
+                    'name': 'svc1',
+                    'startup': 'disabled'
                 },
                 {
-                    "current": "active",
-                    "name": "svc2",
-                    "startup": "enabled"
+                    'current': 'active',
+                    'name': 'svc2',
+                    'startup': 'enabled'
                 }
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         services = self.client.get_services()
         self.assertEqual(len(services), 2)
@@ -1997,21 +1997,21 @@ services:
 
     def test_get_services_names(self):
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
-                    "current": "inactive",
-                    "name": "svc1",
-                    "startup": "disabled"
+                    'current': 'inactive',
+                    'name': 'svc1',
+                    'startup': 'disabled'
                 },
                 {
-                    "current": "active",
-                    "name": "svc2",
-                    "startup": "enabled"
+                    'current': 'active',
+                    'name': 'svc2',
+                    'startup': 'enabled'
                 }
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         services = self.client.get_services(['svc1', 'svc2'])
         self.assertEqual(len(services), 2)
@@ -2023,16 +2023,16 @@ services:
         self.assertEqual(services[1].current, pebble.ServiceStatus.ACTIVE)
 
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
-                    "current": "active",
-                    "name": "svc2",
-                    "startup": "enabled"
+                    'current': 'active',
+                    'name': 'svc2',
+                    'startup': 'enabled'
                 }
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         services = self.client.get_services(['svc2'])
         self.assertEqual(len(services), 1)
@@ -2434,7 +2434,7 @@ bad path\r
 
     def test_list_files_path(self):
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
                     'path': '/etc/hosts',
                     'name': 'hosts',
@@ -2489,7 +2489,7 @@ bad path\r
 
     def test_list_files_pattern(self):
         self.client.responses.append({
-            "result": [],
+            'result': [],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
@@ -2504,7 +2504,7 @@ bad path\r
 
     def test_list_files_itself(self):
         self.client.responses.append({
-            "result": [],
+            'result': [],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
@@ -2519,7 +2519,7 @@ bad path\r
 
     def test_make_dir_basic(self):
         self.client.responses.append({
-            "result": [{'path': '/foo/bar'}],
+            'result': [{'path': '/foo/bar'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
@@ -2534,7 +2534,7 @@ bad path\r
 
     def test_make_dir_all_options(self):
         self.client.responses.append({
-            "result": [{'path': '/foo/bar'}],
+            'result': [{'path': '/foo/bar'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
@@ -2557,7 +2557,7 @@ bad path\r
 
     def test_make_dir_error(self):
         self.client.responses.append({
-            "result": [{
+            'result': [{
                 'path': '/foo/bar',
                 'error': {
                     'kind': 'permission-denied',
@@ -2576,7 +2576,7 @@ bad path\r
 
     def test_remove_path_basic(self):
         self.client.responses.append({
-            "result": [{'path': '/boo/far'}],
+            'result': [{'path': '/boo/far'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
@@ -2591,7 +2591,7 @@ bad path\r
 
     def test_remove_path_recursive(self):
         self.client.responses.append({
-            "result": [{'path': '/boo/far'}],
+            'result': [{'path': '/boo/far'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
@@ -2608,7 +2608,7 @@ bad path\r
 
     def test_remove_path_error(self):
         self.client.responses.append({
-            "result": [{
+            'result': [{
                 'path': '/boo/far',
                 'error': {
                     'kind': 'generic-file-error',
@@ -2663,23 +2663,23 @@ bad path\r
 
     def test_get_checks_all(self):
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
-                    "name": "chk1",
-                    "status": "up",
-                    "threshold": 2,
+                    'name': 'chk1',
+                    'status': 'up',
+                    'threshold': 2,
                 },
                 {
-                    "name": "chk2",
-                    "level": "alive",
-                    "status": "down",
-                    "failures": 5,
-                    "threshold": 3,
+                    'name': 'chk2',
+                    'level': 'alive',
+                    'status': 'down',
+                    'failures': 5,
+                    'threshold': 3,
                 }
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         checks = self.client.get_checks()
         self.assertEqual(len(checks), 2)
@@ -2700,17 +2700,17 @@ bad path\r
 
     def test_get_checks_filters(self):
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
-                    "name": "chk2",
-                    "level": "ready",
-                    "status": "up",
-                    "threshold": 3,
+                    'name': 'chk2',
+                    'level': 'ready',
+                    'status': 'up',
+                    'threshold': 3,
                 },
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         self.assertEqual(len(checks), 1)
@@ -2726,17 +2726,17 @@ bad path\r
 
     def test_checklevel_conversion(self):
         self.client.responses.append({
-            "result": [
+            'result': [
                 {
-                    "name": "chk2",
-                    "level": "foobar!",
-                    "status": "up",
-                    "threshold": 3,
+                    'name': 'chk2',
+                    'level': 'foobar!',
+                    'status': 'up',
+                    'threshold': 3,
                 },
             ],
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
         checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         self.assertEqual(len(checks), 1)
@@ -2875,7 +2875,7 @@ class TestSocketClient(unittest.TestCase):
         with self.assertRaises(pebble.ConnectionError) as cm:
             client.get_system_info()
         self.assertIsInstance(cm.exception, pebble.Error)
-        self.assertIn("Could not connect to Pebble", str(cm.exception))
+        self.assertIn('Could not connect to Pebble', str(cm.exception))
 
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
@@ -3272,7 +3272,7 @@ class TestExec(unittest.TestCase):
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
         stdout_buffer = io.BytesIO()
-        process = self.client.exec(["echo", "FOOBAR"], stdout=stdout_buffer, encoding=None)
+        process = self.client.exec(['echo', 'FOOBAR'], stdout=stdout_buffer, encoding=None)
         with self.assertRaises(TypeError):
             process.wait_output()
 
@@ -3288,7 +3288,7 @@ class TestExec(unittest.TestCase):
             process = self.client.exec(['python3', '--version'])
             out, err = process.wait_output()
         self.assertEqual(cm.output, [
-            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
+            'WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)',
             "WARNING:ops.pebble:Invalid I/O command 'foo'",
         ])
 
@@ -3376,7 +3376,7 @@ class TestExec(unittest.TestCase):
             process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err)
             process.wait()
         self.assertEqual(cm.output, [
-            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
+            'WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)',
             "WARNING:ops.pebble:Invalid I/O command 'foo'",
         ])
 

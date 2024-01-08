@@ -38,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 _libraries = None
 
-_libline_re = re.compile(r'''^LIB([A-Z]+)\s*=\s*([0-9]+|['"][a-zA-Z0-9_.\-@]+['"])''')
-_libname_re = re.compile(r'''^[a-z][a-z0-9]+$''')
+_libline_re = re.compile(r"""^LIB([A-Z]+)\s*=\s*([0-9]+|['"][a-zA-Z0-9_.\-@]+['"])""")
+_libname_re = re.compile(r"""^[a-z][a-z0-9]+$""")
 
 # Not perfect, but should do for now.
-_libauthor_re = re.compile(r'''^[A-Za-z0-9_+.-]+@[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.[a-z]{2,3}$''')
+_libauthor_re = re.compile(r"""^[A-Za-z0-9_+.-]+@[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.[a-z]{2,3}$""")
 
 
 def use(name: str, api: int, author: str) -> ModuleType:
@@ -62,7 +62,7 @@ def use(name: str, api: int, author: str) -> ModuleType:
         TypeError: if the name, api, or author are the wrong type.
         ValueError: if the name, api, or author are invalid.
     """
-    warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
+    warnings.warn('ops.lib is deprecated, prefer charm libraries instead',
                   category=DeprecationWarning)
     if not isinstance(name, str):
         raise TypeError(f"invalid library name: {name!r} (must be a str)")
@@ -104,7 +104,7 @@ def autoimport():
     DEPRECATED: This function is deprecated. Prefer charm libraries instead
     (https://juju.is/docs/sdk/library).
     """
-    warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
+    warnings.warn('ops.lib is deprecated, prefer charm libraries instead',
                   category=DeprecationWarning)
     global _libraries
     _libraries = {}
@@ -120,8 +120,8 @@ def autoimport():
 
 def _find_all_specs(path: typing.Iterable[str]) -> typing.Iterator[ModuleSpec]:
     for sys_dir in path:
-        if sys_dir == "":
-            sys_dir = "."
+        if sys_dir == '':
+            sys_dir = '.'
         try:
             top_dirs = os.listdir(sys_dir)
         except (FileNotFoundError, NotADirectoryError):
@@ -152,14 +152,14 @@ def _find_all_specs(path: typing.Iterable[str]) -> typing.Iterator[ModuleSpec]:
                 spec_name = f"{top_dir}.opslib.{lib_dir}"
                 spec = finder.find_spec(spec_name)
                 if spec is None:
-                    logger.debug("    No spec for %r", spec_name)
+                    logger.debug('    No spec for %r', spec_name)
                     continue
                 if spec.loader is None:
                     # a namespace package; not supported
-                    logger.debug("    No loader for %r (probably a namespace package)", spec_name)
+                    logger.debug('    No loader for %r (probably a namespace package)', spec_name)
                     continue
 
-                logger.debug("    Found %r", spec_name)
+                logger.debug('    Found %r', spec_name)
                 yield spec
 
 
@@ -171,7 +171,7 @@ _NEEDED_KEYS = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
 
 def _join_and(keys: List[str]) -> str:
     if len(keys) == 0:
-        return ""
+        return ''
     if len(keys) == 1:
         return keys[0]
     all_except_last = ', '.join(keys[:-1])
@@ -193,13 +193,13 @@ class _Missing:
         return f"got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}"
 
 
-def _parse_lib(spec: ModuleSpec) -> typing.Optional["_Lib"]:
+def _parse_lib(spec: ModuleSpec) -> typing.Optional['_Lib']:
     if spec.origin is None:
         # "can't happen"
-        logger.warning("No origin for %r (no idea why; please report)", spec.name)
+        logger.warning('No origin for %r (no idea why; please report)', spec.name)
         return None
 
-    logger.debug("    Parsing %r", spec.name)
+    logger.debug('    Parsing %r', spec.name)
 
     try:
         with open(spec.origin, 'rt', encoding='utf-8') as f:
@@ -209,7 +209,7 @@ def _parse_lib(spec: ModuleSpec) -> typing.Optional["_Lib"]:
                     break
                 if n > _MAX_LIB_LINES:
                     logger.debug(
-                        "      Missing opslib metadata after reading to line %d: %s",
+                        '      Missing opslib metadata after reading to line %d: %s',
                         _MAX_LIB_LINES, _Missing(libinfo))
                     return None
                 m = _libline_re.match(line)
@@ -220,22 +220,22 @@ def _parse_lib(spec: ModuleSpec) -> typing.Optional["_Lib"]:
                     value = literal_eval(value)
                     if not isinstance(value, _NEEDED_KEYS[key]):
                         logger.debug(
-                            "      Bad type for %s: expected %s, got %s",
+                            '      Bad type for %s: expected %s, got %s',
                             key, _NEEDED_KEYS[key].__name__, type(value).__name__)
                         return None
                     libinfo[key] = value
             else:
                 if len(libinfo) != len(_NEEDED_KEYS):
                     logger.debug(
-                        "      Missing opslib metadata after reading to end of file: %s",
+                        '      Missing opslib metadata after reading to end of file: %s',
                         _Missing(libinfo))
                     return None
     except Exception as e:
-        logger.debug("      Failed: %s", e)
+        logger.debug('      Failed: %s', e)
         return None
 
     lib = _Lib(spec, libinfo['NAME'], libinfo['AUTHOR'], libinfo['API'], libinfo['PATCH'])
-    logger.debug("    Success: found library %s", lib)
+    logger.debug('    Success: found library %s', lib)
 
     return lib
 
@@ -255,7 +255,7 @@ class _Lib:
         return f"<_Lib {self}>"
 
     def __str__(self):
-        return "{0.name} by {0.author}, API {0.api}, patch {0.patch}".format(self)
+        return '{0.name} by {0.author}, API {0.api}, patch {0.patch}'.format(self)
 
     def import_module(self) -> ModuleType:
         if self._module is None:

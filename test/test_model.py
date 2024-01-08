@@ -37,7 +37,7 @@ from ops.model import _ModelBackend
 
 class TestModel(unittest.TestCase):
     def setUp(self):
-        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
+        self.harness = ops.testing.Harness(ops.CharmBase, meta="""
             name: myapp
             provides:
               db0:
@@ -51,7 +51,7 @@ class TestModel(unittest.TestCase):
             resources:
               foo: {type: file, filename: foo.txt}
               bar: {type: file, filename: bar.txt}
-        ''', config='''
+        """, config="""
         options:
             foo:
                 type: string
@@ -59,7 +59,7 @@ class TestModel(unittest.TestCase):
                 type: int
             qux:
                 type: boolean
-        ''')
+        """)
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
         self.harness._get_backend_calls(reset=True)
@@ -92,7 +92,7 @@ class TestModel(unittest.TestCase):
         m = ops.Model(ops.CharmMeta(), self.harness._backend)
         self.assertEqual(m.name, 'default')
         with self.assertRaises(AttributeError):
-            m.name = "changes-disallowed"  # type: ignore
+            m.name = 'changes-disallowed'  # type: ignore
 
     def test_relations_keys(self):
         rel_app1 = self.harness.add_relation('db1', 'remoteapp1')
@@ -672,7 +672,7 @@ class TestModel(unittest.TestCase):
     def test_workload_version_invalid(self):
         with self.assertRaises(TypeError) as cm:
             self.model.unit.set_workload_version(5)  # type: ignore
-        self.assertEqual(str(cm.exception), "workload version must be a str, not int: 5")
+        self.assertEqual(str(cm.exception), 'workload version must be a str, not int: 5')
         self.assertBackendCalls([])
 
     def test_resources(self):
@@ -890,14 +890,14 @@ class TestModel(unittest.TestCase):
         }
         model = ops.Model(meta, _ModelBackend('myapp/0'))
 
-        fake_script(self, 'storage-list', '''
+        fake_script(self, 'storage-list', """
             if [ "$1" = disks ]; then
                 echo '["disks/0", "disks/1"]'
             else
                 echo '[]'
             fi
-        ''')
-        fake_script(self, 'storage-get', '''
+        """)
+        fake_script(self, 'storage-get', """
             if [ "$2" = disks/0 ]; then
                 echo '"/var/srv/disks/0"'
             elif [ "$2" = disks/1 ]; then
@@ -905,7 +905,7 @@ class TestModel(unittest.TestCase):
             else
                 exit 2
             fi
-        ''')
+        """)
         fake_script(self, 'storage-add', '')
 
         self.assertEqual(len(model.storages), 2)
@@ -969,17 +969,17 @@ class TestModel(unittest.TestCase):
         self.assertEqual(str(cm.exception), 'ERROR cannot get status\n')
         self.assertEqual(cm.exception.args[0], 'ERROR cannot get status\n')
 
-    @patch("grp.getgrgid")
-    @patch("pwd.getpwuid")
+    @patch('grp.getgrgid')
+    @patch('pwd.getpwuid')
     def test_push_path_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
-        harness = ops.testing.Harness(ops.CharmBase, meta='''
+        harness = ops.testing.Harness(ops.CharmBase, meta="""
             name: test-app
             containers:
               foo:
                 resource: foo-image
-            ''')
+            """)
         harness.begin()
         harness.set_can_connect('foo', True)
         container = harness.model.unit.containers['foo']
@@ -987,8 +987,8 @@ class TestModel(unittest.TestCase):
         with tempfile.TemporaryDirectory() as push_src:
             push_path = pathlib.Path(push_src) / 'src.txt'
             push_path.write_text('hello')
-            container.push_path(push_path, "/")
-        assert container.exists("/src.txt"), 'push_path failed: file "src.txt" missing'
+            container.push_path(push_path, '/')
+        assert container.exists('/src.txt'), 'push_path failed: file "src.txt" missing'
 
 
 class PushPullCase:
@@ -1194,12 +1194,12 @@ recursive_push_pull_cases = [
 @pytest.mark.parametrize('case', recursive_push_pull_cases)
 def test_recursive_push_and_pull(case: PushPullCase):
     # full "integration" test of push+pull
-    harness = ops.testing.Harness(ops.CharmBase, meta='''
+    harness = ops.testing.Harness(ops.CharmBase, meta="""
         name: test-app
         containers:
           foo:
             resource: foo-image
-        ''')
+        """)
     harness.begin()
     harness.set_can_connect('foo', True)
     c = harness.model.unit.containers['foo']
@@ -1292,12 +1292,12 @@ def test_recursive_push_and_pull(case: PushPullCase):
     ),
 ])
 def test_push_path_relative(case: PushPullCase):
-    harness = ops.testing.Harness(ops.CharmBase, meta='''
+    harness = ops.testing.Harness(ops.CharmBase, meta="""
         name: test-app
         containers:
           foo:
             resource: foo-image
-        ''')
+        """)
     harness.begin()
     harness.set_can_connect('foo', True)
     container = harness.model.unit.containers['foo']
@@ -1313,7 +1313,7 @@ def test_push_path_relative(case: PushPullCase):
                 testfile_path = pathlib.Path(tmp / testfile)
                 testfile_path.parent.mkdir(parents=True, exist_ok=True)
                 testfile_path.touch(exist_ok=True)
-                testfile_path.write_text("test", encoding="utf-8")
+                testfile_path.write_text('test', encoding='utf-8')
 
             # push path under test to container
             assert case.dst is not None
@@ -1330,7 +1330,7 @@ def test_push_path_relative(case: PushPullCase):
 class TestApplication(unittest.TestCase):
 
     def setUp(self):
-        self.harness = ops.testing.Harness(ops.CharmBase, meta='''
+        self.harness = ops.testing.Harness(ops.CharmBase, meta="""
             name: myapp
             provides:
               db0:
@@ -1347,7 +1347,7 @@ class TestApplication(unittest.TestCase):
             containers:
               bar:
                 k: v
-        ''')
+        """)
         self.peer_rel_id = self.harness.add_relation('db2', 'db2')
         self.app = self.harness.model.app
         self.addCleanup(self.harness.cleanup)
@@ -1359,7 +1359,7 @@ class TestApplication(unittest.TestCase):
         c = self.harness.charm.unit.get_container('bar')
         c.add_layer('layer1', {
             'summary': 'layer',
-            'services': {"baz": {'override': 'replace', 'summary': 'echo', 'command': 'echo 1'}},
+            'services': {'baz': {'override': 'replace', 'summary': 'echo', 'command': 'echo 1'}},
         })
 
         s = c.get_service('baz')  # So far, so good
@@ -1407,7 +1407,7 @@ class TestApplication(unittest.TestCase):
         self.assertEqual(self.app.planned_units(), 1)
 
         with self.assertRaises(TypeError):
-            self.harness.set_planned_units("foo")  # type: ignore
+            self.harness.set_planned_units('foo')  # type: ignore
 
         with self.assertRaises(TypeError):
             self.harness.set_planned_units(-3423000102312321090)
@@ -1545,7 +1545,7 @@ containers:
     def test_restart_fallback(self):
         def restart_services(service_names: str):
             self.pebble.requests.append(('restart', service_names))
-            raise pebble.APIError({}, 400, "", "")
+            raise pebble.APIError({}, 400, '', '')
 
         self.pebble.restart_services = restart_services
         # Setup the Pebble client to respond to a call to get_services()
@@ -1569,7 +1569,7 @@ containers:
 
     def test_restart_fallback_non_400_error(self):
         def restart_services(service_names: str):
-            raise pebble.APIError({}, 500, "", "")
+            raise pebble.APIError({}, 500, '', '')
 
         self.pebble.restart_services = restart_services
         with self.assertRaises(pebble.APIError) as cm:
@@ -1890,7 +1890,7 @@ containers:
             stdin='STDIN',
             stdout=stdout,
             stderr=stderr,
-            encoding="encoding",
+            encoding='encoding',
             combine_stderr=True,
         )
         self.assertEqual(self.pebble.requests, [
@@ -1906,7 +1906,7 @@ containers:
                 stdin='STDIN',
                 stdout=stdout,
                 stderr=stderr,
-                encoding="encoding",
+                encoding='encoding',
                 combine_stderr=True,
             ))
         ])
@@ -2122,7 +2122,7 @@ class TestModelBindings(unittest.TestCase):
         fake_script(self, 'relation-ids',
                     """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
         fake_script(self, 'relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
-        self.network_get_out = '''{
+        self.network_get_out = """{
   "bind-addresses": [
     {
       "mac-address": "de:ad:be:ef:ca:fe",
@@ -2174,7 +2174,7 @@ class TestModelBindings(unittest.TestCase):
     "dead:beef::1",
     "2001:db8::3"
   ]
-}'''
+}"""
 
     def ensure_relation(self, name: str = 'db1', relation_id: typing.Optional[int] = None):
         """Wrapper around self.model.get_relation that enforces that None is not returned."""
@@ -2411,9 +2411,9 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
 
     def test_is_leader_refresh(self):
-        meta = ops.CharmMeta.from_yaml('''
+        meta = ops.CharmMeta.from_yaml("""
             name: myapp
-        ''')
+        """)
         model = ops.Model(meta, self.backend)
         fake_script(self, 'is-leader', 'echo false')
         self.assertFalse(model.unit.is_leader())
@@ -2488,14 +2488,14 @@ class TestModelBackend(unittest.TestCase):
     def test_relation_get_juju_version_quirks(self):
         self.addCleanup(os.environ.pop, 'JUJU_VERSION', None)
 
-        fake_script(self, 'relation-get', '''echo '{"foo": "bar"}' ''')
+        fake_script(self, 'relation-get', """echo '{"foo": "bar"}' """)
 
         # on 2.7.0+, things proceed as expected
         for v in ['2.8.0', '2.7.0']:
             with self.subTest(v):
                 os.environ['JUJU_VERSION'] = v
                 rel_data = self.backend.relation_get(1, 'foo/0', is_app=True)
-                self.assertEqual(rel_data, {"foo": "bar"})
+                self.assertEqual(rel_data, {'foo': 'bar'})
                 calls = [' '.join(i) for i in fake_script_calls(self, clear=True)]
                 self.assertEqual(calls, ['relation-get -r 1 - foo/0 --app --format=json'])
 
@@ -2538,8 +2538,8 @@ class TestModelBackend(unittest.TestCase):
         content = '{"message": "", "status": "unknown", "status-data": {}}'
         fake_script(self, 'status-get', f"echo '{content}'")
         s = self.backend.status_get(is_app=False)
-        self.assertEqual(s['status'], "unknown")
-        self.assertEqual(s['message'], "")
+        self.assertEqual(s['status'], 'unknown')
+        self.assertEqual(s['message'], '')
         # taken from actual Juju output
         content = dedent("""
             {
@@ -2559,8 +2559,8 @@ class TestModelBackend(unittest.TestCase):
             """)
         fake_script(self, 'status-get', f"echo '{content}'")
         s = self.backend.status_get(is_app=True)
-        self.assertEqual(s['status'], "maintenance")
-        self.assertEqual(s['message'], "installing")
+        self.assertEqual(s['status'], 'maintenance')
+        self.assertEqual(s['message'], 'installing')
         self.assertEqual(fake_script_calls(self, clear=True), [
             ['status-get', '--include-data', '--application=False', '--format=json'],
             ['status-get', '--include-data', '--application=True', '--format=json'],
@@ -2583,9 +2583,9 @@ class TestModelBackend(unittest.TestCase):
 
     def test_local_set_invalid_status(self):
         # juju returns exit code 1 if you ask to set status to 'unknown' or 'error'
-        meta = ops.CharmMeta.from_yaml('''
+        meta = ops.CharmMeta.from_yaml("""
             name: myapp
-        ''')
+        """)
         model = ops.Model(meta, self.backend)
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
@@ -2614,34 +2614,34 @@ class TestModelBackend(unittest.TestCase):
 
     def test_local_get_status(self):
         for name, expected_cls in (
-            ("active", ops.ActiveStatus),
-            ("waiting", ops.WaitingStatus),
-            ("blocked", ops.BlockedStatus),
-            ("maintenance", ops.MaintenanceStatus),
-            ("error", ops.ErrorStatus),
+            ('active', ops.ActiveStatus),
+            ('waiting', ops.WaitingStatus),
+            ('blocked', ops.BlockedStatus),
+            ('maintenance', ops.MaintenanceStatus),
+            ('error', ops.ErrorStatus),
         ):
-            meta = ops.CharmMeta.from_yaml('''
+            meta = ops.CharmMeta.from_yaml("""
                 name: myapp
-            ''')
+            """)
             model = ops.Model(meta, self.backend)
 
             with self.subTest(name):
                 content = json.dumps({
-                    "message": "foo",
-                    "status": name,
-                    "status-data": {},
+                    'message': 'foo',
+                    'status': name,
+                    'status-data': {},
                 })
                 fake_script(self, 'status-get', f"echo '{content}'")
 
                 self.assertIsInstance(model.unit.status, expected_cls)
                 self.assertEqual(model.unit.status.name, name)
-                self.assertEqual(model.unit.status.message, "foo")
+                self.assertEqual(model.unit.status.message, 'foo')
 
                 content = json.dumps({
-                    "application-status": {
-                        "message": "bar",
-                        "status": name,
-                        "status-data": {},
+                    'application-status': {
+                        'message': 'bar',
+                        'status': name,
+                        'status-data': {},
                     }
                 })
                 fake_script(self, 'status-get', f"echo '{content}'")
@@ -2649,7 +2649,7 @@ class TestModelBackend(unittest.TestCase):
 
                 self.assertIsInstance(model.app.status, expected_cls)
                 self.assertEqual(model.app.status.name, name)
-                self.assertEqual(model.app.status.message, "bar")
+                self.assertEqual(model.app.status.message, 'bar')
 
     def test_status_set_is_app_not_bool_raises(self):
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
@@ -2682,7 +2682,7 @@ class TestModelBackend(unittest.TestCase):
         self.assertEqual(fake_script_calls(self, clear=True), [])
 
     def test_network_get(self):
-        network_get_out = '''{
+        network_get_out = """{
   "bind-addresses": [
     {
       "mac-address": "",
@@ -2702,7 +2702,7 @@ class TestModelBackend(unittest.TestCase):
   "ingress-addresses": [
     "192.0.2.2"
   ]
-}'''
+}"""
         fake_script(self, 'network-get',
                     f'''[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1''')
         network_info = self.backend.network_get('deadbeef')
@@ -2722,12 +2722,12 @@ class TestModelBackend(unittest.TestCase):
         test_cases = [(
             lambda: fake_script(self, 'network-get',
                                 f'echo {err_no_endpoint} >&2 ; exit 1'),
-            lambda: self.backend.network_get("deadbeef"),
+            lambda: self.backend.network_get('deadbeef'),
             ops.ModelError,
             [['network-get', 'deadbeef', '--format=json']],
         ), (
             lambda: fake_script(self, 'network-get', f'echo {err_no_rel} >&2 ; exit 2'),
-            lambda: self.backend.network_get("deadbeef", 3),
+            lambda: self.backend.network_get('deadbeef', 3),
             ops.RelationNotFoundError,
             [['network-get', 'deadbeef', '-r', '3', '--format=json']],
         )]
@@ -2751,14 +2751,14 @@ class TestModelBackend(unittest.TestCase):
         with self.assertRaises(ops.ModelError):
             self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
         self.assertCountEqual(
-            ["action-set", "dead=beef cafe", "foo=bar"], fake_script_calls(self, clear=True)[0])
+            ['action-set', 'dead=beef cafe', 'foo=bar'], fake_script_calls(self, clear=True)[0])
 
     def test_action_log_error(self):
         fake_script(self, 'action-get', '')
         fake_script(self, 'action-log', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.ModelError):
             self.backend.action_log('log-message')
-        calls = [["action-log", "log-message"]]
+        calls = [['action-log', 'log-message']]
         self.assertEqual(fake_script_calls(self, clear=True), calls)
 
     def test_action_get(self):
@@ -3762,5 +3762,5 @@ class TestLazyNotice(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -92,7 +92,7 @@ class TestLogging(unittest.TestCase):
                 ('WARNING', 'warning message'),
                 ('CRITICAL', 'critical message'),
              ])
-        self.assertEqual(buffer.getvalue(), "")
+        self.assertEqual(buffer.getvalue(), '')
 
     def test_debug_logging(self):
         buffer = io.StringIO()
@@ -145,7 +145,7 @@ class TestLogging(unittest.TestCase):
         calls = self.backend.calls()
         self.assertEqual(len(calls), 3)
         # Verify that we note that we are splitting the log message.
-        self.assertTrue("Splitting into multiple chunks" in calls[0][1])
+        self.assertTrue('Splitting into multiple chunks' in calls[0][1])
 
         # Verify that it got split into the expected chunks.
         self.assertTrue(len(calls[1][1]) == MAX_LOG_LINE_LEN)

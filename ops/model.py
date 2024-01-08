@@ -488,7 +488,7 @@ class Unit:
         self._status = None
         self._collected_statuses: 'List[StatusBase]' = []
 
-        if self._is_our_unit and hasattr(meta, "containers"):
+        if self._is_our_unit and hasattr(meta, 'containers'):
             containers: _ContainerMeta_Raw = meta.containers
             self._containers = ContainerMapping(iter(containers), backend)
 
@@ -568,7 +568,7 @@ class Unit:
         shown in the output of 'juju status'.
         """
         if not isinstance(version, str):
-            raise TypeError("workload version must be a str, not {}: {!r}".format(
+            raise TypeError('workload version must be a str, not {}: {!r}'.format(
                 type(version).__name__, version))
         self._backend.application_version_set(version)
 
@@ -1609,7 +1609,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
-                "{} is not leader and cannot read its own application databag".format(
+                '{} is not leader and cannot read its own application databag'.format(
                     self._backend.unit_name
                 )
             )
@@ -1640,7 +1640,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
-                    "{} cannot write the data of remote application {}".format(
+                    '{} cannot write the data of remote application {}'.format(
                         self._backend.app_name, self._entity.name
                     ))
             # Whether the application data bag is mutable or not depends on
@@ -1656,7 +1656,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # is it OUR UNIT's?
             if self._backend.unit_name != self._entity.name:
                 raise RelationDataAccessError(
-                    "{} cannot write databag of {}: not the same unit.".format(
+                    '{} cannot write databag of {}: not the same unit.'.format(
                         self._backend.unit_name, self._entity.name
                     )
                 )
@@ -1725,7 +1725,7 @@ class StatusBase:
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
-            raise TypeError("cannot instantiate a base class")
+            raise TypeError('cannot instantiate a base class')
         self.message = message
 
     def __eq__(self, other: 'StatusBase') -> bool:
@@ -1761,7 +1761,7 @@ class StatusBase:
         """Register a Status for the child's name."""
         if not isinstance(getattr(child, 'name'), str):
             raise TypeError(f"Can't register StatusBase subclass {child}: ",
-                            "missing required `name: str` class attribute")
+                            'missing required `name: str` class attribute')
         cls._statuses[child.name] = child
         return child
 
@@ -1798,7 +1798,7 @@ class UnknownStatus(StatusBase):
         super().__init__('')
 
     def __repr__(self):
-        return "UnknownStatus()"
+        return 'UnknownStatus()'
 
 
 @StatusBase.register
@@ -1976,7 +1976,7 @@ class Storage:
     @property
     def id(self) -> int:
         """DEPRECATED. Use :attr:`Storage.index` instead."""
-        logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
+        logger.warning('model.Storage.id is being replaced - please use model.Storage.index')
         return self.index
 
     @property
@@ -1988,7 +1988,7 @@ class Storage:
     def location(self) -> Path:
         """Location of the storage."""
         if self._location is None:
-            raw = self._backend.storage_get(self.full_id, "location")
+            raw = self._backend.storage_get(self.full_id, 'location')
             self._location = Path(raw)
         return self._location
 
@@ -2081,17 +2081,17 @@ class Container:
         try:
             self._pebble.get_system_info()
         except pebble.ConnectionError as e:
-            logger.debug("Pebble API is not ready; ConnectionError: %s", e)
+            logger.debug('Pebble API is not ready; ConnectionError: %s', e)
             return False
         except FileNotFoundError as e:
             # In some cases, charm authors can attempt to hit the Pebble API before it has had the
             # chance to create the UNIX socket in the shared volume.
-            logger.debug("Pebble API is not ready; UNIX socket not found: %s", e)
+            logger.debug('Pebble API is not ready; UNIX socket not found: %s', e)
             return False
         except pebble.APIError as e:
             # An API error is only raised when the Pebble API returns invalid JSON, or the response
             # cannot be read. Both of these are a likely indicator that something is wrong.
-            logger.warning("Pebble API is not ready; APIError: %s", e)
+            logger.warning('Pebble API is not ready; APIError: %s', e)
             return False
         return True
 
@@ -2475,12 +2475,12 @@ class Container:
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
         except KeyError:
-            logger.warning("Could not get name for user %s", info.st_uid)
+            logger.warning('Could not get name for user %s', info.st_uid)
             pw_name = None
         try:
             gr_name = grp.getgrgid(info.st_gid).gr_name
         except KeyError:
-            logger.warning("Could not get name for group %s", info.st_gid)
+            logger.warning('Could not get name for group %s', info.st_gid)
             gr_name = None
         return pebble.FileInfo(
             path=str(path),
@@ -2982,7 +2982,7 @@ class _ModelBackend:
              ) -> Union[str, Any, None]:
         kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
         if input_stream:
-            kwargs.update({"input": input_stream})
+            kwargs.update({'input': input_stream})
         which_cmd = shutil.which(args[0])
         if which_cmd is None:
             raise RuntimeError(f'command not found: {args[0]}')
@@ -3093,7 +3093,7 @@ class _ModelBackend:
         args = ['relation-set', '-r', str(relation_id)]
         if is_app:
             args.append('--app')
-        args.extend(["--file", "-"])
+        args.extend(['--file', '-'])
 
         try:
             content = yaml.safe_dump({key: value})
@@ -3137,12 +3137,12 @@ class _ModelBackend:
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
         try:
             spec_path = tmpdir / 'spec.yaml'
-            with spec_path.open("wt", encoding="utf8") as f:
+            with spec_path.open('wt', encoding='utf8') as f:
                 yaml.safe_dump(spec, stream=f)
             args = ['--file', str(spec_path)]
             if k8s_resources:
                 k8s_res_path = tmpdir / 'k8s-resources.yaml'
-                with k8s_res_path.open("wt", encoding="utf8") as f:
+                with k8s_res_path.open('wt', encoding='utf8') as f:
                     yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
@@ -3208,10 +3208,10 @@ class _ModelBackend:
         match = self._STORAGE_KEY_RE.match(output)
         if match is None:
             raise RuntimeError(f'unable to find storage key in {output!r}')
-        key = match.groupdict()["storage_key"]
+        key = match.groupdict()['storage_key']
 
-        index = int(key.split("/")[1])
-        location = self.storage_get(key, "location")
+        index = int(key.split('/')[1])
+        location = self.storage_get(key, 'location')
         return index, location
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
@@ -3264,7 +3264,7 @@ class _ModelBackend:
     def juju_log(self, level: str, message: str) -> None:
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
-            self._run('juju-log', '--log-level', level, "--", line)
+            self._run('juju-log', '--log-level', level, '--', line)
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
         """Return network info provided by network-get for a given binding.
@@ -3480,13 +3480,13 @@ class _ModelBackend:
 
     def reboot(self, now: bool = False):
         if now:
-            self._run("juju-reboot", "--now")
+            self._run('juju-reboot', '--now')
             # Juju will kill the Charm process, and in testing no code after
             # this point would execute. However, we want to guarantee that for
             # Charmers, so we force that to be the case.
             sys.exit()
         else:
-            self._run("juju-reboot")
+            self._run('juju-reboot')
 
 
 class _ModelBackendValidator:

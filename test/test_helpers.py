@@ -28,8 +28,8 @@ from ops.storage import SQLiteStorage
 def fake_script(test_case: unittest.TestCase, name: str, content: str):
     if not hasattr(test_case, 'fake_script_path'):
         fake_script_path = tempfile.mkdtemp('-fake_script')
-        old_path = os.environ["PATH"]
-        os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ["PATH"]])
+        old_path = os.environ['PATH']
+        os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ['PATH']])
 
         def cleanup():
             shutil.rmtree(fake_script_path)
@@ -49,13 +49,13 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
         # Before executing the provided script, dump the provided arguments in calls.txt.
         # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which seem appropriate.
         f.write(  # type: ignore
-            '''#!/bin/sh
+            """#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
-{content}'''.format_map(template_args))
+{content}""".format_map(template_args))
     os.chmod(str(path), 0o755)  # type: ignore
     # TODO: this hardcodes the path to bash.exe, which works for now but might
     #       need to be set via environ or something like that.
-    path.with_suffix(".bat").write_text(  # type: ignore
+    path.with_suffix('.bat').write_text(  # type: ignore
         f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
 
@@ -119,10 +119,10 @@ class BaseTestCase(unittest.TestCase):
         same dir (e.g. for storing state).
         """
         if tmpdir is None:
-            data_fpath = ":memory:"
+            data_fpath = ':memory:'
             charm_dir = 'non-existant'
         else:
-            data_fpath = tmpdir / "framework.data"
+            data_fpath = tmpdir / 'framework.data'
             charm_dir = tmpdir
 
         framework = ops.Framework(

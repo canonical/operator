@@ -54,7 +54,7 @@ def _exe_path(path: Path) -> Optional[Path]:
 
 
 def _get_charm_dir():
-    charm_dir = os.environ.get("JUJU_CHARM_DIR")
+    charm_dir = os.environ.get('JUJU_CHARM_DIR')
     if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
         charm_dir = Path(f'{__file__}/../../..').resolve()
@@ -79,7 +79,7 @@ def _create_event_link(charm: 'ops.charm.CharmBase', bound_event: 'ops.framework
         event_dir = charm.framework.charm_dir / 'hooks'
         event_path = event_dir / bound_event.event_kind.replace('_', '-')
     elif issubclass(bound_event.event_type, ops.charm.ActionEvent):
-        if not bound_event.event_kind.endswith("_action"):
+        if not bound_event.event_kind.endswith('_action'):
             raise RuntimeError(
                 f'action event name {bound_event.event_kind} needs _action suffix')
         event_dir = charm.framework.charm_dir / 'actions'
@@ -116,7 +116,7 @@ def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
         charm: An instance of the Charm class.
 
     """
-    link_to = os.path.realpath(os.environ.get("JUJU_DISPATCH_PATH", sys.argv[0]))
+    link_to = os.path.realpath(os.environ.get('JUJU_DISPATCH_PATH', sys.argv[0]))
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         if issubclass(bound_event.event_type, (ops.charm.HookEvent, ops.charm.ActionEvent)):
@@ -134,7 +134,7 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        logger.debug("Event %s not defined for %s.", event_name, charm)
+        logger.debug('Event %s not defined for %s.', event_name, charm)
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
@@ -169,13 +169,13 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
             args.append(int(os.environ['JUJU_SECRET_REVISION']))
         return args, {}
     elif issubclass(event_type, ops.charm.StorageEvent):
-        storage_id = os.environ.get("JUJU_STORAGE_ID", "")
+        storage_id = os.environ.get('JUJU_STORAGE_ID', '')
         if storage_id:
-            storage_name = storage_id.split("/")[0]
+            storage_name = storage_id.split('/')[0]
         else:
             # Before JUJU_STORAGE_ID exists, take the event name as
             # <storage_name>_storage_<attached|detached> and replace it with <storage_name>
-            storage_name = "-".join(bound_event.event_kind.split("_")[:-2])
+            storage_name = '-'.join(bound_event.event_kind.split('_')[:-2])
 
         storages = model.storages[storage_name]
         index, storage_location = model._backend._storage_event_details()
@@ -273,26 +273,26 @@ class _Dispatcher:
 
         # super strange that there isn't an is_executable
         if not os.access(str(dispatch_path), os.X_OK):
-            logger.warning("Legacy %s exists but is not executable.", self._dispatch_path)
+            logger.warning('Legacy %s exists but is not executable.', self._dispatch_path)
             return
 
         if dispatch_path.resolve() == Path(sys.argv[0]).resolve():
-            logger.debug("Legacy %s is just a link to ourselves.", self._dispatch_path)
+            logger.debug('Legacy %s is just a link to ourselves.', self._dispatch_path)
             return
 
         argv = sys.argv.copy()
         argv[0] = str(dispatch_path)
-        logger.info("Running legacy %s.", self._dispatch_path)
+        logger.info('Running legacy %s.', self._dispatch_path)
         try:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
-            logger.warning("Legacy %s exited with status %d.", self._dispatch_path, e.returncode)
+            logger.warning('Legacy %s exited with status %d.', self._dispatch_path, e.returncode)
             sys.exit(e.returncode)
         except OSError as e:
-            logger.warning("Unable to run legacy %s: %s", self._dispatch_path, e)
+            logger.warning('Unable to run legacy %s: %s', self._dispatch_path, e)
             sys.exit(1)
         else:
-            logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
+            logger.debug('Legacy %s exited with status 0.', self._dispatch_path)
 
     def _set_name_from_path(self, path: Path):
         """Sets the name attribute to that which can be inferred from the given path."""
@@ -322,7 +322,7 @@ class _Dispatcher:
         self._dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
 
         if 'OPERATOR_DISPATCH' in os.environ:
-            logger.debug("Charm called itself via %s.", self._dispatch_path)
+            logger.debug('Charm called itself via %s.', self._dispatch_path)
             sys.exit(0)
         os.environ['OPERATOR_DISPATCH'] = '1'
 
@@ -348,17 +348,17 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     # only use controller storage for Kubernetes podspec charms
     is_podspec = 'kubernetes' in meta.series
     if not is_podspec:
-        logger.debug("Using local storage: not a Kubernetes podspec charm")
+        logger.debug('Using local storage: not a Kubernetes podspec charm')
         return False
 
     # are we in a new enough Juju?
     cur_version = JujuVersion.from_environ()
 
     if cur_version.has_controller_storage():
-        logger.debug("Using controller storage: JUJU_VERSION=%s", cur_version)
+        logger.debug('Using controller storage: JUJU_VERSION=%s', cur_version)
         return True
     else:
-        logger.debug("Using local storage: JUJU_VERSION=%s", cur_version)
+        logger.debug('Using local storage: JUJU_VERSION=%s', cur_version)
         return False
 
 
@@ -384,7 +384,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     # only to juju-log as normal.
     handling_action = ('JUJU_ACTION_NAME' in os.environ)
     setup_root_logging(model_backend, debug=debug, exc_stderr=handling_action)
-    logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
+    logger.debug('ops %s up and running.', ops.__version__)  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
     dispatcher.run_any_legacy_hook()
@@ -410,7 +410,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
         use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
     elif use_juju_for_storage:
         warnings.warn("Controller storage is deprecated; it's intended for "
-                      "podspec charms and will be removed in a future release.",
+                      'podspec charms and will be removed in a future release.',
                       category=DeprecationWarning)
 
     if use_juju_for_storage:

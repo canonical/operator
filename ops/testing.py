@@ -82,7 +82,7 @@ _RawStatus = TypedDict('_RawStatus', {
     'status': _StatusName,
     'message': str,
 })
-_RawConfig = TypedDict("_RawConfig", {'options': Dict[str, _ConfigOption]})
+_RawConfig = TypedDict('_RawConfig', {'options': Dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
@@ -427,7 +427,7 @@ class Harness(Generic[CharmType]):
                 rel_ids = self._backend._relation_ids_map.get(relname, [])
                 random.shuffle(rel_ids)
                 for rel_id in rel_ids:
-                    app_name = self._backend._relation_app_and_units[rel_id]["app"]
+                    app_name = self._backend._relation_app_and_units[rel_id]['app']
                     self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
             charm.on.leader_elected.emit()
@@ -445,13 +445,13 @@ class Harness(Generic[CharmType]):
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
-        if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
-            self._backend.status_set("unknown", "", is_app=False)
+        if post_setup_sts.get('status') == 'maintenance' and not post_setup_sts.get('message'):
+            self._backend.status_set('unknown', '', is_app=False)
         all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
             rel_app_and_units = self._backend._relation_app_and_units[rel_id]
-            app_name = rel_app_and_units["app"]
+            app_name = rel_app_and_units['app']
             # Note: Juju *does* fire relation events for a given relation in the sorted order of
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
@@ -460,7 +460,7 @@ class Harness(Generic[CharmType]):
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
                 charm.on[rel_name].relation_changed.emit(relation, app, None)
-            for unit_name in sorted(rel_app_and_units["units"]):
+            for unit_name in sorted(rel_app_and_units['units']):
                 remote_unit = self._model.get_unit(unit_name)
                 charm.on[rel_name].relation_joined.emit(
                     relation, remote_unit.app, remote_unit)
@@ -489,7 +489,7 @@ class Harness(Generic[CharmType]):
         charm_metadata: Optional[Dict[str, Any]] = None
         charmcraft_metadata: Optional[Dict[str, Any]] = None
         # Check charmcraft.yaml and load it if it exists
-        charmcraft_meta = charm_dir / "charmcraft.yaml"
+        charmcraft_meta = charm_dir / 'charmcraft.yaml'
         if charmcraft_meta.is_file():
             self._charm_dir = charm_dir
             charmcraft_metadata = yaml.safe_load(charmcraft_meta.read_text())
@@ -502,7 +502,7 @@ class Harness(Generic[CharmType]):
         else:
             # Check charmcraft.yaml for metadata if no metadata is provided
             if charmcraft_metadata is not None:
-                meta_keys = ["name", "summary", "description"]
+                meta_keys = ['name', 'summary', 'description']
                 if any(key in charmcraft_metadata for key in meta_keys):
                     # Unrelated keys in the charmcraft.yaml file will be ignored.
                     charm_metadata = charmcraft_metadata
@@ -516,7 +516,7 @@ class Harness(Generic[CharmType]):
 
         # Use default metadata if metadata is not found
         if charm_metadata is None:
-            charm_metadata = {"name": "test-charm"}
+            charm_metadata = {'name': 'test-charm'}
 
         action_metadata: Optional[Dict[str, Any]] = None
         # Load actions from parameters if provided
@@ -526,8 +526,8 @@ class Harness(Generic[CharmType]):
             action_metadata = yaml.safe_load(action_metadata_yaml)
         else:
             # Check charmcraft.yaml for actions if no actions are provided
-            if charmcraft_metadata is not None and "actions" in charmcraft_metadata:
-                action_metadata = charmcraft_metadata["actions"]
+            if charmcraft_metadata is not None and 'actions' in charmcraft_metadata:
+                action_metadata = charmcraft_metadata['actions']
 
             # Still no actions, check actions.yaml
             if action_metadata is None:
@@ -555,10 +555,10 @@ class Harness(Generic[CharmType]):
             config = yaml.safe_load(charm_config_yaml)
         else:
             # Check charmcraft.yaml for config if no config is provided
-            charmcraft_meta = charm_dir / "charmcraft.yaml"
+            charmcraft_meta = charm_dir / 'charmcraft.yaml'
             if charmcraft_meta.is_file():
                 charmcraft_metadata: Dict[str, Any] = yaml.safe_load(charmcraft_meta.read_text())
-                config = charmcraft_metadata.get("config")
+                config = charmcraft_metadata.get('config')
 
             # Still no config, check config.yaml
             if config is None:
@@ -594,7 +594,7 @@ class Harness(Generic[CharmType]):
                         }
         if resource_name not in self._meta.resources.keys():
             raise RuntimeError(f'Resource {resource_name} is not a defined resources')
-        if self._meta.resources[resource_name].type != "oci-image":
+        if self._meta.resources[resource_name].type != 'oci-image':
             raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
 
         as_yaml = yaml.safe_dump(contents)
@@ -614,7 +614,7 @@ class Harness(Generic[CharmType]):
         if resource_name not in self._meta.resources.keys():
             raise RuntimeError(f'Resource {resource_name} is not a defined resource')
         record = self._meta.resources[resource_name]
-        if record.type != "file":
+        if record.type != 'file':
             raise RuntimeError(
                 f'Resource {resource_name} is not a file, but actually {record.type}')
         filename = record.filename
@@ -626,7 +626,7 @@ class Harness(Generic[CharmType]):
     def populate_oci_resources(self) -> None:
         """Populate all OCI resources."""
         for name, data in self._meta.resources.items():
-            if data.type == "oci-image":
+            if data.type == 'oci-image':
                 self.add_oci_resource(name)
 
     def disable_hooks(self) -> None:
@@ -840,8 +840,8 @@ class Harness(Generic[CharmType]):
             self._backend.app_name: {}}
 
         self._backend._relation_app_and_units[relation_id] = {
-            "app": remote_app,
-            "units": [],
+            'app': remote_app,
+            'units': [],
         }
         # Reload the relation_ids list
         if self._model is not None:
@@ -952,7 +952,7 @@ class Harness(Generic[CharmType]):
                 'the remote unit name should be {}/<some-number>, not {!r}.'
                 ''.format(relation_name, app.name, app.name, remote_unit_name))
         app_and_units = self._backend._relation_app_and_units
-        app_and_units[relation_id]["units"].append(remote_unit_name)
+        app_and_units[relation_id]['units'].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         remote_unit = self._model.get_unit(remote_unit_name)
@@ -1008,7 +1008,7 @@ class Harness(Generic[CharmType]):
         self._emit_relation_departed(relation_id, remote_unit_name)
         # remove the relation data for the departed unit now that the event has happened
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
-        self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
+        self._backend._relation_app_and_units[relation_id]['units'].remove(remote_unit_name)
         self._backend._relation_data_raw[relation_id].pop(remote_unit_name)
         self.model._relations._invalidate(relation_name=relation.name)
 
@@ -1324,7 +1324,7 @@ class Harness(Generic[CharmType]):
         event.
         """
         if num_units < 0:
-            raise TypeError("num_units must be 0 or a positive integer.")
+            raise TypeError('num_units must be 0 or a positive integer.')
         self._backend._planned_units = num_units
 
     def reset_planned_units(self) -> None:
@@ -1765,7 +1765,7 @@ class Harness(Generic[CharmType]):
             harness.handle_exec('database', ['foo'], handler=handle_timeout)
         """
         if (handler is None and result is None) or (handler is not None and result is not None):
-            raise TypeError("Either handler or result must be provided, but not both.")
+            raise TypeError('Either handler or result must be provided, but not both.')
         container_name = container if isinstance(container, str) else container.name
         if result is not None:
             if isinstance(result, int) and not isinstance(result, bool):
@@ -2020,8 +2020,8 @@ class _TestingModelBackend:
         self.model_uuid = str(uuid.uuid4())
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
-        self._harness_storage_path = pathlib.Path(self._harness_tmp_dir.name) / "storages"
-        self._harness_container_path = pathlib.Path(self._harness_tmp_dir.name) / "containers"
+        self._harness_storage_path = pathlib.Path(self._harness_tmp_dir.name) / 'storages'
+        self._harness_container_path = pathlib.Path(self._harness_tmp_dir.name) / 'containers'
         self._harness_storage_path.mkdir()
         self._harness_container_path.mkdir()
         # this is used by the _record_calls decorator
@@ -2196,8 +2196,8 @@ class _TestingModelBackend:
     def resource_get(self, resource_name: str):
         if resource_name not in self._resources_map:
             raise model.ModelError(
-                "ERROR could not download resource: HTTP request failed: "
-                "Get https://.../units/unit-{}/resources/{}: resource#{}/{} not found".format(
+                'ERROR could not download resource: HTTP request failed: '
+                'Get https://.../units/unit-{}/resources/{}: resource#{}/{} not found'.format(
                     self.unit_name.replace('/', '-'), resource_name, self.app_name, resource_name
                 ))
         filename, contents = self._resources_map[resource_name]
@@ -2239,7 +2239,7 @@ class _TestingModelBackend:
                     if include_detached or self._storage_is_attached(name, index))
 
     def storage_get(self, storage_name_id: str, attribute: str) -> Any:
-        name, index = storage_name_id.split("/", 1)
+        name, index = storage_name_id.split('/', 1)
         index = int(index)
         try:
             if index not in self._storage_attached[name]:
@@ -2297,7 +2297,7 @@ class _TestingModelBackend:
                     root = client._root
                     mounting_dir = root / mount.location[1:]
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
-                    target_dir = pathlib.Path(store["location"])
+                    target_dir = pathlib.Path(store['location'])
                     target_dir.mkdir(parents=True, exist_ok=True)
                     mounting_dir.symlink_to(target_dir)
 
@@ -2324,14 +2324,14 @@ class _TestingModelBackend:
         assert self._running_action is not None
         action_meta = self._meta.actions[self._running_action.name]
         for name, action_meta in action_meta.parameters.items():
-            if "default" in action_meta:
-                params[name] = action_meta["default"]
+            if 'default' in action_meta:
+                params[name] = action_meta['default']
         params.update(self._running_action.parameters)
         return params
 
     def action_set(self, results: Dict[str, Any]):
         assert self._running_action is not None
-        for key in ("stdout", "stderr", "stdout-encoding", "stderr-encoding"):
+        for key in ('stdout', 'stderr', 'stdout-encoding', 'stderr-encoding'):
             if key in results:
                 # Match Juju's error message.
                 raise model.ModelError(f'ERROR cannot set reserved action key "{key}"')
@@ -2673,7 +2673,7 @@ class _TestingExecProcess:
         self._timeout = timeout
         self._is_timeout = is_timeout
         if exit_code is None and not is_timeout:
-            raise ValueError("when is_timeout is False, exit_code must not be None")
+            raise ValueError('when is_timeout is False, exit_code must not be None')
         self._exit_code = exit_code
         self.stdin = stdin
         self.stdout = stdout
@@ -2703,7 +2703,7 @@ class _TestingExecProcess:
 
     def send_signal(self, sig: Union[int, str]):
         # the process is always terminated when ExecProcess is return in the simulation.
-        raise BrokenPipeError("[Errno 32] Broken pipe")
+        raise BrokenPipeError('[Errno 32] Broken pipe')
 
 
 @_copy_docstrings(pebble.Client)
@@ -2931,7 +2931,7 @@ class _TestingPebbleClient:
 
     @staticmethod
     def _check_absolute_path(path: str):
-        if not path.startswith("/"):
+        if not path.startswith('/'):
             raise pebble.PathError(
                 'generic-file-error',
                 f'paths must be absolute, got {path!r}'
@@ -2945,7 +2945,7 @@ class _TestingPebbleClient:
         try:
             return cast(
                 Union[BinaryIO, TextIO],
-                file_path.open("rb" if encoding is None else "r", encoding=encoding))
+                file_path.open('rb' if encoding is None else 'r', encoding=encoding))
         except FileNotFoundError:
             raise pebble.PathError('not-found', f'stat {path}: no such file or directory')
         except IsADirectoryError:
@@ -3023,8 +3023,8 @@ class _TestingPebbleClient:
             rel_path = os.path.relpath(file_info.path, start=self._root)
             rel_path = '/' if rel_path == '.' else '/' + rel_path
             file_info.path = rel_path
-            if rel_path == "/":
-                file_info.name = "/"
+            if rel_path == '/':
+                file_info.name = '/'
         return file_infos
 
     def make_dir(
@@ -3132,7 +3132,7 @@ class _TestingPebbleClient:
         self._check_connection()
         handler = self._find_exec_handler(command)
         if handler is None:
-            message = "execution handler not found, please register one using Harness.handle_exec"
+            message = 'execution handler not found, please register one using Harness.handle_exec'
             raise pebble.APIError(
                 body={}, code=500, status='Internal Server Error', message=message
             )
@@ -3154,7 +3154,7 @@ class _TestingPebbleClient:
             group = service.group if group is None else group
             group_id = service.group_id if group_id is None else group_id
 
-        if hasattr(stdin, "read"):
+        if hasattr(stdin, 'read'):
             stdin = stdin.read()  # type: ignore
 
         exec_args = ExecArgs(
@@ -3189,8 +3189,8 @@ class _TestingPebbleClient:
                 return cast(pebble.ExecProcess[Any], exec_process)
             else:
                 raise RuntimeError(
-                    "a TimeoutError occurred in the execution handler, "
-                    "but no timeout value was provided in the execution arguments."
+                    'a TimeoutError occurred in the execution handler, '
+                    'but no timeout value was provided in the execution arguments.'
                 ) from None
         if result is None:
             exit_code = 0
@@ -3203,8 +3203,8 @@ class _TestingPebbleClient:
         else:
             raise TypeError(f"execution handler returned an unexpected type: {type(result)!r}.")
         if combine_stderr and proc_stderr.getvalue():
-            raise ValueError("execution handler returned a non-empty stderr "
-                             "even though combine_stderr is enabled.")
+            raise ValueError('execution handler returned a non-empty stderr '
+                             'even though combine_stderr is enabled.')
         if stdout is not None:
             shutil.copyfileobj(cast(io.IOBase, proc_stdout), cast(io.IOBase, stdout))
             proc_stdout = None

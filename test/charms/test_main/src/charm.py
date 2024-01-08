@@ -115,7 +115,7 @@ class Charm(ops.CharmBase):
         self.framework.observe(self.on.custom, self._on_custom)
 
         if os.getenv('TRY_EXCEPTHOOK', False):
-            raise RuntimeError("failing as requested")
+            raise RuntimeError('failing as requested')
 
     def _on_install(self, event: ops.InstallEvent):
         self._stored.on_install.append(type(event).__name__)

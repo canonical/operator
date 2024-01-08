@@ -78,9 +78,9 @@ _ObjectPath = Tuple[Optional[_Path], _Kind]
 _PathToObjectMapping = Dict[_Path, 'Object']
 _PathToSerializableMapping = Dict[_Path, Serializable]
 
-_T = TypeVar("_T")
+_T = TypeVar('_T')
 _EventType = TypeVar('_EventType', bound='EventBase')
-_ObjectType = TypeVar("_ObjectType", bound="Object")
+_ObjectType = TypeVar('_ObjectType', bound='Object')
 
 logger = logging.getLogger(__name__)
 
@@ -154,8 +154,8 @@ class Handle:
     def from_path(cls, path: str) -> 'Handle':
         """Build a handle from the indicated path."""
         handle = None
-        for pair in path.split("/"):
-            pair = pair.split("[")
+        for pair in path.split('/'):
+            pair = pair.split('[')
             good = False
             if len(pair) == 1:
                 kind, key = pair[0], None
@@ -240,7 +240,7 @@ class EventBase:
         3. At some future time, event C happens, which also checks if A can
            proceed.
         """
-        logger.debug("Deferring %s.", self)
+        logger.debug('Deferring %s.', self)
         self.deferred = True
 
     def snapshot(self) -> Dict[str, Any]:
@@ -359,7 +359,7 @@ class HandleKind:
     """
 
     def __get__(self, obj: 'Object', obj_type: 'Type[Object]') -> str:
-        kind = typing.cast(str, obj_type.__dict__.get("handle_kind"))
+        kind = typing.cast(str, obj_type.__dict__.get('handle_kind'))
         if kind:
             return kind
         return obj_type.__name__
@@ -419,12 +419,12 @@ class Object:
 class ObjectEvents(Object):
     """Convenience type to allow defining ``.on`` attributes at class level."""
 
-    handle_kind = "on"
+    handle_kind = 'on'
 
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] = \
+        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] =\
             weakref.WeakKeyDictionary()
 
     def __get__(self, emitter: Object, emitter_type: 'Type[Object]'):
@@ -621,7 +621,7 @@ class Framework(Object):
 
         if isinstance(storage, (str, pathlib.Path)):
             logger.warning(
-                "deprecated: Framework now takes a Storage not a path")
+                'deprecated: Framework now takes a Storage not a path')
             storage = SQLiteStorage(storage)
         # TODO(benhoyt): should probably have a Storage protocol
         self._storage: 'SQLiteStorage' = storage  # type: ignore
@@ -709,7 +709,7 @@ class Framework(Object):
         self._type_registry[(parent_path, kind_)] = cls
         self._type_known.add(cls)
 
-    def save_snapshot(self, value: Union["StoredStateData", "EventBase"]):
+    def save_snapshot(self, value: Union['StoredStateData', 'EventBase']):
         """Save a persistent snapshot of the provided value."""
         if type(value) not in self._type_known:
             raise RuntimeError(
@@ -724,7 +724,7 @@ class Framework(Object):
         try:
             marshal.dumps(data)
         except ValueError:
-            msg = "unable to save the data for {}, it must contain only simple types: {!r}"
+            msg = 'unable to save the data for {}, it must contain only simple types: {!r}'
             raise ValueError(msg.format(value.__class__.__name__, data)) from None
 
         self._storage.save_snapshot(value.handle.path, data)
@@ -789,7 +789,7 @@ class Framework(Object):
 
         self.register_type(event_type, emitter, event_kind)  # type: ignore
 
-        if hasattr(emitter, "handle"):
+        if hasattr(emitter, 'handle'):
             emitter_path = emitter.handle.path
         else:
             raise RuntimeError(
@@ -802,7 +802,7 @@ class Framework(Object):
 
         method_name = observer.__name__
 
-        assert isinstance(observer.__self__, Object), "can't register observers " \
+        assert isinstance(observer.__self__, Object), "can't register observers "\
                                                       "that aren't `Object`s"
         observer_obj = observer.__self__
         if not sig.parameters:
@@ -833,7 +833,7 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent = event.handle.parent
-        assert isinstance(parent, Handle), "event handle must have a parent"
+        assert isinstance(parent, Handle), 'event handle must have a parent'
         parent_path = parent.path
         # TODO Track observers by (parent_path, event_kind) rather than as a list of
         #  all observers. Avoiding linear search through all observers for every event
@@ -916,7 +916,7 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug("Re-emitting deferred event %s.", event)
+                    logger.debug('Re-emitting deferred event %s.', event)
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
                     pass
@@ -924,7 +924,7 @@ class Framework(Object):
                     # if the event we are emitting now is not the event being
                     # dispatched, and it also is not an event we have deferred,
                     # it must be a custom event
-                    logger.debug("Emitting custom event %s.", event)
+                    logger.debug('Emitting custom event %s.', event)
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
@@ -995,7 +995,7 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
         else:
             logger.warning(
-                "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
+                'Breakpoint %r skipped (not found in the requested breakpoints: %s)',
                 name, indicated_breakpoints)
 
     def remove_unreferenced_events(self) -> None:
@@ -1071,8 +1071,8 @@ class BoundStoredState:
             data = StoredStateData(parent, attr_name)
 
         # __dict__ is used to avoid infinite recursion.
-        self.__dict__["_data"] = data
-        self.__dict__["_attr_name"] = attr_name
+        self.__dict__['_data'] = data
+        self.__dict__['_attr_name'] = attr_name
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
@@ -1086,14 +1086,14 @@ class BoundStoredState:
 
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
-        if key == "on":
+        if key == 'on':
             return self._data.on
         if key not in self._data:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
 
     def __setattr__(self, key: str, value: Any):
-        if key == "on":
+        if key == 'on':
             raise AttributeError("attribute 'on' is reserved and cannot be set")
 
         unwrapped = _unwrap_stored(self._data, value)
@@ -1185,7 +1185,7 @@ class StoredState:
                 if bound is not None:
                     # the StoredState instance is being stored in two different
                     # attributes -> unclear what is expected of us -> bail out
-                    raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
+                    raise RuntimeError('StoredState shared by {0}.{1} and {0}.{2}'.format(
                         cls.__name__, self.attr_name, attr_name))
                 # we've found ourselves for the first time; save where, and bind the object
                 self.attr_name = attr_name

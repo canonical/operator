@@ -60,7 +60,7 @@ class SQLiteStorage:
             # sqlite3.connect creates the file silently if it does not exist
             logger.debug(f"Initializing SQLite local storage: {filename}.")
 
-        if filename != ":memory:":
+        if filename != ':memory:':
             self._ensure_db_permissions(str(filename))
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
@@ -87,20 +87,20 @@ class SQLiteStorage:
         """Make the database ready to be used as storage."""
         # Make sure that the database is locked until the connection is closed,
         # not until the transaction ends.
-        self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
-        c = self._db.execute("BEGIN")
+        self._db.execute('PRAGMA locking_mode=EXCLUSIVE')
+        c = self._db.execute('BEGIN')
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
-            self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
-            self._db.execute('''
+            self._db.execute('CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)')
+            self._db.execute("""
                 CREATE TABLE notice (
                   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                   event_path TEXT,
                   observer_path TEXT,
                   method_name TEXT)
-                ''')
+                """)
             self._db.commit()
 
     def close(self) -> None:
@@ -127,7 +127,7 @@ class SQLiteStorage:
         """
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(snapshot_data)
-        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, raw_data))
+        self._db.execute('REPLACE INTO snapshot VALUES (?, ?)', (handle_path, raw_data))
 
     def load_snapshot(self, handle_path: str) -> Any:
         """Part of the Storage API, retrieve a snapshot that was previously saved.
@@ -139,7 +139,7 @@ class SQLiteStorage:
             NoSnapshotError: if there is no snapshot for the given handle_path.
         """
         c = self._db.cursor()
-        c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
+        c.execute('SELECT data FROM snapshot WHERE handle=?', (handle_path,))
         row = c.fetchone()
         if row:
             return pickle.loads(row[0])
@@ -150,12 +150,12 @@ class SQLiteStorage:
 
         Dropping a snapshot that doesn't exist is treated as a no-op.
         """
-        self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
+        self._db.execute('DELETE FROM snapshot WHERE handle=?', (handle_path,))
 
     def list_snapshots(self) -> Generator[str, None, None]:
         """Return the name of all snapshots that are currently saved."""
         c = self._db.cursor()
-        c.execute("SELECT handle FROM snapshot")
+        c.execute('SELECT handle FROM snapshot')
         while True:
             rows = c.fetchmany()
             if not rows:
@@ -170,12 +170,12 @@ class SQLiteStorage:
 
     def drop_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
         """Part of the Storage API, remove a notice that was previously recorded."""
-        self._db.execute('''
+        self._db.execute("""
             DELETE FROM notice
              WHERE event_path=?
                AND observer_path=?
                AND method_name=?
-            ''', (event_path, observer_path, method_name))
+            """, (event_path, observer_path, method_name))
 
     def notices(self, event_path: Optional[str] = None) -> '_NoticeGenerator':
         """Part of the Storage API, return all notices that begin with event_path.
@@ -188,18 +188,18 @@ class SQLiteStorage:
             Iterable of (event_path, observer_path, method_name) tuples
         """
         if event_path:
-            c = self._db.execute('''
+            c = self._db.execute("""
                 SELECT event_path, observer_path, method_name
                   FROM notice
                  WHERE event_path=?
                  ORDER BY sequence
-                ''', (event_path,))
+                """, (event_path,))
         else:
-            c = self._db.execute('''
+            c = self._db.execute("""
                 SELECT event_path, observer_path, method_name
                   FROM notice
                  ORDER BY sequence
-                ''')
+                """)
         while True:
             rows = c.fetchmany()
             if not rows:
@@ -215,7 +215,7 @@ class JujuStorage:
     as the way to store state for the framework and for components.
     """
 
-    NOTICE_KEY = "#notices#"
+    NOTICE_KEY = '#notices#'
 
     def __init__(self, backend: Optional['_JujuStorageBackend'] = None):
         self._backend: _JujuStorageBackend = backend or _JujuStorageBackend()
@@ -379,7 +379,7 @@ class _JujuStorageBackend:
             default_style='|',
             default_flow_style=False,
             Dumper=_SimpleDumper)
-        _run(["state-set", "--file", "-"], input=content, check=True)
+        _run(['state-set', '--file', '-'], input=content, check=True)
 
     def get(self, key: str) -> Any:
         """Get the bytes value associated with a given key.
@@ -390,7 +390,7 @@ class _JujuStorageBackend:
             CalledProcessError: if 'state-get' returns an error code.
         """
         # We don't capture stderr here so it can end up in debug logs.
-        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True)
+        p = _run(['state-get', key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore
@@ -403,7 +403,7 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-delete' returns an error code.
         """
-        _run(["state-delete", key], check=True)
+        _run(['state-delete', key], check=True)
 
 
 class NoSnapshotError(Exception):

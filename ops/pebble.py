@@ -199,22 +199,22 @@ if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
     _CheckInfoDict = TypedDict('_CheckInfoDict',
-                               {"name": str,
-                                "level": NotRequired[Optional[Union['CheckLevel', str]]],
-                                "status": Union['CheckStatus', str],
-                                "failures": NotRequired[int],
-                                "threshold": int})
+                               {'name': str,
+                                'level': NotRequired[Optional[Union['CheckLevel', str]]],
+                                'status': Union['CheckStatus', str],
+                                'failures': NotRequired[int],
+                                'threshold': int})
     _FileInfoDict = TypedDict('_FileInfoDict',
-                              {"path": str,
-                               "name": str,
-                               "size": NotRequired[Optional[int]],
-                               "permissions": str,
-                               "last-modified": str,
-                               "user-id": NotRequired[Optional[int]],
-                               "user": NotRequired[Optional[str]],
-                               "group-id": NotRequired[Optional[int]],
-                               "group": NotRequired[Optional[str]],
-                               "type": Union['FileType', str]})
+                              {'path': str,
+                               'name': str,
+                               'size': NotRequired[Optional[int]],
+                               'permissions': str,
+                               'last-modified': str,
+                               'user-id': NotRequired[Optional[int]],
+                               'user': NotRequired[Optional[str]],
+                               'group-id': NotRequired[Optional[int]],
+                               'group': NotRequired[Optional[str]],
+                               'type': Union['FileType', str]})
 
     _ProgressDict = TypedDict('_ProgressDict',
                               {'label': str,
@@ -365,7 +365,7 @@ class ProtocolError(Error):
 class PathError(Error):
     """Raised when there's an error with a specific path."""
 
-    kind: typing.Literal["not-found", "permission-denied", "generic-file-error"]
+    kind: typing.Literal['not-found', 'permission-denied', 'generic-file-error']
     """Short string representing the kind of error."""
 
     message: str
@@ -1515,7 +1515,7 @@ class ExecProcess(Generic[AnyStr]):
         if self.stdout is None:
             raise TypeError(
                 "can't use wait_output() when exec was called with the stdout argument; "
-                "use wait() instead"
+                'use wait() instead'
             )
 
         if self._encoding is not None:
@@ -1802,7 +1802,7 @@ class Client:
             if e.args and isinstance(e.args[0], FileNotFoundError):
                 raise ConnectionError(
                     f"Could not connect to Pebble: socket not found at {self.socket_path!r} "
-                    "(container restarted?)") from None
+                    '(container restarted?)') from None
             raise ConnectionError(e.reason) from e
 
         return response
@@ -2801,7 +2801,7 @@ class _FilesParser:
 
     def __init__(self, boundary: Union[bytes, str]):
         self._response: Optional[_FilesResponse] = None  # externally managed
-        self._part_type: Optional[Literal["response", "files"]] = None  # externally managed
+        self._part_type: Optional[Literal['response', 'files']] = None  # externally managed
         self._headers: Optional[email.message.Message] = None  # externally managed
         self._files: Dict[str, _Tempfile] = {}
 

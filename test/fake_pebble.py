@@ -28,12 +28,12 @@ import urllib.parse
 from typing_extensions import NotRequired
 
 _Response = typing.TypedDict(
-    "_Response", {
-        "result": typing.Optional[typing.Dict[str, str]],
-        "status": str,
-        "status-code": int,
-        "type": str,
-        "change": NotRequired[str]})
+    '_Response', {
+        'result': typing.Optional[typing.Dict[str, str]],
+        'status': str,
+        'status-code': int,
+        'type': str,
+        'change': NotRequired[str]})
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -67,45 +67,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def bad_request(self, message: str):
         d: _Response = {
-            "result": {
-                "message": message,
+            'result': {
+                'message': message,
             },
-            "status": "Bad Request",
-            "status-code": 400,
-            "type": "error"
+            'status': 'Bad Request',
+            'status-code': 400,
+            'type': 'error'
         }
         self.respond(d, 400)
 
     def not_found(self):
         d: _Response = {
-            "result": {
-                "message": "invalid API endpoint requested"
+            'result': {
+                'message': 'invalid API endpoint requested'
             },
-            "status": "Not Found",
-            "status-code": 404,
-            "type": "error"
+            'status': 'Not Found',
+            'status-code': 404,
+            'type': 'error'
         }
         self.respond(d, 404)
 
     def method_not_allowed(self):
         d: _Response = {
-            "result": {
-                "message": 'method "PUT" not allowed'
+            'result': {
+                'message': 'method "PUT" not allowed'
             },
-            "status": "Method Not Allowed",
-            "status-code": 405,
-            "type": "error"
+            'status': 'Method Not Allowed',
+            'status-code': 405,
+            'type': 'error'
         }
         self.respond(d, 405)
 
     def internal_server_error(self, msg: Exception):
         d: _Response = {
-            "result": {
-                "message": f"internal server error: {msg}",
+            'result': {
+                'message': f"internal server error: {msg}",
             },
-            "status": "Internal Server Error",
-            "status-code": 500,
-            "type": "error"
+            'status': 'Internal Server Error',
+            'status-code': 500,
+            'type': 'error'
         }
         self.respond(d, 500)
 
@@ -162,12 +162,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         query: typing.Dict[str, str],
                         data: typing.Dict[str, str]):
         self.respond({
-            "result": {
-                "version": "3.14.159"
+            'result': {
+                'version': '3.14.159'
             },
-            "status": "OK",
-            "status-code": 200,
-            "type": "sync"
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync'
         })
 
     def services_action(self,
@@ -182,11 +182,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self.bad_request(f'service "{service}" does not exist')
                     return
             self.respond({
-                "change": "1234",
-                "result": None,
-                "status": "Accepted",
-                "status-code": 202,
-                "type": "async"
+                'change': '1234',
+                'result': None,
+                'status': 'Accepted',
+                'status-code': 202,
+                'type': 'async'
             })
         else:
             self.bad_request(f'action "{action}" not implemented')

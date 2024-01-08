@@ -222,14 +222,14 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
 
     def test_permissions_new(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
+            filename = os.path.join(temp_dir, '.unit-state.db')
             storage = ops.storage.SQLiteStorage(filename)
             self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
             storage.close()
 
     def test_permissions_existing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
+            filename = os.path.join(temp_dir, '.unit-state.db')
             ops.storage.SQLiteStorage(filename).close()
             # Set the file to access that will need fixing for user, group, and other.
             os.chmod(filename, 0o744)
@@ -237,22 +237,22 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
             storage.close()
 
-    @unittest.mock.patch("os.path.exists")
+    @unittest.mock.patch('os.path.exists')
     def test_permissions_race(self, exists: unittest.mock.MagicMock):
         exists.return_value = False
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
+            filename = os.path.join(temp_dir, '.unit-state.db')
             # Create an existing file, but the mock will simulate a race condition saying that it
             # does not exist.
-            open(filename, "w").close()
+            open(filename, 'w').close()
             self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
-    @unittest.mock.patch("os.chmod")
+    @unittest.mock.patch('os.chmod')
     def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
         chmod.side_effect = OSError
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
-            open(filename, "w").close()
+            filename = os.path.join(temp_dir, '.unit-state.db')
+            open(filename, 'w').close()
             self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
 
@@ -264,7 +264,7 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         'state_file': str(state_file.as_posix()),
     }
 
-    fake_script(test_case, 'state-set', dedent('''\
+    fake_script(test_case, 'state-set', dedent("""\
         {executable} -c '
         import sys
         if "{pthpth}" not in sys.path:
@@ -283,9 +283,9 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         with state_file.open("wb") as f:
             pickle.dump(state, f)
         ' "$@"
-        ''').format(**template_args))
+        """).format(**template_args))
 
-    fake_script(test_case, 'state-get', dedent('''\
+    fake_script(test_case, 'state-get', dedent("""\
         {executable} -Sc '
         import sys
         if "{pthpth}" not in sys.path:
@@ -301,9 +301,9 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         result = state.get(sys.argv[1], "\\n")
         sys.stdout.write(result)
         ' "$@"
-        ''').format(**template_args))
+        """).format(**template_args))
 
-    fake_script(test_case, 'state-delete', dedent('''\
+    fake_script(test_case, 'state-delete', dedent("""\
         {executable} -Sc '
         import sys
         if "{pthpth}" not in sys.path:
@@ -320,7 +320,7 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         with state_file.open("wb") as f:
             pickle.dump(state, f)
         ' "$@"
-        ''').format(**template_args))
+        """).format(**template_args))
 
 
 class TestJujuStorage(StoragePermutations, BaseTestCase):
