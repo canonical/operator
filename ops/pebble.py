@@ -1308,7 +1308,7 @@ class NoticesSelect(enum.Enum):
     """
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Notice:
     """Information about a single notice."""
 

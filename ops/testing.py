@@ -3313,20 +3313,27 @@ class _TestingPebbleClient:
                 last_repeated=now,
                 expire_after=datetime.timedelta(days=7),
                 occurrences=1,
+                last_data=data or {},
+                repeat_after=repeat_after,
             )
             self._notices[unique_key] = notice
             new_or_repeated = True
         else:
             # Additional occurrence, update existing notice
-            notice.occurrences += 1
+            last_repeated = notice.last_repeated
             if repeat_after is None or now > notice.last_repeated + repeat_after:
                 # Update last repeated time if repeat-after time has elapsed (or is None)
-                notice.last_repeated = now
+                last_repeated = now
                 new_or_repeated = True
-
-        notice.last_occurred = now
-        notice.last_data = data or {}
-        notice.repeat_after = repeat_after
+            notice = dataclasses.replace(
+                notice,
+                last_occurred=now,
+                last_repeated=last_repeated,
+                occurrences=notice.occurrences + 1,
+                last_data=data or {},
+                repeat_after=repeat_after,
+            )
+            self._notices[unique_key] = notice
 
         return notice.id, new_or_repeated
 
