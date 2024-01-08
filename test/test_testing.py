@@ -5520,6 +5520,7 @@ class TestNotify(unittest.TestCase):
 
         self.assertIsInstance(id3, str)
         self.assertNotEqual(id3, '')
+        self.assertNotEqual(id3, id2)
 
         expected_changes = [{
             'name': 'pebble-custom-notice',
@@ -5549,8 +5550,7 @@ class TestNotify(unittest.TestCase):
         self.assertEqual(harness.charm.changes, expected_changes)
 
     def test_notify_no_repeat(self):
-        # Ensure event doesn't get triggered when notice occurs but doesn't repeat.
-
+        """Ensure event doesn't get triggered when notice occurs but doesn't repeat."""
         harness = ops.testing.Harness(ContainerEventCharm, meta="""
             name: notifier
             containers:
@@ -5620,7 +5620,7 @@ class PebbleNoticesMixin:
         key2 = 'example.com/' + os.urandom(16).hex()
         id1 = client.notify(pebble.NoticeType.CUSTOM, key1)
         id2 = client.notify(pebble.NoticeType.CUSTOM, key2, data={'x': 'y'})
-        time.sleep(0.01)
+        time.sleep(0.000_001)  # Ensure times are different.
         client.notify(pebble.NoticeType.CUSTOM, key2, data={'k': 'v', 'foo': 'bar'})
 
         notice = client.get_notice(id1)
@@ -5654,9 +5654,9 @@ class PebbleNoticesMixin:
         key3 = 'example.com/' + os.urandom(16).hex()
 
         client.notify(pebble.NoticeType.CUSTOM, key1)
-        time.sleep(0.01)
+        time.sleep(0.000_001)  # Ensure times are different.
         client.notify(pebble.NoticeType.CUSTOM, key2)
-        time.sleep(0.01)
+        time.sleep(0.000_001)  # Ensure times are different.
         client.notify(pebble.NoticeType.CUSTOM, key3)
 
         notices = client.get_notices()

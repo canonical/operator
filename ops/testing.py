@@ -3295,7 +3295,7 @@ class _TestingPebbleClient:
 
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
-        uid = 0  # hard-code UID as root (Pebble and charms ran as root for now)
+        uid = 0  # Hard-code UID as root (Pebble and charms run as root for now).
 
         new_or_repeated = False
         unique_key = (uid, type.value, key)
@@ -3306,7 +3306,7 @@ class _TestingPebbleClient:
             notice = pebble.Notice(
                 id=str(self._last_notice_id),
                 user_id=uid,
-                type=pebble.NoticeType(type),
+                type=type,
                 key=key,
                 first_occurred=now,
                 last_occurred=now,
@@ -3365,25 +3365,22 @@ class _TestingPebbleClient:
             filter_user_id = None
 
         if types is not None:
-            types = [(t.value if isinstance(t, pebble.NoticeType) else t) for t in types]
+            types = {(t.value if isinstance(t, pebble.NoticeType) else t) for t in types}
         if keys is not None:
-            keys = list(keys)
+            keys = set(keys)
 
-        notices: List[pebble.Notice] = []
-        for notice in self._notices.values():
-            if not self._notice_matches(notice, filter_user_id, types, keys):
-                continue
-            notices.append(notice)
-
+        notices = [notice for notice in self._notices.values() if
+                   self._notice_matches(notice, filter_user_id, types, keys)]
         notices.sort(key=lambda notice: notice.last_repeated)
         return notices
 
     @staticmethod
     def _notice_matches(notice: pebble.Notice,
                         user_id: Optional[int] = None,
-                        types: Optional[List[str]] = None,
-                        keys: Optional[List[str]] = None) -> bool:
+                        types: Optional[Set[str]] = None,
+                        keys: Optional[Set[str]] = None) -> bool:
         # Same logic as NoticeFilter.matches in Pebble.
+        # For example: if user_id filter is set and it doesn't match, return False.
         if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
             return False
         if types is not None and notice.type not in types:

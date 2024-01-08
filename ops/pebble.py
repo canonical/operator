@@ -2754,7 +2754,7 @@ class Client:
             key: Notice key; must be in "example.com/path" format
             data: Data fields for this notice
             repeat_after: Prevent notice with same type and key from
-                reoccurring within this duration
+                repeating within this duration
 
         Returns:
             The notice's ID.
