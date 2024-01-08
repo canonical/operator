@@ -2750,11 +2750,11 @@ class Client:
         """Record an occurrence of a notice with the specified options.
 
         Args:
-            type: Notice type (currently only "custom" notices are supported)
-            key: Notice key; must be in "example.com/path" format
-            data: Data fields for this notice
-            repeat_after: Prevent notice with same type and key from
-                repeating within this duration
+            type: Notice type (currently only "custom" notices are supported).
+            key: Notice key; must be in "example.com/path" format.
+            data: Data fields for this notice.
+            repeat_after: Only allow this notice to repeat after this duration
+                has elapsed (the default is to always repeat).
 
         Returns:
             The notice's ID.
@@ -2804,12 +2804,12 @@ class Client:
         type has nanosecond precision).
 
         Args:
-            select: select which notices to return (instead of returning
-                notices for the current user)
-            user_id: filter for notices for the specified user, including
-                public notices (only works for Pebble admins)
-            types: filter for notices with any of the specified types
-            keys: filter for notices with any of the specified keys
+            select: Select which notices to return (instead of returning
+                notices for the current user).
+            user_id: Filter for notices for the specified user, including
+                public notices (only works for Pebble admins).
+            types: Filter for notices with any of the specified types.
+            keys: Filter for notices with any of the specified keys.
         """
         query: Dict[str, Union[str, List[str]]] = {}
         if select is not None:

@@ -5506,9 +5506,9 @@ class TestNotify(unittest.TestCase):
         harness.charm.observe_container_events('bar')
 
         id1a = harness.pebble_notify('foo', 'example.com/n1')
-        id1b = harness.pebble_notify('foo', 'example.com/n1')
         id2 = harness.pebble_notify('foo', 'foo.com/n2')
         id3 = harness.pebble_notify('bar', 'example.com/n1')
+        id1b = harness.pebble_notify('foo', 'example.com/n1')
 
         self.assertIsInstance(id1a, str)
         self.assertNotEqual(id1a, '')
@@ -5531,12 +5531,6 @@ class TestNotify(unittest.TestCase):
         }, {
             'name': 'pebble-custom-notice',
             'container': 'foo',
-            'notice_id': id1a,
-            'notice_type': 'custom',
-            'notice_key': 'example.com/n1',
-        }, {
-            'name': 'pebble-custom-notice',
-            'container': 'foo',
             'notice_id': id2,
             'notice_type': 'custom',
             'notice_key': 'foo.com/n2',
@@ -5544,6 +5538,12 @@ class TestNotify(unittest.TestCase):
             'name': 'pebble-custom-notice',
             'container': 'bar',
             'notice_id': id3,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
             'notice_type': 'custom',
             'notice_key': 'example.com/n1',
         }]

@@ -1110,12 +1110,12 @@ class Harness(Generic[CharmType]):
         :class:`ops.PebbleCustomNoticeEvent`.
 
         Args:
-            container_name: Name of workload container
-            key: Notice key; must be in "example.com/path" format
-            data: Data fields for this notice
-            repeat_after: Prevent notice with same type and key from
-                reoccurring within this duration
-            type: Notice type (currently only "custom" notices are supported)
+            container_name: Name of workload container.
+            key: Notice key; must be in "example.com/path" format.
+            data: Data fields for this notice.
+            repeat_after: Only allow this notice to repeat after this duration
+                has elapsed (the default is to always repeat).
+            type: Notice type (currently only "custom" notices are supported).
 
         Returns:
             The notice's ID.
@@ -2755,7 +2755,7 @@ class _TestingPebbleClient:
         self._root = container_root
         self._backend = backend
         self._exec_handlers: Dict[Tuple[str, ...], ExecHandler] = {}
-        self._notices: Dict[Tuple[Optional[int], str, str], pebble.Notice] = {}
+        self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         self._last_notice_id = 0
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
@@ -3295,17 +3295,16 @@ class _TestingPebbleClient:
 
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
-        uid = 0  # Hard-code UID as root (Pebble and charms run as root for now).
 
         new_or_repeated = False
-        unique_key = (uid, type.value, key)
+        unique_key = (type.value, key)
         notice = self._notices.get(unique_key)
         if notice is None:
             # First occurrence of this notice uid+type+key
             self._last_notice_id += 1
             notice = pebble.Notice(
                 id=str(self._last_notice_id),
-                user_id=uid,
+                user_id=0,  # Charm should always be able to read pebble_notify notices.
                 type=type,
                 key=key,
                 first_occurred=now,
