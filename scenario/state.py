@@ -943,14 +943,15 @@ class State(_DCBase):
 
 
 def _is_valid_charmcraft_25_metadata(meta: Dict[str, Any]):
-    # Check whether the metadata has the expected mandatory fields
+    # Check whether this dict has the expected mandatory metadata fields according to the
+    # charmcraft >2.5 charmcraft.yaml schema
     if (config_type := meta.get("type")) != "charm":
         logger.debug(
             f"Not a charm: charmcraft yaml config ``.type`` is {config_type!r}.",
         )
         return False
     if not all(field in meta for field in {"name", "summary", "description"}):
-        logger.debug("not a charm: charmcraft yaml misses some required")
+        logger.debug("Not a charm: charmcraft yaml misses some required fields")
         return False
     return True
 
