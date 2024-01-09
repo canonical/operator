@@ -12,6 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Run (some) unit tests against a real Pebble server.
+
+Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
+against a real Pebble server. For example, in one terminal, run Pebble:
+
+$ PEBBLE=~/pebble pebble run --http=:4000
+2021-09-20T04:10:34.934Z [pebble] Started daemon
+
+In another terminal, run the tests:
+
+$ source .tox/unit/bin/activate
+$ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_real_pebble.py -v
+$ deactivate
+"""
+
 import json
 import os
 import shutil
@@ -26,32 +41,23 @@ import uuid
 
 from ops import pebble
 
-from .test_testing import PebbleStorageAPIsTestMixin
+from .test_testing import PebbleNoticesMixin, PebbleStorageAPIsTestMixin
 
 
-# Set the RUN_REAL_PEBBLE_TESTS environment variable to run these tests
-# against a real Pebble server. For example, in one terminal, run Pebble:
-#
-# $ PEBBLE=~/pebble pebble run --http=:4000
-# 2021-09-20T04:10:34.934Z [pebble] Started daemon
-#
-# In another terminal, run the tests:
-#
-# $ source .tox/unit/bin/activate
-# $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_real_pebble.py -v
-# $ deactivate
-#
+def get_socket_path() -> str:
+    socket_path = os.getenv('PEBBLE_SOCKET')
+    pebble_path = os.getenv('PEBBLE')
+    if not socket_path and pebble_path:
+        assert isinstance(pebble_path, str)
+        socket_path = os.path.join(pebble_path, '.pebble.socket')
+    assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
+    return socket_path
+
+
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
 class TestRealPebble(unittest.TestCase):
     def setUp(self):
-        socket_path = os.getenv('PEBBLE_SOCKET')
-        pebble_path = os.getenv('PEBBLE')
-        if not socket_path and pebble_path:
-            assert isinstance(pebble_path, str)
-            socket_path = os.path.join(pebble_path, '.pebble.socket')
-        assert socket_path, 'PEBBLE or PEBBLE_SOCKET must be set if RUN_REAL_PEBBLE_TESTS set'
-
-        self.client = pebble.Client(socket_path=socket_path)
+        self.client = pebble.Client(socket_path=get_socket_path())
 
     def test_checks_and_health(self):
         self.client.add_layer('layer', {
@@ -289,14 +295,10 @@ class TestRealPebble(unittest.TestCase):
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
 class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
     def setUp(self):
-        socket_path = os.getenv('PEBBLE_SOCKET')
-        pebble_dir = os.getenv('PEBBLE')
-        if not socket_path and pebble_dir:
-            socket_path = os.path.join(pebble_dir, '.pebble.socket')
-        assert socket_path and pebble_dir, 'PEBBLE must be set if RUN_REAL_PEBBLE_TESTS set'
-
-        self.prefix = tempfile.mkdtemp(dir=pebble_dir)
-        self.client = pebble.Client(socket_path=socket_path)
+        pebble_path = os.getenv('PEBBLE')
+        assert pebble_path is not None
+        self.prefix = tempfile.mkdtemp(dir=pebble_path)
+        self.client = pebble.Client(socket_path=get_socket_path())
 
     def tearDown(self):
         shutil.rmtree(self.prefix)
@@ -306,3 +308,9 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsT
     @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
+
+
+@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
+class TestNoticesUsingRealPebble(unittest.TestCase, PebbleNoticesMixin):
+    def setUp(self):
+        self.client = pebble.Client(socket_path=get_socket_path())
