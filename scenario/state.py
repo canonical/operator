@@ -6,6 +6,7 @@ import dataclasses
 import datetime
 import inspect
 import re
+import warnings
 from collections import namedtuple
 from enum import Enum
 from itertools import chain
@@ -151,10 +152,12 @@ class Secret(_DCBase):
     contents: Dict[int, "RawSecretRevisionContents"]
 
     # indicates if the secret is owned by THIS unit, THIS app or some other app/unit.
-    owner: Literal["unit", "application", None] = None
+    # if None, the implication is that the secret has been granted to this unit.
+    owner: Literal["unit", "app", None] = None
 
-    # has this secret been granted to this unit/app or neither? Only applicable if NOT owner
-    granted: Literal["unit", "app", False] = False
+    # deprecated! if a secret is not granted to this unit, omit it from State.secrets altogether.
+    # this attribute will be removed in Scenario 7+
+    granted: Literal["unit", "app", False] = "<DEPRECATED>"
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
@@ -167,6 +170,27 @@ class Secret(_DCBase):
     description: Optional[str] = None
     expire: Optional[datetime.datetime] = None
     rotate: Optional[SecretRotate] = None
+
+    def __post_init__(self):
+        if self.granted != "<DEPRECATED>":
+            msg = (
+                "``state.Secret.granted`` is deprecated and will be removed in Scenario 7+. "
+                "If a Secret is not owned by the app/unit you are testing, nor has been granted to "
+                "it by the (remote) owner, then omit it from ``State.secrets`` altogether."
+            )
+            logger.warning(msg)
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+        if self.owner == "application":
+            msg = (
+                "Secret.owner='application' is deprecated in favour of 'app' "
+                "and will be removed in Scenario 7+."
+            )
+            logger.warning(msg)
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+            # bypass frozen dataclass
+            object.__setattr__(self, "owner", "app")
 
     # consumer-only events
     @property
@@ -221,8 +245,9 @@ class Secret(_DCBase):
     ):
         """Update the metadata."""
         revision = max(self.contents.keys())
+        self.contents[revision + 1] = content
+
         # bypass frozen dataclass
-        object.__setattr__(self, "contents"[revision + 1], content)
         if label:
             object.__setattr__(self, "label", label)
         if description:
@@ -856,10 +881,11 @@ class State(_DCBase):
     model: Model = Model()
     """The model this charm lives in."""
     secrets: List[Secret] = dataclasses.field(default_factory=list)
-    """The secrets this charm has access to (as an owner, or as a grantee)."""
+    """The secrets this charm has access to (as an owner, or as a grantee).
+    The presence of a secret in this list entails that the charm can read it.
+    Whether it can manage it or not depends on the individual secret's `owner` flag."""
     resources: Dict[str, "PathLike"] = dataclasses.field(default_factory=dict)
     """Mapping from resource name to path at which the resource can be found."""
-
     planned_units: int = 1
     """Number of non-dying planned units that are expected to be running this application.
     Use with caution."""
