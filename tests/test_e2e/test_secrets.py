@@ -247,7 +247,7 @@ def test_set(mycharm):
 
 def test_set_juju33(mycharm):
     rev1, rev2, rev3 = {"foo": "bar"}, {"foo": "baz"}, {"foo": "baz", "qux": "roz"}
-    with Context(mycharm, meta={"name": "local"}, juju_version="3.3").manager(
+    with Context(mycharm, meta={"name": "local"}, juju_version="3.3.1").manager(
         "update_status",
         State(),
     ) as mgr:

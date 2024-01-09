@@ -132,10 +132,10 @@ class _EventManager(_Manager):
             return cast("State", super().run())
 
     def _runner(self):
-        return self._ctx._run_event
+        return self._ctx._run_event  # noqa
 
     def _get_output(self):
-        return self._ctx._output_state
+        return self._ctx._output_state  # noqa
 
 
 class _ActionManager(_Manager):
@@ -146,10 +146,10 @@ class _ActionManager(_Manager):
             return cast("ActionOutput", super().run())
 
     def _runner(self):
-        return self._ctx._run_action
+        return self._ctx._run_action  # noqa
 
     def _get_output(self):
-        return self._ctx._finalize_action(self._ctx.output_state)
+        return self._ctx._finalize_action(self._ctx.output_state)  # noqa
 
 
 class Context:
@@ -199,7 +199,7 @@ class Context:
 
         >>> from scenario import Context, State
         >>> from ops import ActiveStatus
-        >>> from charm import MyCharm, MyCustomEvent
+        >>> from charm import MyCharm, MyCustomEvent  # noqa
         >>>
         >>> def test_foo():
         >>>     # Arrange: set the context up
@@ -259,6 +259,11 @@ class Context:
         self.charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
+        if juju_version.split(".")[0] == "2":
+            logger.warn(
+                "Juju 2.x is closed and unsupported. You may encounter inconsistencies.",
+            )
+
         self._app_name = app_name
         self._unit_id = unit_id
         self._tmp = tempfile.TemporaryDirectory()
@@ -366,7 +371,7 @@ class Context:
         if not isinstance(event, Event):
             raise InvalidEventError(f"Expected Event | str, got {type(event)}")
 
-        if event._is_action_event:
+        if event._is_action_event:  # noqa
             raise InvalidEventError(
                 "Cannot Context.run() action events. "
                 "Use Context.run_action instead.",
@@ -396,9 +401,9 @@ class Context:
 
         Usage:
         >>> with Context().manager("start", State()) as manager:
-        >>>     assert manager.charm._some_private_attribute == "foo"
+        >>>     assert manager.charm._some_private_attribute == "foo"  # noqa
         >>>     manager.run()  # this will fire the event
-        >>>     assert manager.charm._some_private_attribute == "bar"
+        >>>     assert manager.charm._some_private_attribute == "bar"  # noqa
 
         :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -415,9 +420,9 @@ class Context:
 
         Usage:
         >>> with Context().action_manager("foo-action", State()) as manager:
-        >>>     assert manager.charm._some_private_attribute == "foo"
+        >>>     assert manager.charm._some_private_attribute == "foo"  # noqa
         >>>     manager.run()  # this will fire the event
-        >>>     assert manager.charm._some_private_attribute == "bar"
+        >>>     assert manager.charm._some_private_attribute == "bar"  # noqa
 
         :arg action: the Action that the charm will execute. Can be a string or an Action instance.
         :arg state: the State instance to use as data source for the hook tool calls that the

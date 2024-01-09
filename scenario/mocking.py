@@ -169,7 +169,7 @@ class _MockModelBackend(_ModelBackend):
 
     def _get_secret(self, id=None, label=None):
         # FIXME: what error would a charm get IRL?
-        # ops 2.0 supports Secret, but juju only supports it from 3.0.2
+        # ops 2.0 supports secrets, but juju only supports it from 3.0.2
         if self._context.juju_version < "3.0.2":
             raise RuntimeError(
                 "secrets are only available in juju >= 3.0.2."
@@ -373,10 +373,10 @@ class _MockModelBackend(_ModelBackend):
         self,
         secret: "Secret",
     ):
-        # FIXME: match real tracebacks
         if secret.owner is None:
             raise SecretNotFoundError(
-                "this secret is not owned by this unit/app or granted to it",
+                "this secret is not owned by this unit/app or granted to it. "
+                "Did you forget passing it to State.secrets?",
             )
         if secret.owner == "app" and not self.is_leader():
             understandable_error = SecretNotFoundError(
@@ -395,8 +395,8 @@ class _MockModelBackend(_ModelBackend):
         peek: bool = False,
     ) -> Dict[str, str]:
         secret = self._get_secret(id, label)
-
-        if self._context.juju_version < "3.1.7":
+        juju_version = self._context.juju_version
+        if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # in this medieval juju chapter,
             # secret owners always used to track the latest revision.
             # ref: https://bugs.launchpad.net/juju/+bug/2037120
