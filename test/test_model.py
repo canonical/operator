@@ -2381,6 +2381,13 @@ class TestModelBindings(unittest.TestCase):
 _metric_and_label_pair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
 
 
+ValidMetricsTestCase = typing.Tuple[
+    typing.Mapping[str, typing.Union[int, float]],
+    typing.Mapping[str, str],
+    typing.List[typing.List[str]],
+]
+
+
 class TestModelBackend(unittest.TestCase):
 
     def setUp(self):
@@ -2851,12 +2858,8 @@ class TestModelBackend(unittest.TestCase):
                          [['juju-log', '--log-level', 'BAR', '--', 'foo']])
 
     def test_valid_metrics(self):
-        _caselist = typing.List[typing.Tuple[
-            typing.Mapping[str, typing.Union[int, float]],
-            typing.Mapping[str, str],
-            typing.List[typing.List[str]]]]
         fake_script(self, 'add-metric', 'exit 0')
-        test_cases: _caselist = [(
+        test_cases: typing.List[ValidMetricsTestCase] = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
             OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
             [['add-metric', '--labels', 'de=ad,be=ef_ -',

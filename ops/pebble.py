@@ -1614,7 +1614,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
             break
 
         if encoding is not None:
-            chunk = chunk.decode(encoding)
+            chunk = typing.cast(bytes, chunk).decode(encoding)
         writer.write(chunk)
 
 
@@ -2019,7 +2019,7 @@ class Client:
 
     def _wait_change(self, change_id: ChangeID, timeout: Optional[float] = None) -> Change:
         """Call the wait-change API endpoint directly."""
-        query = {}
+        query: Dict[str, Any] = {}
         if timeout is not None:
             query['timeout'] = _format_timeout(timeout)
 
@@ -2255,7 +2255,7 @@ class Client:
         elif isinstance(source, bytes):
             source_io: _AnyStrFileLikeIO = io.BytesIO(source)
         else:
-            source_io: _AnyStrFileLikeIO = source
+            source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
         content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
@@ -2736,7 +2736,7 @@ class Client:
         Returns:
             List of :class:`CheckInfo` objects.
         """
-        query = {}
+        query: Dict[str, Any] = {}
         if level is not None:
             query['level'] = level.value
         if names:

@@ -2425,7 +2425,7 @@ bad path\r
         for part in message.walk():
             name = part.get_param('name', header='Content-Disposition')
             if name == 'request':
-                req = json.loads(part.get_payload())
+                req = json.loads(typing.cast(str, part.get_payload()))
             elif name == 'files':
                 # decode=True, ironically, avoids decoding bytes to str
                 content = part.get_payload(decode=True)
@@ -3092,10 +3092,11 @@ class TestExec(unittest.TestCase):
         process = self.client.exec(['false'])
         with self.assertRaises(pebble.ExecError) as cm:
             process.wait()
-        self.assertEqual(cm.exception.command, ['false'])
-        self.assertEqual(cm.exception.exit_code, 1)
-        self.assertEqual(cm.exception.stdout, None)
-        self.assertEqual(cm.exception.stderr, None)
+        exc = typing.cast(pebble.ExecError[str], cm.exception)
+        self.assertEqual(exc.command, ['false'])
+        self.assertEqual(exc.exit_code, 1)
+        self.assertIsNone(exc.stdout)
+        self.assertIsNone(exc.stderr)
 
         self.assertEqual(self.client.requests, [
             ('POST', '/v1/exec', None, self.build_exec_data(['false'])),

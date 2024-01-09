@@ -101,12 +101,11 @@ class TestCharm(unittest.TestCase):
         # way we know of to cleanly decorate charm event observers.
         events: typing.List[ops.EventBase] = []
 
-        def dec(fn: typing.Callable[['MyCharm', ops.EventBase], None]  # noqa: F821
-                ) -> typing.Callable[..., None]:
+        def dec(fn: typing.Any) -> typing.Any:
             # simple decorator that appends to the nonlocal
             # `events` list all events it receives
             @functools.wraps(fn)
-            def wrapper(charm: 'MyCharm', evt: ops.EventBase):
+            def wrapper(charm: typing.Any, evt: typing.Any):
                 events.append(evt)
                 fn(charm, evt)
             return wrapper

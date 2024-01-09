@@ -28,6 +28,7 @@ import random
 import shutil
 import signal
 import tempfile
+import typing
 import uuid
 import warnings
 from contextlib import contextmanager
@@ -3017,7 +3018,7 @@ class _TestingPebbleClient:
                 file_path.write_bytes(source)
             else:
                 # If source is binary, open file in binary mode and ignore encoding param
-                is_binary = isinstance(source.read(0), bytes)
+                is_binary = isinstance(source.read(0), bytes)  # type: ignore
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
                 with file_path.open(open_mode, encoding=open_encoding) as f:
@@ -3141,7 +3142,7 @@ class _TestingPebbleClient:
                     f"exec handler must return bytes if encoding is None,"
                     f"not {data.__class__.__name__}")
             else:
-                return io.StringIO(data)
+                return io.StringIO(typing.cast(str, data))
 
     def exec(
         self,
