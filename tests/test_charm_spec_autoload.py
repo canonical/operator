@@ -11,7 +11,7 @@ from ops.testing import CharmType
 
 from scenario import Context, Relation, State
 from scenario.context import ContextSetupError
-from scenario.state import _CharmSpec, MetadataNotFoundError
+from scenario.state import MetadataNotFoundError, _CharmSpec
 
 CHARM = """
 from ops import CharmBase
@@ -46,13 +46,13 @@ def create_tempcharm(
     charmpy = src / "charm.py"
     charmpy.write_text(charm)
 
-    if legacy:
-        # we add a charmcraft.yaml file to verify that _CharmSpec._load_metadata
-        # is able to tell that the presence of charmcraft.yaml ALONE is not enough
-        # to make this a valid charm
-        charmcraft = {"builds-on": "literally anywhere! isn't that awesome?"}
-        (root / "charmcraft.yaml").write_text(yaml.safe_dump(charmcraft))
+    # we add a charmcraft.yaml file to verify that _CharmSpec._load_metadata
+    # is able to tell that the presence of charmcraft.yaml ALONE is not enough
+    # to make this a valid charm
+    charmcraft = {"builds-on": "literally anywhere! isn't that awesome?"}
+    (root / "charmcraft.yaml").write_text(yaml.safe_dump(charmcraft))
 
+    if legacy:
         if meta is not None:
             (root / "metadata.yaml").write_text(yaml.safe_dump(meta))
 
@@ -109,7 +109,9 @@ def test_autoload_legacy_type_passes(tmp_path, config_type):
 @pytest.mark.parametrize("legacy", (True, False))
 def test_meta_autoload(tmp_path, legacy):
     with create_tempcharm(
-        tmp_path, legacy=legacy, meta={"type": "charm", "name": "foo"}
+        tmp_path,
+        legacy=legacy,
+        meta={"type": "charm", "name": "foo", "summary": "foo", "description": "foo"},
     ) as charm:
         ctx = Context(charm)
         ctx.run("start", State())
@@ -133,6 +135,8 @@ def test_relations_ok(tmp_path, legacy):
         legacy=legacy,
         meta={
             "type": "charm",
+            "summary": "foo",
+            "description": "foo",
             "name": "josh",
             "requires": {"cuddles": {"interface": "arms"}},
         },
@@ -146,7 +150,12 @@ def test_config_defaults(tmp_path, legacy):
     with create_tempcharm(
         tmp_path,
         legacy=legacy,
-        meta={"type": "charm", "name": "josh"},
+        meta={
+            "type": "charm",
+            "name": "josh",
+            "summary": "foo",
+            "description": "foo",
+        },
         config={"options": {"foo": {"type": "bool", "default": True}}},
     ) as charm:
         # this would fail if there were no 'cuddles' relation defined in meta

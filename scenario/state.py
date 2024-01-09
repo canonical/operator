@@ -942,6 +942,20 @@ class State(_DCBase):
         return sort_patch(patch)
 
 
+def _is_valid_charmcraft_25_metadata(meta: Dict[str, Any]):
+    # Check whether this dict has the expected mandatory metadata fields according to the
+    # charmcraft >2.5 charmcraft.yaml schema
+    if (config_type := meta.get("type")) != "charm":
+        logger.debug(
+            f"Not a charm: charmcraft yaml config ``.type`` is {config_type!r}.",
+        )
+        return False
+    if not all(field in meta for field in {"name", "summary", "description"}):
+        logger.debug("Not a charm: charmcraft yaml misses some required fields")
+        return False
+    return True
+
+
 @dataclasses.dataclass(frozen=True)
 class _CharmSpec(_DCBase):
     """Charm spec."""
@@ -976,10 +990,7 @@ class _CharmSpec(_DCBase):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
         metadata_path = charm_root / "charmcraft.yaml"
         meta = yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
-        if (config_type := meta.get("type")) != "charm":
-            logger.debug(
-                f"Not a charm: charmcraft yaml config ``.type`` is {config_type!r}.",
-            )
+        if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
         config = meta.pop("config", None)
         actions = meta.pop("actions", None)
