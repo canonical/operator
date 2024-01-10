@@ -466,7 +466,7 @@ class RelationCreatedEvent(RelationEvent):
     can occur before units for those applications have started. All existing
     relations should be established before start.
     """
-    unit: None
+    unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
     """Always ``None``."""
 
 
@@ -481,7 +481,7 @@ class RelationJoinedEvent(RelationEvent):
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
-    unit: model.Unit
+    unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
     """The remote unit that has triggered this event."""
 
 
@@ -523,7 +523,7 @@ class RelationDepartedEvent(RelationEvent):
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
-    unit: model.Unit
+    unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
     """The remote unit that has triggered this event."""
 
     def __init__(self, handle: 'Handle', relation: 'model.Relation',
@@ -580,7 +580,7 @@ class RelationBrokenEvent(RelationEvent):
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
-    unit: None
+    unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
     """Always ``None``."""
 
 

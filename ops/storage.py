@@ -22,7 +22,7 @@ import stat
 import subprocess
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Tuple, Union
+from typing import Any, Callable, Generator, List, Optional, Tuple, Union, cast
 
 import yaml  # pyright: ignore[reportMissingModuleSource]
 
@@ -205,7 +205,7 @@ class SQLiteStorage:
             if not rows:
                 break
             for row in rows:
-                yield tuple(row)
+                yield cast(_Notice, tuple(row))
 
 
 class JujuStorage:

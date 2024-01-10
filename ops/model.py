@@ -282,17 +282,18 @@ class Model:
         return Secret(self._backend, id=id, label=label, content=content)
 
 
+if typing.TYPE_CHECKING:
+    # (entity type, name): instance.
+    _WeakCacheType = weakref.WeakValueDictionary[
+        Tuple['UnitOrApplicationType', str],
+        Optional[Union['Unit', 'Application']]]
+
+
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
-        if typing.TYPE_CHECKING:
-            # (entity type, name): instance.
-            _weakcachetype = weakref.WeakValueDictionary[
-                Tuple['UnitOrApplicationType', str],
-                Optional[Union['Unit', 'Application']]]
-
         self._meta = meta
         self._backend = backend
-        self._weakrefs: _weakcachetype = weakref.WeakValueDictionary()
+        self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
     def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
@@ -2764,7 +2765,6 @@ class Container:
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
-        after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
         """Query for notices that match all of the provided filters.
 
@@ -2776,7 +2776,6 @@ class Container:
             user_id=user_id,
             types=types,
             keys=keys,
-            after=after,
         )
 
     # Define this last to avoid clashes with the imported "pebble" module
