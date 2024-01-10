@@ -1813,7 +1813,12 @@ class ContainerStorageMeta:
 
     @property
     def location(self) -> str:
-        """The location the storage is mounted at."""
+        """The location the storage is mounted at.
+        
+        Raises:
+            RuntimeError: if there is more than one mount point with the same
+                backing storage - use :attr:`locations` instead.
+        """
         if len(self._locations) == 1:
             return self._locations[0]
         raise RuntimeError(
