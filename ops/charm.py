@@ -14,6 +14,7 @@
 
 """Base objects for the Charm, events and metadata."""
 
+import dataclasses
 import enum
 import logging
 import pathlib
@@ -26,6 +27,7 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
+    Set,
     TextIO,
     Tuple,
     TypedDict,
@@ -33,7 +35,7 @@ from typing import (
     cast,
 )
 
-from ops import model
+from ops import jujuversion, model
 from ops._private import yaml
 from ops.framework import (
     EventBase,
@@ -79,6 +81,12 @@ if TYPE_CHECKING:
         '_MountDict', {'storage': Required[str],
                        'location': str},
         total=False)
+
+    class _DeviceMetaDict(TypedDict, total=False):
+        type: Required[str]
+        description: str
+        countmin: int
+        countmax: int
 
 
 logger = logging.getLogger(__name__)
@@ -1295,7 +1303,7 @@ class CharmMeta:
         self.summary = raw_.get('summary', '')
         self.description = raw_.get('description', '')
         # The metadata spec says that these should be display-name <email>
-        # (roughly 'name-addr' in RFC 5322). However, many charms have only
+        # (roughly 'name-addr' from RFC 5322). However, many charms have only
         # an email, or have a URL, or something else, so we leave these as
         # a plain string.
         self.maintainers: List[str] = []
@@ -1337,10 +1345,13 @@ class CharmMeta:
         self.subordinate = raw_.get('subordinate', False)
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
+        self.assumes = JujuAssumes.from_list(raw_.get('assumes_', []))
         self.min_juju_version = raw_.get('min-juju-version')
-        self.assumes = JujuAssumes(raw_.get('assumes_', ()))
-        # TODO BEFORE MERGING THIS PR: if there's an obvious "minimum juju version" in assumes, should it be copied into min_juju_version?
-        # What about the other way, ie. no assumes but there is min_juju_version, should that go into assumes?
+        if self.min_juju_version:
+            # Add in an implied 'assumes'.
+            self.assumes.all_of.append(f'juju >= {self.min_juju_version}')
+        else:
+            self.min_juju_version = self._assumes_min_juju_version()
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw_.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
@@ -1355,7 +1366,7 @@ class CharmMeta:
                          for name, storage in raw_.get('storage', {}).items()}
         self.resources = {name: ResourceMeta(name, res)
                           for name, res in raw_.get('resources', {}).items()}
-        self.devices = {name: DeviceMeta(name, device)
+        self.devices = {name: DeviceMeta.from_dict(device)
                         for name, device in raw_.get('devices', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw_.get('payloads', {}).items()}
@@ -1363,6 +1374,31 @@ class CharmMeta:
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
+
+    def _assumes_min_juju_version(self) -> Optional[str]:
+        juju_versions: Set[jujuversion.JujuVersion] = set()
+
+        def _add_version_if_min(feature: str):
+            comparison, version = feature.split(None)[1:]
+            if comparison in ('=', '>', '>='):
+                juju_versions.add(jujuversion.JujuVersion(version))
+
+        for feature in self.assumes.any_of:
+            if not feature.startswith('juju'):
+                # We need to ignore any 'any-of' Juju requirement, because the
+                # 'assumes' requirement could be met by this other feature.
+                juju_versions.clear()
+                break
+            _add_version_if_min(feature)
+
+        for feature in self.assumes.all_of:
+            if not feature.startswith('juju'):
+                continue
+            _add_version_if_min(feature)
+
+        if juju_versions:
+            return str(min(juju_versions))
+        return None
 
     @classmethod
     def from_yaml(
@@ -1556,11 +1592,9 @@ class DeviceType(enum.Enum):
     AMD_CPU = 'amd.com/gpu'
 
 
+@dataclasses.dataclass(frozen=True)
 class DeviceMeta:
     """Object containing metadata about a device request."""
-
-    device_name: str
-    """Name of the device."""
 
     type: DeviceType
     """The type of device requested."""
@@ -1577,18 +1611,18 @@ class DeviceMeta:
     max: Optional[int]
     """Maximum number of devices required."""
 
-    def __init__(self, name: str, raw: Dict[str, Any]):
-        self.device_name = name
-        self.type = DeviceType(raw['type'])
-        self.description = raw.get('description', '')
-        self.min = raw.get('countmin')
-        self.max = raw.get('countmax')
-        if ((self.min and self.min < 0)
-            or (self.max and self.max < 0)
-                or (self.min and self.max and self.max < self.min)):
-            raise model.ModelError('Invalid device requirement values.')
+    @classmethod
+    def from_dict(cls, d: '_DeviceMetaDict') -> 'DeviceMeta':
+        """Create new DeviceMeta object from dict parsed from YAML."""
+        return cls(
+            type=DeviceType(d['type']),
+            description=d.get('description', ''),
+            min=d.get('countmin'),
+            max=d.get('countmax'),
+        )
 
 
+@dataclasses.dataclass(frozen=True)
 class JujuAssumes:
     """Juju model features that are required by the charm."""
 
@@ -1598,15 +1632,18 @@ class JujuAssumes:
     any_of: List[str]
     """Any of these features must be available."""
 
-    def __init__(self, raw: Dict[str, Any]):
-        self.all_of: List[str] = []
-        self.any_of: List[str] = []
-        for feature in raw:
+    @classmethod
+    def from_list(cls, d: Dict[Any, Any]) -> 'JujuAssumes':
+        """Create new JujuAssumes object from list parsed from YAML."""
+        all_of: List[str] = []
+        any_of: List[str] = []
+        for feature in d:
             if isinstance(feature, str):
-                self.all_of.append(feature)
+                all_of.append(feature)
                 continue
-            self.any_of.extend(feature.get('any-of', ()))
-            self.all_of.extend(feature.get('all-of', ()))
+            any_of.extend(feature.get('any-of', ()))
+            all_of.extend(feature.get('all-of', ()))
+        return cls(all_of=all_of, any_of=any_of)
 
 
 class ActionMeta:
@@ -1669,14 +1706,17 @@ class ContainerMeta:
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
         self._mounts: Dict[str, ContainerStorageMeta] = {}
-        self.bases = [ContainerBase(base) for base in raw.get('bases', ())]
-        self.resource = raw.get("resource")
-        if self.resource and self.bases:
-            raise model.ModelError('A container may specify a resource or base, not both.')
+        self.bases = None
+        self.resource = None
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
             self._populate_mounts(raw.get('mounts', []))
+            self.resource = raw.get("resource")
+            self.bases = [ContainerBase(base) for base in raw.get('bases', ())]
+
+        if self.resource and self.bases:
+            raise model.ModelError('A container may specify a resource or base, not both.')
 
     @property
     def mounts(self) -> Dict[str, 'ContainerStorageMeta']:
@@ -1731,9 +1771,6 @@ class ContainerStorageMeta:
     :class:`StorageMeta`.
     """
 
-    location: str
-    """The location the storage is mounted at."""
-
     def __init__(self, storage: str, location: str):
         self.storage = storage
         self._locations: List[str] = [location]
@@ -1747,17 +1784,12 @@ class ContainerStorageMeta:
         """An accessor for the list of locations for a mount."""
         return self._locations
 
-    def __getattr__(self, name: str):
-        # TODO(benhoyt): this should just be a property "location"
-        if name == "location":
-            if len(self._locations) == 1:
-                return self._locations[0]
-            else:
-                raise RuntimeError(
-                    "container has more than one mount point with the same backing storage. "
-                    "Request .locations to see a list"
-                )
-        else:
-            raise AttributeError(
-                f"{self.__class__.__name__} has no such attribute: {name}!"
-            )
+    @property
+    def location(self) -> str:
+        """The location the storage is mounted at."""
+        if len(self._locations) == 1:
+            return self._locations[0]
+        raise RuntimeError(
+            "container has more than one mount point with the same backing storage. "
+            "Request .locations to see a list"
+        )
