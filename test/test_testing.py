@@ -2851,6 +2851,29 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.app.status, ops.ActiveStatus('active app'))
         self.assertEqual(harness.model.unit.status, ops.ActiveStatus('active unit'))
 
+    def test_invalid_status_set(self):
+
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
+                self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+                self.app_status_to_add = ops.ErrorStatus('errored app')
+                self.unit_status_to_add = ops.ErrorStatus('errored unit')
+
+            def _on_collect_app_status(self, event: ops.CollectStatusEvent):
+                event.add_status(self.app_status_to_add)
+
+            def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
+                event.add_status(self.unit_status_to_add)
+
+        harness = ops.testing.Harness(TestCharm)
+        harness.set_leader(True)
+        harness.begin()
+
+        with self.assertRaises(ops.model.ModelError):
+            harness.evaluate_status()
+
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):

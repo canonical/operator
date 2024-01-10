@@ -1790,6 +1790,14 @@ class UnknownStatus(StatusBase):
     A unit-agent has finished calling install, config-changed and start, but the
     charm has not called status-set yet.
 
+    This status is for READ ONLY and should not be used to set a unit status. The following
+    charm code would be an invalid charm code.
+
+        ```
+        # Raises ops.model.ModelError : ERROR invalid status "unknown", expected one of
+        # [maintenance blocked waiting active]
+        self.unit.status = UnknownStatus()
+        ```
     """
     name = 'unknown'
 
@@ -1807,6 +1815,15 @@ class ErrorStatus(StatusBase):
 
     The unit-agent has encountered an error (the application or unit requires
     human intervention in order to operate correctly).
+
+    This status is for READ ONLY and should not be used to set a unit status. The following
+    charm code would be an invalid charm code.
+
+        ```
+        # Raises ops.model.ModelError : ERROR invalid status "error", expected one of
+        # [maintenance blocked waiting active]
+        self.unit.status = ErrorStatus()
+        ```
     """
     name = 'error'
 
