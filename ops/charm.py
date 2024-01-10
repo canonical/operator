@@ -1211,6 +1211,21 @@ class CharmMeta:
     maintainers: List[str]
     """List of email addresses of charm maintainers."""
 
+    # TODO BEFORE MERGING THIS PR:
+    # Would these (websites, sources, issues, documentation) be better merged
+    # into a 'links' or 'info_links' attribute?
+    websites: List[str]
+    """List of links to project websites."""
+
+    sources: List[str]
+    """List of links to the charm source code."""
+
+    issues: List[str]
+    """List of links to the charm issue tracker."""
+
+    documentation: Optional[str]
+    """Link to charm documentation."""
+
     tags: List[str]
     """Charmhub tag metadata for categories associated with this charm."""
 
@@ -1229,6 +1244,9 @@ class CharmMeta:
 
     min_juju_version: Optional[str]
     """Indicates the minimum Juju version this charm requires."""
+
+    assumes: 'JujuAssumes'
+    """Juju features this charm requires."""
 
     containers: Dict[str, 'ContainerMeta']
     """Container metadata for each defined container."""
@@ -1256,6 +1274,9 @@ class CharmMeta:
     resources: Dict[str, 'ResourceMeta']
     """Resource metadata for each defined resource."""
 
+    devices: Dict[str, 'DeviceMeta']
+    """Device metadata for each defined device request."""
+
     payloads: Dict[str, 'PayloadMeta']
     """Payload metadata for each defined payload."""
 
@@ -1273,16 +1294,53 @@ class CharmMeta:
         self.name = raw_.get('name', '')
         self.summary = raw_.get('summary', '')
         self.description = raw_.get('description', '')
+        # The metadata spec says that these should be display-name <email>
+        # (roughly 'name-addr' in RFC 5322). However, many charms have only
+        # an email, or have a URL, or something else, so we leave these as
+        # a plain string.
         self.maintainers: List[str] = []
+        # Note that metadata v2 only defines 'maintainers' not 'maintainer'.
         if 'maintainer' in raw_:
             self.maintainers.append(raw_['maintainer'])
         if 'maintainers' in raw_:
             self.maintainers.extend(raw_['maintainers'])
+        if 'links' in raw_ and 'contact' in raw_['links']
+            # When running tests, this might be loading from charmcraft.yaml.
+            self.maintainers.append(raw_['links']['contact'])
+        self.websites = raw_.get('website', [])
+        if not self.websites and 'links' in raw_:
+            # When running tests, this might be loading from charmcraft.yaml.
+            self.websites = raw_['links'].get('website')
+        if isinstance(self.websites, str):
+            self.websites = [self.websites]
+        self.sources = raw_.get('source', [])
+        if not self.sources and 'links' in raw_:
+            # When running tests, this might be loading from charmcraft.yaml.
+            self.sources = raw_['links'].get('source')
+        if isinstance(self.sources, str):
+            self.sources = [self.sources]
+        self.issues = raw_.get('issues', [])
+        if not self.issues and 'links' in raw_:
+            # When running tests, this might be loading from charmcraft.yaml.
+            self.issues = raw_['links'].get('issues')
+        if isinstance(self.issues, str):
+            self.issues = [self.issues]
+        self.documentation = raw_.get('documentation')
+        if self.documentation is None:
+            # When running tests, this might be loading from charmcraft.yaml.
+            self.documentation = raw_.get('links', {}).get('documentation')
+        # Note that metadata v2 does not define tags.
         self.tags = raw_.get('tags', [])
         self.terms = raw_.get('terms', [])
+        # Note that metadata v2 does not define series.
         self.series = raw_.get('series', [])
         self.subordinate = raw_.get('subordinate', False)
+        # Note that metadata v2 does not define min-juju-version ('assumes'
+        # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
+        self.assumes = JujuAssumes(raw_.get('assumes_', ()))
+        # TODO BEFORE MERGING THIS PR: if there's an obvious "minimum juju version" in assumes, should it be copied into min_juju_version?
+        # What about the other way, ie. no assumes but there is min_juju_version, should that go into assumes?
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw_.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
@@ -1297,13 +1355,12 @@ class CharmMeta:
                          for name, storage in raw_.get('storage', {}).items()}
         self.resources = {name: ResourceMeta(name, res)
                           for name, res in raw_.get('resources', {}).items()}
+        self.devices = {name: DeviceMeta(name, device)
+                        for name, device in raw_.get('devices', {}).items()}}
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
-        # This is taken from Charm Metadata v2, but only the "containers" and
-        # "containers.name" fields that we need right now for Pebble. See:
-        # https://discourse.charmhub.io/t/charm-metadata-v2/3674
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
 
@@ -1431,6 +1488,9 @@ class StorageMeta:
     multiple_range: Optional[Tuple[int, Optional[int]]]
     """Range of numeric qualifiers when multiple storage units are used."""
 
+    properties = List[Literal['transient']]
+    """List of additional characteristics of the storage."""
+
     def __init__(self, name: str, raw: '_StorageMetaDict'):
         self.storage_name = name
         self.type = raw['type']
@@ -1447,6 +1507,7 @@ class StorageMeta:
             else:
                 range = range.split('-')
                 self.multiple_range = (int(range[0]), int(range[1]) if range[1] else None)
+        self.properties = raw.get('properties', [])
 
 
 class ResourceMeta:
@@ -1488,6 +1549,66 @@ class PayloadMeta:
         self.type = raw['type']
 
 
+class DeviceType(enum.Enum):
+    """Types of device that may be requested."""
+    GPU = 'gpu'
+    NVIDIA_GPU = 'nvidia.com/gpu'
+    AMD_CPU = 'amd.com/gpu'
+
+
+class DeviceMeta:
+    """Object containing metadata about a device request."""
+
+    device_name: str
+    """Name of the device."""
+
+    type: DeviceType
+    """The type of device requested."""
+
+    description: str
+    """A description of the resource.
+
+    This will be empty string (rather than None) if not set in ``metadata.yaml``.
+    """
+
+    min: Optional[int]
+    """Minimum number of devices required."""
+
+    max: Optional[int]
+    """Maximum number of devices required."""
+
+    def __init__(self, name: str, raw: Dict[str, Any]):
+        self.device_name = name
+        self.type = DeviceType(raw['type'])
+        self.description = raw.get('description', '')
+        self.min = raw.get('countmin')
+        self.max = raw.get('countmax')
+        if ((self.min and self.min < 0)
+            or (self.max and self.max < 0)
+                or (self.min and self.max and self.max < self.min)):
+            raise model.ModelError('Invalid device requirement values.')
+
+
+class JujuAssumes:
+    """Juju model features that are required by the charm."""
+
+    all_of: List[str]
+    """All of these features must be available."""
+
+    any_of: List[str]
+    """Any of these features must be available."""
+
+    def __init__(self, raw: Dict[str, Any]):
+        self.all_of: List[str] = []
+        self.any_of: List[str] = []
+        for feature in raw:
+            if isinstance(feature, str):
+                self.all_of.append(feature)
+                continue
+            self.any_of.extend(feature.get('any-of', ()))
+            self.all_of.extend(feature.get('all-of', ()))
+
+
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
@@ -1501,19 +1622,57 @@ class ActionMeta:
         self.additional_properties = raw.get('additionalProperties', True)
 
 
-class ContainerMeta:
-    """Metadata about an individual container.
+class ContainerBase:
+    """Metadata to resolve a container image."""
 
-    NOTE: this is extremely lightweight right now, and just includes the fields we need for
-    Pebble interaction.
+    os_name: str
+    """Name of the OS.
+
+    For example: ``ubuntu``
     """
+
+    channel: str
+    """Channel of the OS in format ``track[/risk][/branch] as used by Snaps.
+
+    For example: ``20.04/stable`` or ``18.04/stable/fips``
+    """
+
+    architectures: List[str]
+    """List of architectures that this charm can run on."""
+
+    def __init__(self, raw: Dict[str, Any]):
+        self.os_name = raw['name']
+        self.channel = raw['channel']
+        self.architectures = raw['architectures']
+
+
+class ContainerMeta:
+    """Metadata about an individual container."""
 
     name: str
     """Name of the container (key in the YAML)."""
 
+    resource: Optional[str]
+    """Reference for an entry in the ``resources`` field.
+
+    Specifies the oci-image resource used to create the container. Must not be
+    present if a base/channel is specified.
+    """
+
+    bases: Optional[List['ContainerBase']]
+    """List of bases for use in resolving a container image.
+
+    Sorted by descending order of preference, and must not be present if
+    resource is specified.
+    """
+
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
         self._mounts: Dict[str, ContainerStorageMeta] = {}
+        self.bases = [ContainerBase(base) for base in raw.get('bases', ())]
+        self.resource = raw.get("resource")
+        if self.resource and self.bases:
+            raise model.ModelError('A container may specify a resource or base, not both.')
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
