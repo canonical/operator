@@ -1219,20 +1219,8 @@ class CharmMeta:
     maintainers: List[str]
     """List of email addresses of charm maintainers."""
 
-    # TODO BEFORE MERGING THIS PR:
-    # Would these (websites, sources, issues, documentation) be better merged
-    # into a 'links' or 'info_links' attribute?
-    websites: List[str]
-    """List of links to project websites."""
-
-    sources: List[str]
-    """List of links to the charm source code."""
-
-    issues: List[str]
-    """List of links to the charm issue tracker."""
-
-    documentation: Optional[str]
-    """Link to charm documentation."""
+    links: 'MetadataLinks'
+    """Links to more details about the charm."""
 
     tags: List[str]
     """Charmhub tag metadata for categories associated with this charm."""
@@ -1315,28 +1303,7 @@ class CharmMeta:
         if 'links' in raw_ and 'contact' in raw_['links']:
             # When running tests, this might be loading from charmcraft.yaml.
             self.maintainers.append(raw_['links']['contact'])
-        self.websites = raw_.get('website', [])
-        if not self.websites and 'links' in raw_:
-            # When running tests, this might be loading from charmcraft.yaml.
-            self.websites = raw_['links'].get('website')
-        if isinstance(self.websites, str):
-            self.websites = [self.websites]
-        self.sources = raw_.get('source', [])
-        if not self.sources and 'links' in raw_:
-            # When running tests, this might be loading from charmcraft.yaml.
-            self.sources = raw_['links'].get('source')
-        if isinstance(self.sources, str):
-            self.sources = [self.sources]
-        self.issues = raw_.get('issues', [])
-        if not self.issues and 'links' in raw_:
-            # When running tests, this might be loading from charmcraft.yaml.
-            self.issues = raw_['links'].get('issues')
-        if isinstance(self.issues, str):
-            self.issues = [self.issues]
-        self.documentation = raw_.get('documentation')
-        if self.documentation is None:
-            # When running tests, this might be loading from charmcraft.yaml.
-            self.documentation = raw_.get('links', {}).get('documentation')
+        self._load_links(raw_)
         # Note that metadata v2 does not define tags.
         self.tags = raw_.get('tags', [])
         self.terms = raw_.get('terms', [])
@@ -1374,6 +1341,39 @@ class CharmMeta:
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
+
+    def _load_links(self, raw: Dict[str, Any]):
+        websites = raw.get('website', [])
+        if not websites and 'links' in raw:
+            # When running tests, this might be loading from charmcraft.yaml.
+            websites = raw['links'].get('website', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(websites, str):
+            websites = [websites]
+        sources = raw.get('source', [])
+        if not sources and 'links' in raw:
+            # When running tests, this might be loading from charmcraft.yaml.
+            sources = raw['links'].get('source', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(sources, str):
+            sources = [sources]
+        issues = raw.get('issues', [])
+        if not issues and 'links' in raw:
+            # When running tests, this might be loading from charmcraft.yaml.
+            issues = raw['links'].get('issues', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(issues, str):
+            issues = [issues]
+        documentation = raw.get('documentation')
+        if documentation is None:
+            # When running tests, this might be loading from charmcraft.yaml.
+            documentation = raw.get('links', {}).get('documentation')
+        self.links = MetadataLinks(
+            websites=websites,
+            sources=sources,
+            issues=issues,
+            documentation=documentation,
+        )
 
     def _assumes_min_juju_version(self) -> Optional[str]:
         juju_versions: Set[jujuversion.JujuVersion] = set()
@@ -1620,6 +1620,20 @@ class DeviceMeta:
             min=d.get('countmin'),
             max=d.get('countmax'),
         )
+
+@dataclasses.dataclass(frozen=True)
+class MetadataLinks:
+    websites: List[str]
+    """List of links to project websites."""
+
+    sources: List[str]
+    """List of links to the charm source code."""
+
+    issues: List[str]
+    """List of links to the charm issue tracker."""
+
+    documentation: Optional[str]
+    """Link to charm documentation."""
 
 
 @dataclasses.dataclass(frozen=True)
