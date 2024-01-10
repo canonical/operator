@@ -2252,6 +2252,11 @@ class Container:
              group: Optional[str] = None):
         """Write content to a given file path on the remote system.
 
+        Note that if another process has the file open on the remote system,
+        or if the remote file is a bind mount, pushing will fail with a
+        :class:`pebble.PathError`. Use :meth:`Container.exec` for full
+        control.
+
         Args:
             path: Path of the file to write to on the remote system.
             source: Source of data to write. This is either a concrete str or
@@ -2739,7 +2744,6 @@ class Container:
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
-        after: Optional[datetime.datetime] = None,
     ) -> List[pebble.Notice]:
         """Query for notices that match all of the provided filters.
 
@@ -2751,7 +2755,6 @@ class Container:
             user_id=user_id,
             types=types,
             keys=keys,
-            after=after,
         )
 
     # Define this last to avoid clashes with the imported "pebble" module
