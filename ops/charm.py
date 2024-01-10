@@ -1314,15 +1314,13 @@ class CharmMeta:
         # Note that metadata v2 does not define series.
         self.series = raw_.get('series', [])
         self.subordinate = raw_.get('subordinate', False)
+        self.assumes = JujuAssumes.from_list(raw_.get('assumes', []))
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
-        self.assumes = JujuAssumes.from_list(raw_.get('assumes', []))
         self.min_juju_version = raw_.get('min-juju-version')
         if self.min_juju_version:
             # Add in an implied 'assumes'.
             self.assumes.features.append(f'juju >= {self.min_juju_version}')
-        else:
-            self.min_juju_version = self._assumes_min_juju_version()
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw_.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
@@ -1378,40 +1376,6 @@ class CharmMeta:
             issues=issues,
             documentation=documentation,
         )
-
-    def _assumes_min_juju_version(self) -> Optional[str]:
-        def _add_version_if_min(versions: Set[jujuversion.JujuVersion], feature: str):
-            try:
-                comparison, version = feature.split(None)[1:]
-            except ValueError:
-                # If there's no version specified, then it's not relevant here.
-                return
-            if comparison in ('=', '>', '>='):
-                versions.add(jujuversion.JujuVersion(version))
-
-        def _find_min_version(assumes: JujuAssumes) -> Optional[jujuversion.JujuVersion]:
-            versions: Set[jujuversion.JujuVersion] = set()
-            for feature in assumes.features:
-                if isinstance(feature, str):
-                    if feature.startswith('juju'):
-                        _add_version_if_min(versions, feature)
-                    elif assumes.predicate == JujuAssumesCondition.ANY:
-                        # We need to ignore anything else here, because the
-                        # 'assumes' requirement could be met by something other
-                        # than Juju.
-                        return None
-                else:
-                    nested = _find_min_version(feature)
-                    if nested:
-                        versions.add(nested)
-            if versions:
-                return min(versions)
-            return None
-
-        version = _find_min_version(self.assumes)
-        if version:
-            return str(version)
-        return None
 
     @classmethod
     def from_yaml(
