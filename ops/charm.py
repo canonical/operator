@@ -1321,7 +1321,7 @@ class CharmMeta:
         self.min_juju_version = raw_.get('min-juju-version')
         if self.min_juju_version:
             # Add in an implied 'assumes'.
-            self.assumes.all_of.append(f'juju >= {self.min_juju_version}')
+            self.assumes.features.append(f'juju >= {self.min_juju_version}')
         else:
             self.min_juju_version = self._assumes_min_juju_version()
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
@@ -1381,28 +1381,37 @@ class CharmMeta:
         )
 
     def _assumes_min_juju_version(self) -> Optional[str]:
-        juju_versions: Set[jujuversion.JujuVersion] = set()
-
-        def _add_version_if_min(feature: str):
-            comparison, version = feature.split(None)[1:]
+        def _add_version_if_min(versions: Set[jujuversion.JujuVersion], feature: str):
+            try:
+                comparison, version = feature.split(None)[1:]
+            except ValueError:
+                # If there's no version specified, then it's not relevant here.
+                return
             if comparison in ('=', '>', '>='):
-                juju_versions.add(jujuversion.JujuVersion(version))
+                versions.add(jujuversion.JujuVersion(version))
 
-        for feature in self.assumes.any_of:
-            if not feature.startswith('juju'):
-                # We need to ignore any 'any-of' Juju requirement, because the
-                # 'assumes' requirement could be met by this other feature.
-                juju_versions.clear()
-                break
-            _add_version_if_min(feature)
+        def _find_min_version(assumes: JujuAssumes) -> Optional[jujuversion.JujuVersion]:
+            versions: Set[jujuversion.JujuVersion] = set()
+            for feature in assumes.features:
+                if isinstance(feature, str):
+                    if feature.startswith('juju'):
+                        _add_version_if_min(versions, feature)
+                    elif assumes.predicate == JujuAssumesCondition.ANY:
+                        # We need to ignore anything else here, because the
+                        # 'assumes' requirement could be met by something other
+                        # than Juju.
+                        return None
+                else:
+                    nested = _find_min_version(feature)
+                    if nested:
+                        versions.add(nested)
+            if versions:
+                return min(versions)
+            return None
 
-        for feature in self.assumes.all_of:
-            if not feature.startswith('juju'):
-                continue
-            _add_version_if_min(feature)
-
-        if juju_versions:
-            return str(min(juju_versions))
+        version = _find_min_version(self.assumes)
+        if version:
+            return str(version)
         return None
 
     @classmethod
@@ -1644,28 +1653,41 @@ class MetadataLinks:
     """Link to charm documentation."""
 
 
+class JujuAssumesCondition(enum.Enum):
+    """Distinguishes between :class:`JujuAssumes` that must match all or any features."""
+
+    ALL = 'all-of'
+    """All features are required to satisfy the requirement."""
+
+    ANY = 'any-of'
+    """Any of the features satisfies the requirement."""
+
+
 @dataclasses.dataclass(frozen=True)
 class JujuAssumes:
-    """Juju model features that are required by the charm."""
+    """Juju model features that are required by the charm.
 
-    all_of: List[str]
-    """All of these features must be available."""
+    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
+    list of available features.
+    """
 
-    any_of: List[str]
-    """Any of these features must be available."""
+    features: List[Union[str, 'JujuAssumes']]
+    predicate: JujuAssumesCondition
 
     @classmethod
-    def from_list(cls, d: Dict[Any, Any]) -> 'JujuAssumes':
+    def from_list(cls, raw: List[Any],
+                  predicate: JujuAssumesCondition = JujuAssumesCondition('all-of'),
+                  ) -> 'JujuAssumes':
         """Create new JujuAssumes object from list parsed from YAML."""
-        all_of: List[str] = []
-        any_of: List[str] = []
-        for feature in d:
+        features: List[Union[str, 'JujuAssumes']] = []
+        for feature in raw:
             if isinstance(feature, str):
-                all_of.append(feature)
-                continue
-            any_of.extend(feature.get('any-of', ()))
-            all_of.extend(feature.get('all-of', ()))
-        return cls(all_of=all_of, any_of=any_of)
+                features.append(feature)
+            else:
+                for nested_predicate, nested_features in feature.items():
+                    features.append(JujuAssumes.from_list(
+                        nested_features, JujuAssumesCondition(nested_predicate)))
+        return cls(features=features, predicate=predicate)
 
 
 class ActionMeta:
@@ -1814,7 +1836,7 @@ class ContainerStorageMeta:
     @property
     def location(self) -> str:
         """The location the storage is mounted at.
-        
+
         Raises:
             RuntimeError: if there is more than one mount point with the same
                 backing storage - use :attr:`locations` instead.
