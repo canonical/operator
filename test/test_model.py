@@ -2378,10 +2378,10 @@ class TestModelBindings(unittest.TestCase):
         self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
-_metric_and_label_pair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
+_MetricAndLabelPair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
 
 
-ValidMetricsTestCase = typing.Tuple[
+_ValidMetricsTestCase = typing.Tuple[
     typing.Mapping[str, typing.Union[int, float]],
     typing.Mapping[str, str],
     typing.List[typing.List[str]],
@@ -2859,7 +2859,7 @@ class TestModelBackend(unittest.TestCase):
 
     def test_valid_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
-        test_cases: typing.List[ValidMetricsTestCase] = [(
+        test_cases: typing.List[_ValidMetricsTestCase] = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
             OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
             [['add-metric', '--labels', 'de=ad,be=ef_ -',
@@ -2874,7 +2874,7 @@ class TestModelBackend(unittest.TestCase):
             self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
     def test_invalid_metric_names(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
@@ -2893,7 +2893,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
@@ -2905,7 +2905,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_labels(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'': 'baz'}),
             ({'foo': 4.2}, {',bar': 'baz'}),
             ({'foo': 4.2}, {'b=a=r': 'baz'}),
@@ -2916,7 +2916,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_label_values(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
             ({'foo': 4.2}, {'bar': 'b=az'}),

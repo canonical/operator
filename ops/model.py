@@ -279,7 +279,7 @@ class Model:
 
 if typing.TYPE_CHECKING:
     # (entity type, name): instance.
-    _weakcachetype = weakref.WeakValueDictionary[
+    _WeakCacheType = weakref.WeakValueDictionary[
         Tuple['UnitOrApplicationType', str],
         Optional[Union['Unit', 'Application']]]
 
@@ -288,7 +288,7 @@ class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
-        self._weakrefs: '_weakcachetype' = weakref.WeakValueDictionary()
+        self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
     def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
