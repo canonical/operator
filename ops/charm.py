@@ -88,6 +88,11 @@ if TYPE_CHECKING:
         countmin: int
         countmax: int
 
+    class _ContainerBaseDict(TypedDict):
+        name: str
+        channel: str
+        architectures: List[str]
+
 
 logger = logging.getLogger(__name__)
 
@@ -1676,6 +1681,7 @@ class ActionMeta:
         self.additional_properties = raw.get('additionalProperties', True)
 
 
+@dataclasses.dataclass(frozen=True)
 class ContainerBase:
     """Metadata to resolve a container image."""
 
@@ -1686,7 +1692,7 @@ class ContainerBase:
     """
 
     channel: str
-    """Channel of the OS in format ``track[/risk][/branch] as used by Snaps.
+    """Channel of the OS in format ``track[/risk][/branch]`` as used by Snaps.
 
     For example: ``20.04/stable`` or ``18.04/stable/fips``
     """
@@ -1694,10 +1700,14 @@ class ContainerBase:
     architectures: List[str]
     """List of architectures that this charm can run on."""
 
-    def __init__(self, raw: Dict[str, Any]):
-        self.os_name = raw['name']
-        self.channel = raw['channel']
-        self.architectures = raw['architectures']
+    @classmethod
+    def from_dict(cls, d: '_ContainerBaseDict') -> 'ContainerBase':
+        """Create new ContainerBase object from dict parsed from YAML."""
+        return cls(
+            os_name=d['name'],
+            channel=d['channel'],
+            architectures=d['architectures'],
+        )
 
 
 class ContainerMeta:
@@ -1730,7 +1740,7 @@ class ContainerMeta:
         if raw:
             self._populate_mounts(raw.get('mounts', []))
             self.resource = raw.get("resource")
-            self.bases = [ContainerBase(base) for base in raw.get('bases', ())]
+            self.bases = [ContainerBase.from_dict(base) for base in raw.get('bases', ())]
 
         if self.resource and self.bases:
             raise model.ModelError('A container may specify a resource or base, not both.')
