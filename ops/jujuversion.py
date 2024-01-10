@@ -94,6 +94,9 @@ class JujuVersion:
             return self.build < other.build
         return False
 
+    def __hash__(self):
+        return hash((self.major, self.minor, self.tag, self.patch, self.build))
+
     @classmethod
     def from_environ(cls) -> 'JujuVersion':
         """Build a version from the ``JUJU_VERSION`` environment variable."""

@@ -1317,7 +1317,7 @@ class CharmMeta:
         self.subordinate = raw_.get('subordinate', False)
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
-        self.assumes = JujuAssumes.from_list(raw_.get('assumes_', []))
+        self.assumes = JujuAssumes.from_list(raw_.get('assumes', []))
         self.min_juju_version = raw_.get('min-juju-version')
         if self.min_juju_version:
             # Add in an implied 'assumes'.
