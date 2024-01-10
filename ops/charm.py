@@ -1621,8 +1621,11 @@ class DeviceMeta:
             max=d.get('countmax'),
         )
 
+
 @dataclasses.dataclass(frozen=True)
 class MetadataLinks:
+    """Links to additional information about a charm."""
+
     websites: List[str]
     """List of links to project websites."""
 
