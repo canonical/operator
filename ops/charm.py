@@ -684,8 +684,7 @@ class WorkloadEvent(HookEvent):
     """Base class representing workload-related events.
 
     Workload events are generated for all containers that the charm
-    expects in metadata. Workload containers currently only trigger
-    a :class:`PebbleReadyEvent`.
+    expects in metadata.
     """
 
     workload: 'model.Container'
