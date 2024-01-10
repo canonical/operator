@@ -172,9 +172,10 @@ class TestRealPebble(unittest.TestCase):
         with self.assertRaises(pebble.ExecError) as cm:
             process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
             process.wait_output()
-        self.assertEqual(cm.exception.exit_code, 42)
-        self.assertEqual(cm.exception.stdout, 'OUT\n')
-        self.assertEqual(cm.exception.stderr, 'ERR\n')
+        exc = typing.cast(pebble.ExecError[str], cm.exception)
+        self.assertEqual(exc.exit_code, 42)
+        self.assertEqual(exc.stdout, 'OUT\n')
+        self.assertEqual(exc.stderr, 'ERR\n')
 
     def test_exec_send_stdin(self):
         process = self.client.exec(['awk', '{ print toupper($0) }'], stdin='foo\nBar\n')
