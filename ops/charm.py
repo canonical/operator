@@ -1304,7 +1304,7 @@ class CharmMeta:
             self.maintainers.append(raw_['maintainer'])
         if 'maintainers' in raw_:
             self.maintainers.extend(raw_['maintainers'])
-        if 'links' in raw_ and 'contact' in raw_['links']
+        if 'links' in raw_ and 'contact' in raw_['links']:
             # When running tests, this might be loading from charmcraft.yaml.
             self.maintainers.append(raw_['links']['contact'])
         self.websites = raw_.get('website', [])
@@ -1356,7 +1356,7 @@ class CharmMeta:
         self.resources = {name: ResourceMeta(name, res)
                           for name, res in raw_.get('resources', {}).items()}
         self.devices = {name: DeviceMeta(name, device)
-                        for name, device in raw_.get('devices', {}).items()}}
+                        for name, device in raw_.get('devices', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
