@@ -87,10 +87,11 @@ if TYPE_CHECKING:
         countmin: int
         countmax: int
 
-    class _ContainerBaseDict(TypedDict):
-        name: str
-        channel: str
-        architectures: List[str]
+
+class _ContainerBaseDict(TypedDict):
+    name: str
+    channel: str
+    architectures: List[str]
 
 
 logger = logging.getLogger(__name__)
