@@ -108,4 +108,5 @@ reportMissingModuleSource = false
 reportPrivateUsage = false
 reportUnnecessaryIsInstance = false
 reportUnnecessaryComparison = false
+disableBytesTypePromotions = false
 stubPath = ""
