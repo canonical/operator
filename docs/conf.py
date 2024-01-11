@@ -76,7 +76,6 @@ nitpick_ignore = [
     # Please keep this list sorted alphabetically.
     ('py:class', '_ChangeDict'),
     ('py:class', '_CheckInfoDict'),
-    ('py:class', '_ContainerBaseDict'),
     ('py:class', '_DeviceMetaDict'),
     ('py:class', '_FileInfoDict'),
     ('py:class', '_NoticeDict'),
@@ -89,6 +88,7 @@ nitpick_ignore = [
     ('py:class', '_TextOrBinaryIO'),
     ('py:class', '_WarningDict'),
     ('py:class', '_Writeable'),
+    ('py:class', 'ops.charm._ContainerBaseDict'),
     ('py:class', 'ops.model._AddressDict'),
     ('py:class', 'ops.model._ConfigOption'),
     ('py:class', 'ops.model._ModelBackend'),
