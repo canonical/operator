@@ -1980,7 +1980,6 @@ containers:
             select=pebble.NoticesSelect.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
-            after=datetime.datetime(2023, 12, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
         )
         self.assertEqual(len(notices), 1)
         self.assertEqual(notices[0].id, '124')
@@ -1992,7 +1991,6 @@ containers:
             select=pebble.NoticesSelect.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
-            after=datetime.datetime(2023, 12, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
         ))])
 
 

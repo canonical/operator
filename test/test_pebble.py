@@ -2750,6 +2750,52 @@ bad path\r
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
         ])
 
+    def test_notify_basic(self):
+        self.client.responses.append({
+            'result': {
+                'id': '123',
+            },
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        notice_id = self.client.notify(pebble.NoticeType.CUSTOM, 'example.com/a')
+        self.assertEqual(notice_id, '123')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/notices', None, {
+                'action': 'add',
+                'key': 'example.com/a',
+                'type': 'custom',
+            }),
+        ])
+
+    def test_notify_other_args(self):
+        self.client.responses.append({
+            'result': {
+                'id': '321',
+            },
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        notice_id = self.client.notify(pebble.NoticeType.CUSTOM, 'example.com/a',
+                                       data={'k': 'v'},
+                                       repeat_after=datetime.timedelta(hours=3))
+        self.assertEqual(notice_id, '321')
+
+        self.assertEqual(self.client.requests, [
+            ('POST', '/v1/notices', None, {
+                'action': 'add',
+                'key': 'example.com/a',
+                'type': 'custom',
+                'data': {'k': 'v'},
+                'repeat-after': '10800.000s',
+            }),
+        ])
+
     def test_get_notice(self):
         self.client.responses.append({
             'result': {
@@ -2851,7 +2897,6 @@ bad path\r
             select=pebble.NoticesSelect.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
-            after=datetime_utc(2023, 12, 1, 2, 3, 4, 5),
         )
         self.assertEqual(len(notices), 2)
         self.assertEqual(notices[0].id, '123')
@@ -2862,7 +2907,6 @@ bad path\r
             'select': 'all',
             'types': ['custom'],
             'keys': ['example.com/a', 'example.com/b'],
-            'after': '2023-12-01T02:03:04.000005+00:00',
         }
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/notices', query, None),

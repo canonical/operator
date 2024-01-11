@@ -27,6 +27,7 @@ import shutil
 import sys
 import tempfile
 import textwrap
+import time
 import typing
 import unittest
 import uuid
@@ -34,7 +35,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from typing_extensions import Required
 
 import ops
 import ops.testing
@@ -2647,7 +2647,7 @@ class TestHarness(unittest.TestCase):
                                          expected_relation_created[0]]
         self.assertEqual(changes[:2], expected_relation_created)
         changes = changes[2:]
-        expected_middle: typing.List[RecordedChange] = [
+        expected_middle: typing.List[typing.Dict[str, typing.Any]] = [
             {'name': 'leader-elected'},
             {'name': 'config-changed', 'data': {}},
             {'name': 'start'},
@@ -3047,7 +3047,7 @@ class RelationChangedViewer(ops.Object):
 
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
-        self.changes: typing.List[typing.Dict[str, str]] = []
+        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
         charm.framework.observe(charm.on[relation_name].relation_changed, self.on_relation_changed)
 
     def on_relation_changed(self, event: ops.RelationEvent):
@@ -3060,19 +3060,12 @@ class RelationChangedViewer(ops.Object):
         self.changes.append(dict(data))
 
 
-class RecordedChange(typing.TypedDict, total=False):
-    name: Required[str]
-    data: typing.Dict[str, typing.Any]
-    relation: str
-    container: typing.Optional[str]
-
-
 class RecordingCharm(ops.CharmBase):
     """Record the events that we see, and any associated data."""
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.changes: typing.List[RecordedChange] = []
+        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.leader_settings_changed, self._on_leader_settings_changed)
@@ -3166,10 +3159,11 @@ class RelationEventCharm(RecordingCharm):
             assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
-        recording: RecordedChange = {
+        recording: typing.Dict[str, typing.Any] = {
             'name': event_name,
             'relation': event.relation.name,
-            'data': data}
+            'data': data,
+        }
 
         if self.record_relation_data_on_events:
             recording["data"].update({'relation_data': {
@@ -3193,16 +3187,25 @@ class ContainerEventCharm(RecordingCharm):
 
     def observe_container_events(self, container_name: str):
         self.framework.observe(self.on[container_name].pebble_ready, self._on_pebble_ready)
+        self.framework.observe(self.on[container_name].pebble_custom_notice,
+                               self._on_pebble_custom_notice)
 
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
-        self._observe_container_event('pebble-ready', event)
+        self.changes.append({
+            'name': 'pebble-ready',
+            'container': event.workload.name,
+        })
 
-    def _observe_container_event(self, event_name: str, event: ops.PebbleReadyEvent):
-        container_name = None
-        if event.workload is not None:
-            container_name = event.workload.name
-        self.changes.append(
-            {'name': event_name, 'container': container_name})
+    def _on_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+        type_str = (event.notice.type.value if isinstance(event.notice.type, pebble.NoticeType)
+                    else event.notice.type)
+        self.changes.append({
+            'name': 'pebble-custom-notice',
+            'container': event.workload.name,
+            'notice_id': event.notice.id,
+            'notice_type': type_str,
+            'notice_key': event.notice.key,
+        })
 
 
 def get_public_methods(obj: object):
@@ -5502,3 +5505,199 @@ class TestActions(unittest.TestCase):
         self._action_results["A"] = "foo"
         with self.assertRaises(ValueError):
             self.harness.run_action("results")
+
+
+class TestNotify(unittest.TestCase):
+    def test_notify_basics(self):
+        harness = ops.testing.Harness(ContainerEventCharm, meta="""
+            name: notifier
+            containers:
+              foo:
+                resource: foo-image
+              bar:
+                resource: foo-image
+        """)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_container_events('foo')
+        harness.charm.observe_container_events('bar')
+
+        id1a = harness.pebble_notify('foo', 'example.com/n1')
+        id2 = harness.pebble_notify('foo', 'foo.com/n2')
+        id3 = harness.pebble_notify('bar', 'example.com/n1')
+        id1b = harness.pebble_notify('foo', 'example.com/n1')
+
+        self.assertIsInstance(id1a, str)
+        self.assertNotEqual(id1a, '')
+        self.assertEqual(id1a, id1b)
+
+        self.assertIsInstance(id2, str)
+        self.assertNotEqual(id2, '')
+        self.assertNotEqual(id2, id1a)
+
+        self.assertIsInstance(id3, str)
+        self.assertNotEqual(id3, '')
+        self.assertNotEqual(id3, id2)
+
+        expected_changes = [{
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id2,
+            'notice_type': 'custom',
+            'notice_key': 'foo.com/n2',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'bar',
+            'notice_id': id3,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }]
+        self.assertEqual(harness.charm.changes, expected_changes)
+
+    def test_notify_no_repeat(self):
+        """Ensure event doesn't get triggered when notice occurs but doesn't repeat."""
+        harness = ops.testing.Harness(ContainerEventCharm, meta="""
+            name: notifier
+            containers:
+              foo:
+                resource: foo-image
+        """)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_container_events('foo')
+
+        id1a = harness.pebble_notify('foo', 'example.com/n1',
+                                     repeat_after=datetime.timedelta(days=1))
+        id1b = harness.pebble_notify('foo', 'example.com/n1',
+                                     repeat_after=datetime.timedelta(days=1))
+
+        self.assertEqual(id1a, id1b)
+
+        expected_changes = [{
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }]
+        self.assertEqual(harness.charm.changes, expected_changes)
+
+    def test_notify_no_begin(self):
+        num_notices = 0
+
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on['c1'].pebble_custom_notice,
+                                       self._on_pebble_custom_notice)
+
+            def _on_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+                nonlocal num_notices
+                num_notices += 1
+
+        harness = ops.testing.Harness(TestCharm, meta="""
+            name: notifier
+            containers:
+              c1:
+                resource: c1-image
+        """)
+        self.addCleanup(harness.cleanup)
+
+        id = harness.pebble_notify('c1', 'example.com/n1')
+
+        self.assertIsInstance(id, str)
+        self.assertNotEqual(id, '')
+        self.assertEqual(num_notices, 0)
+
+
+class PebbleNoticesMixin:
+    client: ops.pebble.Client
+
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertIsNone = unittest.TestCase.assertIsNone  # noqa
+    assertLess = unittest.TestCase.assertLess  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
+    assertGreaterEqual = unittest.TestCase.assertGreaterEqual  # noqa
+
+    def test_get_notice_by_id(self):
+        client = self.client
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        id1 = client.notify(pebble.NoticeType.CUSTOM, key1)
+        id2 = client.notify(pebble.NoticeType.CUSTOM, key2, data={'x': 'y'})
+        time.sleep(0.000_001)  # Ensure times are different.
+        client.notify(pebble.NoticeType.CUSTOM, key2, data={'k': 'v', 'foo': 'bar'})
+
+        notice = client.get_notice(id1)
+        self.assertEqual(notice.id, id1)
+        self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notice.key, key1)
+        self.assertEqual(notice.first_occurred, notice.last_occurred)
+        self.assertEqual(notice.first_occurred, notice.last_repeated)
+        self.assertEqual(notice.occurrences, 1)
+        self.assertEqual(notice.last_data, {})
+        self.assertIsNone(notice.repeat_after)
+        self.assertEqual(notice.expire_after, datetime.timedelta(days=7))
+
+        notice = client.get_notice(id2)
+        self.assertEqual(notice.id, id2)
+        self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notice.key, key2)
+        self.assertLess(notice.first_occurred, notice.last_occurred)
+        self.assertLess(notice.first_occurred, notice.last_repeated)
+        self.assertEqual(notice.last_occurred, notice.last_repeated)
+        self.assertEqual(notice.occurrences, 2)
+        self.assertEqual(notice.last_data, {'k': 'v', 'foo': 'bar'})
+        self.assertIsNone(notice.repeat_after)
+        self.assertEqual(notice.expire_after, datetime.timedelta(days=7))
+
+    def test_get_notices(self):
+        client = self.client
+
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        key3 = 'example.com/' + os.urandom(16).hex()
+
+        client.notify(pebble.NoticeType.CUSTOM, key1)
+        time.sleep(0.000_001)  # Ensure times are different.
+        client.notify(pebble.NoticeType.CUSTOM, key2)
+        time.sleep(0.000_001)  # Ensure times are different.
+        client.notify(pebble.NoticeType.CUSTOM, key3)
+
+        notices = client.get_notices()
+        self.assertGreaterEqual(len(notices), 3)
+
+        notices = client.get_notices(keys=[key1, key2, key3])
+        self.assertEqual(len(notices), 3)
+        self.assertEqual(notices[0].key, key1)
+        self.assertEqual(notices[1].key, key2)
+        self.assertEqual(notices[2].key, key3)
+        self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
+        self.assertLess(notices[1].last_repeated, notices[2].last_repeated)
+
+        notices = client.get_notices(keys=[key2])
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].key, key2)
+
+        notices = client.get_notices(keys=[key1, key3])
+        self.assertEqual(len(notices), 2)
+        self.assertEqual(notices[0].key, key1)
+        self.assertEqual(notices[1].key, key3)
+        self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
+
+
+class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMixin):
+    def setUp(self):
+        self.client = self.get_testing_client()
