@@ -27,7 +27,6 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
-    Set,
     TextIO,
     Tuple,
     TypedDict,
@@ -35,7 +34,7 @@ from typing import (
     cast,
 )
 
-from ops import jujuversion, model
+from ops import model
 from ops._private import yaml
 from ops.framework import (
     EventBase,
