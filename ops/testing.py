@@ -448,7 +448,7 @@ class Harness(Generic[CharmType]):
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
         if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
-            self._backend.status_set("unknown", "", is_app=False)
+            self._backend._unit_status = {'status': 'unknown', 'message': ''}
         all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
@@ -2256,6 +2256,9 @@ class _TestingModelBackend:
             return self._unit_status
 
     def status_set(self, status: '_StatusName', message: str = '', *, is_app: bool = False):
+        if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
+            raise model.ModelError(f'ERROR invalid status "{status}", expected one of'
+                                   ' [maintenance blocked waiting active]')
         if is_app:
             self._app_status = {'status': status, 'message': message}
         else:
