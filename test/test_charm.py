@@ -21,7 +21,7 @@ from pathlib import Path
 
 import ops
 import ops.charm
-from ops.model import _ModelBackend
+from ops.model import ModelError, _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
@@ -561,6 +561,8 @@ storage:
   other:
     type: filesystem
     location: /test/other
+    properties:
+      - transient
 containers:
   test1:
     mounts:
@@ -568,11 +570,43 @@ containers:
         location: /test/storagemount
       - storage: other
         location: /test/otherdata
+    resource: ubuntu-22.10
+  test2:
+    bases:
+      - name: ubuntu
+        channel: '23.10'
+        architectures:
+         - amd64
+      - name: ubuntu
+        channel: 23.04/stable/fips
+        architectures:
+         - arm
 """)
         self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
         self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
         self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
         self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
+        self.assertEqual(meta.storages['other'].properties, ['transient'])
+        self.assertEqual(meta.containers['test1'].resource, 'ubuntu-22.10')
+        assert meta.containers['test2'].bases is not None
+        self.assertEqual(len(meta.containers['test2'].bases), 2)
+        self.assertEqual(meta.containers['test2'].bases[0].os_name, 'ubuntu')
+        self.assertEqual(meta.containers['test2'].bases[0].channel, '23.10')
+        self.assertEqual(meta.containers['test2'].bases[0].architectures, ['amd64'])
+        self.assertEqual(meta.containers['test2'].bases[1].os_name, 'ubuntu')
+        self.assertEqual(meta.containers['test2'].bases[1].channel, '23.04/stable/fips')
+        self.assertEqual(meta.containers['test2'].bases[1].architectures, ['arm'])
+        with self.assertRaises(ModelError):
+            ops.CharmMeta.from_yaml("""
+name: invalid-charm
+containers:
+  test1:
+    bases:
+      - name: ubuntu
+        channel: '23.10'
+        architectures: [amd64]
+    resource: ubuntu-23.10
+""")
 
     def test_containers_storage_multiple_mounts(self):
         meta = ops.CharmMeta.from_yaml("""
@@ -827,4 +861,122 @@ containers:
             ['status-set', '--application=True', 'waiting', ''],
             ['status-set', '--application=True', 'active', ''],
             ['status-set', '--application=True', 'unknown', ''],
+        ])
+
+
+class TestCharmMeta(unittest.TestCase):
+    def test_links(self):
+        # Each type of link can be a single item.
+        meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+website: https://example.com
+source: https://git.example.com
+issues: https://bugs.example.com
+docs: https://docs.example.com
+""")
+        self.assertEqual(meta.links.websites, ['https://example.com'])
+        self.assertEqual(meta.links.sources, ['https://git.example.com'])
+        self.assertEqual(meta.links.issues, ['https://bugs.example.com'])
+        self.assertEqual(meta.links.documentation, 'https://docs.example.com')
+        # Other than documentation, they can also all be lists of items.
+        meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+website:
+ - https://example.com
+ - https://example.org
+source:
+ - https://git.example.com
+ - https://bzr.example.com
+issues:
+ - https://bugs.example.com
+ - https://features.example.com
+""")
+        self.assertEqual(meta.links.websites, ['https://example.com', 'https://example.org'])
+        self.assertEqual(
+            meta.links.sources, [
+                'https://git.example.com', 'https://bzr.example.com'])
+        self.assertEqual(
+            meta.links.issues, [
+                'https://bugs.example.com', 'https://features.example.com'])
+
+    def test_links_charmcraft_yaml(self):
+        meta = ops.CharmMeta.from_yaml("""
+links:
+  documentation: https://discourse.example.com/
+  issues:
+  - https://git.example.com/
+  source:
+  - https://git.example.com/issues/
+  website:
+  - https://example.com/
+  contact: Support Team <help@example.com>
+""")
+        self.assertEqual(meta.links.websites, ['https://example.com/'])
+        self.assertEqual(meta.links.sources, ['https://git.example.com/issues/'])
+        self.assertEqual(meta.links.issues, ['https://git.example.com/'])
+        self.assertEqual(meta.links.documentation, 'https://discourse.example.com/')
+        self.assertEqual(meta.maintainers, ['Support Team <help@example.com>'])
+
+    def test_device(self):
+        meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+devices:
+  device1:
+    type: gpu
+    description: Just one or two GPUs, thanks!
+    countmin: 1
+    countmax: 2
+  device2:
+    type: nvidia.com/gpu
+  device3:
+    type: amd.com/gpu
+    countmin: 10
+""")
+        self.assertEqual(meta.devices['device1'].type, ops.DeviceType.GPU)
+        self.assertEqual(meta.devices['device1'].description, 'Just one or two GPUs, thanks!')
+        self.assertEqual(meta.devices['device1'].min, 1)
+        self.assertEqual(meta.devices['device1'].max, 2)
+        self.assertEqual(meta.devices["device2"].type, ops.DeviceType.NVIDIA_GPU)
+        self.assertEqual(meta.devices['device2'].description, '')
+        self.assertEqual(meta.devices['device2'].min, None)
+        self.assertEqual(meta.devices['device2'].max, None)
+        self.assertEqual(meta.devices["device3"].type, ops.DeviceType.AMD_GPU)
+        self.assertEqual(meta.devices['device3'].min, 10)
+
+    def test_assumes(self):
+        meta = ops.CharmMeta.from_yaml("""
+min-juju-version: '3.3'
+""")
+        self.assertEqual(meta.min_juju_version, '3.3')
+        self.assertEqual(meta.assumes.condition, ops.JujuAssumesCondition.ALL)
+        self.assertEqual(meta.assumes.features, ['juju >= 3.3'])
+        meta = ops.CharmMeta.from_yaml("""
+assumes:
+  - juju
+""")
+        self.assertEqual(meta.assumes.features, ['juju'])
+        meta = ops.CharmMeta.from_yaml("""
+assumes:
+  - juju > 3
+  - k8s-api
+""")
+        self.assertEqual(meta.assumes.features, ['juju > 3', 'k8s-api'])
+        meta = ops.CharmMeta.from_yaml("""
+assumes:
+  - k8s-api
+  - any-of:
+      - all-of:
+          - juju >= 2.9.44
+          - juju < 3
+      - all-of:
+          - juju >= 3.1.5
+          - juju < 4
+""")
+        self.assertEqual(meta.assumes.features, [
+            'k8s-api',
+            ops.JujuAssumes(
+                [ops.JujuAssumes(['juju >= 2.9.44', 'juju < 3']),
+                 ops.JujuAssumes(['juju >= 3.1.5', 'juju < 4'])],
+                ops.JujuAssumesCondition.ANY
+            ),
         ])

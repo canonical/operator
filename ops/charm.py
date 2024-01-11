@@ -1365,7 +1365,7 @@ class CharmMeta:
         # In YAML, this can be a single string, or a list of strings.
         if isinstance(issues, str):
             issues = [issues]
-        documentation = raw.get('documentation')
+        documentation = raw.get('docs')
         if documentation is None:
             # When running tests, this might be loading from charmcraft.yaml.
             documentation = raw.get('links', {}).get('documentation')
@@ -1565,7 +1565,7 @@ class DeviceType(enum.Enum):
     """Types of device that may be requested."""
     GPU = 'gpu'
     NVIDIA_GPU = 'nvidia.com/gpu'
-    AMD_CPU = 'amd.com/gpu'
+    AMD_GPU = 'amd.com/gpu'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1634,11 +1634,11 @@ class JujuAssumes:
     """
 
     features: List[Union[str, 'JujuAssumes']]
-    predicate: JujuAssumesCondition
+    condition: JujuAssumesCondition = JujuAssumesCondition.ALL
 
     @classmethod
     def from_list(cls, raw: List[Any],
-                  predicate: JujuAssumesCondition = JujuAssumesCondition('all-of'),
+                  condition: JujuAssumesCondition = JujuAssumesCondition.ALL,
                   ) -> 'JujuAssumes':
         """Create new JujuAssumes object from list parsed from YAML."""
         features: List[Union[str, 'JujuAssumes']] = []
@@ -1646,10 +1646,10 @@ class JujuAssumes:
             if isinstance(feature, str):
                 features.append(feature)
             else:
-                for nested_predicate, nested_features in feature.items():
+                for nested_condition, nested_features in feature.items():
                     features.append(JujuAssumes.from_list(
-                        nested_features, JujuAssumesCondition(nested_predicate)))
-        return cls(features=features, predicate=predicate)
+                        nested_features, JujuAssumesCondition(nested_condition)))
+        return cls(features=features, condition=condition)
 
 
 class ActionMeta:
