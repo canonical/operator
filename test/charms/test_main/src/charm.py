@@ -143,6 +143,8 @@ class Charm(ops.CharmBase):
 
     def _on_db_relation_joined(self, event: ops.RelationJoinedEvent):
         assert event.app is not None, 'application name cannot be None for a relation-joined event'
+        assert event.relation.active, 'a joined relation is always active'
+        assert self.model.relations['db']
         self._stored.on_db_relation_joined.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.db_relation_joined_data = event.snapshot()
@@ -154,6 +156,8 @@ class Charm(ops.CharmBase):
             assert event.unit is not None, (
                 'a unit name cannot be None for a relation-changed event'
                 ' associated with a remote unit')
+        assert event.relation.active, 'a changed relation is always active'
+        assert self.model.relations['mon']
         self._stored.on_mon_relation_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.mon_relation_changed_data = event.snapshot()
@@ -161,6 +165,8 @@ class Charm(ops.CharmBase):
     def _on_mon_relation_departed(self, event: ops.RelationDepartedEvent):
         assert event.app is not None, (
             'application name cannot be None for a relation-departed event')
+        assert event.relation.active, 'a departed relation is still active'
+        assert self.model.relations['mon']
         self._stored.on_mon_relation_departed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.mon_relation_departed_data = event.snapshot()
@@ -170,6 +176,8 @@ class Charm(ops.CharmBase):
             'relation-broken events cannot have a reference to a remote application')
         assert event.unit is None, (
             'relation broken events cannot have a reference to a remote unit')
+        assert not event.relation.active, 'relation broken events always have a broken relation'
+        assert not self.model.relations['ha']
         self._stored.on_ha_relation_broken.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.ha_relation_broken_data = event.snapshot()

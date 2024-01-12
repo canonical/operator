@@ -2243,6 +2243,34 @@ class TestModelBindings(unittest.TestCase):
             ['network-get', 'db0', '--format=json'],
         ])
 
+    def test_broken_relations(self):
+        meta = ops.CharmMeta()
+        meta.relations = {
+            'db0': ops.RelationMeta(
+                ops.RelationRole.provides, 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': ops.RelationMeta(
+                ops.RelationRole.requires, 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': ops.RelationMeta(
+                ops.RelationRole.peer, 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
+        backend = _ModelBackend('myapp/0')
+        model = ops.Model(meta, backend, broken_relation_id=8)
+        fake_script(self, 'relation-ids',
+                    """if [ "$1" = "db0" ]; then
+                         echo '["db0:4"]'
+                       elif [ "$1" = "db1" ]; then
+                         echo '["db1:8"]'
+                       elif [ "$1" = "db2" ]; then
+                         echo '["db2:16"]'
+                       else
+                         echo '[]'
+                       fi
+                    """)
+        fake_script(self, 'relation-list', """echo '""'""")
+        self.assertTrue(model.relations['db0'])
+        self.assertFalse(model.relations['db1'])
+        self.assertTrue(model.relations['db2'])
+
     def test_binding_by_relation_name(self):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{self.network_get_out}' || exit 1''')

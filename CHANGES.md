@@ -1,6 +1,7 @@
 # 2.10.0
 
 * Added support for Pebble Notices (`PebbleCustomNoticeEvent`, `get_notices`, and so on)
+* Added `Relation.active`, and excluded inactive relations from `Model.relations`
 * Added full support for charm metadata v2 (in particular, `DeviceMeta`,
   extended `ContainerMeta`, and various info links in `CharmMeta`)
 
