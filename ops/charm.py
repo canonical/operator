@@ -1291,6 +1291,12 @@ class CharmMeta:
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
 
+        # When running in production, this data is generally loaded from
+        # metadata.yaml. However, when running tests, this data is
+        # potentially loaded from charmcraft.yaml (which will be split out
+        # into a metadata.yaml as part of packing). Most of the field names
+        # are the same, but there are some differences that we handle here,
+        # and in _load_links(), so that loading from either file works.
         self.name = raw_.get('name', '')
         self.summary = raw_.get('summary', '')
         self.description = raw_.get('description', '')
@@ -1305,7 +1311,6 @@ class CharmMeta:
         if 'maintainers' in raw_:
             self.maintainers.extend(raw_['maintainers'])
         if 'links' in raw_ and 'contact' in raw_['links']:
-            # When running tests, this might be loading from charmcraft.yaml.
             self.maintainers.append(raw_['links']['contact'])
         self._load_links(raw_)
         # Note that metadata v2 does not define tags.
@@ -1318,9 +1323,6 @@ class CharmMeta:
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
-        if self.min_juju_version:
-            # Add in an implied 'assumes'.
-            self.assumes.features.append(f'juju >= {self.min_juju_version}')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw_.get('requires', {}).items()}
         self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
@@ -1347,28 +1349,24 @@ class CharmMeta:
     def _load_links(self, raw: Dict[str, Any]):
         websites = raw.get('website', [])
         if not websites and 'links' in raw:
-            # When running tests, this might be loading from charmcraft.yaml.
             websites = raw['links'].get('website', [])
         # In YAML, this can be a single string, or a list of strings.
         if isinstance(websites, str):
             websites = [websites]
         sources = raw.get('source', [])
         if not sources and 'links' in raw:
-            # When running tests, this might be loading from charmcraft.yaml.
             sources = raw['links'].get('source', [])
         # In YAML, this can be a single string, or a list of strings.
         if isinstance(sources, str):
             sources = [sources]
         issues = raw.get('issues', [])
         if not issues and 'links' in raw:
-            # When running tests, this might be loading from charmcraft.yaml.
             issues = raw['links'].get('issues', [])
         # In YAML, this can be a single string, or a list of strings.
         if isinstance(issues, str):
             issues = [issues]
         documentation = raw.get('docs')
         if documentation is None:
-            # When running tests, this might be loading from charmcraft.yaml.
             documentation = raw.get('links', {}).get('documentation')
         self.links = MetadataLinks(
             websites=websites,
@@ -1562,19 +1560,12 @@ class PayloadMeta:
         self.type = raw['type']
 
 
-class DeviceType(enum.Enum):
-    """Types of device that may be requested."""
-    GPU = 'gpu'
-    NVIDIA_GPU = 'nvidia.com/gpu'
-    AMD_GPU = 'amd.com/gpu'
-
-
 @dataclasses.dataclass(frozen=True)
 class DeviceMeta:
     """Object containing metadata about a device request."""
 
-    type: DeviceType
-    """The type of device requested."""
+    type: str
+    """The type of device requested; for example, `gpu`."""
 
     description: str
     """A description of the resource.
@@ -1592,7 +1583,7 @@ class DeviceMeta:
     def from_dict(cls, d: '_DeviceMetaDict') -> 'DeviceMeta':
         """Create new DeviceMeta object from dict parsed from YAML."""
         return cls(
-            type=DeviceType(d['type']),
+            type=d['type'],
             description=d.get('description', ''),
             min=d.get('countmin'),
             max=d.get('countmax'),
@@ -1724,7 +1715,7 @@ class ContainerMeta:
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
             self._populate_mounts(raw.get('mounts', []))
-            self.resource = raw.get("resource")
+            self.resource = raw.get('resource')
             self.bases = [ContainerBase.from_dict(base) for base in raw.get('bases', ())]
 
         if self.resource and self.bases:

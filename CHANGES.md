@@ -1,7 +1,7 @@
 # 2.10.0
 
 * Added support for Pebble Notices (`PebbleCustomNoticeEvent`, `get_notices`, and so on)
-* Added full support for charm metadata v2 (in particular, `DeviceType`, `DeviceMeta`,
+* Added full support for charm metadata v2 (in particular, `DeviceMeta`,
   extended `ContainerMeta`, and various info links in `CharmMeta`)
 
 # 2.9.0

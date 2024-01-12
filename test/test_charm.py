@@ -596,6 +596,7 @@ containers:
         self.assertEqual(meta.containers['test2'].bases[1].os_name, 'ubuntu')
         self.assertEqual(meta.containers['test2'].bases[1].channel, '23.04/stable/fips')
         self.assertEqual(meta.containers['test2'].bases[1].architectures, ['arm'])
+        # It's an error to specify both the 'resource' and the 'bases' fields.
         with self.assertRaises(ModelError):
             ops.CharmMeta.from_yaml("""
 name: invalid-charm
@@ -932,15 +933,15 @@ devices:
     type: amd.com/gpu
     countmin: 10
 """)
-        self.assertEqual(meta.devices['device1'].type, ops.DeviceType.GPU)
+        self.assertEqual(meta.devices['device1'].type, 'gpu')
         self.assertEqual(meta.devices['device1'].description, 'Just one or two GPUs, thanks!')
         self.assertEqual(meta.devices['device1'].min, 1)
         self.assertEqual(meta.devices['device1'].max, 2)
-        self.assertEqual(meta.devices["device2"].type, ops.DeviceType.NVIDIA_GPU)
+        self.assertEqual(meta.devices["device2"].type, 'nvidia.com/gpu')
         self.assertEqual(meta.devices['device2'].description, '')
         self.assertEqual(meta.devices['device2'].min, None)
         self.assertEqual(meta.devices['device2'].max, None)
-        self.assertEqual(meta.devices["device3"].type, ops.DeviceType.AMD_GPU)
+        self.assertEqual(meta.devices["device3"].type, 'amd.com/gpu')
         self.assertEqual(meta.devices['device3'].min, 10)
 
     def test_assumes(self):
