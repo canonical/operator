@@ -30,19 +30,28 @@ docs = [
     "lxd-sphinx-extensions",
     "sphinx-copybutton",
 ]
-dev = [
-    "isort~=5.11",
+lint = [
     "autopep8~=1.6",
     "flake8~=6.1",
     "flake8-docstrings~=1.7",
     "flake8-builtins~=2.1",
-    "pyproject-flake8~=6.1",
+    "isort~=5.11",
     "pep8-naming~=0.13",
-    "pytest~=7.2",
+    "pyproject-flake8~=6.1",
+]
+static = [
     "pyright==1.1.345",
-    "pytest-operator~=0.23",
-    "coverage[toml]~=7.0",
+    "pytest~=7.2",
     "typing_extensions~=4.2",
+]
+unit = [
+    "coverage[toml]~=7.0",
+    "pytest~=7.2",
+    "typing_extensions~=4.2",
+]
+integration = [
+    "coverage[toml]~=7.0",
+    "pytest-operator~=0.23",
 ]
 
 [project.urls]
@@ -61,7 +70,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = {attr = "ops.__version__"}
+version = {attr = "ops.version.version"}
 
 [tool.pip-tools]
 generate-hashes = true
