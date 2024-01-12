@@ -1811,6 +1811,8 @@ class UnknownStatus(StatusBase):
     A unit-agent has finished calling install, config-changed and start, but the
     charm has not called status-set yet.
 
+    This status is read-only; trying to set unit or application status to
+    ``UnknownStatus`` will raise :class:`ModelError`.
     """
     name = 'unknown'
 
@@ -1828,6 +1830,9 @@ class ErrorStatus(StatusBase):
 
     The unit-agent has encountered an error (the application or unit requires
     human intervention in order to operate correctly).
+
+    This status is read-only; trying to set unit or application status to
+    ``ErrorStatus`` will raise :class:`ModelError`.
     """
     name = 'error'
 

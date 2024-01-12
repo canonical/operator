@@ -2878,6 +2878,23 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.app.status, ops.ActiveStatus('active app'))
         self.assertEqual(harness.model.unit.status, ops.ActiveStatus('active unit'))
 
+    def test_invalid_status_set(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        harness.set_leader(True)
+        harness.begin()
+
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.app.status = ops.UnknownStatus()
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.app.status = ops.ErrorStatus()
+        harness.model.app.status = ops.ActiveStatus()
+
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.unit.status = ops.UnknownStatus()
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.unit.status = ops.ErrorStatus()
+        harness.model.unit.status = ops.ActiveStatus()
+
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):
