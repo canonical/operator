@@ -1565,7 +1565,7 @@ class DeviceMeta:
     """Object containing metadata about a device request."""
 
     type: str
-    """The type of device requested; for example, `gpu`."""
+    """The type of device requested; for example, ``gpu``."""
 
     description: str
     """A description of the resource.
