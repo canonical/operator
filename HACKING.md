@@ -180,12 +180,11 @@ next to the relevant content (e.g. headings, etc.).
 
 Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
 
-To update the requirements list for the documentation, ensure that
-[pip-tools](https://pypi.org/project/pip-tools/) is installed and run, in the
-root project folder:
+As noted above, you can generate a local copy of the API reference docs with tox:
 
 ```sh
-pip-compile --extra=docs -o docs/requirements.txt pyproject.toml
+tox -e docs
+open docs/_build/html/index.html
 ```
 
 # Dependencies
@@ -194,21 +193,13 @@ The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
 are listed in [pyproject.toml](pyproject.toml) in the `project.dependencies` section.
 
-If the dependencies change, use [pip-tools](https://pypi.org/project/pip-tools/)
-to update the generated dependency lockfiles:
-
-```sh
-pip-compile -o requirements.txt pyproject.toml
-pip-compile --extra=dev -o requirements-dev.txt pyproject.toml
-```
-
 # Dev Tools
 
 ## Formatting and Checking
 
 Test environments are managed with [tox](https://tox.wiki/) and executed with
 [pytest](https://pytest.org), with coverage measured by
-[coverage](https://coverage.readthedocs.io/en/7.3.2/).
+[coverage](https://coverage.readthedocs.io/).
 Static type checking is done using [pyright](https://github.com/microsoft/pyright),
 and extends the Python 3.8 type hinting support through the
 [typing_extensions](https://pypi.org/project/typing-extensions/) package.
