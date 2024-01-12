@@ -1,14 +1,10 @@
-recursive-exclude .github/
-recursive-exclude docs/
-exclude .readthedocs.yaml
-exclude .gitignore
+graft ops
+graft test
 
-recursive-include test/
-recursive-include ops/
-
-include .pyproject.toml
+include *.txt
 include *.md
-include LICENSE.txt
 include MANIFEST.in
-include requirements.txt
+include pyproject.toml
 include tox.ini
+
+global-exclude *~ *.py[cod] __pycache__ *.charm
