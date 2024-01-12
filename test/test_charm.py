@@ -945,7 +945,6 @@ devices:
         self.assertEqual(meta.devices['device3'].min, 10)
 
     def test_assumes(self):
-        self.assertEqual(meta.assumes.features, ['juju >= 3.3'])
         meta = ops.CharmMeta.from_yaml("""
 assumes:
   - juju
