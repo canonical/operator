@@ -192,7 +192,7 @@ pip-compile --extra=docs -o docs/requirements.txt pyproject.toml
 
 The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
-are listed in [pyproject.toml](pyproject.toml) in the `[project] dependencies` section.
+are listed in [pyproject.toml](pyproject.toml) in the `project.dependencies` section.
 
 If the dependencies change, use [pip-tools](https://pypi.org/project/pip-tools/)
 to update the generated dependency lockfiles:
