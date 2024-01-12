@@ -239,7 +239,7 @@ To make a release of the ops library, do the following:
    and a brief summary of the main changes in the release
    E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
 5. Drop notes and a changelog in the description.
-6. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+6. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".) Wait for the new version to be published successfully to [the PyPI project](https://pypi.org/project/ops/).
 7. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
    next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
    `'3.14.1.dev0'`).
