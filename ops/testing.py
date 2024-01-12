@@ -880,8 +880,18 @@ class Harness(Generic[CharmType]):
         for unit_name in rel_list_map[relation_id].copy():
             self.remove_relation_unit(relation_id, unit_name)
 
+        prev_broken_id = None  # Silence linter warning.
+        if self._model is not None:
+            # Let the model's RelationMapping know that this relation is broken.
+            # Normally, this is handled in `main`, but while testing we create
+            # the `Model` object and keep it around for multiple events.
+            prev_broken_id = self._model._relations._broken_relation_id
+            self._model.relations._broken_relation_id = relation_id
+            # Ensure that we don't offer a cached relation.
+            self._model.relations._invalidate(relation_name)
         self._emit_relation_broken(relation_name, relation_id, remote_app)
         if self._model is not None:
+            self._model.relations._broken_relation_id = prev_broken_id
             self._model.relations._invalidate(relation_name)
 
         self._backend._relation_app_and_units.pop(relation_id)

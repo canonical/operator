@@ -583,6 +583,33 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id)
         self.assertIsNone(self._find_relation_in_model_by_id(harness, rel_id))
 
+    def test_remove_relation_marks_relation_as_inactive(self):
+        relations: typing.List[str] = []
+        is_broken = False
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.db_relation_broken, self._db_relation_broken)
+
+            def _db_relation_broken(self, event: ops.RelationBrokenEvent):
+                nonlocal is_broken, relations
+                is_broken = not event.relation.active
+                relations = [rel.name for rel in self.model.relations["db"]]
+
+        harness = ops.testing.Harness(MyCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.remove_relation(rel_id)
+        self.assertTrue(is_broken, 'event.relation.active not False in relation-broken event')
+        self.assertFalse(relations, 'Model.relations contained broken relation')
+
     def _find_relation_in_model_by_id(
             self,
             harness: ops.testing.Harness['RelationEventCharm'],
