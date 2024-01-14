@@ -111,12 +111,14 @@ class Model:
     as ``self.model`` from any class that derives from :class:`Object`.
     """
 
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
+    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend',
+                 broken_relation_id: Optional[int] = None):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: Dict[str, 'ops.RelationMeta'] = meta.relations
-        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
+        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache,
+                                          broken_relation_id=broken_relation_id)
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
         self._resources = Resources(list(resources), self._backend)
@@ -147,6 +149,9 @@ class Model:
 
         Answers the question "what am I currently related to".
         See also :meth:`.get_relation`.
+
+        In a ``relation-broken`` event, the broken relation is excluded from
+        this list.
         """
         return self._relations
 
@@ -797,8 +802,12 @@ class LazyMapping(Mapping[str, str], ABC):
 class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
-    def __init__(self, relations_meta: Dict[str, 'ops.RelationMeta'], our_unit: 'Unit',
-                 backend: '_ModelBackend', cache: '_ModelCache'):
+    def __init__(self,
+                 relations_meta: Dict[str, 'ops.RelationMeta'],
+                 our_unit: 'Unit',
+                 backend: '_ModelBackend',
+                 cache: '_ModelCache',
+                 broken_relation_id: Optional[int]):
         self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
@@ -806,6 +815,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
+        self._broken_relation_id = broken_relation_id
         self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
 
     def __contains__(self, key: str):
@@ -823,6 +833,8 @@ class RelationMapping(Mapping[str, List['Relation']]):
         if not isinstance(relation_list, list):
             relation_list = self._data[relation_name] = []  # type: ignore
             for rid in self._backend.relation_ids(relation_name):
+                if rid == self._broken_relation_id:
+                    continue
                 relation = Relation(relation_name, rid, is_peer,
                                     self._our_unit, self._backend, self._cache)
                 relation_list.append(relation)
@@ -850,7 +862,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
                 return Relation(relation_name, relation_id, is_peer,
-                                self._our_unit, self._backend, self._cache)
+                                self._our_unit, self._backend, self._cache, active=False)
         relations = self[relation_name]
         num_related = len(relations)
         self._backend._validate_relation_access(
@@ -1454,13 +1466,21 @@ class Relation:
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
     """
 
+    active: bool
+    """Indicates whether this relation is active.
+
+    This is normally ``True``; it will be ``False`` if the current event is a
+    ``relation-broken`` event associated with this relation.
+    """
+
     def __init__(
             self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
-            backend: '_ModelBackend', cache: '_ModelCache'):
+            backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
         self.app: Optional[Application] = None
         self.units: Set[Unit] = set()
+        self.active = active
 
         if is_peer:
             # For peer relations, both the remote and the local app are the same.
@@ -1475,7 +1495,7 @@ class Relation:
                     self.app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
-            pass
+            self.active = False
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".

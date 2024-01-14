@@ -9,7 +9,8 @@ jobs:
       fail-fast: false
       matrix:
         charm-repo:
-          - "canonical/postgresql-operator"
+# TODO: uncomment once secrets issue is fixed in this charm (see https://github.com/canonical/postgresql-operator/pull/307)
+#          - "canonical/postgresql-operator"
           - "canonical/postgresql-k8s-operator"
 # TODO: uncomment once secrets issues are fixed in these charms (eg: https://github.com/canonical/mysql-operator/issues/367)
 #          - "canonical/mysql-operator"
