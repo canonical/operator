@@ -21,40 +21,6 @@ dependencies = [
 ]
 dynamic = ["version"]
 
-[project.optional-dependencies]
-docs = [
-    "sphinx==6.2.1",
-    "sphinx-design",
-    "furo",
-    "sphinx-tabs",
-    "lxd-sphinx-extensions",
-    "sphinx-copybutton",
-]
-lint = [
-    "autopep8~=1.6",
-    "flake8~=6.1",
-    "flake8-docstrings~=1.7",
-    "flake8-builtins~=2.1",
-    "isort~=5.11",
-    "pep8-naming~=0.13",
-    "pyproject-flake8~=6.1",
-]
-static = [
-    "pyright==1.1.345",
-    "pytest~=7.2",
-    "typing_extensions~=4.2",
-]
-unit = [
-    "coverage[toml]~=7.0",
-    "pytest~=7.2",
-    "typing_extensions~=4.2",
-]
-smoke = [
-    "coverage[toml]~=7.0",
-    "pytest~=7.2",
-    "pytest-operator~=0.23",
-]
-
 [project.urls]
 "Homepage" = "https://juju.is/docs/sdk"
 "Repository" = "https://github.com/canonical/operator"
