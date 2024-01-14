@@ -39,11 +39,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.dynamic]
 version = {attr = "ops.version.version"}
 
-[tool.pip-tools]
-generate-hashes = true
-strip-extras = true
-allow-unsafe = true
-
 # Testing tools configuration
 [tool.coverage.run]
 branch = true

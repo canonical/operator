@@ -211,7 +211,8 @@ Formatting uses [isort](https://pypi.org/project/isort/) and
 [builtins](https://pypi.org/project/flake8-builtins/) and
 [pep8-naming](https://pypi.org/project/pep8-naming/) extensions.
 
-All tool configuration is kept in [project.toml](pyproject.toml).
+All tool configuration is kept in [project.toml](pyproject.toml). The list of
+dependencies can be found in the relevant `tox.ini` environment `deps` field.
 
 ## Building
 
