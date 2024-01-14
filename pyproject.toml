@@ -21,6 +21,16 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+docs = [
+    "sphinx==6.2.1",
+    "sphinx-design",
+    "furo",
+    "sphinx-tabs",
+    "lxd-sphinx-extensions",
+    "sphinx-copybutton",
+]
+
 [project.urls]
 "Homepage" = "https://juju.is/docs/sdk"
 "Repository" = "https://github.com/canonical/operator"
