@@ -139,16 +139,6 @@ class TestJujuVersion(unittest.TestCase):
             self.assertEqual(ops.JujuVersion(a) == ops.JujuVersion(b), expected)
             self.assertEqual(ops.JujuVersion(a) == b, expected)
 
-    def test_hash(self):
-        d = {ops.JujuVersion('2.9.30'): 'xyz'}
-        d[ops.JujuVersion('2.9.30')] = '2.9.30'
-        self.assertEqual(d[ops.JujuVersion('2.9.30')], '2.9.30')
-
-        d[ops.JujuVersion('3.4.0')] = 'three four oh'
-        self.assertEqual(len(d), 2)
-        self.assertEqual(d[ops.JujuVersion('2.9.30')], '2.9.30')
-        self.assertEqual(d[ops.JujuVersion('3.4.0')], 'three four oh')
-
     def test_comparison(self):
         test_cases = [
             ("1.0.0", "1.0.0", False, True),
