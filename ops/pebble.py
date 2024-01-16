@@ -1614,7 +1614,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
             break
 
         if encoding is not None:
-            chunk = chunk.decode(encoding)
+            chunk = typing.cast(bytes, chunk).decode(encoding)
         writer.write(chunk)
 
 
@@ -2019,7 +2019,7 @@ class Client:
 
     def _wait_change(self, change_id: ChangeID, timeout: Optional[float] = None) -> Change:
         """Call the wait-change API endpoint directly."""
-        query = {}
+        query: Dict[str, Any] = {}
         if timeout is not None:
             query['timeout'] = _format_timeout(timeout)
 
@@ -2255,7 +2255,7 @@ class Client:
         elif isinstance(source, bytes):
             source_io: _AnyStrFileLikeIO = io.BytesIO(source)
         else:
-            source_io: _AnyStrFileLikeIO = source
+            source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
         content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
@@ -2736,13 +2736,40 @@ class Client:
         Returns:
             List of :class:`CheckInfo` objects.
         """
-        query = {}
+        query: Dict[str, Any] = {}
         if level is not None:
             query['level'] = level.value
         if names:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def notify(self, type: NoticeType, key: str, *,
+               data: Optional[Dict[str, str]] = None,
+               repeat_after: Optional[datetime.timedelta] = None) -> str:
+        """Record an occurrence of a notice with the specified options.
+
+        Args:
+            type: Notice type (currently only "custom" notices are supported).
+            key: Notice key; must be in "example.com/path" format.
+            data: Data fields for this notice.
+            repeat_after: Only allow this notice to repeat after this duration
+                has elapsed (the default is to always repeat).
+
+        Returns:
+            The notice's ID.
+        """
+        body: Dict[str, Any] = {
+            'action': 'add',
+            'type': type.value,
+            'key': key,
+        }
+        if data is not None:
+            body['data'] = data
+        if repeat_after is not None:
+            body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
+        resp = self._request('POST', '/v1/notices', body=body)
+        return resp['result']['id']
 
     def get_notice(self, id: str) -> Notice:
         """Get details about a single notice by ID.
@@ -2760,7 +2787,6 @@ class Client:
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
-        after: Optional[datetime.datetime] = None,
     ) -> List[Notice]:
         """Query for notices that match all of the provided filters.
 
@@ -2772,14 +2798,18 @@ class Client:
         user (notices whose ``user_id`` matches the requester UID as well as
         public notices).
 
+        Note that the "after" filter is not yet implemented, as it's not
+        needed right now and it's hard to implement correctly with Python's
+        datetime type, which only has microsecond precision (and Go's Time
+        type has nanosecond precision).
+
         Args:
-            select: select which notices to return (instead of returning
-                notices for the current user)
-            user_id: filter for notices for the specified user, including
-                public notices (only works for Pebble admins)
-            types: filter for notices with any of the specified types
-            keys: filter for notices with any of the specified keys
-            after: filter for notices that were last repeated after this time
+            select: Select which notices to return (instead of returning
+                notices for the current user).
+            user_id: Filter for notices for the specified user, including
+                public notices (only works for Pebble admins).
+            types: Filter for notices with any of the specified types.
+            keys: Filter for notices with any of the specified keys.
         """
         query: Dict[str, Union[str, List[str]]] = {}
         if select is not None:
@@ -2790,8 +2820,6 @@ class Client:
             query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
         if keys is not None:
             query['keys'] = list(keys)
-        if after is not None:
-            query['after'] = after.isoformat()
         resp = self._request('GET', '/v1/notices', query)
         return [Notice.from_dict(info) for info in resp['result']]
 
