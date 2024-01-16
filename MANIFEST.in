@@ -1,0 +1,10 @@
+graft ops
+graft test
+
+include *.txt
+include *.md
+include MANIFEST.in
+include pyproject.toml
+include tox.ini
+
+global-exclude *~ *.py[cod] __pycache__ *.charm
