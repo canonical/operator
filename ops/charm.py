@@ -14,6 +14,7 @@
 
 """Base objects for the Charm, events and metadata."""
 
+import dataclasses
 import enum
 import logging
 import pathlib
@@ -79,6 +80,12 @@ if TYPE_CHECKING:
         '_MountDict', {'storage': Required[str],
                        'location': str},
         total=False)
+
+
+class _ContainerBaseDict(TypedDict):
+    name: str
+    channel: str
+    architectures: List[str]
 
 
 logger = logging.getLogger(__name__)
@@ -671,8 +678,7 @@ class WorkloadEvent(HookEvent):
     """Base class representing workload-related events.
 
     Workload events are generated for all containers that the charm
-    expects in metadata. Workload containers currently only trigger
-    a :class:`PebbleReadyEvent`.
+    expects in metadata.
     """
 
     workload: 'model.Container'
@@ -1211,6 +1217,9 @@ class CharmMeta:
     maintainers: List[str]
     """List of email addresses of charm maintainers."""
 
+    links: 'MetadataLinks'
+    """Links to more details about the charm."""
+
     tags: List[str]
     """Charmhub tag metadata for categories associated with this charm."""
 
@@ -1229,6 +1238,9 @@ class CharmMeta:
 
     min_juju_version: Optional[str]
     """Indicates the minimum Juju version this charm requires."""
+
+    assumes: 'JujuAssumes'
+    """Juju features this charm requires."""
 
     containers: Dict[str, 'ContainerMeta']
     """Container metadata for each defined container."""
@@ -1270,18 +1282,37 @@ class CharmMeta:
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
 
+        # When running in production, this data is generally loaded from
+        # metadata.yaml. However, when running tests, this data is
+        # potentially loaded from charmcraft.yaml (which will be split out
+        # into a metadata.yaml as part of packing). Most of the field names
+        # are the same, but there are some differences that we handle here,
+        # and in _load_links(), so that loading from either file works.
         self.name = raw_.get('name', '')
         self.summary = raw_.get('summary', '')
         self.description = raw_.get('description', '')
+        # The metadata spec says that these should be display-name <email>
+        # (roughly 'name-addr' from RFC 5322). However, many charms have only
+        # an email, or have a URL, or something else, so we leave these as
+        # a plain string.
         self.maintainers: List[str] = []
+        # Note that metadata v2 only defines 'maintainers' not 'maintainer'.
         if 'maintainer' in raw_:
             self.maintainers.append(raw_['maintainer'])
         if 'maintainers' in raw_:
             self.maintainers.extend(raw_['maintainers'])
+        if 'links' in raw_ and 'contact' in raw_['links']:
+            self.maintainers.append(raw_['links']['contact'])
+        self._load_links(raw_)
+        # Note that metadata v2 does not define tags.
         self.tags = raw_.get('tags', [])
         self.terms = raw_.get('terms', [])
+        # Note that metadata v2 does not define series.
         self.series = raw_.get('series', [])
         self.subordinate = raw_.get('subordinate', False)
+        self.assumes = JujuAssumes.from_list(raw_.get('assumes', []))
+        # Note that metadata v2 does not define min-juju-version ('assumes'
+        # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw_.get('requires', {}).items()}
@@ -1301,11 +1332,37 @@ class CharmMeta:
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
-        # This is taken from Charm Metadata v2, but only the "containers" and
-        # "containers.name" fields that we need right now for Pebble. See:
-        # https://discourse.charmhub.io/t/charm-metadata-v2/3674
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
+
+    def _load_links(self, raw: Dict[str, Any]):
+        websites = raw.get('website', [])
+        if not websites and 'links' in raw:
+            websites = raw['links'].get('website', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(websites, str):
+            websites = [websites]
+        sources = raw.get('source', [])
+        if not sources and 'links' in raw:
+            sources = raw['links'].get('source', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(sources, str):
+            sources = [sources]
+        issues = raw.get('issues', [])
+        if not issues and 'links' in raw:
+            issues = raw['links'].get('issues', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(issues, str):
+            issues = [issues]
+        documentation = raw.get('docs')
+        if documentation is None:
+            documentation = raw.get('links', {}).get('documentation')
+        self.links = MetadataLinks(
+            websites=websites,
+            sources=sources,
+            issues=issues,
+            documentation=documentation,
+        )
 
     @classmethod
     def from_yaml(
@@ -1431,6 +1488,9 @@ class StorageMeta:
     multiple_range: Optional[Tuple[int, Optional[int]]]
     """Range of numeric qualifiers when multiple storage units are used."""
 
+    properties = List[str]
+    """List of additional characteristics of the storage."""
+
     def __init__(self, name: str, raw: '_StorageMetaDict'):
         self.storage_name = name
         self.type = raw['type']
@@ -1447,6 +1507,7 @@ class StorageMeta:
             else:
                 range = range.split('-')
                 self.multiple_range = (int(range[0]), int(range[1]) if range[1] else None)
+        self.properties = raw.get('properties', [])
 
 
 class ResourceMeta:
@@ -1488,6 +1549,60 @@ class PayloadMeta:
         self.type = raw['type']
 
 
+@dataclasses.dataclass(frozen=True)
+class MetadataLinks:
+    """Links to additional information about a charm."""
+
+    websites: List[str]
+    """List of links to project websites."""
+
+    sources: List[str]
+    """List of links to the charm source code."""
+
+    issues: List[str]
+    """List of links to the charm issue tracker."""
+
+    documentation: Optional[str]
+    """Link to charm documentation."""
+
+
+class JujuAssumesCondition(enum.Enum):
+    """Distinguishes between :class:`JujuAssumes` that must match all or any features."""
+
+    ALL = 'all-of'
+    """All features are required to satisfy the requirement."""
+
+    ANY = 'any-of'
+    """Any of the features satisfies the requirement."""
+
+
+@dataclasses.dataclass(frozen=True)
+class JujuAssumes:
+    """Juju model features that are required by the charm.
+
+    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
+    list of available features.
+    """
+
+    features: List[Union[str, 'JujuAssumes']]
+    condition: JujuAssumesCondition = JujuAssumesCondition.ALL
+
+    @classmethod
+    def from_list(cls, raw: List[Any],
+                  condition: JujuAssumesCondition = JujuAssumesCondition.ALL,
+                  ) -> 'JujuAssumes':
+        """Create new JujuAssumes object from list parsed from YAML."""
+        features: List[Union[str, 'JujuAssumes']] = []
+        for feature in raw:
+            if isinstance(feature, str):
+                features.append(feature)
+            else:
+                for nested_condition, nested_features in feature.items():
+                    features.append(JujuAssumes.from_list(
+                        nested_features, JujuAssumesCondition(nested_condition)))
+        return cls(features=features, condition=condition)
+
+
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
@@ -1501,23 +1616,69 @@ class ActionMeta:
         self.additional_properties = raw.get('additionalProperties', True)
 
 
-class ContainerMeta:
-    """Metadata about an individual container.
+@dataclasses.dataclass(frozen=True)
+class ContainerBase:
+    """Metadata to resolve a container image."""
 
-    NOTE: this is extremely lightweight right now, and just includes the fields we need for
-    Pebble interaction.
+    os_name: str
+    """Name of the OS.
+
+    For example: ``ubuntu``
     """
+
+    channel: str
+    """Channel of the OS in format ``track[/risk][/branch]`` as used by Snaps.
+
+    For example: ``20.04/stable`` or ``18.04/stable/fips``
+    """
+
+    architectures: List[str]
+    """List of architectures that this charm can run on."""
+
+    @classmethod
+    def from_dict(cls, d: '_ContainerBaseDict') -> 'ContainerBase':
+        """Create new ContainerBase object from dict parsed from YAML."""
+        return cls(
+            os_name=d['name'],
+            channel=d['channel'],
+            architectures=d['architectures'],
+        )
+
+
+class ContainerMeta:
+    """Metadata about an individual container."""
 
     name: str
     """Name of the container (key in the YAML)."""
 
+    resource: Optional[str]
+    """Reference for an entry in the ``resources`` field.
+
+    Specifies the oci-image resource used to create the container. Must not be
+    present if a base/channel is specified.
+    """
+
+    bases: Optional[List['ContainerBase']]
+    """List of bases for use in resolving a container image.
+
+    Sorted by descending order of preference, and must not be present if
+    resource is specified.
+    """
+
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
         self._mounts: Dict[str, ContainerStorageMeta] = {}
+        self.bases = None
+        self.resource = None
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
             self._populate_mounts(raw.get('mounts', []))
+            self.resource = raw.get('resource')
+            self.bases = [ContainerBase.from_dict(base) for base in raw.get('bases', ())]
+
+        if self.resource and self.bases:
+            raise model.ModelError('A container may specify a resource or base, not both.')
 
     @property
     def mounts(self) -> Dict[str, 'ContainerStorageMeta']:
@@ -1572,9 +1733,6 @@ class ContainerStorageMeta:
     :class:`StorageMeta`.
     """
 
-    location: str
-    """The location the storage is mounted at."""
-
     def __init__(self, storage: str, location: str):
         self.storage = storage
         self._locations: List[str] = [location]
@@ -1588,17 +1746,17 @@ class ContainerStorageMeta:
         """An accessor for the list of locations for a mount."""
         return self._locations
 
-    def __getattr__(self, name: str):
-        # TODO(benhoyt): this should just be a property "location"
-        if name == "location":
-            if len(self._locations) == 1:
-                return self._locations[0]
-            else:
-                raise RuntimeError(
-                    "container has more than one mount point with the same backing storage. "
-                    "Request .locations to see a list"
-                )
-        else:
-            raise AttributeError(
-                f"{self.__class__.__name__} has no such attribute: {name}!"
-            )
+    @property
+    def location(self) -> str:
+        """The location the storage is mounted at.
+
+        Raises:
+            RuntimeError: if there is more than one mount point with the same
+                backing storage - use :attr:`locations` instead.
+        """
+        if len(self._locations) == 1:
+            return self._locations[0]
+        raise RuntimeError(
+            "container has more than one mount point with the same backing storage. "
+            "Request .locations to see a list"
+        )
