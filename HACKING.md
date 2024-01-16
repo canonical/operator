@@ -180,26 +180,63 @@ next to the relevant content (e.g. headings, etc.).
 
 Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
 
+As noted above, you can generate a local copy of the API reference docs with tox:
 
-## Dependencies
+```sh
+tox -e docs
+open docs/_build/html/index.html
+```
+
+# Dependencies
 
 The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
-are listed in [requirements.txt](requirements.txt).
+are listed in [pyproject.toml](pyproject.toml) in the `project.dependencies` section.
 
+# Dev Tools
+
+## Formatting and Checking
+
+Test environments are managed with [tox](https://tox.wiki/) and executed with
+[pytest](https://pytest.org), with coverage measured by
+[coverage](https://coverage.readthedocs.io/).
+Static type checking is done using [pyright](https://github.com/microsoft/pyright),
+and extends the Python 3.8 type hinting support through the
+[typing_extensions](https://pypi.org/project/typing-extensions/) package.
+
+Formatting uses [isort](https://pypi.org/project/isort/) and
+[autopep8](https://pypi.org/project/autopep8/), with linting also using
+[flake8](https://github.com/PyCQA/flake8), including the
+[docstrings](https://pypi.org/project/flake8-docstrings/),
+[builtins](https://pypi.org/project/flake8-builtins/) and
+[pep8-naming](https://pypi.org/project/pep8-naming/) extensions.
+
+All tool configuration is kept in [project.toml](pyproject.toml). The list of
+dependencies can be found in the relevant `tox.ini` environment `deps` field.
+
+## Building
+
+The build backend is [setuptools](https://pypi.org/project/setuptools/), and
+the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
 To make a release of the ops library, do the following:
 
-1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
-2. Click "Draft a new release"
-3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
-   E.g. 2.3.12
-4. Drop notes and a changelog in the description.
-5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+1. Open a PR to change [version.py][ops/version.py]'s `version` to the
+   [appropriate string](https://semver.org/), and get that merged to main.
+2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
+3. Click "Draft a new release"
+4. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+   and a brief summary of the main changes in the release
+   E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
+5. Drop notes and a changelog in the description.
+6. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".) Wait for the new version to be published successfully to [the PyPI project](https://pypi.org/project/ops/).
+7. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
+   next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
+   `'3.14.1.dev0'`).
 
-This will trigger an automatic build for the Python package and publish it to PyPI (the API token/secret is already set up in the repository settings).
+This will trigger an automatic build for the Python package and publish it to PyPI (authorization is handled via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
 
 See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the GitHub actions, not the versions of the ops library.)
 
