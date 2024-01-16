@@ -918,32 +918,6 @@ links:
         self.assertEqual(meta.links.documentation, 'https://discourse.example.com/')
         self.assertEqual(meta.maintainers, ['Support Team <help@example.com>'])
 
-    def test_device(self):
-        meta = ops.CharmMeta.from_yaml("""
-name: my-charm
-devices:
-  device1:
-    type: gpu
-    description: Just one or two GPUs, thanks!
-    countmin: 1
-    countmax: 2
-  device2:
-    type: nvidia.com/gpu
-  device3:
-    type: amd.com/gpu
-    countmin: 10
-""")
-        self.assertEqual(meta.devices['device1'].type, 'gpu')
-        self.assertEqual(meta.devices['device1'].description, 'Just one or two GPUs, thanks!')
-        self.assertEqual(meta.devices['device1'].min, 1)
-        self.assertEqual(meta.devices['device1'].max, 2)
-        self.assertEqual(meta.devices["device2"].type, 'nvidia.com/gpu')
-        self.assertEqual(meta.devices['device2'].description, '')
-        self.assertEqual(meta.devices['device2'].min, None)
-        self.assertEqual(meta.devices['device2'].max, None)
-        self.assertEqual(meta.devices["device3"].type, 'amd.com/gpu')
-        self.assertEqual(meta.devices['device3'].min, 10)
-
     def test_assumes(self):
         meta = ops.CharmMeta.from_yaml("""
 assumes:

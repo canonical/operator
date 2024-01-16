@@ -81,12 +81,6 @@ if TYPE_CHECKING:
                        'location': str},
         total=False)
 
-    class _DeviceMetaDict(TypedDict, total=False):
-        type: Required[str]
-        description: str
-        countmin: int
-        countmax: int
-
 
 class _ContainerBaseDict(TypedDict):
     name: str
@@ -1274,9 +1268,6 @@ class CharmMeta:
     resources: Dict[str, 'ResourceMeta']
     """Resource metadata for each defined resource."""
 
-    devices: Dict[str, 'DeviceMeta']
-    """Device metadata for each defined device request."""
-
     payloads: Dict[str, 'PayloadMeta']
     """Payload metadata for each defined payload."""
 
@@ -1337,8 +1328,6 @@ class CharmMeta:
                          for name, storage in raw_.get('storage', {}).items()}
         self.resources = {name: ResourceMeta(name, res)
                           for name, res in raw_.get('resources', {}).items()}
-        self.devices = {name: DeviceMeta.from_dict(device)
-                        for name, device in raw_.get('devices', {}).items()}
         self.payloads = {name: PayloadMeta(name, payload)
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
@@ -1499,7 +1488,7 @@ class StorageMeta:
     multiple_range: Optional[Tuple[int, Optional[int]]]
     """Range of numeric qualifiers when multiple storage units are used."""
 
-    properties = List[Literal['transient']]
+    properties = List[str]
     """List of additional characteristics of the storage."""
 
     def __init__(self, name: str, raw: '_StorageMetaDict'):
@@ -1558,36 +1547,6 @@ class PayloadMeta:
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.payload_name = name
         self.type = raw['type']
-
-
-@dataclasses.dataclass(frozen=True)
-class DeviceMeta:
-    """Object containing metadata about a device request."""
-
-    type: str
-    """The type of device requested; for example, ``gpu``."""
-
-    description: str
-    """A description of the resource.
-
-    This will be empty string (rather than None) if not set in ``metadata.yaml``.
-    """
-
-    min: Optional[int]
-    """Minimum number of devices required."""
-
-    max: Optional[int]
-    """Maximum number of devices required."""
-
-    @classmethod
-    def from_dict(cls, d: '_DeviceMetaDict') -> 'DeviceMeta':
-        """Create new DeviceMeta object from dict parsed from YAML."""
-        return cls(
-            type=d['type'],
-            description=d.get('description', ''),
-            min=d.get('countmin'),
-            max=d.get('countmax'),
-        )
 
 
 @dataclasses.dataclass(frozen=True)
