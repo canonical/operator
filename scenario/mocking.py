@@ -352,7 +352,7 @@ class _MockModelBackend(_ModelBackend):
         description: Optional[str] = None,
         expire: Optional[datetime.datetime] = None,
         rotate: Optional[SecretRotate] = None,
-        owner: Optional[Literal["unit", "application"]] = None,
+        owner: Optional[Literal["unit", "app"]] = None,
     ) -> str:
         from scenario.state import Secret
 

@@ -157,7 +157,7 @@ class Secret(_DCBase):
 
     # deprecated! if a secret is not granted to this unit, omit it from State.secrets altogether.
     # this attribute will be removed in Scenario 7+
-    granted: Literal["unit", "app", False] = "<DEPRECATED>"
+    granted = "<DEPRECATED>"
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
@@ -245,7 +245,8 @@ class Secret(_DCBase):
     ):
         """Update the metadata."""
         revision = max(self.contents.keys())
-        self.contents[revision + 1] = content
+        if content:
+            self.contents[revision + 1] = content
 
         # bypass frozen dataclass
         if label:
