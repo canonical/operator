@@ -52,6 +52,7 @@ if TYPE_CHECKING:  # pragma: no cover
         Event,
         ExecOutput,
         Relation,
+        Secret,
         State,
         SubordinateRelation,
         _CharmSpec,
@@ -167,6 +168,14 @@ class _MockModelBackend(_ModelBackend):
             raise RelationNotFoundError()
 
     def _get_secret(self, id=None, label=None):
+        # FIXME: what error would a charm get IRL?
+        # ops 2.0 supports secrets, but juju only supports it from 3.0.2
+        if self._context.juju_version < "3.0.2":
+            raise RuntimeError(
+                "secrets are only available in juju >= 3.0.2."
+                "Set ``Context.juju_version`` to 3.0.2+ to use them.",
+            )
+
         canonicalize_id = Secret_Ops._canonicalize_id
 
         if id:
@@ -360,6 +369,23 @@ class _MockModelBackend(_ModelBackend):
         self._state.secrets.append(secret)
         return secret_id
 
+    def _check_can_manage_secret(
+        self,
+        secret: "Secret",
+    ):
+        if secret.owner is None:
+            raise SecretNotFoundError(
+                "this secret is not owned by this unit/app or granted to it. "
+                "Did you forget passing it to State.secrets?",
+            )
+        if secret.owner == "app" and not self.is_leader():
+            understandable_error = SecretNotFoundError(
+                f"App-owned secret {secret.id!r} can only be "
+                f"managed by the leader.",
+            )
+            # charm-facing side: respect ops error
+            raise ModelError("ERROR permission denied") from understandable_error
+
     def secret_get(
         self,
         *,
@@ -369,6 +395,14 @@ class _MockModelBackend(_ModelBackend):
         peek: bool = False,
     ) -> Dict[str, str]:
         secret = self._get_secret(id, label)
+        juju_version = self._context.juju_version
+        if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
+            # in this medieval juju chapter,
+            # secret owners always used to track the latest revision.
+            # ref: https://bugs.launchpad.net/juju/+bug/2037120
+            if secret.owner is not None:
+                refresh = True
+
         revision = secret.revision
         if peek or refresh:
             revision = max(secret.contents.keys())
@@ -384,8 +418,9 @@ class _MockModelBackend(_ModelBackend):
         label: Optional[str] = None,
     ) -> SecretInfo:
         secret = self._get_secret(id, label)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+
+        # only "manage"=write access level can read secret info
+        self._check_can_manage_secret(secret)
 
         return SecretInfo(
             id=secret.id,
@@ -407,8 +442,7 @@ class _MockModelBackend(_ModelBackend):
         rotate: Optional[SecretRotate] = None,
     ):
         secret = self._get_secret(id, label)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_can_manage_secret(secret)
 
         secret._update_metadata(
             content=content,
@@ -420,8 +454,7 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_can_manage_secret(secret)
 
         grantee = unit or self.relation_remote_app_name(
             relation_id,
@@ -435,8 +468,7 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
         secret = self._get_secret(id)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_can_manage_secret(secret)
 
         grantee = unit or self.relation_remote_app_name(
             relation_id,
@@ -448,8 +480,7 @@ class _MockModelBackend(_ModelBackend):
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         secret = self._get_secret(id)
-        if not secret.owner:
-            raise RuntimeError(f"not the owner of {secret}")
+        self._check_can_manage_secret(secret)
 
         if revision:
             del secret.contents[revision]

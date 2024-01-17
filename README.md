@@ -191,10 +191,11 @@ def test_statuses():
         WaitingStatus('checking this is right...'),
         ActiveStatus("I am ruled"),
     ]
-
+    
+    # similarly you can check the app status history:
     assert ctx.app_status_history == [
         UnknownStatus(),
-        ActiveStatus(""),
+        ...
     ]
 ```
 
@@ -434,9 +435,8 @@ that this unit can see).
 Because of that, `SubordinateRelation`, compared to `Relation`, always talks in terms of `remote`:
 
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` taking a single `Dict[str:str]`. The remote unit ID can be provided as a separate argument. 
-- `Relation.remote_unit_ids` becomes `SubordinateRelation.primary_id` (a single ID instead of a list of IDs)
+- `Relation.remote_unit_ids` becomes `SubordinateRelation.remote_unit_id` (a single ID instead of a list of IDs)
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` (a single databag instead of a mapping from unit IDs to databags)
-- `Relation.remote_app_name` maps to `SubordinateRelation.primary_app_name`
 
 ```python
 from scenario.state import SubordinateRelation
@@ -658,12 +658,12 @@ def test_pebble_push():
     state_in = State(
         containers=[container]
     )
-    Context(
+    ctx = Context(
         MyCharm,
-        meta={"name": "foo", "containers": {"foo": {}}}).run(
-        "start",
-        state_in,
+        meta={"name": "foo", "containers": {"foo": {}}}
     )
+    
+    ctx.run("start", state_in)
 
     # this is the root of the simulated container filesystem. Any mounts will be symlinks in it.
     container_root_fs = container.get_filesystem(ctx)
@@ -832,11 +832,21 @@ state = State(
 ```
 
 The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping
-from revision numbers (integers) to a str:str dict representing the payload of the revision.
+from revision numbers (integers) to a `str:str` dict representing the payload of the revision.
 
-By default, the secret is not owned by **this charm** nor is it granted to it.
-Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to
-this charm, nor we specified that the secret is owned by it.
+There are three cases:
+- the secret is owned by this app but not this unit, in which case this charm can only manage it if we are the leader
+- the secret is owned by this unit, in which case this charm can always manage it (leader or not)
+- (default) the secret is not owned by this app nor unit, which means we can't manage it but only view it
+
+Thus by default, the secret is not owned by **this charm**, but, implicitly, by some unknown 'other charm', and that other charm has granted us view rights.
+
+
+The presence of the secret in `State.secrets` entails that we have access to it, either as owners or as grantees. Therefore, if we're not owners, we must be grantees. Absence of a Secret from the known secrets list means we are not entitled to obtaining it in any way. The charm, indeed, shouldn't even know it exists.
+
+[note]
+If this charm does not own the secret, but also it was not granted view rights by the (remote) owner, you model this in Scenario by _not adding it to State.secrets_! The presence of a `Secret` in `State.secrets` means, in other words, that the charm has view rights (otherwise, why would we put it there?). If the charm owns the secret, or is leader, it will _also_ have manage rights on top of view ones.
+[/note]
 
 To specify a secret owned by this unit (or app):
 
@@ -847,7 +857,7 @@ state = State(
     secrets=[
         Secret(
             id='foo',
-            contents={0: {'key': 'public'}},
+            contents={0: {'key': 'private'}},
             owner='unit',  # or 'app'
             remote_grants={0: {"remote"}}
             # the secret owner has granted access to the "remote" app over some relation with ID 0
@@ -867,7 +877,6 @@ state = State(
             id='foo',
             contents={0: {'key': 'public'}},
             # owner=None, which is the default
-            granted="unit",  # or "app",
             revision=0,  # the revision that this unit (or app) is currently tracking
         )
     ]
