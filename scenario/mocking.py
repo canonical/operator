@@ -97,6 +97,7 @@ class _MockExecProcess:
 _NOT_GIVEN = object()  # non-None default value sentinel
 
 
+# pyright: reportIncompatibleMethodOverride=false
 class _MockModelBackend(_ModelBackend):
     def __init__(
         self,
@@ -116,7 +117,7 @@ class _MockModelBackend(_ModelBackend):
 
     def open_port(
         self,
-        protocol: "_RawPortProtocolLiteral",
+        protocol: "_RawPortProtocolLiteral",  # pyright: ignore[reportIncompatibleMethodOverride]
         port: Optional[int] = None,
     ):
         # fixme: the charm will get hit with a StateValidationError

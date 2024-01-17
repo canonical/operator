@@ -157,7 +157,7 @@ class Secret(_DCBase):
 
     # deprecated! if a secret is not granted to this unit, omit it from State.secrets altogether.
     # this attribute will be removed in Scenario 7+
-    granted = "<DEPRECATED>"
+    granted: Any = "<DEPRECATED>"  # noqa
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
@@ -370,7 +370,7 @@ class RelationBase(_DCBase):
         yield self.local_unit_data
 
     @property
-    def _remote_unit_ids(self) -> Tuple[int]:
+    def _remote_unit_ids(self) -> Tuple["UnitID", ...]:
         """Ids of the units on the other end of this relation."""
         raise NotImplementedError()
 

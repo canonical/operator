@@ -98,7 +98,7 @@ class _Manager:
         raise NotImplementedError("override in subclass")
 
     def __enter__(self):
-        self._wrapped_ctx = wrapped_ctx = self._runner()(self._arg, self._state_in)
+        self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
         ops = wrapped_ctx.__enter__()
         self.ops = ops
         return self
@@ -126,11 +126,12 @@ class _Manager:
 
 class _EventManager(_Manager):
     if TYPE_CHECKING:  # pragma: no cover
-        output: State
+        output: State  # pyright: ignore[reportIncompatibleVariableOverride]
 
         def run(self) -> "State":
             return cast("State", super().run())
 
+    @property
     def _runner(self):
         return self._ctx._run_event  # noqa
 
@@ -140,11 +141,12 @@ class _EventManager(_Manager):
 
 class _ActionManager(_Manager):
     if TYPE_CHECKING:  # pragma: no cover
-        output: ActionOutput
+        output: ActionOutput  # pyright: ignore[reportIncompatibleVariableOverride]
 
         def run(self) -> "ActionOutput":
             return cast("ActionOutput", super().run())
 
+    @property
     def _runner(self):
         return self._ctx._run_action  # noqa
 

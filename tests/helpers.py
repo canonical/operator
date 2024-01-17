@@ -12,7 +12,7 @@ from typing import (
     Union,
 )
 
-from scenario.context import Context, DEFAULT_JUJU_VERSION
+from scenario.context import DEFAULT_JUJU_VERSION, Context
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
