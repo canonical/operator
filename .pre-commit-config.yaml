@@ -67,7 +67,7 @@ repos:
   - repo: local
     hooks:
       - id: changelogs-rst
-        name: changelog filenames
+        name: Changelog filenames
         language: fail
         entry: "changelog files must be named ####.(feature|bugfix|doc|removal|misc).rst"
         exclude: ^docs/changelog/(\d+\.(feature|bugfix|doc|removal|misc).rst|template.jinja2)
@@ -79,4 +79,5 @@ repos:
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.347
     hooks:
-    - id: pyright
+      - id: pyright
+        name: Static type checks
