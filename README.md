@@ -601,8 +601,9 @@ def test_pebble_push():
         )
         Context(
             MyCharm,
-            meta={"name": "foo", "containers": {"foo": {}}}).run(
-            "start",
+            meta={"name": "foo", "containers": {"foo": {}}}
+        ).run(
+            container.pebble_ready_event(),
             state_in,
         )
         assert local_file.read().decode() == "TEST"
