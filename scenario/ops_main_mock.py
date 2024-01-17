@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence, cast
 
 import ops.charm
 import ops.framework
@@ -17,9 +17,11 @@ from ops.log import setup_root_logging
 from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_args
 from ops.main import logger as ops_logger
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import Event, State, _CharmSpec
+
+# pyright: reportPrivateUsage=false
 
 
 class NoObserverError(RuntimeError):
@@ -51,7 +53,7 @@ def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
 def _emit_charm_event(
     charm: "CharmBase",
     event_name: str,
-    event: "Event" = None,
+    event: Optional["Event"] = None,
 ):
     """Emits a charm event based on a Juju event name.
 
@@ -86,7 +88,7 @@ def setup_framework(
 ):
     from scenario.mocking import _MockModelBackend
 
-    model_backend = _MockModelBackend(  # pyright: reportPrivateUsage=false
+    model_backend = _MockModelBackend(
         state=state,
         event=event,
         context=context,
@@ -113,7 +115,7 @@ def setup_framework(
 
     # TODO: add use_juju_for_storage support
     store = ops.storage.SQLiteStorage(charm_state_path)
-    framework = ops.framework.Framework(store, charm_dir, meta, model)
+    framework = ops.Framework(store, charm_dir, meta, model)
     framework.set_breakpointhook()
     return framework
 
@@ -156,9 +158,9 @@ class Ops:
         self.charm_spec = charm_spec
 
         # set by setup()
-        self.dispatcher = None
-        self.framework = None
-        self.charm = None
+        self.dispatcher: Optional[_Dispatcher] = None
+        self.framework: Optional[ops.Framework] = None
+        self.charm: Optional[ops.CharmBase] = None
 
         self._has_setup = False
         self._has_emitted = False
@@ -180,14 +182,18 @@ class Ops:
             raise RuntimeError("should .setup() before you .emit()")
         self._has_emitted = True
 
-        try:
-            if not self.dispatcher.is_restricted_context():
-                self.framework.reemit()
+        dispatcher = cast(_Dispatcher, self.dispatcher)
+        charm = cast(CharmBase, self.charm)
+        framework = cast(ops.Framework, self.framework)
 
-            _emit_charm_event(self.charm, self.dispatcher.event_name, self.event)
+        try:
+            if not dispatcher.is_restricted_context():
+                framework.reemit()
+
+            _emit_charm_event(charm, dispatcher.event_name, self.event)
 
         except Exception:
-            self.framework.close()
+            framework.close()
             raise
 
     def commit(self):
@@ -195,15 +201,18 @@ class Ops:
         if not self._has_emitted:
             raise RuntimeError("should .emit() before you .commit()")
 
+        framework = cast(ops.Framework, self.framework)
+        charm = cast(CharmBase, self.charm)
+
         # emit collect-status events
-        ops.charm._evaluate_status(self.charm)
+        ops.charm._evaluate_status(charm)
 
         self._has_committed = True
 
         try:
-            self.framework.commit()
+            framework.commit()
         finally:
-            self.framework.close()
+            framework.close()
 
     def finalize(self):
         """Step through all non-manually-called procedures and run them."""

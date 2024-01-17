@@ -5,26 +5,15 @@ import dataclasses
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    ContextManager,
-    Dict,
-    List,
-    Optional,
-    Type,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union, cast
 
-from ops import EventBase
+from ops import CharmBase, EventBase
 
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import Action, Event, MetadataNotFoundError, _CharmSpec
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.ops_main_mock import Ops
@@ -33,6 +22,8 @@ if TYPE_CHECKING:
     PathLike = Union[str, Path]
 
 logger = scenario_logger.getChild("runtime")
+
+DEFAULT_JUJU_VERSION = "3.4"
 
 
 @dataclasses.dataclass
@@ -44,8 +35,9 @@ class ActionOutput:
     In most cases, actions are not expected to be affecting it."""
     logs: List[str]
     """Any logs associated with the action output, set by the charm."""
-    results: Dict[str, Any]
-    """Key-value mapping assigned by the charm as a result of the action."""
+    results: Optional[Dict[str, Any]]
+    """Key-value mapping assigned by the charm as a result of the action.
+    Will be None if the charm never calls action-set."""
     failure: Optional[str] = None
     """If the action is not a success: the message the charm set when failing the action."""
 
@@ -91,8 +83,12 @@ class _Manager:
         self.output: Optional[Union["State", ActionOutput]] = None
 
     @property
-    def charm(self) -> "CharmType":
-        return self.ops.charm
+    def charm(self) -> CharmBase:
+        if not self.ops:
+            raise RuntimeError(
+                "you should __enter__ this contextmanager before accessing this",
+            )
+        return cast(CharmBase, self.ops.charm)
 
     @property
     def _runner(self):
@@ -102,7 +98,7 @@ class _Manager:
         raise NotImplementedError("override in subclass")
 
     def __enter__(self):
-        self._wrapped_ctx = wrapped_ctx = self._runner()(self._arg, self._state_in)
+        self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
         ops = wrapped_ctx.__enter__()
         self.ops = ops
         return self
@@ -129,31 +125,33 @@ class _Manager:
 
 
 class _EventManager(_Manager):
-    if TYPE_CHECKING:
-        output: State
+    if TYPE_CHECKING:  # pragma: no cover
+        output: State  # pyright: ignore[reportIncompatibleVariableOverride]
 
         def run(self) -> "State":
             return cast("State", super().run())
 
+    @property
     def _runner(self):
-        return self._ctx._run_event
+        return self._ctx._run_event  # noqa
 
     def _get_output(self):
-        return self._ctx._output_state
+        return self._ctx._output_state  # noqa
 
 
 class _ActionManager(_Manager):
-    if TYPE_CHECKING:
-        output: ActionOutput
+    if TYPE_CHECKING:  # pragma: no cover
+        output: ActionOutput  # pyright: ignore[reportIncompatibleVariableOverride]
 
         def run(self) -> "ActionOutput":
             return cast("ActionOutput", super().run())
 
+    @property
     def _runner(self):
-        return self._ctx._run_action
+        return self._ctx._run_action  # noqa
 
     def _get_output(self):
-        return self._ctx._finalize_action(self._ctx._output_state)
+        return self._ctx._finalize_action(self._ctx.output_state)  # noqa
 
 
 class Context:
@@ -165,10 +163,12 @@ class Context:
         meta: Optional[Dict[str, Any]] = None,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-        charm_root: "PathLike" = None,
-        juju_version: str = "3.0",
+        charm_root: Optional["PathLike"] = None,
+        juju_version: str = DEFAULT_JUJU_VERSION,
         capture_deferred_events: bool = False,
         capture_framework_events: bool = False,
+        app_name: Optional[str] = None,
+        unit_id: Optional[int] = 0,
     ):
         """Represents a simulated charm's execution context.
 
@@ -201,7 +201,7 @@ class Context:
 
         >>> from scenario import Context, State
         >>> from ops import ActiveStatus
-        >>> from charm import MyCharm, MyCustomEvent
+        >>> from charm import MyCharm, MyCustomEvent  # noqa
         >>>
         >>> def test_foo():
         >>>     # Arrange: set the context up
@@ -222,6 +222,9 @@ class Context:
         :arg config: charm config to use. Needs to be a valid config.yaml format (as a dict).
             If none is provided, we will search for a ``config.yaml`` file in the charm root.
         :arg juju_version: Juju agent version to simulate.
+        :arg app_name: App name that this charm is deployed as. Defaults to the charm name as
+            defined in metadata.yaml.
+        :arg unit_id: Unit ID that this charm is deployed as. Defaults to 0.
         :arg charm_root: virtual charm root the charm will be executed with.
             If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
             execution cwd, you need to use this. E.g.:
@@ -258,6 +261,13 @@ class Context:
         self.charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
+        if juju_version.split(".")[0] == "2":
+            logger.warn(
+                "Juju 2.x is closed and unsupported. You may encounter inconsistencies.",
+            )
+
+        self._app_name = app_name
+        self._unit_id = unit_id
         self._tmp = tempfile.TemporaryDirectory()
 
         # config for what events to be captured in emitted_events.
@@ -276,13 +286,26 @@ class Context:
         self._output_state: Optional["State"] = None
 
         # ephemeral side effects from running an action
-        self._action_logs = []
-        self._action_results = None
-        self._action_failure = None
+
+        self._action_logs: List[str] = []
+        self._action_results: Optional[Dict[str, str]] = None
+        self._action_failure: Optional[str] = None
 
     def _set_output_state(self, output_state: "State"):
         """Hook for Runtime to set the output state."""
         self._output_state = output_state
+
+    @property
+    def output_state(self) -> "State":
+        """The output state obtained by running an event on this context.
+
+        Will raise an exception if this Context hasn't been run yet.
+        """
+        if not self._output_state:
+            raise RuntimeError(
+                "No output state available. ``.run()`` this Context first.",
+            )
+        return self._output_state
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
@@ -325,9 +348,9 @@ class Context:
     def _record_status(self, state: "State", is_app: bool):
         """Record the previous status before a status change."""
         if is_app:
-            self.app_status_history.append(state.app_status)
+            self.app_status_history.append(cast("_EntityStatus", state.app_status))
         else:
-            self.unit_status_history.append(state.unit_status)
+            self.unit_status_history.append(cast("_EntityStatus", state.unit_status))
 
     @staticmethod
     def _coalesce_action(action: Union[str, Action]) -> Action:
@@ -350,7 +373,7 @@ class Context:
         if not isinstance(event, Event):
             raise InvalidEventError(f"Expected Event | str, got {type(event)}")
 
-        if event._is_action_event:
+        if event._is_action_event:  # noqa
             raise InvalidEventError(
                 "Cannot Context.run() action events. "
                 "Use Context.run_action instead.",
@@ -380,9 +403,9 @@ class Context:
 
         Usage:
         >>> with Context().manager("start", State()) as manager:
-        >>>     assert manager.charm._some_private_attribute == "foo"
+        >>>     assert manager.charm._some_private_attribute == "foo"  # noqa
         >>>     manager.run()  # this will fire the event
-        >>>     assert manager.charm._some_private_attribute == "bar"
+        >>>     assert manager.charm._some_private_attribute == "bar"  # noqa
 
         :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -399,9 +422,9 @@ class Context:
 
         Usage:
         >>> with Context().action_manager("foo-action", State()) as manager:
-        >>>     assert manager.charm._some_private_attribute == "foo"
+        >>>     assert manager.charm._some_private_attribute == "foo"  # noqa
         >>>     manager.run()  # this will fire the event
-        >>>     assert manager.charm._some_private_attribute == "bar"
+        >>>     assert manager.charm._some_private_attribute == "bar"  # noqa
 
         :arg action: the Action that the charm will execute. Can be a string or an Action instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
@@ -414,7 +437,7 @@ class Context:
         self,
         event: Union["Event", str],
         state: "State",
-    ) -> ContextManager["Ops"]:
+    ):
         _event = self._coalesce_event(event)
         with self._run(event=_event, state=state) as ops:
             yield ops
@@ -423,8 +446,8 @@ class Context:
         self,
         event: Union["Event", str],
         state: "State",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
+        pre_event: Optional[Callable[[CharmBase], None]] = None,
+        post_event: Optional[Callable[[CharmBase], None]] = None,
     ) -> "State":
         """Trigger a charm execution with an Event and a State.
 
@@ -445,21 +468,21 @@ class Context:
 
         with self._run_event(event=event, state=state) as ops:
             if pre_event:
-                pre_event(ops.charm)
+                pre_event(cast(CharmBase, ops.charm))
 
             ops.emit()
 
             if post_event:
-                post_event(ops.charm)
+                post_event(cast(CharmBase, ops.charm))
 
-        return self._output_state
+        return self.output_state
 
     def run_action(
         self,
         action: Union["Action", str],
         state: "State",
-        pre_event: Optional[Callable[["CharmType"], None]] = None,
-        post_event: Optional[Callable[["CharmType"], None]] = None,
+        pre_event: Optional[Callable[[CharmBase], None]] = None,
+        post_event: Optional[Callable[[CharmBase], None]] = None,
     ) -> ActionOutput:
         """Trigger a charm execution with an Action and a State.
 
@@ -481,14 +504,14 @@ class Context:
         _action = self._coalesce_action(action)
         with self._run_action(action=_action, state=state) as ops:
             if pre_event:
-                pre_event(ops.charm)
+                pre_event(cast(CharmBase, ops.charm))
 
             ops.emit()
 
             if post_event:
-                post_event(ops.charm)
+                post_event(cast(CharmBase, ops.charm))
 
-        return self._finalize_action(self._output_state)
+        return self._finalize_action(self.output_state)
 
     def _finalize_action(self, state_out: "State"):
         ao = ActionOutput(
@@ -510,7 +533,7 @@ class Context:
         self,
         action: Union["Action", str],
         state: "State",
-    ) -> ContextManager["Ops"]:
+    ):
         _action = self._coalesce_action(action)
         with self._run(event=_action.event, state=state) as ops:
             yield ops
@@ -520,11 +543,13 @@ class Context:
         self,
         event: "Event",
         state: "State",
-    ) -> ContextManager["Ops"]:
+    ):
         runtime = Runtime(
             charm_spec=self.charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
+            app_name=self._app_name,
+            unit_id=self._unit_id,
         )
         with runtime.exec(
             state=state,

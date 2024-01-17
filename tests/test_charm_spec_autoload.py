@@ -7,6 +7,7 @@ from typing import Type
 
 import pytest
 import yaml
+from ops import CharmBase
 from ops.testing import CharmType
 
 from scenario import Context, Relation, State

@@ -77,7 +77,7 @@ A scenario test consists of three broad steps:
     - optionally, you can use a context manager to get a hold of the charm instance and run assertions on internal APIs and the internal state of the charm and operator framework.
 
 The most basic scenario is one in which all is defaulted and barely any data is
-available. The charm has no config, no relations, no networks, no leadership, and its status is `unknown`.
+available. The charm has no config, no relations, no leadership, and its status is `unknown`.
 
 With that, we can write the simplest possible scenario test:
 
@@ -191,10 +191,11 @@ def test_statuses():
         WaitingStatus('checking this is right...'),
         ActiveStatus("I am ruled"),
     ]
-
+    
+    # similarly you can check the app status history:
     assert ctx.app_status_history == [
         UnknownStatus(),
-        ActiveStatus(""),
+        ...
     ]
 ```
 
@@ -434,9 +435,8 @@ that this unit can see).
 Because of that, `SubordinateRelation`, compared to `Relation`, always talks in terms of `remote`:
 
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` taking a single `Dict[str:str]`. The remote unit ID can be provided as a separate argument. 
-- `Relation.remote_unit_ids` becomes `SubordinateRelation.primary_id` (a single ID instead of a list of IDs)
+- `Relation.remote_unit_ids` becomes `SubordinateRelation.remote_unit_id` (a single ID instead of a list of IDs)
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` (a single databag instead of a mapping from unit IDs to databags)
-- `Relation.remote_app_name` maps to `SubordinateRelation.primary_app_name`
 
 ```python
 from scenario.state import SubordinateRelation
@@ -526,6 +526,26 @@ remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
 # which is syntactic sugar for:
 remote_unit_2_is_joining_event = Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
 ```
+
+### Networks
+
+Simplifying a bit the Juju "spaces" model, each integration endpoint a charm defines in its metadata is associated with a network. Regardless of whether there is a living relation over that endpoint, that is.  
+
+If your charm has a relation `"foo"` (defined in metadata.yaml), then the charm will be able at runtime to do `self.model.get_binding("foo").network`.
+The network you'll get by doing so is heavily defaulted (see `state.Network.default`) and good for most use-cases because the charm should typically not be concerned about what IP it gets. 
+
+On top of the relation-provided network bindings, a charm can also define some `extra-bindings` in its metadata.yaml and access them at runtime. Note that this is a deprecated feature that should not be relied upon. For completeness, we support it in Scenario.
+
+If you want to, you can override any of these relation or extra-binding associated networks with a custom one by passing it to `State.networks`.
+
+```python
+from scenario import State, Network
+state = State(networks={
+  'foo': Network.default(private_address='4.4.4.4')
+})
+```
+
+Where `foo` can either be the name of an `extra-bindings`-defined binding, or a relation endpoint.
 
 # Containers
 
@@ -638,12 +658,12 @@ def test_pebble_push():
     state_in = State(
         containers=[container]
     )
-    Context(
+    ctx = Context(
         MyCharm,
-        meta={"name": "foo", "containers": {"foo": {}}}).run(
-        "start",
-        state_in,
+        meta={"name": "foo", "containers": {"foo": {}}}
     )
+    
+    ctx.run("start", state_in)
 
     # this is the root of the simulated container filesystem. Any mounts will be symlinks in it.
     container_root_fs = container.get_filesystem(ctx)
@@ -812,11 +832,21 @@ state = State(
 ```
 
 The only mandatory arguments to Secret are its secret ID (which should be unique) and its 'contents': that is, a mapping
-from revision numbers (integers) to a str:str dict representing the payload of the revision.
+from revision numbers (integers) to a `str:str` dict representing the payload of the revision.
 
-By default, the secret is not owned by **this charm** nor is it granted to it.
-Therefore, if charm code attempted to get that secret revision, it would get a permission error: we didn't grant it to
-this charm, nor we specified that the secret is owned by it.
+There are three cases:
+- the secret is owned by this app but not this unit, in which case this charm can only manage it if we are the leader
+- the secret is owned by this unit, in which case this charm can always manage it (leader or not)
+- (default) the secret is not owned by this app nor unit, which means we can't manage it but only view it
+
+Thus by default, the secret is not owned by **this charm**, but, implicitly, by some unknown 'other charm', and that other charm has granted us view rights.
+
+
+The presence of the secret in `State.secrets` entails that we have access to it, either as owners or as grantees. Therefore, if we're not owners, we must be grantees. Absence of a Secret from the known secrets list means we are not entitled to obtaining it in any way. The charm, indeed, shouldn't even know it exists.
+
+[note]
+If this charm does not own the secret, but also it was not granted view rights by the (remote) owner, you model this in Scenario by _not adding it to State.secrets_! The presence of a `Secret` in `State.secrets` means, in other words, that the charm has view rights (otherwise, why would we put it there?). If the charm owns the secret, or is leader, it will _also_ have manage rights on top of view ones.
+[/note]
 
 To specify a secret owned by this unit (or app):
 
@@ -827,7 +857,7 @@ state = State(
     secrets=[
         Secret(
             id='foo',
-            contents={0: {'key': 'public'}},
+            contents={0: {'key': 'private'}},
             owner='unit',  # or 'app'
             remote_grants={0: {"remote"}}
             # the secret owner has granted access to the "remote" app over some relation with ID 0
@@ -847,7 +877,6 @@ state = State(
             id='foo',
             contents={0: {'key': 'public'}},
             # owner=None, which is the default
-            granted="unit",  # or "app",
             revision=0,  # the revision that this unit (or app) is currently tracking
         )
     ]

@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from ops import CharmBase
 
 from scenario import Action, Context, Event, State
@@ -14,7 +15,9 @@ def test_run():
     state = State()
 
     with patch.object(ctx, "_run") as p:
-        ctx.run("start", state)
+        ctx._output_state = "foo"  # would normally be set within the _run call scope
+        output = ctx.run("start", state)
+        assert output == "foo"
 
     assert p.called
     e = p.call_args.kwargs["event"]
@@ -30,7 +33,11 @@ def test_run_action():
     state = State()
 
     with patch.object(ctx, "_run_action") as p:
-        ctx.run_action("do-foo", state)
+        ctx._output_state = (
+            "foo"  # would normally be set within the _run_action call scope
+        )
+        output = ctx.run_action("do-foo", state)
+        assert output.state == "foo"
 
     assert p.called
     a = p.call_args.kwargs["action"]
@@ -50,3 +57,13 @@ def test_clear():
 
     ctx.clear()
     assert not ctx.emitted_events  # and others...
+
+
+@pytest.mark.parametrize("app_name", ("foo", "bar", "george"))
+@pytest.mark.parametrize("unit_id", (1, 2, 42))
+def test_app_name(app_name, unit_id):
+    with Context(
+        MyCharm, meta={"name": "foo"}, app_name=app_name, unit_id=unit_id
+    ).manager("start", State()) as mgr:
+        assert mgr.charm.app.name == app_name
+        assert mgr.charm.unit.name == f"{app_name}/{unit_id}"

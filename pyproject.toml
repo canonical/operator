@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "5.8.1"
+version = "6.0"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -20,7 +20,6 @@ keywords = ["juju", "test"]
 dependencies = [
     "ops>=2.6",
     "PyYAML>=6.0.1",
-    "typer==0.7.0",
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -81,6 +80,11 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
+[tool.pyright]
+ignore = [
+    "scenario/sequences.py",
+    "scenario/capture_events.py"
+]
 [tool.isort]
 profile = "black"
 

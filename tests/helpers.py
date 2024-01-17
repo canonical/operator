@@ -12,9 +12,9 @@ from typing import (
     Union,
 )
 
-from scenario.context import Context
+from scenario.context import DEFAULT_JUJU_VERSION, Context
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.state import Event, State
@@ -36,7 +36,7 @@ def trigger(
     actions: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None,
     charm_root: Optional["PathLike"] = None,
-    juju_version: str = "3.0",
+    juju_version: str = DEFAULT_JUJU_VERSION,
 ) -> "State":
     ctx = Context(
         charm_type=charm_type,

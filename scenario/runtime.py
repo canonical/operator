@@ -8,20 +8,10 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    ContextManager,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 
 import yaml
-from ops.framework import EventBase, _event_regex
+from ops.framework import _event_regex
 from ops.storage import NoSnapshotError, SQLiteStorage
 
 from scenario.capture_events import capture_events
@@ -29,14 +19,11 @@ from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
 from scenario.state import DeferredEvent, PeerRelation, StoredState
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.context import Context
-    from scenario.ops_main_mock import Ops
-    from scenario.state import AnyRelation, Event, State, _CharmSpec
-
-    _CT = TypeVar("_CT", bound=Type[CharmType])
+    from scenario.state import Event, State, _CharmSpec
 
     PathLike = Union[str, Path]
 
@@ -68,7 +55,7 @@ class UnitStateDB:
         self._db_path = db_path
         self._state_file = Path(self._db_path)
 
-    def _open_db(self) -> Optional[SQLiteStorage]:
+    def _open_db(self) -> SQLiteStorage:
         """Open the db."""
         return SQLiteStorage(self._state_file)
 
@@ -168,16 +155,19 @@ class Runtime:
         charm_spec: "_CharmSpec",
         charm_root: Optional["PathLike"] = None,
         juju_version: str = "3.0.0",
+        app_name: Optional[str] = None,
+        unit_id: Optional[int] = 0,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
         self._charm_root = charm_root
 
-        app_name = self._charm_spec.meta.get("name")
+        app_name = app_name or self._charm_spec.meta.get("name")
         if not app_name:
             raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
         self._app_name = app_name
+        self._unit_id = unit_id
 
     @staticmethod
     def _cleanup_env(env):
@@ -199,7 +189,7 @@ class Runtime:
 
         env = {
             "JUJU_VERSION": self._juju_version,
-            "JUJU_UNIT_NAME": f"{self._app_name}/{state.unit_id}",
+            "JUJU_UNIT_NAME": f"{self._app_name}/{self._unit_id}",
             "_": "./dispatch",
             "JUJU_DISPATCH_PATH": f"hooks/{event.name}",
             "JUJU_MODEL_NAME": state.model.name,
@@ -208,8 +198,6 @@ class Runtime:
             "JUJU_CHARM_DIR": str(charm_root.absolute()),
             # todo consider setting pwd, (python)path
         }
-
-        relation: "AnyRelation"
 
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
@@ -273,7 +261,7 @@ class Runtime:
         return env
 
     @staticmethod
-    def _wrap(charm_type: "_CT") -> "_CT":
+    def _wrap(charm_type: Type["CharmType"]) -> Type["CharmType"]:
         # dark sorcery to work around framework using class attrs to hold on to event sources
         # todo this should only be needed if we call play multiple times on the same runtime.
         #  can we avoid it?
@@ -286,10 +274,10 @@ class Runtime:
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
-        return WrappedCharm
+        return typing.cast(Type["CharmType"], WrappedCharm)
 
     @contextmanager
-    def _virtual_charm_root(self) -> typing.ContextManager[Path]:
+    def _virtual_charm_root(self):
         # If we are using runtime on a real charm, we can make some assumptions about the
         # directory structure we are going to find.
         # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
@@ -356,7 +344,8 @@ class Runtime:
                     file.write_text(previous_content)
 
         else:
-            charm_virtual_root.cleanup()
+            # charm_virtual_root is a tempdir
+            typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()
 
     @staticmethod
     def _get_state_db(temporary_charm_root: Path):
@@ -376,7 +365,7 @@ class Runtime:
         return state.replace(deferred=deferred, stored_state=stored_state)
 
     @contextmanager
-    def _exec_ctx(self, ctx: "Context") -> ContextManager[Tuple[Path, List[EventBase]]]:
+    def _exec_ctx(self, ctx: "Context"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
             # todo allow customizing capture_events
@@ -392,7 +381,7 @@ class Runtime:
         state: "State",
         event: "Event",
         context: "Context",
-    ) -> ContextManager["Ops"]:
+    ):
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the
@@ -428,7 +417,7 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
-            from scenario.ops_main_mock import Ops
+            from scenario.ops_main_mock import Ops  # noqa: F811
 
             try:
                 ops = Ops(
@@ -463,6 +452,5 @@ class Runtime:
             output_state = self._close_storage(output_state, temporary_charm_root)
 
         context.emitted_events.extend(captured)
-
         logger.info("event dispatched. done.")
         context._set_output_state(output_state)
