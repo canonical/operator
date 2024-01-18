@@ -19,8 +19,6 @@ import io
 import json
 import signal
 import tempfile
-
-import ops
 import test.fake_pebble as fake_pebble
 import typing
 import unittest
@@ -29,10 +27,11 @@ import unittest.util
 
 import pytest
 import websocket  # type: ignore
-
-from ops import pebble, Framework
-from ops._private import yaml
 from testing import Harness
+
+import ops
+from ops import Framework, pebble
+from ops._private import yaml
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
 unittest.util._MAX_LENGTH = 1000
@@ -562,7 +561,6 @@ log-targets:
         # Should be read-only ("can't set attribute")
         with self.assertRaises(AttributeError):
             plan.log_targets = {}  # type: ignore
-
 
     def test_yaml(self):
         # Starting with nothing, we get the empty result
@@ -3609,6 +3607,7 @@ class MyCharm(ops.CharmBase):
     def __init__(self, framework: Framework):
         super().__init__(framework)
 
+
 def test_add_layer_with_log_targets_to_plan():
     raw = '''\
     services:
@@ -3627,7 +3626,8 @@ def test_add_layer_with_log_targets_to_plan():
       type: loki
       location: https://example.com:3100/loki/api/v1/push
     '''
-    h = Harness(MyCharm, meta=yaml.safe_dump({'name': 'foo', "containers": {"consumer": {"type": "oci-image"}}}))
+    h = Harness(MyCharm, meta=yaml.safe_dump(
+        {'name': 'foo', "containers": {"consumer": {"type": "oci-image"}}}))
     h.begin()
     h.set_can_connect('consumer', True)
 
