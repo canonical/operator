@@ -67,15 +67,6 @@ aggressive = 3
 line-length = 99
 target-version = "py38"
 
-# Notes:
-# 1. Ruff does not yet implement all of the pycodestyle rules, which
-# we checked/fixed with autopep8, see: https://github.com/astral-sh/ruff/issues/2402
-# 2. Ruff implements all Flake8 rules (the "F" rules).
-# 3. flake8-docstrings is not listed in the Ruff re-implementation list.
-# 4. Ruff reimplements flake8-builtins.
-# 5. Ruff's isort is "profile='black'".
-# 6. We had "R" rules enabled, what are those from?
-
 [tool.ruff.lint]
 select = [
     # Pyflakes
