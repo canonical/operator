@@ -362,7 +362,7 @@ class TestLib(TestCase):
             ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
 
         with self.assertRaises(TypeError):
-            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) > 42  # type:ignore  # noqa: B015
+            42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore  # noqa: B015
         with self.assertRaises(TypeError):
             ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < 42  # type: ignore  # noqa: B015
 
