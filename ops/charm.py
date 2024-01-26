@@ -949,12 +949,9 @@ class CollectStatusEvent(EventBase):
             def _on_collect_status(self, event: ops.CollectStatusEvent):
                 if 'port' not in self.model.config:
                     event.add_status(ops.BlockedStatus('please set "port" config'))
-
-    Return:
+                    return
                 event.add_status(ops.ActiveStatus())
-
-    .. # noqa (pydocstyle barfs on the above for unknown reasons I've spent hours on)
-    """
+    """  # noqa: D405, D214, D411, D416  Final return confuses docstyle
 
     def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.
