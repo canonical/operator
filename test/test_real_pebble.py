@@ -118,7 +118,7 @@ class TestRealPebble(unittest.TestCase):
                 break
             time.sleep(0.06)
         else:
-            self.assertFalse(True, 'timed out waiting for "bad" check to go down')
+            assert False, 'timed out waiting for "bad" check to go down'
         self.assertEqual(bad_check.failures, 2)
         self.assertEqual(bad_check.threshold, 2)
         good_check = [c for c in checks if c.name == 'good'][0]
