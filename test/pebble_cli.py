@@ -31,7 +31,7 @@ from ops import pebble
 from ops._private import timeconv
 
 
-def main():
+def main():  # noqa: C901
     parser = argparse.ArgumentParser()
     parser.add_argument('--socket', help='pebble socket path, default $PEBBLE/.pebble.socket')
     subparsers = parser.add_subparsers(dest='command', metavar='command')
@@ -184,15 +184,9 @@ def main():
                     stderr = sys.stderr.buffer if not args.combine_stderr else None
             else:
                 if sys.stdin.isatty():
-                    if encoding is not None:
-                        stdin = sys.stdin
-                    else:
-                        stdin = sys.stdin.buffer
+                    stdin = sys.stdin.buffer if encoding is None else sys.stdin
                 else:
-                    if encoding is not None:
-                        stdin = sys.stdin.read()
-                    else:
-                        stdin = sys.stdin.buffer.read()
+                    stdin = sys.stdin.buffer.read() if encoding is None else sys.stdin.read()
                 stdout = None
                 stderr = None
 

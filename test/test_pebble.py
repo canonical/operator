@@ -1405,13 +1405,13 @@ class TestMultipartParser(unittest.TestCase):
                 bodies_done: typing.List[bool] = []
 
                 def handle_header(data: typing.Any):
-                    headers.append(bytes(data))
-                    bodies.append(b'')
-                    bodies_done.append(False)
+                    headers.append(bytes(data))  # noqa: B023
+                    bodies.append(b'')  # noqa: B023
+                    bodies_done.append(False)  # noqa: B023
 
                 def handle_body(data: bytes, done: bool = False):
-                    bodies[-1] += data
-                    bodies_done[-1] = done
+                    bodies[-1] += data  # noqa: B023
+                    bodies_done[-1] = done  # noqa: B023
 
                 parser = pebble._MultipartParser(
                     marker,

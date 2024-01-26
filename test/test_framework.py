@@ -261,7 +261,7 @@ class TestFramework(BaseTestCase):
         self.assertEqual(new_obs._stored.mydata, 42)  # type: ignore
 
         with self.assertRaises(AttributeError):
-            new_obs._stored.myotherdata  # type: ignore
+            new_obs._stored.myotherdata  # type: ignore  # noqa: B018
 
     def test_defer_and_reemit(self):
         framework = self.create_framework()
@@ -1001,7 +1001,7 @@ class TestStoredState(BaseTestCase):
         assert isinstance(obj, _StoredProtocol)
 
         try:
-            obj._stored.foo  # type: ignore
+            obj._stored.foo  # type: ignore  # noqa: B018
         except AttributeError as e:
             self.assertEqual(str(e), "attribute 'foo' is not stored")
         else:

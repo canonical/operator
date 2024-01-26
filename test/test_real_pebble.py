@@ -118,7 +118,8 @@ class TestRealPebble(unittest.TestCase):
                 break
             time.sleep(0.06)
         else:
-            assert False, 'timed out waiting for "bad" check to go down'
+            # This should be pytest.fail() when we move to pytest.
+            self.assertFalse(True, 'timed out waiting for "bad" check to go down')
         self.assertEqual(bad_check.failures, 2)
         self.assertEqual(bad_check.threshold, 2)
         good_check = [c for c in checks if c.name == 'good'][0]
@@ -234,9 +235,7 @@ class TestRealPebble(unittest.TestCase):
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[str] = []
-        for line in process.stdout:
-            reads.append(line)
+        reads: typing.List[str] = list(process.stdout)
 
         process.wait()
 
@@ -258,9 +257,7 @@ class TestRealPebble(unittest.TestCase):
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[bytes] = []
-        for line in process.stdout:
-            reads.append(line)
+        reads: typing.List[bytes] = list(process.stdout)
 
         process.wait()
 

@@ -29,23 +29,9 @@ import types
 import typing
 import weakref
 from contextlib import contextmanager
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Hashable,
-    Iterable,
-    List,
-    Literal,
-    Optional,
-    Protocol,
-    Set,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import (TYPE_CHECKING, Any, Callable, Dict, Hashable, Iterable,
+                    List, Literal, Optional, Protocol, Set, Tuple, Type,
+                    TypeVar, Union)
 
 from ops import charm
 from ops.model import Model, _ModelBackend
@@ -60,13 +46,13 @@ class Serializable(typing.Protocol):
     @property
     def handle(self) -> 'Handle': ...  # noqa
     @handle.setter
-    def handle(self, val: 'Handle'): ...  # noqa
+    def handle(self, val: 'Handle'): ...
     def snapshot(self) -> Dict[str, Any]: ...  # noqa
     def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
 
 
 class _StoredObject(Protocol):
-    _under: Any = None  # noqa
+    _under: Any = None
 
 
 StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ops
 import logging
 import os
 import sys
@@ -20,7 +21,6 @@ import typing
 
 sys.path.append('lib')
 
-import ops  # noqa: E402 (module-level import after non-import code)
 
 logger = logging.getLogger()
 

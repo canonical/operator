@@ -632,7 +632,7 @@ containers:
         self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
 
         with self.assertRaises(RuntimeError):
-            meta.containers["test1"].mounts["data"].location
+            meta.containers["test1"].mounts["data"].location  # noqa: B018
 
     def test_secret_events(self):
         class MyCharm(ops.CharmBase):

@@ -18,32 +18,13 @@ import dataclasses
 import enum
 import logging
 import pathlib
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Literal,
-    Mapping,
-    NoReturn,
-    Optional,
-    TextIO,
-    Tuple,
-    TypedDict,
-    Union,
-    cast,
-)
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Mapping, NoReturn,
+                    Optional, TextIO, Tuple, TypedDict, Union, cast)
 
 from ops import model
 from ops._private import yaml
-from ops.framework import (
-    EventBase,
-    EventSource,
-    Framework,
-    Handle,
-    Object,
-    ObjectEvents,
-)
+from ops.framework import (EventBase, EventSource, Framework, Handle, Object,
+                           ObjectEvents)
 
 if TYPE_CHECKING:
     from typing_extensions import Required
@@ -226,9 +207,9 @@ class StartEvent(HookEvent):
 
     This event is triggered immediately after the first
     :class:`ConfigChangedEvent`. Callback methods bound to the event should be
-    used to ensure that the charm’s software is in a running state. Note that
-    the charm’s software should be configured so as to persist in this state
-    through reboots without further intervention on Juju’s part.
+    used to ensure that the charm's software is in a running state. Note that
+    the charm's software should be configured so as to persist in this state
+    through reboots without further intervention on Juju's part.
     """
 
 
@@ -237,8 +218,8 @@ class StopEvent(HookEvent):
 
     This event is triggered when an application's removal is requested
     by the client. The event fires immediately before the end of the
-    unit’s destruction sequence. Callback methods bound to this event
-    should be used to ensure that the charm’s software is not running,
+    unit's destruction sequence. Callback methods bound to this event
+    should be used to ensure that the charm's software is not running,
     and that it will not start again on reboot.
     """
 
@@ -507,7 +488,7 @@ class RelationChangedEvent(RelationEvent):
     are incomplete, since it can be guaranteed that when the remote unit or
     application changes its settings, the event will fire again.
 
-    The settings that may be queried, or set, are determined by the relation’s
+    The settings that may be queried, or set, are determined by the relation's
     interface.
     """
 
@@ -522,8 +503,8 @@ class RelationDepartedEvent(RelationEvent):
     emitted once for each remaining unit.
 
     Callback methods bound to this event may be used to remove all
-    references to the departing remote unit, because there’s no
-    guarantee that it’s still part of the system; it’s perfectly
+    references to the departing remote unit, because there's no
+    guarantee that it's still part of the system; it's perfectly
     probable (although not guaranteed) that the system running that
     unit has already shut down.
 
@@ -581,7 +562,7 @@ class RelationBrokenEvent(RelationEvent):
     fire to signal that the relationship has been fully terminated.
 
     The event indicates that the current relation is no longer valid, and that
-    the charm’s software must be configured as though the relation had never
+    the charm's software must be configured as though the relation had never
     existed. It will only be called after every callback method bound to
     :class:`RelationDepartedEvent` has been run. If a callback method
     bound to this event is being executed, it is guaranteed that no remote units
@@ -630,7 +611,9 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore # noqa
+            self.storage = next(
+                (s for s in storages if s.index == storage_index),
+                None)  # type: ignore
             if self.storage is None:
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
@@ -638,8 +621,7 @@ class StorageEvent(HookEvent):
             if storage_location is None:
                 raise RuntimeError(
                     'failed loading storage location from snapshot.'
-                    '(name={!r}, index={!r}, storage_location=None)'
-                    .format(storage_name, storage_index))
+                    f'(name={storage_name!r}, index={storage_index!r}, storage_location=None)')
 
             self.storage.location = storage_location
 
@@ -967,7 +949,8 @@ class CollectStatusEvent(EventBase):
             def _on_collect_status(self, event: ops.CollectStatusEvent):
                 if 'port' not in self.model.config:
                     event.add_status(ops.BlockedStatus('please set "port" config'))
-                    return
+
+    Return:
                 event.add_status(ops.ActiveStatus())
 
     .. # noqa (pydocstyle barfs on the above for unknown reasons I've spent hours on)

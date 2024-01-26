@@ -62,19 +62,142 @@ recursive = true
 jobs = -1
 aggressive = 3
 
-[tool.isort]
-profile = "black"
-
 # Linting tools configuration
-[tool.flake8]
-max-line-length = 99
-max-doc-length = 99
-exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
-select = ["E", "W", "F", "C", "N", "R", "D", "H"]
-ignore = ["D105", "D107", "W503"]
-# D100, D101, D102, D103, D104: Ignore missing docstrings in tests
-per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
-docstring-convention = "google"
+[tool.ruff]
+line-length = 99
+target-version = "py38"
+
+# Notes:
+# 1. Ruff does not yet implement all of the pycodestyle rules, which
+# we checked/fixed with autopep8, see: https://github.com/astral-sh/ruff/issues/2402
+# 2. Ruff implements all Flake8 rules (the "F" rules).
+# 3. flake8-docstrings is not listed in the Ruff re-implementation list.
+# 4. Ruff reimplements flake8-builtins.
+# 5. Ruff's isort is "profile='black'".
+# 6. We had "R" rules enabled, what are those from?
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001",
+    # pep8-naming
+    "N",
+    # mccabe
+    "C",
+    # flake8-builtins
+    "A",
+    # flake8-copyright
+    "CPY",
+    # pyupgrade
+    "UP",
+    # flake8-2020
+    "YTT",
+    # flake8-annotations
+    "ANN",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # Ruff specific
+    "RUF",
+    # Perflint
+    "PERF",
+    # flake8-pytest-style
+    "PT",
+    # pyflakes-docstrings
+    "D",
+]
+ignore = [
+    # Use of `assert` detected
+    "S101",
+    # Do not `assert False`
+    "B011",
+    # `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+    "S403",
+    # `subprocess` module is possibly insecure
+    "S404",
+
+    # No explicit `stacklevel` keyword argument found
+    "B028",
+
+    # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "SIM117",
+
+    # Missing type annotation for `self` in method
+    "ANN101",
+    # Missing type annotation for `cls` in classmethod
+    "ANN102",
+
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in `__init__`
+    "D107",
+
+    ## Likely worth doing, but later.
+
+    # Convert {} from `TypedDict` functional to class syntax
+    "UP013",
+    # Missing return type annotation for public function `restore`
+    "ANN201",
+    # Missing return type annotation for private function
+    "ANN202",
+    # Missing return type annotation for special method {}
+    "ANN204",
+    # Missing return type annotation for staticmethod
+    "ANN205",
+    # Missing return type annotation for classmethod
+    "ANN206",
+    # Dynamically typed expressions (typing.Any) are disallowed
+    "ANN401",
+    # `subprocess` call: check for execution of untrusted input
+    "S603",
+    # Prefer `next(iter(info_dicts))` over single element slice
+    "RUF015",
+    # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF012",
+    # Unnecessary `tuple` call (rewrite as a literal)
+    "C408",
+
+    ## (Remove once we move to pytest native tests).
+
+    # Use `pytest.raises` instead of unittest-style `assertRaises`
+    "PT027",
+    # PT009 Use a regular `assert` instead of unittest-style {}
+    "PT009",
+]
+[tool.ruff.per-file-ignores]
+"test/*" = ["D", "ANN", "S101", "S105", "S106", "RUF015", "PT018", "PT015"]
+"docs/conf.py" = [
+    "CPY001",  # Missing copyright notice at top of file
+    "D100",  # Missing docstring in public module
+    "I001",  # [*] Import block is un-sorted or un-formatted
+    "ANN001",  # Missing type annotation for function argument `context`
+    "ANN202",  # Missing return type annotation for private function `_compute_navigation_tree`
+    "A001",  # Variable `copyright` is shadowing a Python builtin
+    "RUF003",  # Comment contains ambiguous {}
+    "RUF019",  # [*] Unnecessary key check before dictionary access
+]
+"ops/_private/timeconv.py" = [
+    "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+    "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
+
+[tool.ruff.lint.mccabe]
+# TODO IN THIS PR: we had this enabled in pyflakes, why is it finding issues now?
+max-complexity = 22
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]

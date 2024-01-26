@@ -32,7 +32,7 @@ def get_python_filepaths(include_tests: bool = True):
         for dirpath, _, filenames in os.walk(root):
             for filename in filenames:
                 if filename.endswith(".py"):
-                    python_paths.append(os.path.join(dirpath, filename))
+                    python_paths.append(os.path.join(dirpath, filename))  # noqa: PERF401
     return python_paths
 
 
@@ -42,7 +42,7 @@ class InfrastructureTests(unittest.TestCase):
         # ensure we're not using unneeded backslash to escape strings
         issues: typing.List[typing.Tuple[str, int, str]] = []
         for filepath in get_python_filepaths():
-            with open(filepath, "rt", encoding="utf8") as fh:
+            with open(filepath, encoding="utf8") as fh:
                 for idx, line in enumerate(fh, 1):
                     if (r'\"' in line or r"\'" in line) and "NOQA" not in line:
                         issues.append((filepath, idx, line.rstrip()))
@@ -58,7 +58,7 @@ class InfrastructureTests(unittest.TestCase):
             if os.stat(filepath).st_size == 0:
                 continue
 
-            with open(filepath, "rt", encoding="utf8") as fh:
+            with open(filepath, encoding="utf8") as fh:
                 for line in itertools.islice(fh, 5):
                     if regex.match(line):
                         break
@@ -90,7 +90,7 @@ class ImportersTestCase(unittest.TestCase):
         fd, testfile = tempfile.mkstemp()
         self.addCleanup(os.unlink, testfile)
 
-        with open(fd, 'wt', encoding='utf8') as fh:
+        with open(fd, "w", encoding='utf8') as fh:
             fh.write(self.template.format(module_name=name))
 
         environ = os.environ.copy()

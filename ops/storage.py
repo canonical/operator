@@ -142,7 +142,7 @@ class SQLiteStorage:
         c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
         row = c.fetchone()
         if row:
-            return pickle.loads(row[0])
+            return pickle.loads(row[0])  # noqa: S301
         raise NoSnapshotError(handle_path)
 
     def drop_snapshot(self, handle_path: str):
@@ -393,6 +393,7 @@ class _JujuStorageBackend:
         p = _run(["state-get", key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
+        # TODO IN THIS PR: Why doesn't this use safe_load()?
         return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore
 
     def delete(self, key: str) -> None:

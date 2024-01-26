@@ -395,10 +395,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     metadata = (charm_dir / 'metadata.yaml').read_text()
     actions_meta = charm_dir / 'actions.yaml'
-    if actions_meta.exists():
-        actions_metadata = actions_meta.read_text()
-    else:
-        actions_metadata = None
+    actions_metadata = actions_meta.read_text() if actions_meta.exists() else None
 
     # If we are in a RelationBroken event, we want to know which relation is
     # broken within the model, not only in the event's `.relation` attribute.
