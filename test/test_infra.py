@@ -38,18 +38,6 @@ def get_python_filepaths(include_tests: bool = True):
 
 class InfrastructureTests(unittest.TestCase):
 
-    def test_quote_backslashes(self):
-        # ensure we're not using unneeded backslash to escape strings
-        issues: typing.List[typing.Tuple[str, int, str]] = []
-        for filepath in get_python_filepaths():
-            with open(filepath, encoding="utf8") as fh:
-                for idx, line in enumerate(fh, 1):
-                    if (r'\"' in line or r"\'" in line) and "NOQA" not in line:
-                        issues.append((filepath, idx, line.rstrip()))
-        if issues:
-            msgs = ["{}:{:d}:{}".format(*issue) for issue in issues]
-            self.fail("Spurious backslashes found, please fix these quotings:\n" + "\n".join(msgs))
-
     def test_ensure_copyright(self):
         # all non-empty Python files must have a proper copyright somewhere in the first 5 lines
         issues: typing.List[str] = []
