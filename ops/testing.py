@@ -1874,7 +1874,7 @@ class Harness(Generic[CharmType]):
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
-    if isinstance(app_or_unit, model.Application, model.Unit):
+    if isinstance(app_or_unit, (model.Application, model.Unit)):
         return app_or_unit.name
     elif isinstance(app_or_unit, str):
         return app_or_unit

@@ -327,7 +327,7 @@ class TestLibParser(TestCase):
         if m.origin is None:
             self.assertIsNotNone(m.origin)
             return
-        with open(m.origin, "w", encoding='latin-1') as f:
+        with open(m.origin, 'w', encoding='latin-1') as f:
             f.write(dedent('''
             LIBNAME = "foo"
             LIBAPI = 2
