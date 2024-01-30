@@ -2931,49 +2931,39 @@ class _TestingPebbleClient:
         else:
             self._layers[label] = layer_obj
 
-    def _render_services(self) -> Dict[str, pebble.ServiceDict]:
-        services: Dict[str, pebble.ServiceDict] = {}
+    def _render_services(self) -> Dict[str, pebble.Service]:
+        services: Dict[str, pebble.Service] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # TODO: (jam) 2021-04-07 have a way to merge existing services
-                services[name] = service.to_dict()
+                # todo: merge existing services https://github.com/canonical/operator/issues/1112
+                services[name] = service
         return services
 
-    def _render_checks(self) -> Dict[str, pebble.CheckDict]:
-        services: Dict[str, pebble.CheckDict] = {}
+    def _render_checks(self) -> Dict[str, pebble.Check]:
+        """The checks in the current plan."""
+        checks: Dict[str, pebble.Check] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, check in layer.checks.items():
-                services[name] = check.to_dict()
-        return services
+                checks[name] = check
+        return checks
 
-    def _render_log_targets(self) -> Dict[str, pebble.LogTargetDict]:
-        services: Dict[str, pebble.LogTargetDict] = {}
+    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
+        """The log targets in the current plan."""
+        log_targets: Dict[str, pebble.LogTarget] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, log_target in layer.log_targets.items():
-                services[name] = log_target.to_dict()
-        return services
-
-    def _render_plan(self) -> str:
-        raw_plan = {}
-        services = self._render_services()
-        if services:
-            raw_plan["services"] = services
-
-        checks = self._render_checks()
-        if checks:
-            raw_plan["checks"] = checks
-
-        log_targets = self._render_log_targets()
-        if log_targets:
-            raw_plan["log-targets"] = log_targets
-        return yaml.safe_dump(raw_plan)
+                log_targets[name] = log_target
+        return log_targets
 
     def get_plan(self) -> pebble.Plan:
         self._check_connection()
-        plan = pebble.Plan(self._render_plan())
+        plan = pebble.Plan("")
+        plan.services.update(self._render_services())
+        plan.checks.update(self._render_checks())
+        plan.log_targets.update(self._render_log_targets())
         return plan
 
     def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:

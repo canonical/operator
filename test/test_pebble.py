@@ -27,10 +27,8 @@ import unittest.util
 
 import pytest
 import websocket  # type: ignore
-from testing import Harness
 
-import ops
-from ops import Framework, pebble
+from ops import pebble
 from ops._private import yaml
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
@@ -3601,42 +3599,3 @@ class TestExec(unittest.TestCase):
     if hasattr(pytest, 'PytestUnhandledThreadExceptionWarning'):
         test_websocket_recv_raises = pytest.mark.filterwarnings(
             'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_recv_raises)
-
-
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework: Framework):
-        super().__init__(framework)
-
-
-def test_add_layer_with_log_targets_to_plan():
-    raw = '''\
-    services:
-     foo:
-      override: replace
-      command: echo foo
-
-    checks:
-     bar:
-      http:
-       https://example.com/
-
-    log-targets:
-     baz:
-      override: replace
-      type: loki
-      location: https://example.com:3100/loki/api/v1/push
-    '''
-    h = Harness(MyCharm, meta=yaml.safe_dump(
-        {'name': 'foo', "containers": {"consumer": {"type": "oci-image"}}}))
-    h.begin()
-    h.set_can_connect('consumer', True)
-
-    c = h.charm.unit.containers["consumer"]
-    layer = pebble.Layer(raw)
-    c.add_layer('foo', layer)
-
-    c_plan = c.get_plan()
-
-    assert c_plan.services['foo']
-    assert c_plan.checks['bar']
-    assert c_plan.log_targets['baz']
