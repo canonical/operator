@@ -2936,12 +2936,11 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # todo: merge existing services https://github.com/canonical/operator/issues/1112
+                # TODO: merge existing services https://github.com/canonical/operator/issues/1112
                 services[name] = service
         return services
 
     def _render_checks(self) -> Dict[str, pebble.Check]:
-        """The checks in the current plan."""
         checks: Dict[str, pebble.Check] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
@@ -2950,7 +2949,6 @@ class _TestingPebbleClient:
         return checks
 
     def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
-        """The log targets in the current plan."""
         log_targets: Dict[str, pebble.LogTarget] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
@@ -2960,7 +2958,7 @@ class _TestingPebbleClient:
 
     def get_plan(self) -> pebble.Plan:
         self._check_connection()
-        plan = pebble.Plan("")
+        plan = pebble.Plan('{}')
         plan.services.update(self._render_services())
         plan.checks.update(self._render_checks())
         plan.log_targets.update(self._render_log_targets())
