@@ -11,10 +11,9 @@ jobs:
         charm-repo:
           - "canonical/postgresql-operator"
           - "canonical/postgresql-k8s-operator"
-# TODO: uncomment once secrets issues are fixed in these charms:
-#       https://github.com/canonical/mysql-operator/pull/383
-#       https://github.com/canonical/data-platform-libs/pull/132
-#          - "canonical/mysql-operator"
+          - "canonical/mysql-operator"
+# TODO: uncomment once secrets issues are fixed in this charm:
+#       https://github.com/canonical/mysql-k8s-operator/pull/371
 #          - "canonical/mysql-k8s-operator"
 
     steps:
