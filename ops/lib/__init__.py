@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import sys
+import typing
 import warnings
 from ast import literal_eval
 from importlib.machinery import ModuleSpec
@@ -96,9 +97,9 @@ def use(name: str, api: int, author: str) -> ModuleType:
 def autoimport():
     """Find all libs in the path and enable use of them.
 
-    You only need to call this if you've installed a package or
-    otherwise changed sys.path in the current run, and need to see the
-    changes. Otherwise libraries are found on first call of `use`.
+    Call this function only when a package has been installed or sys.path has been
+    otherwise changed in the current run, and the changes need to be seen.
+    Otherwise libraries are found on first call of `use`.
 
     DEPRECATED: This function is deprecated. Prefer charm libraries instead
     (https://juju.is/docs/sdk/library).
@@ -117,7 +118,7 @@ def autoimport():
         versions.sort(reverse=True)
 
 
-def _find_all_specs(path):
+def _find_all_specs(path: typing.Iterable[str]) -> typing.Iterator[ModuleSpec]:
     for sys_dir in path:
         if sys_dir == "":
             sys_dir = "."
@@ -192,7 +193,7 @@ class _Missing:
         return f"got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}"
 
 
-def _parse_lib(spec):
+def _parse_lib(spec: ModuleSpec) -> typing.Optional["_Lib"]:
     if spec.origin is None:
         # "can't happen"
         logger.warning("No origin for %r (no idea why; please report)", spec.name)

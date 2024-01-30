@@ -17,6 +17,8 @@ get-model-name:
   description: Return the name of the model
 get-status:
   description: Return the Status of the unit
+keyerror:
+  description: Raise a KeyError (to see crash output)
 log-critical:
   description: log a message at Critical level
 log-error:

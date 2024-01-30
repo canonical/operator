@@ -18,27 +18,26 @@ import os
 import pickle
 import shutil
 import sqlite3
+import stat
 import subprocess
-import typing
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Tuple, Union
+from typing import Any, Callable, Generator, List, Optional, Tuple, Union, cast
 
 import yaml  # pyright: ignore[reportMissingModuleSource]
 
 logger = logging.getLogger()
 
 
-if typing.TYPE_CHECKING:
-    # _Notice = Tuple[event_path, observer_path, method_name]
-    _Notice = Tuple[str, str, str]
-    _Notices = List[_Notice]
+# _Notice = Tuple[event_path, observer_path, method_name]
+_Notice = Tuple[str, str, str]
+_Notices = List[_Notice]
 
-    # This is a function that takes a Tuple and returns a yaml node.
-    # it replaces a method, so the first argument passed to the function
-    # (Any) is 'self'.
-    _TupleRepresenterType = Callable[[Any, Tuple[Any, ...]], yaml.Node]
-    _NoticeGenerator = Generator['_Notice', None, None]
+# This is a function that takes a Tuple and returns a yaml node.
+# it replaces a method, so the first argument passed to the function
+# (Any) is 'self'.
+_TupleRepresenterType = Callable[[Any, Tuple[Any, ...]], yaml.Node]
+_NoticeGenerator = Generator['_Notice', None, None]
 
 
 def _run(args: List[str], **kw: Any):
@@ -61,10 +60,28 @@ class SQLiteStorage:
             # sqlite3.connect creates the file silently if it does not exist
             logger.debug(f"Initializing SQLite local storage: {filename}.")
 
+        if filename != ":memory:":
+            self._ensure_db_permissions(str(filename))
         self._db = sqlite3.connect(str(filename),
                                    isolation_level=None,
                                    timeout=self.DB_LOCK_TIMEOUT.total_seconds())
         self._setup()
+
+    def _ensure_db_permissions(self, filename: str):
+        """Make sure that the DB file has appropriately secure permissions."""
+        mode = stat.S_IRUSR | stat.S_IWUSR
+        if os.path.exists(filename):
+            try:
+                os.chmod(filename, mode)
+            except OSError as e:
+                raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
+            return
+
+        try:
+            fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
+        except OSError as e:
+            raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
+        os.close(fd)
 
     def _setup(self):
         """Make the database ready to be used as storage."""
@@ -106,7 +123,7 @@ class SQLiteStorage:
         Args:
             handle_path: The string identifying the snapshot.
             snapshot_data: The data to be persisted. (as returned by Object.snapshot()). This
-            might be a dict/tuple/int, but must only contain 'simple' python types.
+            might be a dict/tuple/int, but must only contain 'simple' Python types.
         """
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(snapshot_data)
@@ -188,7 +205,7 @@ class SQLiteStorage:
             if not rows:
                 break
             for row in rows:
-                yield tuple(row)
+                yield cast(_Notice, tuple(row))
 
 
 class JujuStorage:
@@ -237,7 +254,7 @@ class JujuStorage:
         try:
             content = self._backend.get(handle_path)
         except KeyError:
-            raise NoSnapshotError(handle_path)
+            raise NoSnapshotError(handle_path) from None
         return content
 
     def drop_snapshot(self, handle_path: str):

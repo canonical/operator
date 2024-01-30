@@ -19,6 +19,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 
 import binascii
 import copy
+import dataclasses
 import datetime
 import email.message
 import email.parser
@@ -53,10 +54,13 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     Optional,
+    Protocol,
     Sequence,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
 )
 
@@ -121,91 +125,111 @@ CheckDict = typing.TypedDict('CheckDict',
                               'threshold': Optional[int]},
                              total=False)
 
+# In Python 3.11+ 'services' and 'labels' should be NotRequired, and total=True.
+LogTargetDict = typing.TypedDict('LogTargetDict',
+                                 {'override': Union[Literal['merge'], Literal['replace']],
+                                  'type': Literal['loki'],
+                                  'location': str,
+                                  'services': List[str],
+                                  'labels': Dict[str, str]},
+                                 total=False)
+
 LayerDict = typing.TypedDict('LayerDict',
                              {'summary': str,
                               'description': str,
                               'services': Dict[str, ServiceDict],
-                              'checks': Dict[str, CheckDict]},
+                              'checks': Dict[str, CheckDict],
+                              'log-targets': Dict[str, LogTargetDict]},
                              total=False)
 
 PlanDict = typing.TypedDict('PlanDict',
                             {'services': Dict[str, ServiceDict],
-                             'checks': Dict[str, CheckDict]},
+                             'checks': Dict[str, CheckDict],
+                             'log-targets': Dict[str, LogTargetDict]},
                             total=False)
 
+_AuthDict = TypedDict('_AuthDict',
+                      {'permissions': Optional[str],
+                       'user-id': Optional[int],
+                       'user': Optional[str],
+                       'group-id': Optional[int],
+                       'group': Optional[str],
+                       'path': Optional[str],
+                       'make-dirs': Optional[bool],
+                       'make-parents': Optional[bool],
+                       }, total=False)
+
+_ServiceInfoDict = TypedDict('_ServiceInfoDict',
+                             {'startup': Union['ServiceStartup', str],
+                                 'current': Union['ServiceStatus', str],
+                                 'name': str})
+
+# Callback types for _MultiParser header and body handlers
+
+
+class _BodyHandler(Protocol):
+    def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
+
+
+_HeaderHandler = Callable[[bytes], None]
+
+# tempfile.NamedTemporaryFile has an odd interface because of that
+# 'name' attribute, so we need to make a Protocol for it.
+
+
+class _Tempfile(Protocol):
+    name = ''
+    def write(self, data: bytes): ...  # noqa
+    def close(self): ...  # noqa
+
+
+class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
+    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
+    def write(self, __s: typing.AnyStr) -> int: ...  # noqa
+    def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
+
+
+_AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
+_TextOrBinaryIO = Union[TextIO, BinaryIO]
+_IOSource = Union[str, bytes, _AnyStrFileLikeIO]
+
+_SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
+
 if TYPE_CHECKING:
-    from typing_extensions import Literal, Protocol, TypedDict
+    from typing_extensions import NotRequired
 
-    # callback types for _MultiParser header and body handlers
-    class _BodyHandler(Protocol):
-        def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
-
-    _HeaderHandler = Callable[[bytes], None]
-
-    # tempfile.NamedTemporaryFile has an odd interface because of that
-    # 'name' attribute, so we need to make a Protocol for it.
-    class _Tempfile(Protocol):
-        name = ''
-        def write(self, data: bytes): ...  # noqa
-        def close(self): ...  # noqa
-
-    class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-        def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
-        def write(self, __s: typing.AnyStr) -> int: ...  # noqa
-        def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
-
-    _AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
-    _TextOrBinaryIO = Union[TextIO, BinaryIO]
-    _IOSource = Union[str, bytes, _AnyStrFileLikeIO]
-
-    _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
     _CheckInfoDict = TypedDict('_CheckInfoDict',
                                {"name": str,
-                                "level": Optional[Union['CheckLevel', str]],
+                                "level": NotRequired[Optional[Union['CheckLevel', str]]],
                                 "status": Union['CheckStatus', str],
-                                "failures": int,
+                                "failures": NotRequired[int],
                                 "threshold": int})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
-                               "size": Optional[int],
+                               "size": NotRequired[Optional[int]],
                                "permissions": str,
                                "last-modified": str,
-                               "user-id": Optional[int],
-                               "user": Optional[str],
-                               "group-id": Optional[int],
-                               "group": Optional[str],
+                               "user-id": NotRequired[Optional[int]],
+                               "user": NotRequired[Optional[str]],
+                               "group-id": NotRequired[Optional[int]],
+                               "group": NotRequired[Optional[str]],
                                "type": Union['FileType', str]})
-
-    _AuthDict = TypedDict('_AuthDict',
-                          {'permissions': Optional[str],
-                           'user-id': Optional[int],
-                           'user': Optional[str],
-                           'group-id': Optional[int],
-                           'group': Optional[str],
-                           'path': Optional[str],
-                           'make-dirs': Optional[bool],
-                           'make-parents': Optional[bool],
-                           }, total=False)
-    _ServiceInfoDict = TypedDict('_ServiceInfoDict',
-                                 {'startup': Union['ServiceStartup', str],
-                                  'current': Union['ServiceStatus', str],
-                                  'name': str})
 
     _ProgressDict = TypedDict('_ProgressDict',
                               {'label': str,
                                'done': int,
                                'total': int})
     _TaskDict = TypedDict('_TaskDict',
-                          {'id': 'TaskID',
+                          {'id': str,
                            'kind': str,
                            'summary': str,
                            'status': str,
-                           'log': Optional[List[str]],
+                           'log': NotRequired[Optional[List[str]]],
                            'progress': _ProgressDict,
                            'spawn-time': str,
-                           'ready-time': str,
-                           'data': Optional[Dict[str, Any]]})
+                           'ready-time': NotRequired[Optional[str]],
+                           'data': NotRequired[Optional[Dict[str, Any]]]})
     _ChangeDict = TypedDict('_ChangeDict',
                             {'id': str,
                              'kind': str,
@@ -213,17 +237,17 @@ if TYPE_CHECKING:
                              'status': str,
                              'ready': bool,
                              'spawn-time': str,
-                             'tasks': Optional[List[_TaskDict]],
-                             'err': Optional[str],
-                             'ready-time': Optional[str],
-                             'data': Optional[Dict[str, Any]]})
+                             'tasks': NotRequired[Optional[List[_TaskDict]]],
+                             'err': NotRequired[Optional[str]],
+                             'ready-time': NotRequired[Optional[str]],
+                             'data': NotRequired[Optional[Dict[str, Any]]]})
 
     _Error = TypedDict('_Error',
                        {'kind': str,
                         'message': str})
     _Item = TypedDict('_Item',
                       {'path': str,
-                       'error': _Error})
+                       'error': NotRequired[_Error]})
     _FilesResponse = TypedDict('_FilesResponse',
                                {'result': List[_Item]})
 
@@ -231,16 +255,32 @@ if TYPE_CHECKING:
                              {'message': str,
                               'first-added': str,
                               'last-added': str,
-                              'last-shown': Optional[str],
+                              'last-shown': NotRequired[Optional[str]],
                               'expire-after': str,
                               'repeat-after': str})
 
-    class _WebSocket(Protocol):
-        def connect(self, url: str, socket: socket.socket): ...  # noqa
-        def shutdown(self): ...                                  # noqa
-        def send(self, payload: str): ...                        # noqa
-        def send_binary(self, payload: bytes): ...               # noqa
-        def recv(self) -> Union[str, bytes]: ...                 # noqa
+    _NoticeDict = TypedDict('_NoticeDict', {
+        'id': str,
+        'user-id': NotRequired[Optional[int]],
+        'type': str,
+        'key': str,
+        'first-occurred': str,
+        'last-occurred': str,
+        'last-repeated': str,
+        'occurrences': int,
+        'last-data': NotRequired[Optional[Dict[str, str]]],
+        'repeat-after': NotRequired[str],
+        'expire-after': NotRequired[str],
+    })
+
+
+class _WebSocket(Protocol):
+    def connect(self, url: str, socket: socket.socket): ...  # noqa
+    def shutdown(self): ...                                  # noqa
+    def send(self, payload: str): ...                        # noqa
+    def send_binary(self, payload: bytes): ...               # noqa
+    def recv(self) -> Union[str, bytes]: ...                 # noqa
+
 
 logger = logging.getLogger(__name__)
 
@@ -603,7 +643,7 @@ class Task:
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
-            ready_time=(timeconv.parse_rfc3339(d['ready-time'])
+            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
                         if d.get('ready-time') else None),
             data=d.get('data') or {},
         )
@@ -704,6 +744,9 @@ class Plan:
                                               for name, service in d.get('services', {}).items()}
         self._checks: Dict[str, Check] = {name: Check(name, check)
                                           for name, check in d.get('checks', {}).items()}
+        self._log_targets: Dict[str, LogTarget] = {
+            name: LogTarget(name, target)
+            for name, target in d.get('log-targets', {}).items()}
 
     @property
     def services(self) -> Dict[str, 'Service']:
@@ -721,11 +764,20 @@ class Plan:
         """
         return self._checks
 
+    @property
+    def log_targets(self) -> Dict[str, 'LogTarget']:
+        """This plan's log targets mapping (maps log target name to :class:`LogTarget`).
+
+        This property is currently read-only.
+        """
+        return self._log_targets
+
     def to_dict(self) -> 'PlanDict':
         """Convert this plan to its dict representation."""
         fields = [
             ('services', {name: service.to_dict() for name, service in self._services.items()}),
             ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
+            ('log-targets', {name: target.to_dict() for name, target in self._log_targets.items()})
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('PlanDict', dct)
@@ -752,6 +804,8 @@ class Layer:
     services: Dict[str, 'Service']
     #: Mapping of check to :class:`Check` defined by this layer.
     checks: Dict[str, 'Check']
+    #: Mapping of target to :class:`LogTarget` defined by this layer.
+    log_targets: Dict[str, 'LogTarget']
 
     def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
         if isinstance(raw, str):
@@ -766,6 +820,8 @@ class Layer:
                          for name, service in d.get('services', {}).items()}
         self.checks = {name: Check(name, check)
                        for name, check in d.get('checks', {}).items()}
+        self.log_targets = {name: LogTarget(name, target)
+                            for name, target in d.get('log-targets', {}).items()}
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -778,6 +834,7 @@ class Layer:
             ('description', self.description),
             ('services', {name: service.to_dict() for name, service in self.services.items()}),
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
+            ('log-targets', {name: target.to_dict() for name, target in self.log_targets.items()})
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('LayerDict', dct)
@@ -1014,6 +1071,45 @@ class CheckStatus(enum.Enum):
     DOWN = 'down'
 
 
+class LogTarget:
+    """Represents a log target in a Pebble configuration layer."""
+
+    def __init__(self, name: str, raw: Optional['LogTargetDict'] = None):
+        self.name = name
+        dct: LogTargetDict = raw or {}
+        self.override: str = dct.get('override', '')
+        self.type = dct.get('type', '')
+        self.location = dct.get('location', '')
+        self.services: List[str] = list(dct.get('services', []))
+        labels = dct.get('labels')
+        if labels is not None:
+            labels = copy.deepcopy(labels)
+        self.labels: Optional[Dict[str, str]] = labels
+
+    def to_dict(self) -> 'LogTargetDict':
+        """Convert this log target object to its dict representation."""
+        fields = [
+            ('override', self.override),
+            ('type', self.type),
+            ('location', self.location),
+            ('services', self.services),
+            ('labels', self.labels),
+        ]
+        dct = {name: value for name, value in fields if value}
+        return typing.cast('LogTargetDict', dct)
+
+    def __repr__(self):
+        return f'LogTarget({self.to_dict()!r})'
+
+    def __eq__(self, other: Union['LogTargetDict', 'LogTarget']):
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, LogTarget):
+            return self.to_dict() == other.to_dict()
+        else:
+            return NotImplemented
+
+
 class FileType(enum.Enum):
     """Enum of file types."""
 
@@ -1196,6 +1292,90 @@ class CheckInfo:
                 ).format(self=self)
 
 
+class NoticeType(enum.Enum):
+    """Enum of notice types."""
+
+    CUSTOM = 'custom'
+
+
+class NoticesSelect(enum.Enum):
+    """Enum of :meth:`Client.get_notices` ``select`` values."""
+
+    ALL = 'all'
+    """Select notices from all users (any user ID, including public notices).
+
+    This only works for Pebble admins (for example, root).
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class Notice:
+    """Information about a single notice."""
+
+    id: str
+    """Server-generated unique ID for this notice."""
+
+    user_id: Optional[int]
+    """UID of the user who may view this notice (None means notice is public)."""
+
+    type: Union[NoticeType, str]
+    """Type of the notice."""
+
+    key: str
+    """The notice key, a string that differentiates notices of this type.
+
+    This is in the format ``example.com/path``.
+    """
+
+    first_occurred: datetime.datetime
+    """The first time one of these notices (type and key combination) occurs."""
+
+    last_occurred: datetime.datetime
+    """The last time one of these notices occurred."""
+
+    last_repeated: datetime.datetime
+    """The time this notice was last repeated.
+
+    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    for an explanation of what "repeated" means.
+    """
+
+    occurrences: int
+    """The number of times one of these notices has occurred."""
+
+    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """Additional data captured from the last occurrence of one of these notices."""
+
+    repeat_after: Optional[datetime.timedelta] = None
+    """Minimum time after one of these was last repeated before Pebble will repeat it again."""
+
+    expire_after: Optional[datetime.timedelta] = None
+    """How long since one of these last occurred until Pebble will drop the notice."""
+
+    @classmethod
+    def from_dict(cls, d: '_NoticeDict') -> 'Notice':
+        """Create new Notice object from dict parsed from JSON."""
+        try:
+            notice_type = NoticeType(d['type'])
+        except ValueError:
+            notice_type = d['type']
+        return cls(
+            id=d['id'],
+            user_id=d.get('user-id'),
+            type=notice_type,
+            key=d['key'],
+            first_occurred=timeconv.parse_rfc3339(d['first-occurred']),
+            last_occurred=timeconv.parse_rfc3339(d['last-occurred']),
+            last_repeated=timeconv.parse_rfc3339(d['last-repeated']),
+            occurrences=d['occurrences'],
+            last_data=d.get('last-data') or {},
+            repeat_after=timeconv.parse_duration(d['repeat-after'])
+            if 'repeat-after' in d else None,
+            expire_after=timeconv.parse_duration(d['expire-after'])
+            if 'expire-after' in d else None,
+        )
+
+
 class ExecProcess(Generic[AnyStr]):
     """Represents a process started by :meth:`Client.exec`.
 
@@ -1330,6 +1510,7 @@ class ExecProcess(Generic[AnyStr]):
         Raises:
             ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
+            TypeError: if :meth:`Client.exec` was called with the ``stdout`` argument.
         """
         if self.stdout is None:
             raise TypeError(
@@ -1433,7 +1614,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
             break
 
         if encoding is not None:
-            chunk = chunk.decode(encoding)
+            chunk = typing.cast(bytes, chunk).decode(encoding)
         writer.write(chunk)
 
 
@@ -1514,6 +1695,15 @@ class Client:
 
     Defaults to using a Unix socket at socket_path (which must be specified
     unless a custom opener is provided).
+
+    For methods that wait for changes, such as :meth:`start_services` and :meth:`replan_services`,
+    if the change fails or times out, then a :class:`ChangeError` or :class:`TimeoutError` will be
+    raised.
+
+    All methods may raise exceptions when there are problems communicating with Pebble. Problems
+    connecting to or transferring data with Pebble will raise a :class:`ConnectionError`. When an
+    error occurs executing the request, such as trying to add an invalid layer or execute a command
+    that does not exist, an :class:`APIError` is raised.
     """
 
     _chunk_size = 8192
@@ -1607,9 +1797,13 @@ class Client:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body: Dict[str, Any] = {}
                 message = f'{type(e2).__name__} - {e2}'
-            raise APIError(body, code, status, message)
+            raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
-            raise ConnectionError(e.reason)
+            if e.args and isinstance(e.args[0], FileNotFoundError):
+                raise ConnectionError(
+                    f"Could not connect to Pebble: socket not found at {self.socket_path!r} "
+                    "(container restarted?)") from None
+            raise ConnectionError(e.reason) from e
 
         return response
 
@@ -1655,16 +1849,16 @@ class Client:
         """Start the startup-enabled services and wait (poll) for them to be started.
 
         Args:
-            timeout: Seconds before autostart change is considered timed out (float).
+            timeout: Seconds before autostart change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change ID
+                immediately.
             delay: Seconds before executing the autostart change (float).
 
         Returns:
             ChangeID of the autostart change.
 
         Raises:
-            ChangeError: if one or more of the services didn't start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't start, and ``timeout`` is non-zero.
         """
         return self._services_action('autostart', [], timeout, delay)
 
@@ -1672,16 +1866,17 @@ class Client:
         """Replan by (re)starting changed and startup-enabled services and wait for them to start.
 
         Args:
-            timeout: Seconds before replan change is considered timed out (float).
+            timeout: Seconds before replan change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the replan change (float).
 
         Returns:
             ChangeID of the replan change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
+                non-zero.
         """
         return self._services_action('replan', [], timeout, delay)
 
@@ -1692,16 +1887,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to start.
-            timeout: Seconds before start change is considered timed out (float).
+            timeout: Seconds before start change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the start change (float).
 
         Returns:
             ChangeID of the start change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start, and ``timeout`` is
+                non-zero.
         """
         return self._services_action('start', services, timeout, delay)
 
@@ -1712,16 +1908,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to stop.
-            timeout: Seconds before stop change is considered timed out (float).
+            timeout: Seconds before stop change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the stop change (float).
 
         Returns:
             ChangeID of the stop change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
+                non-zero.
         """
         return self._services_action('stop', services, timeout, delay)
 
@@ -1732,16 +1929,17 @@ class Client:
 
         Args:
             services: Non-empty list of services to restart.
-            timeout: Seconds before restart change is considered timed out (float).
+            timeout: Seconds before restart change is considered timed out (float). If
+                timeout is 0, submit the action but don't wait; just return the change
+                ID immediately.
             delay: Seconds before executing the restart change (float).
 
         Returns:
             ChangeID of the restart change.
 
         Raises:
-            ChangeError: if one or more of the services didn't stop/start. If
-                timeout is 0, submit the action but don't wait; just return the change
-                ID immediately.
+            ChangeError: if one or more of the services didn't stop/start and ``timeout`` is
+                non-zero.
         """
         return self._services_action('restart', services, timeout, delay)
 
@@ -1821,7 +2019,7 @@ class Client:
 
     def _wait_change(self, change_id: ChangeID, timeout: Optional[float] = None) -> Change:
         """Call the wait-change API endpoint directly."""
-        query = {}
+        query: Dict[str, Any] = {}
         if timeout is not None:
             query['timeout'] = _format_timeout(timeout)
 
@@ -1898,6 +2096,14 @@ class Client:
             query = {'names': ','.join(names)}
         resp = self._request('GET', '/v1/services', query)
         return [ServiceInfo.from_dict(info) for info in resp['result']]
+
+    @typing.overload
+    def pull(self, path: str, *, encoding: None) -> BinaryIO:  # noqa
+        ...
+
+    @typing.overload
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:  # noqa
+        ...
 
     def pull(self,
              path: str,
@@ -1995,6 +2201,10 @@ class Client:
             group_id: Group ID (GID) for file.
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
+
+        Raises:
+            PathError: If there was an error writing the file to the path; for example, if the
+                destination path doesn't exist and ``make_dirs`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2045,7 +2255,7 @@ class Client:
         elif isinstance(source, bytes):
             source_io: _AnyStrFileLikeIO = io.BytesIO(source)
         else:
-            source_io: _AnyStrFileLikeIO = source
+            source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
         content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
@@ -2092,6 +2302,10 @@ class Client:
                 for example ``*.txt``.
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
+
+        Raises:
+            PathError: if there was an error listing the directory; for example, if the directory
+                does not exist.
         """
         query = {
             'action': 'list',
@@ -2125,6 +2339,10 @@ class Client:
             group_id: Group ID (GID) for directory.
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
+
+        Raises:
+            PathError: if there was an error making the directory; for example, if the parent path
+                does not exist, and ``make_parents`` is not used.
         """
         info = self._make_auth_dict(permissions, user_id, user, group_id, group)
         info['path'] = path
@@ -2142,11 +2360,14 @@ class Client:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory recursively deletes it and
-                       everything under it. If the path is a file, delete the file and
-                       do nothing if the file is non-existent. Behaviourally similar
-                       to ``rm -rf <file|dir>``.
+            recursive: If True, and path is a directory, recursively delete it and
+                       everything under it. If path is a file, delete the file. In
+                       either case, do nothing if the file or directory does not
+                       exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
+        Raises:
+            pebble.PathError: If a relative path is provided, or if `recursive` is False
+                and the file or directory cannot be removed (it does not exist or is not empty).
         """
         info: Dict[str, Any] = {'path': path}
         if recursive:
@@ -2338,6 +2559,11 @@ class Client:
             :meth:`ExecProcess.wait` if stdout/stderr were provided as
             arguments to :meth:`exec`, or :meth:`ExecProcess.wait_output` if
             not.
+
+        Raises:
+            APIError: if an error occurred communicating with pebble, or if the command is not
+                found.
+            ExecError: if the command exits with a non-zero exit code.
         """
         if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
             raise TypeError(f'command must be a list of str, not {type(command).__name__}')
@@ -2510,13 +2736,92 @@ class Client:
         Returns:
             List of :class:`CheckInfo` objects.
         """
-        query = {}
+        query: Dict[str, Any] = {}
         if level is not None:
             query['level'] = level.value
         if names:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def notify(self, type: NoticeType, key: str, *,
+               data: Optional[Dict[str, str]] = None,
+               repeat_after: Optional[datetime.timedelta] = None) -> str:
+        """Record an occurrence of a notice with the specified options.
+
+        Args:
+            type: Notice type (currently only "custom" notices are supported).
+            key: Notice key; must be in "example.com/path" format.
+            data: Data fields for this notice.
+            repeat_after: Only allow this notice to repeat after this duration
+                has elapsed (the default is to always repeat).
+
+        Returns:
+            The notice's ID.
+        """
+        body: Dict[str, Any] = {
+            'action': 'add',
+            'type': type.value,
+            'key': key,
+        }
+        if data is not None:
+            body['data'] = data
+        if repeat_after is not None:
+            body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
+        resp = self._request('POST', '/v1/notices', body=body)
+        return resp['result']['id']
+
+    def get_notice(self, id: str) -> Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            APIError: if a notice with the given ID is not found (``code`` 404)
+        """
+        resp = self._request('GET', f'/v1/notices/{id}')
+        return Notice.from_dict(resp['result'])
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+    ) -> List[Notice]:
+        """Query for notices that match all of the provided filters.
+
+        Pebble returns notices that match all of the filters, for example, if
+        called with ``types=[NoticeType.CUSTOM], keys=["example.com/a"]``,
+        Pebble will only return custom notices that also have key "example.com/a".
+
+        If no filters are specified, return notices viewable by the requesting
+        user (notices whose ``user_id`` matches the requester UID as well as
+        public notices).
+
+        Note that the "after" filter is not yet implemented, as it's not
+        needed right now and it's hard to implement correctly with Python's
+        datetime type, which only has microsecond precision (and Go's Time
+        type has nanosecond precision).
+
+        Args:
+            select: Select which notices to return (instead of returning
+                notices for the current user).
+            user_id: Filter for notices for the specified user, including
+                public notices (only works for Pebble admins).
+            types: Filter for notices with any of the specified types.
+            keys: Filter for notices with any of the specified keys.
+        """
+        query: Dict[str, Union[str, List[str]]] = {}
+        if select is not None:
+            query['select'] = select.value
+        if user_id is not None:
+            query['user-id'] = str(user_id)
+        if types is not None:
+            query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
+        if keys is not None:
+            query['keys'] = list(keys)
+        resp = self._request('GET', '/v1/notices', query)
+        return [Notice.from_dict(info) for info in resp['result']]
 
 
 class _FilesParser:

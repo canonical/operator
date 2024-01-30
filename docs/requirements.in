@@ -1,7 +1,0 @@
--r ../requirements.txt
-sphinx==6.2.1
-sphinx-design
-furo
-sphinx-tabs
-lxd-sphinx-extensions
-sphinx-copybutton

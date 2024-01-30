@@ -17,21 +17,29 @@ import gc
 import io
 import os
 import pathlib
+import stat
 import sys
 import tempfile
+import typing
+import unittest
+import unittest.mock
 from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
 from textwrap import dedent
 
 import yaml
 
 import ops
+import ops.storage
 
 
 class StoragePermutations(abc.ABC):
 
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
+
     def create_framework(self) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
-        return ops.Framework(self.create_storage(), None, None, None)
+        return ops.Framework(self.create_storage(), None, None, None)  # type: ignore
 
     @abc.abstractmethod
     def create_storage(self) -> ops.storage.SQLiteStorage:
@@ -41,16 +49,17 @@ class StoragePermutations(abc.ABC):
     def test_save_and_load_snapshot(self):
         f = self.create_framework()
 
-        class Sample(ops.Object):
+        class Sample(ops.StoredStateData):
 
-            def __init__(self, parent, key, content):
+            def __init__(self, parent: ops.Object, key: str,
+                         content: typing.Dict[str, typing.Any]):
                 super().__init__(parent, key)
                 self.content = content
 
             def snapshot(self):
                 return {'content': self.content}
 
-            def restore(self, snapshot):
+            def restore(self, snapshot: typing.Dict[str, typing.Any]):
                 self.__dict__.update(snapshot)
 
         f.register_type(Sample, None, Sample.handle_kind)
@@ -69,20 +78,20 @@ class StoragePermutations(abc.ABC):
         del s
         gc.collect()
         res = f.load_snapshot(handle)
-        self.assertEqual(data, res.content)
+        self.assertEqual(data, res.content)  # type: ignore
 
     def test_emit_event(self):
         f = self.create_framework()
 
         class Evt(ops.EventBase):
-            def __init__(self, handle, content):
+            def __init__(self, handle: ops.Handle, content: typing.Any):
                 super().__init__(handle)
                 self.content = content
 
             def snapshot(self):
                 return self.content
 
-            def restore(self, content):
+            def restore(self, content: typing.Any):
                 self.content = content
 
         class Events(ops.ObjectEvents):
@@ -90,15 +99,21 @@ class StoragePermutations(abc.ABC):
 
         class Sample(ops.Object):
 
-            on = Events()
+            on = Events()  # type: ignore
 
-            def __init__(self, parent, key):
+            def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
                 self.observed_content = None
                 self.framework.observe(self.on.event, self._on_event)
 
             def _on_event(self, event: Evt):
                 self.observed_content = event.content
+
+            def snapshot(self) -> typing.Dict[str, typing.Any]:
+                raise NotImplementedError()
+
+            def restore(self, snapshot: typing.Dict[str, typing.Any]) -> None:
+                raise NotImplementedError()
 
         s = Sample(f, 'key')
         f.register_type(Sample, None, Sample.handle_kind)
@@ -205,8 +220,43 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
     def create_storage(self):
         return ops.storage.SQLiteStorage(':memory:')
 
+    def test_permissions_new(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            storage = ops.storage.SQLiteStorage(filename)
+            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            storage.close()
 
-def setup_juju_backend(test_case, state_file):
+    def test_permissions_existing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            ops.storage.SQLiteStorage(filename).close()
+            # Set the file to access that will need fixing for user, group, and other.
+            os.chmod(filename, 0o744)
+            storage = ops.storage.SQLiteStorage(filename)
+            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            storage.close()
+
+    @unittest.mock.patch("os.path.exists")
+    def test_permissions_race(self, exists: unittest.mock.MagicMock):
+        exists.return_value = False
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            # Create an existing file, but the mock will simulate a race condition saying that it
+            # does not exist.
+            open(filename, "w").close()
+            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+
+    @unittest.mock.patch("os.chmod")
+    def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
+        chmod.side_effect = OSError
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, ".unit-state.db")
+            open(filename, "w").close()
+            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+
+
+def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
     """Create fake scripts for pretending to be state-set and state-get."""
     template_args = {
         'executable': str(pathlib.Path(sys.executable).as_posix()),
@@ -305,7 +355,7 @@ class TestSimpleLoader(BaseTestCase):
         parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)
         self.assertEqual(parsed, (1, 'tuple'))
 
-    def assertRefused(self, obj):  # noqa: N802
+    def assertRefused(self, obj: typing.Any):  # noqa: N802
         # We shouldn't allow them to be written
         with self.assertRaises(yaml.representer.RepresenterError):
             yaml.dump(obj, Dumper=ops.storage._SimpleDumper)

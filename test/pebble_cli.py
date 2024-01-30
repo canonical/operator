@@ -25,6 +25,7 @@ import argparse
 import datetime
 import os
 import sys
+import typing
 
 from ops import pebble
 from ops._private import timeconv
@@ -195,7 +196,7 @@ def main():
                 stdout = None
                 stderr = None
 
-            process = client.exec(
+            process = client.exec(  # type: ignore
                 args.exec_command,
                 service_context=args.context,
                 environment=environment,
@@ -203,12 +204,17 @@ def main():
                 timeout=args.timeout,
                 user=args.user,
                 group=args.group,
-                stdin=stdin,
-                stdout=stdout,
-                stderr=stderr,
+                stdin=stdin,  # type: ignore
+                stdout=stdout,  # type: ignore
+                stderr=stderr,  # type: ignore
                 encoding=encoding,
                 combine_stderr=args.combine_stderr,
             )
+            # `process` might actually be a pebble.ExecProcess[bytes].
+            # However, for the use we are making of it - particularly of `.stdout` and `.stderr` -
+            # it does not make any difference. Unfortunately, pyright complains when we call
+            # `wait()` and `wait_output()` if we do not make the generic concrete here.
+            process = typing.cast(pebble.ExecProcess[str], process)
 
             try:
                 if args.io_mode == 'passthrough':
@@ -219,7 +225,8 @@ def main():
                     if stderr:
                         print(repr(stderr), end='', file=sys.stderr)
                 sys.exit(0)
-            except pebble.ExecError as e:
+            # The `[str]` here is to resolve the same issue as above.
+            except pebble.ExecError[str] as e:
                 print('ExecError:', e, file=sys.stderr)
                 sys.exit(e.exit_code)
 

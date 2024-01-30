@@ -14,9 +14,9 @@
 
 """Base objects for the Charm, events and metadata."""
 
+import dataclasses
 import enum
 import logging
-import os
 import pathlib
 from typing import (
     TYPE_CHECKING,
@@ -25,9 +25,11 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NoReturn,
     Optional,
     TextIO,
     Tuple,
+    TypedDict,
     Union,
     cast,
 )
@@ -38,22 +40,21 @@ from ops.framework import (
     EventBase,
     EventSource,
     Framework,
+    Handle,
     LifecycleEvent,
     Object,
     ObjectEvents,
 )
 
 if TYPE_CHECKING:
-    from typing_extensions import Required, TypedDict
-
-    from ops.framework import Handle
-    from ops.model import Container, Relation, Storage
+    from typing_extensions import Required
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
         '_RelationMetaDict', {
             'interface': Required[str],
             'limit': int,
+            'optional': bool,
             'scope': _Scopes},
         total=False)
 
@@ -67,7 +68,7 @@ if TYPE_CHECKING:
         'location': str,
         'multiple-range': str,
         'multiple': _MultipleRange
-    })
+    }, total=False)
 
     _ResourceMetaDict = TypedDict(
         '_ResourceMetaDict', {
@@ -80,6 +81,12 @@ if TYPE_CHECKING:
         '_MountDict', {'storage': Required[str],
                        'location': str},
         total=False)
+
+
+class _ContainerBaseDict(TypedDict):
+    name: str
+    channel: str
+    architectures: List[str]
 
 
 logger = logging.getLogger(__name__)
@@ -121,11 +128,14 @@ class ActionEvent(EventBase):
     params: Dict[str, Any]
     """The parameters passed to the action."""
 
-    def defer(self) -> None:
+    def defer(self) -> NoReturn:
         """Action events are not deferrable like other events.
 
         This is because an action runs synchronously and the administrator
         is waiting for the result.
+
+        Raises:
+            RuntimeError: always.
         """
         raise RuntimeError('cannot defer action events')
 
@@ -134,12 +144,6 @@ class ActionEvent(EventBase):
 
         Not meant to be called directly by charm code.
         """
-        env_action_name = os.environ.get('JUJU_ACTION_NAME')
-        event_action_name = self.handle.kind[:-len('_action')].replace('_', '-')
-        if event_action_name != env_action_name:
-            # This could only happen if the dev manually emits the action, or from a bug.
-            raise RuntimeError('action event kind ({}) does not match current '
-                               'action ({})'.format(event_action_name, env_action_name))
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
@@ -163,6 +167,11 @@ class ActionEvent(EventBase):
         alphanumeric, and can only contain lowercase alphanumeric, hyphens
         and periods.
 
+        Because results are passed to Juju using the command line, the maximum
+        size is around 100KB. However, actions results are designed to be
+        small: a few key-value pairs shown in the Juju CLI. If larger content
+        is needed, store it in a file and use something like ``juju scp``.
+
         If any exceptions occur whilst the action is being handled, juju will
         gather any stdout/stderr data (and the return code) and inject them into the
         results object. Thus, the results object might contain the following keys,
@@ -176,6 +185,13 @@ class ActionEvent(EventBase):
 
         Args:
             results: The result of the action as a Dict
+
+        Raises:
+            ModelError: if a reserved key is used.
+            ValueError: if ``results`` has a mix of dotted/non-dotted keys that expand out to
+                result in duplicate keys, for example: :code:`{'a': {'b': 1}, 'a.b': 2}`. Also
+                raised if a dict is passed with a key that fails to meet the format requirements.
+            OSError: if extremely large (>100KB) results are provided.
         """
         self.framework.model._backend.action_set(results)
 
@@ -248,7 +264,7 @@ class ConfigChangedEvent(HookEvent):
       This event notifies the charm of its initial configuration.
       Typically, this event will fire between an :class:`install <InstallEvent>`
       and a :class:`start <StartEvent>` during the startup sequence
-      (when you first deploy a unit), but in general it will fire whenever
+      (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
     - As a specific instance of the above point: when networking changes
@@ -360,8 +376,11 @@ class CollectMetricsEvent(HookEvent):
         Args:
             metrics: Key-value mapping of metrics that have been gathered.
             labels: Key-value labels applied to the metrics.
+
+        Raises:
+            ModelError: if invalid keys or values are provided.
         """
-        self.framework.model._backend.add_metrics(metrics, labels)  # type:ignore
+        self.framework.model._backend.add_metrics(metrics, labels)
 
 
 class RelationEvent(HookEvent):
@@ -375,11 +394,10 @@ class RelationEvent(HookEvent):
     relations with the same name.
     """
 
-    relation: 'Relation'
+    relation: 'model.Relation'
     """The relation involved in this event."""
 
-    # TODO(benhoyt): I *think* app should never be None, but confirm and update type
-    app: Optional[model.Application]
+    app: model.Application
     """The remote application that has triggered this event."""
 
     unit: Optional[model.Unit]
@@ -389,7 +407,7 @@ class RelationEvent(HookEvent):
     :class:`Application <model.Application>`-level event.
     """
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None):
         super().__init__(handle)
@@ -399,7 +417,12 @@ class RelationEvent(HookEvent):
                 f'cannot create RelationEvent with application {app} and unit {unit}')
 
         self.relation = relation
-        self.app = app
+        if app is None:
+            logger.warning("'app' expected but not received.")
+            # Do an explicit assignment here so that we can contain the type: ignore.
+            self.app = None  # type: ignore
+        else:
+            self.app = app
         self.unit = unit
 
     def snapshot(self) -> Dict[str, Any]:
@@ -434,7 +457,8 @@ class RelationEvent(HookEvent):
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         else:
-            self.app = None
+            logger.warning("'app_name' expected in snapshot but not found.")
+            self.app = None  # type: ignore
 
         unit_name = snapshot.get('unit_name')
         if unit_name:
@@ -450,6 +474,8 @@ class RelationCreatedEvent(RelationEvent):
     can occur before units for those applications have started. All existing
     relations should be established before start.
     """
+    unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
+    """Always ``None``."""
 
 
 class RelationJoinedEvent(RelationEvent):
@@ -463,6 +489,8 @@ class RelationJoinedEvent(RelationEvent):
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
+    unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
+    """The remote unit that has triggered this event."""
 
 
 class RelationChangedEvent(RelationEvent):
@@ -503,8 +531,10 @@ class RelationDepartedEvent(RelationEvent):
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
+    unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
+    """The remote unit that has triggered this event."""
 
-    def __init__(self, handle: 'Handle', relation: 'Relation',
+    def __init__(self, handle: 'Handle', relation: 'model.Relation',
                  app: Optional[model.Application] = None,
                  unit: Optional[model.Unit] = None,
                  departing_unit_name: Optional[str] = None):
@@ -526,8 +556,8 @@ class RelationDepartedEvent(RelationEvent):
     def departing_unit(self) -> Optional[model.Unit]:
         """The :class:`ops.Unit` that is departing, if any.
 
-        You can use this to determine (for example) whether *you* are the
-        departing unit.
+        Use this method to determine (for example) whether this unit is the
+        departing one.
         """
         # doing this on init would fail because `framework` gets patched in
         # post-init
@@ -558,6 +588,8 @@ class RelationBrokenEvent(RelationEvent):
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
+    unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
+    """Always ``None``."""
 
 
 class StorageEvent(HookEvent):
@@ -569,10 +601,10 @@ class StorageEvent(HookEvent):
     of :class:`StorageEvent`.
     """
 
-    storage: 'Storage'
+    storage: 'model.Storage'
     """Storage instance this event refers to."""
 
-    def __init__(self, handle: 'Handle', storage: 'Storage'):
+    def __init__(self, handle: 'Handle', storage: 'model.Storage'):
         super().__init__(handle)
         self.storage = storage
 
@@ -647,11 +679,10 @@ class WorkloadEvent(HookEvent):
     """Base class representing workload-related events.
 
     Workload events are generated for all containers that the charm
-    expects in metadata. Workload containers currently only trigger
-    a :class:`PebbleReadyEvent`.
+    expects in metadata.
     """
 
-    workload: 'Container'
+    workload: 'model.Container'
     """The workload involved in this event.
 
     Workload currently only can be a :class:`Container <model.Container>`, but
@@ -659,7 +690,7 @@ class WorkloadEvent(HookEvent):
     for example a machine.
     """
 
-    def __init__(self, handle: 'Handle', workload: 'Container'):
+    def __init__(self, handle: 'Handle', workload: 'model.Container'):
         super().__init__(handle)
 
         self.workload = workload
@@ -687,7 +718,7 @@ class WorkloadEvent(HookEvent):
 
 
 class PebbleReadyEvent(WorkloadEvent):
-    """Event triggered when pebble is ready for a workload.
+    """Event triggered when Pebble is ready for a workload.
 
     This event is triggered when the Pebble process for a workload/container
     starts up, allowing the charm to configure how services should be launched.
@@ -697,6 +728,45 @@ class PebbleReadyEvent(WorkloadEvent):
     regarding what services should be started. The name prefix of the hook
     will depend on the container key defined in the ``metadata.yaml`` file.
     """
+
+
+class PebbleNoticeEvent(WorkloadEvent):
+    """Base class for Pebble notice events (each notice type is a subclass)."""
+
+    notice: model.LazyNotice
+    """Provide access to the event notice's details."""
+
+    def __init__(self, handle: 'Handle', workload: 'model.Container',
+                 notice_id: str, notice_type: str, notice_key: str):
+        super().__init__(handle, workload)
+        self.notice = model.LazyNotice(workload, notice_id, notice_type, notice_key)
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        d = super().snapshot()
+        d['notice_id'] = self.notice.id
+        d['notice_type'] = (self.notice.type if isinstance(self.notice.type, str)
+                            else self.notice.type.value)
+        d['notice_key'] = self.notice.key
+        return d
+
+    def restore(self, snapshot: Dict[str, Any]):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        super().restore(snapshot)
+        notice_id = snapshot.pop('notice_id')
+        notice_type = snapshot.pop('notice_type')
+        notice_key = snapshot.pop('notice_key')
+        self.notice = model.LazyNotice(self.workload, notice_id, notice_type, notice_key)
+
+
+class PebbleCustomNoticeEvent(PebbleNoticeEvent):
+    """Event triggered when a Pebble notice of type "custom" is created or repeats."""
 
 
 class SecretEvent(HookEvent):
@@ -736,7 +806,7 @@ class SecretChangedEvent(SecretEvent):
     a new secret revision, and all applications or units that are tracking this
     secret will be notified via this event that a new revision is available.
 
-    Typically, you will want to fetch the new content by calling
+    Typically, the charm will fetch the new content by calling
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
     """
@@ -750,8 +820,12 @@ class SecretRotateEvent(SecretEvent):
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
-    def defer(self) -> None:
-        """Secret rotation events are not deferrable (Juju handles re-invocation)."""
+    def defer(self) -> NoReturn:
+        """Secret rotation events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
         raise RuntimeError(
             'Cannot defer secret rotation events. Juju will keep firing this '
             'event until you create a new revision.')
@@ -764,7 +838,7 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, you will want to call
+    Typically, the charm will call
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision.
     """
@@ -830,8 +904,12 @@ class SecretExpiredEvent(SecretEvent):
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
 
-    def defer(self) -> None:
-        """Secret expiration events are not deferrable (Juju handles re-invocation)."""
+    def defer(self) -> NoReturn:
+        """Secret expiration events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
         raise RuntimeError(
             'Cannot defer secret expiration events. Juju will keep firing '
             'this event until you create a new revision.')
@@ -848,7 +926,7 @@ class CollectStatusEvent(LifecycleEvent):
 
     The framework will trigger these events after the hook code runs
     successfully (``collect_app_status`` will only be triggered on the leader
-    unit). If any statuses were added by the event handlers using
+    unit). If any statuses were added by the event handler using
     :meth:`add_status`, the framework will choose the highest-priority status
     and set that as the status (application status for ``collect_app_status``,
     or unit status for ``collect_unit_status``).
@@ -1012,7 +1090,7 @@ class CharmBase(Object):
 
     :code:`CharmBase` is used to create a charm. This is done by inheriting
     from :code:`CharmBase` and customising the subclass as required. So to
-    create your own charm, say ``MyCharm``, define a charm class and set up the
+    create a charm called ``MyCharm``, define a charm class and set up the
     required event handlers (“hooks”) in its constructor::
 
         import logging
@@ -1071,6 +1149,7 @@ class CharmBase(Object):
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
             self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
+            self.on.define_event(f"{container_name}_pebble_custom_notice", PebbleCustomNoticeEvent)
 
     @property
     def app(self) -> model.Application:
@@ -1139,6 +1218,9 @@ class CharmMeta:
     maintainers: List[str]
     """List of email addresses of charm maintainers."""
 
+    links: 'MetadataLinks'
+    """Links to more details about the charm."""
+
     tags: List[str]
     """Charmhub tag metadata for categories associated with this charm."""
 
@@ -1157,6 +1239,9 @@ class CharmMeta:
 
     min_juju_version: Optional[str]
     """Indicates the minimum Juju version this charm requires."""
+
+    assumes: 'JujuAssumes'
+    """Juju features this charm requires."""
 
     containers: Dict[str, 'ContainerMeta']
     """Container metadata for each defined container."""
@@ -1198,18 +1283,37 @@ class CharmMeta:
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
 
+        # When running in production, this data is generally loaded from
+        # metadata.yaml. However, when running tests, this data is
+        # potentially loaded from charmcraft.yaml (which will be split out
+        # into a metadata.yaml as part of packing). Most of the field names
+        # are the same, but there are some differences that we handle here,
+        # and in _load_links(), so that loading from either file works.
         self.name = raw_.get('name', '')
         self.summary = raw_.get('summary', '')
         self.description = raw_.get('description', '')
+        # The metadata spec says that these should be display-name <email>
+        # (roughly 'name-addr' from RFC 5322). However, many charms have only
+        # an email, or have a URL, or something else, so we leave these as
+        # a plain string.
         self.maintainers: List[str] = []
+        # Note that metadata v2 only defines 'maintainers' not 'maintainer'.
         if 'maintainer' in raw_:
             self.maintainers.append(raw_['maintainer'])
         if 'maintainers' in raw_:
             self.maintainers.extend(raw_['maintainers'])
+        if 'links' in raw_ and 'contact' in raw_['links']:
+            self.maintainers.append(raw_['links']['contact'])
+        self._load_links(raw_)
+        # Note that metadata v2 does not define tags.
         self.tags = raw_.get('tags', [])
         self.terms = raw_.get('terms', [])
+        # Note that metadata v2 does not define series.
         self.series = raw_.get('series', [])
         self.subordinate = raw_.get('subordinate', False)
+        self.assumes = JujuAssumes.from_list(raw_.get('assumes', []))
+        # Note that metadata v2 does not define min-juju-version ('assumes'
+        # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
         self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
                          for name, rel in raw_.get('requires', {}).items()}
@@ -1229,11 +1333,37 @@ class CharmMeta:
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
-        # This is taken from Charm Metadata v2, but only the "containers" and
-        # "containers.name" fields that we need right now for Pebble. See:
-        # https://discourse.charmhub.io/t/charm-metadata-v2/3674
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
+
+    def _load_links(self, raw: Dict[str, Any]):
+        websites = raw.get('website', [])
+        if not websites and 'links' in raw:
+            websites = raw['links'].get('website', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(websites, str):
+            websites = [websites]
+        sources = raw.get('source', [])
+        if not sources and 'links' in raw:
+            sources = raw['links'].get('source', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(sources, str):
+            sources = [sources]
+        issues = raw.get('issues', [])
+        if not issues and 'links' in raw:
+            issues = raw['links'].get('issues', [])
+        # In YAML, this can be a single string, or a list of strings.
+        if isinstance(issues, str):
+            issues = [issues]
+        documentation = raw.get('docs')
+        if documentation is None:
+            documentation = raw.get('links', {}).get('documentation')
+        self.links = MetadataLinks(
+            websites=websites,
+            sources=sources,
+            issues=issues,
+            documentation=documentation,
+        )
 
     @classmethod
     def from_yaml(
@@ -1302,6 +1432,14 @@ class RelationMeta:
     Will be either ``"global"`` or ``"container"``.
     """
 
+    optional: bool
+    """If True, the relation is considered optional.
+
+    This value is informational only and is not used by Juju itself (all
+    relations are optional from Juju's perspective), but it may be set in
+    ``metadata.yaml`` and used by the charm code if appropriate.
+    """
+
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
@@ -1320,6 +1458,8 @@ class RelationMeta:
         if self.scope not in self.VALID_SCOPES:
             raise TypeError("scope should be one of {}; not '{}'".format(
                 ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
+
+        self.optional = raw.get('optional', False)
 
 
 class StorageMeta:
@@ -1349,6 +1489,9 @@ class StorageMeta:
     multiple_range: Optional[Tuple[int, Optional[int]]]
     """Range of numeric qualifiers when multiple storage units are used."""
 
+    properties = List[str]
+    """List of additional characteristics of the storage."""
+
     def __init__(self, name: str, raw: '_StorageMetaDict'):
         self.storage_name = name
         self.type = raw['type']
@@ -1365,6 +1508,7 @@ class StorageMeta:
             else:
                 range = range.split('-')
                 self.multiple_range = (int(range[0]), int(range[1]) if range[1] else None)
+        self.properties = raw.get('properties', [])
 
 
 class ResourceMeta:
@@ -1406,6 +1550,60 @@ class PayloadMeta:
         self.type = raw['type']
 
 
+@dataclasses.dataclass(frozen=True)
+class MetadataLinks:
+    """Links to additional information about a charm."""
+
+    websites: List[str]
+    """List of links to project websites."""
+
+    sources: List[str]
+    """List of links to the charm source code."""
+
+    issues: List[str]
+    """List of links to the charm issue tracker."""
+
+    documentation: Optional[str]
+    """Link to charm documentation."""
+
+
+class JujuAssumesCondition(enum.Enum):
+    """Distinguishes between :class:`JujuAssumes` that must match all or any features."""
+
+    ALL = 'all-of'
+    """All features are required to satisfy the requirement."""
+
+    ANY = 'any-of'
+    """Any of the features satisfies the requirement."""
+
+
+@dataclasses.dataclass(frozen=True)
+class JujuAssumes:
+    """Juju model features that are required by the charm.
+
+    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
+    list of available features.
+    """
+
+    features: List[Union[str, 'JujuAssumes']]
+    condition: JujuAssumesCondition = JujuAssumesCondition.ALL
+
+    @classmethod
+    def from_list(cls, raw: List[Any],
+                  condition: JujuAssumesCondition = JujuAssumesCondition.ALL,
+                  ) -> 'JujuAssumes':
+        """Create new JujuAssumes object from list parsed from YAML."""
+        features: List[Union[str, 'JujuAssumes']] = []
+        for feature in raw:
+            if isinstance(feature, str):
+                features.append(feature)
+            else:
+                for nested_condition, nested_features in feature.items():
+                    features.append(JujuAssumes.from_list(
+                        nested_features, JujuAssumesCondition(nested_condition)))
+        return cls(features=features, condition=condition)
+
+
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
@@ -1416,25 +1614,72 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
+        self.additional_properties = raw.get('additionalProperties', True)
+
+
+@dataclasses.dataclass(frozen=True)
+class ContainerBase:
+    """Metadata to resolve a container image."""
+
+    os_name: str
+    """Name of the OS.
+
+    For example: ``ubuntu``
+    """
+
+    channel: str
+    """Channel of the OS in format ``track[/risk][/branch]`` as used by Snaps.
+
+    For example: ``20.04/stable`` or ``18.04/stable/fips``
+    """
+
+    architectures: List[str]
+    """List of architectures that this charm can run on."""
+
+    @classmethod
+    def from_dict(cls, d: '_ContainerBaseDict') -> 'ContainerBase':
+        """Create new ContainerBase object from dict parsed from YAML."""
+        return cls(
+            os_name=d['name'],
+            channel=d['channel'],
+            architectures=d['architectures'],
+        )
 
 
 class ContainerMeta:
-    """Metadata about an individual container.
-
-    NOTE: this is extremely lightweight right now, and just includes the fields we need for
-    Pebble interaction.
-    """
+    """Metadata about an individual container."""
 
     name: str
     """Name of the container (key in the YAML)."""
 
+    resource: Optional[str]
+    """Reference for an entry in the ``resources`` field.
+
+    Specifies the oci-image resource used to create the container. Must not be
+    present if a base/channel is specified.
+    """
+
+    bases: Optional[List['ContainerBase']]
+    """List of bases for use in resolving a container image.
+
+    Sorted by descending order of preference, and must not be present if
+    resource is specified.
+    """
+
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
         self._mounts: Dict[str, ContainerStorageMeta] = {}
+        self.bases = None
+        self.resource = None
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
             self._populate_mounts(raw.get('mounts', []))
+            self.resource = raw.get('resource')
+            self.bases = [ContainerBase.from_dict(base) for base in raw.get('bases', ())]
+
+        if self.resource and self.bases:
+            raise model.ModelError('A container may specify a resource or base, not both.')
 
     @property
     def mounts(self) -> Dict[str, 'ContainerStorageMeta']:
@@ -1489,9 +1734,6 @@ class ContainerStorageMeta:
     :class:`StorageMeta`.
     """
 
-    location: str
-    """The location the storage is mounted at."""
-
     def __init__(self, storage: str, location: str):
         self.storage = storage
         self._locations: List[str] = [location]
@@ -1505,17 +1747,17 @@ class ContainerStorageMeta:
         """An accessor for the list of locations for a mount."""
         return self._locations
 
-    def __getattr__(self, name: str):
-        # TODO(benhoyt): this should just be a property "location"
-        if name == "location":
-            if len(self._locations) == 1:
-                return self._locations[0]
-            else:
-                raise RuntimeError(
-                    "container has more than one mount point with the same backing storage. "
-                    "Request .locations to see a list"
-                )
-        else:
-            raise AttributeError(
-                f"{self.__class__.__name__} has no such attribute: {name}!"
-            )
+    @property
+    def location(self) -> str:
+        """The location the storage is mounted at.
+
+        Raises:
+            RuntimeError: if there is more than one mount point with the same
+                backing storage - use :attr:`locations` instead.
+        """
+        if len(self._locations) == 1:
+            return self._locations[0]
+        raise RuntimeError(
+            "container has more than one mount point with the same backing storage. "
+            "Request .locations to see a list"
+        )

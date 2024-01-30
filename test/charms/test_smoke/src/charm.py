@@ -23,8 +23,9 @@ develop a new k8s charm using the ops library:
 """
 
 import logging
+import typing
 
-from ops.charm import CharmBase
+from ops.charm import CharmBase, EventBase
 from ops.main import main
 from ops.model import ActiveStatus
 
@@ -34,11 +35,11 @@ logger = logging.getLogger(__name__)
 class SmokeCharm(CharmBase):
     """Charm the service."""
 
-    def __init__(self, *args):
+    def __init__(self, *args: typing.Any):
         super().__init__(*args)
         self.framework.observe(self.on.install, self._on_install)
 
-    def _on_install(self, event):
+    def _on_install(self, event: EventBase):
         self.unit.status = ActiveStatus()
 
 

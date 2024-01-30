@@ -26,7 +26,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import ops.charm
 import ops.framework
@@ -35,11 +35,6 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
-
-if TYPE_CHECKING:
-    from ops.charm import CharmBase
-    from ops.framework import BoundEvent, EventSource
-    from ops.model import Relation
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -68,7 +63,7 @@ def _get_charm_dir():
     return charm_dir
 
 
-def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
+def _create_event_link(charm: 'ops.charm.CharmBase', bound_event: 'ops.framework.EventSource',
                        link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
@@ -106,7 +101,7 @@ def _create_event_link(charm: 'CharmBase', bound_event: 'EventSource',
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
+def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
@@ -128,7 +123,7 @@ def _setup_event_links(charm_dir: Path, charm: 'CharmBase'):
             _create_event_link(charm, bound_event, link_to)
 
 
-def _emit_charm_event(charm: 'CharmBase', event_name: str):
+def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
     """Emits a charm event based on a Juju event name.
 
     Args:
@@ -149,8 +144,12 @@ def _emit_charm_event(charm: 'CharmBase', event_name: str):
         event_to_emit.emit(*args, **kwargs)
 
 
-def _get_event_args(charm: 'CharmBase',
-                    bound_event: 'BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
+def _get_juju_relation_id():
+    return int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+
+
+def _get_event_args(charm: 'ops.charm.CharmBase',
+                    bound_event: 'ops.framework.BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
 
@@ -158,7 +157,13 @@ def _get_event_args(charm: 'CharmBase',
     if issubclass(event_type, ops.charm.WorkloadEvent):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
-        return [container], {}
+        args: List[Any] = [container]
+        if issubclass(event_type, ops.charm.PebbleNoticeEvent):
+            notice_id = os.environ['JUJU_NOTICE_ID']
+            notice_type = os.environ['JUJU_NOTICE_TYPE']
+            notice_key = os.environ['JUJU_NOTICE_KEY']
+            args.extend([notice_id, notice_type, notice_key])
+        return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
             os.environ['JUJU_SECRET_ID'],
@@ -188,8 +193,8 @@ def _get_event_args(charm: 'CharmBase',
         return [storage], {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
-        relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
-        relation: Optional[Relation] = model.get_relation(relation_name, relation_id)
+        relation_id = _get_juju_relation_id()
+        relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
     remote_unit_name = os.environ.get('JUJU_REMOTE_UNIT', '')
@@ -239,7 +244,7 @@ class _Dispatcher:
         else:
             self._init_legacy()
 
-    def ensure_event_links(self, charm: 'CharmBase'):
+    def ensure_event_links(self, charm: 'ops.charm.CharmBase'):
         """Make sure necessary symlinks are present on disk."""
         if self.is_dispatch_aware:
             # links aren't needed
@@ -340,7 +345,7 @@ class _Dispatcher:
 
 def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     """Figure out whether we want to use controller storage or not."""
-    # if you've previously used local state, carry on using that
+    # if local state has been used previously, carry on using that
     if db_path.exists():
         return False
 
@@ -368,7 +373,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     The event name is based on the way this executable was called (argv[0]).
 
     Args:
-        charm_class: your charm class.
+        charm_class: the charm class to instantiate and receive the event.
         use_juju_for_storage: whether to use controller-side storage. If not specified
             then kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
@@ -378,7 +383,11 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     model_backend = ops.model._ModelBackend()
     debug = ('JUJU_DEBUG' in os.environ)
-    setup_root_logging(model_backend, debug=debug)
+    # For actions, there is a communication channel with the user running the
+    # action, so we want to send exception details through stderr, rather than
+    # only to juju-log as normal.
+    handling_action = ('JUJU_ACTION_NAME' in os.environ)
+    setup_root_logging(model_backend, debug=debug, exc_stderr=handling_action)
     logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     dispatcher = _Dispatcher(charm_dir)
@@ -391,8 +400,14 @@ def main(charm_class: Type[ops.charm.CharmBase],
     else:
         actions_metadata = None
 
+    # If we are in a RelationBroken event, we want to know which relation is
+    # broken within the model, not only in the event's `.relation` attribute.
+    if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
+        broken_relation_id = _get_juju_relation_id()
+    else:
+        broken_relation_id = None
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
-    model = ops.model.Model(meta, model_backend)
+    model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
 

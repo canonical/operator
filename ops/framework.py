@@ -37,7 +37,9 @@ from typing import (
     Hashable,
     Iterable,
     List,
+    Literal,
     Optional,
+    Protocol,
     Set,
     Tuple,
     Type,
@@ -46,6 +48,7 @@ from typing import (
 )
 
 from ops import charm
+from ops.model import Model, _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 
@@ -62,23 +65,18 @@ class Serializable(typing.Protocol):
     def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
 
 
-if TYPE_CHECKING:
-    from typing import Literal, Protocol
+class _StoredObject(Protocol):
+    _under: Any = None  # noqa
 
-    from ops.charm import CharmMeta
-    from ops.model import Model, _ModelBackend
 
-    class _StoredObject(Protocol):
-        _under: Any = None  # noqa
+StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
 
-    StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
-
-    _Path = _Kind = _MethodName = _EventKey = str
-    # used to type Framework Attributes
-    _ObserverPath = List[Tuple[_Path, _MethodName, _Path, _EventKey]]
-    _ObjectPath = Tuple[Optional[_Path], _Kind]
-    _PathToObjectMapping = Dict[_Path, 'Object']
-    _PathToSerializableMapping = Dict[_Path, Serializable]
+_Path = _Kind = _MethodName = _EventKey = str
+# used to type Framework Attributes
+_ObserverPath = List[Tuple[_Path, _MethodName, _Path, _EventKey]]
+_ObjectPath = Tuple[Optional[_Path], _Kind]
+_PathToObjectMapping = Dict[_Path, 'Object']
+_PathToSerializableMapping = Dict[_Path, Serializable]
 
 _T = TypeVar("_T")
 _EventType = TypeVar('_EventType', bound='EventBase')
@@ -101,7 +99,7 @@ class Handle:
     under the same parent and kind may have the same key.
     """
 
-    def __init__(self, parent: Optional[Union['Handle', 'Object']], kind: str, key: str):
+    def __init__(self, parent: Optional[Union['Handle', 'Object']], kind: str, key: Optional[str]):
         if isinstance(parent, Object):
             # if it's not an Object, it will be either a Handle (good) or None (no parent)
             parent = parent.handle
@@ -119,7 +117,7 @@ class Handle:
             else:
                 self._path = f"{kind}"  # don't need f-string, but consistent with above
 
-    def nest(self, kind: str, key: str) -> 'Handle':
+    def nest(self, kind: str, key: Optional[str]) -> 'Handle':
         """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
@@ -143,7 +141,7 @@ class Handle:
         return self._kind
 
     @property
-    def key(self) -> str:
+    def key(self) -> Optional[str]:
         """Return the handle's key."""
         return self._key
 
@@ -202,7 +200,7 @@ class EventBase:
         the result of an action, or any event other than metric events. The
         queue of events will be dispatched before the new event is processed.
 
-        From the above you may deduce, but it's important to point out:
+        Important points that follow from the above:
 
         * ``defer()`` does not interrupt the execution of the current event
           handler. In almost all cases, a call to ``defer()`` should be followed
@@ -220,19 +218,18 @@ class EventBase:
 
         The general desire to call ``defer()`` happens when some precondition
         isn't yet met. However, care should be exercised as to whether it is
-        better to defer this event so that you see it again, or whether it is
+        better to defer this event so that it is seen again, or whether it is
         better to just wait for the event that indicates the precondition has
         been met.
 
-        For example, if ``config-changed`` is fired, and you are waiting for
-        different config, there is no reason to defer the event because there
-        will be a *different* ``config-changed`` event when the config actually
-        changes, rather than checking to see if maybe config has changed prior
-        to every other event that occurs.
+        For example, if handling a config change requires that two config
+        values are changed, there's no reason to defer the first
+        ``config-changed`` because there will be a *second* ``config-changed``
+        event fired when the other config value changes.
 
-        Similarly, if you need 2 events to occur before you are ready to
-        proceed (say event A and B). When you see event A, you could chose to
-        ``defer()`` it because you haven't seen B yet. However, that leads to:
+        Similarly, if two events need to occur before execution can proceed
+        (say event A and B), the event A handler could ``defer()`` because B
+        has not been seen yet. However, that leads to:
 
         1. event A fires, calls defer()
 
@@ -242,7 +239,6 @@ class EventBase:
 
         3. At some future time, event C happens, which also checks if A can
            proceed.
-
         """
         logger.debug("Deferring %s.", self)
         self.deferred = True
@@ -267,11 +263,11 @@ class EventSource:
 
     It is generally used as::
 
-        class SomethingHappened(EventBase):
+        class SomethingHappened(ops.EventBase):
             pass
 
         class SomeObject(Object):
-            something_happened = EventSource(SomethingHappened)
+            something_happened = ops.EventSource(SomethingHappened)
 
     With that, instances of that type will offer the ``someobj.something_happened``
     attribute which is a :class:`BoundEvent`, and may be used to emit and observe
@@ -335,7 +331,18 @@ class BoundEvent:
     def emit(self, *args: Any, **kwargs: Any):
         """Emit event to all registered observers.
 
-        The current storage state is committed before and after each observer is notified.
+        The current storage state is committed before and after each observer
+        is notified.
+
+        Note that the emission of custom events is handled immediately. In
+        other words, custom events are not queued, but rather nested. For
+        example::
+
+            1. Main hook handler (emits custom_event_1)
+            2.   Custom event 1 handler (emits custom_event_2)
+            3.     Custom event 2 handler
+            4.   Resume custom event 1 handler
+            5. Resume main hook handler
         """
         framework = self.emitter.framework
         key = framework._next_event_key()
@@ -449,6 +456,10 @@ class ObjectEvents(Object):
                         event. Must be a valid Python identifier, not be a keyword
                         or an existing attribute.
             event_type: A type of the event to define.
+
+        Raises:
+            RuntimeError: if the same event is defined twice, or if ``event_kind``
+                is an invalid name.
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
@@ -563,21 +574,22 @@ class Framework(Object):
     model: 'Model' = None  # type: ignore
     """The :class:`Model` instance for this charm."""
 
-    meta: 'CharmMeta' = None  # type: ignore
+    meta: 'charm.CharmMeta' = None  # type: ignore
     """The charm's metadata."""
 
     charm_dir: 'pathlib.Path' = None  # type: ignore
     """The charm project root directory."""
 
+    _stored: 'StoredStateData' = None  # type: ignore
+
     # to help the type checker and IDEs:
     if TYPE_CHECKING:
-        _stored: 'StoredStateData' = None  # type: ignore
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
     def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
                  charm_dir: Union[str, pathlib.Path],
-                 meta: 'CharmMeta', model: 'Model',
+                 meta: 'charm.CharmMeta', model: 'Model',
                  event_name: Optional[str] = None):
         super().__init__(self, None)
 
@@ -713,7 +725,7 @@ class Framework(Object):
             marshal.dumps(data)
         except ValueError:
             msg = "unable to save the data for {}, it must contain only simple types: {!r}"
-            raise ValueError(msg.format(value.__class__.__name__, data))
+            raise ValueError(msg.format(value.__class__.__name__, data)) from None
 
         self._storage.save_snapshot(value.handle.path, data)
 
@@ -958,6 +970,9 @@ class Framework(Object):
         stop execution when a hook event is about to be handled.
 
         For those reasons, the "all" and "hook" breakpoint names are reserved.
+
+        Raises:
+            ValueError: if the breakpoint name is invalid.
         """
         # If given, validate the name comply with all the rules
         if name is not None:
@@ -1062,15 +1077,18 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
-    if TYPE_CHECKING:
-        @typing.overload
-        def __getattr__(self, key: Literal['on']) -> ObjectEvents:  # type: ignore
-            pass
+    @typing.overload
+    def __getattr__(self, key: Literal['on']) -> ObjectEvents:
+        pass
+
+    @typing.overload
+    def __getattr__(self, key: str) -> Any:
+        pass
 
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
         if key == "on":
-            return self._data.on  # type: ignore  # casting won't work for some reason
+            return self._data.on
         if key not in self._data:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
@@ -1100,23 +1118,23 @@ class StoredState:
 
     Example::
 
-        class MyClass(Object):
-            _stored = StoredState()
+        class MyClass(ops.Object):
+            _stored = ops.StoredState()
 
     Instances of ``MyClass`` can transparently save state between invocations by
     setting attributes on ``_stored``. Initial state should be set with
     ``set_default`` on the bound object, that is::
 
-        class MyClass(Object):
-            _stored = StoredState()
+        class MyClass(ops.Object):
+            _stored = ops.StoredState()
 
-        def __init__(self, parent, key):
-            super().__init__(parent, key)
-            self._stored.set_default(seen=set())
-            self.framework.observe(self.on.seen, self._on_seen)
+            def __init__(self, parent, key):
+                super().__init__(parent, key)
+                self._stored.set_default(seen=set())
+                self.framework.observe(self.on.seen, self._on_seen)
 
-        def _on_seen(self, event):
-            self._stored.seen.add(event.uuid)
+            def _on_seen(self, event):
+                self._stored.seen.add(event.uuid)
 
     """
 
@@ -1124,20 +1142,19 @@ class StoredState:
         self.parent_type: Optional[Type[Any]] = None
         self.attr_name: Optional[str] = None
 
-    if TYPE_CHECKING:
-        @typing.overload
-        def __get__(
-                self,
-                parent: Literal[None],
-                parent_type: 'Type[_ObjectType]') -> 'StoredState':
-            pass
+    @typing.overload
+    def __get__(
+            self,
+            parent: Literal[None],
+            parent_type: 'Type[_ObjectType]') -> 'StoredState':
+        pass
 
-        @typing.overload
-        def __get__(
-                self,
-                parent: '_ObjectType',
-                parent_type: 'Type[_ObjectType]') -> BoundStoredState:
-            pass
+    @typing.overload
+    def __get__(
+            self,
+            parent: '_ObjectType',
+            parent_type: 'Type[_ObjectType]') -> BoundStoredState:
+        pass
 
     def __get__(self,
                 parent: Optional['_ObjectType'],
@@ -1361,8 +1378,8 @@ class StoredSet(typing.MutableSet[Any]):
 
         Per https://docs.python.org/3/library/collections.abc.html
         if the Set mixin is being used in a class with a different constructor signature,
-        you will need to override _from_iterable() with a classmethod that can construct
-        new instances from an iterable argument.
+        override _from_iterable() with a classmethod that can construct new instances
+        from an iterable argument.
         """
         return set(it)
 
