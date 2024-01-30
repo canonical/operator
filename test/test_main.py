@@ -791,13 +791,11 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        # Fixme: this is always an empty list, is this test outdated?
         all_event_hooks = [
-            f"hooks/{name.replace('_', '-')}" for name,
-            event_source in self.charm_module.Charm.on.events().items() if issubclass(
-                event_source.event_type,
-                (ops.CommitEvent,
-                 ops.PreCommitEvent))]
+            f"hooks/{name.replace('_', '-')}"
+            for name, event_source in self.charm_module.Charm.on.events().items()
+            if issubclass(event_source.event_type, (ops.CommitEvent, ops.PreCommitEvent))
+        ]
 
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
