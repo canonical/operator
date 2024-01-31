@@ -2936,18 +2936,32 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # TODO: (jam) 2021-04-07 have a way to merge existing services
+                # TODO: merge existing services https://github.com/canonical/operator/issues/1112
                 services[name] = service
         return services
+
+    def _render_checks(self) -> Dict[str, pebble.Check]:
+        checks: Dict[str, pebble.Check] = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, check in layer.checks.items():
+                checks[name] = check
+        return checks
+
+    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
+        log_targets: Dict[str, pebble.LogTarget] = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, log_target in layer.log_targets.items():
+                log_targets[name] = log_target
+        return log_targets
 
     def get_plan(self) -> pebble.Plan:
         self._check_connection()
         plan = pebble.Plan('{}')
-        services = self._render_services()
-        if not services:
-            return plan
-        for name in sorted(services.keys()):
-            plan.services[name] = services[name]
+        plan.services.update(self._render_services())
+        plan.checks.update(self._render_checks())
+        plan.log_targets.update(self._render_log_targets())
         return plan
 
     def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:
