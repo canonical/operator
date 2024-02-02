@@ -31,7 +31,7 @@ from ops import pebble
 from ops._private import timeconv
 
 
-def main():  # noqa: C901
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--socket', help='pebble socket path, default $PEBBLE/.pebble.socket')
     subparsers = parser.add_subparsers(dest='command', metavar='command')

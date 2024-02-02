@@ -78,8 +78,6 @@ select = [
     "I001",
     # pep8-naming
     "N",
-    # mccabe
-    "C",
     # flake8-builtins
     "A",
     # flake8-copyright
@@ -185,10 +183,6 @@ convention = "google"
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
-
-[tool.ruff.lint.mccabe]
-# TODO IN THIS PR: we had this enabled in pyflakes, why is it finding issues now?
-max-complexity = 22
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]

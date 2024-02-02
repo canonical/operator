@@ -63,7 +63,7 @@ def parse_rfc3339(s: str) -> datetime.datetime:
                              microsecond=microsecond, tzinfo=tz)
 
 
-def parse_duration(s: str) -> datetime.timedelta:  # noqa: C901
+def parse_duration(s: str) -> datetime.timedelta:
     """Parse a formatted Go duration.
 
     This is similar to Go's time.ParseDuration function: it parses the output
