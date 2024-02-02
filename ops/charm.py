@@ -18,8 +18,21 @@ import dataclasses
 import enum
 import logging
 import pathlib
-from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Mapping, NoReturn,
-                    Optional, TextIO, Tuple, TypedDict, Union, cast)
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    NoReturn,
+    Optional,
+    TextIO,
+    Tuple,
+    TypedDict,
+    Union,
+    cast,
+)
 
 from ops import model
 from ops._private import yaml
