@@ -393,8 +393,7 @@ class _JujuStorageBackend:
         p = _run(["state-get", key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
-        # TODO IN THIS PR: Why doesn't this use safe_load()?
-        return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore
+        return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore  # noqa: S506
 
     def delete(self, key: str) -> None:
         """Remove a key from being tracked.
