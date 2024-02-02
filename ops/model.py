@@ -296,9 +296,9 @@ class _ModelCache:
         self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
-    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
+    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...
     @typing.overload
-    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...  # noqa
+    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...
 
     def get(self, entity_type: 'UnitOrApplicationType', name: str):
         """Fetch the cached entity of type `entity_type` with name `name`."""
@@ -2238,11 +2238,11 @@ class Container:
         return checks[check_name]
 
     @typing.overload
-    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:  # noqa
+    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:
         ...
 
     @typing.overload
-    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:  # noqa
+    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:
         ...
 
     def pull(self, path: Union[str, PurePath], *,
@@ -2639,7 +2639,7 @@ class Container:
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
@@ -2661,7 +2661,7 @@ class Container:
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,

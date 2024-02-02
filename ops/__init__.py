@@ -173,20 +173,20 @@ __all__ = [
 # isort:skip_file
 
 # Import pebble explicitly. It's the one module we don't import names from below.
-from . import pebble  # type: ignore # noqa: F401
+from . import pebble  # type: ignore
 
 # Also import charm explicitly. This is not strictly necessary as the
 # "from .charm" import automatically does that, but be explicit since this
 # import was here previously
-from . import charm  # type: ignore # noqa: F401
+from . import charm  # type: ignore # noqa: F401 `.charm` imported but unused
 
 # Import the main module, which we've overriden in main.py to be callable.
 # This allows "import ops; ops.main(Charm)" to work as expected.
-from . import main  # type: ignore # noqa: F401
+from . import main  # type: ignore
 
 # Explicitly import names from submodules so users can just "import ops" and
 # then use them as "ops.X".
-from .charm import (  # noqa: F401
+from .charm import (
     ActionEvent,
     ActionMeta,
     CharmBase,
@@ -237,7 +237,7 @@ from .charm import (  # noqa: F401
     WorkloadEvent,
 )
 
-from .framework import (  # noqa: F401
+from .framework import (
     BoundEvent,
     BoundStoredState,
     CommitEvent,
@@ -261,9 +261,9 @@ from .framework import (  # noqa: F401
     StoredStateData,
 )
 
-from .jujuversion import JujuVersion  # noqa: F401
+from .jujuversion import JujuVersion
 
-from .model import (  # noqa: F401 E402
+from .model import (
     ActiveStatus,
     Application,
     Binding,
@@ -312,4 +312,4 @@ from .model import (  # noqa: F401 E402
 # NOTE: don't import testing or Harness here, as that's a test-time concern
 # rather than a runtime concern.
 
-from .version import version as __version__  # noqa: F401 E402
+from .version import version as __version__

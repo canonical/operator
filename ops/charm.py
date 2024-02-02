@@ -630,7 +630,7 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore # noqa
+            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore
             if self.storage is None:
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)
@@ -970,8 +970,7 @@ class CollectStatusEvent(EventBase):
                     return
                 event.add_status(ops.ActiveStatus())
 
-    .. # noqa (pydocstyle barfs on the above for unknown reasons I've spent hours on)
-    """
+    """  # noqa: D405, D214, D411, D416  Final return confuses docstyle.
 
     def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.

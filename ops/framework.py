@@ -60,13 +60,13 @@ class Serializable(typing.Protocol):
     @property
     def handle(self) -> 'Handle': ...  # noqa
     @handle.setter
-    def handle(self, val: 'Handle'): ...  # noqa
+    def handle(self, val: 'Handle'): ...
     def snapshot(self) -> Dict[str, Any]: ...  # noqa
     def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
 
 
 class _StoredObject(Protocol):
-    _under: Any = None  # noqa
+    _under: Any = None
 
 
 StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
