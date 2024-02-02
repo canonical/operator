@@ -2798,6 +2798,39 @@ class TestHarness(unittest.TestCase):
         harness_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
 
+    def test_add_layer_with_log_targets_to_plan(self):
+        layer_yaml = '''\
+        services:
+         foo:
+          override: replace
+          command: echo foo
+
+        checks:
+         bar:
+          http:
+           https://example.com/
+
+        log-targets:
+         baz:
+          override: replace
+          type: loki
+          location: https://example.com:3100/loki/api/v1/push
+        '''
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'foo', "containers": {"consumer": {"type": "oci-image"}}}))
+        harness.begin()
+        harness.set_can_connect('consumer', True)
+
+        container = harness.charm.unit.containers["consumer"]
+        layer = pebble.Layer(layer_yaml)
+        container.add_layer('foo', layer)
+
+        plan = container.get_plan()
+
+        self.assertIsNotNone(plan.services.get('foo'))
+        self.assertIsNotNone(plan.checks.get('bar'))
+        self.assertIsNotNone(plan.log_targets.get('baz'))
+
     def test_get_pebble_container_plan_unknown(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test-app
