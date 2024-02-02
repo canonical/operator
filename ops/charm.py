@@ -41,6 +41,7 @@ from ops.framework import (
     EventSource,
     Framework,
     Handle,
+    LifecycleEvent,
     Object,
     ObjectEvents,
 )
@@ -914,7 +915,7 @@ class SecretExpiredEvent(SecretEvent):
             'this event until you create a new revision.')
 
 
-class CollectStatusEvent(EventBase):
+class CollectStatusEvent(LifecycleEvent):
     """Event triggered at the end of every hook to collect statuses for evaluation.
 
     If the charm wants to provide application or unit status in a consistent

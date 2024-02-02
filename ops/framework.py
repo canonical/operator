@@ -923,6 +923,7 @@ class Framework(Object):
                 elif self._event_name and self._event_name != event.handle.kind:
                     # if the event we are emitting now is not the event being
                     # dispatched, and it also is not an event we have deferred,
+                    # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
                     logger.debug("Emitting custom event %s.", event)
 
