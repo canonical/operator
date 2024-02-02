@@ -36,8 +36,14 @@ from typing import (
 
 from ops import model
 from ops._private import yaml
-from ops.framework import (EventBase, EventSource, Framework, Handle, Object,
-                           ObjectEvents)
+from ops.framework import (
+    EventBase,
+    EventSource,
+    Framework,
+    Handle,
+    Object,
+    ObjectEvents,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import Required
