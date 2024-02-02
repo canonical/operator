@@ -29,9 +29,23 @@ import types
 import typing
 import weakref
 from contextlib import contextmanager
-from typing import (TYPE_CHECKING, Any, Callable, Dict, Hashable, Iterable,
-                    List, Literal, Optional, Protocol, Set, Tuple, Type,
-                    TypeVar, Union)
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 from ops import charm
 from ops.model import Model, _ModelBackend
