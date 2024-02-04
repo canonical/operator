@@ -2687,14 +2687,14 @@ class _TestingModelBackend:
         # should be testing details of error messages).
         if protocol == 'icmp':
             if port is not None:
-                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')  # NOQA: test_quote_backslashes
+                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')  # noqa: E501
         elif protocol in ['tcp', 'udp']:
             if port is None:
-                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')  # NOQA: test_quote_backslashes
+                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')  # noqa: E501
             if not (1 <= port <= 65535):
-                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # NOQA: test_quote_backslashes
+                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # noqa: E501
         else:
-            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # NOQA: test_quote_backslashes
+            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # noqa: E501
 
     def reboot(self, now: bool = False):
         self._reboot_count += 1

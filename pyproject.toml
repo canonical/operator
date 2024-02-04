@@ -62,19 +62,49 @@ recursive = true
 jobs = -1
 aggressive = 3
 
-[tool.isort]
-profile = "black"
-
 # Linting tools configuration
-[tool.flake8]
-max-line-length = 99
-max-doc-length = 99
-exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
-select = ["E", "W", "F", "C", "N", "R", "D", "H"]
-ignore = ["D105", "D107", "W503"]
-# D100, D101, D102, D103, D104: Ignore missing docstrings in tests
-per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
-docstring-convention = "google"
+[tool.ruff]
+line-length = 99
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001",
+    # pep8-naming
+    "N",
+    # flake8-builtins
+    "A",
+    # flake8-copyright
+    "CPY",
+    # pyflakes-docstrings
+    "D",
+]
+ignore = [
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in `__init__`
+    "D107",
+]
+[tool.ruff.per-file-ignores]
+"test/*" = ["D"]
+"docs/conf.py" = [
+    "CPY001",  # Missing copyright notice at top of file
+    "D100",  # Missing docstring in public module
+    "I001",  # [*] Import block is un-sorted or un-formatted
+    "A001",  # Variable `copyright` is shadowing a Python builtin
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]

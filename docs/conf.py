@@ -33,8 +33,8 @@ furo._compute_navigation_tree = _compute_navigation_tree
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
-import re
-import sphinx.ext.autodoc
+import re  # noqa: E402
+import sphinx.ext.autodoc  # noqa: E402
 sphinx.ext.autodoc.py_ext_sig_re = re.compile(
     r'''^ ([\w.]+::)?            # explicit module name
           ([\w.]+\.)?            # module and/or class name(s)
@@ -150,7 +150,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # Find the current builder
 builder = "dirhtml"
 if '-b' in sys.argv:
-    builder = sys.argv[sys.argv.index('-b')+1]
+    builder = sys.argv[sys.argv.index('-b') + 1]
 
 html_theme = 'furo'
 html_last_updated_fmt = ""
@@ -158,7 +158,7 @@ html_permalinks_icon = "¶"
 html_theme_options = {
     "light_css_variables": {
         "color-sidebar-background-border": "none",
-        "font-stack": "Ubuntu, -apple-system, Segoe UI, Roboto, Oxygen, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif",
+        "font-stack": "Ubuntu, -apple-system, Segoe UI, Roboto, Oxygen, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif",  # noqa: E501
         "font-stack--monospace": "Ubuntu Mono, Consolas, Monaco, Courier, monospace",
         "color-foreground-primary": "#111",
         "color-foreground-secondary": "var(--color-foreground-primary)",
@@ -168,7 +168,7 @@ html_theme_options = {
         "color-brand-primary": "#111",
         "color-brand-content": "#06C",
         # NOTE: this looks horrible -- commented out
-        #"color-api-background": "#cdcdcd",
+        # "color-api-background": "#cdcdcd",
         "color-inline-code-background": "rgba(0,0,0,.03)",
         "color-sidebar-link-text": "#111",
         "color-sidebar-item-background--current": "#ebebeb",

@@ -168,7 +168,7 @@ _ServiceInfoDict = TypedDict('_ServiceInfoDict',
 
 
 class _BodyHandler(Protocol):
-    def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
+    def __call__(self, data: bytes, done: bool = False) -> None: ...
 
 
 _HeaderHandler = Callable[[bytes], None]
@@ -179,14 +179,14 @@ _HeaderHandler = Callable[[bytes], None]
 
 class _Tempfile(Protocol):
     name = ''
-    def write(self, data: bytes): ...  # noqa
-    def close(self): ...  # noqa
+    def write(self, data: bytes): ...
+    def close(self): ...
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
-    def write(self, __s: typing.AnyStr) -> int: ...  # noqa
-    def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
+    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO
+    def write(self, __s: typing.AnyStr) -> int: ...
+    def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
 _AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
@@ -275,11 +275,11 @@ if TYPE_CHECKING:
 
 
 class _WebSocket(Protocol):
-    def connect(self, url: str, socket: socket.socket): ...  # noqa
-    def shutdown(self): ...                                  # noqa
-    def send(self, payload: str): ...                        # noqa
-    def send_binary(self, payload: bytes): ...               # noqa
-    def recv(self) -> Union[str, bytes]: ...                 # noqa
+    def connect(self, url: str, socket: socket.socket): ...
+    def shutdown(self): ...
+    def send(self, payload: str): ...
+    def send_binary(self, payload: bytes): ...
+    def recv(self) -> Union[str, bytes]: ...
 
 
 logger = logging.getLogger(__name__)
@@ -2098,11 +2098,11 @@ class Client:
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
     @typing.overload
-    def pull(self, path: str, *, encoding: None) -> BinaryIO:  # noqa
+    def pull(self, path: str, *, encoding: None) -> BinaryIO:
         ...
 
     @typing.overload
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:  # noqa
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:
         ...
 
     def pull(self,
@@ -2381,7 +2381,7 @@ class Client:
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
@@ -2403,7 +2403,7 @@ class Client:
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
