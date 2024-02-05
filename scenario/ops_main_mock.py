@@ -109,7 +109,13 @@ def setup_framework(
         actions_metadata = None
 
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
-    model = ops.model.Model(meta, model_backend)
+
+    # If we are in a RelationBroken event, we want to know which relation is
+    # broken within the model, not only in the event's `.relation` attribute.
+    broken_relation_id = (
+        event.relation.relation_id if event.name.endswith("_relation_broken") else None
+    )
+    model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
 

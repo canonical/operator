@@ -1,9 +1,16 @@
 from typing import Type
 
 import pytest
-from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, RelationDepartedEvent
+from ops.charm import (
+    CharmBase,
+    CharmEvents,
+    CollectStatusEvent,
+    RelationDepartedEvent,
+    RelationEvent,
+)
 from ops.framework import EventBase, Framework
 
+from scenario import Context
 from scenario.state import (
     PeerRelation,
     Relation,
@@ -115,8 +122,15 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
         endpoint="foo", interface="foo", remote_app_name=remote_app_name
     )
 
-    def callback(charm: CharmBase, _):
-        assert charm.model.get_relation("foo").app.name == remote_app_name
+    def callback(charm: CharmBase, e):
+        if not isinstance(e, RelationEvent):
+            return  # filter out collect status events
+
+        if evt_name == "broken":
+            assert charm.model.get_relation("foo") is None
+            assert e.relation.app.name == remote_app_name
+        else:
+            assert charm.model.get_relation("foo").app.name == remote_app_name
 
     mycharm._call = callback
 
@@ -357,3 +371,15 @@ def test_relation_ids():
     for i in range(10):
         rel = Relation("foo")
         assert rel.relation_id == initial_id + i
+
+
+def test_broken_relation_not_in_model_relations(mycharm):
+    rel = Relation("foo")
+
+    with Context(
+        mycharm, meta={"name": "local", "requires": {"foo": {"interface": "foo"}}}
+    ).manager(rel.broken_event, state=State(relations=[rel])) as mgr:
+        charm = mgr.charm
+
+        assert charm.model.get_relation("foo") is None
+        assert charm.model.relations["foo"] == []
