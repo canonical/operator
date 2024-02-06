@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -34,26 +32,6 @@ def get_python_filepaths(include_tests: bool = True):
                 if filename.endswith(".py"):
                     python_paths.append(os.path.join(dirpath, filename))  # noqa: PERF401
     return python_paths
-
-
-class InfrastructureTests(unittest.TestCase):
-
-    def test_ensure_copyright(self):
-        # all non-empty Python files must have a proper copyright somewhere in the first 5 lines
-        issues: typing.List[str] = []
-        regex = re.compile(r"# Copyright \d\d\d\d(-\d\d\d\d)? Canonical Ltd.\n")
-        for filepath in get_python_filepaths():
-            if os.stat(filepath).st_size == 0:
-                continue
-
-            with open(filepath, encoding="utf8") as fh:
-                for line in itertools.islice(fh, 5):
-                    if regex.match(line):
-                        break
-                else:
-                    issues.append(filepath)
-        if issues:
-            self.fail("Please add copyright headers to the following files:\n" + "\n".join(issues))
 
 
 class ImportersTestCase(unittest.TestCase):

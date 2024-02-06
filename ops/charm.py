@@ -969,7 +969,7 @@ class CollectStatusEvent(LifecycleEvent):
                     event.add_status(ops.BlockedStatus('please set "port" config'))
                     return
                 event.add_status(ops.ActiveStatus())
-    """  # noqa: D405, D214, D411, D416  Final return confuses docstyle
+    """  # noqa: D405, D214, D411, D416  Final return confuses docstyle.
 
     def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.
