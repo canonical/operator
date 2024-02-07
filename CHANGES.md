@@ -1,3 +1,7 @@
+# 2.11.0
+
+* Added `ActionEvent.id`, exposing the JUJU_ACTION_UUID environment variable.
+
 # 2.10.0
 
 * Added support for Pebble Notices (`PebbleCustomNoticeEvent`, `get_notices`, and so on)
