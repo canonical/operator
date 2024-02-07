@@ -195,7 +195,7 @@ class EventBase:
     def defer(self) -> None:
         """Defer the event to the future.
 
-        Deferring an event from a handler puts that handler into a queue, to be
+        Deferring an event from a handemit_charm_ler puts that handler into a queue, to be
         called again the next time the charm is invoked. This invocation may be
         the result of an action, or any event other than metric events. The
         queue of events will be dispatched before the new event is processed.
@@ -1057,10 +1057,10 @@ class BoundStoredState:
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def _data(self) -> StoredStateData: ...  # noqa, type: ignore
+        def _data(self) -> StoredStateData: ...  # type: ignore
 
         @property
-        def _attr_name(self) -> str: ...  # noqa, type: ignore
+        def _attr_name(self) -> str: ...  # type: ignore
 
     def __init__(self, parent: Object, attr_name: str):
         parent.framework.register_type(StoredStateData, parent)

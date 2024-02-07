@@ -1830,7 +1830,8 @@ class Harness(Generic[CharmType]):
         return self._backend._reboot_count
 
     def run_action(self, action_name: str,
-                   params: Optional[Dict[str, Any]] = None) -> ActionOutput:
+                   params: Optional[Dict[str, Any]] = None,
+                   action_id: str = "1") -> ActionOutput:
         """Simulates running a charm action, as with ``juju run``.
 
         Use this only after calling :meth:`begin`.
@@ -1856,6 +1857,7 @@ class Harness(Generic[CharmType]):
             params: override the default parameter values found in ``actions.yaml``.
                 If a parameter is not in ``params``, or ``params`` is ``None``, then
                 the default value from ``actions.yaml`` will be used.
+            action_id: the Juju ID for the action to run
 
         Raises:
             ActionFailed: if :meth:`ops.ActionEvent.fail` is called. Note that this will
@@ -1883,7 +1885,7 @@ class Harness(Generic[CharmType]):
         action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
         handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
         self._backend._running_action = action_under_test
-        handler.emit()
+        handler.emit(action_id)
         self._backend._running_action = None
         if action_under_test.failure_message is not None:
             raise ActionFailed(

@@ -477,7 +477,7 @@ start:
         self.assertIn('foo_bar_action', events)
         self.assertIn('start_action', events)
 
-        charm.on.foo_bar_action.emit()
+        charm.on.foo_bar_action.emit(id='3')
         self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
             ['action-get', '--format=json'],
@@ -511,7 +511,7 @@ start:
             charm.res = bad_res
 
             with self.assertRaises(ValueError):
-                charm.on.foo_bar_action.emit()
+                charm.on.foo_bar_action.emit(id='1')
 
     def _test_action_event_defer_fails(self, cmd_type: str):
 
@@ -532,7 +532,7 @@ start:
         charm = MyCharm(framework)
 
         with self.assertRaises(RuntimeError):
-            charm.on.start_action.emit()
+            charm.on.start_action.emit(id='2')
 
     def test_action_event_defer_fails(self):
         self._test_action_event_defer_fails('action')
