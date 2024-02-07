@@ -25,7 +25,6 @@ from typing import (
     List,
     Literal,
     Mapping,
-    NoReturn,
     Optional,
     TextIO,
     Tuple,
@@ -42,6 +41,7 @@ from ops.framework import (
     Framework,
     Handle,
     LifecycleEvent,
+    NameToBeAdded,
     Object,
     ObjectEvents,
 )
@@ -92,7 +92,7 @@ class _ContainerBaseDict(TypedDict):
 logger = logging.getLogger(__name__)
 
 
-class HookEvent(EventBase):
+class HookEvent:
     """Events raised by Juju to progress a charm's lifecycle.
 
     Hooks are callback methods of a charm class (a subclass of
@@ -112,7 +112,15 @@ class HookEvent(EventBase):
     """
 
 
-class ActionEvent(EventBase):
+class DeferrableHookEvent(HookEvent, EventBase):
+    """WRITE ME."""
+
+
+class NonDeferrableHookEvent(HookEvent, NameToBeAdded):
+    """WRITE ME."""
+
+
+class ActionEvent(NameToBeAdded):
     """Events raised by Juju when an administrator invokes a Juju Action.
 
     This class is the data type of events triggered when an administrator
@@ -127,17 +135,6 @@ class ActionEvent(EventBase):
 
     params: Dict[str, Any]
     """The parameters passed to the action."""
-
-    def defer(self) -> NoReturn:
-        """Action events are not deferrable like other events.
-
-        This is because an action runs synchronously and the administrator
-        is waiting for the result.
-
-        Raises:
-            RuntimeError: always.
-        """
-        raise RuntimeError('cannot defer action events')
 
     def restore(self, snapshot: Dict[str, Any]):
         """Used by the framework to record the action.
@@ -212,7 +209,7 @@ class ActionEvent(EventBase):
         self.framework.model._backend.action_fail(message)
 
 
-class InstallEvent(HookEvent):
+class InstallEvent(DeferrableHookEvent):
     """Event triggered when a charm is installed.
 
     This event is triggered at the beginning of a charm's
@@ -222,7 +219,7 @@ class InstallEvent(HookEvent):
     """
 
 
-class StartEvent(HookEvent):
+class StartEvent(DeferrableHookEvent):
     """Event triggered immediately after first configuration change.
 
     This event is triggered immediately after the first
@@ -233,7 +230,7 @@ class StartEvent(HookEvent):
     """
 
 
-class StopEvent(HookEvent):
+class StopEvent(NonDeferrableHookEvent):
     """Event triggered when a charm is shut down.
 
     This event is triggered when an application's removal is requested
@@ -244,14 +241,14 @@ class StopEvent(HookEvent):
     """
 
 
-class RemoveEvent(HookEvent):
+class RemoveEvent(NonDeferrableHookEvent):
     """Event triggered when a unit is about to be terminated.
 
     This event fires prior to Juju removing the charm and terminating its unit.
     """
 
 
-class ConfigChangedEvent(HookEvent):
+class ConfigChangedEvent(DeferrableHookEvent):
     """Event triggered when a configuration change occurs.
 
     This event will fire in several situations:
@@ -277,7 +274,7 @@ class ConfigChangedEvent(HookEvent):
     """
 
 
-class UpdateStatusEvent(HookEvent):
+class UpdateStatusEvent(DeferrableHookEvent):
     """Event triggered by a status update request from Juju.
 
     This event is periodically triggered by Juju so that it can
@@ -292,7 +289,7 @@ class UpdateStatusEvent(HookEvent):
     """
 
 
-class UpgradeCharmEvent(HookEvent):
+class UpgradeCharmEvent(DeferrableHookEvent):
     """Event triggered by request to upgrade the charm.
 
     This event will be triggered when an administrator executes ``juju
@@ -305,7 +302,7 @@ class UpgradeCharmEvent(HookEvent):
     """
 
 
-class PreSeriesUpgradeEvent(HookEvent):
+class PreSeriesUpgradeEvent(DeferrableHookEvent):
     """Event triggered to prepare a unit for series upgrade.
 
     This event triggers when an administrator executes ``juju upgrade-machine
@@ -322,7 +319,7 @@ class PreSeriesUpgradeEvent(HookEvent):
     """
 
 
-class PostSeriesUpgradeEvent(HookEvent):
+class PostSeriesUpgradeEvent(DeferrableHookEvent):
     """Event triggered after a series upgrade.
 
     This event is triggered after the administrator has done a distribution
@@ -336,7 +333,7 @@ class PostSeriesUpgradeEvent(HookEvent):
     """
 
 
-class LeaderElectedEvent(HookEvent):
+class LeaderElectedEvent(DeferrableHookEvent):
     """Event triggered when a new leader has been elected.
 
     Juju will trigger this event when a new leader unit is chosen for
@@ -349,7 +346,7 @@ class LeaderElectedEvent(HookEvent):
     """
 
 
-class LeaderSettingsChangedEvent(HookEvent):
+class LeaderSettingsChangedEvent(DeferrableHookEvent):
     """DEPRECATED. Event triggered when leader changes any settings.
 
     This event has been deprecated in favor of using a Peer relation,
@@ -358,7 +355,7 @@ class LeaderSettingsChangedEvent(HookEvent):
     """
 
 
-class CollectMetricsEvent(HookEvent):
+class CollectMetricsEvent(DeferrableHookEvent):
     """Event triggered by Juju to collect metrics.
 
     Juju fires this event every five minutes for the lifetime of the
@@ -383,7 +380,7 @@ class CollectMetricsEvent(HookEvent):
         self.framework.model._backend.add_metrics(metrics, labels)
 
 
-class RelationEvent(HookEvent):
+class RelationEvent(DeferrableHookEvent):
     """A base class representing the various relation lifecycle events.
 
     Relation lifecycle events are generated when application units
@@ -592,7 +589,7 @@ class RelationBrokenEvent(RelationEvent):
     """Always ``None``."""
 
 
-class StorageEvent(HookEvent):
+class StorageEvent(DeferrableHookEvent):
     """Base class representing storage-related events.
 
     Juju can provide a variety of storage types to a charms. The
@@ -675,7 +672,7 @@ class StorageDetachingEvent(StorageEvent):
     """
 
 
-class WorkloadEvent(HookEvent):
+class WorkloadEvent(DeferrableHookEvent):
     """Base class representing workload-related events.
 
     Workload events are generated for all containers that the charm
@@ -769,19 +766,13 @@ class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats."""
 
 
-class SecretEvent(HookEvent):
+class SecretEvent:
     """Base class for all secret events."""
 
-    def __init__(self, handle: 'Handle', id: str, label: Optional[str]):
-        super().__init__(handle)
+    def __init__(self, id: str, label: Optional[str], *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
         self._id = id
         self._label = label
-
-    @property
-    def secret(self) -> model.Secret:
-        """The secret instance this event refers to."""
-        backend = self.framework.model._backend
-        return model.Secret(backend=backend, id=self._id, label=self._label)
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -799,7 +790,35 @@ class SecretEvent(HookEvent):
         self._label = cast(Optional[str], snapshot['label'])
 
 
-class SecretChangedEvent(SecretEvent):
+class DeferrableSecretEvent(SecretEvent, DeferrableHookEvent):
+    """WRITE ME."""
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str]):
+        super().__init__(handle=handle, id=id, label=label)
+
+    # TODO: if we go with this, then before merging, figure out how to avoid
+    # the duplication here (ideally).
+    @property
+    def secret(self) -> model.Secret:
+        """The secret instance this event refers to."""
+        backend = self.framework.model._backend
+        return model.Secret(backend=backend, id=self._id, label=self._label)
+
+
+class NonDeferrableSecretEvent(SecretEvent, NonDeferrableHookEvent):
+    """WRITE ME."""
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str]):
+        super().__init__(handle=handle, id=id, label=label)
+
+    @property
+    def secret(self) -> model.Secret:
+        """The secret instance this event refers to."""
+        backend = self.framework.model._backend
+        return model.Secret(backend=backend, id=self._id, label=self._label)
+
+
+class SecretChangedEvent(DeferrableSecretEvent):
     """Event triggered on the secret observer charm when the secret owner changes its contents.
 
     When the owner of a secret changes the secret's contents, Juju will create
@@ -812,7 +831,7 @@ class SecretChangedEvent(SecretEvent):
     """
 
 
-class SecretRotateEvent(SecretEvent):
+class SecretRotateEvent(NonDeferrableSecretEvent):
     """Event triggered on the secret owner charm when the secret's rotation policy elapses.
 
     This event is fired on the secret owner to inform it that the secret must
@@ -820,18 +839,8 @@ class SecretRotateEvent(SecretEvent):
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
     """
 
-    def defer(self) -> NoReturn:
-        """Secret rotation events are not deferrable (Juju handles re-invocation).
 
-        Raises:
-            RuntimeError: always.
-        """
-        raise RuntimeError(
-            'Cannot defer secret rotation events. Juju will keep firing this '
-            'event until you create a new revision.')
-
-
-class SecretRemoveEvent(SecretEvent):
+class SecretRemoveEvent(DeferrableSecretEvent):
     """Event triggered on the secret owner charm when a secret revision can be removed.
 
     When the owner of a secret creates a new revision, and after all
@@ -870,7 +879,7 @@ class SecretRemoveEvent(SecretEvent):
         self._revision = cast(int, snapshot['revision'])
 
 
-class SecretExpiredEvent(SecretEvent):
+class SecretExpiredEvent(NonDeferrableSecretEvent):
     """Event triggered on the secret owner charm when a secret's expiration time elapses.
 
     This event is fired on the secret owner to inform it that the secret revision
@@ -903,16 +912,6 @@ class SecretExpiredEvent(SecretEvent):
         """
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
-
-    def defer(self) -> NoReturn:
-        """Secret expiration events are not deferrable (Juju handles re-invocation).
-
-        Raises:
-            RuntimeError: always.
-        """
-        raise RuntimeError(
-            'Cannot defer secret expiration events. Juju will keep firing '
-            'this event until you create a new revision.')
 
 
 class CollectStatusEvent(LifecycleEvent):

@@ -522,7 +522,7 @@ start:
                 framework.observe(self.on.start_action, self._on_start_action)
 
             def _on_start_action(self, event: ops.ActionEvent):
-                event.defer()
+                event.defer()  # type: ignore
 
         fake_script(self, f"{cmd_type}-get", """echo '{"foo-name": "name", "silent": true}'""")
         self.meta = self._get_action_test_meta()
@@ -531,7 +531,7 @@ start:
         framework = self.create_framework()
         charm = MyCharm(framework)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AttributeError):
             charm.on.start_action.emit()
 
     def test_action_event_defer_fails(self):

@@ -171,12 +171,8 @@ class Handle:
         return typing.cast(Handle, handle)
 
 
-class EventBase:
-    """The base class for all events.
-
-    Inherit this and override the ``snapshot`` and ``restore`` methods to
-    create a custom event.
-    """
+class NameToBeAdded:
+    """The base class for all events."""
 
     # gets patched in by `Framework.restore()`, if this event is being re-emitted
     # after being loaded from snapshot, or by `BoundEvent.emit()` if this
@@ -187,6 +183,33 @@ class EventBase:
 
     def __init__(self, handle: Handle):
         self.handle = handle
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} via {self.handle}>"
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Return the snapshot data that should be persisted.
+
+        Subclasses must override to save any custom state.
+        """
+        return {}
+
+    def restore(self, snapshot: Dict[str, Any]):
+        """Restore the value state from the given snapshot.
+
+        Subclasses must override to restore their custom state.
+        """
+
+
+class EventBase(NameToBeAdded):
+    """The base class for all events that may be deferred.
+
+    Inherit this and override the ``snapshot`` and ``restore`` methods to
+    create a custom event.
+    """
+
+    def __init__(self, handle: Handle):
+        super().__init__(handle)
         self.deferred: bool = False
 
     def __repr__(self):
@@ -243,13 +266,6 @@ class EventBase:
         logger.debug("Deferring %s.", self)
         self.deferred = True
 
-    def snapshot(self) -> Dict[str, Any]:
-        """Return the snapshot data that should be persisted.
-
-        Subclasses must override to save any custom state.
-        """
-        return {}
-
     def restore(self, snapshot: Dict[str, Any]):
         """Restore the value state from the given snapshot.
 
@@ -263,7 +279,7 @@ class EventSource:
 
     It is generally used as::
 
-        class SomethingHappened(ops.EventBase):
+        class SomethingHappened(ops.NameToBeAdded):
             pass
 
         class SomeObject(Object):
@@ -274,11 +290,11 @@ class EventSource:
     the event.
     """
 
-    def __init__(self, event_type: 'Type[EventBase]'):
-        if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
+    def __init__(self, event_type: 'Type[NameToBeAdded]'):
+        if not isinstance(event_type, type) or not issubclass(event_type, NameToBeAdded):
             raise RuntimeError(
-                f'Event requires a subclass of EventBase as an argument, got {event_type}')
-        self.event_type: Type[EventBase] = event_type
+                f'Event requires a subclass of NameToBeAdded as an argument, got {event_type}')
+        self.event_type: Type[NameToBeAdded] = event_type
         self.event_kind: Optional[str] = None
         self.emitter_type: Optional[Type[Object]] = None
 
@@ -322,7 +338,7 @@ class BoundEvent:
         )
 
     def __init__(self, emitter: 'Object',
-                 event_type: 'Type[EventBase]',
+                 event_type: 'Type[NameToBeAdded]',
                  event_kind: str):
         self.emitter = emitter
         self.event_type = event_type
@@ -438,7 +454,7 @@ class ObjectEvents(Object):
         return instance
 
     @classmethod
-    def define_event(cls, event_kind: str, event_type: 'Type[EventBase]'):
+    def define_event(cls, event_kind: str, event_type: 'Type[NameToBeAdded]'):
         """Define an event on this type at runtime.
 
         Note that attempting to define the same event kind more than once will
@@ -520,7 +536,7 @@ class PrefixedEvents:
         return getattr(self._emitter, self._prefix + name)
 
 
-class LifecycleEvent(EventBase):
+class LifecycleEvent(NameToBeAdded):
     """Events tied to the lifecycle of the Framework object."""
 
 
@@ -709,7 +725,7 @@ class Framework(Object):
         self._type_registry[(parent_path, kind_)] = cls
         self._type_known.add(cls)
 
-    def save_snapshot(self, value: Union["StoredStateData", "EventBase"]):
+    def save_snapshot(self, value: Union["StoredStateData", "NameToBeAdded"]):
         """Save a persistent snapshot of the provided value."""
         if type(value) not in self._type_known:
             raise RuntimeError(
@@ -827,7 +843,7 @@ class Framework(Object):
         self._stored['event_count'] += 1  # type: ignore  #(we know event_count holds an int)
         return str(self._stored['event_count'])
 
-    def _emit(self, event: EventBase):
+    def _emit(self, event: NameToBeAdded):
         """See BoundEvent.emit for the public way to call this."""
         saved = False
         event_path = event.handle.path
@@ -1045,7 +1061,7 @@ class StoredStateData(Object):
         self._cache = snapshot
         self.dirty = False
 
-    def on_commit(self, event: EventBase) -> None:
+    def on_commit(self, event: NameToBeAdded) -> None:
         """Save changes to the storage backend."""
         if self.dirty:
             self.framework.save_snapshot(self)
