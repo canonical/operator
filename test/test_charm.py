@@ -463,7 +463,7 @@ start:
             def _on_foo_bar_action(self, event: ops.ActionEvent):
                 self.seen_action_params = event.params
                 event.log('test-log')
-                event.set_results({'res': 'val with spaces'})
+                event.set_results({'res': 'val with spaces', 'id': event.id})
                 event.fail('test-fail')
 
             def _on_start_action(self, event: ops.ActionEvent):
@@ -477,12 +477,13 @@ start:
         self.assertIn('foo_bar_action', events)
         self.assertIn('start_action', events)
 
-        charm.on.foo_bar_action.emit(id='3')
+        action_id = "1234"
+        charm.on.foo_bar_action.emit(id=action_id)
         self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
         self.assertEqual(fake_script_calls(self), [
             ['action-get', '--format=json'],
             ['action-log', "test-log"],
-            ['action-set', "res=val with spaces"],
+            ['action-set', "res=val with spaces", f"id={action_id}"],
             ['action-fail', "test-fail"],
         ])
 
