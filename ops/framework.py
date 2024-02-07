@@ -195,7 +195,7 @@ class EventBase:
     def defer(self) -> None:
         """Defer the event to the future.
 
-        Deferring an event from a handemit_charm_ler puts that handler into a queue, to be
+        Deferring an event from a handler puts that handler into a queue, to be
         called again the next time the charm is invoked. This invocation may be
         the result of an action, or any event other than metric events. The
         queue of events will be dispatched before the new event is processed.
