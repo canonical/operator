@@ -5,6 +5,8 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, RelationDepart
 from ops.framework import EventBase, Framework
 
 from scenario.state import (
+    _DEFAULT_IP,
+    DEFAULT_JUJU_DATABAG,
     PeerRelation,
     Relation,
     RelationBase,
@@ -226,6 +228,44 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
 
     assert (
         "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
+    )
+
+
+@pytest.mark.parametrize(
+    "evt_name",
+    ("changed", "broken", "departed", "joined", "created"),
+)
+def test_relation_events_remote_units_data_defaults(mycharm, evt_name, caplog):
+    relation = Relation(
+        endpoint="foo",
+        interface="foo",
+    )
+
+    def callback(charm: CharmBase, event):
+        if isinstance(event, CollectStatusEvent):
+            return
+
+        assert event.app  # that's always present
+        remote_unit = event.relation.units.pop()
+
+        assert event.relation.data[remote_unit] == DEFAULT_JUJU_DATABAG
+
+    mycharm._call = callback
+
+    trigger(
+        State(
+            relations=[
+                relation,
+            ],
+        ),
+        getattr(relation, f"{evt_name}_event"),
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+            },
+        },
     )
 
 

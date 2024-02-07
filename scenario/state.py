@@ -444,6 +444,14 @@ class RelationBase(_DCBase):
         )
 
 
+_DEFAULT_IP = "42.42.42.42"
+DEFAULT_JUJU_DATABAG = {
+    "egress-subnets": _DEFAULT_IP,
+    "ingress-address": _DEFAULT_IP,
+    "private-address": _DEFAULT_IP,
+}
+
+
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
     remote_app_name: str = "remote"
@@ -453,7 +461,7 @@ class Relation(RelationBase):
 
     remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
     remote_units_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
-        default_factory=lambda: {0: {}},
+        default_factory=lambda: {0: DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
 
     @property
