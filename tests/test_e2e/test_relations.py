@@ -5,7 +5,6 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, RelationDepart
 from ops.framework import EventBase, Framework
 
 from scenario.state import (
-    _DEFAULT_IP,
     DEFAULT_JUJU_DATABAG,
     PeerRelation,
     Relation,
@@ -231,42 +230,21 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     )
 
 
-@pytest.mark.parametrize(
-    "evt_name",
-    ("changed", "broken", "departed", "joined", "created"),
-)
-def test_relation_events_remote_units_data_defaults(mycharm, evt_name, caplog):
-    relation = Relation(
-        endpoint="foo",
-        interface="foo",
-    )
+def test_relation_default_unit_data_regular():
+    relation = Relation("baz")
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.remote_units_data == {0: DEFAULT_JUJU_DATABAG}
 
-    def callback(charm: CharmBase, event):
-        if isinstance(event, CollectStatusEvent):
-            return
 
-        assert event.app  # that's always present
-        remote_unit = event.relation.units.pop()
+def test_relation_default_unit_data_sub():
+    relation = SubordinateRelation("baz")
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.remote_unit_data == DEFAULT_JUJU_DATABAG
 
-        assert event.relation.data[remote_unit] == DEFAULT_JUJU_DATABAG
 
-    mycharm._call = callback
-
-    trigger(
-        State(
-            relations=[
-                relation,
-            ],
-        ),
-        getattr(relation, f"{evt_name}_event"),
-        mycharm,
-        meta={
-            "name": "local",
-            "requires": {
-                "foo": {"interface": "foo"},
-            },
-        },
-    )
+def test_relation_default_unit_data_peer():
+    relation = PeerRelation("baz")
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
 
 
 @pytest.mark.parametrize(
