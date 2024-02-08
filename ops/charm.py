@@ -112,7 +112,7 @@ class HookEvent(EventBase):
     """
 
 
-class ActionEvent(HookEvent):
+class ActionEvent(EventBase):
     """Events raised by Juju when an administrator invokes a Juju Action.
 
     This class is the data type of events triggered when an administrator
@@ -772,7 +772,7 @@ class PebbleCustomNoticeEvent(PebbleNoticeEvent):
 class SecretEvent(HookEvent):
     """Base class for all secret events."""
 
-    def __init__(self, handle: Handle, id: str, label: Optional[str]):
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str]):
         super().__init__(handle)
         self._id = id
         self._label = label
@@ -821,15 +821,14 @@ class SecretRotateEvent(SecretEvent):
     """
 
     def defer(self) -> NoReturn:
-        """Secret rotate events are not deferrable like other events.
-
-        This is because Juju will continuously fire the event until a new
-        revision is created, so there is an existing retry mechanism.
+        """Secret rotation events are not deferrable (Juju handles re-invocation).
 
         Raises:
             RuntimeError: always.
         """
-        raise RuntimeError('cannot defer secret rotate events')
+        raise RuntimeError(
+            'Cannot defer secret rotation events. Juju will keep firing this '
+            'event until you create a new revision.')
 
 
 class SecretRemoveEvent(SecretEvent):
@@ -843,6 +842,10 @@ class SecretRemoveEvent(SecretEvent):
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision.
     """
+
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
+        super().__init__(handle, id, label)
+        self._revision = revision
 
     @property
     def revision(self) -> int:
@@ -875,21 +878,14 @@ class SecretExpiredEvent(SecretEvent):
     revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
     """
 
+    def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
+        super().__init__(handle, id, label)
+        self._revision = revision
+
     @property
     def revision(self) -> int:
         """The secret revision this event refers to."""
         return self._revision
-
-    def defer(self) -> NoReturn:
-        """Secret expired events are not deferrable like other events.
-
-        This is because an Juju will continuously fire the event until the
-        revision is removed, so there is an existing retry mechanism.
-
-        Raises:
-            RuntimeError: always.
-        """
-        raise RuntimeError('cannot defer secret expired events')
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -907,6 +903,16 @@ class SecretExpiredEvent(SecretEvent):
         """
         super().restore(snapshot)
         self._revision = cast(int, snapshot['revision'])
+
+    def defer(self) -> NoReturn:
+        """Secret expiration events are not deferrable (Juju handles re-invocation).
+
+        Raises:
+            RuntimeError: always.
+        """
+        raise RuntimeError(
+            'Cannot defer secret expiration events. Juju will keep firing '
+            'this event until you create a new revision.')
 
 
 class CollectStatusEvent(LifecycleEvent):
