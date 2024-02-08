@@ -446,7 +446,7 @@ class RelationBase(_DCBase):
         )
 
 
-_DEFAULT_IP = "42.42.42.42"
+_DEFAULT_IP = " 192.0.2.0"
 DEFAULT_JUJU_DATABAG = {
     "egress-subnets": _DEFAULT_IP,
     "ingress-address": _DEFAULT_IP,
