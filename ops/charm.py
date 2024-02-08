@@ -243,12 +243,34 @@ class StopEvent(HookEvent):
     and that it will not start again on reboot.
     """
 
+    def defer(self) -> NoReturn:
+        """Stop events are not deferrable like other events.
+
+        This is because the unit is in the process of tearing down, and there
+        will not be an opportunity for the deferred event to run.
+
+        Raises:
+            RuntimeError: always.
+        """
+        raise RuntimeError('cannot defer stop events')
+
 
 class RemoveEvent(HookEvent):
     """Event triggered when a unit is about to be terminated.
 
     This event fires prior to Juju removing the charm and terminating its unit.
     """
+
+    def defer(self) -> NoReturn:
+        """Remove events are not deferrable like other events.
+
+        This is because the unit is about to be torn down, and there
+        will not be an opportunity for the deferred event to run.
+
+        Raises:
+            RuntimeError: always.
+        """
+        raise RuntimeError('cannot defer remove events')
 
 
 class ConfigChangedEvent(HookEvent):

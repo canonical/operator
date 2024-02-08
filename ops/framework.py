@@ -38,6 +38,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    NoReturn,
     Optional,
     Protocol,
     Set,
@@ -172,7 +173,7 @@ class Handle:
 
 
 class EventBase:
-    """The base class for all events that may be deferred.
+    """The base class for all events.
 
     Inherit this and override the ``snapshot`` and ``restore`` methods to
     create a custom event.
@@ -522,6 +523,17 @@ class PrefixedEvents:
 
 class LifecycleEvent(EventBase):
     """Events tied to the lifecycle of the Framework object."""
+
+    def defer(self) -> NoReturn:
+        """Lifecycle events are not deferrable like other events.
+
+        This is because these events are run alongside each event invokation,
+        so deferring would always end up simply doubling the work.
+
+        Raises:
+            RuntimeError: always.
+        """
+        raise RuntimeError('cannot defer lifecycle events')
 
 
 class PreCommitEvent(LifecycleEvent):
