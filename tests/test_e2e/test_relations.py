@@ -5,6 +5,7 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, RelationDepart
 from ops.framework import EventBase, Framework
 
 from scenario.state import (
+    DEFAULT_JUJU_DATABAG,
     PeerRelation,
     Relation,
     RelationBase,
@@ -227,6 +228,23 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     assert (
         "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
     )
+
+
+def test_relation_default_unit_data_regular():
+    relation = Relation("baz")
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.remote_units_data == {0: DEFAULT_JUJU_DATABAG}
+
+
+def test_relation_default_unit_data_sub():
+    relation = SubordinateRelation("baz")
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.remote_unit_data == DEFAULT_JUJU_DATABAG
+
+
+def test_relation_default_unit_data_peer():
+    relation = PeerRelation("baz")
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
 
 
 @pytest.mark.parametrize(

@@ -6,7 +6,7 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.state import Container, Relation, State, sort_patch
+from scenario.state import DEFAULT_JUJU_DATABAG, Container, Relation, State, sort_patch
 from tests.helpers import trigger
 
 CUSTOM_EVT_SUFFIXES = {
@@ -225,9 +225,9 @@ def test_relation_set(mycharm):
     assert asdict(out.relations[0]) == asdict(
         relation.replace(
             local_app_data={"a": "b"},
-            local_unit_data={"c": "d"},
+            local_unit_data={"c": "d", **DEFAULT_JUJU_DATABAG},
         )
     )
 
     assert out.relations[0].local_app_data == {"a": "b"}
-    assert out.relations[0].local_unit_data == {"c": "d"}
+    assert out.relations[0].local_unit_data == {"c": "d", **DEFAULT_JUJU_DATABAG}

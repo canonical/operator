@@ -360,7 +360,9 @@ class RelationBase(_DCBase):
     local_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
     """This application's databag for this relation."""
 
-    local_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    local_unit_data: "RawDataBagContents" = dataclasses.field(
+        default_factory=lambda: DEFAULT_JUJU_DATABAG.copy(),
+    )
     """This unit's databag for this relation."""
 
     @property
@@ -444,6 +446,14 @@ class RelationBase(_DCBase):
         )
 
 
+_DEFAULT_IP = " 192.0.2.0"
+DEFAULT_JUJU_DATABAG = {
+    "egress-subnets": _DEFAULT_IP,
+    "ingress-address": _DEFAULT_IP,
+    "private-address": _DEFAULT_IP,
+}
+
+
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
     remote_app_name: str = "remote"
@@ -453,7 +463,7 @@ class Relation(RelationBase):
 
     remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
     remote_units_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
-        default_factory=lambda: {0: {}},
+        default_factory=lambda: {0: DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
 
     @property
@@ -482,7 +492,9 @@ class Relation(RelationBase):
 @dataclasses.dataclass(frozen=True)
 class SubordinateRelation(RelationBase):
     remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
-    remote_unit_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
+    remote_unit_data: "RawDataBagContents" = dataclasses.field(
+        default_factory=lambda: DEFAULT_JUJU_DATABAG.copy(),
+    )
 
     # app name and ID of the remote unit that *this unit* is attached to.
     remote_app_name: str = "remote"
@@ -518,7 +530,7 @@ class SubordinateRelation(RelationBase):
 @dataclasses.dataclass(frozen=True)
 class PeerRelation(RelationBase):
     peers_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
-        default_factory=lambda: {0: {}},
+        default_factory=lambda: {0: DEFAULT_JUJU_DATABAG.copy()},
     )
     # mapping from peer unit IDs to their databag contents.
     # Consistency checks will validate that *this unit*'s ID is not in here.
