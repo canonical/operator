@@ -115,9 +115,9 @@ def setup_framework(
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
         broken_relation_id = (
-            event.relation.relation_id
+            event.relation.relation_id  # type: ignore
             if event.name.endswith("_relation_broken")
-            else None  # type: ignore
+            else None
         )
 
         model = ops.model.Model(
