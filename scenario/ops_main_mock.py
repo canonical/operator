@@ -111,7 +111,7 @@ def setup_framework(
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
 
     # ops >= 2.10
-    if inspect.signature(ops.model.Model).parameters["broken_relation_id"]:
+    if inspect.signature(ops.model.Model).parameters.get("broken_relation_id"):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
         broken_relation_id = (
