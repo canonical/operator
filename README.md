@@ -419,10 +419,9 @@ state_in = State(relations=[
     PeerRelation(
         endpoint="peers",
         peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
-    )],
-    unit_id=1)
+    )])
 
-Context(...).run("start", state_in)  # invalid: this unit's id cannot be the ID of a peer.
+Context(..., unit_id=1).run("start", state_in)  # invalid: this unit's id cannot be the ID of a peer.
 
 
 ```
