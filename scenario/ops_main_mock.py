@@ -126,6 +126,10 @@ def setup_framework(
             broken_relation_id=broken_relation_id,
         )
     else:
+        ops_logger.warning(
+            "It looks like this charm is using an older `ops` version. "
+            "You may experience weirdness. Please update ops.",
+        )
         model = ops.model.Model(meta, model_backend)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
