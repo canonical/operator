@@ -1885,7 +1885,7 @@ class Harness(Generic[CharmType]):
         handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
         self._backend._running_action = action_under_test
         self._action_id_counter += 1
-        handler.emit(self._action_id_counter)
+        handler.emit(str(self._action_id_counter))
         self._backend._running_action = None
         if action_under_test.failure_message is not None:
             raise ActionFailed(
