@@ -2069,7 +2069,7 @@ class Container:
     exceptions when there are problems communicating with Pebble. Problems
     connecting to or transferring data with Pebble will raise a
     :class:`ops.pebble.ConnectionError` - you can guard against these by first
-    checking :meth:`can_connect`, but that generally introduces a race condition 
+    checking :meth:`can_connect`, but that generally introduces a race condition
     where problems occur after :meth:`can_connect` has succeeded. When an error
     occurs executing the request, such as trying to add an invalid layer or
     execute a command that does not exist, an :class:`ops.pebble.APIError` is
