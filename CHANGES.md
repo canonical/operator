@@ -1,3 +1,7 @@
+# 2.11.0
+
+* `StopEvent`, `RemoveEvent`, and all `LifeCycleEvent`s are no longer deferrable, and will raise a `RuntimeError` if `defer()` is called on the event object.
+
 # 2.10.0
 
 * Added support for Pebble Notices (`PebbleCustomNoticeEvent`, `get_notices`, and so on)
