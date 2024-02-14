@@ -242,4 +242,4 @@ See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. 
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Mattermost](https://chat.charmhub.io/charmhub/channels/charm-dev)
+Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
