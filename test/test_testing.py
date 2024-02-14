@@ -3065,7 +3065,7 @@ class TestNetwork(unittest.TestCase):
         with self.assertRaises(ops.RelationNotFoundError):
             binding = self.harness.model.get_binding('db')
             assert binding is not None
-            binding.network  # noqa: B018
+            binding.network
 
     def test_add_network_endpoint_not_in_meta(self):
         with self.assertRaises(ops.ModelError):

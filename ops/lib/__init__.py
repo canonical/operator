@@ -264,14 +264,14 @@ class _Lib:
             self._module = module
         return self._module
 
-    def __eq__(self, other):  # noqa: ANN001
+    def __eq__(self, other):
         if not isinstance(other, _Lib):
             return NotImplemented
         a = (self.name, self.author, self.api, self.patch)
         b = (other.name, other.author, other.api, other.patch)
         return a == b
 
-    def __lt__(self, other):  # noqa: ANN001
+    def __lt__(self, other):
         if not isinstance(other, _Lib):
             return NotImplemented
         a = (self.name, self.author, self.api, self.patch)

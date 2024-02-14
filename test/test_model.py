@@ -817,7 +817,7 @@ class TestModel(unittest.TestCase):
     def test_set_app_status_non_leader_raises(self):
         self.harness.set_leader(False)
         with self.assertRaises(RuntimeError):
-            self.model.app.status  # noqa: B018
+            self.model.app.status
 
         with self.assertRaises(RuntimeError):
             self.model.app.status = ops.ActiveStatus()
@@ -1464,7 +1464,7 @@ containers:
 
         with self.assertRaises(RuntimeError):
             other_unit = self.model.get_unit('other')
-            other_unit.containers  # noqa: B018
+            other_unit.containers
 
     def test_unit_get_container(self):
         unit = self.model.unit
