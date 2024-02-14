@@ -1,6 +1,7 @@
 # 2.11.0
 
 * `StopEvent`, `RemoveEvent`, and all `LifeCycleEvent`s are no longer deferrable, and will raise a `RuntimeError` if `defer()` is called on the event object.
+* Added `ActionEvent.id`, exposing the JUJU_ACTION_UUID environment variable.
 
 # 2.10.0
 

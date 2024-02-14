@@ -191,6 +191,9 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
         storage = cast(Union[ops.storage.JujuStorage, ops.storage.SQLiteStorage], storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
+    elif issubclass(event_type, ops.charm.ActionEvent):
+        args: List[Any] = [os.environ['JUJU_ACTION_UUID']]
+        return args, {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = _get_juju_relation_id()

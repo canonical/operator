@@ -125,8 +125,15 @@ class ActionEvent(EventBase):
     :meth:`log`.
     """
 
+    id: str = ""
+    """The Juju ID of the action invocation."""
+
     params: Dict[str, Any]
     """The parameters passed to the action."""
+
+    def __init__(self, handle: 'Handle', id: Optional[str] = None):
+        super().__init__(handle)
+        self.id = id  # type: ignore (for backwards compatibility)
 
     def defer(self) -> NoReturn:
         """Action events are not deferrable like other events.
@@ -144,9 +151,17 @@ class ActionEvent(EventBase):
 
         Not meant to be called directly by charm code.
         """
+        self.id = cast(str, snapshot['id'])
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        return {'id': self.id}
 
     def set_results(self, results: Dict[str, Any]):
         """Report the result of the action.

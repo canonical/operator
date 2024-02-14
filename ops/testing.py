@@ -246,6 +246,7 @@ class Harness(Generic[CharmType]):
         self._unit_name: str = f"{self._meta.name}/0"
         self._hooks_enabled: bool = True
         self._relation_id_counter: int = 0
+        self._action_id_counter: int = 0
         config_ = self._get_config(config)
         self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
         self._model = model.Model(self._meta, self._backend)
@@ -1883,7 +1884,8 @@ class Harness(Generic[CharmType]):
         action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
         handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
         self._backend._running_action = action_under_test
-        handler.emit()
+        self._action_id_counter += 1
+        handler.emit(str(self._action_id_counter))
         self._backend._running_action = None
         if action_under_test.failure_message is not None:
             raise ActionFailed(
