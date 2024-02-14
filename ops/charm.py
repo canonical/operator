@@ -125,12 +125,15 @@ class ActionEvent(EventBase):
     :meth:`log`.
     """
 
+    id: str = ""
+    """The Juju ID of the action invocation."""
+
     params: Dict[str, Any]
     """The parameters passed to the action."""
 
-    def __init__(self, handle: 'Handle', id: str):
+    def __init__(self, handle: 'Handle', id: Optional[str] = None):
         super().__init__(handle)
-        self.id = id
+        self.id = id  # type: ignore (for backwards compatibility)
 
     def defer(self) -> NoReturn:
         """Action events are not deferrable like other events.
