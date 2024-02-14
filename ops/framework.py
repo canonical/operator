@@ -1057,10 +1057,10 @@ class BoundStoredState:
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def _data(self) -> StoredStateData: ...  # noqa, type: ignore
+        def _data(self) -> StoredStateData: ...  # type: ignore
 
         @property
-        def _attr_name(self) -> str: ...  # noqa, type: ignore
+        def _attr_name(self) -> str: ...  # type: ignore
 
     def __init__(self, parent: Object, attr_name: str):
         parent.framework.register_type(StoredStateData, parent)
