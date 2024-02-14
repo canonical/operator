@@ -2401,14 +2401,14 @@ class _TestingModelBackend:
             return data
         raise RelationNotFoundError
 
-    def add_metrics(self, metrics, labels=None):  # type:ignore  # noqa: ANN001
+    def add_metrics(self, metrics, labels=None):  # type:ignore
         raise NotImplementedError(self.add_metrics)  # type:ignore
 
     @classmethod
-    def log_split(cls, message, max_len=model.MAX_LOG_LINE_LEN):  # type:ignore  # noqa: ANN001
+    def log_split(cls, message, max_len=model.MAX_LOG_LINE_LEN):  # type:ignore
         raise NotImplementedError(cls.log_split)  # type:ignore
 
-    def juju_log(self, level, msg):  # type:ignore  # noqa: ANN001
+    def juju_log(self, level, msg):  # type:ignore
         raise NotImplementedError(self.juju_log)  # type:ignore
 
     def get_pebble(self, socket_path: str) -> '_TestingPebbleClient':
@@ -2930,7 +2930,7 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, check in layer.checks.items():
-                checks[name] = check
+                checks[name] = check  # noqa: PERF403
         return checks
 
     def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
@@ -2938,7 +2938,7 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, log_target in layer.log_targets.items():
-                log_targets[name] = log_target
+                log_targets[name] = log_target  # noqa: PERF403
         return log_targets
 
     def get_plan(self) -> pebble.Plan:
@@ -3288,7 +3288,7 @@ class _TestingPebbleClient:
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
             raise self._api_error(500, message) from None
 
-    def get_checks(self, level=None, names=None):  # type:ignore  # noqa: ANN001
+    def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
 
     def notify(self, type: pebble.NoticeType, key: str, *,
