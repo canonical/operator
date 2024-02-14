@@ -132,10 +132,12 @@ ignore = [
     "RUF015",
     # Mutable class attributes should be annotated with `typing.ClassVar`
     "RUF012",
+    # Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+    "RUF025",
     # Unnecessary `tuple` call (rewrite as a literal)
     "C408",
 ]
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "test/*" = [
     # All documentation linting.
     "D",

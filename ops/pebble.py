@@ -2259,8 +2259,8 @@ class Client:
         else:
             source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
-        path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
-        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
+        path_escaped = path.replace('"', '\\"').encode('utf-8')
+        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([
