@@ -2097,7 +2097,7 @@ class Container:
 
         For example::
 
-            # Add state based on any earlier errors communicating with Pebble.
+            # Add status based on any earlier errors communicating with Pebble.
             ...
             # Check that Pebble is still reachable now.
             container = self.unit.get_container("example")
