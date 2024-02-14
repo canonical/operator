@@ -527,7 +527,7 @@ class LifecycleEvent(EventBase):
     def defer(self) -> NoReturn:
         """Lifecycle events are not deferrable like other events.
 
-        This is because these events are run alongside each event invokation,
+        This is because these events are run alongside each event invocation,
         so deferring would always end up simply doubling the work.
 
         Raises:
