@@ -5426,6 +5426,7 @@ class TestActions(unittest.TestCase):
             def _on_simple_action(self, event: ops.ActionEvent):
                 """An action that doesn't generate logs, have any results, or fail."""
                 self.simple_was_called = True
+                assert isinstance(event.id, str)
 
             def _on_fail_action(self, event: ops.ActionEvent):
                 event.fail("this will be ignored")

@@ -2056,13 +2056,15 @@ class Container:
     For methods that make changes to the container, if the change fails or times out, then a
     :class:`ops.pebble.ChangeError` or :class:`ops.pebble.TimeoutError` will be raised.
 
-    Interactions with the container use Pebble, so all methods may raise exceptions when there are
-    problems communicating with Pebble. Problems connecting to or transferring data with Pebble
-    will raise a :class:`ops.pebble.ConnectionError` - generally you can guard against these by
-    first checking :meth:`can_connect`, but it is possible for problems to occur after
-    :meth:`can_connect` has succeeded. When an error occurs executing the request, such as trying
-    to add an invalid layer or execute a command that does not exist, an
-    :class:`ops.pebble.APIError` is raised.
+    Interactions with the container use Pebble, so all methods may raise
+    exceptions when there are problems communicating with Pebble. Problems
+    connecting to or transferring data with Pebble will raise a
+    :class:`ops.pebble.ConnectionError` - you can guard against these by first
+    checking :meth:`can_connect`, but that generally introduces a race condition
+    where problems occur after :meth:`can_connect` has succeeded. When an error
+    occurs executing the request, such as trying to add an invalid layer or
+    execute a command that does not exist, an :class:`ops.pebble.APIError` is
+    raised.
     """
 
     name: str
@@ -2086,14 +2088,12 @@ class Container:
 
         For example::
 
+            # Add status based on any earlier errors communicating with Pebble.
+            ...
+            # Check that Pebble is still reachable now.
             container = self.unit.get_container("example")
-            if container.can_connect():
-                try:
-                    c.pull('/does/not/exist')
-                except ProtocolError, PathError:
-                    # handle it
-            else:
-                event.defer()
+            if not container.can_connect():
+                event.add_status(ops.WaitingStatus("Waiting for Pebble..."))
         """
         try:
             self._pebble.get_system_info()
