@@ -82,22 +82,94 @@ select = [
     "A",
     # flake8-copyright
     "CPY",
+    # pyupgrade
+    "UP",
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # Ruff specific
+    "RUF",
+    # Perflint
+    "PERF",
     # pyflakes-docstrings
     "D",
 ]
 ignore = [
+    # Use of `assert` detected
+    "S101",
+    # Do not `assert False`
+    "B011",
+    # `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+    "S403",
+    # `subprocess` module is possibly insecure
+    "S404",
+
+    # No explicit `stacklevel` keyword argument found
+    "B028",
+
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
+    # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "SIM117",
+
     # Missing docstring in magic method
     "D105",
     # Missing docstring in `__init__`
     "D107",
+
+    # Manual list comprehension.
+    "PERF401",
+    # Manual dict comprehension.
+    "PERF403",
+
+    # Convert {} from `TypedDict` functional to class syntax
+    # Note that since we have some `TypedDict`s that cannot use the class
+    # syntax, we're currently choosing to be consistent in syntax even though
+    # some can be moved to the class syntax.
+    "UP013",
+
+    ## Likely worth doing, but later.
+
+    # `subprocess` call: check for execution of untrusted input
+    "S603",
+    # Prefer `next(iter(info_dicts))` over single element slice
+    "RUF015",
+    # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF012",
+    # Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+    "RUF025",
+    # Unnecessary `tuple` call (rewrite as a literal)
+    "C408",
 ]
-[tool.ruff.per-file-ignores]
-"test/*" = ["D"]
+[tool.ruff.lint.per-file-ignores]
+"test/*" = [
+    # All documentation linting.
+    "D",
+
+    # Hard-coded password string.
+    "S105",
+    # Hard-coded password function argument.
+    "S106",
+
+    # "Useless" expression.
+    "B018"
+]
 "docs/conf.py" = [
     "CPY001",  # Missing copyright notice at top of file
     "D100",  # Missing docstring in public module
     "I001",  # [*] Import block is un-sorted or un-formatted
     "A001",  # Variable `copyright` is shadowing a Python builtin
+    "RUF003",  # Comment contains ambiguous {}
+    "RUF019",  # [*] Unnecessary key check before dictionary access
+]
+"ops/_private/timeconv.py" = [
+    "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+    "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
 ]
 
 [tool.ruff.lint.pydocstyle]

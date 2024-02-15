@@ -2176,8 +2176,8 @@ class TestHarness(unittest.TestCase):
         harness.set_can_connect('foo', True)
         c = harness.model.unit.containers['foo']
 
-        dir_path = '/tmp/foo/dir'
-        file_path = '/tmp/foo/file'
+        dir_path = '/tmp/foo/dir'  # noqa: S108
+        file_path = '/tmp/foo/file'  # noqa: S108
 
         self.assertFalse(c.isdir(dir_path))
         self.assertFalse(c.exists(dir_path))
@@ -4704,7 +4704,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
             (tempdir / "foo/test").write_text("test")
             (tempdir / "foo/bar/foobar").write_text("foobar")
             (tempdir / "foo/baz").mkdir(parents=True)
-            self.container.push_path(tempdir / "foo", "/tmp")
+            self.container.push_path(tempdir / "foo", "/tmp")  # noqa: S108
 
             self.assertTrue((self.root / "tmp").is_dir())
             self.assertTrue((self.root / "tmp/foo").is_dir())
@@ -4714,7 +4714,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
             self.assertEqual((self.root / "tmp/foo/bar/foobar").read_text(), "foobar")
 
     def test_make_dir(self):
-        self.container.make_dir("/tmp")
+        self.container.make_dir("/tmp")  # noqa: S108
         self.assertTrue((self.root / "tmp").is_dir())
         self.container.make_dir("/foo/bar/foobar", make_parents=True)
         self.assertTrue((self.root / "foo/bar/foobar").is_dir())
@@ -5382,7 +5382,7 @@ class TestHandleExec(unittest.TestCase):
     def test_exec_service_context(self):
         service: ops.pebble.ServiceDict = {
             "command": "test",
-            "working-dir": "/tmp",
+            "working-dir": "/tmp",  # noqa: S108
             "user": "foo",
             "user-id": 1,
             "group": "bar",
@@ -5404,7 +5404,7 @@ class TestHandleExec(unittest.TestCase):
         self.harness.handle_exec(self.container, ["ls"], handler=handler)
 
         self.container.exec(["ls"], service_context="test").wait()
-        self.assertEqual(args_history[-1].working_dir, "/tmp")
+        self.assertEqual(args_history[-1].working_dir, "/tmp")  # noqa: S108
         self.assertEqual(args_history[-1].user, "foo")
         self.assertEqual(args_history[-1].user_id, 1)
         self.assertEqual(args_history[-1].group, "bar")
