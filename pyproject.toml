@@ -127,10 +127,14 @@ ignore = [
     # Manual dict comprehension.
     "PERF403",
 
+    # Convert {} from `TypedDict` functional to class syntax
+    # Note that since we have some `TypedDict`s that cannot use the class
+    # syntax, we're currently choosing to be consistent in syntax even though
+    # some can be moved to the class syntax.
+    "UP013",
+
     ## Likely worth doing, but later.
 
-    # Convert {} from `TypedDict` functional to class syntax
-    "UP013",
     # `subprocess` call: check for execution of untrusted input
     "S603",
     # Prefer `next(iter(info_dicts))` over single element slice
