@@ -147,8 +147,6 @@ ignore = [
     # All documentation linting.
     "D",
 
-    # Use of 'assert'.
-    "S101",
     # Hard-coded password string.
     "S105",
     # Hard-coded password function argument.
