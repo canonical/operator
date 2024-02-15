@@ -2923,7 +2923,7 @@ class _TestingPebbleClient:
             layer = self._layers[key]
             for name, service in layer.services.items():
                 # TODO: merge existing services https://github.com/canonical/operator/issues/1112
-                services[name] = service  # noqa: PERF403
+                services[name] = service
         return services
 
     def _render_checks(self) -> Dict[str, pebble.Check]:
@@ -2931,7 +2931,7 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, check in layer.checks.items():
-                checks[name] = check  # noqa: PERF403
+                checks[name] = check
         return checks
 
     def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
@@ -2939,7 +2939,7 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, log_target in layer.log_targets.items():
-                log_targets[name] = log_target  # noqa: PERF403
+                log_targets[name] = log_target
         return log_targets
 
     def get_plan(self) -> pebble.Plan:

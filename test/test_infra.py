@@ -30,7 +30,7 @@ def get_python_filepaths(include_tests: bool = True):
         for dirpath, _, filenames in os.walk(root):
             for filename in filenames:
                 if filename.endswith(".py"):
-                    python_paths.append(os.path.join(dirpath, filename))  # noqa: PERF401
+                    python_paths.append(os.path.join(dirpath, filename))
     return python_paths
 
 
