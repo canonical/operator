@@ -180,24 +180,23 @@ class Runtime:
 
     def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
         """Build the simulated environment the operator framework expects."""
-        if event.name.endswith("_action"):
-            # todo: do we need some special metadata, or can we assume action names
-            #  are always dashes?
-            action_name = event.name[: -len("_action")].replace("_", "-")
-        else:
-            action_name = ""
-
         env = {
             "JUJU_VERSION": self._juju_version,
             "JUJU_UNIT_NAME": f"{self._app_name}/{self._unit_id}",
             "_": "./dispatch",
             "JUJU_DISPATCH_PATH": f"hooks/{event.name}",
             "JUJU_MODEL_NAME": state.model.name,
-            "JUJU_ACTION_NAME": action_name,
             "JUJU_MODEL_UUID": state.model.uuid,
             "JUJU_CHARM_DIR": str(charm_root.absolute()),
             # todo consider setting pwd, (python)path
         }
+
+        if event.name.endswith("_action"):
+            # todo: do we need some special metadata, or can we assume action names
+            #  are always dashes?
+            env["JUJU_ACTION_NAME"] = event.name[: -len("_action")].replace("_", "-")
+            assert event.action is not None
+            env["JUJU_ACTION_UUID"] = event.action.id
 
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
