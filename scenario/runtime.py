@@ -191,12 +191,14 @@ class Runtime:
             # todo consider setting pwd, (python)path
         }
 
-        if event.name.endswith("_action"):
-            # todo: do we need some special metadata, or can we assume action names
-            #  are always dashes?
-            env["JUJU_ACTION_NAME"] = event.name[: -len("_action")].replace("_", "-")
-            assert event.action is not None
-            env["JUJU_ACTION_UUID"] = event.action.id
+        if event._is_action_event and (action := event.action):
+            env.update(
+                {
+                    # TODO: we should check we're doing the right thing here.
+                    "JUJU_ACTION_NAME": action.name.replace("_", "-"),
+                    "JUJU_ACTION_UUID": action.id,
+                },
+            )
 
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):

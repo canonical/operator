@@ -1443,7 +1443,10 @@ class Action(_DCBase):
     params: Dict[str, "AnyJson"] = dataclasses.field(default_factory=dict)
 
     id: str = dataclasses.field(default_factory=next_action_id)
-    """Juju action ID. Every action invocation gets a new unique one."""
+    """Juju action ID.
+
+    Every action invocation is automatically assigned a new one. Override in
+    the rare cases where a specific ID is required."""
 
     @property
     def event(self) -> Event:
