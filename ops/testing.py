@@ -595,7 +595,7 @@ class Harness(Generic[CharmType]):
                         'username': 'username',
                         'password': 'password',
                         }
-        if resource_name not in self._meta.resources.keys():
+        if resource_name not in self._meta.resources:
             raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
@@ -614,7 +614,7 @@ class Harness(Generic[CharmType]):
             content: Either string or bytes content, which will be the content of the filename
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
-        if resource_name not in self._meta.resources.keys():
+        if resource_name not in self._meta.resources:
             raise RuntimeError(f'Resource {resource_name} is not a defined resource')
         record = self._meta.resources[resource_name]
         if record.type != "file":
@@ -1706,12 +1706,9 @@ class Harness(Generic[CharmType]):
         Return:
             The path of the temporary directory associated with the specified container.
         """
-        # it's okay to access the container directly in this context, as its creation has already
+        # It's okay to access the container directly in this context, as its creation has already
         # been ensured during the model's initialization.
-        if isinstance(container, str):
-            container_name = container
-        else:
-            container_name = container.name
+        container_name = container if isinstance(container, str) else container.name
         return self._backend._pebble_clients[container_name]._root
 
     def evaluate_status(self) -> None:
@@ -1866,7 +1863,7 @@ class Harness(Generic[CharmType]):
         try:
             action_meta = self.charm.meta.actions[action_name]
         except KeyError:
-            raise RuntimeError(f"Charm does not have a {action_name!r} action.")
+            raise RuntimeError(f"Charm does not have a {action_name!r} action.") from None
         if params is None:
             params = {}
         for key in action_meta.required:
@@ -1896,9 +1893,7 @@ class Harness(Generic[CharmType]):
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
-    if isinstance(app_or_unit, model.Application):
-        return app_or_unit.name
-    elif isinstance(app_or_unit, model.Unit):
+    if isinstance(app_or_unit, (model.Application, model.Unit)):
         return app_or_unit.name
     elif isinstance(app_or_unit, str):
         return app_or_unit
@@ -1918,9 +1913,9 @@ def _record_calls(cls: Any):
 
         def decorator(orig_method: Any):
             def wrapped(self: '_TestingModelBackend', *args: Any, **kwargs: Any):
-                full_args = (orig_method.__name__,) + args
+                full_args = (orig_method.__name__, *args)
                 if kwargs:
-                    full_args = full_args + (kwargs,)
+                    full_args = (*full_args, kwargs)
                 self._calls.append(full_args)
                 return orig_method(self, *args, **kwargs)
             return wrapped
@@ -1940,7 +1935,7 @@ def _copy_docstrings(source_cls: Any):
     __doc__ for that method.
     """
     def decorator(target_cls: Any):
-        for meth_name, _ in target_cls.__dict__.items():
+        for meth_name in target_cls.__dict__:
             if meth_name.startswith('_'):
                 continue
             source_method = source_cls.__dict__.get(meth_name)
@@ -1987,15 +1982,15 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         # has the expected type.
         option = self._spec.get('options', {}).get(key)
         if not option:
-            raise RuntimeError('Unknown config option {}; '
+            raise RuntimeError(f'Unknown config option {key}; '
                                'not declared in `config.yaml`.'
                                'Check https://juju.is/docs/sdk/config for the '
-                               'spec.'.format(key))
+                               'spec.')
 
         declared_type = option.get('type')
         if not declared_type:
-            raise RuntimeError('Incorrectly formatted `options.yaml`, option {} '
-                               'is expected to declare a `type`.'.format(key))
+            raise RuntimeError(f'Incorrectly formatted `options.yaml`, option {key} '
+                               'is expected to declare a `type`.')
 
         if declared_type not in self._supported_types:
             raise RuntimeError(
@@ -2003,9 +1998,8 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
 
         if type(value) is not self._supported_types[declared_type]:
-            raise RuntimeError('Config option {} is supposed to be of type '
-                               '{}, not `{}`.'.format(key, declared_type,
-                                                      type(value).__name__))
+            raise RuntimeError(f'Config option {key} is supposed to be of type '
+                               f'{declared_type}, not `{type(value).__name__}`.')
 
         # call 'normal' setattr.
         dict.__setitem__(self, key, value)  # type: ignore
@@ -2126,8 +2120,7 @@ class _TestingModelBackend:
         if self._hook_is_running == 'leader_elected' and relation_name in valid_relation_endpoints:
             raise RuntimeError(
                 'cannot access relation data without first adding the relation: '
-                'use Harness.add_relation({!r}, <app>) before calling set_leader'
-                .format(relation_name))
+                f'use Harness.add_relation({relation_name!r}, <app>) before calling set_leader')
 
     def _can_connect(self, pebble_client: '_TestingPebbleClient') -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
@@ -2205,10 +2198,7 @@ class _TestingModelBackend:
             raise RelationNotFoundError(relation_id)
 
         relation = self._relation_data_raw[relation_id]
-        if is_app:
-            bucket_key = self.app_name
-        else:
-            bucket_key = self.unit_name
+        bucket_key = self.app_name if is_app else self.unit_name
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
@@ -2237,10 +2227,7 @@ class _TestingModelBackend:
         resource_dir = self._get_resource_dir()
         resource_filename = resource_dir / resource_name / filename
         if not resource_filename.exists():
-            if isinstance(contents, bytes):
-                mode = 'wb'
-            else:
-                mode = 'wt'
+            mode = 'wb' if isinstance(contents, bytes) else 'wt'
             resource_filename.parent.mkdir(exist_ok=True)
             with resource_filename.open(mode=mode) as resource_file:
                 resource_file.write(contents)
@@ -2271,8 +2258,8 @@ class _TestingModelBackend:
             name: name (i.e. from metadata.yaml).
             include_detached: True to include unattached storage mounts as well.
         """
-        return list(index for index in self._storage_list[name]
-                    if include_detached or self._storage_is_attached(name, index))
+        return [index for index in self._storage_list[name]
+                if include_detached or self._storage_is_attached(name, index)]
 
     def storage_get(self, storage_name_id: str, attribute: str) -> Any:
         name, index = storage_name_id.split("/", 1)
@@ -2309,7 +2296,7 @@ class _TestingModelBackend:
         index = int(index)
 
         for container, client in self._pebble_clients.items():
-            for _, mount in self._meta.containers[container].mounts.items():
+            for mount in self._meta.containers[container].mounts.values():
                 if mount.storage != name:
                     continue
                 root = client._root
@@ -2326,10 +2313,10 @@ class _TestingModelBackend:
         name, index = storage_id.split('/', 1)
 
         for container, client in self._pebble_clients.items():
-            for _, mount in self._meta.containers[container].mounts.items():
+            for mount in self._meta.containers[container].mounts.values():
                 if mount.storage != name:
                     continue
-                for index, store in self._storage_list[mount.storage].items():
+                for store in self._storage_list[mount.storage].values():
                     root = client._root
                     mounting_dir = root / mount.location[1:]
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -2359,9 +2346,9 @@ class _TestingModelBackend:
         params: Dict[str, Any] = {}
         assert self._running_action is not None
         action_meta = self._meta.actions[self._running_action.name]
-        for name, action_meta in action_meta.parameters.items():
-            if "default" in action_meta:
-                params[name] = action_meta["default"]
+        for name, meta in action_meta.parameters.items():
+            if "default" in meta:
+                params[name] = meta["default"]
         params.update(self._running_action.parameters)
         return params
 
@@ -2585,7 +2572,7 @@ class _TestingModelBackend:
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
-        return f"secret:{str(uuid.uuid4())}"
+        return f"secret:{uuid.uuid4()}"
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -2593,10 +2580,7 @@ class _TestingModelBackend:
                    expire: Optional[datetime.datetime] = None,
                    rotate: Optional[model.SecretRotate] = None,
                    owner: Optional[str] = None) -> str:
-        if owner == 'unit':
-            owner_name = self.unit_name
-        else:
-            owner_name = self.app_name
+        owner_name = self.unit_name if owner == 'unit' else self.app_name
         return self._secret_add(content, owner_name,
                                 label=label,
                                 description=description,
@@ -2904,11 +2888,11 @@ class _TestingPebbleClient:
                 # 'override' is actually single quoted in the real error, but
                 # it shouldn't be, hopefully that gets cleaned up.
                 if not service.override:
-                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
-                                       '"override" for service "{}"'.format(label, name))
+                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" must define'
+                                       f'"override" for service "{name}"')
                 if service.override not in ('merge', 'replace'):
-                    raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
-                                       '"override" value on service "{}"'.format(label, name))
+                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" has invalid '
+                                       f'"override" value on service "{name}"')
                 elif service.override == 'replace':
                     layer.services[name] = service
                 elif service.override == 'merge':
@@ -2999,9 +2983,11 @@ class _TestingPebbleClient:
                 Union[BinaryIO, TextIO],
                 file_path.open("rb" if encoding is None else "r", encoding=encoding))
         except FileNotFoundError:
-            raise pebble.PathError('not-found', f'stat {path}: no such file or directory')
+            raise pebble.PathError('not-found',
+                                   f'stat {path}: no such file or directory') from None
         except IsADirectoryError:
-            raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
+            raise pebble.PathError('generic-file-error',
+                                   f'can only read a regular file: "{path}"') from None
 
     def push(
             self, path: str, source: 'ReadableBuffer', *,
@@ -3043,10 +3029,10 @@ class _TestingPebbleClient:
             os.chmod(file_path, permissions)
         except FileNotFoundError as e:
             raise pebble.PathError(
-                'not-found', f'parent directory not found: {e.args[0]}')
+                'not-found', f'parent directory not found: {e.args[0]}') from None
         except NotADirectoryError:
             raise pebble.PathError('generic-file-error',
-                                   f'open {path}.~: not a directory')
+                                   f'open {path}.~: not a directory') from None
 
     def list_files(self, path: str, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List[pebble.FileInfo]:
@@ -3111,10 +3097,12 @@ class _TestingPebbleClient:
             os.chmod(dir_path, permissions)
         except FileExistsError:
             if not make_parents:
-                raise pebble.PathError('generic-file-error', f'mkdir {path}: file exists')
+                raise pebble.PathError(
+                    'generic-file-error',
+                    f'mkdir {path}: file exists') from None
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}')
+            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
 
     def remove_path(self, path: str, *, recursive: bool = False):
         self._check_connection()
@@ -3289,7 +3277,7 @@ class _TestingPebbleClient:
             # conform with the real pebble api
             first_service = next(iter(service_names))
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
-            raise self._api_error(500, message)
+            raise self._api_error(500, message) from None
 
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore

@@ -949,7 +949,7 @@ class _TestMainWithDispatch(_TestMain):
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = [f"hooks/{e.replace('_', '-')}"
-                           for e in self.charm_module.Charm.on.events().keys()]
+                           for e in self.charm_module.Charm.on.events()]
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
             EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),

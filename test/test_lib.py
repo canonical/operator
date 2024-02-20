@@ -327,7 +327,7 @@ class TestLibParser(TestCase):
         if m.origin is None:
             self.assertIsNotNone(m.origin)
             return
-        with open(m.origin, 'wt', encoding='latin-1') as f:
+        with open(m.origin, 'w', encoding='latin-1') as f:
             f.write(dedent('''
             LIBNAME = "foo"
             LIBAPI = 2
@@ -362,9 +362,9 @@ class TestLib(TestCase):
             ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
 
         with self.assertRaises(TypeError):
-            42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore
+            42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore  # noqa: B015, SIM300
         with self.assertRaises(TypeError):
-            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < 42  # type: ignore
+            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < 42  # type: ignore  # noqa: B015
 
         # these two might be surprising in that they don't raise an exception,
         # but they are correct: our __eq__ bailing means Python falls back to

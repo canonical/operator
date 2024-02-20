@@ -1133,13 +1133,13 @@ class SecretInfo:
 
     def __repr__(self):
         return ('SecretInfo('
-                'id={self.id!r}, '
-                'label={self.label!r}, '
-                'revision={self.revision}, '
-                'expires={self.expires!r}, '
-                'rotation={self.rotation}, '
-                'rotates={self.rotates!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'label={self.label!r}, '
+                f'revision={self.revision}, '
+                f'expires={self.expires!r}, '
+                f'rotation={self.rotation}, '
+                f'rotates={self.rotates!r})'
+                )
 
 
 class Secret:
@@ -1771,7 +1771,7 @@ class StatusBase:
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
-        if not isinstance(getattr(child, 'name'), str):
+        if not isinstance(child.name, str):
             raise TypeError(f"Can't register StatusBase subclass {child}: ",
                             "missing required `name: str` class attribute")
         cls._statuses[child.name] = child
@@ -1940,7 +1940,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
         if storage_name not in self._storage_map:
-            meant = ', or '.join(repr(k) for k in self._storage_map.keys())
+            meant = ', or '.join(repr(k) for k in self._storage_map)
             raise KeyError(
                 f'Storage {storage_name!r} not found. Did you mean {meant}?')
         storage_list = self._storage_map[storage_name]
@@ -1961,8 +1961,8 @@ class StorageMapping(Mapping[str, List['Storage']]):
             ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
-            raise ModelError(('cannot add storage {!r}:'
-                              ' it is not present in the charm metadata').format(storage_name))
+            raise ModelError(f'cannot add storage {storage_name!r}:'
+                             ' it is not present in the charm metadata')
         self._backend.storage_add(storage_name, count)
 
     def _invalidate(self, storage_name: str):
@@ -2995,7 +2995,11 @@ class _ModelBackend:
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
              ) -> Union[str, Any, None]:
-        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
+        kwargs = {
+            'stdout': subprocess.PIPE,
+            'stderr': subprocess.PIPE,
+            'check': True,
+            'encoding': 'utf-8'}
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -3525,12 +3529,12 @@ class _ModelBackendValidator:
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise ModelError('invalid metric value {!r} provided:'
-                             ' must be a positive finite float'.format(value))
+            raise ModelError(f'invalid metric value {value!r} provided:'
+                             ' must be a positive finite float')
 
         if math.isnan(value) or math.isinf(value) or value < 0:
-            raise ModelError('invalid metric value {!r} provided:'
-                             ' must be a positive finite float'.format(value))
+            raise ModelError(f'invalid metric value {value!r} provided:'
+                             ' must be a positive finite float')
         return str(value)
 
     @classmethod
