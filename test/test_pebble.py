@@ -654,6 +654,15 @@ services:
     override: replace
 ''')
         self.assertTrue(plan1 == plan2)
+        plan1_as_dict = pebble.PlanDict({
+            "services": {
+                "foo": pebble.ServiceDict({
+                    "command": "echo foo",
+                    "override": "replace",
+                })
+            },
+        })
+        self.assertTrue(plan1, plan1_as_dict)
         plan3 = pebble.Plan('''
 services:
   foo:

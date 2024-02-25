@@ -791,8 +791,10 @@ class Plan:
 
     __str__ = to_yaml
 
-    def __eq__(self, __value: object) -> bool:
-        if isinstance(__value, Plan):
+    def __eq__(self, __value: Union['PlanDict', 'Plan']) -> bool:
+        if isinstance(__value, dict):
+            return self.to_dict() == __value
+        elif isinstance(__value, Plan):
             return self.to_dict() == __value.to_dict()
         return super().__eq__(__value)
 
