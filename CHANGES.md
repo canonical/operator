@@ -1,3 +1,8 @@
+# 2.11.0
+
+* Added support for creating `pebble.Plan` objects by passing in a `pebble.PlanDict`, and the
+  ability to compare two `Plan` objects with `==`.
+
 # 2.10.0
 
 * Added support for Pebble Notices (`PebbleCustomNoticeEvent`, `get_notices`, and so on)

@@ -589,6 +589,35 @@ log-targets:
         self.assertEqual(plan.to_yaml(), reformed)
         self.assertEqual(str(plan), reformed)
 
+    def test_plandict(self):
+        # Starting with nothing, we get the empty result.
+        plan = pebble.Plan(pebble.PlanDict({}))
+        self.assertEqual(plan.to_dict(), {})
+
+        # With a service, we return validated yaml content.
+        raw = pebble.PlanDict({
+            "services": {
+                "foo": pebble.ServiceDict({
+                    "override": "replace",
+                    "command": "echo foo",
+                }),
+            },
+            "checks": {
+                "bar": pebble.CheckDict({
+                    "http": pebble.HttpDict({"url": "https://example.com/"}),
+                }),
+            },
+            "log-targets": {
+                "baz": pebble.LogTargetDict({
+                    "override": "replace",
+                    "type": "loki",
+                    "location": "https://example.com:3100/loki/api/v1/push",
+                }),
+            }
+        })
+        plan = pebble.Plan(raw)
+        self.assertEqual(plan.to_dict(), raw)
+
     def test_service_equality(self):
         plan = pebble.Plan("""
 services:
@@ -609,6 +638,101 @@ services:
             "foo": {"override": "replace", "command": "echo foo"}
         }
         self.assertEqual(plan.services, services_as_dict)
+
+    def test_plan_equality(self):
+        plan1 = pebble.Plan('''
+services:
+  foo:
+    override: replace
+    command: echo foo
+''')
+        self.assertFalse(plan1 == "foo")
+        plan2 = pebble.Plan('''
+services:
+  foo:
+    command: echo foo
+    override: replace
+''')
+        self.assertTrue(plan1 == plan2)
+        plan3 = pebble.Plan('''
+services:
+  foo:
+    override: replace
+    command: echo bar
+''')
+        self.assertFalse(plan1 == plan3)
+        plan4 = pebble.Plan('''
+services:
+ foo:
+  override: replace
+  command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.com/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3100/loki/api/v1/push
+''')
+        plan5 = pebble.Plan('''
+services:
+ foo:
+  override: replace
+  command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.org/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3100/loki/api/v1/push
+''')
+        self.assertFalse(plan4 == plan5)
+        plan6 = pebble.Plan('''
+services:
+ foo:
+  override: replace
+  command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.com/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3200/loki/api/v1/push
+''')
+        self.assertFalse(plan4 == plan6)
+        plan7 = pebble.Plan('''
+services:
+ foo:
+  command: echo foo
+  override: replace
+
+log-targets:
+ baz:
+  type: loki
+  override: replace
+  location: https://example.com:3100/loki/api/v1/push
+
+checks:
+ bar:
+  http:
+   https://example.com/
+
+''')
+        self.assertTrue(plan4 == plan7)
 
 
 class TestLayer(unittest.TestCase):
