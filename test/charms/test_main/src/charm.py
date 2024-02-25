@@ -20,7 +20,7 @@ import typing
 
 sys.path.append('lib')
 
-import ops  # noqa: E402 (module-level import after non-import code)
+import ops
 
 logger = logging.getLogger()
 

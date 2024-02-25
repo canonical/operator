@@ -234,9 +234,7 @@ class TestRealPebble(unittest.TestCase):
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[str] = []
-        for line in process.stdout:
-            reads.append(line)
+        reads: typing.List[str] = list(process.stdout)
 
         process.wait()
 
@@ -258,9 +256,7 @@ class TestRealPebble(unittest.TestCase):
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[bytes] = []
-        for line in process.stdout:
-            reads.append(line)
+        reads: typing.List[bytes] = list(process.stdout)
 
         process.wait()
 

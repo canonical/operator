@@ -32,7 +32,7 @@ from pkgutil import get_importer
 from types import ModuleType
 from typing import List
 
-__all__ = ('use', 'autoimport')
+__all__ = ('autoimport', 'use')
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +182,7 @@ def _join_and(keys: List[str]) -> str:
 class _Missing:
     """Helper to get the difference between what was found and what was needed when logging."""
 
-    def __init__(self, found):
+    def __init__(self, found: bool):
         self._found = found
 
     def __str__(self):
@@ -202,7 +202,7 @@ def _parse_lib(spec: ModuleSpec) -> typing.Optional["_Lib"]:
     logger.debug("    Parsing %r", spec.name)
 
     try:
-        with open(spec.origin, 'rt', encoding='utf-8') as f:
+        with open(spec.origin, encoding='utf-8') as f:
             libinfo = {}
             for n, line in enumerate(f):
                 if len(libinfo) == len(_NEEDED_KEYS):
@@ -255,7 +255,7 @@ class _Lib:
         return f"<_Lib {self}>"
 
     def __str__(self):
-        return "{0.name} by {0.author}, API {0.api}, patch {0.patch}".format(self)
+        return f"{self.name} by {self.author}, API {self.api}, patch {self.patch}"
 
     def import_module(self) -> ModuleType:
         if self._module is None:

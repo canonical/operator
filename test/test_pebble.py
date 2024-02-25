@@ -1537,14 +1537,17 @@ class TestMultipartParser(unittest.TestCase):
                 bodies: typing.List[bytes] = []
                 bodies_done: typing.List[bool] = []
 
+                # All of the "noqa: B023" here are due to a ruff bug:
+                # https://github.com/astral-sh/ruff/issues/7847
+                # ruff should tell us when the 'noqa's are no longer required.
                 def handle_header(data: typing.Any):
-                    headers.append(bytes(data))
-                    bodies.append(b'')
-                    bodies_done.append(False)
+                    headers.append(bytes(data))  # noqa: B023
+                    bodies.append(b'')  # noqa: B023
+                    bodies_done.append(False)  # noqa: B023
 
                 def handle_body(data: bytes, done: bool = False):
-                    bodies[-1] += data
-                    bodies_done[-1] = done
+                    bodies[-1] += data  # noqa: B023
+                    bodies_done[-1] = done  # noqa: B023
 
                 parser = pebble._MultipartParser(
                     marker,
