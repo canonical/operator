@@ -179,13 +179,17 @@ _HeaderHandler = Callable[[bytes], None]
 
 class _Tempfile(Protocol):
     name = ''
+
     def write(self, data: bytes): ...
+
     def close(self): ...
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
     def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO
+
     def write(self, __s: typing.AnyStr) -> int: ...
+
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
@@ -276,9 +280,13 @@ if TYPE_CHECKING:
 
 class _WebSocket(Protocol):
     def connect(self, url: str, socket: socket.socket): ...
+
     def shutdown(self): ...
+
     def send(self, payload: str): ...
+
     def send_binary(self, payload: bytes): ...
+
     def recv(self) -> Union[str, bytes]: ...
 
 
