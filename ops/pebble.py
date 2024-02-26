@@ -743,7 +743,7 @@ class Plan:
     documented at https://github.com/canonical/pebble/#layer-specification.
     """
 
-    def __init__(self, raw: Optional[Union[str, 'PlanDict']]):
+    def __init__(self, raw: Optional[Union[str, 'PlanDict']] = None):
         if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore
         else:
@@ -799,12 +799,12 @@ class Plan:
 
     __str__ = to_yaml
 
-    def __eq__(self, __value: Union['PlanDict', 'Plan']) -> bool:
-        if isinstance(__value, dict):
-            return self.to_dict() == __value
-        elif isinstance(__value, Plan):
-            return self.to_dict() == __value.to_dict()
-        return super().__eq__(__value)
+    def __eq__(self, other: Union['PlanDict', 'Plan']) -> bool:
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Plan):
+            return self.to_dict() == other.to_dict()
+        return NotImplemented
 
 
 class Layer:

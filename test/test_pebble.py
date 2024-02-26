@@ -492,10 +492,6 @@ single log
 
 
 class TestPlan(unittest.TestCase):
-    def test_no_args(self):
-        with self.assertRaises(TypeError):
-            pebble.Plan()  # type: ignore
-
     def test_services(self):
         plan = pebble.Plan('')
         self.assertEqual(plan.services, {})
@@ -591,30 +587,32 @@ log-targets:
 
     def test_plandict(self):
         # Starting with nothing, we get the empty result.
-        plan = pebble.Plan(pebble.PlanDict({}))
+        plan = pebble.Plan({})
+        self.assertEqual(plan.to_dict(), {})
+        plan = pebble.Plan()
         self.assertEqual(plan.to_dict(), {})
 
         # With a service, we return validated yaml content.
-        raw = pebble.PlanDict({
+        raw: pebble.PlanDict = {
             "services": {
-                "foo": pebble.ServiceDict({
+                "foo": {
                     "override": "replace",
                     "command": "echo foo",
-                }),
+                },
             },
             "checks": {
-                "bar": pebble.CheckDict({
-                    "http": pebble.HttpDict({"url": "https://example.com/"}),
-                }),
+                "bar": {
+                    "http": {"url": "https://example.com/"},
+                },
             },
             "log-targets": {
-                "baz": pebble.LogTargetDict({
+                "baz": {
                     "override": "replace",
                     "type": "loki",
                     "location": "https://example.com:3100/loki/api/v1/push",
-                }),
-            }
-        })
+                },
+            },
+        }
         plan = pebble.Plan(raw)
         self.assertEqual(plan.to_dict(), raw)
 
@@ -646,30 +644,31 @@ services:
     override: replace
     command: echo foo
 ''')
-        self.assertFalse(plan1 == "foo")
+        self.assertNotEqual(plan1, "foo")
         plan2 = pebble.Plan('''
 services:
   foo:
     command: echo foo
     override: replace
 ''')
-        self.assertTrue(plan1 == plan2)
-        plan1_as_dict = pebble.PlanDict({
+        self.assertEqual(plan1, plan2)
+        plan1_as_dict = {
             "services": {
-                "foo": pebble.ServiceDict({
+                "foo": {
                     "command": "echo foo",
                     "override": "replace",
-                })
+                },
             },
-        })
-        self.assertTrue(plan1, plan1_as_dict)
+        }
+        self.assertEqual(plan1, plan1_as_dict)
         plan3 = pebble.Plan('''
 services:
   foo:
     override: replace
     command: echo bar
 ''')
-        self.assertFalse(plan1 == plan3)
+        # Different command.
+        self.assertNotEqual(plan1, plan3)
         plan4 = pebble.Plan('''
 services:
  foo:
@@ -696,7 +695,7 @@ services:
 checks:
  bar:
   http:
-   https://example.org/
+   https://different.example.com/
 
 log-targets:
  baz:
@@ -704,7 +703,8 @@ log-targets:
   type: loki
   location: https://example.com:3100/loki/api/v1/push
 ''')
-        self.assertFalse(plan4 == plan5)
+        # Different checks.bar.http
+        self.assertNotEqual(plan4, plan5)
         plan6 = pebble.Plan('''
 services:
  foo:
@@ -722,7 +722,8 @@ log-targets:
   type: loki
   location: https://example.com:3200/loki/api/v1/push
 ''')
-        self.assertFalse(plan4 == plan6)
+        # Reordered elements.
+        self.assertNotEqual(plan4, plan6)
         plan7 = pebble.Plan('''
 services:
  foo:
@@ -741,7 +742,8 @@ checks:
    https://example.com/
 
 ''')
-        self.assertTrue(plan4 == plan7)
+        # Reordered sections.
+        self.assertEqual(plan4, plan7)
 
 
 class TestLayer(unittest.TestCase):
