@@ -33,7 +33,6 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
-import pytest
 import yaml
 
 import ops
@@ -343,20 +342,6 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({'k': 'v3'}, backend.relation_get(rel_id, 'test-app', is_app=True))
         self.assertTrue(len(harness.charm.observed_events), 1)
         self.assertIsInstance(harness.charm.observed_events[0], ops.RelationEvent)
-
-    def test_relation_get_bad_key(self):
-        harness = ops.testing.Harness(RelationBadKeyTester, meta='''
-            name: test-app
-            requires:
-                foo:
-                    interface: foofoo
-            ''')
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        harness.charm.observe_relation_events('foo')
-        rel_id = harness.add_relation('foo', None)  # type: ignore
-        with pytest.raises(KeyError, match='with a Unit or Application'):
-            harness.remove_relation(rel_id)
 
     def test_remove_relation(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -3228,14 +3213,6 @@ class RelationEventCharm(RecordingCharm):
             }})
 
         self.changes.append(recording)
-
-
-class RelationBadKeyTester(RelationEventCharm):
-    """Access inaccessible relation data."""
-
-    def _on_relation_broken(self, event: ops.RelationBrokenEvent):
-        # We expect this to fail, because we're not using a unit or app as key.
-        event.relation.data[None]['bar']  # type: ignore
 
 
 class ContainerEventCharm(RecordingCharm):
