@@ -1550,6 +1550,8 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
         return iter(self._data)
 
     def __getitem__(self, key: Union['Unit', 'Application']):
+        if not isinstance(key, Unit) and not isinstance(key, Application):
+            raise KeyError('Can only index relation data with a Unit or Application')
         return self._data[key]
 
     def __repr__(self):
