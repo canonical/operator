@@ -2,6 +2,8 @@
 
 * `StopEvent`, `RemoveEvent`, and all `LifeCycleEvent`s are no longer deferrable, and will raise a `RuntimeError` if `defer()` is called on the event object.
 * Added `ActionEvent.id`, exposing the JUJU_ACTION_UUID environment variable.
+* Added support for creating `pebble.Plan` objects by passing in a `pebble.PlanDict`, the
+  ability to compare two `Plan` objects with `==`, and the ability to create an empty Plan with `Plan()`.
 
 # 2.10.0
 
