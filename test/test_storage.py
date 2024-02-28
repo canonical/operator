@@ -352,7 +352,7 @@ class TestSimpleLoader(BaseTestCase):
 
     def test_handles_tuples(self):
         raw = yaml.dump((1, 'tuple'), Dumper=ops.storage._SimpleDumper)
-        parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)
+        parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
         self.assertEqual(parsed, (1, 'tuple'))
 
     def assertRefused(self, obj: typing.Any):  # noqa: N802
@@ -362,7 +362,7 @@ class TestSimpleLoader(BaseTestCase):
         # If they did somehow end up written, we shouldn't be able to load them
         raw = yaml.dump(obj, Dumper=yaml.Dumper)
         with self.assertRaises(yaml.constructor.ConstructorError):
-            yaml.load(raw, Loader=ops.storage._SimpleLoader)
+            yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
 
     def test_forbids_some_types(self):
         self.assertRefused(1 + 2j)
@@ -444,7 +444,7 @@ class TestJujuStateBackend(BaseTestCase):
         outer = yaml.safe_load(content)
         key = 'Class[foo]/_stored'
         self.assertEqual(list(outer.keys()), [key])
-        inner = yaml.load(outer[key], Loader=ops.storage._SimpleLoader)
+        inner = yaml.load(outer[key], Loader=ops.storage._SimpleLoader)  # noqa: S506
         self.assertEqual(complex_val, inner)
         self.assertEqual(content.decode('utf-8'), dedent("""\
             "Class[foo]/_stored": |

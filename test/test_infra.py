@@ -56,7 +56,7 @@ class ImportersTestCase(unittest.TestCase):
         fd, testfile = tempfile.mkstemp()
         self.addCleanup(os.unlink, testfile)
 
-        with open(fd, 'wt', encoding='utf8') as fh:
+        with open(fd, 'w', encoding='utf8') as fh:
             fh.write(self.template.format(module_name=name))
 
         environ = os.environ.copy()

@@ -191,6 +191,9 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
         storage = cast(Union[ops.storage.JujuStorage, ops.storage.SQLiteStorage], storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
+    elif issubclass(event_type, ops.charm.ActionEvent):
+        args: List[Any] = [os.environ['JUJU_ACTION_UUID']]
+        return args, {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
         relation_id = _get_juju_relation_id()
@@ -395,10 +398,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
     metadata = (charm_dir / 'metadata.yaml').read_text()
     actions_meta = charm_dir / 'actions.yaml'
-    if actions_meta.exists():
-        actions_metadata = actions_meta.read_text()
-    else:
-        actions_metadata = None
+    actions_metadata = actions_meta.read_text() if actions_meta.exists() else None
 
     # If we are in a RelationBroken event, we want to know which relation is
     # broken within the model, not only in the event's `.relation` attribute.

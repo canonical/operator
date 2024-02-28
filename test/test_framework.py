@@ -1813,7 +1813,7 @@ class DebugHookTests(BaseTestCase):
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                publisher.foobar_action.emit()
+                publisher.foobar_action.emit(id='1')
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(observer.called)
@@ -1833,7 +1833,7 @@ class DebugHookTests(BaseTestCase):
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                publisher.foobar_action.emit()
+                publisher.foobar_action.emit(id='2')
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(observer.called)

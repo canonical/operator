@@ -22,11 +22,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 _old_compute_navigation_tree = furo._compute_navigation_tree
 
+
 def _compute_navigation_tree(context):
     tree_html = _old_compute_navigation_tree(context)
     if not tree_html and context.get("toc"):
         tree_html = furo.navigation.get_navigation_tree(context["toc"])
     return tree_html
+
 
 furo._compute_navigation_tree = _compute_navigation_tree
 
