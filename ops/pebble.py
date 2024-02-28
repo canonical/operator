@@ -161,13 +161,17 @@ _HeaderHandler = Callable[[bytes], None]
 
 class _Tempfile(Protocol):
     name = ''
+
     def write(self, data: bytes): ...
+
     def close(self): ...
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
     def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO
+
     def write(self, __s: typing.AnyStr) -> int: ...
+
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
@@ -258,9 +262,13 @@ if TYPE_CHECKING:
 
 class _WebSocket(Protocol):
     def connect(self, url: str, socket: socket.socket): ...
+
     def shutdown(self): ...
+
     def send(self, payload: str): ...
+
     def send_binary(self, payload: bytes): ...
+
     def recv(self) -> Union[str, bytes]: ...
 
 
@@ -717,8 +725,11 @@ class Plan:
     documented at https://github.com/canonical/pebble/#layer-specification.
     """
 
-    def __init__(self, raw: str):
-        d = yaml.safe_load(raw) or {}  # type: ignore
+    def __init__(self, raw: Optional[Union[str, 'PlanDict']] = None):
+        if isinstance(raw, str):  # noqa: SIM108
+            d = yaml.safe_load(raw) or {}  # type: ignore
+        else:
+            d = raw or {}
         d = typing.cast('PlanDict', d)
 
         self._raw = raw
@@ -769,6 +780,13 @@ class Plan:
         return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
+
+    def __eq__(self, other: Union['PlanDict', 'Plan']) -> bool:
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Plan):
+            return self.to_dict() == other.to_dict()
+        return NotImplemented
 
 
 class Layer:
