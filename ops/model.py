@@ -33,26 +33,9 @@ import typing
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path, PurePath
-from typing import (
-    Any,
-    BinaryIO,
-    Callable,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Literal,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Set,
-    TextIO,
-    Tuple,
-    Type,
-    TypedDict,
-    Union,
-)
+from typing import (Any, BinaryIO, Callable, Dict, Generator, Iterable, List,
+                    Literal, Mapping, MutableMapping, Optional, Sequence, Set,
+                    TextIO, Tuple, Type, TypedDict, Union)
 
 import ops
 import ops.pebble as pebble

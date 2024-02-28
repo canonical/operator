@@ -18,33 +18,13 @@ import dataclasses
 import enum
 import logging
 import pathlib
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Literal,
-    Mapping,
-    NoReturn,
-    Optional,
-    TextIO,
-    Tuple,
-    TypedDict,
-    Union,
-    cast,
-)
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Mapping, NoReturn,
+                    Optional, TextIO, Tuple, TypedDict, Union, cast)
 
 from ops import model
 from ops._private import yaml
-from ops.framework import (
-    EventBase,
-    EventSource,
-    Framework,
-    Handle,
-    LifecycleEvent,
-    Object,
-    ObjectEvents,
-)
+from ops.framework import (EventBase, EventSource, Framework, Handle,
+                           LifecycleEvent, Object, ObjectEvents)
 
 if TYPE_CHECKING:
     from typing_extensions import Required
@@ -668,7 +648,9 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore
+            self.storage = next(
+                (s for s in storages if s.index == storage_index),
+                None)  # type: ignore
             if self.storage is None:
                 msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
                     .format(storage_name, storage_index)

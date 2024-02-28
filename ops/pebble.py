@@ -42,27 +42,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
-from typing import (
-    IO,
-    TYPE_CHECKING,
-    Any,
-    AnyStr,
-    BinaryIO,
-    Callable,
-    Dict,
-    Generator,
-    Generic,
-    Iterable,
-    List,
-    Literal,
-    Optional,
-    Protocol,
-    Sequence,
-    TextIO,
-    Tuple,
-    TypedDict,
-    Union,
-)
+from typing import (IO, TYPE_CHECKING, Any, AnyStr, BinaryIO, Callable, Dict,
+                    Generator, Generic, Iterable, List, Literal, Optional,
+                    Protocol, Sequence, TextIO, Tuple, TypedDict, Union)
 
 import websocket  # type: ignore
 

@@ -34,33 +34,15 @@ import warnings
 from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
-from typing import (
-    Any,
-    AnyStr,
-    BinaryIO,
-    Callable,
-    Dict,
-    Generic,
-    Iterable,
-    List,
-    Literal,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    TextIO,
-    Tuple,
-    Type,
-    TypedDict,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import (Any, AnyStr, BinaryIO, Callable, Dict, Generic, Iterable,
+                    List, Literal, Mapping, Optional, Sequence, Set, TextIO,
+                    Tuple, Type, TypedDict, TypeVar, Union, cast)
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError, _ConfigOption, _NetworkDict
+from ops.model import (Container, RelationNotFoundError, _ConfigOption,
+                       _NetworkDict)
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -799,6 +781,9 @@ class Harness(Generic[CharmType]):
 
         This function creates a relation with an application and triggers a
         :class:`RelationCreatedEvent <ops.RelationCreatedEvent>`.
+        This function also creates a defaulted network binding on this endpoint. If you wish
+        to associate a custom network to this binding, provide one using
+        `add_network` before calling `add_relation`.
 
         If `app_data` or `unit_data` are provided, also add a new unit
         (``<remote_app>/0``) to the relation and trigger
@@ -832,6 +817,11 @@ class Harness(Generic[CharmType]):
         Return:
             The ID of the relation created.
         """
+        if not (relation_name in self._meta.provides
+                or relation_name in self._meta.requires
+                or relation_name in self._meta.peers):
+            raise RelationNotFoundError("relation %s not declared in metadata" % relation_name)
+
         relation_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(
             relation_name, []).append(relation_id)
@@ -858,6 +848,13 @@ class Harness(Generic[CharmType]):
                 self.update_relation_data(relation_id, remote_app, app_data)
             if unit_data is not None:
                 self.update_relation_data(relation_id, remote_unit, unit_data)
+
+        # if we don't already have a network binding for this relation id, create one
+        if not self._backend._networks.get((relation_name, relation_id)):
+            self.add_network("10.0.0.10", endpoint=relation_name, relation_id=relation_id)
+        # if we don't already have a default network binding for this endpoint, create one
+        if not self._backend._networks.get((relation_name, None)):
+            self.add_network("10.0.0.10", endpoint=relation_name)
 
         return relation_id
 
