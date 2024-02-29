@@ -492,10 +492,6 @@ single log
 
 
 class TestPlan(unittest.TestCase):
-    def test_no_args(self):
-        with self.assertRaises(TypeError):
-            pebble.Plan()  # type: ignore
-
     def test_services(self):
         plan = pebble.Plan('')
         self.assertEqual(plan.services, {})
@@ -589,6 +585,37 @@ log-targets:
         self.assertEqual(plan.to_yaml(), reformed)
         self.assertEqual(str(plan), reformed)
 
+    def test_plandict(self):
+        # Starting with nothing, we get the empty result.
+        plan = pebble.Plan({})
+        self.assertEqual(plan.to_dict(), {})
+        plan = pebble.Plan()
+        self.assertEqual(plan.to_dict(), {})
+
+        # With a service, we return validated yaml content.
+        raw: pebble.PlanDict = {
+            "services": {
+                "foo": {
+                    "override": "replace",
+                    "command": "echo foo",
+                },
+            },
+            "checks": {
+                "bar": {
+                    "http": {"url": "https://example.com/"},
+                },
+            },
+            "log-targets": {
+                "baz": {
+                    "override": "replace",
+                    "type": "loki",
+                    "location": "https://example.com:3100/loki/api/v1/push",
+                },
+            },
+        }
+        plan = pebble.Plan(raw)
+        self.assertEqual(plan.to_dict(), raw)
+
     def test_service_equality(self):
         plan = pebble.Plan("""
 services:
@@ -609,6 +636,114 @@ services:
             "foo": {"override": "replace", "command": "echo foo"}
         }
         self.assertEqual(plan.services, services_as_dict)
+
+    def test_plan_equality(self):
+        plan1 = pebble.Plan('''
+services:
+  foo:
+    override: replace
+    command: echo foo
+''')
+        self.assertNotEqual(plan1, "foo")
+        plan2 = pebble.Plan('''
+services:
+  foo:
+    command: echo foo
+    override: replace
+''')
+        self.assertEqual(plan1, plan2)
+        plan1_as_dict = {
+            "services": {
+                "foo": {
+                    "command": "echo foo",
+                    "override": "replace",
+                },
+            },
+        }
+        self.assertEqual(plan1, plan1_as_dict)
+        plan3 = pebble.Plan('''
+services:
+  foo:
+    override: replace
+    command: echo bar
+''')
+        # Different command.
+        self.assertNotEqual(plan1, plan3)
+        plan4 = pebble.Plan('''
+services:
+ foo:
+  override: replace
+  command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.com/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3100/loki/api/v1/push
+''')
+        plan5 = pebble.Plan('''
+services:
+ foo:
+  override: replace
+  command: echo foo
+
+checks:
+ bar:
+  http:
+   https://different.example.com/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3100/loki/api/v1/push
+''')
+        # Different checks.bar.http
+        self.assertNotEqual(plan4, plan5)
+        plan6 = pebble.Plan('''
+services:
+ foo:
+  override: replace
+  command: echo foo
+
+checks:
+ bar:
+  http:
+   https://example.com/
+
+log-targets:
+ baz:
+  override: replace
+  type: loki
+  location: https://example.com:3200/loki/api/v1/push
+''')
+        # Reordered elements.
+        self.assertNotEqual(plan4, plan6)
+        plan7 = pebble.Plan('''
+services:
+ foo:
+  command: echo foo
+  override: replace
+
+log-targets:
+ baz:
+  type: loki
+  override: replace
+  location: https://example.com:3100/loki/api/v1/push
+
+checks:
+ bar:
+  http:
+   https://example.com/
+
+''')
+        # Reordered sections.
+        self.assertEqual(plan4, plan7)
 
 
 class TestLayer(unittest.TestCase):
@@ -1404,14 +1539,17 @@ class TestMultipartParser(unittest.TestCase):
                 bodies: typing.List[bytes] = []
                 bodies_done: typing.List[bool] = []
 
+                # All of the "noqa: B023" here are due to a ruff bug:
+                # https://github.com/astral-sh/ruff/issues/7847
+                # ruff should tell us when the 'noqa's are no longer required.
                 def handle_header(data: typing.Any):
-                    headers.append(bytes(data))
-                    bodies.append(b'')
-                    bodies_done.append(False)
+                    headers.append(bytes(data))  # noqa: B023
+                    bodies.append(b'')  # noqa: B023
+                    bodies_done.append(False)  # noqa: B023
 
                 def handle_body(data: bytes, done: bool = False):
-                    bodies[-1] += data
-                    bodies_done[-1] = done
+                    bodies[-1] += data  # noqa: B023
+                    bodies_done[-1] = done  # noqa: B023
 
                 parser = pebble._MultipartParser(
                     marker,

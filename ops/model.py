@@ -1133,13 +1133,13 @@ class SecretInfo:
 
     def __repr__(self):
         return ('SecretInfo('
-                'id={self.id!r}, '
-                'label={self.label!r}, '
-                'revision={self.revision}, '
-                'expires={self.expires!r}, '
-                'rotation={self.rotation}, '
-                'rotates={self.rotates!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'label={self.label!r}, '
+                f'revision={self.revision}, '
+                f'expires={self.expires!r}, '
+                f'rotation={self.rotation}, '
+                f'rotates={self.rotates!r})'
+                )
 
 
 class Secret:
@@ -1550,15 +1550,6 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
         return iter(self._data)
 
     def __getitem__(self, key: Union['Unit', 'Application']):
-        if key is None and self.relation.app is None:
-            # NOTE: if juju gets fixed to set JUJU_REMOTE_APP for relation-broken events, then that
-            # should fix the only case in which we expect key to be None - potentially removing the
-            # need for this error in future ops versions (i.e. if relation.app is guaranteed to not
-            # be None. See https://bugs.launchpad.net/juju/+bug/1960934.
-            raise KeyError(
-                'Cannot index relation data with "None".'
-                ' Are you trying to access remote app data during a relation-broken event?'
-                ' This is not allowed.')
         return self._data[key]
 
     def __repr__(self):
@@ -1780,7 +1771,7 @@ class StatusBase:
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
-        if not isinstance(getattr(child, 'name'), str):
+        if not isinstance(child.name, str):
             raise TypeError(f"Can't register StatusBase subclass {child}: ",
                             "missing required `name: str` class attribute")
         cls._statuses[child.name] = child
@@ -1949,7 +1940,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
         if storage_name not in self._storage_map:
-            meant = ', or '.join(repr(k) for k in self._storage_map.keys())
+            meant = ', or '.join(repr(k) for k in self._storage_map)
             raise KeyError(
                 f'Storage {storage_name!r} not found. Did you mean {meant}?')
         storage_list = self._storage_map[storage_name]
@@ -1970,8 +1961,8 @@ class StorageMapping(Mapping[str, List['Storage']]):
             ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
-            raise ModelError(('cannot add storage {!r}:'
-                              ' it is not present in the charm metadata').format(storage_name))
+            raise ModelError(f'cannot add storage {storage_name!r}:'
+                             ' it is not present in the charm metadata')
         self._backend.storage_add(storage_name, count)
 
     def _invalidate(self, storage_name: str):
@@ -2065,13 +2056,15 @@ class Container:
     For methods that make changes to the container, if the change fails or times out, then a
     :class:`ops.pebble.ChangeError` or :class:`ops.pebble.TimeoutError` will be raised.
 
-    Interactions with the container use Pebble, so all methods may raise exceptions when there are
-    problems communicating with Pebble. Problems connecting to or transferring data with Pebble
-    will raise a :class:`ops.pebble.ConnectionError` - generally you can guard against these by
-    first checking :meth:`can_connect`, but it is possible for problems to occur after
-    :meth:`can_connect` has succeeded. When an error occurs executing the request, such as trying
-    to add an invalid layer or execute a command that does not exist, an
-    :class:`ops.pebble.APIError` is raised.
+    Interactions with the container use Pebble, so all methods may raise
+    exceptions when there are problems communicating with Pebble. Problems
+    connecting to or transferring data with Pebble will raise a
+    :class:`ops.pebble.ConnectionError` - you can guard against these by first
+    checking :meth:`can_connect`, but that generally introduces a race condition
+    where problems occur after :meth:`can_connect` has succeeded. When an error
+    occurs executing the request, such as trying to add an invalid layer or
+    execute a command that does not exist, an :class:`ops.pebble.APIError` is
+    raised.
     """
 
     name: str
@@ -2095,14 +2088,12 @@ class Container:
 
         For example::
 
+            # Add status based on any earlier errors communicating with Pebble.
+            ...
+            # Check that Pebble is still reachable now.
             container = self.unit.get_container("example")
-            if container.can_connect():
-                try:
-                    c.pull('/does/not/exist')
-                except ProtocolError, PathError:
-                    # handle it
-            else:
-                event.defer()
+            if not container.can_connect():
+                event.add_status(ops.WaitingStatus("Waiting for Pebble..."))
         """
         try:
             self._pebble.get_system_info()
@@ -3004,7 +2995,11 @@ class _ModelBackend:
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
              ) -> Union[str, Any, None]:
-        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
+        kwargs = {
+            'stdout': subprocess.PIPE,
+            'stderr': subprocess.PIPE,
+            'check': True,
+            'encoding': 'utf-8'}
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -3534,12 +3529,12 @@ class _ModelBackendValidator:
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise ModelError('invalid metric value {!r} provided:'
-                             ' must be a positive finite float'.format(value))
+            raise ModelError(f'invalid metric value {value!r} provided:'
+                             ' must be a positive finite float')
 
         if math.isnan(value) or math.isinf(value) or value < 0:
-            raise ModelError('invalid metric value {!r} provided:'
-                             ' must be a positive finite float'.format(value))
+            raise ModelError(f'invalid metric value {value!r} provided:'
+                             ' must be a positive finite float')
         return str(value)
 
     @classmethod
