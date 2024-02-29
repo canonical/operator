@@ -61,7 +61,7 @@ from typing import (
     TextIO,
     Tuple,
     TypedDict,
-    Union
+    Union,
 )
 
 import websocket  # type: ignore

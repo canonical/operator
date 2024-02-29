@@ -51,7 +51,7 @@ from typing import (
     Tuple,
     Type,
     TypedDict,
-    Union
+    Union,
 )
 
 import ops

@@ -54,7 +54,7 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
-    cast
+    cast,
 )
 
 from ops import charm, framework, model, pebble, storage

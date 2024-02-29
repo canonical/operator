@@ -31,7 +31,7 @@ from typing import (
     Tuple,
     TypedDict,
     Union,
-    cast
+    cast,
 )
 
 from ops import model
@@ -43,7 +43,7 @@ from ops.framework import (
     Handle,
     LifecycleEvent,
     Object,
-    ObjectEvents
+    ObjectEvents,
 )
 
 if TYPE_CHECKING:
