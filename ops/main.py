@@ -479,7 +479,8 @@ class _Ops:
         meta = self._charm_meta
         model = ops.model.Model(meta, model_backend)
         store = self._setup_storage(dispatcher)
-        framework = ops.framework.Framework(store, self.charm_spec.charm_root, meta, model)
+        framework = ops.framework.Framework(store, self.charm_spec.charm_root, meta, model,
+                                            event_name=dispatcher.event_name)
         framework.set_breakpointhook()
         return framework
 
@@ -529,6 +530,12 @@ class _Ops:
         dispatcher = cast(_Dispatcher, self.dispatcher)
 
         try:
+            # TODO: Remove the collect_metrics check below as soon as the relevant
+            #       Juju changes are made. Also adjust the docstring on
+            #       EventBase.defer().
+            #
+            # Skip reemission of deferred events for collect-metrics events because
+            # they do not have the full access to all hook tools.
             if not dispatcher.is_restricted_context():
                 framework.reemit()
 
