@@ -19,7 +19,6 @@ This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
 as expected.
 """
 import dataclasses
-import inspect
 import logging
 import os
 import shutil
