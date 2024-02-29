@@ -34,15 +34,33 @@ import warnings
 from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
-from typing import (Any, AnyStr, BinaryIO, Callable, Dict, Generic, Iterable,
-                    List, Literal, Mapping, Optional, Sequence, Set, TextIO,
-                    Tuple, Type, TypedDict, TypeVar, Union, cast)
+from typing import (
+    Any,
+    AnyStr,
+    BinaryIO,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    TextIO,
+    Tuple,
+    Type,
+    TypedDict,
+    TypeVar,
+    Union,
+    cast
+)
 
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import (Container, RelationNotFoundError, _ConfigOption,
-                       _NetworkDict)
+from ops.model import Container, RelationNotFoundError, _ConfigOption, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
