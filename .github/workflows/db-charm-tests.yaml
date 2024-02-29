@@ -12,7 +12,9 @@ jobs:
           - "canonical/postgresql-operator"
           - "canonical/postgresql-k8s-operator"
           - "canonical/mysql-operator"
-          - "canonical/mysql-k8s-operator"
+# TODO: uncomment once secrets issues are fixed in this charm:
+#       https://github.com/canonical/mysql-k8s-operator/pull/371
+#          - "canonical/mysql-k8s-operator"
 
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository

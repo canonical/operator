@@ -1,3 +1,52 @@
+[project]
+name = "ops"
+description = "The Python library behind great charms"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name="The Charm Tech team at Canonical Ltd.", email="charm-tech@lists.launchpad.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "PyYAML==6.*",
+    "websocket-client==1.*",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx==6.2.1",
+    "sphinx-design",
+    "furo",
+    "sphinx-tabs",
+    "lxd-sphinx-extensions",
+    "sphinx-copybutton",
+]
+
+[project.urls]
+"Homepage" = "https://juju.is/docs/sdk"
+"Repository" = "https://github.com/canonical/operator"
+"Issues" = "https://github.com/canonical/operator/issues"
+"Documentation" = "https://ops.readthedocs.io"
+"Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
+
+[build-system]
+requires = [
+    "setuptools>=60",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "ops.version.version"}
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -13,19 +62,121 @@ recursive = true
 jobs = -1
 aggressive = 3
 
-[tool.isort]
-profile = "black"
-
 # Linting tools configuration
-[tool.flake8]
-max-line-length = 99
-max-doc-length = 99
-exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
-select = ["E", "W", "F", "C", "N", "R", "D", "H"]
-ignore = ["D105", "D107", "W503"]
-# D100, D101, D102, D103, D104: Ignore missing docstrings in tests
-per-file-ignores = ["test/*:D100,D101,D102,D103,D104"]
-docstring-convention = "google"
+[tool.ruff]
+line-length = 99
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001",
+    # pep8-naming
+    "N",
+    # flake8-builtins
+    "A",
+    # flake8-copyright
+    "CPY",
+    # pyupgrade
+    "UP",
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # Ruff specific
+    "RUF",
+    # Perflint
+    "PERF",
+    # pyflakes-docstrings
+    "D",
+]
+ignore = [
+    # Use of `assert` detected
+    "S101",
+    # Do not `assert False`
+    "B011",
+    # `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+    "S403",
+    # `subprocess` module is possibly insecure
+    "S404",
+
+    # No explicit `stacklevel` keyword argument found
+    "B028",
+
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
+    # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "SIM117",
+
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in `__init__`
+    "D107",
+
+    # Manual list comprehension.
+    "PERF401",
+    # Manual dict comprehension.
+    "PERF403",
+
+    # Convert {} from `TypedDict` functional to class syntax
+    # Note that since we have some `TypedDict`s that cannot use the class
+    # syntax, we're currently choosing to be consistent in syntax even though
+    # some can be moved to the class syntax.
+    "UP013",
+
+    ## Likely worth doing, but later.
+
+    # `subprocess` call: check for execution of untrusted input
+    "S603",
+    # Prefer `next(iter(info_dicts))` over single element slice
+    "RUF015",
+    # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF012",
+    # Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+    "RUF025",
+    # Unnecessary `tuple` call (rewrite as a literal)
+    "C408",
+]
+[tool.ruff.lint.per-file-ignores]
+"test/*" = [
+    # All documentation linting.
+    "D",
+
+    # Hard-coded password string.
+    "S105",
+    # Hard-coded password function argument.
+    "S106",
+
+    # "Useless" expression.
+    "B018"
+]
+"docs/conf.py" = [
+    "CPY001",  # Missing copyright notice at top of file
+    "D100",  # Missing docstring in public module
+    "I001",  # [*] Import block is un-sorted or un-formatted
+    "A001",  # Variable `copyright` is shadowing a Python builtin
+    "RUF003",  # Comment contains ambiguous {}
+    "RUF019",  # [*] Unnecessary key check before dictionary access
+]
+"ops/_private/timeconv.py" = [
+    "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+    "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]
@@ -38,4 +189,5 @@ reportMissingModuleSource = false
 reportPrivateUsage = false
 reportUnnecessaryIsInstance = false
 reportUnnecessaryComparison = false
+disableBytesTypePromotions = false
 stubPath = ""

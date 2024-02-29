@@ -27,6 +27,7 @@ import shutil
 import sys
 import tempfile
 import textwrap
+import time
 import typing
 import unittest
 import uuid
@@ -34,7 +35,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from typing_extensions import Required
 
 import ops
 import ops.testing
@@ -582,6 +582,33 @@ class TestHarness(unittest.TestCase):
         self.assertEqual({'app': 'data'}, backend.relation_get(rel_id, remote_app, is_app=True))
         harness.remove_relation(rel_id)
         self.assertIsNone(self._find_relation_in_model_by_id(harness, rel_id))
+
+    def test_remove_relation_marks_relation_as_inactive(self):
+        relations: typing.List[str] = []
+        is_broken = False
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.db_relation_broken, self._db_relation_broken)
+
+            def _db_relation_broken(self, event: ops.RelationBrokenEvent):
+                nonlocal is_broken, relations
+                is_broken = not event.relation.active
+                relations = [rel.name for rel in self.model.relations["db"]]
+
+        harness = ops.testing.Harness(MyCharm, meta='''
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.remove_relation(rel_id)
+        self.assertTrue(is_broken, 'event.relation.active not False in relation-broken event')
+        self.assertFalse(relations, 'Model.relations contained broken relation')
 
     def _find_relation_in_model_by_id(
             self,
@@ -2149,8 +2176,8 @@ class TestHarness(unittest.TestCase):
         harness.set_can_connect('foo', True)
         c = harness.model.unit.containers['foo']
 
-        dir_path = '/tmp/foo/dir'
-        file_path = '/tmp/foo/file'
+        dir_path = '/tmp/foo/dir'  # noqa: S108
+        file_path = '/tmp/foo/file'  # noqa: S108
 
         self.assertFalse(c.isdir(dir_path))
         self.assertFalse(c.exists(dir_path))
@@ -2647,7 +2674,7 @@ class TestHarness(unittest.TestCase):
                                          expected_relation_created[0]]
         self.assertEqual(changes[:2], expected_relation_created)
         changes = changes[2:]
-        expected_middle: typing.List[RecordedChange] = [
+        expected_middle: typing.List[typing.Dict[str, typing.Any]] = [
             {'name': 'leader-elected'},
             {'name': 'config-changed', 'data': {}},
             {'name': 'start'},
@@ -2771,6 +2798,39 @@ class TestHarness(unittest.TestCase):
         harness_plan = harness.get_container_pebble_plan('foo')
         self.assertEqual(harness_plan.to_yaml(), plan.to_yaml())
 
+    def test_add_layer_with_log_targets_to_plan(self):
+        layer_yaml = '''\
+        services:
+         foo:
+          override: replace
+          command: echo foo
+
+        checks:
+         bar:
+          http:
+           https://example.com/
+
+        log-targets:
+         baz:
+          override: replace
+          type: loki
+          location: https://example.com:3100/loki/api/v1/push
+        '''
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'foo', "containers": {"consumer": {"type": "oci-image"}}}))
+        harness.begin()
+        harness.set_can_connect('consumer', True)
+
+        container = harness.charm.unit.containers["consumer"]
+        layer = pebble.Layer(layer_yaml)
+        container.add_layer('foo', layer)
+
+        plan = container.get_plan()
+
+        self.assertIsNotNone(plan.services.get('foo'))
+        self.assertIsNotNone(plan.checks.get('bar'))
+        self.assertIsNotNone(plan.log_targets.get('baz'))
+
     def test_get_pebble_container_plan_unknown(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test-app
@@ -2850,6 +2910,23 @@ class TestHarness(unittest.TestCase):
         harness.evaluate_status()
         self.assertEqual(harness.model.app.status, ops.ActiveStatus('active app'))
         self.assertEqual(harness.model.unit.status, ops.ActiveStatus('active unit'))
+
+    def test_invalid_status_set(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        harness.set_leader(True)
+        harness.begin()
+
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.app.status = ops.UnknownStatus()
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.app.status = ops.ErrorStatus()
+        harness.model.app.status = ops.ActiveStatus()
+
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.unit.status = ops.UnknownStatus()
+        with self.assertRaises(ops.model.ModelError):
+            harness.model.unit.status = ops.ErrorStatus()
+        harness.model.unit.status = ops.ActiveStatus()
 
 
 class TestNetwork(unittest.TestCase):
@@ -3030,7 +3107,7 @@ class RelationChangedViewer(ops.Object):
 
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
-        self.changes: typing.List[typing.Dict[str, str]] = []
+        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
         charm.framework.observe(charm.on[relation_name].relation_changed, self.on_relation_changed)
 
     def on_relation_changed(self, event: ops.RelationEvent):
@@ -3043,19 +3120,12 @@ class RelationChangedViewer(ops.Object):
         self.changes.append(dict(data))
 
 
-class RecordedChange(typing.TypedDict, total=False):
-    name: Required[str]
-    data: typing.Dict[str, typing.Any]
-    relation: str
-    container: typing.Optional[str]
-
-
 class RecordingCharm(ops.CharmBase):
     """Record the events that we see, and any associated data."""
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.changes: typing.List[RecordedChange] = []
+        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.leader_settings_changed, self._on_leader_settings_changed)
@@ -3149,10 +3219,11 @@ class RelationEventCharm(RecordingCharm):
             assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
-        recording: RecordedChange = {
+        recording: typing.Dict[str, typing.Any] = {
             'name': event_name,
             'relation': event.relation.name,
-            'data': data}
+            'data': data,
+        }
 
         if self.record_relation_data_on_events:
             recording["data"].update({'relation_data': {
@@ -3176,16 +3247,25 @@ class ContainerEventCharm(RecordingCharm):
 
     def observe_container_events(self, container_name: str):
         self.framework.observe(self.on[container_name].pebble_ready, self._on_pebble_ready)
+        self.framework.observe(self.on[container_name].pebble_custom_notice,
+                               self._on_pebble_custom_notice)
 
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
-        self._observe_container_event('pebble-ready', event)
+        self.changes.append({
+            'name': 'pebble-ready',
+            'container': event.workload.name,
+        })
 
-    def _observe_container_event(self, event_name: str, event: ops.PebbleReadyEvent):
-        container_name = None
-        if event.workload is not None:
-            container_name = event.workload.name
-        self.changes.append(
-            {'name': event_name, 'container': container_name})
+    def _on_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+        type_str = (event.notice.type.value if isinstance(event.notice.type, pebble.NoticeType)
+                    else event.notice.type)
+        self.changes.append({
+            'name': 'pebble-custom-notice',
+            'container': event.workload.name,
+            'notice_id': event.notice.id,
+            'notice_type': type_str,
+            'notice_key': event.notice.key,
+        })
 
 
 def get_public_methods(obj: object):
@@ -4624,7 +4704,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
             (tempdir / "foo/test").write_text("test")
             (tempdir / "foo/bar/foobar").write_text("foobar")
             (tempdir / "foo/baz").mkdir(parents=True)
-            self.container.push_path(tempdir / "foo", "/tmp")
+            self.container.push_path(tempdir / "foo", "/tmp")  # noqa: S108
 
             self.assertTrue((self.root / "tmp").is_dir())
             self.assertTrue((self.root / "tmp/foo").is_dir())
@@ -4634,7 +4714,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
             self.assertEqual((self.root / "tmp/foo/bar/foobar").read_text(), "foobar")
 
     def test_make_dir(self):
-        self.container.make_dir("/tmp")
+        self.container.make_dir("/tmp")  # noqa: S108
         self.assertTrue((self.root / "tmp").is_dir())
         self.container.make_dir("/foo/bar/foobar", make_parents=True)
         self.assertTrue((self.root / "foo/bar/foobar").is_dir())
@@ -5302,7 +5382,7 @@ class TestHandleExec(unittest.TestCase):
     def test_exec_service_context(self):
         service: ops.pebble.ServiceDict = {
             "command": "test",
-            "working-dir": "/tmp",
+            "working-dir": "/tmp",  # noqa: S108
             "user": "foo",
             "user-id": 1,
             "group": "bar",
@@ -5324,7 +5404,7 @@ class TestHandleExec(unittest.TestCase):
         self.harness.handle_exec(self.container, ["ls"], handler=handler)
 
         self.container.exec(["ls"], service_context="test").wait()
-        self.assertEqual(args_history[-1].working_dir, "/tmp")
+        self.assertEqual(args_history[-1].working_dir, "/tmp")  # noqa: S108
         self.assertEqual(args_history[-1].user, "foo")
         self.assertEqual(args_history[-1].user_id, 1)
         self.assertEqual(args_history[-1].group, "bar")
@@ -5365,6 +5445,7 @@ class TestActions(unittest.TestCase):
             def _on_simple_action(self, event: ops.ActionEvent):
                 """An action that doesn't generate logs, have any results, or fail."""
                 self.simple_was_called = True
+                assert isinstance(event.id, str)
 
             def _on_fail_action(self, event: ops.ActionEvent):
                 event.fail("this will be ignored")
@@ -5485,3 +5566,199 @@ class TestActions(unittest.TestCase):
         self._action_results["A"] = "foo"
         with self.assertRaises(ValueError):
             self.harness.run_action("results")
+
+
+class TestNotify(unittest.TestCase):
+    def test_notify_basics(self):
+        harness = ops.testing.Harness(ContainerEventCharm, meta="""
+            name: notifier
+            containers:
+              foo:
+                resource: foo-image
+              bar:
+                resource: foo-image
+        """)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_container_events('foo')
+        harness.charm.observe_container_events('bar')
+
+        id1a = harness.pebble_notify('foo', 'example.com/n1')
+        id2 = harness.pebble_notify('foo', 'foo.com/n2')
+        id3 = harness.pebble_notify('bar', 'example.com/n1')
+        id1b = harness.pebble_notify('foo', 'example.com/n1')
+
+        self.assertIsInstance(id1a, str)
+        self.assertNotEqual(id1a, '')
+        self.assertEqual(id1a, id1b)
+
+        self.assertIsInstance(id2, str)
+        self.assertNotEqual(id2, '')
+        self.assertNotEqual(id2, id1a)
+
+        self.assertIsInstance(id3, str)
+        self.assertNotEqual(id3, '')
+        self.assertNotEqual(id3, id2)
+
+        expected_changes = [{
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id2,
+            'notice_type': 'custom',
+            'notice_key': 'foo.com/n2',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'bar',
+            'notice_id': id3,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }, {
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }]
+        self.assertEqual(harness.charm.changes, expected_changes)
+
+    def test_notify_no_repeat(self):
+        """Ensure event doesn't get triggered when notice occurs but doesn't repeat."""
+        harness = ops.testing.Harness(ContainerEventCharm, meta="""
+            name: notifier
+            containers:
+              foo:
+                resource: foo-image
+        """)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.charm.observe_container_events('foo')
+
+        id1a = harness.pebble_notify('foo', 'example.com/n1',
+                                     repeat_after=datetime.timedelta(days=1))
+        id1b = harness.pebble_notify('foo', 'example.com/n1',
+                                     repeat_after=datetime.timedelta(days=1))
+
+        self.assertEqual(id1a, id1b)
+
+        expected_changes = [{
+            'name': 'pebble-custom-notice',
+            'container': 'foo',
+            'notice_id': id1a,
+            'notice_type': 'custom',
+            'notice_key': 'example.com/n1',
+        }]
+        self.assertEqual(harness.charm.changes, expected_changes)
+
+    def test_notify_no_begin(self):
+        num_notices = 0
+
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on['c1'].pebble_custom_notice,
+                                       self._on_pebble_custom_notice)
+
+            def _on_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+                nonlocal num_notices
+                num_notices += 1
+
+        harness = ops.testing.Harness(TestCharm, meta="""
+            name: notifier
+            containers:
+              c1:
+                resource: c1-image
+        """)
+        self.addCleanup(harness.cleanup)
+
+        id = harness.pebble_notify('c1', 'example.com/n1')
+
+        self.assertIsInstance(id, str)
+        self.assertNotEqual(id, '')
+        self.assertEqual(num_notices, 0)
+
+
+class PebbleNoticesMixin:
+    client: ops.pebble.Client
+
+    assertEqual = unittest.TestCase.assertEqual  # noqa
+    assertIsNone = unittest.TestCase.assertIsNone  # noqa
+    assertLess = unittest.TestCase.assertLess  # noqa
+    assertRaises = unittest.TestCase.assertRaises  # noqa
+    assertGreaterEqual = unittest.TestCase.assertGreaterEqual  # noqa
+
+    def test_get_notice_by_id(self):
+        client = self.client
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        id1 = client.notify(pebble.NoticeType.CUSTOM, key1)
+        id2 = client.notify(pebble.NoticeType.CUSTOM, key2, data={'x': 'y'})
+        time.sleep(0.000_001)  # Ensure times are different.
+        client.notify(pebble.NoticeType.CUSTOM, key2, data={'k': 'v', 'foo': 'bar'})
+
+        notice = client.get_notice(id1)
+        self.assertEqual(notice.id, id1)
+        self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notice.key, key1)
+        self.assertEqual(notice.first_occurred, notice.last_occurred)
+        self.assertEqual(notice.first_occurred, notice.last_repeated)
+        self.assertEqual(notice.occurrences, 1)
+        self.assertEqual(notice.last_data, {})
+        self.assertIsNone(notice.repeat_after)
+        self.assertEqual(notice.expire_after, datetime.timedelta(days=7))
+
+        notice = client.get_notice(id2)
+        self.assertEqual(notice.id, id2)
+        self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notice.key, key2)
+        self.assertLess(notice.first_occurred, notice.last_occurred)
+        self.assertLess(notice.first_occurred, notice.last_repeated)
+        self.assertEqual(notice.last_occurred, notice.last_repeated)
+        self.assertEqual(notice.occurrences, 2)
+        self.assertEqual(notice.last_data, {'k': 'v', 'foo': 'bar'})
+        self.assertIsNone(notice.repeat_after)
+        self.assertEqual(notice.expire_after, datetime.timedelta(days=7))
+
+    def test_get_notices(self):
+        client = self.client
+
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        key3 = 'example.com/' + os.urandom(16).hex()
+
+        client.notify(pebble.NoticeType.CUSTOM, key1)
+        time.sleep(0.000_001)  # Ensure times are different.
+        client.notify(pebble.NoticeType.CUSTOM, key2)
+        time.sleep(0.000_001)  # Ensure times are different.
+        client.notify(pebble.NoticeType.CUSTOM, key3)
+
+        notices = client.get_notices()
+        self.assertGreaterEqual(len(notices), 3)
+
+        notices = client.get_notices(keys=[key1, key2, key3])
+        self.assertEqual(len(notices), 3)
+        self.assertEqual(notices[0].key, key1)
+        self.assertEqual(notices[1].key, key2)
+        self.assertEqual(notices[2].key, key3)
+        self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
+        self.assertLess(notices[1].last_repeated, notices[2].last_repeated)
+
+        notices = client.get_notices(keys=[key2])
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].key, key2)
+
+        notices = client.get_notices(keys=[key1, key3])
+        self.assertEqual(len(notices), 2)
+        self.assertEqual(notices[0].key, key1)
+        self.assertEqual(notices[1].key, key3)
+        self.assertLess(notices[0].last_repeated, notices[1].last_repeated)
+
+
+class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMixin):
+    def setUp(self):
+        self.client = self.get_testing_client()

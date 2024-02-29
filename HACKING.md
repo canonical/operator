@@ -79,6 +79,79 @@ source .tox/unit/bin/activate
 pytest -v test/test_real_pebble.py
 ```
 
+## Using an `ops` branch in a charm
+
+When making changes to `ops`, you'll commonly want to try those changes out in
+a charm.
+
+### From a Git branch
+
+If your changes are in a Git branch, you can simply replace your `ops` version
+in `requirements.txt` (or `pyproject.toml`) with a reference to the branch, like:
+
+```
+#ops ~= 2.9
+git+https://github.com/{your-username}/operator@{your-branch-name}
+```
+
+`git` is not normally available when `charmcraft` is packing the charm, so you'll
+need to also tell `charmcraft` that it's required for the build, by adding
+something like this to your `charmcraft.yaml`:
+
+```yaml
+parts:
+  charm:
+    build-packages:
+      - git
+```
+
+### From local code
+
+If your changes are only on your local device, you can inject your local `ops`
+into the charm after it has packed, and before you deploy it, by unzipping the
+`.charm` file and replacing the `ops` folder in the virtualenv. This small
+script will handle that for you:
+
+```shell-script
+#!/usr/bin/env bash
+
+if [ "$#" -lt 2 ]
+then
+	echo "Inject local copy of Python Operator Framework source into charm"
+	echo
+    echo "usage: inject-ops.sh file.charm /path/to/ops/dir" >&2
+    exit 1
+fi
+
+if [ ! -f "$2/framework.py" ]; then
+    echo "$2/framework.py not found; arg 2 should be path to 'ops' directory"
+    exit 1
+fi
+
+set -ex
+
+mkdir inject-ops-tmp
+unzip -q $1 -d inject-ops-tmp
+rm -rf inject-ops-tmp/venv/ops
+cp -r $2 inject-ops-tmp/venv/ops
+cd inject-ops-tmp
+zip -q -r ../inject-ops-new.charm .
+cd ..
+rm -rf inject-ops-tmp
+rm $1
+mv inject-ops-new.charm $1
+```
+
+### Using a Juju branch
+
+If your `ops` change relies on a change in a Juju branch, you'll need to deploy
+your charm to a controller using that version of Juju. For example, with microk8s:
+
+1. [Build Juju and its dependencies](https://github.com/juju/juju/blob/3.4/CONTRIBUTING.md#build-juju-and-its-dependencies)
+2. Run `make microk8s-operator-update`
+3. Run `GOBIN=/path/to/your/juju/_build/linux_amd64/bin:$GOBIN /path/to/your/juju bootstrap`
+4. Add a model and deploy your charm as normal
+
 # Documentation
 
 In general, new functionality
@@ -107,29 +180,66 @@ next to the relevant content (e.g. headings, etc.).
 
 Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
 
+As noted above, you can generate a local copy of the API reference docs with tox:
 
-## Dependencies
+```sh
+tox -e docs
+open docs/_build/html/index.html
+```
+
+# Dependencies
 
 The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
-are listed in [requirements.txt](requirements.txt).
+are listed in [pyproject.toml](pyproject.toml) in the `project.dependencies` section.
 
+# Dev Tools
+
+## Formatting and Checking
+
+Test environments are managed with [tox](https://tox.wiki/) and executed with
+[pytest](https://pytest.org), with coverage measured by
+[coverage](https://coverage.readthedocs.io/).
+Static type checking is done using [pyright](https://github.com/microsoft/pyright),
+and extends the Python 3.8 type hinting support through the
+[typing_extensions](https://pypi.org/project/typing-extensions/) package.
+
+Formatting uses [isort](https://pypi.org/project/isort/) and
+[autopep8](https://pypi.org/project/autopep8/), with linting also using
+[flake8](https://github.com/PyCQA/flake8), including the
+[docstrings](https://pypi.org/project/flake8-docstrings/),
+[builtins](https://pypi.org/project/flake8-builtins/) and
+[pep8-naming](https://pypi.org/project/pep8-naming/) extensions.
+
+All tool configuration is kept in [project.toml](pyproject.toml). The list of
+dependencies can be found in the relevant `tox.ini` environment `deps` field.
+
+## Building
+
+The build backend is [setuptools](https://pypi.org/project/setuptools/), and
+the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
 To make a release of the ops library, do the following:
 
-1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
-2. Click "Draft a new release"
-3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
-   E.g. 2.3.12
-4. Drop notes and a changelog in the description.
-5. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+1. Open a PR to change [version.py][ops/version.py]'s `version` to the
+   [appropriate string](https://semver.org/), and get that merged to main.
+2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
+3. Click "Draft a new release"
+4. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+   and a brief summary of the main changes in the release
+   E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
+5. Drop notes and a changelog in the description.
+6. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".) Wait for the new version to be published successfully to [the PyPI project](https://pypi.org/project/ops/).
+7. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
+   next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
+   `'3.14.1.dev0'`).
 
-This will trigger an automatic build for the Python package and publish it to PyPI (the API token/secret is already set up in the repository settings).
+This will trigger an automatic build for the Python package and publish it to PyPI (authorization is handled via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
 
 See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the GitHub actions, not the versions of the ops library.)
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Mattermost](https://chat.charmhub.io/charmhub/channels/charm-dev)
+Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)

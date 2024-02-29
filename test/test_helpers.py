@@ -52,7 +52,7 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
             '''#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}'''.format_map(template_args))
-    os.chmod(str(path), 0o755)  # type: ignore
+    os.chmod(str(path), 0o755)  # type: ignore  # noqa: S103
     # TODO: this hardcodes the path to bash.exe, which works for now but might
     #       need to be set via environ or something like that.
     path.with_suffix(".bat").write_text(  # type: ignore

@@ -111,12 +111,14 @@ class Model:
     as ``self.model`` from any class that derives from :class:`Object`.
     """
 
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
+    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend',
+                 broken_relation_id: Optional[int] = None):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: Dict[str, 'ops.RelationMeta'] = meta.relations
-        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache)
+        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache,
+                                          broken_relation_id=broken_relation_id)
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
         self._resources = Resources(list(resources), self._backend)
@@ -147,6 +149,9 @@ class Model:
 
         Answers the question "what am I currently related to".
         See also :meth:`.get_relation`.
+
+        In a ``relation-broken`` event, the broken relation is excluded from
+        this list.
         """
         return self._relations
 
@@ -277,22 +282,23 @@ class Model:
         return Secret(self._backend, id=id, label=label, content=content)
 
 
+if typing.TYPE_CHECKING:
+    # (entity type, name): instance.
+    _WeakCacheType = weakref.WeakValueDictionary[
+        Tuple['UnitOrApplicationType', str],
+        Optional[Union['Unit', 'Application']]]
+
+
 class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
-        if typing.TYPE_CHECKING:
-            # (entity type, name): instance.
-            _weakcachetype = weakref.WeakValueDictionary[
-                Tuple['UnitOrApplicationType', str],
-                Optional[Union['Unit', 'Application']]]
-
         self._meta = meta
         self._backend = backend
-        self._weakrefs: _weakcachetype = weakref.WeakValueDictionary()
+        self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
-    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...  # noqa
+    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...
     @typing.overload
-    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...  # noqa
+    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...
 
     def get(self, entity_type: 'UnitOrApplicationType', name: str):
         """Fetch the cached entity of type `entity_type` with name `name`."""
@@ -796,8 +802,12 @@ class LazyMapping(Mapping[str, str], ABC):
 class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
-    def __init__(self, relations_meta: Dict[str, 'ops.RelationMeta'], our_unit: 'Unit',
-                 backend: '_ModelBackend', cache: '_ModelCache'):
+    def __init__(self,
+                 relations_meta: Dict[str, 'ops.RelationMeta'],
+                 our_unit: 'Unit',
+                 backend: '_ModelBackend',
+                 cache: '_ModelCache',
+                 broken_relation_id: Optional[int]):
         self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
@@ -805,6 +815,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._our_unit = our_unit
         self._backend = backend
         self._cache = cache
+        self._broken_relation_id = broken_relation_id
         self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
 
     def __contains__(self, key: str):
@@ -822,6 +833,8 @@ class RelationMapping(Mapping[str, List['Relation']]):
         if not isinstance(relation_list, list):
             relation_list = self._data[relation_name] = []  # type: ignore
             for rid in self._backend.relation_ids(relation_name):
+                if rid == self._broken_relation_id:
+                    continue
                 relation = Relation(relation_name, rid, is_peer,
                                     self._our_unit, self._backend, self._cache)
                 relation_list.append(relation)
@@ -849,7 +862,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
                 return Relation(relation_name, relation_id, is_peer,
-                                self._our_unit, self._backend, self._cache)
+                                self._our_unit, self._backend, self._cache, active=False)
         relations = self[relation_name]
         num_related = len(relations)
         self._backend._validate_relation_access(
@@ -1120,13 +1133,13 @@ class SecretInfo:
 
     def __repr__(self):
         return ('SecretInfo('
-                'id={self.id!r}, '
-                'label={self.label!r}, '
-                'revision={self.revision}, '
-                'expires={self.expires!r}, '
-                'rotation={self.rotation}, '
-                'rotates={self.rotates!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'label={self.label!r}, '
+                f'revision={self.revision}, '
+                f'expires={self.expires!r}, '
+                f'rotation={self.rotation}, '
+                f'rotates={self.rotates!r})'
+                )
 
 
 class Secret:
@@ -1453,13 +1466,21 @@ class Relation:
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
     """
 
+    active: bool
+    """Indicates whether this relation is active.
+
+    This is normally ``True``; it will be ``False`` if the current event is a
+    ``relation-broken`` event associated with this relation.
+    """
+
     def __init__(
             self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
-            backend: '_ModelBackend', cache: '_ModelCache'):
+            backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
         self.app: Optional[Application] = None
         self.units: Set[Unit] = set()
+        self.active = active
 
         if is_peer:
             # For peer relations, both the remote and the local app are the same.
@@ -1474,7 +1495,7 @@ class Relation:
                     self.app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
-            pass
+            self.active = False
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
@@ -1759,7 +1780,7 @@ class StatusBase:
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
-        if not isinstance(getattr(child, 'name'), str):
+        if not isinstance(child.name, str):
             raise TypeError(f"Can't register StatusBase subclass {child}: ",
                             "missing required `name: str` class attribute")
         cls._statuses[child.name] = child
@@ -1790,6 +1811,8 @@ class UnknownStatus(StatusBase):
     A unit-agent has finished calling install, config-changed and start, but the
     charm has not called status-set yet.
 
+    This status is read-only; trying to set unit or application status to
+    ``UnknownStatus`` will raise :class:`ModelError`.
     """
     name = 'unknown'
 
@@ -1807,6 +1830,9 @@ class ErrorStatus(StatusBase):
 
     The unit-agent has encountered an error (the application or unit requires
     human intervention in order to operate correctly).
+
+    This status is read-only; trying to set unit or application status to
+    ``ErrorStatus`` will raise :class:`ModelError`.
     """
     name = 'error'
 
@@ -1923,7 +1949,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __getitem__(self, storage_name: str) -> List['Storage']:
         if storage_name not in self._storage_map:
-            meant = ', or '.join(repr(k) for k in self._storage_map.keys())
+            meant = ', or '.join(repr(k) for k in self._storage_map)
             raise KeyError(
                 f'Storage {storage_name!r} not found. Did you mean {meant}?')
         storage_list = self._storage_map[storage_name]
@@ -1944,8 +1970,8 @@ class StorageMapping(Mapping[str, List['Storage']]):
             ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
-            raise ModelError(('cannot add storage {!r}:'
-                              ' it is not present in the charm metadata').format(storage_name))
+            raise ModelError(f'cannot add storage {storage_name!r}:'
+                             ' it is not present in the charm metadata')
         self._backend.storage_add(storage_name, count)
 
     def _invalidate(self, storage_name: str):
@@ -2039,13 +2065,15 @@ class Container:
     For methods that make changes to the container, if the change fails or times out, then a
     :class:`ops.pebble.ChangeError` or :class:`ops.pebble.TimeoutError` will be raised.
 
-    Interactions with the container use Pebble, so all methods may raise exceptions when there are
-    problems communicating with Pebble. Problems connecting to or transferring data with Pebble
-    will raise a :class:`ops.pebble.ConnectionError` - generally you can guard against these by
-    first checking :meth:`can_connect`, but it is possible for problems to occur after
-    :meth:`can_connect` has succeeded. When an error occurs executing the request, such as trying
-    to add an invalid layer or execute a command that does not exist, an
-    :class:`ops.pebble.APIError` is raised.
+    Interactions with the container use Pebble, so all methods may raise
+    exceptions when there are problems communicating with Pebble. Problems
+    connecting to or transferring data with Pebble will raise a
+    :class:`ops.pebble.ConnectionError` - you can guard against these by first
+    checking :meth:`can_connect`, but that generally introduces a race condition
+    where problems occur after :meth:`can_connect` has succeeded. When an error
+    occurs executing the request, such as trying to add an invalid layer or
+    execute a command that does not exist, an :class:`ops.pebble.APIError` is
+    raised.
     """
 
     name: str
@@ -2069,14 +2097,12 @@ class Container:
 
         For example::
 
+            # Add status based on any earlier errors communicating with Pebble.
+            ...
+            # Check that Pebble is still reachable now.
             container = self.unit.get_container("example")
-            if container.can_connect():
-                try:
-                    c.pull('/does/not/exist')
-                except ProtocolError, PathError:
-                    # handle it
-            else:
-                event.defer()
+            if not container.can_connect():
+                event.add_status(ops.WaitingStatus("Waiting for Pebble..."))
         """
         try:
             self._pebble.get_system_info()
@@ -2174,7 +2200,7 @@ class Container:
         """Get status information for a single named service.
 
         Raises:
-            ModelError: if service_name is not found.
+            ModelError: if a service with the given name is not found
         """
         services = self.get_services(service_name)
         if not services:
@@ -2202,7 +2228,7 @@ class Container:
         """Get check information for a single named check.
 
         Raises:
-            ModelError: if ``check_name`` is not found.
+            ModelError: if a check with the given name is not found
         """
         checks = self.get_checks(check_name)
         if not checks:
@@ -2212,11 +2238,11 @@ class Container:
         return checks[check_name]
 
     @typing.overload
-    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:  # noqa
+    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:
         ...
 
     @typing.overload
-    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:  # noqa
+    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:
         ...
 
     def pull(self, path: Union[str, PurePath], *,
@@ -2251,6 +2277,11 @@ class Container:
              group_id: Optional[int] = None,
              group: Optional[str] = None):
         """Write content to a given file path on the remote system.
+
+        Note that if another process has the file open on the remote system,
+        or if the remote file is a bind mount, pushing will fail with a
+        :class:`pebble.PathError`. Use :meth:`Container.exec` for full
+        control.
 
         Args:
             path: Path of the file to write to on the remote system.
@@ -2608,7 +2639,7 @@ class Container:
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
@@ -2630,7 +2661,7 @@ class Container:
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
@@ -2718,6 +2749,39 @@ class Container:
             raise TypeError('send_signal expected at least 1 service name, got 0')
 
         self._pebble.send_signal(sig, service_names)
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            ModelError: if a notice with the given ID is not found
+        """
+        try:
+            return self._pebble.get_notice(id)
+        except pebble.APIError as e:
+            if e.code == 404:
+                raise ModelError(f'notice {id!r} not found') from e
+            raise
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[pebble.NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+    ) -> List[pebble.Notice]:
+        """Query for notices that match all of the provided filters.
+
+        See :meth:`ops.pebble.Client.get_notices` for documentation of the
+        parameters.
+        """
+        return self._pebble.get_notices(
+            select=select,
+            user_id=user_id,
+            types=types,
+            keys=keys,
+        )
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
@@ -2940,7 +3004,11 @@ class _ModelBackend:
     def _run(self, *args: str, return_output: bool = False,
              use_json: bool = False, input_stream: Optional[str] = None
              ) -> Union[str, Any, None]:
-        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
+        kwargs = {
+            'stdout': subprocess.PIPE,
+            'stderr': subprocess.PIPE,
+            'check': True,
+            'encoding': 'utf-8'}
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
@@ -3470,12 +3538,12 @@ class _ModelBackendValidator:
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise ModelError('invalid metric value {!r} provided:'
-                             ' must be a positive finite float'.format(value))
+            raise ModelError(f'invalid metric value {value!r} provided:'
+                             ' must be a positive finite float')
 
         if math.isnan(value) or math.isinf(value) or value < 0:
-            raise ModelError('invalid metric value {!r} provided:'
-                             ' must be a positive finite float'.format(value))
+            raise ModelError(f'invalid metric value {value!r} provided:'
+                             ' must be a positive finite float')
         return str(value)
 
     @classmethod
@@ -3489,3 +3557,51 @@ class _ModelBackendValidator:
         if re.search('[,=]', v) is not None:
             raise ModelError(
                 f'metric label values must not contain "," or "=": {label}={value!r}')
+
+
+class LazyNotice:
+    """Provide lazily-loaded access to a Pebble notice's details.
+
+    The attributes provided by this class are the same as those of
+    :class:`ops.pebble.Notice`, however, the notice details are only fetched
+    from Pebble if necessary (and cached on the instance).
+    """
+
+    id: str
+    user_id: Optional[int]
+    type: Union[pebble.NoticeType, str]
+    key: str
+    first_occurred: datetime.datetime
+    last_occurred: datetime.datetime
+    last_repeated: datetime.datetime
+    occurrences: int
+    last_data: Dict[str, str]
+    repeat_after: Optional[datetime.timedelta]
+    expire_after: Optional[datetime.timedelta]
+
+    def __init__(self, container: Container, id: str, type: str, key: str):
+        self._container = container
+        self.id = id
+        try:
+            self.type = pebble.NoticeType(type)
+        except ValueError:
+            self.type = type
+        self.key = key
+
+        self._notice: Optional[ops.pebble.Notice] = None
+
+    def __repr__(self):
+        type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
+        return f'LazyNotice(id={self.id!r}, type={type_repr}, key={self.key!r})'
+
+    def __getattr__(self, item: str):
+        # Note: not called for defined attributes (id, type, key)
+        self._ensure_loaded()
+        return getattr(self._notice, item)
+
+    def _ensure_loaded(self):
+        if self._notice is not None:
+            return
+        self._notice = self._container.get_notice(self.id)
+        assert self._notice.type == self.type
+        assert self._notice.key == self.key

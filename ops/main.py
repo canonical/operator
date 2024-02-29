@@ -113,6 +113,10 @@ def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
             _create_event_link(charm, bound_event, link_to)
 
 
+def _get_juju_relation_id():
+    return int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+
+
 def _get_event_args(charm: 'ops.charm.CharmBase',
                     bound_event: 'ops.framework.BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
@@ -122,7 +126,13 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
     if issubclass(event_type, ops.charm.WorkloadEvent):
         workload_name = os.environ['JUJU_WORKLOAD_NAME']
         container = model.unit.get_container(workload_name)
-        return [container], {}
+        args: List[Any] = [container]
+        if issubclass(event_type, ops.charm.PebbleNoticeEvent):
+            notice_id = os.environ['JUJU_NOTICE_ID']
+            notice_type = os.environ['JUJU_NOTICE_TYPE']
+            notice_key = os.environ['JUJU_NOTICE_KEY']
+            args.extend([notice_id, notice_type, notice_key])
+        return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
             os.environ['JUJU_SECRET_ID'],
@@ -150,9 +160,12 @@ def _get_event_args(charm: 'ops.charm.CharmBase',
         storage = cast(Union[ops.storage.JujuStorage, ops.storage.SQLiteStorage], storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
+    elif issubclass(event_type, ops.charm.ActionEvent):
+        args: List[Any] = [os.environ['JUJU_ACTION_UUID']]
+        return args, {}
     elif issubclass(event_type, ops.charm.RelationEvent):
         relation_name = os.environ['JUJU_RELATION']
-        relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        relation_id = _get_juju_relation_id()
         relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = os.environ.get('JUJU_REMOTE_APP', '')
@@ -477,7 +490,15 @@ class _Ops:
             model_backend: "ops.model._ModelBackend"
     ):
         meta = self._charm_meta
-        model = ops.model.Model(meta, model_backend)
+
+        # If we are in a RelationBroken event, we want to know which relation is
+        # broken within the model, not only in the event's `.relation` attribute.
+        if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
+            broken_relation_id = _get_juju_relation_id()
+        else:
+            broken_relation_id = None
+
+        model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
         store = self._setup_storage(dispatcher)
         framework = ops.framework.Framework(store, self.charm_spec.charm_root, meta, model,
                                             event_name=dispatcher.event_name)

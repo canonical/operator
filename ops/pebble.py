@@ -19,6 +19,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 
 import binascii
 import copy
+import dataclasses
 import datetime
 import email.message
 import email.parser
@@ -167,7 +168,7 @@ _ServiceInfoDict = TypedDict('_ServiceInfoDict',
 
 
 class _BodyHandler(Protocol):
-    def __call__(self, data: bytes, done: bool = False) -> None: ...  # noqa
+    def __call__(self, data: bytes, done: bool = False) -> None: ...
 
 
 _HeaderHandler = Callable[[bytes], None]
@@ -178,14 +179,14 @@ _HeaderHandler = Callable[[bytes], None]
 
 class _Tempfile(Protocol):
     name = ''
-    def write(self, data: bytes): ...  # noqa
-    def close(self): ...  # noqa
+    def write(self, data: bytes): ...
+    def close(self): ...
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO  # noqa
-    def write(self, __s: typing.AnyStr) -> int: ...  # noqa
-    def __enter__(self) -> typing.IO[typing.AnyStr]: ...  # noqa
+    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO
+    def write(self, __s: typing.AnyStr) -> int: ...
+    def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
 _AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
@@ -258,13 +259,27 @@ if TYPE_CHECKING:
                               'expire-after': str,
                               'repeat-after': str})
 
+    _NoticeDict = TypedDict('_NoticeDict', {
+        'id': str,
+        'user-id': NotRequired[Optional[int]],
+        'type': str,
+        'key': str,
+        'first-occurred': str,
+        'last-occurred': str,
+        'last-repeated': str,
+        'occurrences': int,
+        'last-data': NotRequired[Optional[Dict[str, str]]],
+        'repeat-after': NotRequired[str],
+        'expire-after': NotRequired[str],
+    })
+
 
 class _WebSocket(Protocol):
-    def connect(self, url: str, socket: socket.socket): ...  # noqa
-    def shutdown(self): ...                                  # noqa
-    def send(self, payload: str): ...                        # noqa
-    def send_binary(self, payload: bytes): ...               # noqa
-    def recv(self) -> Union[str, bytes]: ...                 # noqa
+    def connect(self, url: str, socket: socket.socket): ...
+    def shutdown(self): ...
+    def send(self, payload: str): ...
+    def send_binary(self, payload: bytes): ...
+    def recv(self) -> Union[str, bytes]: ...
 
 
 logger = logging.getLogger(__name__)
@@ -546,13 +561,13 @@ class Warning:
 
     def __repr__(self):
         return ('Warning('
-                'message={self.message!r}, '
-                'first_added={self.first_added!r}, '
-                'last_added={self.last_added!r}, '
-                'last_shown={self.last_shown!r}, '
-                'expire_after={self.expire_after!r}, '
-                'repeat_after={self.repeat_after!r})'
-                ).format(self=self)
+                f'message={self.message!r}, '
+                f'first_added={self.first_added!r}, '
+                f'last_added={self.last_added!r}, '
+                f'last_shown={self.last_shown!r}, '
+                f'expire_after={self.expire_after!r}, '
+                f'repeat_after={self.repeat_after!r})'
+                )
 
 
 class TaskProgress:
@@ -579,10 +594,10 @@ class TaskProgress:
 
     def __repr__(self):
         return ('TaskProgress('
-                'label={self.label!r}, '
-                'done={self.done!r}, '
-                'total={self.total!r})'
-                ).format(self=self)
+                f'label={self.label!r}, '
+                f'done={self.done!r}, '
+                f'total={self.total!r})'
+                )
 
 
 class TaskID(str):
@@ -635,16 +650,16 @@ class Task:
 
     def __repr__(self):
         return ('Task('
-                'id={self.id!r}, '
-                'kind={self.kind!r}, '
-                'summary={self.summary!r}, '
-                'status={self.status!r}, '
-                'log={self.log!r}, '
-                'progress={self.progress!r}, '
-                'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r}, '
-                'data={self.data!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'kind={self.kind!r}, '
+                f'summary={self.summary!r}, '
+                f'status={self.status!r}, '
+                f'log={self.log!r}, '
+                f'progress={self.progress!r}, '
+                f'spawn_time={self.spawn_time!r}, '
+                f'ready_time={self.ready_time!r}, '
+                f'data={self.data!r})'
+                )
 
 
 class ChangeID(str):
@@ -700,17 +715,17 @@ class Change:
 
     def __repr__(self):
         return ('Change('
-                'id={self.id!r}, '
-                'kind={self.kind!r}, '
-                'summary={self.summary!r}, '
-                'status={self.status!r}, '
-                'tasks={self.tasks!r}, '
-                'ready={self.ready!r}, '
-                'err={self.err!r}, '
-                'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r}, '
-                'data={self.data!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'kind={self.kind!r}, '
+                f'summary={self.summary!r}, '
+                f'status={self.status!r}, '
+                f'tasks={self.tasks!r}, '
+                f'ready={self.ready!r}, '
+                f'err={self.err!r}, '
+                f'spawn_time={self.spawn_time!r}, '
+                f'ready_time={self.ready_time!r}, '
+                f'data={self.data!r})'
+                )
 
 
 class Plan:
@@ -793,7 +808,7 @@ class Layer:
     log_targets: Dict[str, 'LogTarget']
 
     def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
-        if isinstance(raw, str):
+        if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
             d = raw or {}
@@ -975,10 +990,10 @@ class ServiceInfo:
 
     def __repr__(self):
         return ('ServiceInfo('
-                'name={self.name!r}, '
-                'startup={self.startup}, '
-                'current={self.current})'
-                ).format(self=self)
+                f'name={self.name!r}, '
+                f'startup={self.startup}, '
+                f'current={self.current})'
+                )
 
 
 class Check:
@@ -1186,17 +1201,17 @@ class FileInfo:
 
     def __repr__(self):
         return ('FileInfo('
-                'path={self.path!r}, '
-                'name={self.name!r}, '
-                'type={self.type}, '
-                'size={self.size}, '
-                'permissions=0o{self.permissions:o}, '
-                'last_modified={self.last_modified!r}, '
-                'user_id={self.user_id}, '
-                'user={self.user!r}, '
-                'group_id={self.group_id}, '
-                'group={self.group!r})'
-                ).format(self=self)
+                f'path={self.path!r}, '
+                f'name={self.name!r}, '
+                f'type={self.type}, '
+                f'size={self.size}, '
+                f'permissions=0o{self.permissions:o}, '
+                f'last_modified={self.last_modified!r}, '
+                f'user_id={self.user_id}, '
+                f'user={self.user!r}, '
+                f'group_id={self.group_id}, '
+                f'group={self.group!r})'
+                )
 
 
 class CheckInfo:
@@ -1269,12 +1284,96 @@ class CheckInfo:
 
     def __repr__(self):
         return ('CheckInfo('
-                'name={self.name!r}, '
-                'level={self.level!r}, '
-                'status={self.status}, '
-                'failures={self.failures}, '
-                'threshold={self.threshold!r})'
-                ).format(self=self)
+                f'name={self.name!r}, '
+                f'level={self.level!r}, '
+                f'status={self.status}, '
+                f'failures={self.failures}, '
+                f'threshold={self.threshold!r})'
+                )
+
+
+class NoticeType(enum.Enum):
+    """Enum of notice types."""
+
+    CUSTOM = 'custom'
+
+
+class NoticesSelect(enum.Enum):
+    """Enum of :meth:`Client.get_notices` ``select`` values."""
+
+    ALL = 'all'
+    """Select notices from all users (any user ID, including public notices).
+
+    This only works for Pebble admins (for example, root).
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class Notice:
+    """Information about a single notice."""
+
+    id: str
+    """Server-generated unique ID for this notice."""
+
+    user_id: Optional[int]
+    """UID of the user who may view this notice (None means notice is public)."""
+
+    type: Union[NoticeType, str]
+    """Type of the notice."""
+
+    key: str
+    """The notice key, a string that differentiates notices of this type.
+
+    This is in the format ``example.com/path``.
+    """
+
+    first_occurred: datetime.datetime
+    """The first time one of these notices (type and key combination) occurs."""
+
+    last_occurred: datetime.datetime
+    """The last time one of these notices occurred."""
+
+    last_repeated: datetime.datetime
+    """The time this notice was last repeated.
+
+    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    for an explanation of what "repeated" means.
+    """
+
+    occurrences: int
+    """The number of times one of these notices has occurred."""
+
+    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """Additional data captured from the last occurrence of one of these notices."""
+
+    repeat_after: Optional[datetime.timedelta] = None
+    """Minimum time after one of these was last repeated before Pebble will repeat it again."""
+
+    expire_after: Optional[datetime.timedelta] = None
+    """How long since one of these last occurred until Pebble will drop the notice."""
+
+    @classmethod
+    def from_dict(cls, d: '_NoticeDict') -> 'Notice':
+        """Create new Notice object from dict parsed from JSON."""
+        try:
+            notice_type = NoticeType(d['type'])
+        except ValueError:
+            notice_type = d['type']
+        return cls(
+            id=d['id'],
+            user_id=d.get('user-id'),
+            type=notice_type,
+            key=d['key'],
+            first_occurred=timeconv.parse_rfc3339(d['first-occurred']),
+            last_occurred=timeconv.parse_rfc3339(d['last-occurred']),
+            last_repeated=timeconv.parse_rfc3339(d['last-repeated']),
+            occurrences=d['occurrences'],
+            last_data=d.get('last-data') or {},
+            repeat_after=timeconv.parse_duration(d['repeat-after'])
+            if 'repeat-after' in d else None,
+            expire_after=timeconv.parse_duration(d['expire-after'])
+            if 'expire-after' in d else None,
+        )
 
 
 class ExecProcess(Generic[AnyStr]):
@@ -1515,7 +1614,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
             break
 
         if encoding is not None:
-            chunk = chunk.decode(encoding)
+            chunk = typing.cast(bytes, chunk).decode(encoding)
         writer.write(chunk)
 
 
@@ -1684,7 +1783,7 @@ class Client:
 
         if headers is None:
             headers = {}
-        request = urllib.request.Request(url, method=method, data=data, headers=headers)
+        request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
 
         try:
             response = self.opener.open(request, timeout=self.timeout)
@@ -1920,7 +2019,7 @@ class Client:
 
     def _wait_change(self, change_id: ChangeID, timeout: Optional[float] = None) -> Change:
         """Call the wait-change API endpoint directly."""
-        query = {}
+        query: Dict[str, Any] = {}
         if timeout is not None:
             query['timeout'] = _format_timeout(timeout)
 
@@ -1928,9 +2027,11 @@ class Client:
             resp = self._request('GET', f'/v1/changes/{change_id}/wait', query)
         except APIError as e:
             if e.code == 404:
-                raise NotImplementedError('server does not implement wait-change endpoint')
+                raise NotImplementedError(
+                    'server does not implement wait-change endpoint') from None
             if e.code == 504:
-                raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
+                raise TimeoutError(
+                    f'timed out waiting for change {change_id} ({timeout} seconds)') from None
             raise
 
         return Change.from_dict(resp['result'])
@@ -1999,11 +2100,11 @@ class Client:
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
     @typing.overload
-    def pull(self, path: str, *, encoding: None) -> BinaryIO:  # noqa
+    def pull(self, path: str, *, encoding: None) -> BinaryIO:
         ...
 
     @typing.overload
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:  # noqa
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:
         ...
 
     def pull(self,
@@ -2156,10 +2257,10 @@ class Client:
         elif isinstance(source, bytes):
             source_io: _AnyStrFileLikeIO = io.BytesIO(source)
         else:
-            source_io: _AnyStrFileLikeIO = source
+            source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
-        path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
-        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
+        path_escaped = path.replace('"', '\\"').encode('utf-8')
+        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([
@@ -2282,7 +2383,7 @@ class Client:
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
@@ -2304,7 +2405,7 @@ class Client:
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
-    def exec(  # noqa
+    def exec(
         self,
         command: List[str],
         *,
@@ -2513,8 +2614,8 @@ class Client:
             # finishing early with an error. Call wait_change to pick that up.
             change = self.wait_change(ChangeID(change_id))
             if change.err:
-                raise ChangeError(change.err, change)
-            raise ConnectionError(f'unexpected error connecting to websockets: {e}')
+                raise ChangeError(change.err, change) from e
+            raise ConnectionError(f'unexpected error connecting to websockets: {e}') from e
 
         cancel_stdin: Optional[Callable[[], None]] = None
         cancel_reader: Optional[int] = None
@@ -2608,7 +2709,7 @@ class Client:
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError('services must be of type Iterable[str], '
-                            'not {}'.format(type(services).__name__))
+                            f'not {type(services).__name__}')
         for s in services:
             if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
@@ -2637,13 +2738,92 @@ class Client:
         Returns:
             List of :class:`CheckInfo` objects.
         """
-        query = {}
+        query: Dict[str, Any] = {}
         if level is not None:
             query['level'] = level.value
         if names:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def notify(self, type: NoticeType, key: str, *,
+               data: Optional[Dict[str, str]] = None,
+               repeat_after: Optional[datetime.timedelta] = None) -> str:
+        """Record an occurrence of a notice with the specified options.
+
+        Args:
+            type: Notice type (currently only "custom" notices are supported).
+            key: Notice key; must be in "example.com/path" format.
+            data: Data fields for this notice.
+            repeat_after: Only allow this notice to repeat after this duration
+                has elapsed (the default is to always repeat).
+
+        Returns:
+            The notice's ID.
+        """
+        body: Dict[str, Any] = {
+            'action': 'add',
+            'type': type.value,
+            'key': key,
+        }
+        if data is not None:
+            body['data'] = data
+        if repeat_after is not None:
+            body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
+        resp = self._request('POST', '/v1/notices', body=body)
+        return resp['result']['id']
+
+    def get_notice(self, id: str) -> Notice:
+        """Get details about a single notice by ID.
+
+        Raises:
+            APIError: if a notice with the given ID is not found (``code`` 404)
+        """
+        resp = self._request('GET', f'/v1/notices/{id}')
+        return Notice.from_dict(resp['result'])
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+    ) -> List[Notice]:
+        """Query for notices that match all of the provided filters.
+
+        Pebble returns notices that match all of the filters, for example, if
+        called with ``types=[NoticeType.CUSTOM], keys=["example.com/a"]``,
+        Pebble will only return custom notices that also have key "example.com/a".
+
+        If no filters are specified, return notices viewable by the requesting
+        user (notices whose ``user_id`` matches the requester UID as well as
+        public notices).
+
+        Note that the "after" filter is not yet implemented, as it's not
+        needed right now and it's hard to implement correctly with Python's
+        datetime type, which only has microsecond precision (and Go's Time
+        type has nanosecond precision).
+
+        Args:
+            select: Select which notices to return (instead of returning
+                notices for the current user).
+            user_id: Filter for notices for the specified user, including
+                public notices (only works for Pebble admins).
+            types: Filter for notices with any of the specified types.
+            keys: Filter for notices with any of the specified keys.
+        """
+        query: Dict[str, Union[str, List[str]]] = {}
+        if select is not None:
+            query['select'] = select.value
+        if user_id is not None:
+            query['user-id'] = str(user_id)
+        if types is not None:
+            query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
+        if keys is not None:
+            query['keys'] = list(keys)
+        resp = self._request('GET', '/v1/notices', query)
+        return [Notice.from_dict(info) for info in resp['result']]
 
 
 class _FilesParser:
@@ -2750,7 +2930,7 @@ class _FilesParser:
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
         newline = '' if encoding else None
-        file_io = open(self._files[path].name, mode,
+        file_io = open(self._files[path].name, mode,  # noqa: SIM115
                        encoding=encoding, newline=newline)
         # open() returns IO[Any]
         return typing.cast('_TextOrBinaryIO', file_io)

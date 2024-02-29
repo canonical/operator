@@ -1933,6 +1933,66 @@ containers:
         ])
         self.pebble.requests = []
 
+    def test_get_notice(self):
+        self.pebble.responses.append(pebble.Notice.from_dict({
+            'id': '123',
+            'user-id': 1000,
+            'type': 'custom',
+            'key': 'example.com/a',
+            'first-occurred': '2023-12-07T17:01:02.123456789Z',
+            'last-occurred': '2023-12-07T17:01:03.123456789Z',
+            'last-repeated': '2023-12-07T17:01:04.123456789Z',
+            'occurrences': 8,
+        }))
+
+        notice = self.container.get_notice('123')
+        self.assertEqual(notice.id, '123')
+        self.assertEqual(notice.type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notice.key, 'example.com/a')
+
+        self.assertEqual(self.pebble.requests, [
+            ('get_notice', '123'),
+        ])
+
+    def test_get_notice_not_found(self):
+        def raise_error(id: str):
+            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
+        self.pebble.get_notice = raise_error
+        with self.assertRaises(ops.ModelError):
+            self.container.get_notice('123')
+
+    def test_get_notices(self):
+        self.pebble.responses.append([
+            pebble.Notice.from_dict({
+                'id': '124',
+                'user-id': 1000,
+                'type': 'custom',
+                'key': 'example.com/b',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 8,
+            }),
+        ])
+
+        notices = self.container.get_notices(
+            user_id=1000,
+            select=pebble.NoticesSelect.ALL,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+        )
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].id, '124')
+        self.assertEqual(notices[0].type, pebble.NoticeType.CUSTOM)
+        self.assertEqual(notices[0].key, 'example.com/b')
+
+        self.assertEqual(self.pebble.requests, [('get_notices', dict(
+            user_id=1000,
+            select=pebble.NoticesSelect.ALL,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+        ))])
+
 
 class MockPebbleBackend(_ModelBackend):
     def get_pebble(self, socket_path: str):
@@ -2032,6 +2092,14 @@ class MockPebbleClient:
 
     def send_signal(self, signal: typing.Union[str, int], service_names: str):
         self.requests.append(('send_signal', signal, service_names))
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        self.requests.append(('get_notice', id))
+        return self.responses.pop(0)
+
+    def get_notices(self, **kwargs: typing.Any):
+        self.requests.append(('get_notices', kwargs))
+        return self.responses.pop(0)
 
 
 class TestModelBindings(unittest.TestCase):
@@ -2175,6 +2243,34 @@ class TestModelBindings(unittest.TestCase):
             ['network-get', 'db0', '--format=json'],
         ])
 
+    def test_broken_relations(self):
+        meta = ops.CharmMeta()
+        meta.relations = {
+            'db0': ops.RelationMeta(
+                ops.RelationRole.provides, 'db0', {'interface': 'db0', 'scope': 'global'}),
+            'db1': ops.RelationMeta(
+                ops.RelationRole.requires, 'db1', {'interface': 'db1', 'scope': 'global'}),
+            'db2': ops.RelationMeta(
+                ops.RelationRole.peer, 'db2', {'interface': 'db2', 'scope': 'global'}),
+        }
+        backend = _ModelBackend('myapp/0')
+        model = ops.Model(meta, backend, broken_relation_id=8)
+        fake_script(self, 'relation-ids',
+                    """if [ "$1" = "db0" ]; then
+                         echo '["db0:4"]'
+                       elif [ "$1" = "db1" ]; then
+                         echo '["db1:8"]'
+                       elif [ "$1" = "db2" ]; then
+                         echo '["db2:16"]'
+                       else
+                         echo '[]'
+                       fi
+                    """)
+        fake_script(self, 'relation-list', """echo '""'""")
+        self.assertTrue(model.relations['db0'])
+        self.assertFalse(model.relations['db1'])
+        self.assertTrue(model.relations['db2'])
+
     def test_binding_by_relation_name(self):
         fake_script(self, 'network-get',
                     f'''[ "$1" = db0 ] && echo '{self.network_get_out}' || exit 1''')
@@ -2310,7 +2406,14 @@ class TestModelBindings(unittest.TestCase):
         self.assertEqual(binding.network.ingress_addresses, ['foo.bar.baz.com'])
 
 
-_metric_and_label_pair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
+_MetricAndLabelPair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
+
+
+_ValidMetricsTestCase = typing.Tuple[
+    typing.Mapping[str, typing.Union[int, float]],
+    typing.Mapping[str, str],
+    typing.List[typing.List[str]],
+]
 
 
 class TestModelBackend(unittest.TestCase):
@@ -2783,12 +2886,8 @@ class TestModelBackend(unittest.TestCase):
                          [['juju-log', '--log-level', 'BAR', '--', 'foo']])
 
     def test_valid_metrics(self):
-        _caselist = typing.List[typing.Tuple[
-            typing.Mapping[str, typing.Union[int, float]],
-            typing.Mapping[str, str],
-            typing.List[typing.List[str]]]]
         fake_script(self, 'add-metric', 'exit 0')
-        test_cases: _caselist = [(
+        test_cases: typing.List[_ValidMetricsTestCase] = [(
             OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
             OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
             [['add-metric', '--labels', 'de=ad,be=ef_ -',
@@ -2803,7 +2902,7 @@ class TestModelBackend(unittest.TestCase):
             self.assertEqual(fake_script_calls(self, clear=True), expected_calls)
 
     def test_invalid_metric_names(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
@@ -2822,7 +2921,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
@@ -2834,7 +2933,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_labels(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'': 'baz'}),
             ({'foo': 4.2}, {',bar': 'baz'}),
             ({'foo': 4.2}, {'b=a=r': 'baz'}),
@@ -2845,7 +2944,7 @@ class TestModelBackend(unittest.TestCase):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_label_values(self):
-        invalid_inputs: typing.List[_metric_and_label_pair] = [
+        invalid_inputs: typing.List[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
             ({'foo': 4.2}, {'bar': 'b=az'}),
@@ -3637,6 +3736,59 @@ class TestUnit(unittest.TestCase):
             self.model.get_unit('other').reboot()
         with self.assertRaises(RuntimeError):
             self.model.get_unit('other').reboot(now=True)
+
+
+class TestLazyNotice(unittest.TestCase):
+    def test_lazy_notice(self):
+        calls = 0
+        timestamp = datetime.datetime.now()
+
+        class FakeWorkload:
+            def get_notice(self, id: str):
+                nonlocal calls
+                calls += 1
+                return ops.pebble.Notice(
+                    id=id,
+                    user_id=1000,
+                    type=ops.pebble.NoticeType.CUSTOM,
+                    key='example.com/a',
+                    first_occurred=timestamp,
+                    last_occurred=timestamp,
+                    last_repeated=timestamp,
+                    occurrences=7,
+                    last_data={'key': 'val'},
+                )
+
+        workload = typing.cast(ops.Container, FakeWorkload())
+        n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
+        self.assertEqual(n.id, '123')
+        self.assertEqual(n.type, ops.pebble.NoticeType.CUSTOM)
+        self.assertEqual(n.key, 'example.com/a')
+        self.assertEqual(calls, 0)
+
+        self.assertEqual(n.occurrences, 7)
+        self.assertEqual(calls, 1)
+
+        self.assertEqual(n.user_id, 1000)
+        self.assertEqual(n.last_data, {'key': 'val'})
+        self.assertEqual(calls, 1)
+
+        with self.assertRaises(AttributeError):
+            assert n.not_exist
+
+    def test_repr(self):
+        workload = typing.cast(ops.Container, None)
+        n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
+        self.assertEqual(
+            repr(n),
+            "LazyNotice(id='123', type=NoticeType.CUSTOM, key='example.com/a')",
+        )
+
+        n = ops.model.LazyNotice(workload, '123', 'foobar', 'example.com/a')
+        self.assertEqual(
+            repr(n),
+            "LazyNotice(id='123', type='foobar', key='example.com/a')",
+        )
 
 
 if __name__ == "__main__":

@@ -63,6 +63,9 @@ class EventSpec:
                  set_in_env: typing.Optional[typing.Dict[str,
                                                          str]] = None,
                  workload_name: typing.Optional[str] = None,
+                 notice_id: typing.Optional[str] = None,
+                 notice_type: typing.Optional[str] = None,
+                 notice_key: typing.Optional[str] = None,
                  departing_unit_name: typing.Optional[str] = None,
                  secret_id: typing.Optional[str] = None,
                  secret_label: typing.Optional[str] = None,
@@ -77,6 +80,9 @@ class EventSpec:
         self.model_name = model_name
         self.set_in_env = set_in_env
         self.workload_name = workload_name
+        self.notice_id = notice_id
+        self.notice_type = notice_type
+        self.notice_key = notice_key
         self.secret_id = secret_id
         self.secret_label = secret_label
         self.secret_revision = secret_revision
@@ -336,7 +342,7 @@ class _TestMain(abc.ABC):
         actions_dir_name = 'actions'
         actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
         actions_dir.mkdir()
-        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status'):
+        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status', 'keyerror'):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(self,
@@ -426,6 +432,15 @@ class _TestMain(abc.ABC):
             assert event_spec.workload_name is not None
             env.update({
                 'JUJU_WORKLOAD_NAME': event_spec.workload_name,
+            })
+        if issubclass(event_spec.event_type, ops.PebbleNoticeEvent):
+            assert event_spec.notice_id is not None
+            assert event_spec.notice_type is not None
+            assert event_spec.notice_key is not None
+            env.update({
+                'JUJU_NOTICE_ID': event_spec.notice_id,
+                'JUJU_NOTICE_TYPE': event_spec.notice_type,
+                'JUJU_NOTICE_KEY': event_spec.notice_key,
             })
         if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[:-len('_action')].replace('_', '-')
@@ -571,16 +586,28 @@ class _TestMain(abc.ABC):
              'departing_unit': 'remote/42'},
         ), (
             EventSpec(ops.ActionEvent, 'start_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME',
+                      set_in_env={'JUJU_ACTION_UUID': '1'}),
             {},
         ), (
             EventSpec(ops.ActionEvent, 'foo_bar_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME',
+                      set_in_env={'JUJU_ACTION_UUID': '2'}),
             {},
         ), (
             EventSpec(ops.PebbleReadyEvent, 'test_pebble_ready',
                       workload_name='test'),
             {'container_name': 'test'},
+        ), (
+            EventSpec(ops.PebbleCustomNoticeEvent, 'test_pebble_custom_notice',
+                      workload_name='test',
+                      notice_id='123',
+                      notice_type='custom',
+                      notice_key='example.com/a'),
+            {'container_name': 'test',
+             'notice_id': '123',
+             'notice_type': 'custom',
+             'notice_key': 'example.com/a'},
         ), (
             EventSpec(ops.SecretChangedEvent, 'secret_changed',
                       secret_id='secret:12345',
@@ -701,19 +728,20 @@ class _TestMain(abc.ABC):
         fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
 
         test_cases = [(
-            EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
+            EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME',
+                      set_in_env={'JUJU_ACTION_UUID': '1'}),
             ['juju-log', '--log-level', 'CRITICAL', '--', 'super critical'],
         ), (
             EventSpec(ops.ActionEvent, 'log_error_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME', set_in_env={'JUJU_ACTION_UUID': '2'}),
             ['juju-log', '--log-level', 'ERROR', '--', 'grave error'],
         ), (
             EventSpec(ops.ActionEvent, 'log_warning_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME', set_in_env={'JUJU_ACTION_UUID': '3'}),
             ['juju-log', '--log-level', 'WARNING', '--', 'wise warning'],
         ), (
             EventSpec(ops.ActionEvent, 'log_info_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME', set_in_env={'JUJU_ACTION_UUID': '4'}),
             ['juju-log', '--log-level', 'INFO', '--', 'useful info'],
         )]
 
@@ -754,7 +782,8 @@ class _TestMain(abc.ABC):
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_model_name_action',
             env_var='JUJU_ACTION_NAME',
-            model_name='test-model-name'))
+            model_name='test-model-name',
+            set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state._on_get_model_name_action, ['test-model-name'])
 
@@ -766,7 +795,8 @@ class _TestMain(abc.ABC):
                     """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
-            env_var='JUJU_ACTION_NAME'))
+            env_var='JUJU_ACTION_NAME',
+            set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state.status_name, 'unknown')
         self.assertEqual(state.status_message, '')
@@ -776,7 +806,8 @@ class _TestMain(abc.ABC):
             """echo '{"status": "blocked", "message": "help meeee"}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
-            env_var='JUJU_ACTION_NAME'))
+            env_var='JUJU_ACTION_NAME',
+            set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state.status_name, 'blocked')
         self.assertEqual(state.status_message, 'help meeee')
@@ -841,9 +872,11 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
 
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = [f"hooks/{name.replace('_', '-')}"
-                           for name, event_source in self.charm_module.Charm.on.events().items()
-                           if issubclass(event_source.event_type, ops.LifecycleEvent)]
+        all_event_hooks = [
+            f"hooks/{name.replace('_', '-')}"
+            for name, event_source in self.charm_module.Charm.on.events().items()
+            if issubclass(event_source.event_type, (ops.CommitEvent, ops.PreCommitEvent))
+        ]
 
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
@@ -916,7 +949,7 @@ class _TestMainWithDispatch(_TestMain):
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = [f"hooks/{e.replace('_', '-')}"
-                           for e in self.charm_module.Charm.on.events().keys()]
+                           for e in self.charm_module.Charm.on.events()]
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
             EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
@@ -1003,6 +1036,8 @@ class _TestMainWithDispatch(_TestMain):
 
         self.stdout.seek(0)
         self.assertEqual(self.stdout.read(), b'')
+        self.stderr.seek(0)
+        self.assertEqual(self.stderr.read(), b'')
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         hook = Path('hooks/install')
         expected = [
@@ -1128,9 +1163,24 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         )
         subprocess.run(
             [sys.executable, str(dispatch)],
-            # stdout=self.stdout,
-            # stderr=self.stderr,
+            stdout=self.stdout,
+            stderr=self.stderr,
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
+
+    def test_crash_action(self):
+        self._prepare_actions()
+        self.stderr = tempfile.TemporaryFile('w+t')
+        self.addCleanup(self.stderr.close)
+        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._simulate_event(EventSpec(
+                ops.ActionEvent, 'keyerror_action',
+                env_var='JUJU_ACTION_NAME',
+                set_in_env={'JUJU_ACTION_UUID': '1'}))
+        self.stderr.seek(0)
+        stderr = self.stderr.read()
+        self.assertIn('KeyError', stderr)
+        self.assertIn("'foo' not found in 'bar'", stderr)
 
 
 class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):

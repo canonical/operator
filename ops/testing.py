@@ -18,6 +18,7 @@
 import dataclasses
 import datetime
 import fnmatch
+import http
 import inspect
 import io
 import ipaddress
@@ -27,6 +28,7 @@ import random
 import shutil
 import signal
 import tempfile
+import typing
 import uuid
 import warnings
 from contextlib import contextmanager
@@ -244,6 +246,7 @@ class Harness(Generic[CharmType]):
         self._unit_name: str = f"{self._meta.name}/0"
         self._hooks_enabled: bool = True
         self._relation_id_counter: int = 0
+        self._action_id_counter: int = 0
         config_ = self._get_config(config)
         self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
         self._model = model.Model(self._meta, self._backend)
@@ -446,7 +449,7 @@ class Harness(Generic[CharmType]):
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
         if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
-            self._backend.status_set("unknown", "", is_app=False)
+            self._backend._unit_status = {'status': 'unknown', 'message': ''}
         all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
@@ -592,7 +595,7 @@ class Harness(Generic[CharmType]):
                         'username': 'username',
                         'password': 'password',
                         }
-        if resource_name not in self._meta.resources.keys():
+        if resource_name not in self._meta.resources:
             raise RuntimeError(f'Resource {resource_name} is not a defined resources')
         if self._meta.resources[resource_name].type != "oci-image":
             raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
@@ -611,7 +614,7 @@ class Harness(Generic[CharmType]):
             content: Either string or bytes content, which will be the content of the filename
                 returned by resource-get. If contents is a string, it will be encoded in utf-8
         """
-        if resource_name not in self._meta.resources.keys():
+        if resource_name not in self._meta.resources:
             raise RuntimeError(f'Resource {resource_name} is not a defined resource')
         record = self._meta.resources[resource_name]
         if record.type != "file":
@@ -878,8 +881,18 @@ class Harness(Generic[CharmType]):
         for unit_name in rel_list_map[relation_id].copy():
             self.remove_relation_unit(relation_id, unit_name)
 
+        prev_broken_id = None  # Silence linter warning.
+        if self._model is not None:
+            # Let the model's RelationMapping know that this relation is broken.
+            # Normally, this is handled in `main`, but while testing we create
+            # the `Model` object and keep it around for multiple events.
+            prev_broken_id = self._model._relations._broken_relation_id
+            self._model.relations._broken_relation_id = relation_id
+            # Ensure that we don't offer a cached relation.
+            self._model.relations._invalidate(relation_name)
         self._emit_relation_broken(relation_name, relation_id, remote_app)
         if self._model is not None:
+            self._model.relations._broken_relation_id = prev_broken_id
             self._model.relations._invalidate(relation_name)
 
         self._backend._relation_app_and_units.pop(relation_id)
@@ -1097,6 +1110,37 @@ class Harness(Generic[CharmType]):
         container = self.model.unit.get_container(container_name)
         self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
+
+    def pebble_notify(self, container_name: str, key: str, *,
+                      data: Optional[Dict[str, str]] = None,
+                      repeat_after: Optional[datetime.timedelta] = None,
+                      type: pebble.NoticeType = pebble.NoticeType.CUSTOM) -> str:
+        """Record a Pebble notice with the specified key and data.
+
+        If :meth:`begin` has been called and the notice is new or was repeated,
+        this will trigger a notice event of the appropriate type, for example
+        :class:`ops.PebbleCustomNoticeEvent`.
+
+        Args:
+            container_name: Name of workload container.
+            key: Notice key; must be in "example.com/path" format.
+            data: Data fields for this notice.
+            repeat_after: Only allow this notice to repeat after this duration
+                has elapsed (the default is to always repeat).
+            type: Notice type (currently only "custom" notices are supported).
+
+        Returns:
+            The notice's ID.
+        """
+        container = self.model.unit.get_container(container_name)
+        client = self._backend._pebble_clients[container.name]
+
+        id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
+
+        if self._charm is not None and type == pebble.NoticeType.CUSTOM and new_or_repeated:
+            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type.value, key)
+
+        return id
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -1662,12 +1706,9 @@ class Harness(Generic[CharmType]):
         Return:
             The path of the temporary directory associated with the specified container.
         """
-        # it's okay to access the container directly in this context, as its creation has already
+        # It's okay to access the container directly in this context, as its creation has already
         # been ensured during the model's initialization.
-        if isinstance(container, str):
-            container_name = container
-        else:
-            container_name = container.name
+        container_name = container if isinstance(container, str) else container.name
         return self._backend._pebble_clients[container_name]._root
 
     def evaluate_status(self) -> None:
@@ -1822,7 +1863,7 @@ class Harness(Generic[CharmType]):
         try:
             action_meta = self.charm.meta.actions[action_name]
         except KeyError:
-            raise RuntimeError(f"Charm does not have a {action_name!r} action.")
+            raise RuntimeError(f"Charm does not have a {action_name!r} action.") from None
         if params is None:
             params = {}
         for key in action_meta.required:
@@ -1840,7 +1881,8 @@ class Harness(Generic[CharmType]):
         action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
         handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
         self._backend._running_action = action_under_test
-        handler.emit()
+        self._action_id_counter += 1
+        handler.emit(str(self._action_id_counter))
         self._backend._running_action = None
         if action_under_test.failure_message is not None:
             raise ActionFailed(
@@ -1851,9 +1893,7 @@ class Harness(Generic[CharmType]):
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
-    if isinstance(app_or_unit, model.Application):
-        return app_or_unit.name
-    elif isinstance(app_or_unit, model.Unit):
+    if isinstance(app_or_unit, (model.Application, model.Unit)):
         return app_or_unit.name
     elif isinstance(app_or_unit, str):
         return app_or_unit
@@ -1873,9 +1913,9 @@ def _record_calls(cls: Any):
 
         def decorator(orig_method: Any):
             def wrapped(self: '_TestingModelBackend', *args: Any, **kwargs: Any):
-                full_args = (orig_method.__name__,) + args
+                full_args = (orig_method.__name__, *args)
                 if kwargs:
-                    full_args = full_args + (kwargs,)
+                    full_args = (*full_args, kwargs)
                 self._calls.append(full_args)
                 return orig_method(self, *args, **kwargs)
             return wrapped
@@ -1895,7 +1935,7 @@ def _copy_docstrings(source_cls: Any):
     __doc__ for that method.
     """
     def decorator(target_cls: Any):
-        for meth_name, _ in target_cls.__dict__.items():
+        for meth_name in target_cls.__dict__:
             if meth_name.startswith('_'):
                 continue
             source_method = source_cls.__dict__.get(meth_name)
@@ -1942,15 +1982,15 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         # has the expected type.
         option = self._spec.get('options', {}).get(key)
         if not option:
-            raise RuntimeError('Unknown config option {}; '
+            raise RuntimeError(f'Unknown config option {key}; '
                                'not declared in `config.yaml`.'
                                'Check https://juju.is/docs/sdk/config for the '
-                               'spec.'.format(key))
+                               'spec.')
 
         declared_type = option.get('type')
         if not declared_type:
-            raise RuntimeError('Incorrectly formatted `options.yaml`, option {} '
-                               'is expected to declare a `type`.'.format(key))
+            raise RuntimeError(f'Incorrectly formatted `options.yaml`, option {key} '
+                               'is expected to declare a `type`.')
 
         if declared_type not in self._supported_types:
             raise RuntimeError(
@@ -1958,9 +1998,8 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
 
         if type(value) is not self._supported_types[declared_type]:
-            raise RuntimeError('Config option {} is supposed to be of type '
-                               '{}, not `{}`.'.format(key, declared_type,
-                                                      type(value).__name__))
+            raise RuntimeError(f'Config option {key} is supposed to be of type '
+                               f'{declared_type}, not `{type(value).__name__}`.')
 
         # call 'normal' setattr.
         dict.__setitem__(self, key, value)  # type: ignore
@@ -2081,8 +2120,7 @@ class _TestingModelBackend:
         if self._hook_is_running == 'leader_elected' and relation_name in valid_relation_endpoints:
             raise RuntimeError(
                 'cannot access relation data without first adding the relation: '
-                'use Harness.add_relation({!r}, <app>) before calling set_leader'
-                .format(relation_name))
+                f'use Harness.add_relation({relation_name!r}, <app>) before calling set_leader')
 
     def _can_connect(self, pebble_client: '_TestingPebbleClient') -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
@@ -2172,10 +2210,7 @@ class _TestingModelBackend:
             raise RelationNotFoundError(relation_id)
 
         relation = self._relation_data_raw[relation_id]
-        if is_app:
-            bucket_key = self.app_name
-        else:
-            bucket_key = self.unit_name
+        bucket_key = self.app_name if is_app else self.unit_name
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
@@ -2204,10 +2239,7 @@ class _TestingModelBackend:
         resource_dir = self._get_resource_dir()
         resource_filename = resource_dir / resource_name / filename
         if not resource_filename.exists():
-            if isinstance(contents, bytes):
-                mode = 'wb'
-            else:
-                mode = 'wt'
+            mode = 'wb' if isinstance(contents, bytes) else 'wt'
             resource_filename.parent.mkdir(exist_ok=True)
             with resource_filename.open(mode=mode) as resource_file:
                 resource_file.write(contents)
@@ -2223,6 +2255,9 @@ class _TestingModelBackend:
             return self._unit_status
 
     def status_set(self, status: '_StatusName', message: str = '', *, is_app: bool = False):
+        if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
+            raise model.ModelError(f'ERROR invalid status "{status}", expected one of'
+                                   ' [maintenance blocked waiting active]')
         if is_app:
             self._app_status = {'status': status, 'message': message}
         else:
@@ -2235,8 +2270,8 @@ class _TestingModelBackend:
             name: name (i.e. from metadata.yaml).
             include_detached: True to include unattached storage mounts as well.
         """
-        return list(index for index in self._storage_list[name]
-                    if include_detached or self._storage_is_attached(name, index))
+        return [index for index in self._storage_list[name]
+                if include_detached or self._storage_is_attached(name, index)]
 
     def storage_get(self, storage_name_id: str, attribute: str) -> Any:
         name, index = storage_name_id.split("/", 1)
@@ -2273,7 +2308,7 @@ class _TestingModelBackend:
         index = int(index)
 
         for container, client in self._pebble_clients.items():
-            for _, mount in self._meta.containers[container].mounts.items():
+            for mount in self._meta.containers[container].mounts.values():
                 if mount.storage != name:
                     continue
                 root = client._root
@@ -2290,10 +2325,10 @@ class _TestingModelBackend:
         name, index = storage_id.split('/', 1)
 
         for container, client in self._pebble_clients.items():
-            for _, mount in self._meta.containers[container].mounts.items():
+            for mount in self._meta.containers[container].mounts.values():
                 if mount.storage != name:
                     continue
-                for index, store in self._storage_list[mount.storage].items():
+                for store in self._storage_list[mount.storage].values():
                     root = client._root
                     mounting_dir = root / mount.location[1:]
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -2323,9 +2358,9 @@ class _TestingModelBackend:
         params: Dict[str, Any] = {}
         assert self._running_action is not None
         action_meta = self._meta.actions[self._running_action.name]
-        for name, action_meta in action_meta.parameters.items():
-            if "default" in action_meta:
-                params[name] = action_meta["default"]
+        for name, meta in action_meta.parameters.items():
+            if "default" in meta:
+                params[name] = meta["default"]
         params.update(self._running_action.parameters)
         return params
 
@@ -2549,7 +2584,7 @@ class _TestingModelBackend:
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
-        return f"secret:{str(uuid.uuid4())}"
+        return f"secret:{uuid.uuid4()}"
 
     def secret_add(self, content: Dict[str, str], *,
                    label: Optional[str] = None,
@@ -2557,10 +2592,7 @@ class _TestingModelBackend:
                    expire: Optional[datetime.datetime] = None,
                    rotate: Optional[model.SecretRotate] = None,
                    owner: Optional[str] = None) -> str:
-        if owner == 'unit':
-            owner_name = self.unit_name
-        else:
-            owner_name = self.app_name
+        owner_name = self.unit_name if owner == 'unit' else self.app_name
         return self._secret_add(content, owner_name,
                                 label=label,
                                 description=description,
@@ -2641,14 +2673,14 @@ class _TestingModelBackend:
         # should be testing details of error messages).
         if protocol == 'icmp':
             if port is not None:
-                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')  # NOQA: test_quote_backslashes
+                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')  # noqa: E501
         elif protocol in ['tcp', 'udp']:
             if port is None:
-                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')  # NOQA: test_quote_backslashes
+                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')  # noqa: E501
             if not (1 <= port <= 65535):
-                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # NOQA: test_quote_backslashes
+                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # noqa: E501
         else:
-            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # NOQA: test_quote_backslashes
+            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # noqa: E501
 
     def reboot(self, now: bool = False):
         self._reboot_count += 1
@@ -2723,6 +2755,8 @@ class _TestingPebbleClient:
         self._root = container_root
         self._backend = backend
         self._exec_handlers: Dict[Tuple[str, ...], ExecHandler] = {}
+        self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
+        self._last_notice_id = 0
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
@@ -2866,11 +2900,11 @@ class _TestingPebbleClient:
                 # 'override' is actually single quoted in the real error, but
                 # it shouldn't be, hopefully that gets cleaned up.
                 if not service.override:
-                    raise RuntimeError('500 Internal Server Error: layer "{}" must define'
-                                       '"override" for service "{}"'.format(label, name))
+                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" must define'
+                                       f'"override" for service "{name}"')
                 if service.override not in ('merge', 'replace'):
-                    raise RuntimeError('500 Internal Server Error: layer "{}" has invalid '
-                                       '"override" value on service "{}"'.format(label, name))
+                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" has invalid '
+                                       f'"override" value on service "{name}"')
                 elif service.override == 'replace':
                     layer.services[name] = service
                 elif service.override == 'merge':
@@ -2888,18 +2922,32 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # TODO: (jam) 2021-04-07 have a way to merge existing services
+                # TODO: merge existing services https://github.com/canonical/operator/issues/1112
                 services[name] = service
         return services
+
+    def _render_checks(self) -> Dict[str, pebble.Check]:
+        checks: Dict[str, pebble.Check] = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, check in layer.checks.items():
+                checks[name] = check
+        return checks
+
+    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
+        log_targets: Dict[str, pebble.LogTarget] = {}
+        for key in sorted(self._layers.keys()):
+            layer = self._layers[key]
+            for name, log_target in layer.log_targets.items():
+                log_targets[name] = log_target
+        return log_targets
 
     def get_plan(self) -> pebble.Plan:
         self._check_connection()
         plan = pebble.Plan('{}')
-        services = self._render_services()
-        if not services:
-            return plan
-        for name in sorted(services.keys()):
-            plan.services[name] = services[name]
+        plan.services.update(self._render_services())
+        plan.checks.update(self._render_checks())
+        plan.log_targets.update(self._render_log_targets())
         return plan
 
     def get_services(self, names: Optional[List[str]] = None) -> List[pebble.ServiceInfo]:
@@ -2947,9 +2995,11 @@ class _TestingPebbleClient:
                 Union[BinaryIO, TextIO],
                 file_path.open("rb" if encoding is None else "r", encoding=encoding))
         except FileNotFoundError:
-            raise pebble.PathError('not-found', f'stat {path}: no such file or directory')
+            raise pebble.PathError('not-found',
+                                   f'stat {path}: no such file or directory') from None
         except IsADirectoryError:
-            raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
+            raise pebble.PathError('generic-file-error',
+                                   f'can only read a regular file: "{path}"') from None
 
     def push(
             self, path: str, source: 'ReadableBuffer', *,
@@ -2983,7 +3033,7 @@ class _TestingPebbleClient:
                 file_path.write_bytes(source)
             else:
                 # If source is binary, open file in binary mode and ignore encoding param
-                is_binary = isinstance(source.read(0), bytes)
+                is_binary = isinstance(source.read(0), bytes)  # type: ignore
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
                 with file_path.open(open_mode, encoding=open_encoding) as f:
@@ -2991,10 +3041,10 @@ class _TestingPebbleClient:
             os.chmod(file_path, permissions)
         except FileNotFoundError as e:
             raise pebble.PathError(
-                'not-found', f'parent directory not found: {e.args[0]}')
+                'not-found', f'parent directory not found: {e.args[0]}') from None
         except NotADirectoryError:
             raise pebble.PathError('generic-file-error',
-                                   f'open {path}.~: not a directory')
+                                   f'open {path}.~: not a directory') from None
 
     def list_files(self, path: str, *, pattern: Optional[str] = None,
                    itself: bool = False) -> List[pebble.FileInfo]:
@@ -3002,9 +3052,7 @@ class _TestingPebbleClient:
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if not file_path.exists():
-            raise pebble.APIError(
-                body={}, code=404, status='Not Found',
-                message=f"stat {path}: no such file or directory")
+            raise self._api_error(404, f"stat {path}: no such file or directory")
         files = [file_path]
         if not itself:
             try:
@@ -3061,10 +3109,12 @@ class _TestingPebbleClient:
             os.chmod(dir_path, permissions)
         except FileExistsError:
             if not make_parents:
-                raise pebble.PathError('generic-file-error', f'mkdir {path}: file exists')
+                raise pebble.PathError(
+                    'generic-file-error',
+                    f'mkdir {path}: file exists') from None
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}')
+            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
 
     def remove_path(self, path: str, *, recursive: bool = False):
         self._check_connection()
@@ -3109,7 +3159,7 @@ class _TestingPebbleClient:
                     f"exec handler must return bytes if encoding is None,"
                     f"not {data.__class__.__name__}")
             else:
-                return io.StringIO(data)
+                return io.StringIO(typing.cast(str, data))
 
     def exec(
         self,
@@ -3133,19 +3183,13 @@ class _TestingPebbleClient:
         handler = self._find_exec_handler(command)
         if handler is None:
             message = "execution handler not found, please register one using Harness.handle_exec"
-            raise pebble.APIError(
-                body={}, code=500, status='Internal Server Error', message=message
-            )
+            raise self._api_error(500, message)
         environment = {} if environment is None else environment
         if service_context is not None:
             plan = self.get_plan()
             if service_context not in plan.services:
                 message = f'context service "{service_context}" not found'
-                body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
-                        'result': {'message': message}}
-                raise pebble.APIError(
-                    body=body, code=500, status='Internal Server Error', message=message
-                )
+                raise self._api_error(500, message)
             service = plan.services[service_context]
             environment = {**service.environment, **environment}
             working_dir = service.working_dir if working_dir is None else working_dir
@@ -3236,11 +3280,7 @@ class _TestingPebbleClient:
             if service not in plan.services or not self.get_services([service])[0].is_running():
                 # conform with the real pebble api
                 message = f'cannot send signal to "{service}": service is not running'
-                body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
-                        'result': {'message': message}}
-                raise pebble.APIError(
-                    body=body, code=500, status='Internal Server Error', message=message
-                )
+                raise self._api_error(500, message)
 
         # Check if signal name is valid
         try:
@@ -3249,13 +3289,126 @@ class _TestingPebbleClient:
             # conform with the real pebble api
             first_service = next(iter(service_names))
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
-            body = {'type': 'error', 'status-code': 500, 'status': 'Internal Server Error',
-                    'result': {'message': message}}
-            raise pebble.APIError(
-                body=body,
-                code=500,
-                status='Internal Server Error',
-                message=message) from None
+            raise self._api_error(500, message) from None
 
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
+
+    def notify(self, type: pebble.NoticeType, key: str, *,
+               data: Optional[Dict[str, str]] = None,
+               repeat_after: Optional[datetime.timedelta] = None) -> str:
+        notice_id, _ = self._notify(type, key, data=data, repeat_after=repeat_after)
+        return notice_id
+
+    def _notify(self, type: pebble.NoticeType, key: str, *,
+                data: Optional[Dict[str, str]] = None,
+                repeat_after: Optional[datetime.timedelta] = None) -> Tuple[str, bool]:
+        """Record an occurrence of a notice with the specified details.
+
+        Return a tuple of (notice_id, new_or_repeated).
+        """
+        if type != pebble.NoticeType.CUSTOM:
+            message = f'invalid type "{type.value}" (can only add "custom" notices)'
+            raise self._api_error(400, message)
+
+        # The shape of the code below is taken from State.AddNotice in Pebble.
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        new_or_repeated = False
+        unique_key = (type.value, key)
+        notice = self._notices.get(unique_key)
+        if notice is None:
+            # First occurrence of this notice uid+type+key
+            self._last_notice_id += 1
+            notice = pebble.Notice(
+                id=str(self._last_notice_id),
+                user_id=0,  # Charm should always be able to read pebble_notify notices.
+                type=type,
+                key=key,
+                first_occurred=now,
+                last_occurred=now,
+                last_repeated=now,
+                expire_after=datetime.timedelta(days=7),
+                occurrences=1,
+                last_data=data or {},
+                repeat_after=repeat_after,
+            )
+            self._notices[unique_key] = notice
+            new_or_repeated = True
+        else:
+            # Additional occurrence, update existing notice
+            last_repeated = notice.last_repeated
+            if repeat_after is None or now > notice.last_repeated + repeat_after:
+                # Update last repeated time if repeat-after time has elapsed (or is None)
+                last_repeated = now
+                new_or_repeated = True
+            notice = dataclasses.replace(
+                notice,
+                last_occurred=now,
+                last_repeated=last_repeated,
+                occurrences=notice.occurrences + 1,
+                last_data=data or {},
+                repeat_after=repeat_after,
+            )
+            self._notices[unique_key] = notice
+
+        return notice.id, new_or_repeated
+
+    def _api_error(self, code: int, message: str) -> pebble.APIError:
+        status = http.HTTPStatus(code).phrase
+        body = {
+            'type': 'error',
+            'status-code': code,
+            'status': status,
+            'result': {'message': message},
+        }
+        return pebble.APIError(body, code, status, message)
+
+    def get_notice(self, id: str) -> pebble.Notice:
+        for notice in self._notices.values():
+            if notice.id == id:
+                return notice
+        raise self._api_error(404, f'cannot find notice with ID "{id}"')
+
+    def get_notices(
+        self,
+        *,
+        select: Optional[pebble.NoticesSelect] = None,
+        user_id: Optional[int] = None,
+        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
+        keys: Optional[Iterable[str]] = None,
+    ) -> List[pebble.Notice]:
+        # Similar logic as api_notices.go:v1GetNotices in Pebble.
+
+        filter_user_id = 0  # default is to filter by request UID (root)
+        if user_id is not None:
+            filter_user_id = user_id
+        if select is not None:
+            if user_id is not None:
+                raise self._api_error(400, 'cannot use both "select" and "user_id"')
+            filter_user_id = None
+
+        if types is not None:
+            types = {(t.value if isinstance(t, pebble.NoticeType) else t) for t in types}
+        if keys is not None:
+            keys = set(keys)
+
+        notices = [notice for notice in self._notices.values() if
+                   self._notice_matches(notice, filter_user_id, types, keys)]
+        notices.sort(key=lambda notice: notice.last_repeated)
+        return notices
+
+    @staticmethod
+    def _notice_matches(notice: pebble.Notice,
+                        user_id: Optional[int] = None,
+                        types: Optional[Set[str]] = None,
+                        keys: Optional[Set[str]] = None) -> bool:
+        # Same logic as NoticeFilter.matches in Pebble.
+        # For example: if user_id filter is set and it doesn't match, return False.
+        if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
+            return False
+        if types is not None and notice.type not in types:
+            return False
+        if keys is not None and notice.key not in keys:
+            return False
+        return True

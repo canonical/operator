@@ -38,6 +38,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    NoReturn,
     Optional,
     Protocol,
     Set,
@@ -60,13 +61,13 @@ class Serializable(typing.Protocol):
     @property
     def handle(self) -> 'Handle': ...  # noqa
     @handle.setter
-    def handle(self, val: 'Handle'): ...  # noqa
+    def handle(self, val: 'Handle'): ...
     def snapshot(self) -> Dict[str, Any]: ...  # noqa
     def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
 
 
 class _StoredObject(Protocol):
-    _under: Any = None  # noqa
+    _under: Any = None
 
 
 StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
@@ -523,6 +524,17 @@ class PrefixedEvents:
 class LifecycleEvent(EventBase):
     """Events tied to the lifecycle of the Framework object."""
 
+    def defer(self) -> NoReturn:
+        """Lifecycle events are not deferrable like other events.
+
+        This is because these events are run alongside each event invocation,
+        so deferring would always end up simply doubling the work.
+
+        Raises:
+            RuntimeError: always.
+        """
+        raise RuntimeError('cannot defer lifecycle events')
+
 
 class PreCommitEvent(LifecycleEvent):
     """Event that will be emitted first on commit."""
@@ -923,6 +935,7 @@ class Framework(Object):
                 elif self._event_name and self._event_name != event.handle.kind:
                     # if the event we are emitting now is not the event being
                     # dispatched, and it also is not an event we have deferred,
+                    # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
                     logger.debug("Emitting custom event %s.", event)
 
@@ -1056,10 +1069,10 @@ class BoundStoredState:
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def _data(self) -> StoredStateData: ...  # noqa, type: ignore
+        def _data(self) -> StoredStateData: ...  # type: ignore
 
         @property
-        def _attr_name(self) -> str: ...  # noqa, type: ignore
+        def _attr_name(self) -> str: ...  # type: ignore
 
     def __init__(self, parent: Object, attr_name: str):
         parent.framework.register_type(StoredStateData, parent)

@@ -887,6 +887,31 @@ class TestFramework(BaseTestCase):
                 'ObjectWithStorage[obj]/on/event[1]']))
 
 
+MutableTypesTestCase = typing.Tuple[
+    typing.Callable[[], typing.Any],  # Called to get operand A.
+    typing.Any,  # Operand B.
+    typing.Any,  # Expected result.
+    typing.Callable[[typing.Any, typing.Any], None],  # Operation to perform.
+    typing.Callable[[typing.Any, typing.Any], typing.Any],  # Validation to perform.
+]
+
+ComparisonOperationsTestCase = typing.Tuple[
+    typing.Any,  # Operand A.
+    typing.Any,  # Operand B.
+    typing.Callable[[typing.Any, typing.Any], bool],  # Operation to test.
+    bool,  # Result of op(A, B).
+    bool,  # Result of op(B, A).
+]
+
+SetOperationsTestCase = typing.Tuple[
+    typing.Set[str],  # A set to test an operation against (other_set).
+    # An operation to test.
+    typing.Callable[[typing.Set[str], typing.Set[str]], typing.Set[str]],
+    typing.Set[str],  # The expected result of operation(obj._stored.set, other_set).
+    typing.Set[str],  # The expected result of operation(other_set, obj._stored.set).
+]
+
+
 class TestStoredState(BaseTestCase):
 
     def setUp(self):
@@ -1116,14 +1141,7 @@ class TestStoredState(BaseTestCase):
         # Test and validation functions in a list of tuples.
         # Assignment and keywords like del are not supported in lambdas
         #  so functions are used instead.
-        test_case = typing.Tuple[
-            typing.Callable[[], typing.Any],                        # Called to get operand A.
-            typing.Any,                                             # Operand B.
-            typing.Any,                                             # Expected result.
-            typing.Callable[[typing.Any, typing.Any], None],        # Operation to perform.
-            typing.Callable[[typing.Any, typing.Any], typing.Any],  # Validation to perform.
-        ]
-        test_operations: typing.List[test_case] = [(
+        test_operations: typing.List[MutableTypesTestCase] = [(
             lambda: {},
             None,
             {},
@@ -1336,14 +1354,7 @@ class TestStoredState(BaseTestCase):
             framework_copy.close()
 
     def test_comparison_operations(self):
-        test_case = typing.Tuple[
-            typing.Any,                                       # Operand A.
-            typing.Any,                                       # Operand B.
-            typing.Callable[[typing.Any, typing.Any], bool],  # Operation to test.
-            bool,                                             # Result of op(A, B).
-            bool,                                             # Result of op(B, A).
-        ]
-        test_operations: typing.List[test_case] = [(
+        test_operations: typing.List[ComparisonOperationsTestCase] = [(
             {"1"},
             {"1", "2"},
             lambda a, b: a < b,
@@ -1436,14 +1447,7 @@ class TestStoredState(BaseTestCase):
             self.assertEqual(op(b, obj._stored.a), op_ba)
 
     def test_set_operations(self):
-        test_case = typing.Tuple[
-            typing.Set[str],  # A set to test an operation against (other_set).
-            # An operation to test.
-            typing.Callable[[typing.Set[str], typing.Set[str]], typing.Set[str]],
-            typing.Set[str],  # The expected result of operation(obj._stored.set, other_set).
-            typing.Set[str],  # The expected result of operation(other_set, obj._stored.set).
-        ]
-        test_operations: typing.List[test_case] = [(
+        test_operations: typing.List[SetOperationsTestCase] = [(
             {"1"},
             lambda a, b: a | b,
             {"1", "a", "b"},
@@ -1809,7 +1813,7 @@ class DebugHookTests(BaseTestCase):
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                publisher.foobar_action.emit()
+                publisher.foobar_action.emit(id='1')
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(observer.called)
@@ -1829,7 +1833,7 @@ class DebugHookTests(BaseTestCase):
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
-                publisher.foobar_action.emit()
+                publisher.foobar_action.emit(id='2')
 
         self.assertEqual(mock.call_count, 1)
         self.assertFalse(observer.called)
