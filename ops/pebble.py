@@ -179,13 +179,17 @@ _HeaderHandler = Callable[[bytes], None]
 
 class _Tempfile(Protocol):
     name = ''
+
     def write(self, data: bytes): ...
+
     def close(self): ...
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
     def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO
+
     def write(self, __s: typing.AnyStr) -> int: ...
+
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
@@ -276,9 +280,13 @@ if TYPE_CHECKING:
 
 class _WebSocket(Protocol):
     def connect(self, url: str, socket: socket.socket): ...
+
     def shutdown(self): ...
+
     def send(self, payload: str): ...
+
     def send_binary(self, payload: bytes): ...
+
     def recv(self) -> Union[str, bytes]: ...
 
 
@@ -561,13 +569,13 @@ class Warning:
 
     def __repr__(self):
         return ('Warning('
-                'message={self.message!r}, '
-                'first_added={self.first_added!r}, '
-                'last_added={self.last_added!r}, '
-                'last_shown={self.last_shown!r}, '
-                'expire_after={self.expire_after!r}, '
-                'repeat_after={self.repeat_after!r})'
-                ).format(self=self)
+                f'message={self.message!r}, '
+                f'first_added={self.first_added!r}, '
+                f'last_added={self.last_added!r}, '
+                f'last_shown={self.last_shown!r}, '
+                f'expire_after={self.expire_after!r}, '
+                f'repeat_after={self.repeat_after!r})'
+                )
 
 
 class TaskProgress:
@@ -594,10 +602,10 @@ class TaskProgress:
 
     def __repr__(self):
         return ('TaskProgress('
-                'label={self.label!r}, '
-                'done={self.done!r}, '
-                'total={self.total!r})'
-                ).format(self=self)
+                f'label={self.label!r}, '
+                f'done={self.done!r}, '
+                f'total={self.total!r})'
+                )
 
 
 class TaskID(str):
@@ -650,16 +658,16 @@ class Task:
 
     def __repr__(self):
         return ('Task('
-                'id={self.id!r}, '
-                'kind={self.kind!r}, '
-                'summary={self.summary!r}, '
-                'status={self.status!r}, '
-                'log={self.log!r}, '
-                'progress={self.progress!r}, '
-                'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r}, '
-                'data={self.data!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'kind={self.kind!r}, '
+                f'summary={self.summary!r}, '
+                f'status={self.status!r}, '
+                f'log={self.log!r}, '
+                f'progress={self.progress!r}, '
+                f'spawn_time={self.spawn_time!r}, '
+                f'ready_time={self.ready_time!r}, '
+                f'data={self.data!r})'
+                )
 
 
 class ChangeID(str):
@@ -715,17 +723,17 @@ class Change:
 
     def __repr__(self):
         return ('Change('
-                'id={self.id!r}, '
-                'kind={self.kind!r}, '
-                'summary={self.summary!r}, '
-                'status={self.status!r}, '
-                'tasks={self.tasks!r}, '
-                'ready={self.ready!r}, '
-                'err={self.err!r}, '
-                'spawn_time={self.spawn_time!r}, '
-                'ready_time={self.ready_time!r}, '
-                'data={self.data!r})'
-                ).format(self=self)
+                f'id={self.id!r}, '
+                f'kind={self.kind!r}, '
+                f'summary={self.summary!r}, '
+                f'status={self.status!r}, '
+                f'tasks={self.tasks!r}, '
+                f'ready={self.ready!r}, '
+                f'err={self.err!r}, '
+                f'spawn_time={self.spawn_time!r}, '
+                f'ready_time={self.ready_time!r}, '
+                f'data={self.data!r})'
+                )
 
 
 class Plan:
@@ -735,8 +743,11 @@ class Plan:
     documented at https://github.com/canonical/pebble/#layer-specification.
     """
 
-    def __init__(self, raw: str):
-        d = yaml.safe_load(raw) or {}  # type: ignore
+    def __init__(self, raw: Optional[Union[str, 'PlanDict']] = None):
+        if isinstance(raw, str):  # noqa: SIM108
+            d = yaml.safe_load(raw) or {}  # type: ignore
+        else:
+            d = raw or {}
         d = typing.cast('PlanDict', d)
 
         self._raw = raw
@@ -788,6 +799,13 @@ class Plan:
 
     __str__ = to_yaml
 
+    def __eq__(self, other: Union['PlanDict', 'Plan']) -> bool:
+        if isinstance(other, dict):
+            return self.to_dict() == other
+        elif isinstance(other, Plan):
+            return self.to_dict() == other.to_dict()
+        return NotImplemented
+
 
 class Layer:
     """Represents a Pebble configuration layer.
@@ -808,7 +826,7 @@ class Layer:
     log_targets: Dict[str, 'LogTarget']
 
     def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
-        if isinstance(raw, str):
+        if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
             d = raw or {}
@@ -990,10 +1008,10 @@ class ServiceInfo:
 
     def __repr__(self):
         return ('ServiceInfo('
-                'name={self.name!r}, '
-                'startup={self.startup}, '
-                'current={self.current})'
-                ).format(self=self)
+                f'name={self.name!r}, '
+                f'startup={self.startup}, '
+                f'current={self.current})'
+                )
 
 
 class Check:
@@ -1201,17 +1219,17 @@ class FileInfo:
 
     def __repr__(self):
         return ('FileInfo('
-                'path={self.path!r}, '
-                'name={self.name!r}, '
-                'type={self.type}, '
-                'size={self.size}, '
-                'permissions=0o{self.permissions:o}, '
-                'last_modified={self.last_modified!r}, '
-                'user_id={self.user_id}, '
-                'user={self.user!r}, '
-                'group_id={self.group_id}, '
-                'group={self.group!r})'
-                ).format(self=self)
+                f'path={self.path!r}, '
+                f'name={self.name!r}, '
+                f'type={self.type}, '
+                f'size={self.size}, '
+                f'permissions=0o{self.permissions:o}, '
+                f'last_modified={self.last_modified!r}, '
+                f'user_id={self.user_id}, '
+                f'user={self.user!r}, '
+                f'group_id={self.group_id}, '
+                f'group={self.group!r})'
+                )
 
 
 class CheckInfo:
@@ -1284,12 +1302,12 @@ class CheckInfo:
 
     def __repr__(self):
         return ('CheckInfo('
-                'name={self.name!r}, '
-                'level={self.level!r}, '
-                'status={self.status}, '
-                'failures={self.failures}, '
-                'threshold={self.threshold!r})'
-                ).format(self=self)
+                f'name={self.name!r}, '
+                f'level={self.level!r}, '
+                f'status={self.status}, '
+                f'failures={self.failures}, '
+                f'threshold={self.threshold!r})'
+                )
 
 
 class NoticeType(enum.Enum):
@@ -1783,7 +1801,7 @@ class Client:
 
         if headers is None:
             headers = {}
-        request = urllib.request.Request(url, method=method, data=data, headers=headers)
+        request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
 
         try:
             response = self.opener.open(request, timeout=self.timeout)
@@ -2027,9 +2045,11 @@ class Client:
             resp = self._request('GET', f'/v1/changes/{change_id}/wait', query)
         except APIError as e:
             if e.code == 404:
-                raise NotImplementedError('server does not implement wait-change endpoint')
+                raise NotImplementedError(
+                    'server does not implement wait-change endpoint') from None
             if e.code == 504:
-                raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
+                raise TimeoutError(
+                    f'timed out waiting for change {change_id} ({timeout} seconds)') from None
             raise
 
         return Change.from_dict(resp['result'])
@@ -2257,8 +2277,8 @@ class Client:
         else:
             source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
-        path_escaped = path.replace('"', '\\"').encode('utf-8')  # NOQA: test_quote_backslashes
-        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""  # NOQA: test_quote_backslashes
+        path_escaped = path.replace('"', '\\"').encode('utf-8')
+        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([
@@ -2612,8 +2632,8 @@ class Client:
             # finishing early with an error. Call wait_change to pick that up.
             change = self.wait_change(ChangeID(change_id))
             if change.err:
-                raise ChangeError(change.err, change)
-            raise ConnectionError(f'unexpected error connecting to websockets: {e}')
+                raise ChangeError(change.err, change) from e
+            raise ConnectionError(f'unexpected error connecting to websockets: {e}') from e
 
         cancel_stdin: Optional[Callable[[], None]] = None
         cancel_reader: Optional[int] = None
@@ -2707,7 +2727,7 @@ class Client:
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError('services must be of type Iterable[str], '
-                            'not {}'.format(type(services).__name__))
+                            f'not {type(services).__name__}')
         for s in services:
             if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
@@ -2928,7 +2948,7 @@ class _FilesParser:
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
         newline = '' if encoding else None
-        file_io = open(self._files[path].name, mode,
+        file_io = open(self._files[path].name, mode,  # noqa: SIM115
                        encoding=encoding, newline=newline)
         # open() returns IO[Any]
         return typing.cast('_TextOrBinaryIO', file_io)

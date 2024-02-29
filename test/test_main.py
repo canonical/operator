@@ -586,11 +586,13 @@ class _TestMain(abc.ABC):
              'departing_unit': 'remote/42'},
         ), (
             EventSpec(ops.ActionEvent, 'start_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME',
+                      set_in_env={'JUJU_ACTION_UUID': '1'}),
             {},
         ), (
             EventSpec(ops.ActionEvent, 'foo_bar_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME',
+                      set_in_env={'JUJU_ACTION_UUID': '2'}),
             {},
         ), (
             EventSpec(ops.PebbleReadyEvent, 'test_pebble_ready',
@@ -726,19 +728,20 @@ class _TestMain(abc.ABC):
         fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
 
         test_cases = [(
-            EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME'),
+            EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME',
+                      set_in_env={'JUJU_ACTION_UUID': '1'}),
             ['juju-log', '--log-level', 'CRITICAL', '--', 'super critical'],
         ), (
             EventSpec(ops.ActionEvent, 'log_error_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME', set_in_env={'JUJU_ACTION_UUID': '2'}),
             ['juju-log', '--log-level', 'ERROR', '--', 'grave error'],
         ), (
             EventSpec(ops.ActionEvent, 'log_warning_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME', set_in_env={'JUJU_ACTION_UUID': '3'}),
             ['juju-log', '--log-level', 'WARNING', '--', 'wise warning'],
         ), (
             EventSpec(ops.ActionEvent, 'log_info_action',
-                      env_var='JUJU_ACTION_NAME'),
+                      env_var='JUJU_ACTION_NAME', set_in_env={'JUJU_ACTION_UUID': '4'}),
             ['juju-log', '--log-level', 'INFO', '--', 'useful info'],
         )]
 
@@ -779,7 +782,8 @@ class _TestMain(abc.ABC):
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_model_name_action',
             env_var='JUJU_ACTION_NAME',
-            model_name='test-model-name'))
+            model_name='test-model-name',
+            set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state._on_get_model_name_action, ['test-model-name'])
 
@@ -791,7 +795,8 @@ class _TestMain(abc.ABC):
                     """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
-            env_var='JUJU_ACTION_NAME'))
+            env_var='JUJU_ACTION_NAME',
+            set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state.status_name, 'unknown')
         self.assertEqual(state.status_message, '')
@@ -801,7 +806,8 @@ class _TestMain(abc.ABC):
             """echo '{"status": "blocked", "message": "help meeee"}'""")
         state = self._simulate_event(EventSpec(
             ops.ActionEvent, 'get_status_action',
-            env_var='JUJU_ACTION_NAME'))
+            env_var='JUJU_ACTION_NAME',
+            set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         self.assertEqual(state.status_name, 'blocked')
         self.assertEqual(state.status_message, 'help meeee')
@@ -943,7 +949,7 @@ class _TestMainWithDispatch(_TestMain):
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = [f"hooks/{e.replace('_', '-')}"
-                           for e in self.charm_module.Charm.on.events().keys()]
+                           for e in self.charm_module.Charm.on.events()]
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
             EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
@@ -1169,7 +1175,8 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(
                 ops.ActionEvent, 'keyerror_action',
-                env_var='JUJU_ACTION_NAME'))
+                env_var='JUJU_ACTION_NAME',
+                set_in_env={'JUJU_ACTION_UUID': '1'}))
         self.stderr.seek(0)
         stderr = self.stderr.read()
         self.assertIn('KeyError', stderr)
