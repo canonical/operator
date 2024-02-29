@@ -53,7 +53,7 @@ def _exe_path(path: Path) -> Optional[Path]:
     return Path(p)
 
 
-def _create_event_link(charm: "ops.charm.CharmBase", bound_event: "ops.framework.EventSource",
+def _create_event_link(charm: 'ops.charm.CharmBase', bound_event: 'ops.framework.EventSource',
                        link_to: Union[str, Path]):
     """Create a symlink for a particular event.
 
@@ -91,7 +91,7 @@ def _create_event_link(charm: "ops.charm.CharmBase", bound_event: "ops.framework
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir: Path, charm: "ops.charm.CharmBase"):
+def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
@@ -113,7 +113,7 @@ def _setup_event_links(charm_dir: Path, charm: "ops.charm.CharmBase"):
             _create_event_link(charm, bound_event, link_to)
 
 
-def _get_event_args(charm: "ops.charm.CharmBase",
+def _get_event_args(charm: 'ops.charm.CharmBase',
                     bound_event: 'ops.framework.BoundEvent') -> Tuple[List[Any], Dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
@@ -203,7 +203,7 @@ class _Dispatcher:
         else:
             self._init_legacy()
 
-    def ensure_event_links(self, charm: "ops.charm.CharmBase"):
+    def ensure_event_links(self, charm: 'ops.charm.CharmBase'):
         """Make sure necessary symlinks are present on disk."""
         if self.is_dispatch_aware:
             # links aren't needed
@@ -376,10 +376,10 @@ class _CharmSpec:
         )
 
 
-class Ops:
+class _Ops:
     """Initializes the Framework and manages the lifecycle of a charm.
 
-    Running Ops consists of three main steps:
+    Running _Ops consists of three main steps:
     - setup: initialize from envvars and argv's the objects that encapsulate:
       - the Framework (hook tool wrappers)
       - the storage backend
@@ -416,8 +416,6 @@ class Ops:
 
     def _setup_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
         charm_type = self.charm_spec.charm_type
-        sig = inspect.signature(charm_type)
-        sig.bind(framework)  # signature check
 
         charm = charm_type(framework)
         dispatcher.ensure_event_links(charm)
@@ -434,10 +432,7 @@ class Ops:
         setup_root_logging(backend, debug=debug)
 
         # our hello world
-        logger.debug(
-            "ops %s up and running.",
-            ops.__version__,
-        )  # type:ignore
+        logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     def _setup_storage(self, dispatcher: _Dispatcher):
         charm_state_path = self.charm_spec.charm_root / self.CHARM_STATE_FILE
@@ -489,8 +484,7 @@ class Ops:
         return framework
 
     def setup(self):
-        """Setup framework, charm and dispatcher."""
-        """Setup dispatcher, framework and charm objects."""
+        """Set up dispatcher, framework and charm objects."""
         model_backend = self._setup_model_backend()
         self._setup_root_logging(model_backend)
         self.dispatcher = dispatcher = _Dispatcher(self.charm_spec.charm_root)
@@ -518,7 +512,7 @@ class Ops:
             event_to_emit = getattr(owner, event_name)
         except AttributeError:
             logger.debug("Event %s not defined for %s.", event_name, charm)
-            exit(0)
+            return  # no event emitted on the charm!
 
         args, kwargs = _get_event_args(charm, event_to_emit)
         logger.debug("Emitting Juju event %s.", event_name)
@@ -588,7 +582,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
         charm_class,
     )
 
-    ops = Ops(
+    ops = _Ops(
         charm_spec,
         use_juju_for_storage=use_juju_for_storage)
 
