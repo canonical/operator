@@ -128,6 +128,31 @@ class TestCharm(unittest.TestCase):
         # check that the event has been seen by the observer
         self.assertIsInstance(charm.seen, ops.StartEvent)
 
+    def test_observe_nested_object_noninstantiated(self):
+        class MyObj(ops.Object):
+            def __init__(self, charm, *args: typing.Any):
+                super().__init__(charm, "obj")
+                framework.observe(charm.on.start, self._on_start)
+
+            def _on_start(self, _):
+                raise RuntimeError()  # never reached!
+
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args: typing.Any):
+                super().__init__(*args)
+                MyObj(self)  # not assigned!
+                framework.observe(self.on.start, self._on_start)
+
+            def _on_start(self, event: ops.EventBase):
+                pass  # is reached
+
+        framework = self.create_framework()
+        c = MyCharm(framework)
+        with self.assertLogs() as logs:
+            c.on.start.emit()
+        assert logs
+
     def test_empty_action(self):
         meta = ops.CharmMeta.from_yaml('name: my-charm', '')
         self.assertEqual(meta.actions, {})
