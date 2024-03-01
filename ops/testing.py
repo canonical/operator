@@ -799,9 +799,9 @@ class Harness(Generic[CharmType]):
 
         This function creates a relation with an application and triggers a
         :class:`RelationCreatedEvent <ops.RelationCreatedEvent>`.
-        This function also creates a defaulted network binding on this endpoint. If you wish
+        It also creates a default network binding on this endpoint. If you want
         to associate a custom network to this binding, provide one using
-        `add_network` before calling `add_relation`.
+        :meth:`add_network` before calling this function.
 
         If `app_data` or `unit_data` are provided, also add a new unit
         (``<remote_app>/0``) to the relation and trigger
@@ -838,7 +838,7 @@ class Harness(Generic[CharmType]):
         if not (relation_name in self._meta.provides
                 or relation_name in self._meta.requires
                 or relation_name in self._meta.peers):
-            raise RelationNotFoundError("relation %s not declared in metadata" % relation_name)
+            raise RelationNotFoundError(f'relation {relation_name!r} not declared in metadata')
 
         relation_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(
