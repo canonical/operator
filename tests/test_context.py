@@ -4,6 +4,7 @@ import pytest
 from ops import CharmBase
 
 from scenario import Action, Context, Event, State
+from scenario.state import next_action_id
 
 
 class MyCharm(CharmBase):
@@ -31,6 +32,7 @@ def test_run():
 def test_run_action():
     ctx = Context(MyCharm, meta={"name": "foo"})
     state = State()
+    expected_id = next_action_id(update=False)
 
     with patch.object(ctx, "_run_action") as p:
         ctx._output_state = (
@@ -46,6 +48,7 @@ def test_run_action():
     assert isinstance(a, Action)
     assert a.event.name == "do_foo_action"
     assert s is state
+    assert a.id == expected_id
 
 
 def test_clear():

@@ -58,9 +58,11 @@ def generate_startup_sequence(state_template: State):
         (
             (
                 Event(
-                    "leader_elected"
-                    if state_template.leader
-                    else "leader_settings_changed",
+                    (
+                        "leader_elected"
+                        if state_template.leader
+                        else "leader_settings_changed"
+                    ),
                 ),
                 state_template.copy(),
             ),

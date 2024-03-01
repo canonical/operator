@@ -1423,11 +1423,30 @@ class Event(_DCBase):
         )
 
 
+_next_action_id_counter = 1
+
+
+def next_action_id(update=True):
+    global _next_action_id_counter
+    cur = _next_action_id_counter
+    if update:
+        _next_action_id_counter += 1
+    # Juju currently uses numbers for the ID, but in the past used UUIDs, so
+    # we need these to be strings.
+    return str(cur)
+
+
 @dataclasses.dataclass(frozen=True)
 class Action(_DCBase):
     name: str
 
     params: Dict[str, "AnyJson"] = dataclasses.field(default_factory=dict)
+
+    id: str = dataclasses.field(default_factory=next_action_id)
+    """Juju action ID.
+
+    Every action invocation is automatically assigned a new one. Override in
+    the rare cases where a specific ID is required."""
 
     @property
     def event(self) -> Event:
