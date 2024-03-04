@@ -3054,7 +3054,7 @@ class TestNetwork(unittest.TestCase):
             binding.network
 
     def test_add_relation_network_get(self):
-        self.harness.add_relation("db", "remote")
+        self.harness.add_relation('db', 'remote')
         binding = self.harness.model.get_binding('db')
         assert binding is not None
         assert binding.network
@@ -4753,7 +4753,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
 class TestSecrets(unittest.TestCase):
     def test_add_model_secret_by_app_name_str(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4767,7 +4767,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_add_model_secret_by_app_instance(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4782,7 +4782,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_add_model_secret_by_unit_instance(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4797,7 +4797,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_get_secret_as_owner(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         harness.begin()
@@ -4859,7 +4859,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_set_secret_content(self):
         harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4907,7 +4907,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_grant_secret_and_revoke_secret(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4925,7 +4925,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_grant_secret_wrong_app(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4938,7 +4938,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_grant_secret_wrong_unit(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "webapp", "requires": {"db": {"interface": "pgsql"}}}
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
@@ -4959,7 +4959,7 @@ class TestSecrets(unittest.TestCase):
 
     def test_get_secret_grants(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {"name": "database", "provides": {"db": {"interface": "pgsql"}}}
+            {'name': 'database', 'provides': {'db': {'interface': 'pgsql'}}}
         ))
         self.addCleanup(harness.cleanup)
 
