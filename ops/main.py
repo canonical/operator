@@ -465,17 +465,16 @@ class _Ops:
                           "podspec charms and will be removed in a future release.",
                           category=DeprecationWarning)
 
-        if use_juju_for_storage:
-            if dispatcher.is_restricted_context():
-                # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
-                #  Though we eventually expect that Juju will run collect-metrics in a
-                #  non-restricted context. Once we can determine that we are running
-                #  collect-metrics in a non-restricted context, we should fire the event as normal.
-                logger.debug('"%s" is not supported when using Juju for storage\n'
-                             'see: https://github.com/canonical/operator/issues/348',
-                             dispatcher.event_name)
-                # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
-                exit(0)
+        if use_juju_for_storage and dispatcher.is_restricted_context():
+            # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
+            #  Though we eventually expect that Juju will run collect-metrics in a
+            #  non-restricted context. Once we can determine that we are running
+            #  collect-metrics in a non-restricted context, we should fire the event as normal.
+            logger.debug('"%s" is not supported when using Juju for storage\n'
+                         'see: https://github.com/canonical/operator/issues/348',
+                         dispatcher.event_name)
+            # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
+            exit(0)
 
         if self._use_juju_for_storage:
             store = ops.storage.JujuStorage()
