@@ -38,7 +38,7 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
-from ops.model import RelationNotFoundError, _ModelBackend
+from ops.model import _ModelBackend
 from ops.pebble import FileType
 from ops.testing import ExecResult, _TestingPebbleClient
 
@@ -95,7 +95,7 @@ class TestHarness(unittest.TestCase):
     def test_add_relation_no_meta_fails(self):
         harness = ops.testing.Harness(ops.CharmBase, meta="name: mycharm")
         self.addCleanup(harness.cleanup)
-        with self.assertRaises(RelationNotFoundError):
+        with self.assertRaises(ops.RelationNotFoundError):
             harness.add_relation('db', 'postgresql')
 
     def test_add_relation(self):
