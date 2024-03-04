@@ -867,12 +867,12 @@ class Harness(Generic[CharmType]):
             if unit_data is not None:
                 self.update_relation_data(relation_id, remote_unit, unit_data)
 
-        # if we don't already have a network binding for this relation id, create one
+        # If we don't already have a network binding for this relation id, create one.
         if not self._backend._networks.get((relation_name, relation_id)):
             self.add_network("10.0.0.10", endpoint=relation_name, relation_id=relation_id)
-        # if we don't already have a default network binding for this endpoint, create one
+        # If we don't already have a default network binding for this endpoint, create one.
         if not self._backend._networks.get((relation_name, None)):
-            self.add_network("10.0.0.10", endpoint=relation_name)
+            self.add_network("192.0.2.0", endpoint=relation_name)
 
         return relation_id
 
