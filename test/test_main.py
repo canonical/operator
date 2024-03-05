@@ -131,7 +131,7 @@ class CharmInitTestCase(unittest.TestCase):
         if extra_environ is not None:
             fake_environ.update(extra_environ)
         with patch.dict(os.environ, fake_environ):
-            with patch('ops.main._CharmSpec._get_charm_dir') as mock_charmdir:
+            with patch('ops.main._get_charm_dir') as mock_charmdir:
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     tmpdirname = Path(tmpdirname)
                     fake_metadata = tmpdirname / 'metadata.yaml'
@@ -227,7 +227,7 @@ class TestDispatch(unittest.TestCase):
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops.main._Ops._emit_charm_event') as mock_charm_event:
-                    with patch('ops.main._CharmSpec._get_charm_dir') as mock_charmdir:
+                    with patch('ops.main._get_charm_dir') as mock_charmdir:
                         mock_charmdir.return_value = tmpdir
                         ops.main(MyCharm)  # type: ignore
 

@@ -337,55 +337,14 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
         return False
 
 
-@dataclasses.dataclass(frozen=True)
-class _CharmSpec:
-    """Charm spec."""
-
-    charm_type: Type["ops.charm.CharmBase"]
-    charm_root: Path
-    meta: Optional[Dict[str, Any]]
-    actions: Optional[Dict[str, Any]] = None
-    config: Optional[Dict[str, Any]] = None
-
-    @staticmethod
-    def _get_charm_dir():
-        charm_dir = os.environ.get("JUJU_CHARM_DIR")
-        if charm_dir is None:
-            # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-            charm_dir = Path(f'{__file__}/../../..').resolve()
-        else:
-            charm_dir = Path(charm_dir).resolve()
-        return charm_dir
-
-    @staticmethod
-    def autoload(charm_type: Type["ops.charm.CharmBase"]):
-        charm_root = _CharmSpec._get_charm_dir()
-
-        metadata_path = charm_root / "metadata.yaml"
-        if not metadata_path.exists():
-            raise FileNotFoundError(
-                f"invalid charm root {charm_root!r}; "
-                f"expected to contain at least a `metadata.yaml` file.",
-            )
-        meta = yaml.safe_load(metadata_path.open())
-
-        actions = config = None
-
-        config_path = charm_root / "config.yaml"
-        if config_path.exists():
-            config = yaml.safe_load(config_path.open())
-
-        actions_path = charm_root / "actions.yaml"
-        if actions_path.exists():
-            actions = yaml.safe_load(actions_path.open())
-
-        return _CharmSpec(
-            charm_type=charm_type,
-            charm_root=charm_root,
-            meta=meta,
-            actions=actions,
-            config=config
-        )
+def _get_charm_dir():
+    charm_dir = os.environ.get("JUJU_CHARM_DIR")
+    if charm_dir is None:
+        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
+        charm_dir = Path(f'{__file__}/../../..').resolve()
+    else:
+        charm_dir = Path(charm_dir).resolve()
+    return charm_dir
 
 
 class _Ops:
@@ -410,11 +369,12 @@ class _Ops:
 
     def __init__(
             self,
-            charm_spec: "_CharmSpec",
+            charm_type: Type["ops.charm.CharmBase"],
             use_juju_for_storage: Optional[bool] = None
     ):
-        self.charm_spec = charm_spec
-        self._charm_meta = CharmMeta(charm_spec.meta, charm_spec.actions)
+        self._charm_type = charm_type
+        self._charm_root = charm_root = _get_charm_dir()
+        self._charm_meta = CharmMeta.from_charm_root(charm_root)
         self._use_juju_for_storage = use_juju_for_storage
 
         # set by setup()
@@ -427,7 +387,7 @@ class _Ops:
         self._has_committed = False
 
     def _setup_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
-        charm_type = self.charm_spec.charm_type
+        charm_type = self._charm_type
 
         charm = charm_type(framework)
         dispatcher.ensure_event_links(charm)
@@ -447,7 +407,7 @@ class _Ops:
         logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     def _setup_storage(self, dispatcher: _Dispatcher):
-        charm_state_path = self.charm_spec.charm_root / self.CHARM_STATE_FILE
+        charm_state_path = self._charm_root / self.CHARM_STATE_FILE
 
         use_juju_for_storage = self._use_juju_for_storage
         if use_juju_for_storage and not ops.storage.juju_backend_available():
@@ -499,7 +459,7 @@ class _Ops:
 
         model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
         store = self._setup_storage(dispatcher)
-        framework = ops.framework.Framework(store, self.charm_spec.charm_root, meta, model,
+        framework = ops.framework.Framework(store, self._charm_root, meta, model,
                                             event_name=dispatcher.event_name)
         framework.set_breakpointhook()
         return framework
@@ -508,7 +468,7 @@ class _Ops:
         """Set up dispatcher, framework and charm objects."""
         model_backend = self._setup_model_backend()
         self._setup_root_logging(model_backend)
-        self.dispatcher = dispatcher = _Dispatcher(self.charm_spec.charm_root)
+        self.dispatcher = dispatcher = _Dispatcher(self._charm_root)
         # do this immediately after we set up the root logger
         dispatcher.run_any_legacy_hook()
 
@@ -605,12 +565,8 @@ def main(charm_class: Type[ops.charm.CharmBase],
             are running on a new enough Juju default to controller-side storage,
             otherwise local storage is used.
     """
-    charm_spec = _CharmSpec.autoload(
-        charm_class,
-    )
-
     ops = _Ops(
-        charm_spec,
+        charm_class,
         use_juju_for_storage=use_juju_for_storage)
 
     ops.run()
