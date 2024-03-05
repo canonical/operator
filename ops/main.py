@@ -417,7 +417,7 @@ class _Ops:
         self._charm_meta = CharmMeta(charm_spec.meta, charm_spec.actions)
         self._use_juju_for_storage = use_juju_for_storage
 
-        # set by setup()
+        # Set by setup()
         self.dispatcher: Optional[_Dispatcher] = None
         self.framework: Optional["ops.framework.Framework"] = None
         self.charm: Optional["ops.charm.CharmBase"] = None
@@ -427,23 +427,24 @@ class _Ops:
         self._has_committed = False
 
     def _setup_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
-        charm_type = self.charm_spec.charm_type
-
-        charm = charm_type(framework)
+        charm = self.charm_spec.charm_type(framework)
         dispatcher.ensure_event_links(charm)
         return charm
 
     @staticmethod
     def _setup_model_backend():
-        # this is a standalone method to facilitate overriding by subclassing in testing
+        # This is a standalone method to facilitate overriding by subclassing in testing.
         return ops.model._ModelBackend()
 
     @staticmethod
     def _setup_root_logging(backend: ops.model._ModelBackend):
         debug = "JUJU_DEBUG" in os.environ
-        setup_root_logging(backend, debug=debug)
+        # For actions, there is a communication channel with the user running the
+        # action, so we want to send exception details through stderr, rather than
+        # only to juju-log as normal.
+        handling_action = 'JUJU_ACTION_NAME' in os.environ
+        setup_root_logging(backend, debug=debug, exc_stderr=handling_action)
 
-        # our hello world
         logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     def _setup_storage(self, dispatcher: _Dispatcher):
@@ -508,7 +509,7 @@ class _Ops:
         model_backend = self._setup_model_backend()
         self._setup_root_logging(model_backend)
         self.dispatcher = dispatcher = _Dispatcher(self.charm_spec.charm_root)
-        # do this immediately after we set up the root logger
+        # Do this immediately after we set up the root logger.
         dispatcher.run_any_legacy_hook()
 
         self.framework = framework = self._setup_framework(dispatcher, model_backend)
@@ -516,16 +517,13 @@ class _Ops:
 
         self._has_setup = True
 
-    def _emit_charm_event(
-            self,
-            event_name: str,
-    ):
+    def _emit_charm_event(self, event_name: str):
         """Emits a charm event based on a Juju event name.
 
         Args:
             event_name: A Juju event name to emit on a charm.
         """
-        charm = cast("ops.charm.CharmBase", self.charm)  # by now we have initialized.
+        charm = cast("ops.charm.CharmBase", self.charm)  # by now we have initialised.
         owner = charm.on
 
         try:
@@ -569,17 +567,17 @@ class _Ops:
         if not self._has_emitted:
             raise RuntimeError("should .emit() before you .commit()")
 
-        # we have initialized already
+        # We have initialised already.
         charm = cast("ops.charm.CharmBase", self.charm)
         framework = cast("ops.framework.Framework", self.framework)
 
-        # emit collect-status events
+        # Emit collect-status events.
         ops.charm._evaluate_status(charm)
-        self._has_committed = True
         try:
             framework.commit()
         finally:
             framework.close()
+        self._has_committed = True
 
     def run(self):
         """Step through all non-manually-called steps and run them."""
