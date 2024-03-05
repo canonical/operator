@@ -316,7 +316,7 @@ class _TestMain(abc.ABC):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
         self.addCleanup(shutil.rmtree, str(self._tmpdir))
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
-        self.CHARM_STATE_FILE = self.JUJU_CHARM_DIR / _Ops.CHARM_STATE_FILE
+        self._charm_state_file = self.JUJU_CHARM_DIR / '.unit-state.db'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
         charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
         self.charm_exec_path = os.path.relpath(charm_path, str(self.hooks_dir))
@@ -348,8 +348,8 @@ class _TestMain(abc.ABC):
     def _read_and_clear_state(self,
                               event_name: str) -> typing.Union[ops.BoundStoredState,
                                                                ops.StoredStateData]:
-        if self.CHARM_STATE_FILE.stat().st_size:
-            storage = SQLiteStorage(self.CHARM_STATE_FILE)
+        if self._charm_state_file.stat().st_size:
+            storage = SQLiteStorage(self._charm_state_file)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
                 af = (self.JUJU_CHARM_DIR / 'actions.yaml')
                 if af.exists():

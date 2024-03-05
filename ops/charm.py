@@ -1313,12 +1313,9 @@ class CharmMeta:
     """Actions the charm has defined."""
 
     def __init__(self, raw: Optional[Dict[str, Any]] = None,
-                 actions_raw: Optional[Dict[str, Any]] = None,
-                 config_raw: Optional[Dict[str, Any]] = None,
-                 ):
+                 actions_raw: Optional[Dict[str, Any]] = None):
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
-        config_raw_: Dict[str, Any] = config_raw or {}
 
         # When running in production, this data is generally loaded from
         # metadata.yaml. However, when running tests, this data is
@@ -1370,8 +1367,6 @@ class CharmMeta:
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
-        self.config = {name: ConfigMeta(name, config) for name, config in
-                       config_raw_.get('options',{}).items()}
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
 
@@ -1385,17 +1380,13 @@ class CharmMeta:
             )
         meta = yaml.safe_load(metadata_path.open())
 
-        actions = config = None
-
-        config_path = charm_root / "config.yaml"
-        if config_path.exists():
-            config = yaml.safe_load(config_path.open())
+        actions = None
 
         actions_path = charm_root / "actions.yaml"
         if actions_path.exists():
             actions = yaml.safe_load(actions_path.open())
 
-        return CharmMeta(meta, actions, config)
+        return CharmMeta(meta, actions)
 
     def _load_links(self, raw: Dict[str, Any]):
         websites = raw.get('website', [])
@@ -1676,17 +1667,6 @@ class ActionMeta:
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
         self.additional_properties = raw.get('additionalProperties', True)
-
-
-class ConfigMeta:
-    """Object containing metadata about a config option's definition."""
-
-    def __init__(self, name: str, raw: Optional[Dict[str, Any]] = None):
-        raw = raw or {}
-        self.name = name
-        self.type = raw['type']  # mandatory arg
-        self.description = raw.get('description', '')
-        self.default = raw.get('default', None)
 
 
 @dataclasses.dataclass(frozen=True)

@@ -365,24 +365,31 @@ class _Ops:
       - graceful teardown of the storage
       - emission of the ``collect-status`` events
     """
-    CHARM_STATE_FILE = '.unit-state.db'
-
     def __init__(
             self,
             charm_type: Type["ops.charm.CharmBase"],
-            use_juju_for_storage: Optional[bool] = None
+            backend_type: Type[ops.model._ModelBackend],
+            use_juju_for_storage: Optional[bool] = None,
+            charm_state_file: str = '.unit-state.db'
     ):
+        # do this as early as possible to be sure to catch the most logs
+        self._setup_root_logging()
+
+        self._charm_state_file = charm_state_file
         self._charm_type = charm_type
+        self._model_backend = backend_type()
         self._charm_root = charm_root = _get_charm_dir()
         self._charm_meta = CharmMeta.from_charm_root(charm_root)
         self._use_juju_for_storage = use_juju_for_storage
 
-        # set by setup()
-        self.dispatcher: Optional[_Dispatcher] = None
-        self.framework: Optional["ops.framework.Framework"] = None
-        self.charm: Optional["ops.charm.CharmBase"] = None
+        # Set up dispatcher, framework and charm objects.
+        self.dispatcher = dispatcher = _Dispatcher(self._charm_root)
+        # do this immediately after we set up the root logger
+        dispatcher.run_any_legacy_hook()
 
-        self._has_setup = False
+        self.framework = framework = self._setup_framework(dispatcher)
+        self.charm = self._setup_charm(framework, dispatcher)
+
         self._has_emitted = False
         self._has_committed = False
 
@@ -393,21 +400,15 @@ class _Ops:
         dispatcher.ensure_event_links(charm)
         return charm
 
-    @staticmethod
-    def _setup_model_backend():
-        # this is a standalone method to facilitate overriding by subclassing in testing
-        return ops.model._ModelBackend()
-
-    @staticmethod
-    def _setup_root_logging(backend: ops.model._ModelBackend):
+    def _setup_root_logging(self):
         debug = "JUJU_DEBUG" in os.environ
-        setup_root_logging(backend, debug=debug)
+        setup_root_logging(self._model_backend, debug=debug)
 
         # our hello world
         logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     def _setup_storage(self, dispatcher: _Dispatcher):
-        charm_state_path = self._charm_root / self.CHARM_STATE_FILE
+        charm_state_path = self._charm_root / self._charm_state_file
 
         use_juju_for_storage = self._use_juju_for_storage
         if use_juju_for_storage and not ops.storage.juju_backend_available():
@@ -445,8 +446,7 @@ class _Ops:
 
     def _setup_framework(
             self,
-            dispatcher: _Dispatcher,
-            model_backend: "ops.model._ModelBackend"
+            dispatcher: _Dispatcher
     ):
         meta = self._charm_meta
 
@@ -457,25 +457,12 @@ class _Ops:
         else:
             broken_relation_id = None
 
-        model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
+        model = ops.model.Model(meta, self._model_backend, broken_relation_id=broken_relation_id)
         store = self._setup_storage(dispatcher)
         framework = ops.framework.Framework(store, self._charm_root, meta, model,
                                             event_name=dispatcher.event_name)
         framework.set_breakpointhook()
         return framework
-
-    def setup(self):
-        """Set up dispatcher, framework and charm objects."""
-        model_backend = self._setup_model_backend()
-        self._setup_root_logging(model_backend)
-        self.dispatcher = dispatcher = _Dispatcher(self._charm_root)
-        # do this immediately after we set up the root logger
-        dispatcher.run_any_legacy_hook()
-
-        self.framework = framework = self._setup_framework(dispatcher, model_backend)
-        self.charm = self._setup_charm(framework, dispatcher)
-
-        self._has_setup = True
 
     def _emit_charm_event(
             self,
@@ -501,8 +488,6 @@ class _Ops:
 
     def emit(self):
         """Emit the event on the charm."""
-        if not self._has_setup:
-            raise RuntimeError("should .setup() before you .emit()")
         self._has_emitted = True
 
         # we have initialized already
@@ -544,8 +529,6 @@ class _Ops:
 
     def run(self):
         """Step through all non-manually-called steps and run them."""
-        if not self._has_setup:
-            self.setup()
         if not self._has_emitted:
             self.emit()
         if not self._has_committed:
