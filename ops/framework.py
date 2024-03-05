@@ -60,12 +60,9 @@ class Serializable(typing.Protocol):
 
     @property
     def handle(self) -> 'Handle': ...  # noqa
-
     @handle.setter
     def handle(self, val: 'Handle'): ...
-
     def snapshot(self) -> Dict[str, Any]: ...  # noqa
-
     def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
 
 
@@ -948,7 +945,7 @@ class Framework(Object):
                     event_is_action = isinstance(event, charm.ActionEvent)
                     with self._event_context(event_handle.kind):
                         if (
-                                event_is_from_juju or event_is_action
+                            event_is_from_juju or event_is_action
                         ) and self._juju_debug_at.intersection({'all', 'hook'}):
                             # Present the welcome message and run under PDB.
                             self._show_debug_code_message()
@@ -1182,7 +1179,7 @@ class StoredState:
     def __get__(self,
                 parent: Optional['_ObjectType'],
                 parent_type: 'Type[_ObjectType]') -> Union['StoredState',
-    BoundStoredState]:
+                                                           BoundStoredState]:
         if self.parent_type is not None and self.parent_type not in parent_type.mro():
             # the StoredState instance is being shared between two unrelated classes
             # -> unclear what is expected of us -> bail out

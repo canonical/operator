@@ -130,13 +130,12 @@ class TestCharm(unittest.TestCase):
 
     def test_observe_nested_object_noninstantiated(self):
         class MyObj(ops.Object):
-            def __init__(self, charm, *args: typing.Any):
+            def __init__(self, charm: ops.CharmBase):
                 super().__init__(charm, "obj")
                 framework.observe(charm.on.start, self._on_start)
 
-            def _on_start(self, _):
+            def _on_start(self, _: ops.StartEvent):
                 raise RuntimeError()  # never reached!
-
 
         class MyCharm(ops.CharmBase):
             def __init__(self, *args: typing.Any):
@@ -144,7 +143,7 @@ class TestCharm(unittest.TestCase):
                 MyObj(self)  # not assigned!
                 framework.observe(self.on.start, self._on_start)
 
-            def _on_start(self, event: ops.EventBase):
+            def _on_start(self, _: ops.StartEvent):
                 pass  # is reached
 
         framework = self.create_framework()
