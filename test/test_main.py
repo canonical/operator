@@ -29,7 +29,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import ops
-from ops.main import _Ops, _should_use_controller_storage
+from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents

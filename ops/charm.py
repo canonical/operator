@@ -1374,6 +1374,7 @@ class CharmMeta:
 
     @staticmethod
     def from_charm_root(charm_root: pathlib.Path):
+        """Initialize CharmMeta from the path to a charm repository root folder."""
         metadata_path = charm_root / "metadata.yaml"
         if not metadata_path.exists():
             raise FileNotFoundError(

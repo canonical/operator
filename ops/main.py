@@ -18,7 +18,6 @@ Note that this module is callable, and calls the :func:`ops.main.main` function.
 This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
 as expected.
 """
-import dataclasses
 import logging
 import os
 import shutil
@@ -28,8 +27,6 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
-import yaml
-
 import ops.charm
 import ops.framework
 import ops.model
@@ -37,6 +34,7 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
+from ops.model import _ModelBackend
 
 logger = logging.getLogger()
 
@@ -347,6 +345,10 @@ def _get_charm_dir():
     return charm_dir
 
 
+class StorageSetupError(Exception):
+    """Raised when setting up the storage fails."""
+
+
 class _Ops:
     """Initializes the Framework and manages the lifecycle of a charm.
 
@@ -365,6 +367,7 @@ class _Ops:
       - graceful teardown of the storage
       - emission of the ``collect-status`` events
     """
+
     def __init__(
             self,
             charm_type: Type["ops.charm.CharmBase"],
@@ -372,12 +375,14 @@ class _Ops:
             use_juju_for_storage: Optional[bool] = None,
             charm_state_file: str = '.unit-state.db'
     ):
-        # do this as early as possible to be sure to catch the most logs
-        self._setup_root_logging()
 
         self._charm_state_file = charm_state_file
         self._charm_type = charm_type
         self._model_backend = backend_type()
+
+        # Do this as early as possible to be sure to catch the most logs.
+        self._setup_root_logging()
+
         self._charm_root = charm_root = _get_charm_dir()
         self._charm_meta = CharmMeta.from_charm_root(charm_root)
         self._use_juju_for_storage = use_juju_for_storage
@@ -436,7 +441,7 @@ class _Ops:
                          'see: https://github.com/canonical/operator/issues/348',
                          dispatcher.event_name)
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
-            exit(0)
+            raise StorageSetupError()
 
         if self._use_juju_for_storage:
             store = ops.storage.JujuStorage()
@@ -470,7 +475,7 @@ class _Ops:
         Args:
             event_name: A Juju event name to emit on a charm.
         """
-        charm = cast("ops.charm.CharmBase", self.charm)  # by now we have initialised.
+        charm = self.charm
         owner = charm.on
 
         try:
@@ -485,11 +490,8 @@ class _Ops:
 
     def emit(self):
         """Emit the event on the charm."""
-        self._has_emitted = True
-
-        # we have initialized already
-        framework = cast("ops.framework.Framework", self.framework)
-        dispatcher = cast(_Dispatcher, self.dispatcher)
+        framework = self.framework
+        dispatcher = _Dispatcher, self.dispatcher
 
         try:
             # TODO: Remove the collect_metrics check below as soon as the relevant
@@ -507,14 +509,15 @@ class _Ops:
             framework.close()
             raise
 
+        self._has_emitted = True
+
     def commit(self):
         """Commit the framework and gracefully teardown."""
         if not self._has_emitted:
             raise RuntimeError("should .emit() before you .commit()")
 
-        # We have initialised already.
-        charm = cast("ops.charm.CharmBase", self.charm)
-        framework = cast("ops.framework.Framework", self.framework)
+        charm = self.charm
+        framework = self.framework
 
         # Emit collect-status events.
         ops.charm._evaluate_status(charm)
@@ -547,6 +550,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
     """
     ops = _Ops(
         charm_class,
+        backend_type=_ModelBackend,
         use_juju_for_storage=use_juju_for_storage)
 
     ops.run()
