@@ -394,17 +394,18 @@ class _Ops:
         self._has_committed = False
 
     def _setup_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
-        charm_type = self._charm_type
-
-        charm = charm_type(framework)
+        charm = self._charm_type(framework)
         dispatcher.ensure_event_links(charm)
         return charm
 
     def _setup_root_logging(self):
         debug = "JUJU_DEBUG" in os.environ
-        setup_root_logging(self._model_backend, debug=debug)
+        # For actions, there is a communication channel with the user running the
+        # action, so we want to send exception details through stderr, rather than
+        # only to juju-log as normal.
+        handling_action = 'JUJU_ACTION_NAME' in os.environ
+        setup_root_logging(self._model_backend, debug=debug, exc_stderr=handling_action)
 
-        # our hello world
         logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
     def _setup_storage(self, dispatcher: _Dispatcher):
@@ -426,17 +427,16 @@ class _Ops:
                           "podspec charms and will be removed in a future release.",
                           category=DeprecationWarning)
 
-        if use_juju_for_storage:
-            if dispatcher.is_restricted_context():
-                # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
-                #  Though we eventually expect that Juju will run collect-metrics in a
-                #  non-restricted context. Once we can determine that we are running
-                #  collect-metrics in a non-restricted context, we should fire the event as normal.
-                logger.debug('"%s" is not supported when using Juju for storage\n'
-                             'see: https://github.com/canonical/operator/issues/348',
-                             dispatcher.event_name)
-                # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
-                exit(0)
+        if use_juju_for_storage and dispatcher.is_restricted_context():
+            # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
+            #  Though we eventually expect that Juju will run collect-metrics in a
+            #  non-restricted context. Once we can determine that we are running
+            #  collect-metrics in a non-restricted context, we should fire the event as normal.
+            logger.debug('"%s" is not supported when using Juju for storage\n'
+                         'see: https://github.com/canonical/operator/issues/348',
+                         dispatcher.event_name)
+            # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
+            exit(0)
 
         if self._use_juju_for_storage:
             store = ops.storage.JujuStorage()
@@ -464,16 +464,13 @@ class _Ops:
         framework.set_breakpointhook()
         return framework
 
-    def _emit_charm_event(
-            self,
-            event_name: str,
-    ):
+    def _emit_charm_event(self, event_name: str):
         """Emits a charm event based on a Juju event name.
 
         Args:
             event_name: A Juju event name to emit on a charm.
         """
-        charm = cast("ops.charm.CharmBase", self.charm)  # by now we have initialized.
+        charm = cast("ops.charm.CharmBase", self.charm)  # by now we have initialised.
         owner = charm.on
 
         try:
@@ -515,17 +512,17 @@ class _Ops:
         if not self._has_emitted:
             raise RuntimeError("should .emit() before you .commit()")
 
-        # we have initialized already
+        # We have initialised already.
         charm = cast("ops.charm.CharmBase", self.charm)
         framework = cast("ops.framework.Framework", self.framework)
 
-        # emit collect-status events
+        # Emit collect-status events.
         ops.charm._evaluate_status(charm)
-        self._has_committed = True
         try:
             framework.commit()
         finally:
             framework.close()
+        self._has_committed = True
 
     def run(self):
         """Step through all non-manually-called steps and run them."""
