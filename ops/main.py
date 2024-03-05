@@ -491,7 +491,7 @@ class _Ops:
     def emit(self):
         """Emit the event on the charm."""
         framework = self.framework
-        dispatcher = _Dispatcher, self.dispatcher
+        dispatcher = self.dispatcher
 
         try:
             # TODO: Remove the collect_metrics check below as soon as the relevant
