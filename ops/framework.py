@@ -956,10 +956,9 @@ class Framework(Object):
 
             else:
                 logger.warning(
-                    f"Weakref to Object at path {observer_path} has been killed somewhere "
-                    "between charm initialization and event emission. "
-                    "This can mean that you are using an Object which is not hard-referenced "
-                    "anywhere from the CharmBase tree. We won't be able to emit any events on it."
+                    f"Reference to ops.Object at path {observer_path} has been garbage collected "
+                    "between when the charm was initialised and when the event was emitted. "
+                    "Make sure sure you store a reference to the observer."
                 )
 
             if event.deferred:

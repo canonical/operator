@@ -128,7 +128,7 @@ class TestCharm(unittest.TestCase):
         # check that the event has been seen by the observer
         self.assertIsInstance(charm.seen, ops.StartEvent)
 
-    def test_observe_nested_object_noninstantiated(self):
+    def test_observer_not_referenced_warning(self):
         class MyObj(ops.Object):
             def __init__(self, charm: ops.CharmBase):
                 super().__init__(charm, "obj")
@@ -150,7 +150,7 @@ class TestCharm(unittest.TestCase):
         c = MyCharm(framework)
         with self.assertLogs() as logs:
             c.on.start.emit()
-        assert logs
+        assert any('Reference to ops.Object' in log for log in logs.output)
 
     def test_empty_action(self):
         meta = ops.CharmMeta.from_yaml('name: my-charm', '')
