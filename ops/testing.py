@@ -795,7 +795,7 @@ class Harness(Generic[CharmType]):
     def add_relation(self, relation_name: str, remote_app: str, *,
                      app_data: Optional[Mapping[str, str]] = None,
                      unit_data: Optional[Mapping[str, str]] = None) -> int:
-        """Declare that there is a new integration between this application and `remote_app`.
+        """Declare that there is a new relation between this application and `remote_app`.
 
         This function creates a relation with an application and triggers a
         :class:`RelationCreatedEvent <ops.RelationCreatedEvent>`.
