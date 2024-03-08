@@ -18,9 +18,10 @@ import os
 import sys
 import typing
 
+import ops
+
 sys.path.append('lib')
 
-import ops
 
 logger = logging.getLogger()
 
