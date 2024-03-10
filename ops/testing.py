@@ -819,8 +819,8 @@ class Harness(Generic[CharmType]):
             })
 
         Args:
-            relation_name: The relation on the charm that is being related to.
-            remote_app: The name of the application that is being related to.
+            relation_name: The relation on the charm that is being integrated with.
+            remote_app: The name of the application that is being integrated with.
                 To add a peer relation, set to the name of *this* application.
             app_data: If provided, also add a new unit to the relation
                 (triggering relation-joined) and set the *application* relation data
@@ -1339,7 +1339,7 @@ class Harness(Generic[CharmType]):
 
         If this charm becomes a leader then `leader_elected` will be triggered.  If :meth:`begin`
         has already been called, then the charm's peer relation should usually be added *prior* to
-        calling this method (with :meth:`add_relation`) to properly initialize and make
+        calling this method (with :meth:`add_relation`) to properly initialise and make
         available relation data that leader elected hooks may want to access.
 
         Args:
