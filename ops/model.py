@@ -147,7 +147,7 @@ class Model:
     def relations(self) -> 'RelationMapping':
         """Mapping of endpoint to list of :class:`Relation`.
 
-        Answers the question "what am I currently related to".
+        Answers the question "what am I currently integrated with".
         See also :meth:`.get_relation`.
 
         In a ``relation-broken`` event, the broken relation is excluded from
@@ -236,7 +236,7 @@ class Model:
                 given application has more than one relation on a given endpoint.
 
         Raises:
-            TooManyRelatedAppsError: is raised if there is more than one relation to the
+            TooManyRelatedAppsError: is raised if there is more than one integration with the
                 supplied relation_name and no relation_id was supplied
         """
         return self.relations._get_unique(relation_name, relation_id)
@@ -315,8 +315,8 @@ class _ModelCache:
 class Application:
     """Represents a named application in the model.
 
-    This might be this charm's application, or might be an application this charm is related
-    to. Charmers should not instantiate Application objects directly, but should use
+    This might be this charm's application, or might be an application this charm is integrated
+    with. Charmers should not instantiate Application objects directly, but should use
     :attr:`Model.app` to get the application this unit is part of, or
     :meth:`Model.get_app` if they need a reference to a given application.
     """
@@ -472,7 +472,7 @@ class Unit:
     """Represents a named unit in the model.
 
     This might be the current unit, another unit of the charm's application, or a unit of
-    another application that the charm is related to.
+    another application that the charm is integrated with.
     """
 
     name: str
@@ -1865,8 +1865,8 @@ class MaintenanceStatus(StatusBase):
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
-    The unit is unable to progress to an active state because an application to which
-    it is related is not running.
+    The unit is unable to progress to an active state because an application with which
+    it is integrated is not running.
 
     """
     name = 'waiting'
@@ -2856,7 +2856,7 @@ class ModelError(Exception):
 
 
 class TooManyRelatedAppsError(ModelError):
-    """Raised by :meth:`Model.get_relation` if there is more than one related application."""
+    """Raised by :meth:`Model.get_relation` if there is more than one integrated application."""
 
     def __init__(self, relation_name: str, num_related: int, max_supported: int):
         super().__init__('Too many remote applications on {} ({} > {})'.format(
