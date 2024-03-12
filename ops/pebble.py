@@ -1317,10 +1317,10 @@ class NoticeType(enum.Enum):
 
 
 class NoticesUsers(enum.Enum):
-    """Enum of :meth:`Client.get_notices` ``select`` values."""
+    """Enum of :meth:`Client.get_notices` ``users`` values."""
 
     ALL = 'all'
-    """Select notices from all users (any user ID, including public notices).
+    """Return notices from all users (any user ID, including public notices).
 
     This only works for Pebble admins (for example, root).
     """
@@ -2824,7 +2824,7 @@ class Client:
         type has nanosecond precision).
 
         Args:
-            users: Select which notices to return (instead of returning
+            users: Filter which users' notices to return (instead of returning
                 notices for the current user).
             user_id: Filter for notices for the specified user, including
                 public notices (only works for Pebble admins).
