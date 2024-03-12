@@ -2757,7 +2757,7 @@ class Container:
     def get_notices(
         self,
         *,
-        select: Optional[pebble.NoticesSelect] = None,
+        users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -2768,7 +2768,7 @@ class Container:
         parameters.
         """
         return self._pebble.get_notices(
-            select=select,
+            users=users,
             user_id=user_id,
             types=types,
             keys=keys,

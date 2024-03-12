@@ -3032,7 +3032,7 @@ bad path\r
 
         notices = self.client.get_notices(
             user_id=1000,
-            select=pebble.NoticesSelect.ALL,
+            users=pebble.NoticesUsers.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
         )
@@ -3042,7 +3042,7 @@ bad path\r
 
         query = {
             'user-id': '1000',
-            'select': 'all',
+            'users': 'all',
             'types': ['custom'],
             'keys': ['example.com/a', 'example.com/b'],
         }

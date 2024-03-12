@@ -3361,7 +3361,7 @@ class _TestingPebbleClient:
     def get_notices(
         self,
         *,
-        select: Optional[pebble.NoticesSelect] = None,
+        users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -3371,9 +3371,9 @@ class _TestingPebbleClient:
         filter_user_id = 0  # default is to filter by request UID (root)
         if user_id is not None:
             filter_user_id = user_id
-        if select is not None:
+        if users is not None:
             if user_id is not None:
-                raise self._api_error(400, 'cannot use both "select" and "user_id"')
+                raise self._api_error(400, 'cannot use both "users" and "user_id"')
             filter_user_id = None
 
         if types is not None:
