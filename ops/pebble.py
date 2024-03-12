@@ -2824,7 +2824,7 @@ class Client:
         type has nanosecond precision).
 
         Args:
-            users: Filter which users' notices to return (instead of returning
+            users: Change which users' notices to return (instead of returning
                 notices for the current user).
             user_id: Filter for notices for the specified user, including
                 public notices (only works for Pebble admins).
