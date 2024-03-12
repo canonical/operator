@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import datetime
+import functools
 import gc
 import inspect
 import io
@@ -885,6 +886,24 @@ class TestFramework(BaseTestCase):
                 'StoredStateData[_stored]',
                 'ObjectWithStorage[obj]/StoredStateData[_stored]',
                 'ObjectWithStorage[obj]/on/event[1]']))
+
+    def test_wrapped_handler(self):
+        def add_arg(func):  # type: ignore
+            @functools.wraps(func)  # type: ignore
+            def wrapper(charm: ops.CharmBase, event: ops.EventBase):
+                return func(charm, event, "extra-arg")  # type: ignore
+
+            return wrapper  # type: ignore
+
+        class MyCharm(ops.CharmBase):
+            @add_arg
+            def _on_event(self, _, another_arg: str):
+                assert another_arg == "extra-arg"
+
+        framework = self.create_framework()
+        charm = MyCharm(framework)
+        framework.observe(charm.on.start, charm._on_event)  # type: ignore
+        charm.on.start.emit()
 
 
 MutableTypesTestCase = typing.Tuple[
