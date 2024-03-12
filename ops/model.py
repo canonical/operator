@@ -1854,9 +1854,9 @@ class MaintenanceStatus(StatusBase):
     """The unit is performing maintenance tasks.
 
     The unit is not yet providing services, but is actively doing work in preparation
-    for providing those services.  This is a "spinning" state, not an error state. It
-    reflects activity on the unit itself, not on peers or related units.
-
+    for providing those services.  This is a "spinning" state, not an error state. In
+    contrast to :class:`WaitingStatus`, "maintenance" reflects activity on this unit
+    or charm, not on peers or related units.
     """
     name = 'maintenance'
 
@@ -1865,9 +1865,10 @@ class MaintenanceStatus(StatusBase):
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
-    The unit is unable to progress to an active state because an application with which
-    it is integrated is not running.
-
+    The unit is unable to progress to an active state because an application it
+    is integrated with is not yet ready. In contrast to
+    :class:`MaintenanceStatus`, "waiting" reflects activity on related units,
+    not on this unit or charm.
     """
     name = 'waiting'
 
