@@ -819,6 +819,8 @@ class Framework(Object):
             required_params = [
                 param.name for param in extra_params
                 if param.default is inspect.Parameter.empty
+                and param.kind not in (inspect.Parameter.VAR_POSITIONAL,
+                                       inspect.Parameter.VAR_KEYWORD)
             ]
             if required_params:
                 raise TypeError(
