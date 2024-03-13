@@ -4496,9 +4496,9 @@ class TestPebbleStorageAPIsUsingMocks(
         self.addCleanup(harness.cleanup)
 
         store_id = harness.add_storage('store1')[0]
-        harness.attach_storage(store_id)
 
         harness.begin()
+        harness.attach_storage(store_id)
         harness.set_can_connect('c1', True)
         harness.set_can_connect('c2', True)
         harness.set_can_connect('c3', True)
@@ -4737,6 +4737,94 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
         self.assertFalse((self.root / "mounts/foo/bar").is_file())
         self.harness.attach_storage(storage_id)
         self.assertTrue((self.root / "mounts/foo/bar").read_text(), "foobar")
+
+    def test_storage_attach(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.attached: typing.List[str] = []
+                self.locations: typing.List[pathlib.Path] = []
+                framework.observe(self.on['test-storage'].storage_attached, self._on_attach)
+
+            def _on_attach(self, event: ops.StorageAttachedEvent):
+                self.attached.append(event.storage.full_id)
+                self.locations.append(event.storage.location)
+
+        meta = '''
+            name: test
+            containers:
+                test-container:
+                    mounts:
+                        - storage: test-storage
+                          location: /mounts/foo
+            storage:
+                test-storage:
+                    type: filesystem
+            '''
+        # If `begin()` hasn't been called, `attach` does not emit storage-attached.
+        harness = ops.testing.Harness(MyCharm, meta=meta)
+        self.addCleanup(harness.cleanup)
+        harness.add_storage('test-storage', attach=True)
+        harness.begin()
+        self.assertNotIn('test-storage/0', harness.charm.attached)
+
+        # `attach` doesn't emit storage-attached before `begin_with_initial_hooks`.
+        harness = ops.testing.Harness(MyCharm, meta=meta)
+        self.addCleanup(harness.cleanup)
+        harness.add_storage('test-storage', attach=True)
+        harness.begin_with_initial_hooks()
+        self.assertIn('test-storage/0', harness.charm.attached)
+        self.assertTrue(harness.charm.locations[0])
+
+        # We can add the storage and attach it later.
+        harness = ops.testing.Harness(MyCharm, meta=meta)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        storage_ids = harness.add_storage('test-storage', attach=False)
+        self.assertNotIn('test-storage/0', harness.charm.attached)
+        for s_id in storage_ids:
+            harness.attach_storage(s_id)
+            # It's safe to call `attach_storage` more than once, and this will
+            # only trigger the event once - this is the same as executing
+            # `juju attach-storage <unit> <storage>` more than once.
+            harness.attach_storage(s_id)
+        self.assertEqual(harness.charm.attached.count('test-storage/0'), 1)
+
+        # Machine charms have slightly different metadata.
+        meta = '''
+            name: test
+            storage:
+                test-storage:
+                    type: filesystem
+                    mount: /mounts/foo
+            '''
+        harness = ops.testing.Harness(MyCharm, meta=meta)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.add_storage('test-storage', attach=True)
+        self.assertIn('test-storage/0', harness.charm.attached)
+
+        # In a machine charm, we can request multiple storage instances.
+        meta = '''
+            name: test
+            storage:
+                test-storage:
+                    type: filesystem
+                    mount: /mounts/foo
+                    multiple:
+                        range: 2-4
+            '''
+        harness = ops.testing.Harness(MyCharm, meta=meta)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.add_storage('test-storage', 2, attach=True)
+        self.assertEqual(harness.charm.attached, ['test-storage/0', 'test-storage/1'])
+        self.assertNotEqual(harness.charm.locations[0], harness.charm.locations[1])
+        harness.add_storage('test-storage', 2, attach=True)
+        self.assertEqual(
+            harness.charm.attached, [
+                'test-storage/0', 'test-storage/1', 'test-storage/2', 'test-storage/3'])
+        self.assertEqual(len(set(harness.charm.locations)), 4)
 
 
 class TestSecrets(unittest.TestCase):

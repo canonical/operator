@@ -690,8 +690,8 @@ class Harness(Generic[CharmType]):
         Args:
             storage_name: The storage backend name on the Charm
             count: Number of disks being added
-            attach: True to also attach the storage mount and emit storage-attached if
-                harness.begin() has been called.
+            attach: True to also attach the storage mount; if :meth:`begin`
+                has been called a True value will also emit storage-attached
 
         Return:
             A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
@@ -739,21 +739,22 @@ class Harness(Generic[CharmType]):
         """Attach a storage device.
 
         The intent of this function is to simulate a ``juju attach-storage`` call.
+        If called before :meth:`begin`, or with hooks disabled, it will have no effect.
         It will trigger a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
 
         The test harness uses symbolic links to imitate storage mounts, which may lead to some
-        inconsistencies compared to the actual charm. Users should be cognizant of
+        inconsistencies compared to the actual charm. Users should be cognisant of
         this potential discrepancy.
 
         Args:
             storage_id: The full storage ID of the storage unit being attached, including the
                 storage key, e.g. my-storage/0.
         """
-        if not self._backend._storage_attach(storage_id):
-            return  # storage was already attached
         if not self._charm or not self._hooks_enabled:
             return  # don't need to run hook callback
+        if not self._backend._storage_attach(storage_id):
+            return  # storage was already attached
 
         storage_name, storage_index = storage_id.split('/', 1)
 
@@ -2322,7 +2323,17 @@ class _TestingModelBackend:
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
                     target_dir = pathlib.Path(store["location"])
                     target_dir.mkdir(parents=True, exist_ok=True)
-                    mounting_dir.symlink_to(target_dir)
+                    try:
+                        mounting_dir.symlink_to(target_dir, target_is_directory=True)
+                    except FileExistsError:
+                        # If the symlink is already the one we want, then we
+                        # don't need to do anything here.
+                        # NOTE: In Python 3.9, this can use `mounting_dir.readlink()`
+                        if (
+                            not mounting_dir.is_symlink()
+                            or os.readlink(mounting_dir) != str(target_dir)
+                        ):
+                            raise
 
         index = int(index)
         if not self._storage_is_attached(name, index):
