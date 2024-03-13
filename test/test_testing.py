@@ -2915,11 +2915,17 @@ class TestHarness(unittest.TestCase):
 
             def __init__(self, *args: typing.Any):
                 super().__init__(*args)
+
                 self._stored.set_default(
                     status={
-                        'retention_size': ops.ActiveStatus(''),
-                        'k8s_patch': ops.ActiveStatus(''),
-                        'config': ops.ActiveStatus('')})
+                        'status': {
+                            'foo': ops.ActiveStatus(''),
+                            'bar': ops.ActiveStatus(''),
+                            'baz': ops.ActiveStatus(''),
+                        }
+                    }
+                )
+
                 self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
 
             def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
@@ -2933,8 +2939,13 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin_with_initial_hooks()
-        harness.cleanup()
-        self.assertRaises(ValueError)
+
+        with self.assertRaises(ValueError) as cm:
+            harness._framework.on.commit.emit()
+            harness.cleanup()
+        self.assertIn(
+            "unable to save the data for StoredStateData, it must contain only simple types", str(
+                cm.exception))
 
 
 class TestNetwork(unittest.TestCase):

@@ -731,7 +731,6 @@ class Framework(Object):
                 f'cannot save {type(value).__name__} values before registering that type')
 
         data = value.snapshot()
-
         # Use marshal as a validator, enforcing the use of simple types, as we later the
         # information is really pickled, which is too error-prone for future evolution of the
         # stored data (e.g. if the developer stores a custom object and later changes its
