@@ -813,11 +813,17 @@ class Framework(Object):
         if not sig.parameters:
             raise TypeError(
                 f'{type(observer_obj).__name__}.{method_name} must accept event parameter')
-        elif any(param.default is inspect.Parameter.empty for param in extra_params):
+        else:
             # Allow for additional optional params, since there's no reason to exclude them, but
             # required params will break.
-            raise TypeError(
-                f'{type(observer_obj).__name__}.{method_name} has extra required parameter')
+            required_params = [
+                param.name for param in extra_params
+                if param.default is inspect.Parameter.empty
+            ]
+            if required_params:
+                raise TypeError(
+                    f'{type(observer_obj).__name__}.{method_name} has extra required '
+                    f'parameter: {", ".join(required_params)}')
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
