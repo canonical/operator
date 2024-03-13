@@ -2915,7 +2915,7 @@ class TestHarness(unittest.TestCase):
 
             def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                
+
                 # invalid data since StoredStateData can contain only simple types
                 self._stored.set_default(
                     status={
