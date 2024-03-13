@@ -2915,7 +2915,11 @@ class TestHarness(unittest.TestCase):
 
             def __init__(self, *args: typing.Any):
                 super().__init__(*args)
-                self._stored.set_default(status={'retention_size': ops.ActiveStatus(''), 'k8s_patch': ops.ActiveStatus(''), 'config': ops.ActiveStatus('')})
+                self._stored.set_default(
+                    status={
+                        'retention_size': ops.ActiveStatus(''),
+                        'k8s_patch': ops.ActiveStatus(''),
+                        'config': ops.ActiveStatus('')})
                 self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
 
             def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
@@ -2931,6 +2935,7 @@ class TestHarness(unittest.TestCase):
         harness.begin_with_initial_hooks()
         harness.cleanup()
         self.assertRaises(ValueError)
+
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):
