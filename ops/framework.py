@@ -784,7 +784,6 @@ class Framework(Object):
         if not isinstance(bound_event, BoundEvent):
             raise TypeError(
                 f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
-        # Help users of older versions of the framework.
         if not isinstance(observer, types.MethodType):
             raise TypeError(
                 f"Framework.observe requires a method as the 'observer' parameter, got {observer}")
