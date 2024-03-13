@@ -723,9 +723,13 @@ class Framework(Object):
 
     def save_snapshot(self, value: Union["StoredStateData", "EventBase"]):
         """Save a persistent snapshot of the provided value."""
+        self._storage.save_snapshot(value.handle.path, self._get_snapshot_data_and_validate(value))
+
+    def _get_snapshot_data_and_validate(self, value: Union["StoredStateData", "EventBase"]):
         if type(value) not in self._type_known:
             raise RuntimeError(
                 f'cannot save {type(value).__name__} values before registering that type')
+
         data = value.snapshot()
 
         # Use marshal as a validator, enforcing the use of simple types, as we later the
@@ -739,7 +743,7 @@ class Framework(Object):
             msg = "unable to save the data for {}, it must contain only simple types: {!r}"
             raise ValueError(msg.format(value.__class__.__name__, data)) from None
 
-        self._storage.save_snapshot(value.handle.path, data)
+        return data
 
     def load_snapshot(self, handle: Handle) -> Serializable:
         """Load a persistent snapshot."""

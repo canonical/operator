@@ -475,6 +475,7 @@ class Harness(Generic[CharmType]):
 
         Always call ``self.addCleanup(harness.cleanup)`` after creating a :class:`Harness`.
         """
+        self._framework._get_snapshot_data_and_validate(self._framework._stored)
         self._backend._cleanup()
 
     def _create_meta(self, charm_metadata_yaml: Optional[YAMLStringOrFile],

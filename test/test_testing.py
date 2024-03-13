@@ -2909,6 +2909,57 @@ class TestHarness(unittest.TestCase):
             harness.model.unit.status = ops.ErrorStatus()
         harness.model.unit.status = ops.ActiveStatus()
 
+    def test_get_snapshot_data_and_validate_works(self):
+        class MyCharm(ops.CharmBase):
+            _stored = ops.framework.StoredState()
+
+            def __init__(self, *args: typing.Any):
+                super().__init__(*args)
+                self._stored.set_default(status={'foo': 1, 'bar': 2, 'baz': 3})
+                self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+                pass
+
+        harness = ops.testing.Harness(MyCharm, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin_with_initial_hooks()
+
+        self.assertRaises(ValueError)
+
+    def test_get_snapshot_data_and_validate_not_working(self):
+        class MyCharm(ops.CharmBase):
+            _stored = ops.framework.StoredState()
+
+            def __init__(self, *args: typing.Any):
+                super().__init__(*args)
+                self._stored.set_default(status={'foo': 1, 'bar': 2, 'baz': 3})
+                self.framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+                pass
+
+        harness = ops.testing.Harness(MyCharm, meta='''
+            name: test-app
+            containers:
+              foo:
+                resource: foo-image
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin_with_initial_hooks()
+
+        with self.assertRaises(ValueError) as cm:
+            pass
+        self.assertIn(
+            "unable to save the data for StoredStateData, it must contain only simple types",
+            str(cm.exception)
+        )
+
 
 class TestNetwork(unittest.TestCase):
     def setUp(self):
