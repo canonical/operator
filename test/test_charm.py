@@ -89,9 +89,6 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(charm.started, True)
 
-        with self.assertRaisesRegex(TypeError, "observer methods must now be explicitly provided"):
-            framework.observe(charm.on.start, charm)  # type: ignore
-
     def test_observe_decorated_method(self):
         # we test that charm methods decorated with @functools.wraps(wrapper)
         # can be observed by Framework. Simpler decorators won't work because

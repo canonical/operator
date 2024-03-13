@@ -167,7 +167,7 @@ class TestFramework(BaseTestCase):
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
 
-        with self.assertRaisesRegex(RuntimeError, "^Framework.observe requires a method"):
+        with self.assertRaisesRegex(TypeError, "^Framework.observe requires a method"):
             framework.observe(pub.baz, obs)  # type: ignore
 
         pub.foo.emit()
@@ -888,12 +888,12 @@ class TestFramework(BaseTestCase):
                 'ObjectWithStorage[obj]/on/event[1]']))
 
     def test_wrapped_handler(self):
-        def add_arg(func):  # type: ignore
-            @functools.wraps(func)  # type: ignore
+        def add_arg(func: typing.Callable[..., None]) -> typing.Callable[..., None]:
+            @functools.wraps(func)
             def wrapper(charm: ops.CharmBase, event: ops.EventBase):
-                return func(charm, event, "extra-arg")  # type: ignore
+                return func(charm, event, "extra-arg")
 
-            return wrapper  # type: ignore
+            return wrapper
 
         class MyCharm(ops.CharmBase):
             @add_arg
@@ -902,7 +902,7 @@ class TestFramework(BaseTestCase):
 
         framework = self.create_framework()
         charm = MyCharm(framework)
-        framework.observe(charm.on.start, charm._on_event)  # type: ignore
+        framework.observe(charm.on.start, charm._on_event)
         charm.on.start.emit()
 
 

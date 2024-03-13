@@ -782,18 +782,12 @@ class Framework(Object):
             RuntimeError: if bound_event or observer are the wrong type.
         """
         if not isinstance(bound_event, BoundEvent):
-            raise RuntimeError(
+            raise TypeError(
                 f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
         # Help users of older versions of the framework.
-        if isinstance(observer, charm.CharmBase):
+        if not isinstance(observer, types.MethodType):
             raise TypeError(
-                'observer methods must now be explicitly provided;'
-                ' please replace observe(self.on.{0}, self)'
-                ' with e.g. observe(self.on.{0}, self._on_{0})'.format(
-                    bound_event.event_kind))
-        if not callable(observer):
-            raise RuntimeError(
-                f'Framework.observe requires a callable as third parameter, got {observer}')
+                f"Framework.observe requires a method as the 'observer' parameter, got {observer}")
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -804,7 +798,7 @@ class Framework(Object):
         if hasattr(emitter, "handle"):
             emitter_path = emitter.handle.path
         else:
-            raise RuntimeError(
+            raise TypeError(
                 f'event emitter {type(emitter).__name__} must have a "handle" attribute')
 
         # Validate that the method has an acceptable call signature.
