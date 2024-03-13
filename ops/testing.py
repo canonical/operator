@@ -405,7 +405,11 @@ class Harness(Generic[CharmType]):
         for storage_name in self._meta.storages:
             for storage_index in self._backend.storage_list(storage_name, include_detached=True):
                 s = model.Storage(storage_name, storage_index, self._backend)
-                self.attach_storage(s.full_id)
+                if self._backend._storage_is_attached(storage_name, storage_index):
+                    # Attaching was done already, but we still need the event to be emitted.
+                    self.charm.on[storage_name].storage_attached.emit(s)
+                else:
+                    self.attach_storage(s.full_id)
         # Storage done, emit install event
         charm.on.install.emit()
 
@@ -739,8 +743,8 @@ class Harness(Generic[CharmType]):
         """Attach a storage device.
 
         The intent of this function is to simulate a ``juju attach-storage`` call.
-        If called before :meth:`begin`, or with hooks disabled, it will have no effect.
-        It will trigger a storage-attached hook if the storage unit in question exists
+        If called after :meth:`begin` and hooks are not disabled, it will trigger
+        a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
 
         The test harness uses symbolic links to imitate storage mounts, which may lead to some
@@ -751,10 +755,10 @@ class Harness(Generic[CharmType]):
             storage_id: The full storage ID of the storage unit being attached, including the
                 storage key, e.g. my-storage/0.
         """
-        if not self._charm or not self._hooks_enabled:
-            return  # don't need to run hook callback
         if not self._backend._storage_attach(storage_id):
             return  # storage was already attached
+        if not self._charm or not self._hooks_enabled:
+            return  # don't need to run hook callback
 
         storage_name, storage_index = storage_id.split('/', 1)
 

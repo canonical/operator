@@ -4496,9 +4496,9 @@ class TestPebbleStorageAPIsUsingMocks(
         self.addCleanup(harness.cleanup)
 
         store_id = harness.add_storage('store1')[0]
+        harness.attach_storage(store_id)
 
         harness.begin()
-        harness.attach_storage(store_id)
         harness.set_can_connect('c1', True)
         harness.set_can_connect('c2', True)
         harness.set_can_connect('c3', True)
