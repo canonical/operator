@@ -1448,7 +1448,7 @@ class Relation:
     id: int
     """The identifier for a particular relation."""
 
-    app: Optional[Application]
+    app: Application
     """Represents the remote application of this relation.
 
     For peer relations, this will be the local application.
@@ -1478,7 +1478,7 @@ class Relation:
             backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
-        self.app: Optional[Application] = None
+        self.app: Application = None
         self.units: Set[Unit] = set()
         self.active = active
 
