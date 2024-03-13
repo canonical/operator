@@ -824,8 +824,8 @@ class Harness(Generic[CharmType]):
             })
 
         Args:
-            relation_name: The relation on the charm that is being related to.
-            remote_app: The name of the application that is being related to.
+            relation_name: The relation on the charm that is being integrated with.
+            remote_app: The name of the application that is being integrated with.
                 To add a peer relation, set to the name of *this* application.
             app_data: If provided, also add a new unit to the relation
                 (triggering relation-joined) and set the *application* relation data
@@ -1344,7 +1344,7 @@ class Harness(Generic[CharmType]):
 
         If this charm becomes a leader then `leader_elected` will be triggered.  If :meth:`begin`
         has already been called, then the charm's peer relation should usually be added *prior* to
-        calling this method (with :meth:`add_relation`) to properly initialize and make
+        calling this method (with :meth:`add_relation`) to properly initialise and make
         available relation data that leader elected hooks may want to access.
 
         Args:
@@ -3376,7 +3376,7 @@ class _TestingPebbleClient:
     def get_notices(
         self,
         *,
-        select: Optional[pebble.NoticesSelect] = None,
+        users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -3386,9 +3386,9 @@ class _TestingPebbleClient:
         filter_user_id = 0  # default is to filter by request UID (root)
         if user_id is not None:
             filter_user_id = user_id
-        if select is not None:
+        if users is not None:
             if user_id is not None:
-                raise self._api_error(400, 'cannot use both "select" and "user_id"')
+                raise self._api_error(400, 'cannot use both "users" and "user_id"')
             filter_user_id = None
 
         if types is not None:
