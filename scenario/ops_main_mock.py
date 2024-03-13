@@ -110,12 +110,27 @@ def setup_framework(
 
     meta = CharmMeta.from_yaml(metadata, actions_metadata)
 
-    # If we are in a RelationBroken event, we want to know which relation is
-    # broken within the model, not only in the event's `.relation` attribute.
-    broken_relation_id = (
-        event.relation.relation_id if event.name.endswith("_relation_broken") else None  # type: ignore
-    )
-    model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
+    # ops >= 2.10
+    if inspect.signature(ops.model.Model).parameters.get("broken_relation_id"):
+        # If we are in a RelationBroken event, we want to know which relation is
+        # broken within the model, not only in the event's `.relation` attribute.
+        broken_relation_id = (
+            event.relation.relation_id  # type: ignore
+            if event.name.endswith("_relation_broken")
+            else None
+        )
+
+        model = ops.model.Model(
+            meta,
+            model_backend,
+            broken_relation_id=broken_relation_id,
+        )
+    else:
+        ops_logger.warning(
+            "It looks like this charm is using an older `ops` version. "
+            "You may experience weirdness. Please update ops.",
+        )
+        model = ops.model.Model(meta, model_backend)
 
     charm_state_path = charm_dir / CHARM_STATE_FILE
 
