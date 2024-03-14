@@ -1478,33 +1478,32 @@ class Relation:
             backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
-        # self.app will not be None and always be set because of the fallback mechanism below.
-        self.app: Application = typing.cast(Application, None)
         self.units: Set[Unit] = set()
         self.active = active
 
-        if is_peer:
-            # For peer relations, both the remote and the local app are the same.
-            self.app = our_unit.app
+        # For peer relations, both the remote and the local app are the same.
+        app = our_unit.app if is_peer else None
 
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
-                if self.app is None:
+                if app is None:
                     # Use the app of one of the units if available.
-                    self.app = unit.app
+                    app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
-        if self.app is None:
+        if app is None:
             app_name = backend.relation_remote_app_name(relation_id)
             if app_name is not None:
-                self.app = cache.get(Application, app_name)
+                app = cache.get(Application, app_name)
 
+        # self.app will not be None and always be set because of the fallback mechanism below.
+        self.app = typing.cast(Application, app)
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
