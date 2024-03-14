@@ -179,6 +179,61 @@ class TestFramework(BaseTestCase):
             "<MyEvent via MyNotifier[1]/bar[2]>",
         ])
 
+    def test_event_observer_more_args(self):
+        framework = self.create_framework()
+
+        class MyEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
+            bar = ops.EventSource(MyEvent)
+            baz = ops.EventSource(MyEvent)
+            qux = ops.EventSource(MyEvent)
+
+        class MyObserver(ops.Object):
+            def __init__(self, parent: ops.Object, key: str):
+                super().__init__(parent, key)
+                self.seen: typing.List[str] = []
+                self.reprs: typing.List[str] = []
+
+            def on_foo(self, event: ops.EventBase):
+                self.seen.append(f"on_foo:{event.handle.kind}")
+                self.reprs.append(repr(event))
+
+            def on_bar(self, event: ops.EventBase, _: int = 1):
+                self.seen.append(f"on_bar:{event.handle.kind}")
+                self.reprs.append(repr(event))
+
+            def on_baz(self, event: ops.EventBase, *, _: int = 1):
+                self.seen.append(f"on_baz:{event.handle.kind}")
+                self.reprs.append(repr(event))
+
+            def on_qux(self, event: ops.EventBase, *args, **kwargs):  # type: ignore
+                self.seen.append(f"on_qux:{event.handle.kind}")
+                self.reprs.append(repr(event))
+
+        pub = MyNotifier(framework, "1")
+        obs = MyObserver(framework, "1")
+
+        framework.observe(pub.foo, obs.on_foo)
+        framework.observe(pub.bar, obs.on_bar)
+        framework.observe(pub.baz, obs.on_baz)
+        framework.observe(pub.qux, obs.on_qux)  # type: ignore
+
+        pub.foo.emit()
+        pub.bar.emit()
+        pub.baz.emit()
+        pub.qux.emit()
+
+        self.assertEqual(obs.seen, ['on_foo:foo', 'on_bar:bar', 'on_baz:baz', 'on_qux:qux'])
+        self.assertEqual(obs.reprs, [
+            "<MyEvent via MyNotifier[1]/foo[1]>",
+            "<MyEvent via MyNotifier[1]/bar[2]>",
+            "<MyEvent via MyNotifier[1]/baz[3]>",
+            "<MyEvent via MyNotifier[1]/qux[4]>",
+        ])
+
     def test_bad_sig_observer(self):
 
         class MyEvent(ops.EventBase):
@@ -211,11 +266,11 @@ class TestFramework(BaseTestCase):
         pub = MyNotifier(framework, "pub")
         obs = MyObserver(framework, "obs")
 
-        with self.assertRaisesRegex(TypeError, "must accept event parameter"):
+        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
             framework.observe(pub.foo, obs._on_foo)  # type: ignore
-        with self.assertRaisesRegex(TypeError, "has extra required parameter"):
+        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
             framework.observe(pub.bar, obs._on_bar)  # type: ignore
-        with self.assertRaisesRegex(TypeError, "has extra required parameter"):
+        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
             framework.observe(pub.baz, obs._on_baz)  # type: ignore
         framework.observe(pub.qux, obs._on_qux)
 
@@ -888,6 +943,8 @@ class TestFramework(BaseTestCase):
                 'ObjectWithStorage[obj]/on/event[1]']))
 
     def test_wrapped_handler(self):
+        # It's fine to wrap the event handler, as long as the framework can
+        # still call it with just the `event` argument.
         def add_arg(func: typing.Callable[..., None]) -> typing.Callable[..., None]:
             @functools.wraps(func)
             def wrapper(charm: ops.CharmBase, event: ops.EventBase):
@@ -904,6 +961,26 @@ class TestFramework(BaseTestCase):
         charm = MyCharm(framework)
         framework.observe(charm.on.start, charm._on_event)
         charm.on.start.emit()
+
+        # If the event handler is wrapped, and then needs an additional argument
+        # that's the same problem as if we didn't wrap it and required an extra
+        # argument, so check that also correctly fails.
+        def bad_arg(func: typing.Callable[..., None]) -> typing.Callable[..., None]:
+            @functools.wraps(func)
+            def wrapper(charm: ops.CharmBase, event: ops.EventBase, _: str):
+                return func(charm, event)
+
+            return wrapper
+
+        class BadCharm(ops.CharmBase):
+            @bad_arg
+            def _on_event(self, _: ops.EventBase):
+                assert False, 'should not get to here'
+
+        framework = self.create_framework()
+        charm = BadCharm(framework)
+        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
+            framework.observe(charm.on.start, charm._on_event)
 
 
 MutableTypesTestCase = typing.Tuple[
