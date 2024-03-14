@@ -1502,7 +1502,7 @@ class Relation:
             if app_name is not None:
                 app = cache.get(Application, app_name)
 
-        # self.app will not be None and always be set because of the fallback mechanism below.
+        # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast(Application, app)
         self.data = RelationData(self, our_unit, backend)
 
