@@ -1478,6 +1478,7 @@ class Relation:
             backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
+        # self.app will not be None and always be set because of the fallback mechanism below.
         self.app: Application = typing.cast(Application, None)
         self.units: Set[Unit] = set()
         self.active = active
