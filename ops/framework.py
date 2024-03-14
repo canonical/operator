@@ -808,7 +808,6 @@ class Framework(Object):
 
         # Validate that the method has an acceptable call signature.
         sig = inspect.signature(observer, follow_wrapped=False)
-        # Self isn't included in the params list, so the first arg will be the event.
         try:
             sig.bind(EventBase(None))  # type: ignore
         except TypeError as e:
