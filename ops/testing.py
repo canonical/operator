@@ -748,8 +748,7 @@ class Harness(Generic[CharmType]):
         and is presently marked as detached.
 
         The test harness uses symbolic links to imitate storage mounts, which may lead to some
-        inconsistencies compared to the actual charm. Users should be cognisant of
-        this potential discrepancy.
+        inconsistencies compared to the actual charm.
 
         Args:
             storage_id: The full storage ID of the storage unit being attached, including the
