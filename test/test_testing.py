@@ -5735,3 +5735,26 @@ class PebbleNoticesMixin:
 class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMixin):
     def setUp(self):
         self.client = self.get_testing_client()
+
+
+class TestCloudSpec(unittest.TestCase):
+    def test_get_set_cloud_spec(self):
+        harness = ops.testing.Harness(EventRecorder, meta='name: myapp')
+        self.addCleanup(harness.cleanup)
+        cloud_spec_dict = {
+                "name": "localhost",
+                "type": "lxd",
+                "endpoint": "https://127.0.0.1:8443"
+            }
+        harness.set_cloud_spec(cloud_spec_dict)
+        harness.begin()
+        result = harness.model.get_cloud_spec()
+        expected = ops.model.CloudSpec.from_dict(cloud_spec_dict)
+        self.assertEqual(repr(result), repr(expected))
+
+    def test_get_cloud_spec_without_set_error(self):
+        harness = ops.testing.Harness(EventRecorder, meta='name: myapp')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(ops.ModelError):
+            harness.model.get_cloud_spec()
