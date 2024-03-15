@@ -3791,5 +3791,109 @@ class TestLazyNotice(unittest.TestCase):
         )
 
 
+class TestCloudSpec(unittest.TestCase):
+    def test_init(self):
+        cloud_spec = ops.CloudSpec(
+            type="localhost",
+            name="lxd",
+            region='localhost',
+            endpoint='https://127.0.0.1:8443',
+            is_controller_cloud=None,
+            credential={
+                'auth-type': 'certificate',
+                'attrs': {
+                    'client-cert': 'xxx',
+                    'client-key': 'yyy',
+                    'server-cert': ''
+                },
+            },
+            identity_endpoint='http://127.0.0.1',
+            storage_endpoint='http://127.0.0.1',
+            ca_certificates=['foo', 'bar'],
+            skip_tls_verify=True,
+        )
+
+        self.assertEqual(cloud_spec.type, 'localhost')
+        self.assertEqual(cloud_spec.name, 'lxd')
+        self.assertEqual(cloud_spec.region, 'localhost')
+        self.assertEqual(cloud_spec.endpoint, 'https://127.0.0.1:8443')
+        self.assertEqual(cloud_spec.credential, {
+            'auth-type': 'certificate',
+            'attrs': {
+                'client-cert': 'xxx',
+                'client-key': 'yyy',
+                'server-cert': ''
+            },
+        })
+        self.assertEqual(cloud_spec.is_controller_cloud, None)
+        self.assertEqual(cloud_spec.identity_endpoint, 'http://127.0.0.1')
+        self.assertEqual(cloud_spec.storage_endpoint, 'http://127.0.0.1')
+        self.assertEqual(cloud_spec.ca_certificates, ['foo', 'bar'])
+        self.assertEqual(cloud_spec.skip_tls_verify, True)
+
+        self.assertTrue(repr(cloud_spec).startswith('CloudSpec('))
+        self.assertTrue(repr(cloud_spec).endswith(')'))
+
+    def test_from_dict(self):
+        cloud_spec = ops.CloudSpec.from_dict(
+            {
+                'type': 'lxd',
+                'name': 'localhost',
+                'region': 'localhost',
+                'endpoint': 'https://10.76.251.1:8443',
+                'isControllerCloud': None,
+                'credential': {
+                    'auth-type': 'certificate',
+                    'attrs': {
+                        'client-cert': 'foo',
+                        'client-key': 'bar',
+                        'server-cert': 'baz'
+                    }
+                },
+                'identityEndpoint': None,
+                'storageEndpoint': None,
+                'caACertificates': None,
+                'skipTLSVerify': None
+            }
+        )
+        self.assertEqual(cloud_spec.type, 'lxd')
+        self.assertEqual(cloud_spec.name, 'localhost')
+        self.assertEqual(cloud_spec.region, 'localhost')
+        self.assertEqual(cloud_spec.endpoint, 'https://10.76.251.1:8443')
+        self.assertEqual(cloud_spec.is_controller_cloud, None)
+        self.assertEqual(cloud_spec.identity_endpoint, None)
+        self.assertEqual(cloud_spec.storage_endpoint, None)
+        self.assertEqual(cloud_spec.ca_certificates, None)
+        self.assertEqual(cloud_spec.skip_tls_verify, None)
+        self.assertEqual(cloud_spec.credential, {
+            'auth-type': 'certificate',
+            'attrs': {
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz'
+            }
+        }
+        )
+
+
+class TestGetCloudSpec(unittest.TestCase):
+    def setUp(self):
+        self.model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
+    def test_get_cloud_spec(self):
+        fake_script(self, 'credential-get', """echo '{"type": "lxd", "name": "localhost"}'""")
+        cloud_spec = self.model.get_cloud_spec()
+        self.assertEqual(cloud_spec.type, 'lxd')
+        self.assertEqual(cloud_spec.name, 'localhost')
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['credential-get', '--format=json']])
+
+    @patch("ops.model._ModelBackend.credential_get")
+    def test_get_cloud_spec_error(self, credential_get: MagicMock):
+        credential_get.side_effect = ops.ModelError
+        with self.assertRaises(ops.ModelError):
+            self.model.get_cloud_spec()
+
+
 if __name__ == "__main__":
     unittest.main()
