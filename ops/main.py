@@ -293,7 +293,7 @@ class _Dispatcher:
             raise _Abort(e.returncode) from e
         except OSError as e:
             logger.warning("Unable to run legacy %s: %s", self._dispatch_path, e)
-            raise _Abort() from e
+            raise _Abort(1) from e
         else:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
@@ -368,8 +368,8 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
 class _Abort(Exception):  # noqa: N818
     """Raised when something happens that should interrupt ops execution."""
 
-    def __init__(self, *args: Any, exit_code: int = 1):
-        super().__init__(*args)
+    def __init__(self, exit_code: int, **kwargs: Any):
+        super().__init__(*kwargs)
         self.exit_code = exit_code
 
 
@@ -463,7 +463,7 @@ class _Manager:
                          'see: https://github.com/canonical/operator/issues/348',
                          dispatcher.event_name)
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
-            raise _Abort(exit_code=0)
+            raise _Abort(0)
 
         if self._use_juju_for_storage:
             store = ops.storage.JujuStorage()
@@ -549,6 +549,7 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
         manager.run()
     except _Abort as e:
+        print(f"aborted with {e.exit_code}")
         sys.exit(e.exit_code)
 
 
