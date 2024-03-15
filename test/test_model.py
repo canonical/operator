@@ -3794,13 +3794,13 @@ class TestLazyNotice(unittest.TestCase):
 class TestCloudSpec(unittest.TestCase):
     def setUp(self) -> None:
         self.credential = {
-                'auth-type': 'certificate',
-                'attrs': {
-                    'client-cert': 'foo',
-                    'client-key': 'bar',
-                    'server-cert': 'baz'
-                },
-            }
+            'auth-type': 'certificate',
+            'attrs': {
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz'
+            },
+        }
 
     def test_init(self):
         cloud_spec = ops.CloudSpec(
