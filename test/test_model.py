@@ -3792,6 +3792,16 @@ class TestLazyNotice(unittest.TestCase):
 
 
 class TestCloudSpec(unittest.TestCase):
+    def setUp(self) -> None:
+        self.credential = {
+                'auth-type': 'certificate',
+                'attrs': {
+                    'client-cert': 'foo',
+                    'client-key': 'bar',
+                    'server-cert': 'baz'
+                },
+            }
+
     def test_init(self):
         cloud_spec = ops.CloudSpec(
             type="localhost",
@@ -3799,14 +3809,7 @@ class TestCloudSpec(unittest.TestCase):
             region='localhost',
             endpoint='https://127.0.0.1:8443',
             is_controller_cloud=None,
-            credential={
-                'auth-type': 'certificate',
-                'attrs': {
-                    'client-cert': 'xxx',
-                    'client-key': 'yyy',
-                    'server-cert': ''
-                },
-            },
+            credential=self.credential,
             identity_endpoint='http://127.0.0.1',
             storage_endpoint='http://127.0.0.1',
             ca_certificates=['foo', 'bar'],
@@ -3817,14 +3820,7 @@ class TestCloudSpec(unittest.TestCase):
         self.assertEqual(cloud_spec.name, 'lxd')
         self.assertEqual(cloud_spec.region, 'localhost')
         self.assertEqual(cloud_spec.endpoint, 'https://127.0.0.1:8443')
-        self.assertEqual(cloud_spec.credential, {
-            'auth-type': 'certificate',
-            'attrs': {
-                'client-cert': 'xxx',
-                'client-key': 'yyy',
-                'server-cert': ''
-            },
-        })
+        self.assertEqual(cloud_spec.credential, self.credential)
         self.assertEqual(cloud_spec.is_controller_cloud, None)
         self.assertEqual(cloud_spec.identity_endpoint, 'http://127.0.0.1')
         self.assertEqual(cloud_spec.storage_endpoint, 'http://127.0.0.1')
@@ -3842,14 +3838,7 @@ class TestCloudSpec(unittest.TestCase):
                 'region': 'localhost',
                 'endpoint': 'https://10.76.251.1:8443',
                 'isControllerCloud': None,
-                'credential': {
-                    'auth-type': 'certificate',
-                    'attrs': {
-                        'client-cert': 'foo',
-                        'client-key': 'bar',
-                        'server-cert': 'baz'
-                    }
-                },
+                'credential': self.credential,
                 'identityEndpoint': None,
                 'storageEndpoint': None,
                 'caACertificates': None,
@@ -3865,15 +3854,7 @@ class TestCloudSpec(unittest.TestCase):
         self.assertEqual(cloud_spec.storage_endpoint, None)
         self.assertEqual(cloud_spec.ca_certificates, None)
         self.assertEqual(cloud_spec.skip_tls_verify, None)
-        self.assertEqual(cloud_spec.credential, {
-            'auth-type': 'certificate',
-            'attrs': {
-                'client-cert': 'foo',
-                'client-key': 'bar',
-                'server-cert': 'baz'
-            }
-        }
-        )
+        self.assertEqual(cloud_spec.credential, self.credential)
 
 
 class TestGetCloudSpec(unittest.TestCase):

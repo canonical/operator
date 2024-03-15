@@ -1891,7 +1891,42 @@ class Harness(Generic[CharmType]):
         return action_under_test.output
 
     def set_cloud_spec(self, content: Dict[str, str]):
-        """Return cloud spec."""
+        """Set cloud specification (metadata) including credentials.
+
+        Call this method before trying to call `Harness.Model.get_cloud_spec.
+
+        Example Usage:
+
+            class TestCharm(unittest.TestCase):
+                def setUp(self):
+                    self.harness = ops.testing.Harness(MyVMCharm)
+                    self.addCleanup(self.harness.cleanup)
+
+                def test_start(self):
+                    self.harness.set_cloud_spec(
+                        {
+                            "name": "lxd",
+                            "type": "lxd",
+                            "endpoint": "https://127.0.0.1:8443"
+                        }
+                    )
+                    self.harness.begin_with_initial_hooks()
+                    cloud_spec = self.harness.model.get_cloud_spec()
+                    expected = ops.CloudSpec(
+                        name="lxd",
+                        type="lxd",
+                        region=None,
+                        endpoint="https://127.0.0.1:8443",
+                        is_controller_cloud=None,
+                        credential=None,
+                        identity_endpoint=None,
+                        storage_endpoint=None,
+                        ca_certificates=None,
+                        skip_tls_verify=None
+                    )
+                    self.assertEqual(repr(cloud_spec), repr(expected))
+                    self.assertEqual(self.harness.model.unit.status, ops.ActiveStatus())
+        """
         self._backend._cloud_spec = model.CloudSpec.from_dict(typing.cast(Dict[str, Any], content))
 
 
@@ -2109,6 +2144,7 @@ class _TestingModelBackend:
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
+        # for `Model.get_cloud_spec`, initialized to None
         self._cloud_spec: Optional[model.CloudSpec] = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):

@@ -287,11 +287,11 @@ class Model:
         Access the cloud credential information and return the cloud specification
         used by the model.
 
-        Note: It does not work in a "caas" model (container as a service,
+        Note: It does not work in a "CaaS" model (Container-as-a-Service,
         i.e., containerized environment, Kubernetes charm).
 
         Raises:
-            :class:`ModelError`: if called in a "caas" model.
+            :class:`ModelError`: if called in a "CaaS" model.
         """
         return self._backend.credential_get()
 
@@ -3522,7 +3522,10 @@ class _ModelBackend:
             self._run("juju-reboot")
 
     def credential_get(self) -> 'CloudSpec':
-        """Access cloud credentials. Returns the cloud specification used by the unit's model."""
+        """Access cloud credentials by running the credential-get hook tool.
+
+        Returns the cloud specification used by the unit's model.
+        """
         try:
             result = self._run('credential-get', return_output=True, use_json=True)
             return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
@@ -3621,7 +3624,7 @@ class LazyNotice:
 
 
 class CloudSpec:
-    """Cloud credential information (metadata)."""
+    """Cloud specification information (metadata) including credentials."""
 
     def __init__(self,
                  type: str,
@@ -3648,7 +3651,7 @@ class CloudSpec:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
-        """Create new Credential object from dict parsed from JSON."""
+        """Create new CloudSpec object from a dict parsed from JSON."""
         return cls(
             type=typing.cast(str, d.get('type')),
             name=typing.cast(str, d.get('name')),
