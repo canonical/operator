@@ -34,7 +34,6 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
-from ops.model import _ModelBackend
 
 logger = logging.getLogger()
 
@@ -48,6 +47,16 @@ def _exe_path(path: Path) -> Optional[Path]:
     if p is None:
         return None
     return Path(p)
+
+
+def _get_charm_dir():
+    charm_dir = os.environ.get("JUJU_CHARM_DIR")
+    if charm_dir is None:
+        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
+        charm_dir = Path(f'{__file__}/../../..').resolve()
+    else:
+        charm_dir = Path(charm_dir).resolve()
+    return charm_dir
 
 
 def _create_event_link(charm: 'ops.charm.CharmBase', bound_event: 'ops.framework.EventSource',
@@ -109,6 +118,25 @@ def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
         if issubclass(bound_event.event_type, (ops.charm.HookEvent, ops.charm.ActionEvent)):
             _create_event_link(charm, bound_event, link_to)
 
+def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
+    """Emits a charm event based on a Juju event name.
+
+    Args:
+        charm: A charm instance to emit an event from.
+        event_name: A Juju event name to emit on a charm.
+    """
+    event_to_emit = None
+    try:
+        event_to_emit = getattr(charm.on, event_name)
+    except AttributeError:
+        logger.debug("Event %s not defined for %s.", event_name, charm)
+
+    # If the event is not supported by the charm implementation, do
+    # not error out or try to emit it. This is to support rollbacks.
+    if event_to_emit is not None:
+        args, kwargs = _get_event_args(charm, event_to_emit)
+        logger.debug('Emitting Juju event %s.', event_name)
+        event_to_emit.emit(*args, **kwargs)
 
 def _get_juju_relation_id():
     return int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
@@ -260,10 +288,10 @@ class _Dispatcher:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
             logger.warning("Legacy %s exited with status %d.", self._dispatch_path, e.returncode)
-            sys.exit(e.returncode)
+            raise _Abort(e.returncode)
         except OSError as e:
             logger.warning("Unable to run legacy %s: %s", self._dispatch_path, e)
-            sys.exit(1)
+            raise _Abort()
         else:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
@@ -296,7 +324,7 @@ class _Dispatcher:
 
         if 'OPERATOR_DISPATCH' in os.environ:
             logger.debug("Charm called itself via %s.", self._dispatch_path)
-            sys.exit(0)
+            raise _Abort(0)
         os.environ['OPERATOR_DISPATCH'] = '1'
 
         self.is_dispatch_aware = True
@@ -335,71 +363,63 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
         return False
 
 
-def _get_charm_dir():
-    charm_dir = os.environ.get("JUJU_CHARM_DIR")
-    if charm_dir is None:
-        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = Path(f'{__file__}/../../..').resolve()
-    else:
-        charm_dir = Path(charm_dir).resolve()
-    return charm_dir
+class _Abort(Exception):
+    """Raised when something happens that should interrupt ops execution."""
+
+    def __init__(self, *args, exit_code: int = 1):
+        super().__init__(*args)
+        self.exit_code = exit_code
 
 
-class StorageSetupError(Exception):
-    """Raised when setting up the storage fails."""
+class _Manager:
+    """Initialises the Framework and manages the lifecycle of a charm.
 
-
-class _Ops:
-    """Initializes the Framework and manages the lifecycle of a charm.
-
-    Running _Ops consists of three main steps:
-    - setup: initialize from envvars and argv's the objects that encapsulate:
+    Running _Manager consists of three main steps:
+    - setup: initialise the following from JUJU_* environment variables:
       - the Framework (hook tool wrappers)
       - the storage backend
       - the event that Juju is emitting on us
       - the charm instance (user-facing)
     - emit: core user-facing lifecycle step. Consists of:
-      - reemit any deferred events found in the storage
-      - emit the Juju event on the charm
-      - emit any other events the charm emitted on itself during this cycle
+      - re-emit any deferred events found in the storage
+      - emit the Juju event to the charm
+        - emit any custom events emitted by the charm during this phase
+      - emit  the ``collect-status`` events
     - commit: responsible for:
       - store any events deferred throughout this execution
       - graceful teardown of the storage
-      - emission of the ``collect-status`` events
     """
 
     def __init__(
             self,
-            charm_type: Type["ops.charm.CharmBase"],
-            backend_type: Type[ops.model._ModelBackend],
+            charm_class: Type["ops.charm.CharmBase"],
+            model_backend: Optional[ops.model._ModelBackend] = None,
             use_juju_for_storage: Optional[bool] = None,
-            charm_state_file: str = '.unit-state.db'
+            charm_state_path: str = '.unit-state.db'
     ):
 
-        self._charm_state_file = charm_state_file
-        self._charm_type = charm_type
-        self._model_backend = backend_type()
+        self._charm_state_path = charm_state_path
+        self._charm_class = charm_class
+        if model_backend is None:
+            model_backend = ops.model._ModelBackend()
+        self._model_backend = model_backend
 
         # Do this as early as possible to be sure to catch the most logs.
         self._setup_root_logging()
 
-        self._charm_root = charm_root = _get_charm_dir()
-        self._charm_meta = CharmMeta.from_charm_root(charm_root)
+        self._charm_root = _get_charm_dir()
+        self._charm_meta = CharmMeta.from_charm_root(self._charm_root)
         self._use_juju_for_storage = use_juju_for_storage
 
         # Set up dispatcher, framework and charm objects.
-        self.dispatcher = dispatcher = _Dispatcher(self._charm_root)
-        # do this immediately after we set up the root logger
-        dispatcher.run_any_legacy_hook()
+        self.dispatcher = _Dispatcher(self._charm_root)
+        self.dispatcher.run_any_legacy_hook()
 
-        self.framework = framework = self._setup_framework(dispatcher)
-        self.charm = self._setup_charm(framework, dispatcher)
+        self.framework = self._make_framework(self.dispatcher)
+        self.charm = self._make_charm(self.framework, self.dispatcher)
 
-        self._has_emitted = False
-        self._has_committed = False
-
-    def _setup_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
-        charm = self._charm_type(framework)
+    def _make_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
+        charm = self._charm_class(framework)
         dispatcher.ensure_event_links(charm)
         return charm
 
@@ -413,8 +433,8 @@ class _Ops:
 
         logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
 
-    def _setup_storage(self, dispatcher: _Dispatcher):
-        charm_state_path = self._charm_root / self._charm_state_file
+    def _make_storage(self, dispatcher: _Dispatcher):
+        charm_state_path = self._charm_root / self._charm_state_path
 
         use_juju_for_storage = self._use_juju_for_storage
         if use_juju_for_storage and not ops.storage.juju_backend_available():
@@ -441,7 +461,7 @@ class _Ops:
                          'see: https://github.com/canonical/operator/issues/348',
                          dispatcher.event_name)
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
-            raise StorageSetupError()
+            raise _Abort(exit_code=0)
 
         if self._use_juju_for_storage:
             store = ops.storage.JujuStorage()
@@ -449,22 +469,20 @@ class _Ops:
             store = ops.storage.SQLiteStorage(charm_state_path)
         return store
 
-    def _setup_framework(
+    def _make_framework(
             self,
             dispatcher: _Dispatcher
     ):
-        meta = self._charm_meta
-
-        # If we are in a RelationBroken event, we want to know which relation is
+                # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
         if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
             broken_relation_id = _get_juju_relation_id()
         else:
             broken_relation_id = None
 
-        model = ops.model.Model(meta, self._model_backend, broken_relation_id=broken_relation_id)
-        store = self._setup_storage(dispatcher)
-        framework = ops.framework.Framework(store, self._charm_root, meta, model,
+        model = ops.model.Model(self._charm_meta, self._model_backend, broken_relation_id=broken_relation_id)
+        store = self._make_storage(dispatcher)
+        framework = ops.framework.Framework(store, self._charm_root, self._charm_meta, model,
                                             event_name=dispatcher.event_name)
         framework.set_breakpointhook()
         return framework
@@ -475,64 +493,36 @@ class _Ops:
         Args:
             event_name: A Juju event name to emit on a charm.
         """
-        charm = self.charm
-        owner = charm.on
+        _emit_charm_event(self.charm, event_name)
 
-        try:
-            event_to_emit = getattr(owner, event_name)
-        except AttributeError:
-            logger.debug("Event %s not defined for %s.", event_name, charm)
-            return  # no event emitted on the charm!
-
-        args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug("Emitting Juju event %s.", event_name)
-        event_to_emit.emit(*args, **kwargs)
-
-    def emit(self):
+    def _emit(self):
         """Emit the event on the charm."""
-        framework = self.framework
-        dispatcher = self.dispatcher
+        # TODO: Remove the collect_metrics check below as soon as the relevant
+        #       Juju changes are made. Also adjust the docstring on
+        #       EventBase.defer().
+        #
+        # Skip reemission of deferred events for collect-metrics events because
+        # they do not have the full access to all hook tools.
+        if not self.dispatcher.is_restricted_context():
+            # re-emit any deferred events from the previous run
+            self.framework.reemit()
 
-        try:
-            # TODO: Remove the collect_metrics check below as soon as the relevant
-            #       Juju changes are made. Also adjust the docstring on
-            #       EventBase.defer().
-            #
-            # Skip reemission of deferred events for collect-metrics events because
-            # they do not have the full access to all hook tools.
-            if not dispatcher.is_restricted_context():
-                framework.reemit()
+        # emit the juju event
+        self._emit_charm_event(self.dispatcher.event_name)
+        # emit collect-status events
+        ops.charm._evaluate_status(self.charm)
 
-            self._emit_charm_event(dispatcher.event_name)
-
-        except Exception:
-            framework.close()
-            raise
-
-        self._has_emitted = True
-
-    def commit(self):
+    def _commit(self):
         """Commit the framework and gracefully teardown."""
-        if not self._has_emitted:
-            raise RuntimeError("should .emit() before you .commit()")
-
-        charm = self.charm
-        framework = self.framework
-
-        # Emit collect-status events.
-        ops.charm._evaluate_status(charm)
-        try:
-            framework.commit()
-        finally:
-            framework.close()
-        self._has_committed = True
+        self.framework.commit()
 
     def run(self):
-        """Step through all non-manually-called steps and run them."""
-        if not self._has_emitted:
-            self.emit()
-        if not self._has_committed:
-            self.commit()
+        """Emit and then commit the framework."""
+        try:
+            self._emit()
+            self._commit()
+        finally:
+            self.framework.close()
 
 
 def main(charm_class: Type[ops.charm.CharmBase],
@@ -548,12 +538,15 @@ def main(charm_class: Type[ops.charm.CharmBase],
             are running on a new enough Juju default to controller-side storage,
             otherwise local storage is used.
     """
-    ops = _Ops(
-        charm_class,
-        backend_type=_ModelBackend,
-        use_juju_for_storage=use_juju_for_storage)
+    try:
+        manager = _Manager(
+            charm_class,
+            model_backend=ops.model._ModelBackend(),
+            use_juju_for_storage=use_juju_for_storage)
 
-    ops.run()
+        manager.run()
+    except _Abort as e:
+        sys.exit(e.exit_code)
 
 
 # Make this module callable and call main(), so that "import ops" and then

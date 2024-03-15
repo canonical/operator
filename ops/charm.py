@@ -1373,21 +1373,20 @@ class CharmMeta:
                            for name, container in raw_.get('containers', {}).items()}
 
     @staticmethod
-    def from_charm_root(charm_root: pathlib.Path):
+    def from_charm_root(charm_root: Union[pathlib.Path, str]):
         """Initialize CharmMeta from the path to a charm repository root folder."""
-        metadata_path = charm_root / "metadata.yaml"
-        if not metadata_path.exists():
-            raise FileNotFoundError(
-                f"invalid charm root {charm_root!r}; "
-                f"expected to contain at least a `metadata.yaml` file.",
-            )
-        meta = yaml.safe_load(metadata_path.open())
+        _charm_root = pathlib.Path(charm_root)
+        metadata_path = _charm_root / "metadata.yaml"
+
+        with metadata_path.open() as f:
+            meta = yaml.safe_load(f.read())
 
         actions = None
 
-        actions_path = charm_root / "actions.yaml"
+        actions_path = _charm_root / "actions.yaml"
         if actions_path.exists():
-            actions = yaml.safe_load(actions_path.open())
+            with actions_path.open() as f:
+                actions = yaml.safe_load(f.read())
 
         return CharmMeta(meta, actions)
 
