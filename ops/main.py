@@ -368,7 +368,7 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
 class _Abort(Exception):  # noqa: N818
     """Raised when something happens that should interrupt ops execution."""
 
-    def __init__(self, *args, exit_code: int = 1):
+    def __init__(self, *args: Any, exit_code: int = 1):
         super().__init__(*args)
         self.exit_code = exit_code
 
