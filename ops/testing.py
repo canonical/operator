@@ -1893,9 +1893,9 @@ class Harness(Generic[CharmType]):
     def set_cloud_spec(self, content: Dict[str, str]):
         """Set cloud specification (metadata) including credentials.
 
-        Call this method before trying to call `Harness.Model.get_cloud_spec.
+        Call this method before trying to call `Harness.Model.get_cloud_spec`.
 
-        Example Usage:
+        Example usage::
 
             class TestCharm(unittest.TestCase):
                 def setUp(self):
@@ -1904,11 +1904,7 @@ class Harness(Generic[CharmType]):
 
                 def test_start(self):
                     self.harness.set_cloud_spec(
-                        {
-                            "name": "lxd",
-                            "type": "lxd",
-                            "endpoint": "https://127.0.0.1:8443"
-                        }
+                        {"name": "lxd", "type": "lxd", "endpoint": "https://127.0.0.1:8443"}
                     )
                     self.harness.begin_with_initial_hooks()
                     cloud_spec = self.harness.model.get_cloud_spec()
@@ -1922,10 +1918,11 @@ class Harness(Generic[CharmType]):
                         identity_endpoint=None,
                         storage_endpoint=None,
                         ca_certificates=None,
-                        skip_tls_verify=None
+                        skip_tls_verify=None,
                     )
                     self.assertEqual(repr(cloud_spec), repr(expected))
                     self.assertEqual(self.harness.model.unit.status, ops.ActiveStatus())
+
         """
         self._backend._cloud_spec = model.CloudSpec.from_dict(typing.cast(Dict[str, Any], content))
 
