@@ -1890,6 +1890,8 @@ class Harness(Generic[CharmType]):
                 output=action_under_test.output)
         return action_under_test.output
 
+    def set_cloud_spec(self, content: Dict[str, str]):
+        self._backend._cloud_spec = model.CloudSpec.from_dict(typing.cast(Dict[str, Any], content))
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
@@ -2105,6 +2107,7 @@ class _TestingModelBackend:
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
+        self._cloud_spec: Optional[model.CloudSpec] = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2677,6 +2680,11 @@ class _TestingModelBackend:
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle everything after the exit.
         raise SystemExit()
+    
+    def credential_get(self) -> model.CloudSpec:
+        if not self._cloud_spec:
+            raise model.ModelError('ERROR cloud spec is empty, set it with Harness.set_cloud_spec first')
+        return self._cloud_spec
 
 
 @_copy_docstrings(pebble.ExecProcess)
