@@ -462,7 +462,6 @@ start:
             assert meta.name == "bob"
             assert meta.requires['foo'].interface_name == "bar"
 
-
     def test_actions_from_charm_root(self):
         with tempfile.TemporaryDirectory() as d:
             td = pathlib.Path(d)

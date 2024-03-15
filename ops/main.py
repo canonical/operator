@@ -118,6 +118,7 @@ def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase'):
         if issubclass(bound_event.event_type, (ops.charm.HookEvent, ops.charm.ActionEvent)):
             _create_event_link(charm, bound_event, link_to)
 
+
 def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
     """Emits a charm event based on a Juju event name.
 
@@ -137,6 +138,7 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
         args, kwargs = _get_event_args(charm, event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
         event_to_emit.emit(*args, **kwargs)
+
 
 def _get_juju_relation_id():
     return int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
@@ -288,10 +290,10 @@ class _Dispatcher:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
             logger.warning("Legacy %s exited with status %d.", self._dispatch_path, e.returncode)
-            raise _Abort(e.returncode)
+            raise _Abort(e.returncode) from e
         except OSError as e:
             logger.warning("Unable to run legacy %s: %s", self._dispatch_path, e)
-            raise _Abort()
+            raise _Abort() from e
         else:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
@@ -363,7 +365,7 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
         return False
 
 
-class _Abort(Exception):
+class _Abort(Exception):  # noqa: N818
     """Raised when something happens that should interrupt ops execution."""
 
     def __init__(self, *args, exit_code: int = 1):
@@ -473,14 +475,15 @@ class _Manager:
             self,
             dispatcher: _Dispatcher
     ):
-                # If we are in a RelationBroken event, we want to know which relation is
+        # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
         if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
             broken_relation_id = _get_juju_relation_id()
         else:
             broken_relation_id = None
 
-        model = ops.model.Model(self._charm_meta, self._model_backend, broken_relation_id=broken_relation_id)
+        model = ops.model.Model(self._charm_meta, self._model_backend,
+                                broken_relation_id=broken_relation_id)
         store = self._make_storage(dispatcher)
         framework = ops.framework.Framework(store, self._charm_root, self._charm_meta, model,
                                             event_name=dispatcher.event_name)
