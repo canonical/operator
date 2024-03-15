@@ -549,7 +549,6 @@ def main(charm_class: Type[ops.charm.CharmBase],
 
         manager.run()
     except _Abort as e:
-        print(f"aborted with {e.exit_code}")
         sys.exit(e.exit_code)
 
 
