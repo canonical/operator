@@ -131,6 +131,30 @@ class TestCharm(unittest.TestCase):
         # check that the event has been seen by the observer
         self.assertIsInstance(charm.seen, ops.StartEvent)
 
+    def test_observer_not_referenced_warning(self):
+        class MyObj(ops.Object):
+            def __init__(self, charm: ops.CharmBase):
+                super().__init__(charm, "obj")
+                framework.observe(charm.on.start, self._on_start)
+
+            def _on_start(self, _: ops.StartEvent):
+                raise RuntimeError()  # never reached!
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args: typing.Any):
+                super().__init__(*args)
+                MyObj(self)  # not assigned!
+                framework.observe(self.on.start, self._on_start)
+
+            def _on_start(self, _: ops.StartEvent):
+                pass  # is reached
+
+        framework = self.create_framework()
+        c = MyCharm(framework)
+        with self.assertLogs() as logs:
+            c.on.start.emit()
+        assert any('Reference to ops.Object' in log for log in logs.output)
+
     def test_empty_action(self):
         meta = ops.CharmMeta.from_yaml('name: my-charm', '')
         self.assertEqual(meta.actions, {})
