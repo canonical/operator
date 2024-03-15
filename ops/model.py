@@ -281,6 +281,20 @@ class Model:
         content = self._backend.secret_get(id=id, label=label)
         return Secret(self._backend, id=id, label=label, content=content)
 
+    def get_cloud_spec(self) -> 'CloudSpec':
+        """Get cloud credential information.
+
+        Access the cloud credential information and return the cloud specification
+        used by the model.
+
+        Note: It does not work in a "caas" model (container as a service,
+        i.e., containerized environment, Kubernetes charm).
+
+        Raises:
+            :class:`ModelError`: if called in a "caas" model.
+        """
+        return self._backend.credential_get()
+
 
 if typing.TYPE_CHECKING:
     # (entity type, name): instance.
@@ -3507,6 +3521,14 @@ class _ModelBackend:
         else:
             self._run("juju-reboot")
 
+    def credential_get(self) -> 'CloudSpec':
+        """Access cloud credentials. Returns the cloud specification used by the unit's model."""
+        try:
+            result = self._run('credential-get', return_output=True, use_json=True)
+            return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
+        except ModelError:
+            raise
+
 
 class _ModelBackendValidator:
     """Provides facilities for validating inputs and formatting them for model backends."""
@@ -3596,3 +3618,60 @@ class LazyNotice:
         self._notice = self._container.get_notice(self.id)
         assert self._notice.type == self.type
         assert self._notice.key == self.key
+
+
+class CloudSpec:
+    """Cloud credential information (metadata)."""
+
+    def __init__(self,
+                 type: str,
+                 name: str,
+                 region: Optional[str],
+                 endpoint: Optional[str],
+                 is_controller_cloud: Optional[str],
+                 credential: Optional[Dict[str, Any]],
+                 identity_endpoint: Optional[str],
+                 storage_endpoint: Optional[str],
+                 ca_certificates: Optional[List[str]],
+                 skip_tls_verify: Optional[bool],
+                 ):
+        self.type = type
+        self.name = name
+        self.region = region
+        self.endpoint = endpoint
+        self.is_controller_cloud = is_controller_cloud
+        self.credential = credential
+        self.identity_endpoint = identity_endpoint
+        self.storage_endpoint = storage_endpoint
+        self.ca_certificates = ca_certificates
+        self.skip_tls_verify = skip_tls_verify
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
+        """Create new Credential object from dict parsed from JSON."""
+        return cls(
+            type=typing.cast(str, d.get('type')),
+            name=typing.cast(str, d.get('name')),
+            region=d.get('region'),
+            endpoint=d.get('endpoint'),
+            is_controller_cloud=d.get('isControllerCloud'),
+            credential=typing.cast(Optional[Dict[str, Any]], d.get('credential')),
+            identity_endpoint=d.get('identityEndpoint'),
+            storage_endpoint=d.get('storageEndpoint'),
+            ca_certificates=d.get('caACertificates'),
+            skip_tls_verify=d.get('skipTLSVerify'),
+        )
+
+    def __repr__(self):
+        return ('CloudSpec('
+                f'type={self.type!r}, '
+                f'name={self.name!r}, '
+                f'region={self.region!r}, '
+                f'endpoint={self.endpoint!r}, '
+                f'is_controller_cloud={self.is_controller_cloud!r}, '
+                f'credential={self.credential!r}, '
+                f'identity_endpoint={self.identity_endpoint!r}, '
+                f'storage_endpoint={self.storage_endpoint!r}, '
+                f'ca_certificates={self.ca_certificates!r}, '
+                f'skip_tls_verify={self.skip_tls_verify!r})'
+                )
