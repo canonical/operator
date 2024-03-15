@@ -799,9 +799,9 @@ class Harness(Generic[CharmType]):
 
         This function creates a relation with an application and triggers a
         :class:`RelationCreatedEvent <ops.RelationCreatedEvent>`.
-        It also creates a default network binding on this endpoint. If you want
-        to associate a custom network to this binding, provide one using
-        :meth:`add_network` before calling this function.
+        To match Juju's behaviour, it also creates a default network binding on this endpoint.
+        If you want to associate a custom network to this binding (or a global default network),
+        provide one using :meth:`add_network` before calling this function.
 
         If `app_data` or `unit_data` are provided, also add a new unit
         (``<remote_app>/0``) to the relation and trigger
@@ -867,12 +867,14 @@ class Harness(Generic[CharmType]):
             if unit_data is not None:
                 self.update_relation_data(relation_id, remote_unit, unit_data)
 
-        # If we don't already have a network binding for this relation id, create one.
-        if not self._backend._networks.get((relation_name, relation_id)):
-            self.add_network("10.0.0.10", endpoint=relation_name, relation_id=relation_id)
-        # If we don't already have a default network binding for this endpoint, create one.
-        if not self._backend._networks.get((relation_name, None)):
-            self.add_network("192.0.2.0", endpoint=relation_name)
+        # if we have a default network binding configured, respect it.
+        if not self._backend._networks.get((None, None)):
+            # If we don't already have a network binding for this relation id, create one.
+            if not self._backend._networks.get((relation_name, relation_id)):
+                self.add_network("10.0.0.10", endpoint=relation_name, relation_id=relation_id)
+            # If we don't already have a default network binding for this endpoint, create one.
+            if not self._backend._networks.get((relation_name, None)):
+                self.add_network("192.0.2.0", endpoint=relation_name)
 
         return relation_id
 
