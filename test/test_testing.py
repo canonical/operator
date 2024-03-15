@@ -5742,10 +5742,10 @@ class TestCloudSpec(unittest.TestCase):
         harness = ops.testing.Harness(EventRecorder, meta='name: myapp')
         self.addCleanup(harness.cleanup)
         cloud_spec_dict = {
-                "name": "localhost",
-                "type": "lxd",
-                "endpoint": "https://127.0.0.1:8443"
-            }
+            "name": "localhost",
+            "type": "lxd",
+            "endpoint": "https://127.0.0.1:8443"
+        }
         harness.set_cloud_spec(cloud_spec_dict)
         harness.begin()
         result = harness.model.get_cloud_spec()

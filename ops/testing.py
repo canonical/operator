@@ -1891,7 +1891,9 @@ class Harness(Generic[CharmType]):
         return action_under_test.output
 
     def set_cloud_spec(self, content: Dict[str, str]):
+        """Return cloud spec."""
         self._backend._cloud_spec = model.CloudSpec.from_dict(typing.cast(Dict[str, Any], content))
+
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
@@ -2680,10 +2682,11 @@ class _TestingModelBackend:
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle everything after the exit.
         raise SystemExit()
-    
+
     def credential_get(self) -> model.CloudSpec:
         if not self._cloud_spec:
-            raise model.ModelError('ERROR cloud spec is empty, set it with Harness.set_cloud_spec first')
+            raise model.ModelError(
+                'ERROR cloud spec is empty, set it with Harness.set_cloud_spec first')
         return self._cloud_spec
 
 
