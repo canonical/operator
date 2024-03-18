@@ -29,7 +29,7 @@ idna==3.6
     # via requests
 imagesize==1.4.1
     # via sphinx
-importlib-metadata==7.0.2
+importlib-metadata==7.0.1
     # via sphinx
 jinja2==3.1.3
     # via sphinx
@@ -44,7 +44,7 @@ pygments==2.17.2
     #   furo
     #   sphinx
     #   sphinx-tabs
-pytz==2024.1
+pytz==2023.3.post1
     # via babel
 pyyaml==6.0.1
     # via ops (pyproject.toml)
@@ -89,5 +89,5 @@ urllib3==2.1.0
     # via requests
 websocket-client==1.7.0
     # via ops (pyproject.toml)
-zipp==3.18.1
+zipp==3.17.0
     # via importlib-metadata
