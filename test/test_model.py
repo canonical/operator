@@ -3802,34 +3802,6 @@ class TestCloudSpec(unittest.TestCase):
             },
         }
 
-    def test_init(self):
-        cloud_spec = ops.CloudSpec(
-            type="localhost",
-            name="lxd",
-            region='localhost',
-            endpoint='https://127.0.0.1:8443',
-            is_controller_cloud=None,
-            credential=self.credential,
-            identity_endpoint='http://127.0.0.1',
-            storage_endpoint='http://127.0.0.1',
-            ca_certificates=['foo', 'bar'],
-            skip_tls_verify=True,
-        )
-
-        self.assertEqual(cloud_spec.type, 'localhost')
-        self.assertEqual(cloud_spec.name, 'lxd')
-        self.assertEqual(cloud_spec.region, 'localhost')
-        self.assertEqual(cloud_spec.endpoint, 'https://127.0.0.1:8443')
-        self.assertEqual(cloud_spec.credential, self.credential)
-        self.assertEqual(cloud_spec.is_controller_cloud, None)
-        self.assertEqual(cloud_spec.identity_endpoint, 'http://127.0.0.1')
-        self.assertEqual(cloud_spec.storage_endpoint, 'http://127.0.0.1')
-        self.assertEqual(cloud_spec.ca_certificates, ['foo', 'bar'])
-        self.assertEqual(cloud_spec.skip_tls_verify, True)
-
-        self.assertTrue(repr(cloud_spec).startswith('CloudSpec('))
-        self.assertTrue(repr(cloud_spec).endswith(')'))
-
     def test_from_dict(self):
         cloud_spec = ops.CloudSpec.from_dict(
             {

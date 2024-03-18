@@ -3620,31 +3620,20 @@ class LazyNotice:
         assert self._notice.key == self.key
 
 
+@dataclasses.dataclass(frozen=True)
 class CloudSpec:
     """Cloud specification information (metadata) including credentials."""
 
-    def __init__(self,
-                 type: str,
-                 name: str,
-                 region: Optional[str],
-                 endpoint: Optional[str],
-                 is_controller_cloud: Optional[str],
-                 credential: Optional[Dict[str, Any]],
-                 identity_endpoint: Optional[str],
-                 storage_endpoint: Optional[str],
-                 ca_certificates: Optional[List[str]],
-                 skip_tls_verify: Optional[bool],
-                 ):
-        self.type = type
-        self.name = name
-        self.region = region
-        self.endpoint = endpoint
-        self.is_controller_cloud = is_controller_cloud
-        self.credential = credential
-        self.identity_endpoint = identity_endpoint
-        self.storage_endpoint = storage_endpoint
-        self.ca_certificates = ca_certificates
-        self.skip_tls_verify = skip_tls_verify
+    type: str
+    name: str
+    region: Optional[str]
+    endpoint: Optional[str]
+    is_controller_cloud: Optional[str]
+    credential: Optional[Dict[str, Any]]
+    identity_endpoint: Optional[str]
+    storage_endpoint: Optional[str]
+    ca_certificates: Optional[List[str]]
+    skip_tls_verify: Optional[bool]
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
@@ -3661,17 +3650,3 @@ class CloudSpec:
             ca_certificates=d.get('caACertificates'),
             skip_tls_verify=d.get('skipTLSVerify'),
         )
-
-    def __repr__(self):
-        return ('CloudSpec('
-                f'type={self.type!r}, '
-                f'name={self.name!r}, '
-                f'region={self.region!r}, '
-                f'endpoint={self.endpoint!r}, '
-                f'is_controller_cloud={self.is_controller_cloud!r}, '
-                f'credential={self.credential!r}, '
-                f'identity_endpoint={self.identity_endpoint!r}, '
-                f'storage_endpoint={self.storage_endpoint!r}, '
-                f'ca_certificates={self.ca_certificates!r}, '
-                f'skip_tls_verify={self.skip_tls_verify!r})'
-                )
