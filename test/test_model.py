@@ -3805,7 +3805,7 @@ class TestCloudCredential(unittest.TestCase):
     def test_from_dict(self):
         cloud_cred = ops.CloudCredential.from_dict(self.cloud_credential_dict)
         self.assertEqual(cloud_cred.auth_type, 'certificate')
-        self.assertEqual(cloud_cred.attributes, self.cloud_credential_dict.get('attributes'))
+        self.assertEqual(cloud_cred.attributes, self.cloud_credential_dict.get('attrs'))
 
 
 class TestCloudSpec(unittest.TestCase):
