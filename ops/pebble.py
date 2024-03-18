@@ -1316,11 +1316,11 @@ class NoticeType(enum.Enum):
     CUSTOM = 'custom'
 
 
-class NoticesSelect(enum.Enum):
-    """Enum of :meth:`Client.get_notices` ``select`` values."""
+class NoticesUsers(enum.Enum):
+    """Enum of :meth:`Client.get_notices` ``users`` values."""
 
     ALL = 'all'
-    """Select notices from all users (any user ID, including public notices).
+    """Return notices from all users (any user ID, including public notices).
 
     This only works for Pebble admins (for example, root).
     """
@@ -2803,7 +2803,7 @@ class Client:
     def get_notices(
         self,
         *,
-        select: Optional[NoticesSelect] = None,
+        users: Optional[NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -2824,7 +2824,7 @@ class Client:
         type has nanosecond precision).
 
         Args:
-            select: Select which notices to return (instead of returning
+            users: Change which users' notices to return (instead of returning
                 notices for the current user).
             user_id: Filter for notices for the specified user, including
                 public notices (only works for Pebble admins).
@@ -2832,8 +2832,8 @@ class Client:
             keys: Filter for notices with any of the specified keys.
         """
         query: Dict[str, Union[str, List[str]]] = {}
-        if select is not None:
-            query['select'] = select.value
+        if users is not None:
+            query['users'] = users.value
         if user_id is not None:
             query['user-id'] = str(user_id)
         if types is not None:

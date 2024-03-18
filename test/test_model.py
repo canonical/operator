@@ -1977,7 +1977,7 @@ containers:
 
         notices = self.container.get_notices(
             user_id=1000,
-            select=pebble.NoticesSelect.ALL,
+            users=pebble.NoticesUsers.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
         )
@@ -1988,7 +1988,7 @@ containers:
 
         self.assertEqual(self.pebble.requests, [('get_notices', dict(
             user_id=1000,
-            select=pebble.NoticesSelect.ALL,
+            users=pebble.NoticesUsers.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
         ))])
