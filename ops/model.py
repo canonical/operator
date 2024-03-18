@@ -3635,8 +3635,8 @@ class CloudCredential:
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
         """Create a new CloudCredential object from a dictionary."""
         return cls(
-            auth_type=d.get('authtype', ""),
-            attributes=d.get('attributes', {}),
+            auth_type=d.get('auth-type', ''),
+            attributes=d.get('attrs', {}),
             redacted=d.get('redacted', []),
         )
 
@@ -3665,7 +3665,7 @@ class CloudSpec:
             region=d.get('region'),
             endpoint=d.get('endpoint'),
             is_controller_cloud=d.get('isControllerCloud'),
-            credential=CloudCredential.from_dict(d.get('credential', {})),
+            credential=CloudCredential.from_dict(typing.cast(Dict[str, Any], d.get('credential'))),
             identity_endpoint=d.get('identityEndpoint'),
             storage_endpoint=d.get('storageEndpoint'),
             ca_certificates=d.get('caACertificates'),

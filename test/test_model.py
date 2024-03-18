@@ -3794,8 +3794,8 @@ class TestLazyNotice(unittest.TestCase):
 class TestCloudCredential(unittest.TestCase):
     def setUp(self) -> None:
         self.cloud_credential_dict = {
-            'authtype': 'certificate',
-            'attributes': {
+            'auth-type': 'certificate',
+            'attrs': {
                 'client-cert': 'foo',
                 'client-key': 'bar',
                 'server-cert': 'baz'
@@ -3811,7 +3811,7 @@ class TestCloudCredential(unittest.TestCase):
 class TestCloudSpec(unittest.TestCase):
     def setUp(self) -> None:
         self.cloud_credential_dict = {
-            'authtype': 'certificate',
+            'auth-type': 'certificate',
             'attrs': {
                 'client-cert': 'foo',
                 'client-key': 'bar',
