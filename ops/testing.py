@@ -1890,7 +1890,7 @@ class Harness(Generic[CharmType]):
                 output=action_under_test.output)
         return action_under_test.output
 
-    def set_cloud_spec(self, content: Dict[str, str]):
+    def set_cloud_spec(self, spec: 'model.CloudSpec'):
         """Set cloud specification (metadata) including credentials.
 
         Call this method before trying to call :meth:`ops.Model.get_cloud_spec`.
@@ -1910,15 +1910,18 @@ class Harness(Generic[CharmType]):
                     self.addCleanup(self.harness.cleanup)
 
                 def test_start(self):
-                    self.harness.set_cloud_spec(
-                        {"name": "lxd", "type": "lxd", "endpoint": "https://127.0.0.1:8443"}
-                    )
+                    cloud_spec_dict = {
+                        "name": "localhost",
+                        "type": "lxd",
+                        "endpoint": "https://127.0.0.1:8443"
+                    }
+                    self.harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
                     self.harness.begin_with_initial_hooks()
                     cloud_spec = self.harness.model.get_cloud_spec()
                     ...
 
         """
-        self._backend._cloud_spec = model.CloudSpec.from_dict(typing.cast(Dict[str, Any], content))
+        self._backend._cloud_spec = spec
 
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:

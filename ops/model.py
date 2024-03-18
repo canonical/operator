@@ -3526,11 +3526,8 @@ class _ModelBackend:
 
         Returns the cloud specification used by the model.
         """
-        try:
-            result = self._run('credential-get', return_output=True, use_json=True)
-            return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
-        except ModelError:
-            raise
+        result = self._run('credential-get', return_output=True, use_json=True)
+        return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
 
 
 class _ModelBackendValidator:

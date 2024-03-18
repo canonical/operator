@@ -5746,7 +5746,7 @@ class TestCloudSpec(unittest.TestCase):
             "type": "lxd",
             "endpoint": "https://127.0.0.1:8443"
         }
-        harness.set_cloud_spec(cloud_spec_dict)
+        harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
         harness.begin()
         result = harness.model.get_cloud_spec()
         expected = ops.model.CloudSpec.from_dict(cloud_spec_dict)
