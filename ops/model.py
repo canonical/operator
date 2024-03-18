@@ -3621,6 +3621,27 @@ class LazyNotice:
 
 
 @dataclasses.dataclass(frozen=True)
+class CloudCredential:
+    """CloudCredential contains a cloud credential possibly with secrets redacted.
+
+    Used as the type of attribute `credential` in `CloudSpec`, see below.
+    """
+
+    auth_type: str
+    attributes: Dict[str, Any]
+    redacted: List[str]
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
+        """Create a new CloudCredential object from a dictionary."""
+        return cls(
+            auth_type=d.get('authtype', ""),
+            attributes=d.get('attributes', {}),
+            redacted=d.get('redacted', []),
+        )
+
+
+@dataclasses.dataclass(frozen=True)
 class CloudSpec:
     """Cloud specification information (metadata) including credentials."""
 
@@ -3629,7 +3650,7 @@ class CloudSpec:
     region: Optional[str]
     endpoint: Optional[str]
     is_controller_cloud: Optional[str]
-    credential: Optional[Dict[str, Any]]
+    credential: Optional[CloudCredential]
     identity_endpoint: Optional[str]
     storage_endpoint: Optional[str]
     ca_certificates: Optional[List[str]]
@@ -3637,14 +3658,14 @@ class CloudSpec:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
-        """Create new CloudSpec object from a dict parsed from JSON."""
+        """Create a new CloudSpec object from a dict parsed from JSON."""
         return cls(
             type=typing.cast(str, d.get('type')),
             name=typing.cast(str, d.get('name')),
             region=d.get('region'),
             endpoint=d.get('endpoint'),
             is_controller_cloud=d.get('isControllerCloud'),
-            credential=typing.cast(Optional[Dict[str, Any]], d.get('credential')),
+            credential=CloudCredential.from_dict(d.get('credential', {})),
             identity_endpoint=d.get('identityEndpoint'),
             storage_endpoint=d.get('storageEndpoint'),
             ca_certificates=d.get('caACertificates'),

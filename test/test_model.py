@@ -3791,10 +3791,27 @@ class TestLazyNotice(unittest.TestCase):
         )
 
 
+class TestCloudCredential(unittest.TestCase):
+    def setUp(self) -> None:
+        self.cloud_credential_dict = {
+            'authtype': 'certificate',
+            'attributes': {
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz'
+            },
+        }
+
+    def test_from_dict(self):
+        cloud_cred = ops.CloudCredential.from_dict(self.cloud_credential_dict)
+        self.assertEqual(cloud_cred.auth_type, 'certificate')
+        self.assertEqual(cloud_cred.attributes, self.cloud_credential_dict.get('attributes'))
+
+
 class TestCloudSpec(unittest.TestCase):
     def setUp(self) -> None:
-        self.credential = {
-            'auth-type': 'certificate',
+        self.cloud_credential_dict = {
+            'authtype': 'certificate',
             'attrs': {
                 'client-cert': 'foo',
                 'client-key': 'bar',
@@ -3810,7 +3827,7 @@ class TestCloudSpec(unittest.TestCase):
                 'region': 'localhost',
                 'endpoint': 'https://10.76.251.1:8443',
                 'isControllerCloud': None,
-                'credential': self.credential,
+                'credential': self.cloud_credential_dict,
                 'identityEndpoint': None,
                 'storageEndpoint': None,
                 'caACertificates': None,
@@ -3826,7 +3843,10 @@ class TestCloudSpec(unittest.TestCase):
         self.assertEqual(cloud_spec.storage_endpoint, None)
         self.assertEqual(cloud_spec.ca_certificates, None)
         self.assertEqual(cloud_spec.skip_tls_verify, None)
-        self.assertEqual(cloud_spec.credential, self.credential)
+        self.assertEqual(
+            cloud_spec.credential,
+            ops.CloudCredential.from_dict(
+                self.cloud_credential_dict))
 
 
 class TestGetCloudSpec(unittest.TestCase):

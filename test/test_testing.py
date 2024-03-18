@@ -5742,9 +5742,17 @@ class TestCloudSpec(unittest.TestCase):
         harness = ops.testing.Harness(EventRecorder, meta='name: myapp')
         self.addCleanup(harness.cleanup)
         cloud_spec_dict = {
-            "name": "localhost",
-            "type": "lxd",
-            "endpoint": "https://127.0.0.1:8443"
+            'name': 'localhost',
+            'type': 'lxd',
+            'endpoint': 'https://127.0.0.1:8443',
+            'credential': {
+                'authtype': 'certificate',
+                'attrs': {
+                    'client-cert': 'foo',
+                    'client-key': 'bar',
+                    'server-cert': 'baz'
+                },
+            },
         }
         harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
         harness.begin()
