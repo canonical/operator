@@ -1,3 +1,7 @@
+# 2.12.0
+
+* Updated Pebble Notices `get_notices` parameter name to `users=all` (previously `select=all`).
+
 # 2.11.0
 
 * `StopEvent`, `RemoveEvent`, and all `LifeCycleEvent`s are no longer deferrable, and will raise a `RuntimeError` if `defer()` is called on the event object.

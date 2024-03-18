@@ -975,7 +975,7 @@ class Harness(Generic[CharmType]):
                                'but no relation matching that name was found.')
 
         self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
-        app = cast(model.Application, relation.app)  # should not be None since we're testing
+        app = relation.app
         if not remote_unit_name.startswith(app.name):
             warnings.warn(
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
@@ -3378,7 +3378,7 @@ class _TestingPebbleClient:
     def get_notices(
         self,
         *,
-        select: Optional[pebble.NoticesSelect] = None,
+        users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -3388,9 +3388,9 @@ class _TestingPebbleClient:
         filter_user_id = 0  # default is to filter by request UID (root)
         if user_id is not None:
             filter_user_id = user_id
-        if select is not None:
+        if users is not None:
             if user_id is not None:
-                raise self._api_error(400, 'cannot use both "select" and "user_id"')
+                raise self._api_error(400, 'cannot use both "users" and "user_id"')
             filter_user_id = None
 
         if types is not None:
