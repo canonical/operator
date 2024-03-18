@@ -405,7 +405,11 @@ class Harness(Generic[CharmType]):
         for storage_name in self._meta.storages:
             for storage_index in self._backend.storage_list(storage_name, include_detached=True):
                 s = model.Storage(storage_name, storage_index, self._backend)
-                self.attach_storage(s.full_id)
+                if self._backend._storage_is_attached(storage_name, storage_index):
+                    # Attaching was done already, but we still need the event to be emitted.
+                    self.charm.on[storage_name].storage_attached.emit(s)
+                else:
+                    self.attach_storage(s.full_id)
         # Storage done, emit install event
         charm.on.install.emit()
 
@@ -690,8 +694,8 @@ class Harness(Generic[CharmType]):
         Args:
             storage_name: The storage backend name on the Charm
             count: Number of disks being added
-            attach: True to also attach the storage mount and emit storage-attached if
-                harness.begin() has been called.
+            attach: True to also attach the storage mount; if :meth:`begin`
+                has been called a True value will also emit storage-attached
 
         Return:
             A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
@@ -739,12 +743,12 @@ class Harness(Generic[CharmType]):
         """Attach a storage device.
 
         The intent of this function is to simulate a ``juju attach-storage`` call.
-        It will trigger a storage-attached hook if the storage unit in question exists
+        If called after :meth:`begin` and hooks are not disabled, it will trigger
+        a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
 
         The test harness uses symbolic links to imitate storage mounts, which may lead to some
-        inconsistencies compared to the actual charm. Users should be cognizant of
-        this potential discrepancy.
+        inconsistencies compared to the actual charm.
 
         Args:
             storage_id: The full storage ID of the storage unit being attached, including the
@@ -2339,7 +2343,17 @@ class _TestingModelBackend:
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
                     target_dir = pathlib.Path(store["location"])
                     target_dir.mkdir(parents=True, exist_ok=True)
-                    mounting_dir.symlink_to(target_dir)
+                    try:
+                        mounting_dir.symlink_to(target_dir, target_is_directory=True)
+                    except FileExistsError:
+                        # If the symlink is already the one we want, then we
+                        # don't need to do anything here.
+                        # NOTE: In Python 3.9, this can use `mounting_dir.readlink()`
+                        if (
+                            not mounting_dir.is_symlink()
+                            or os.readlink(mounting_dir) != str(target_dir)
+                        ):
+                            raise
 
         index = int(index)
         if not self._storage_is_attached(name, index):
