@@ -282,13 +282,13 @@ class Model:
         return Secret(self._backend, id=id, label=label, content=content)
 
     def get_cloud_spec(self) -> 'CloudSpec':
-        """Get cloud credential information.
+        """Get details of the cloud in which the model is deployed.
 
-        Access the cloud credential information and return the cloud specification
-        used by the model.
+        Returns a specification for the cloud in which the model is deployed,
+        including access credential information.
 
-        Note: It does not work in a "CaaS" model (Container-as-a-Service,
-        i.e., containerized environment, Kubernetes charm).
+        Note: This information is only available for machine charms,
+        not Kubernetes sidecar charms.
 
         Raises:
             :class:`ModelError`: if called in a "CaaS" model.
@@ -3524,7 +3524,7 @@ class _ModelBackend:
     def credential_get(self) -> 'CloudSpec':
         """Access cloud credentials by running the credential-get hook tool.
 
-        Returns the cloud specification used by the unit's model.
+        Returns the cloud specification used by the model.
         """
         try:
             result = self._run('credential-get', return_output=True, use_json=True)

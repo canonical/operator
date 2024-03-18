@@ -1893,9 +1893,16 @@ class Harness(Generic[CharmType]):
     def set_cloud_spec(self, content: Dict[str, str]):
         """Set cloud specification (metadata) including credentials.
 
-        Call this method before trying to call `Harness.Model.get_cloud_spec`.
+        Call this method before trying to call :meth:`ops.Model.get_cloud_spec`.
 
         Example usage::
+
+            class MyVMCharm(ops.CharmBase):
+                ...
+                def _on_start(self, event: ops.StartEvent):
+                    spec = self.model.get_cloud_spec()
+                    ....
+
 
             class TestCharm(unittest.TestCase):
                 def setUp(self):
@@ -1908,20 +1915,7 @@ class Harness(Generic[CharmType]):
                     )
                     self.harness.begin_with_initial_hooks()
                     cloud_spec = self.harness.model.get_cloud_spec()
-                    expected = ops.CloudSpec(
-                        name="lxd",
-                        type="lxd",
-                        region=None,
-                        endpoint="https://127.0.0.1:8443",
-                        is_controller_cloud=None,
-                        credential=None,
-                        identity_endpoint=None,
-                        storage_endpoint=None,
-                        ca_certificates=None,
-                        skip_tls_verify=None,
-                    )
-                    self.assertEqual(repr(cloud_spec), repr(expected))
-                    self.assertEqual(self.harness.model.unit.status, ops.ActiveStatus())
+                    ...
 
         """
         self._backend._cloud_spec = model.CloudSpec.from_dict(typing.cast(Dict[str, Any], content))
@@ -2141,7 +2135,7 @@ class _TestingModelBackend:
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
-        # for `Model.get_cloud_spec`, initialized to None
+        # For `Model.get_cloud_spec`, initialised to None.
         self._cloud_spec: Optional[model.CloudSpec] = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
@@ -2719,7 +2713,7 @@ class _TestingModelBackend:
     def credential_get(self) -> model.CloudSpec:
         if not self._cloud_spec:
             raise model.ModelError(
-                'ERROR cloud spec is empty, set it with Harness.set_cloud_spec first')
+                'ERROR cloud spec is empty, set it with `Harness.set_cloud_spec()` first')
         return self._cloud_spec
 
 
