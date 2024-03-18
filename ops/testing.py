@@ -962,7 +962,7 @@ class Harness(Generic[CharmType]):
                                'but no relation matching that name was found.')
 
         self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
-        app = cast(model.Application, relation.app)  # should not be None since we're testing
+        app = relation.app
         if not remote_unit_name.startswith(app.name):
             warnings.warn(
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
