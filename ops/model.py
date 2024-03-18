@@ -3665,7 +3665,7 @@ class CloudSpec:
             region=d.get('region'),
             endpoint=d.get('endpoint'),
             is_controller_cloud=d.get('isControllerCloud'),
-            credential=CloudCredential.from_dict(typing.cast(Dict[str, Any], d.get('credential'))),
+            credential=CloudCredential.from_dict(d.get('credential', {})),
             identity_endpoint=d.get('identityEndpoint'),
             storage_endpoint=d.get('storageEndpoint'),
             ca_certificates=d.get('caACertificates'),
