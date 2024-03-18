@@ -282,6 +282,10 @@ storage:
     multiple:
       range: 2-
     type: filesystem
+  stor-plus:
+    multiple:
+      range: 10+
+    type: filesystem
 ''')
 
         fake_script(
@@ -329,6 +333,7 @@ storage:
         self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
         self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
         self.assertEqual(self.meta.storages['stor-4'].multiple_range, (2, 4))
+        self.assertEqual(self.meta.storages['stor-plus'].multiple_range, (10, None))
 
         charm = MyCharm(self.create_framework())
 
