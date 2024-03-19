@@ -3623,14 +3623,26 @@ class LazyNotice:
 
 @dataclasses.dataclass(frozen=True)
 class CloudCredential:
-    """CloudCredential contains a cloud credential possibly with secrets redacted.
+    """Credentials for cloud.
+
+    Note that the credential might contain redacted secrets in the `redacted` field.
 
     Used as the type of attribute `credential` in :class:`CloudSpec`.
     """
 
     auth_type: str
+    """Authentication type."""
+
     attributes: Dict[str, str]
+    """A dictionary containing cloud credentials.
+
+    For example, for AWS, it contains `access-key` and `secret-key`;
+    for Azure, `application-id`, `application-password` and `subscription-id`
+    can be found here.
+    """
+
     redacted: List[str]
+    """A list of redacted secrets."""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
@@ -3647,15 +3659,34 @@ class CloudSpec:
     """Cloud specification information (metadata) including credentials."""
 
     type: str
+    """Type of the cloud."""
+
     name: str
+    """Juju cloud name."""
+
     region: Optional[str]
+    """Region of the cloud."""
+
     endpoint: Optional[str]
+    """Endpoint of the cloud."""
+
     identity_endpoint: Optional[str]
+    """Identity endpoint of the cloud."""
+
     storage_endpoint: Optional[str]
+    """Storage endpoint of the cloud."""
+
     credential: Optional[CloudCredential]
+    """Cloud credentials, an object of type :class:`CloudCredential`."""
+
     ca_certificates: List[str]
+    """A list of CA certificates."""
+
     skip_tls_verify: bool
+    """Whether to skip TLS verfication, boolean, defaults to False."""
+
     is_controller_cloud: bool
+    """If this is the cloud used by the controller, defaults to False."""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
