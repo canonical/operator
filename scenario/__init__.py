@@ -10,7 +10,6 @@ from scenario.state import (
     DeferredEvent,
     Event,
     ExecOutput,
-    InjectRelation,
     Model,
     Mount,
     Network,
@@ -51,5 +50,4 @@ __all__ = [
     "State",
     "DeferredEvent",
     "Event",
-    "InjectRelation",
 ]
