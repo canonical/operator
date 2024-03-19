@@ -284,14 +284,15 @@ class Model:
     def get_cloud_spec(self) -> 'CloudSpec':
         """Get details of the cloud in which the model is deployed.
 
-        Returns a specification for the cloud in which the model is deployed,
-        including access credential information.
-
         Note: This information is only available for machine charms,
         not Kubernetes sidecar charms.
 
+        Returns:
+            a specification for the cloud in which the model is deployed,
+            including credential information.
+
         Raises:
-            :class:`ModelError`: if called in a "CaaS" model.
+            :class:`ModelError`: if called in a Kubernetes model.
         """
         return self._backend.credential_get()
 
@@ -3624,20 +3625,20 @@ class LazyNotice:
 class CloudCredential:
     """CloudCredential contains a cloud credential possibly with secrets redacted.
 
-    Used as the type of attribute `credential` in `CloudSpec`, see below.
+    Used as the type of attribute `credential` in :class:`CloudSpec`.
     """
 
     auth_type: str
-    attributes: Dict[str, Any]
+    attributes: Dict[str, str]
     redacted: List[str]
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
         """Create a new CloudCredential object from a dictionary."""
         return cls(
-            auth_type=d.get('auth-type', ''),
-            attributes=d.get('attrs', {}),
-            redacted=d.get('redacted', []),
+            auth_type=d.get('auth-type') or '',
+            attributes=d.get('attrs') or {},
+            redacted=d.get('redacted') or [],
         )
 
 
@@ -3662,12 +3663,12 @@ class CloudSpec:
         return cls(
             type=typing.cast(str, d.get('type')),
             name=typing.cast(str, d.get('name')),
-            region=d.get('region'),
-            endpoint=d.get('endpoint'),
-            is_controller_cloud=d.get('isControllerCloud'),
-            credential=CloudCredential.from_dict(d.get('credential', {})),
-            identity_endpoint=d.get('identityEndpoint'),
-            storage_endpoint=d.get('storageEndpoint'),
-            ca_certificates=d.get('caACertificates'),
-            skip_tls_verify=d.get('skipTLSVerify'),
+            region=d.get('region') or '',
+            endpoint=d.get('endpoint') or '',
+            is_controller_cloud=d.get('isControllerCloud') or '',
+            credential=CloudCredential.from_dict(d.get('credential') or {}),
+            identity_endpoint=d.get('identityEndpoint') or '',
+            storage_endpoint=d.get('storageEndpoint') or '',
+            ca_certificates=d.get('caACertificates') or [],
+            skip_tls_verify=d.get('skipTLSVerify') or None,
         )

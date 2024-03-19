@@ -5738,8 +5738,16 @@ class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMix
 
 
 class TestCloudSpec(unittest.TestCase):
-    def test_get_set_cloud_spec(self):
-        harness = ops.testing.Harness(EventRecorder, meta='name: myapp')
+    def test_set_cloud_spec(self):
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.start, self._on_start)
+
+            def _on_start(self, event: ops.StartEvent):
+                self.cloud_spec = self.model.get_cloud_spec()
+
+        harness = ops.testing.Harness(TestCharm)
         self.addCleanup(harness.cleanup)
         cloud_spec_dict = {
             'name': 'localhost',
@@ -5756,12 +5764,11 @@ class TestCloudSpec(unittest.TestCase):
         }
         harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
         harness.begin()
-        result = harness.model.get_cloud_spec()
-        expected = ops.model.CloudSpec.from_dict(cloud_spec_dict)
-        self.assertEqual(repr(result), repr(expected))
+        harness.charm.on.start.emit()
+        self.assertEqual(harness.charm.cloud_spec, ops.model.CloudSpec.from_dict(cloud_spec_dict))
 
     def test_get_cloud_spec_without_set_error(self):
-        harness = ops.testing.Harness(EventRecorder, meta='name: myapp')
+        harness = ops.testing.Harness(ops.CharmBase)
         self.addCleanup(harness.cleanup)
         harness.begin()
         with self.assertRaises(ops.ModelError):

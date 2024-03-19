@@ -3838,10 +3838,10 @@ class TestCloudSpec(unittest.TestCase):
         self.assertEqual(cloud_spec.name, 'localhost')
         self.assertEqual(cloud_spec.region, 'localhost')
         self.assertEqual(cloud_spec.endpoint, 'https://10.76.251.1:8443')
-        self.assertEqual(cloud_spec.is_controller_cloud, None)
-        self.assertEqual(cloud_spec.identity_endpoint, None)
-        self.assertEqual(cloud_spec.storage_endpoint, None)
-        self.assertEqual(cloud_spec.ca_certificates, None)
+        self.assertEqual(cloud_spec.is_controller_cloud, '')
+        self.assertEqual(cloud_spec.identity_endpoint, '')
+        self.assertEqual(cloud_spec.storage_endpoint, '')
+        self.assertEqual(cloud_spec.ca_certificates, [])
         self.assertEqual(cloud_spec.skip_tls_verify, None)
         self.assertEqual(
             cloud_spec.credential,
