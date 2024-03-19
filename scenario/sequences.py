@@ -12,9 +12,7 @@ from scenario.state import (
     BREAK_ALL_RELATIONS,
     CREATE_ALL_RELATIONS,
     DETACH_ALL_STORAGES,
-    META_EVENTS,
     Event,
-    InjectRelation,
     State,
 )
 
@@ -32,20 +30,18 @@ def decompose_meta_event(meta_event: Event, state: State):
         logger.warning(f"meta-event {meta_event.name} not supported yet")
         return
 
-    if meta_event.name in [CREATE_ALL_RELATIONS, BREAK_ALL_RELATIONS]:
+    is_rel_created_meta_event = meta_event.name == CREATE_ALL_RELATIONS
+    is_rel_broken_meta_event = meta_event.name == BREAK_ALL_RELATIONS
+    if is_rel_broken_meta_event:
         for relation in state.relations:
-            event = Event(
-                relation.endpoint + META_EVENTS[meta_event.name],
-                args=(
-                    # right now, the Relation object hasn't been created by ops yet, so we
-                    # can't pass it down.
-                    # this will be replaced by a Relation instance before the event is fired.
-                    InjectRelation(relation.endpoint, relation.relation_id),
-                ),
-            )
+            event = relation.broken_event
             logger.debug(f"decomposed meta {meta_event.name}: {event}")
             yield event, state.copy()
-
+    elif is_rel_created_meta_event:
+        for relation in state.relations:
+            event = relation.created_event
+            logger.debug(f"decomposed meta {meta_event.name}: {event}")
+            yield event, state.copy()
     else:
         raise RuntimeError(f"unknown meta-event {meta_event.name}")
 

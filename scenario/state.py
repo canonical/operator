@@ -1465,31 +1465,3 @@ def deferred(
     if isinstance(event, str):
         event = Event(event, relation=relation, container=container)
     return event.deferred(handler=handler, event_id=event_id)
-
-
-@dataclasses.dataclass(frozen=True)
-class Inject(_DCBase):
-    """Base class for injectors: special placeholders used to tell harness_ctx
-    to inject instances that can't be retrieved in advance in event args or kwargs.
-    """
-
-
-@dataclasses.dataclass(frozen=True)
-class InjectRelation(Inject):
-    relation_name: str
-    relation_id: Optional[int] = None
-
-
-def _derive_args(event_name: str):
-    args = []
-    for term in RELATION_EVENTS_SUFFIX:
-        # fixme: we can't disambiguate between relation id-s.
-        if event_name.endswith(term):
-            args.append(InjectRelation(relation_name=event_name[: -len(term)]))
-
-    return tuple(args)
-
-
-# todo: consider
-#  def get_containers_from_metadata(CharmType, can_connect: bool = False) -> List[Container]:
-#     pass
