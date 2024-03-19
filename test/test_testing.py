@@ -5881,10 +5881,10 @@ class TestCloudSpec(unittest.TestCase):
                 },
             },
         }
-        harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
+        harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
         harness.begin()
         harness.charm.on.start.emit()
-        self.assertEqual(harness.charm.cloud_spec, ops.model.CloudSpec.from_dict(cloud_spec_dict))
+        self.assertEqual(harness.charm.cloud_spec, ops.CloudSpec.from_dict(cloud_spec_dict))
 
     def test_get_cloud_spec_without_set_error(self):
         harness = ops.testing.Harness(ops.CharmBase)

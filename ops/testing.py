@@ -1914,16 +1914,17 @@ class Harness(Generic[CharmType]):
     def set_cloud_spec(self, spec: 'model.CloudSpec'):
         """Set cloud specification (metadata) including credentials.
 
-        Call this method before trying to call :meth:`ops.Model.get_cloud_spec`.
+        Call this method before the charm calls :meth:`ops.Model.get_cloud_spec`.
 
         Example usage::
 
             class MyVMCharm(ops.CharmBase):
-                ...
-                def _on_start(self, event: ops.StartEvent):
-                    spec = self.model.get_cloud_spec()
-                    ....
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.start, self._on_start)
 
+                def _on_start(self, event: ops.StartEvent):
+                    self.cloud_spec = self.model.get_cloud_spec()
 
             class TestCharm(unittest.TestCase):
                 def setUp(self):
@@ -1932,14 +1933,23 @@ class Harness(Generic[CharmType]):
 
                 def test_start(self):
                     cloud_spec_dict = {
-                        "name": "localhost",
-                        "type": "lxd",
-                        "endpoint": "https://127.0.0.1:8443"
+                        'name': 'localhost',
+                        'type': 'lxd',
+                        'endpoint': 'https://127.0.0.1:8443',
+                        'credential': {
+                            'authtype': 'certificate',
+                            'attrs': {
+                                'client-cert': 'foo',
+                                'client-key': 'bar',
+                                'server-cert': 'baz'
+                            },
+                        },
                     }
-                    self.harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
-                    self.harness.begin_with_initial_hooks()
-                    cloud_spec = self.harness.model.get_cloud_spec()
-                    ...
+                    self.harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
+                    self.harness.begin()
+                    self.harness.charm.on.start.emit()
+                    expected = ops.CloudSpec.from_dict(cloud_spec_dict)
+                    self.assertEqual(harness.charm.cloud_spec, expected)
 
         """
         self._backend._cloud_spec = spec
@@ -2159,7 +2169,6 @@ class _TestingModelBackend:
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
-        # For `Model.get_cloud_spec`, initialised to None.
         self._cloud_spec: Optional[model.CloudSpec] = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):

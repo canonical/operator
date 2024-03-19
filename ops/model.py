@@ -3650,25 +3650,25 @@ class CloudSpec:
     name: str
     region: Optional[str]
     endpoint: Optional[str]
-    is_controller_cloud: Optional[str]
-    credential: Optional[CloudCredential]
     identity_endpoint: Optional[str]
     storage_endpoint: Optional[str]
-    ca_certificates: Optional[List[str]]
-    skip_tls_verify: Optional[bool]
+    credential: Optional[CloudCredential]
+    ca_certificates: List[str]
+    skip_tls_verify: bool
+    is_controller_cloud: bool
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
         """Create a new CloudSpec object from a dict parsed from JSON."""
         return cls(
-            type=typing.cast(str, d.get('type')),
-            name=typing.cast(str, d.get('name')),
+            type=d['type'],
+            name=d['name'],
             region=d.get('region') or '',
             endpoint=d.get('endpoint') or '',
-            is_controller_cloud=d.get('isControllerCloud') or '',
+            identity_endpoint=d.get('identity-endpoint') or '',
+            storage_endpoint=d.get('storage-endpoint') or '',
             credential=CloudCredential.from_dict(d.get('credential') or {}),
-            identity_endpoint=d.get('identityEndpoint') or '',
-            storage_endpoint=d.get('storageEndpoint') or '',
-            ca_certificates=d.get('caACertificates') or [],
-            skip_tls_verify=d.get('skipTLSVerify') or None,
+            ca_certificates=d.get('cacertificates') or [],
+            skip_tls_verify=d.get('skip-tls-verify') or False,
+            is_controller_cloud=d.get('is-controller-cloud') or False,
         )
