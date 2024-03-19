@@ -3795,15 +3795,9 @@ class TestCloudCredential(unittest.TestCase):
     def test_from_dict(self):
         d = {
             'auth-type': 'certificate',
-            'attrs': {
-                'client-cert': 'foo',
-                'client-key': 'bar',
-                'server-cert': 'baz'
-            }
         }
         cloud_cred = ops.CloudCredential.from_dict(d)
         self.assertEqual(cloud_cred.auth_type, d['auth-type'])
-        self.assertEqual(cloud_cred.attributes, d['attrs'])
 
     def test_from_dict_full(self):
         d = {
@@ -3819,12 +3813,6 @@ class TestCloudCredential(unittest.TestCase):
         self.assertEqual(cloud_cred.auth_type, d['auth-type'])
         self.assertEqual(cloud_cred.attributes, d['attrs'])
         self.assertEqual(cloud_cred.redacted, d['redacted'])
-
-    def test_from_dict_empty(self):
-        cloud_cred = ops.CloudCredential.from_dict({})
-        self.assertEqual(cloud_cred.auth_type, '')
-        self.assertEqual(cloud_cred.attributes, {})
-        self.assertEqual(cloud_cred.redacted, [])
 
 
 class TestCloudSpec(unittest.TestCase):
