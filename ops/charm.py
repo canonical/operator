@@ -1540,7 +1540,9 @@ class StorageMeta:
         self.multiple_range = None
         if 'multiple' in raw:
             range = raw['multiple']['range']
-            if '-' not in range:
+            if range[-1] == '+':
+                self.multiple_range = (int(range[:-1]), None)
+            elif '-' not in range:
                 self.multiple_range = (int(range), int(range))
             else:
                 range = range.split('-')
