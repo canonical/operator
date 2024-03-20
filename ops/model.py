@@ -3625,15 +3625,13 @@ class LazyNotice:
 class CloudCredential:
     """Credentials for cloud.
 
-    Note that the credential might contain redacted secrets in the `redacted` field.
-
     Used as the type of attribute `credential` in :class:`CloudSpec`.
     """
 
     auth_type: str
     """Authentication type."""
 
-    attributes: Dict[str, str]
+    attributes: Optional[Dict[str, str]] = dataclasses.field(default_factory=dict)
     """A dictionary containing cloud credentials.
 
     For example, for AWS, it contains `access-key` and `secret-key`;
@@ -3641,14 +3639,14 @@ class CloudCredential:
     can be found here.
     """
 
-    redacted: List[str]
+    redacted: Optional[List[str]] = dataclasses.field(default_factory=list)
     """A list of redacted secrets."""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
         """Create a new CloudCredential object from a dictionary."""
         return cls(
-            auth_type=d.get('auth-type') or '',
+            auth_type=d['auth-type'],
             attributes=d.get('attrs') or {},
             redacted=d.get('redacted') or [],
         )
@@ -3664,28 +3662,28 @@ class CloudSpec:
     name: str
     """Juju cloud name."""
 
-    region: Optional[str]
+    region: Optional[str] = None
     """Region of the cloud."""
 
-    endpoint: Optional[str]
+    endpoint: Optional[str] = None
     """Endpoint of the cloud."""
 
-    identity_endpoint: Optional[str]
+    identity_endpoint: Optional[str] = None
     """Identity endpoint of the cloud."""
 
-    storage_endpoint: Optional[str]
+    storage_endpoint: Optional[str] = None
     """Storage endpoint of the cloud."""
 
-    credential: Optional[CloudCredential]
-    """Cloud credentials, an object of type :class:`CloudCredential`."""
+    credential: Optional[CloudCredential] = None
+    """Cloud credentials with key-value attributes."""
 
-    ca_certificates: List[str]
+    ca_certificates: Optional[List[str]] = dataclasses.field(default_factory=list)
     """A list of CA certificates."""
 
-    skip_tls_verify: bool
-    """Whether to skip TLS verfication, boolean, defaults to False."""
+    skip_tls_verify: Optional[bool] = False
+    """Whether to skip TLS verfication."""
 
-    is_controller_cloud: bool
+    is_controller_cloud: Optional[bool] = False
     """If this is the cloud used by the controller, defaults to False."""
 
     @classmethod
@@ -3694,11 +3692,11 @@ class CloudSpec:
         return cls(
             type=d['type'],
             name=d['name'],
-            region=d.get('region') or '',
-            endpoint=d.get('endpoint') or '',
-            identity_endpoint=d.get('identity-endpoint') or '',
-            storage_endpoint=d.get('storage-endpoint') or '',
-            credential=CloudCredential.from_dict(d.get('credential') or {}),
+            region=d.get('region') or None,
+            endpoint=d.get('endpoint') or None,
+            identity_endpoint=d.get('identity-endpoint') or None,
+            storage_endpoint=d.get('storage-endpoint') or None,
+            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
             ca_certificates=d.get('cacertificates') or [],
             skip_tls_verify=d.get('skip-tls-verify') or False,
             is_controller_cloud=d.get('is-controller-cloud') or False,

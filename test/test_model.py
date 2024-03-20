@@ -3798,6 +3798,8 @@ class TestCloudCredential(unittest.TestCase):
         }
         cloud_cred = ops.CloudCredential.from_dict(d)
         self.assertEqual(cloud_cred.auth_type, d['auth-type'])
+        self.assertEqual(cloud_cred.attributes, {})
+        self.assertEqual(cloud_cred.redacted, [])
 
     def test_from_dict_full(self):
         d = {
@@ -3825,11 +3827,11 @@ class TestCloudSpec(unittest.TestCase):
         )
         self.assertEqual(cloud_spec.type, 'lxd')
         self.assertEqual(cloud_spec.name, 'localhost')
-        self.assertEqual(cloud_spec.region, '')
-        self.assertEqual(cloud_spec.endpoint, '')
-        self.assertEqual(cloud_spec.identity_endpoint, '')
-        self.assertEqual(cloud_spec.storage_endpoint, '')
-        self.assertEqual(cloud_spec.credential, ops.CloudCredential.from_dict({}))
+        self.assertEqual(cloud_spec.region, None)
+        self.assertEqual(cloud_spec.endpoint, None)
+        self.assertEqual(cloud_spec.identity_endpoint, None)
+        self.assertEqual(cloud_spec.storage_endpoint, None)
+        self.assertIsNone(cloud_spec.credential)
         self.assertEqual(cloud_spec.ca_certificates, [])
         self.assertEqual(cloud_spec.skip_tls_verify, False)
         self.assertEqual(cloud_spec.is_controller_cloud, False)
@@ -3862,6 +3864,30 @@ class TestCloudSpec(unittest.TestCase):
         self.assertEqual(cloud_spec.region, d['region'])
         self.assertEqual(cloud_spec.endpoint, d['endpoint'])
         self.assertEqual(cloud_spec.credential, ops.CloudCredential.from_dict(cred))
+        self.assertEqual(cloud_spec.identity_endpoint, d['identity-endpoint'])
+        self.assertEqual(cloud_spec.storage_endpoint, d['storage-endpoint'])
+        self.assertEqual(cloud_spec.ca_certificates, d['cacertificates'])
+        self.assertEqual(cloud_spec.skip_tls_verify, False)
+        self.assertEqual(cloud_spec.is_controller_cloud, True)
+
+    def test_from_dict_no_credential(self):
+        d = {
+            'type': 'lxd',
+            'name': 'localhost',
+            'region': 'localhost',
+            'endpoint': 'https://10.76.251.1:8443',
+            'identity-endpoint': 'foo',
+            'storage-endpoint': 'bar',
+            'cacertificates': ['foo', 'bar'],
+            'skip-tls-verify': False,
+            'is-controller-cloud': True,
+        }
+        cloud_spec = ops.CloudSpec.from_dict(d)
+        self.assertEqual(cloud_spec.type, d['type'])
+        self.assertEqual(cloud_spec.name, d['name'])
+        self.assertEqual(cloud_spec.region, d['region'])
+        self.assertEqual(cloud_spec.endpoint, d['endpoint'])
+        self.assertIsNone(cloud_spec.credential)
         self.assertEqual(cloud_spec.identity_endpoint, d['identity-endpoint'])
         self.assertEqual(cloud_spec.storage_endpoint, d['storage-endpoint'])
         self.assertEqual(cloud_spec.ca_certificates, d['cacertificates'])
