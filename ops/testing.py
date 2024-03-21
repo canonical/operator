@@ -2106,22 +2106,6 @@ class _TestingModelBackend:
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
 
-    def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
-        """Ensures that the named relation exists/has been added.
-
-        This is called whenever relation data is accessed via model.get_relation(...).
-        """
-        if len(relations) > 0:
-            return
-
-        valid_relation_endpoints: List[str] = list(self._meta.peers.keys())
-        valid_relation_endpoints.extend(self._meta.requires.keys())
-        valid_relation_endpoints.extend(self._meta.provides.keys())
-        if self._hook_is_running == 'leader_elected' and relation_name in valid_relation_endpoints:
-            raise RuntimeError(
-                'cannot access relation data without first adding the relation: '
-                f'use Harness.add_relation({relation_name!r}, <app>) before calling set_leader')
-
     def _can_connect(self, pebble_client: '_TestingPebbleClient') -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
         return self._pebble_clients_can_connect[pebble_client]
