@@ -368,8 +368,8 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
 class _Abort(Exception):  # noqa: N818
     """Raised when something happens that should interrupt ops execution."""
 
-    def __init__(self, exit_code: int, **kwargs: Any):
-        super().__init__(*kwargs)
+    def __init__(self, exit_code: int):
+        super().__init__()
         self.exit_code = exit_code
 
 
@@ -490,14 +490,6 @@ class _Manager:
         framework.set_breakpointhook()
         return framework
 
-    def _emit_charm_event(self, event_name: str):
-        """Emits a charm event based on a Juju event name.
-
-        Args:
-            event_name: A Juju event name to emit on a charm.
-        """
-        _emit_charm_event(self.charm, event_name)
-
     def _emit(self):
         """Emit the event on the charm."""
         # TODO: Remove the collect_metrics check below as soon as the relevant
@@ -507,12 +499,12 @@ class _Manager:
         # Skip reemission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
         if not self.dispatcher.is_restricted_context():
-            # re-emit any deferred events from the previous run
+            # Re-emit any deferred events from the previous run.
             self.framework.reemit()
 
-        # emit the juju event
-        self._emit_charm_event(self.dispatcher.event_name)
-        # emit collect-status events
+        # Emit the Juju event.
+        _emit_charm_event(self.charm, self.dispatcher.event_name)
+        # Emit collect-status events.
         ops.charm._evaluate_status(self.charm)
 
     def _commit(self):
@@ -537,14 +529,13 @@ def main(charm_class: Type[ops.charm.CharmBase],
     Args:
         charm_class: the charm class to instantiate and receive the event.
         use_juju_for_storage: whether to use controller-side storage. If not specified
-            then kubernetes charms that haven't previously used local storage and that
+            then Kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
             otherwise local storage is used.
     """
     try:
         manager = _Manager(
             charm_class,
-            model_backend=ops.model._ModelBackend(),
             use_juju_for_storage=use_juju_for_storage)
 
         manager.run()
