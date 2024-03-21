@@ -3631,7 +3631,7 @@ class CloudCredential:
     auth_type: str
     """Authentication type."""
 
-    attributes: Optional[Dict[str, str]] = dataclasses.field(default_factory=dict)
+    attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
     """A dictionary containing cloud credentials.
 
     For example, for AWS, it contains `access-key` and `secret-key`;
@@ -3639,7 +3639,7 @@ class CloudCredential:
     can be found here.
     """
 
-    redacted: Optional[List[str]] = dataclasses.field(default_factory=list)
+    redacted: List[str] = dataclasses.field(default_factory=list)
     """A list of redacted secrets."""
 
     @classmethod
@@ -3677,13 +3677,13 @@ class CloudSpec:
     credential: Optional[CloudCredential] = None
     """Cloud credentials with key-value attributes."""
 
-    ca_certificates: Optional[List[str]] = dataclasses.field(default_factory=list)
+    ca_certificates: List[str] = dataclasses.field(default_factory=list)
     """A list of CA certificates."""
 
-    skip_tls_verify: Optional[bool] = False
+    skip_tls_verify: bool = False
     """Whether to skip TLS verfication."""
 
-    is_controller_cloud: Optional[bool] = False
+    is_controller_cloud: bool = False
     """If this is the cloud used by the controller, defaults to False."""
 
     @classmethod
