@@ -562,8 +562,8 @@ def _random_model_name():
 
 @dataclasses.dataclass(frozen=True)
 class Model(_DCBase):
-    name: str = _random_model_name()
-    uuid: str = str(uuid4())
+    name: str = dataclasses.field(default_factory=_random_model_name)
+    uuid: str = dataclasses.field(default_factory=lambda: str(uuid4()))
 
     # whatever juju models --format=json | jq '.models[<current-model-index>].type' gives back.
     # TODO: make this exhaustive.
