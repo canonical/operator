@@ -5854,3 +5854,41 @@ class PebbleNoticesMixin:
 class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMixin):
     def setUp(self):
         self.client = self.get_testing_client()
+
+
+class TestCloudSpec(unittest.TestCase):
+    def test_set_cloud_spec(self):
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.start, self._on_start)
+
+            def _on_start(self, event: ops.StartEvent):
+                self.cloud_spec = self.model.get_cloud_spec()
+
+        harness = ops.testing.Harness(TestCharm)
+        self.addCleanup(harness.cleanup)
+        cloud_spec_dict = {
+            'name': 'localhost',
+            'type': 'lxd',
+            'endpoint': 'https://127.0.0.1:8443',
+            'credential': {
+                'auth-type': 'certificate',
+                'attrs': {
+                    'client-cert': 'foo',
+                    'client-key': 'bar',
+                    'server-cert': 'baz'
+                },
+            },
+        }
+        harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
+        harness.begin()
+        harness.charm.on.start.emit()
+        self.assertEqual(harness.charm.cloud_spec, ops.CloudSpec.from_dict(cloud_spec_dict))
+
+    def test_get_cloud_spec_without_set_error(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(ops.ModelError):
+            harness.model.get_cloud_spec()

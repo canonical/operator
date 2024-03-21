@@ -1911,6 +1911,49 @@ class Harness(Generic[CharmType]):
                 output=action_under_test.output)
         return action_under_test.output
 
+    def set_cloud_spec(self, spec: 'model.CloudSpec'):
+        """Set cloud specification (metadata) including credentials.
+
+        Call this method before the charm calls :meth:`ops.Model.get_cloud_spec`.
+
+        Example usage::
+
+            class MyVMCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.start, self._on_start)
+
+                def _on_start(self, event: ops.StartEvent):
+                    self.cloud_spec = self.model.get_cloud_spec()
+
+            class TestCharm(unittest.TestCase):
+                def setUp(self):
+                    self.harness = ops.testing.Harness(MyVMCharm)
+                    self.addCleanup(self.harness.cleanup)
+
+                def test_start(self):
+                    cloud_spec_dict = {
+                        'name': 'localhost',
+                        'type': 'lxd',
+                        'endpoint': 'https://127.0.0.1:8443',
+                        'credential': {
+                            'authtype': 'certificate',
+                            'attrs': {
+                                'client-cert': 'foo',
+                                'client-key': 'bar',
+                                'server-cert': 'baz'
+                            },
+                        },
+                    }
+                    self.harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
+                    self.harness.begin()
+                    self.harness.charm.on.start.emit()
+                    expected = ops.CloudSpec.from_dict(cloud_spec_dict)
+                    self.assertEqual(harness.charm.cloud_spec, expected)
+
+        """
+        self._backend._cloud_spec = spec
+
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
@@ -2126,6 +2169,7 @@ class _TestingModelBackend:
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
+        self._cloud_spec: Optional[model.CloudSpec] = None
 
     def _validate_relation_access(self, relation_name: str, relations: List[model.Relation]):
         """Ensures that the named relation exists/has been added.
@@ -2708,6 +2752,12 @@ class _TestingModelBackend:
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle everything after the exit.
         raise SystemExit()
+
+    def credential_get(self) -> model.CloudSpec:
+        if not self._cloud_spec:
+            raise model.ModelError(
+                'ERROR cloud spec is empty, set it with `Harness.set_cloud_spec()` first')
+        return self._cloud_spec
 
 
 @_copy_docstrings(pebble.ExecProcess)

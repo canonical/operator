@@ -281,6 +281,21 @@ class Model:
         content = self._backend.secret_get(id=id, label=label)
         return Secret(self._backend, id=id, label=label, content=content)
 
+    def get_cloud_spec(self) -> 'CloudSpec':
+        """Get details of the cloud in which the model is deployed.
+
+        Note: This information is only available for machine charms,
+        not Kubernetes sidecar charms.
+
+        Returns:
+            a specification for the cloud in which the model is deployed,
+            including credential information.
+
+        Raises:
+            :class:`ModelError`: if called in a Kubernetes model.
+        """
+        return self._backend.credential_get()
+
 
 if typing.TYPE_CHECKING:
     # (entity type, name): instance.
@@ -3507,6 +3522,14 @@ class _ModelBackend:
         else:
             self._run("juju-reboot")
 
+    def credential_get(self) -> 'CloudSpec':
+        """Access cloud credentials by running the credential-get hook tool.
+
+        Returns the cloud specification used by the model.
+        """
+        result = self._run('credential-get', return_output=True, use_json=True)
+        return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
+
 
 class _ModelBackendValidator:
     """Provides facilities for validating inputs and formatting them for model backends."""
@@ -3596,3 +3619,85 @@ class LazyNotice:
         self._notice = self._container.get_notice(self.id)
         assert self._notice.type == self.type
         assert self._notice.key == self.key
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudCredential:
+    """Credentials for cloud.
+
+    Used as the type of attribute `credential` in :class:`CloudSpec`.
+    """
+
+    auth_type: str
+    """Authentication type."""
+
+    attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """A dictionary containing cloud credentials.
+
+    For example, for AWS, it contains `access-key` and `secret-key`;
+    for Azure, `application-id`, `application-password` and `subscription-id`
+    can be found here.
+    """
+
+    redacted: List[str] = dataclasses.field(default_factory=list)
+    """A list of redacted secrets."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
+        """Create a new CloudCredential object from a dictionary."""
+        return cls(
+            auth_type=d['auth-type'],
+            attributes=d.get('attrs') or {},
+            redacted=d.get('redacted') or [],
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudSpec:
+    """Cloud specification information (metadata) including credentials."""
+
+    type: str
+    """Type of the cloud."""
+
+    name: str
+    """Juju cloud name."""
+
+    region: Optional[str] = None
+    """Region of the cloud."""
+
+    endpoint: Optional[str] = None
+    """Endpoint of the cloud."""
+
+    identity_endpoint: Optional[str] = None
+    """Identity endpoint of the cloud."""
+
+    storage_endpoint: Optional[str] = None
+    """Storage endpoint of the cloud."""
+
+    credential: Optional[CloudCredential] = None
+    """Cloud credentials with key-value attributes."""
+
+    ca_certificates: List[str] = dataclasses.field(default_factory=list)
+    """A list of CA certificates."""
+
+    skip_tls_verify: bool = False
+    """Whether to skip TLS verfication."""
+
+    is_controller_cloud: bool = False
+    """If this is the cloud used by the controller, defaults to False."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
+        """Create a new CloudSpec object from a dict parsed from JSON."""
+        return cls(
+            type=d['type'],
+            name=d['name'],
+            region=d.get('region') or None,
+            endpoint=d.get('endpoint') or None,
+            identity_endpoint=d.get('identity-endpoint') or None,
+            storage_endpoint=d.get('storage-endpoint') or None,
+            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
+            ca_certificates=d.get('cacertificates') or [],
+            skip_tls_verify=d.get('skip-tls-verify') or False,
+            is_controller_cloud=d.get('is-controller-cloud') or False,
+        )
