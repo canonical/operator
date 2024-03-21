@@ -405,7 +405,11 @@ class Harness(Generic[CharmType]):
         for storage_name in self._meta.storages:
             for storage_index in self._backend.storage_list(storage_name, include_detached=True):
                 s = model.Storage(storage_name, storage_index, self._backend)
-                self.attach_storage(s.full_id)
+                if self._backend._storage_is_attached(storage_name, storage_index):
+                    # Attaching was done already, but we still need the event to be emitted.
+                    self.charm.on[storage_name].storage_attached.emit(s)
+                else:
+                    self.attach_storage(s.full_id)
         # Storage done, emit install event
         charm.on.install.emit()
 
@@ -690,8 +694,8 @@ class Harness(Generic[CharmType]):
         Args:
             storage_name: The storage backend name on the Charm
             count: Number of disks being added
-            attach: True to also attach the storage mount and emit storage-attached if
-                harness.begin() has been called.
+            attach: True to also attach the storage mount; if :meth:`begin`
+                has been called a True value will also emit storage-attached
 
         Return:
             A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
@@ -739,12 +743,12 @@ class Harness(Generic[CharmType]):
         """Attach a storage device.
 
         The intent of this function is to simulate a ``juju attach-storage`` call.
-        It will trigger a storage-attached hook if the storage unit in question exists
+        If called after :meth:`begin` and hooks are not disabled, it will trigger
+        a storage-attached hook if the storage unit in question exists
         and is presently marked as detached.
 
         The test harness uses symbolic links to imitate storage mounts, which may lead to some
-        inconsistencies compared to the actual charm. Users should be cognizant of
-        this potential discrepancy.
+        inconsistencies compared to the actual charm.
 
         Args:
             storage_id: The full storage ID of the storage unit being attached, including the
@@ -799,6 +803,9 @@ class Harness(Generic[CharmType]):
 
         This function creates a relation with an application and triggers a
         :class:`RelationCreatedEvent <ops.RelationCreatedEvent>`.
+        To match Juju's behaviour, it also creates a default network binding on this endpoint.
+        If you want to associate a custom network to this binding (or a global default network),
+        provide one using :meth:`add_network` before calling this function.
 
         If `app_data` or `unit_data` are provided, also add a new unit
         (``<remote_app>/0``) to the relation and trigger
@@ -819,8 +826,8 @@ class Harness(Generic[CharmType]):
             })
 
         Args:
-            relation_name: The relation on the charm that is being related to.
-            remote_app: The name of the application that is being related to.
+            relation_name: The relation on the charm that is being integrated with.
+            remote_app: The name of the application that is being integrated with.
                 To add a peer relation, set to the name of *this* application.
             app_data: If provided, also add a new unit to the relation
                 (triggering relation-joined) and set the *application* relation data
@@ -832,6 +839,11 @@ class Harness(Generic[CharmType]):
         Return:
             The ID of the relation created.
         """
+        if not (relation_name in self._meta.provides
+                or relation_name in self._meta.requires
+                or relation_name in self._meta.peers):
+            raise RelationNotFoundError(f'relation {relation_name!r} not declared in metadata')
+
         relation_id = self._next_relation_id()
         self._backend._relation_ids_map.setdefault(
             relation_name, []).append(relation_id)
@@ -858,6 +870,15 @@ class Harness(Generic[CharmType]):
                 self.update_relation_data(relation_id, remote_app, app_data)
             if unit_data is not None:
                 self.update_relation_data(relation_id, remote_unit, unit_data)
+
+        # If we have a default network binding configured, respect it.
+        if not self._backend._networks.get((None, None)):
+            # If we don't already have a network binding for this relation id, create one.
+            if not self._backend._networks.get((relation_name, relation_id)):
+                self.add_network("10.0.0.10", endpoint=relation_name, relation_id=relation_id)
+            # If we don't already have a default network binding for this endpoint, create one.
+            if not self._backend._networks.get((relation_name, None)):
+                self.add_network("192.0.2.0", endpoint=relation_name)
 
         return relation_id
 
@@ -958,7 +979,7 @@ class Harness(Generic[CharmType]):
                                'but no relation matching that name was found.')
 
         self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
-        app = cast(model.Application, relation.app)  # should not be None since we're testing
+        app = relation.app
         if not remote_unit_name.startswith(app.name):
             warnings.warn(
                 'Remote unit name invalid: the remote application of {} is called {!r}; '
@@ -1339,7 +1360,7 @@ class Harness(Generic[CharmType]):
 
         If this charm becomes a leader then `leader_elected` will be triggered.  If :meth:`begin`
         has already been called, then the charm's peer relation should usually be added *prior* to
-        calling this method (with :meth:`add_relation`) to properly initialize and make
+        calling this method (with :meth:`add_relation`) to properly initialise and make
         available relation data that leader elected hooks may want to access.
 
         Args:
@@ -1890,6 +1911,49 @@ class Harness(Generic[CharmType]):
                 output=action_under_test.output)
         return action_under_test.output
 
+    def set_cloud_spec(self, spec: 'model.CloudSpec'):
+        """Set cloud specification (metadata) including credentials.
+
+        Call this method before the charm calls :meth:`ops.Model.get_cloud_spec`.
+
+        Example usage::
+
+            class MyVMCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.start, self._on_start)
+
+                def _on_start(self, event: ops.StartEvent):
+                    self.cloud_spec = self.model.get_cloud_spec()
+
+            class TestCharm(unittest.TestCase):
+                def setUp(self):
+                    self.harness = ops.testing.Harness(MyVMCharm)
+                    self.addCleanup(self.harness.cleanup)
+
+                def test_start(self):
+                    cloud_spec_dict = {
+                        'name': 'localhost',
+                        'type': 'lxd',
+                        'endpoint': 'https://127.0.0.1:8443',
+                        'credential': {
+                            'authtype': 'certificate',
+                            'attrs': {
+                                'client-cert': 'foo',
+                                'client-key': 'bar',
+                                'server-cert': 'baz'
+                            },
+                        },
+                    }
+                    self.harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
+                    self.harness.begin()
+                    self.harness.charm.on.start.emit()
+                    expected = ops.CloudSpec.from_dict(cloud_spec_dict)
+                    self.assertEqual(harness.charm.cloud_spec, expected)
+
+        """
+        self._backend._cloud_spec = spec
+
 
 def _get_app_or_unit_name(app_or_unit: AppUnitOrName) -> str:
     """Return name of given application or unit (return strings directly)."""
@@ -2105,6 +2169,7 @@ class _TestingModelBackend:
         self._networks: Dict[Tuple[Optional[str], Optional[int]], _NetworkDict] = {}
         self._reboot_count = 0
         self._running_action: Optional[_RunningAction] = None
+        self._cloud_spec: Optional[model.CloudSpec] = None
 
     def _can_connect(self, pebble_client: '_TestingPebbleClient') -> bool:
         """Returns whether the mock client is active and can support API calls with no errors."""
@@ -2306,7 +2371,17 @@ class _TestingModelBackend:
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
                     target_dir = pathlib.Path(store["location"])
                     target_dir.mkdir(parents=True, exist_ok=True)
-                    mounting_dir.symlink_to(target_dir)
+                    try:
+                        mounting_dir.symlink_to(target_dir, target_is_directory=True)
+                    except FileExistsError:
+                        # If the symlink is already the one we want, then we
+                        # don't need to do anything here.
+                        # NOTE: In Python 3.9, this can use `mounting_dir.readlink()`
+                        if (
+                            not mounting_dir.is_symlink()
+                            or os.readlink(mounting_dir) != str(target_dir)
+                        ):
+                            raise
 
         index = int(index)
         if not self._storage_is_attached(name, index):
@@ -2661,6 +2736,12 @@ class _TestingModelBackend:
         # This should exit, reboot, and re-emit the event, but we'll need the caller
         # to handle everything after the exit.
         raise SystemExit()
+
+    def credential_get(self) -> model.CloudSpec:
+        if not self._cloud_spec:
+            raise model.ModelError(
+                'ERROR cloud spec is empty, set it with `Harness.set_cloud_spec()` first')
+        return self._cloud_spec
 
 
 @_copy_docstrings(pebble.ExecProcess)
@@ -3345,7 +3426,7 @@ class _TestingPebbleClient:
     def get_notices(
         self,
         *,
-        select: Optional[pebble.NoticesSelect] = None,
+        users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -3355,9 +3436,9 @@ class _TestingPebbleClient:
         filter_user_id = 0  # default is to filter by request UID (root)
         if user_id is not None:
             filter_user_id = user_id
-        if select is not None:
+        if users is not None:
             if user_id is not None:
-                raise self._api_error(400, 'cannot use both "select" and "user_id"')
+                raise self._api_error(400, 'cannot use both "users" and "user_id"')
             filter_user_id = None
 
         if types is not None:

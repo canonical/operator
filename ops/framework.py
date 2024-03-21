@@ -782,18 +782,11 @@ class Framework(Object):
             RuntimeError: if bound_event or observer are the wrong type.
         """
         if not isinstance(bound_event, BoundEvent):
-            raise RuntimeError(
+            raise TypeError(
                 f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
         if not isinstance(observer, types.MethodType):
-            # help users of older versions of the framework
-            if isinstance(observer, charm.CharmBase):
-                raise TypeError(
-                    'observer methods must now be explicitly provided;'
-                    ' please replace observe(self.on.{0}, self)'
-                    ' with e.g. observe(self.on.{0}, self._on_{0})'.format(
-                        bound_event.event_kind))
-            raise RuntimeError(
-                f'Framework.observe requires a method as third parameter, got {observer}')
+            raise TypeError(
+                f"Framework.observe requires a method as the 'observer' parameter, got {observer}")
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -804,27 +797,23 @@ class Framework(Object):
         if hasattr(emitter, "handle"):
             emitter_path = emitter.handle.path
         else:
-            raise RuntimeError(
+            raise TypeError(
                 f'event emitter {type(emitter).__name__} must have a "handle" attribute')
-
-        # Validate that the method has an acceptable call signature.
-        sig = inspect.signature(observer)
-        # Self isn't included in the params list, so the first arg will be the event.
-        extra_params = list(sig.parameters.values())[1:]
 
         method_name = observer.__name__
 
         assert isinstance(observer.__self__, Object), "can't register observers " \
                                                       "that aren't `Object`s"
         observer_obj = observer.__self__
-        if not sig.parameters:
+
+        # Validate that the method has an acceptable call signature.
+        sig = inspect.signature(observer, follow_wrapped=False)
+        try:
+            sig.bind(EventBase(None))  # type: ignore
+        except TypeError as e:
             raise TypeError(
-                f'{type(observer_obj).__name__}.{method_name} must accept event parameter')
-        elif any(param.default is inspect.Parameter.empty for param in extra_params):
-            # Allow for additional optional params, since there's no reason to exclude them, but
-            # required params will break.
-            raise TypeError(
-                f'{type(observer_obj).__name__}.{method_name} has extra required parameter')
+                f'{type(observer_obj).__name__}.{method_name} must be callable with '
+                "only 'self' and the 'event'") from e
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
@@ -953,6 +942,13 @@ class Framework(Object):
                         else:
                             # Regular call to the registered method.
                             custom_handler(event)
+
+            else:
+                logger.warning(
+                    f"Reference to ops.Object at path {observer_path} has been garbage collected "
+                    "between when the charm was initialised and when the event was emitted. "
+                    "Make sure sure you store a reference to the observer."
+                )
 
             if event.deferred:
                 deferred = True
