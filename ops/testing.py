@@ -380,7 +380,7 @@ class Harness(Generic[CharmType]):
         containers (in addition to triggering pebble-ready for each).
 
         Example::
-            def test_foo():
+
             harness = Harness(MyCharm)
             # Do initial setup here
             # Add storage if needed before begin_with_initial_hooks() is called
@@ -1699,7 +1699,7 @@ class Harness(Generic[CharmType]):
         Example usage::
 
             # charm.py
-            class MyCharm(ops.CharmBase):
+            class ExampleCharm(ops.CharmBase):
                 def __init__(self, *args):
                     super().__init__(*args)
                     self.framework.observe(self.on["mycontainer"].pebble_ready,
@@ -1711,7 +1711,7 @@ class Harness(Generic[CharmType]):
             # test_charm.py
             @pytest.fixture()
             def harness():
-                harness = Harness(MyCharm)
+                harness = Harness(ExampleCharm)
                 yield harness
                 harness.cleanup()
 
