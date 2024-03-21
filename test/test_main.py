@@ -89,7 +89,7 @@ class EventSpec:
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
-@patch('ops.main._Manager._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class CharmInitTestCase(unittest.TestCase):
 
@@ -226,13 +226,13 @@ class TestDispatch(unittest.TestCase):
                 dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
-                with patch('ops.main._Manager._emit_charm_event') as mock_charm_event:
+                with patch('ops.main._emit_charm_event') as mock_charm_event:
                     with patch('ops.main._get_charm_dir') as mock_charmdir:
                         mock_charmdir.return_value = tmpdir
                         ops.main(MyCharm)  # type: ignore
 
         self.assertEqual(mock_charm_event.call_count, 1)
-        return mock_charm_event.call_args[0][0]
+        return mock_charm_event.call_args[0][1]
 
     def test_most_legacy(self):
         """Without dispatch, sys.argv[0] is used."""
