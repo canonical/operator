@@ -1373,6 +1373,24 @@ class CharmMeta:
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
 
+    @staticmethod
+    def from_charm_root(charm_root: Union[pathlib.Path, str]):
+        """Initialise CharmMeta from the path to a charm repository root folder."""
+        _charm_root = pathlib.Path(charm_root)
+        metadata_path = _charm_root / "metadata.yaml"
+
+        with metadata_path.open() as f:
+            meta = yaml.safe_load(f.read())
+
+        actions = None
+
+        actions_path = _charm_root / "actions.yaml"
+        if actions_path.exists():
+            with actions_path.open() as f:
+                actions = yaml.safe_load(f.read())
+
+        return CharmMeta(meta, actions)
+
     def _load_links(self, raw: Dict[str, Any]):
         websites = raw.get('website', [])
         if not websites and 'links' in raw:

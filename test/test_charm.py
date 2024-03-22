@@ -13,11 +13,14 @@
 # limitations under the License.
 import functools
 import os
+import pathlib
 import shutil
 import tempfile
 import typing
 import unittest
 from pathlib import Path
+
+import yaml
 
 import ops
 import ops.charm
@@ -472,6 +475,45 @@ start:
   description: "Start the unit."
   additionalProperties: false
 ''')
+
+    def test_meta_from_charm_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            td = pathlib.Path(d)
+            (td / 'metadata.yaml').write_text(
+                yaml.safe_dump(
+                    {"name": "bob",
+                        "requires": {
+                            "foo":
+                                {"interface": "bar"}
+                        }}))
+            meta = ops.CharmMeta.from_charm_root(td)
+            self.assertEqual(meta.name, "bob")
+            self.assertEqual(meta.requires['foo'].interface_name, "bar")
+
+    def test_actions_from_charm_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            td = pathlib.Path(d)
+            (td / 'actions.yaml').write_text(
+                yaml.safe_dump(
+                    {"foo": {
+                        "description": "foos the bar",
+                        "additionalProperties": False
+                    }}
+                )
+            )
+            (td / 'metadata.yaml').write_text(
+                yaml.safe_dump(
+                    {"name": "bob",
+                        "requires": {
+                            "foo":
+                                {"interface": "bar"}
+                        }}))
+
+            meta = ops.CharmMeta.from_charm_root(td)
+            self.assertEqual(meta.name, "bob")
+            self.assertEqual(meta.requires['foo'].interface_name, "bar")
+            self.assertFalse(meta.actions['foo'].additional_properties)
+            self.assertEqual(meta.actions['foo'].description, "foos the bar")
 
     def _setup_test_action(self):
         fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")
