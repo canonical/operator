@@ -486,10 +486,9 @@ start:
                             "foo":
                                 {"interface": "bar"}
                         }}))
-
             meta = ops.CharmMeta.from_charm_root(td)
-            assert meta.name == "bob"
-            assert meta.requires['foo'].interface_name == "bar"
+            self.assertEqual(meta.name, "bob")
+            self.assertEqual(meta.requires['foo'].interface_name, "bar")
 
     def test_actions_from_charm_root(self):
         with tempfile.TemporaryDirectory() as d:
@@ -511,10 +510,10 @@ start:
                         }}))
 
             meta = ops.CharmMeta.from_charm_root(td)
-            assert meta.name == "bob"
-            assert meta.requires['foo'].interface_name == "bar"
-            assert meta.actions['foo'].additional_properties is False
-            assert meta.actions['foo'].description == "foos the bar"
+            self.assertEqual(meta.name, "bob")
+            self.assertEqual(meta.requires['foo'].interface_name, "bar")
+            self.assertFalse(meta.actions['foo'].additional_properties)
+            self.assertEqual(meta.actions['foo'].description, "foos the bar")
 
     def _setup_test_action(self):
         fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")

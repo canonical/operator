@@ -35,6 +35,9 @@ from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
 
+CHARM_STATE_FILE = '.unit-state.db'
+
+
 logger = logging.getLogger()
 
 
@@ -397,7 +400,7 @@ class _Manager:
             charm_class: Type["ops.charm.CharmBase"],
             model_backend: Optional[ops.model._ModelBackend] = None,
             use_juju_for_storage: Optional[bool] = None,
-            charm_state_path: str = '.unit-state.db'
+            charm_state_path: str = CHARM_STATE_FILE
     ):
 
         self._charm_state_path = charm_state_path

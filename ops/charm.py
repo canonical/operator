@@ -1375,7 +1375,7 @@ class CharmMeta:
 
     @staticmethod
     def from_charm_root(charm_root: Union[pathlib.Path, str]):
-        """Initialize CharmMeta from the path to a charm repository root folder."""
+        """Initialise CharmMeta from the path to a charm repository root folder."""
         _charm_root = pathlib.Path(charm_root)
         metadata_path = _charm_root / "metadata.yaml"
 
