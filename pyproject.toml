@@ -29,6 +29,10 @@ docs = [
     "sphinx-tabs",
     "lxd-sphinx-extensions",
     "sphinx-copybutton",
+    "pyspelling",
+    "sphinxcontrib-jquery",
+    "canonical-sphinx-extensions",
+    "sphinx-notfound-page"
 ]
 
 [project.urls]

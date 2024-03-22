@@ -12,8 +12,13 @@ beautifulsoup4==4.12.2
     # via
     #   canonical-sphinx-extensions
     #   furo
+    #   pyspelling
+bracex==2.4
+    # via wcmatch
 canonical-sphinx-extensions==0.0.18
-    # via lxd-sphinx-extensions
+    # via
+    #   lxd-sphinx-extensions
+    #   ops (pyproject.toml)
 certifi==2023.11.17
     # via requests
 charset-normalizer==3.3.2
@@ -25,16 +30,24 @@ docutils==0.18.1
     #   sphinx-tabs
 furo==2023.9.10
     # via ops (pyproject.toml)
+html5lib==1.1
+    # via pyspelling
 idna==3.6
     # via requests
 imagesize==1.4.1
     # via sphinx
 importlib-metadata==7.0.1
-    # via sphinx
+    # via
+    #   markdown
+    #   sphinx
 jinja2==3.1.3
     # via sphinx
 lxd-sphinx-extensions==0.0.16
     # via ops (pyproject.toml)
+lxml==5.1.0
+    # via pyspelling
+markdown==3.6
+    # via pyspelling
 markupsafe==2.1.3
     # via jinja2
 packaging==23.2
@@ -44,18 +57,26 @@ pygments==2.17.2
     #   furo
     #   sphinx
     #   sphinx-tabs
+pyspelling==2.10
+    # via ops (pyproject.toml)
 pytz==2023.3.post1
     # via babel
 pyyaml==6.0.1
-    # via ops (pyproject.toml)
+    # via
+    #   ops (pyproject.toml)
+    #   pyspelling
 requests==2.31.0
     # via
     #   canonical-sphinx-extensions
     #   sphinx
+six==1.16.0
+    # via html5lib
 snowballstemmer==2.2.0
     # via sphinx
 soupsieve==2.5
-    # via beautifulsoup4
+    # via
+    #   beautifulsoup4
+    #   pyspelling
 sphinx==6.2.1
     # via
     #   canonical-sphinx-extensions
@@ -64,12 +85,16 @@ sphinx==6.2.1
     #   sphinx-basic-ng
     #   sphinx-copybutton
     #   sphinx-design
+    #   sphinx-notfound-page
     #   sphinx-tabs
+    #   sphinxcontrib-jquery
 sphinx-basic-ng==1.0.0b2
     # via furo
 sphinx-copybutton==0.5.2
     # via ops (pyproject.toml)
 sphinx-design==0.5.0
+    # via ops (pyproject.toml)
+sphinx-notfound-page==1.0.0
     # via ops (pyproject.toml)
 sphinx-tabs==3.4.4
     # via ops (pyproject.toml)
@@ -79,6 +104,8 @@ sphinxcontrib-devhelp==1.0.2
     # via sphinx
 sphinxcontrib-htmlhelp==2.0.1
     # via sphinx
+sphinxcontrib-jquery==4.1
+    # via ops (pyproject.toml)
 sphinxcontrib-jsmath==1.0.1
     # via sphinx
 sphinxcontrib-qthelp==1.0.3
@@ -87,6 +114,10 @@ sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
 urllib3==2.1.0
     # via requests
+wcmatch==8.5.1
+    # via pyspelling
+webencodings==0.5.1
+    # via html5lib
 websocket-client==1.7.0
     # via ops (pyproject.toml)
 zipp==3.17.0
