@@ -92,6 +92,11 @@ class StorageWithHyphensHelper(ops.Object):
 
 
 class TestHarness(unittest.TestCase):
+    def test_add_relation_no_meta_fails(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta="name: mycharm")
+        self.addCleanup(harness.cleanup)
+        with self.assertRaises(ops.RelationNotFoundError):
+            harness.add_relation('db', 'postgresql')
 
     def test_add_relation(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -3048,6 +3053,12 @@ class TestNetwork(unittest.TestCase):
             assert binding is not None
             binding.network
 
+    def test_add_relation_network_get(self):
+        self.harness.add_relation('db', 'remote')
+        binding = self.harness.model.get_binding('db')
+        assert binding is not None
+        assert binding.network
+
     def test_add_network_endpoint_not_in_meta(self):
         with self.assertRaises(ops.ModelError):
             self.harness.add_network('35.0.0.1', endpoint='xyz')
@@ -4738,10 +4749,102 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
         self.harness.attach_storage(storage_id)
         self.assertTrue((self.root / "mounts/foo/bar").read_text(), "foobar")
 
+    def _make_storage_attach_harness(self, meta: typing.Optional[str] = None):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.attached: typing.List[str] = []
+                self.locations: typing.List[pathlib.Path] = []
+                framework.observe(self.on['test-storage'].storage_attached, self._on_attach)
+
+            def _on_attach(self, event: ops.StorageAttachedEvent):
+                self.attached.append(event.storage.full_id)
+                self.locations.append(event.storage.location)
+
+        if meta is None:
+            meta = '''
+                name: test
+                containers:
+                    test-container:
+                        mounts:
+                            - storage: test-storage
+                              location: /mounts/foo
+                storage:
+                    test-storage:
+                        type: filesystem
+                '''
+        harness = ops.testing.Harness(MyCharm, meta=meta)
+        self.addCleanup(harness.cleanup)
+        return harness
+
+    def test_storage_attach_begin_no_emit(self):
+        """If `begin()` hasn't been called, `attach` does not emit storage-attached."""
+        harness = self._make_storage_attach_harness()
+        harness.add_storage('test-storage', attach=True)
+        harness.begin()
+        self.assertNotIn('test-storage/0', harness.charm.attached)
+
+    def test_storage_attach_begin_with_hooks_emits(self):
+        """`attach` doesn't emit storage-attached before `begin_with_initial_hooks`."""
+        harness = self._make_storage_attach_harness()
+        harness.add_storage('test-storage', attach=True)
+        harness.begin_with_initial_hooks()
+        self.assertIn('test-storage/0', harness.charm.attached)
+        self.assertTrue(harness.charm.locations[0])
+
+    def test_storage_add_with_later_attach(self):
+        harness = self._make_storage_attach_harness()
+        harness.begin()
+        storage_ids = harness.add_storage('test-storage', attach=False)
+        self.assertNotIn('test-storage/0', harness.charm.attached)
+        for s_id in storage_ids:
+            harness.attach_storage(s_id)
+            # It's safe to call `attach_storage` more than once, and this will
+            # only trigger the event once - this is the same as executing
+            # `juju attach-storage <unit> <storage>` more than once.
+            harness.attach_storage(s_id)
+        self.assertEqual(harness.charm.attached.count('test-storage/0'), 1)
+
+    def test_storage_machine_charm_metadata(self):
+        meta = '''
+            name: test
+            storage:
+                test-storage:
+                    type: filesystem
+                    mount: /mounts/foo
+            '''
+        harness = self._make_storage_attach_harness(meta)
+        harness.begin()
+        harness.add_storage('test-storage', attach=True)
+        self.assertIn('test-storage/0', harness.charm.attached)
+
+    def test_storage_multiple_storage_instances(self):
+        meta = '''
+            name: test
+            storage:
+                test-storage:
+                    type: filesystem
+                    mount: /mounts/foo
+                    multiple:
+                        range: 2-4
+            '''
+        harness = self._make_storage_attach_harness(meta)
+        harness.begin()
+        harness.add_storage('test-storage', 2, attach=True)
+        self.assertEqual(harness.charm.attached, ['test-storage/0', 'test-storage/1'])
+        self.assertNotEqual(harness.charm.locations[0], harness.charm.locations[1])
+        harness.add_storage('test-storage', 2, attach=True)
+        self.assertEqual(
+            harness.charm.attached, [
+                'test-storage/0', 'test-storage/1', 'test-storage/2', 'test-storage/3'])
+        self.assertEqual(len(set(harness.charm.locations)), 4)
+
 
 class TestSecrets(unittest.TestCase):
     def test_add_model_secret_by_app_name_str(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4753,7 +4856,9 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.get_content(), {'password': 'hunter2'})
 
     def test_add_model_secret_by_app_instance(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4766,7 +4871,9 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.get_content(), {'password': 'hunter3'})
 
     def test_add_model_secret_by_unit_instance(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4779,7 +4886,9 @@ class TestSecrets(unittest.TestCase):
         self.assertEqual(secret.get_content(), {'password': 'hunter4'})
 
     def test_get_secret_as_owner(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         harness.begin()
         # App secret.
@@ -4839,7 +4948,9 @@ class TestSecrets(unittest.TestCase):
             harness.add_model_secret('database', {'x': 'y'})  # key too short
 
     def test_set_secret_content(self):
-        harness = ops.testing.Harness(EventRecorder, meta='name: webapp')
+        harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4885,7 +4996,9 @@ class TestSecrets(unittest.TestCase):
             harness.set_secret_content(secret_id, {'x': 'y'})
 
     def test_grant_secret_and_revoke_secret(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4901,7 +5014,9 @@ class TestSecrets(unittest.TestCase):
             harness.model.get_secret(id=secret_id)
 
     def test_grant_secret_wrong_app(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4912,7 +5027,9 @@ class TestSecrets(unittest.TestCase):
             harness.model.get_secret(id=secret_id)
 
     def test_grant_secret_wrong_unit(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
@@ -4931,7 +5048,9 @@ class TestSecrets(unittest.TestCase):
             harness.grant_secret(secret_id, 'webapp')
 
     def test_get_secret_grants(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'database', 'provides': {'db': {'interface': 'pgsql'}}}
+        ))
         self.addCleanup(harness.cleanup)
 
         relation_id = harness.add_relation('db', 'webapp')
@@ -5735,3 +5854,41 @@ class PebbleNoticesMixin:
 class TestNotices(unittest.TestCase, _TestingPebbleClientMixin, PebbleNoticesMixin):
     def setUp(self):
         self.client = self.get_testing_client()
+
+
+class TestCloudSpec(unittest.TestCase):
+    def test_set_cloud_spec(self):
+        class TestCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.start, self._on_start)
+
+            def _on_start(self, event: ops.StartEvent):
+                self.cloud_spec = self.model.get_cloud_spec()
+
+        harness = ops.testing.Harness(TestCharm)
+        self.addCleanup(harness.cleanup)
+        cloud_spec_dict = {
+            'name': 'localhost',
+            'type': 'lxd',
+            'endpoint': 'https://127.0.0.1:8443',
+            'credential': {
+                'auth-type': 'certificate',
+                'attrs': {
+                    'client-cert': 'foo',
+                    'client-key': 'bar',
+                    'server-cert': 'baz'
+                },
+            },
+        }
+        harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
+        harness.begin()
+        harness.charm.on.start.emit()
+        self.assertEqual(harness.charm.cloud_spec, ops.CloudSpec.from_dict(cloud_spec_dict))
+
+    def test_get_cloud_spec_without_set_error(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        with self.assertRaises(ops.ModelError):
+            harness.model.get_cloud_spec()

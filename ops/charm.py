@@ -507,9 +507,10 @@ class RelationEvent(HookEvent):
 class RelationCreatedEvent(RelationEvent):
     """Event triggered when a new relation is created.
 
-    This is triggered when a new relation to another app is added in Juju. This
+    This is triggered when a new integration with another app is added in Juju. This
     can occur before units for those applications have started. All existing
-    relations should be established before start.
+    relations will trigger `RelationCreatedEvent` before :class:`StartEvent` is
+    emitted.
     """
     unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
     """Always ``None``."""
@@ -521,7 +522,7 @@ class RelationJoinedEvent(RelationEvent):
     This event is triggered whenever a new unit of a related
     application joins the relation.  The event fires only when that
     remote unit is first observed by the unit. Callback methods bound
-    to this event may set any local unit settings that can be
+    to this event may set any local unit data that can be
     determined using no more than the name of the joining unit and the
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
@@ -539,13 +540,13 @@ class RelationChangedEvent(RelationEvent):
     the callback method bound to this event.
 
     This event always fires once, after :class:`RelationJoinedEvent`, and
-    will subsequently fire whenever that remote unit changes its settings for
+    will subsequently fire whenever that remote unit changes its data for
     the relation. Callback methods bound to this event should be the only ones
-    that rely on remote relation settings. They should not error if the settings
-    are incomplete, since it can be guaranteed that when the remote unit or
-    application changes its settings, the event will fire again.
+    that rely on remote relation data. They should not error if the data
+    is incomplete, since it can be guaranteed that when the remote unit or
+    application changes its data, the event will fire again.
 
-    The settings that may be queried, or set, are determined by the relation's
+    The data that may be queried, or set, are determined by the relation's
     interface.
     """
 
@@ -1539,7 +1540,9 @@ class StorageMeta:
         self.multiple_range = None
         if 'multiple' in raw:
             range = raw['multiple']['range']
-            if '-' not in range:
+            if range[-1] == '+':
+                self.multiple_range = (int(range[:-1]), None)
+            elif '-' not in range:
                 self.multiple_range = (int(range), int(range))
             else:
                 range = range.split('-')

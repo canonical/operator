@@ -1977,7 +1977,7 @@ containers:
 
         notices = self.container.get_notices(
             user_id=1000,
-            select=pebble.NoticesSelect.ALL,
+            users=pebble.NoticesUsers.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
         )
@@ -1988,7 +1988,7 @@ containers:
 
         self.assertEqual(self.pebble.requests, [('get_notices', dict(
             user_id=1000,
-            select=pebble.NoticesSelect.ALL,
+            users=pebble.NoticesUsers.ALL,
             types=[pebble.NoticeType.CUSTOM],
             keys=['example.com/a', 'example.com/b'],
         ))])
@@ -3789,6 +3789,132 @@ class TestLazyNotice(unittest.TestCase):
             repr(n),
             "LazyNotice(id='123', type='foobar', key='example.com/a')",
         )
+
+
+class TestCloudCredential(unittest.TestCase):
+    def test_from_dict(self):
+        d = {
+            'auth-type': 'certificate',
+        }
+        cloud_cred = ops.CloudCredential.from_dict(d)
+        self.assertEqual(cloud_cred.auth_type, d['auth-type'])
+        self.assertEqual(cloud_cred.attributes, {})
+        self.assertEqual(cloud_cred.redacted, [])
+
+    def test_from_dict_full(self):
+        d = {
+            'auth-type': 'certificate',
+            'attrs': {
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz'
+            },
+            'redacted': ['foo']
+        }
+        cloud_cred = ops.CloudCredential.from_dict(d)
+        self.assertEqual(cloud_cred.auth_type, d['auth-type'])
+        self.assertEqual(cloud_cred.attributes, d['attrs'])
+        self.assertEqual(cloud_cred.redacted, d['redacted'])
+
+
+class TestCloudSpec(unittest.TestCase):
+    def test_from_dict(self):
+        cloud_spec = ops.CloudSpec.from_dict(
+            {
+                'type': 'lxd',
+                'name': 'localhost',
+            }
+        )
+        self.assertEqual(cloud_spec.type, 'lxd')
+        self.assertEqual(cloud_spec.name, 'localhost')
+        self.assertEqual(cloud_spec.region, None)
+        self.assertEqual(cloud_spec.endpoint, None)
+        self.assertEqual(cloud_spec.identity_endpoint, None)
+        self.assertEqual(cloud_spec.storage_endpoint, None)
+        self.assertIsNone(cloud_spec.credential)
+        self.assertEqual(cloud_spec.ca_certificates, [])
+        self.assertEqual(cloud_spec.skip_tls_verify, False)
+        self.assertEqual(cloud_spec.is_controller_cloud, False)
+
+    def test_from_dict_full(self):
+        cred = {
+            'auth-type': 'certificate',
+            'attrs': {
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz'
+            },
+            'redacted': ['foo']
+        }
+        d = {
+            'type': 'lxd',
+            'name': 'localhost',
+            'region': 'localhost',
+            'endpoint': 'https://10.76.251.1:8443',
+            'credential': cred,
+            'identity-endpoint': 'foo',
+            'storage-endpoint': 'bar',
+            'cacertificates': ['foo', 'bar'],
+            'skip-tls-verify': False,
+            'is-controller-cloud': True,
+        }
+        cloud_spec = ops.CloudSpec.from_dict(d)
+        self.assertEqual(cloud_spec.type, d['type'])
+        self.assertEqual(cloud_spec.name, d['name'])
+        self.assertEqual(cloud_spec.region, d['region'])
+        self.assertEqual(cloud_spec.endpoint, d['endpoint'])
+        self.assertEqual(cloud_spec.credential, ops.CloudCredential.from_dict(cred))
+        self.assertEqual(cloud_spec.identity_endpoint, d['identity-endpoint'])
+        self.assertEqual(cloud_spec.storage_endpoint, d['storage-endpoint'])
+        self.assertEqual(cloud_spec.ca_certificates, d['cacertificates'])
+        self.assertEqual(cloud_spec.skip_tls_verify, False)
+        self.assertEqual(cloud_spec.is_controller_cloud, True)
+
+    def test_from_dict_no_credential(self):
+        d = {
+            'type': 'lxd',
+            'name': 'localhost',
+            'region': 'localhost',
+            'endpoint': 'https://10.76.251.1:8443',
+            'identity-endpoint': 'foo',
+            'storage-endpoint': 'bar',
+            'cacertificates': ['foo', 'bar'],
+            'skip-tls-verify': False,
+            'is-controller-cloud': True,
+        }
+        cloud_spec = ops.CloudSpec.from_dict(d)
+        self.assertEqual(cloud_spec.type, d['type'])
+        self.assertEqual(cloud_spec.name, d['name'])
+        self.assertEqual(cloud_spec.region, d['region'])
+        self.assertEqual(cloud_spec.endpoint, d['endpoint'])
+        self.assertIsNone(cloud_spec.credential)
+        self.assertEqual(cloud_spec.identity_endpoint, d['identity-endpoint'])
+        self.assertEqual(cloud_spec.storage_endpoint, d['storage-endpoint'])
+        self.assertEqual(cloud_spec.ca_certificates, d['cacertificates'])
+        self.assertEqual(cloud_spec.skip_tls_verify, False)
+        self.assertEqual(cloud_spec.is_controller_cloud, True)
+
+
+class TestGetCloudSpec(unittest.TestCase):
+    def setUp(self):
+        self.model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
+    def test_success(self):
+        fake_script(self, 'credential-get', """echo '{"type": "lxd", "name": "localhost"}'""")
+        cloud_spec = self.model.get_cloud_spec()
+        self.assertEqual(cloud_spec.type, 'lxd')
+        self.assertEqual(cloud_spec.name, 'localhost')
+        self.assertEqual(fake_script_calls(self, clear=True),
+                         [['credential-get', '--format=json']])
+
+    def test_error(self):
+        fake_script(
+            self,
+            'credential-get',
+            """echo 'ERROR cannot access cloud credentials' >&2; exit 1""")
+        with self.assertRaises(ops.ModelError) as cm:
+            self.model.get_cloud_spec()
+        self.assertEqual(str(cm.exception), 'ERROR cannot access cloud credentials\n')
 
 
 if __name__ == "__main__":

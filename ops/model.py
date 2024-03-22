@@ -147,7 +147,7 @@ class Model:
     def relations(self) -> 'RelationMapping':
         """Mapping of endpoint to list of :class:`Relation`.
 
-        Answers the question "what am I currently related to".
+        Answers the question "what am I currently integrated with".
         See also :meth:`.get_relation`.
 
         In a ``relation-broken`` event, the broken relation is excluded from
@@ -236,7 +236,7 @@ class Model:
                 given application has more than one relation on a given endpoint.
 
         Raises:
-            TooManyRelatedAppsError: is raised if there is more than one relation to the
+            TooManyRelatedAppsError: is raised if there is more than one integration with the
                 supplied relation_name and no relation_id was supplied
         """
         return self.relations._get_unique(relation_name, relation_id)
@@ -281,6 +281,21 @@ class Model:
         content = self._backend.secret_get(id=id, label=label)
         return Secret(self._backend, id=id, label=label, content=content)
 
+    def get_cloud_spec(self) -> 'CloudSpec':
+        """Get details of the cloud in which the model is deployed.
+
+        Note: This information is only available for machine charms,
+        not Kubernetes sidecar charms.
+
+        Returns:
+            a specification for the cloud in which the model is deployed,
+            including credential information.
+
+        Raises:
+            :class:`ModelError`: if called in a Kubernetes model.
+        """
+        return self._backend.credential_get()
+
 
 if typing.TYPE_CHECKING:
     # (entity type, name): instance.
@@ -315,8 +330,8 @@ class _ModelCache:
 class Application:
     """Represents a named application in the model.
 
-    This might be this charm's application, or might be an application this charm is related
-    to. Charmers should not instantiate Application objects directly, but should use
+    This might be this charm's application, or might be an application this charm is integrated
+    with. Charmers should not instantiate Application objects directly, but should use
     :attr:`Model.app` to get the application this unit is part of, or
     :meth:`Model.get_app` if they need a reference to a given application.
     """
@@ -472,7 +487,7 @@ class Unit:
     """Represents a named unit in the model.
 
     This might be the current unit, another unit of the charm's application, or a unit of
-    another application that the charm is related to.
+    another application that the charm is integrated with.
     """
 
     name: str
@@ -1444,7 +1459,7 @@ class Relation:
     id: int
     """The identifier for a particular relation."""
 
-    app: Optional[Application]
+    app: Application
     """Represents the remote application of this relation.
 
     For peer relations, this will be the local application.
@@ -1474,32 +1489,32 @@ class Relation:
             backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
         self.name = relation_name
         self.id = relation_id
-        self.app: Optional[Application] = None
         self.units: Set[Unit] = set()
         self.active = active
 
-        if is_peer:
-            # For peer relations, both the remote and the local app are the same.
-            self.app = our_unit.app
+        # For peer relations, both the remote and the local app are the same.
+        app = our_unit.app if is_peer else None
 
         try:
             for unit_name in backend.relation_list(self.id):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
-                if self.app is None:
+                if app is None:
                     # Use the app of one of the units if available.
-                    self.app = unit.app
+                    app = unit.app
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
-        if self.app is None:
+        if app is None:
             app_name = backend.relation_remote_app_name(relation_id)
             if app_name is not None:
-                self.app = cache.get(Application, app_name)
+                app = cache.get(Application, app_name)
 
+        # self.app will not be None and always be set because of the fallback mechanism above.
+        self.app = typing.cast(Application, app)
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
@@ -1861,8 +1876,8 @@ class MaintenanceStatus(StatusBase):
 class WaitingStatus(StatusBase):
     """A unit is unable to progress.
 
-    The unit is unable to progress to an active state because an application to which
-    it is related is not running.
+    The unit is unable to progress to an active state because an application with which
+    it is integrated is not running.
 
     """
     name = 'waiting'
@@ -2753,7 +2768,7 @@ class Container:
     def get_notices(
         self,
         *,
-        select: Optional[pebble.NoticesSelect] = None,
+        users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
         types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
@@ -2764,7 +2779,7 @@ class Container:
         parameters.
         """
         return self._pebble.get_notices(
-            select=select,
+            users=users,
             user_id=user_id,
             types=types,
             keys=keys,
@@ -2852,7 +2867,7 @@ class ModelError(Exception):
 
 
 class TooManyRelatedAppsError(ModelError):
-    """Raised by :meth:`Model.get_relation` if there is more than one related application."""
+    """Raised by :meth:`Model.get_relation` if there is more than one integrated application."""
 
     def __init__(self, relation_name: str, num_related: int, max_supported: int):
         super().__init__('Too many remote applications on {} ({} > {})'.format(
@@ -3503,6 +3518,14 @@ class _ModelBackend:
         else:
             self._run("juju-reboot")
 
+    def credential_get(self) -> 'CloudSpec':
+        """Access cloud credentials by running the credential-get hook tool.
+
+        Returns the cloud specification used by the model.
+        """
+        result = self._run('credential-get', return_output=True, use_json=True)
+        return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
+
 
 class _ModelBackendValidator:
     """Provides facilities for validating inputs and formatting them for model backends."""
@@ -3592,3 +3615,85 @@ class LazyNotice:
         self._notice = self._container.get_notice(self.id)
         assert self._notice.type == self.type
         assert self._notice.key == self.key
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudCredential:
+    """Credentials for cloud.
+
+    Used as the type of attribute `credential` in :class:`CloudSpec`.
+    """
+
+    auth_type: str
+    """Authentication type."""
+
+    attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """A dictionary containing cloud credentials.
+
+    For example, for AWS, it contains `access-key` and `secret-key`;
+    for Azure, `application-id`, `application-password` and `subscription-id`
+    can be found here.
+    """
+
+    redacted: List[str] = dataclasses.field(default_factory=list)
+    """A list of redacted secrets."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
+        """Create a new CloudCredential object from a dictionary."""
+        return cls(
+            auth_type=d['auth-type'],
+            attributes=d.get('attrs') or {},
+            redacted=d.get('redacted') or [],
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudSpec:
+    """Cloud specification information (metadata) including credentials."""
+
+    type: str
+    """Type of the cloud."""
+
+    name: str
+    """Juju cloud name."""
+
+    region: Optional[str] = None
+    """Region of the cloud."""
+
+    endpoint: Optional[str] = None
+    """Endpoint of the cloud."""
+
+    identity_endpoint: Optional[str] = None
+    """Identity endpoint of the cloud."""
+
+    storage_endpoint: Optional[str] = None
+    """Storage endpoint of the cloud."""
+
+    credential: Optional[CloudCredential] = None
+    """Cloud credentials with key-value attributes."""
+
+    ca_certificates: List[str] = dataclasses.field(default_factory=list)
+    """A list of CA certificates."""
+
+    skip_tls_verify: bool = False
+    """Whether to skip TLS verfication."""
+
+    is_controller_cloud: bool = False
+    """If this is the cloud used by the controller, defaults to False."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
+        """Create a new CloudSpec object from a dict parsed from JSON."""
+        return cls(
+            type=d['type'],
+            name=d['name'],
+            region=d.get('region') or None,
+            endpoint=d.get('endpoint') or None,
+            identity_endpoint=d.get('identity-endpoint') or None,
+            storage_endpoint=d.get('storage-endpoint') or None,
+            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
+            ca_certificates=d.get('cacertificates') or [],
+            skip_tls_verify=d.get('skip-tls-verify') or False,
+            is_controller_cloud=d.get('is-controller-cloud') or False,
+        )
