@@ -185,9 +185,9 @@ class Harness(Generic[CharmType]):
                 harness.cleanup()
 
     Below is an example test using :meth:`begin_with_initial_hooks` that ensures
-    the charm responds correctly to config changes (the parameter ``harness`` in the 
+    the charm responds correctly to config changes (the parameter ``harness`` in the
     test function is a pytest fixture that does setup/teardown, see :class:`Harness`)::
-        
+
         def test_foo(harness):
             # Instantiate the charm and trigger events that Juju would on startup
             harness.begin_with_initial_hooks()
