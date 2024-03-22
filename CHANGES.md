@@ -3,6 +3,7 @@
 * Updated Pebble Notices `get_notices` parameter name to `users=all` (previously `select=all`).
 * Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed.
 * Updated code examples in the docstring of `ops.testing` from unittest to pytest style.
+* Refactored main.py, creating a new `_Manager` class.
 
 # 2.11.0
 

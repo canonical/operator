@@ -29,7 +29,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import ops
-from ops.main import CHARM_STATE_FILE, _should_use_controller_storage
+from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
@@ -196,7 +196,7 @@ class CharmInitTestCase(unittest.TestCase):
 
 
 @patch('sys.argv', new=("hooks/config-changed",))
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops.main._Manager._setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestDispatch(unittest.TestCase):
     def _check(self, *, with_dispatch: bool = False, dispatch_path: str = ''):
@@ -316,7 +316,7 @@ class _TestMain(abc.ABC):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
         self.addCleanup(shutil.rmtree, str(self._tmpdir))
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
-        self.CHARM_STATE_FILE = self.JUJU_CHARM_DIR / CHARM_STATE_FILE
+        self._charm_state_file = self.JUJU_CHARM_DIR / '.unit-state.db'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
         charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
         self.charm_exec_path = os.path.relpath(charm_path, str(self.hooks_dir))
@@ -348,8 +348,8 @@ class _TestMain(abc.ABC):
     def _read_and_clear_state(self,
                               event_name: str) -> typing.Union[ops.BoundStoredState,
                                                                ops.StoredStateData]:
-        if self.CHARM_STATE_FILE.stat().st_size:
-            storage = SQLiteStorage(self.CHARM_STATE_FILE)
+        if self._charm_state_file.stat().st_size:
+            storage = SQLiteStorage(self._charm_state_file)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
                 af = (self.JUJU_CHARM_DIR / 'actions.yaml')
                 if af.exists():
