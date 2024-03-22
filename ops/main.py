@@ -18,7 +18,6 @@ Note that this module is callable, and calls the :func:`ops.main.main` function.
 This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
 as expected.
 """
-
 import logging
 import os
 import shutil
@@ -294,10 +293,10 @@ class _Dispatcher:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
             logger.warning("Legacy %s exited with status %d.", self._dispatch_path, e.returncode)
-            sys.exit(e.returncode)
+            raise _Abort(e.returncode) from e
         except OSError as e:
             logger.warning("Unable to run legacy %s: %s", self._dispatch_path, e)
-            sys.exit(1)
+            raise _Abort(1) from e
         else:
             logger.debug("Legacy %s exited with status 0.", self._dispatch_path)
 
@@ -330,7 +329,7 @@ class _Dispatcher:
 
         if 'OPERATOR_DISPATCH' in os.environ:
             logger.debug("Charm called itself via %s.", self._dispatch_path)
-            sys.exit(0)
+            raise _Abort(0)
         os.environ['OPERATOR_DISPATCH'] = '1'
 
         self.is_dispatch_aware = True
@@ -369,97 +368,182 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
         return False
 
 
-def main(charm_class: Type[ops.charm.CharmBase],
-         use_juju_for_storage: Optional[bool] = None):
-    """Setup the charm and dispatch the observed event.
+class _Abort(Exception):  # noqa: N818
+    """Raised when something happens that should interrupt ops execution."""
 
-    The event name is based on the way this executable was called (argv[0]).
+    def __init__(self, exit_code: int):
+        super().__init__()
+        self.exit_code = exit_code
 
-    Args:
-        charm_class: the charm class to instantiate and receive the event.
-        use_juju_for_storage: whether to use controller-side storage. If not specified
-            then kubernetes charms that haven't previously used local storage and that
-            are running on a new enough Juju default to controller-side storage,
-            otherwise local storage is used.
+
+class _Manager:
+    """Initialises the Framework and manages the lifecycle of a charm.
+
+    Running _Manager consists of three main steps:
+    - setup: initialise the following from JUJU_* environment variables:
+      - the Framework (hook tool wrappers)
+      - the storage backend
+      - the event that Juju is emitting on us
+      - the charm instance (user-facing)
+    - emit: core user-facing lifecycle step. Consists of:
+      - re-emit any deferred events found in the storage
+      - emit the Juju event to the charm
+        - emit any custom events emitted by the charm during this phase
+      - emit  the ``collect-status`` events
+    - commit: responsible for:
+      - store any events deferred throughout this execution
+      - graceful teardown of the storage
     """
-    charm_dir = _get_charm_dir()
 
-    model_backend = ops.model._ModelBackend()
-    debug = ('JUJU_DEBUG' in os.environ)
-    # For actions, there is a communication channel with the user running the
-    # action, so we want to send exception details through stderr, rather than
-    # only to juju-log as normal.
-    handling_action = ('JUJU_ACTION_NAME' in os.environ)
-    setup_root_logging(model_backend, debug=debug, exc_stderr=handling_action)
-    logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
+    def __init__(
+            self,
+            charm_class: Type["ops.charm.CharmBase"],
+            model_backend: Optional[ops.model._ModelBackend] = None,
+            use_juju_for_storage: Optional[bool] = None,
+            charm_state_path: str = CHARM_STATE_FILE
+    ):
 
-    dispatcher = _Dispatcher(charm_dir)
-    dispatcher.run_any_legacy_hook()
+        self._charm_state_path = charm_state_path
+        self._charm_class = charm_class
+        if model_backend is None:
+            model_backend = ops.model._ModelBackend()
+        self._model_backend = model_backend
 
-    metadata = (charm_dir / 'metadata.yaml').read_text()
-    actions_meta = charm_dir / 'actions.yaml'
-    actions_metadata = actions_meta.read_text() if actions_meta.exists() else None
+        # Do this as early as possible to be sure to catch the most logs.
+        self._setup_root_logging()
 
-    # If we are in a RelationBroken event, we want to know which relation is
-    # broken within the model, not only in the event's `.relation` attribute.
-    if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
-        broken_relation_id = _get_juju_relation_id()
-    else:
-        broken_relation_id = None
-    meta = CharmMeta.from_yaml(metadata, actions_metadata)
-    model = ops.model.Model(meta, model_backend, broken_relation_id=broken_relation_id)
+        self._charm_root = _get_charm_dir()
+        self._charm_meta = CharmMeta.from_charm_root(self._charm_root)
+        self._use_juju_for_storage = use_juju_for_storage
 
-    charm_state_path = charm_dir / CHARM_STATE_FILE
+        # Set up dispatcher, framework and charm objects.
+        self.dispatcher = _Dispatcher(self._charm_root)
+        self.dispatcher.run_any_legacy_hook()
 
-    if use_juju_for_storage and not ops.storage.juju_backend_available():
-        # raise an exception; the charm is broken and needs fixing.
-        msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
-        raise RuntimeError(msg.format(JujuVersion.from_environ()))
+        self.framework = self._make_framework(self.dispatcher)
+        self.charm = self._make_charm(self.framework, self.dispatcher)
 
-    if use_juju_for_storage is None:
-        use_juju_for_storage = _should_use_controller_storage(charm_state_path, meta)
-    elif use_juju_for_storage:
-        warnings.warn("Controller storage is deprecated; it's intended for "
-                      "podspec charms and will be removed in a future release.",
-                      category=DeprecationWarning)
+    def _make_charm(self, framework: "ops.framework.Framework", dispatcher: _Dispatcher):
+        charm = self._charm_class(framework)
+        dispatcher.ensure_event_links(charm)
+        return charm
 
-    if use_juju_for_storage:
-        if dispatcher.is_restricted_context():
+    def _setup_root_logging(self):
+        debug = "JUJU_DEBUG" in os.environ
+        # For actions, there is a communication channel with the user running the
+        # action, so we want to send exception details through stderr, rather than
+        # only to juju-log as normal.
+        handling_action = 'JUJU_ACTION_NAME' in os.environ
+        setup_root_logging(self._model_backend, debug=debug, exc_stderr=handling_action)
+
+        logger.debug("ops %s up and running.", ops.__version__)  # type:ignore
+
+    def _make_storage(self, dispatcher: _Dispatcher):
+        charm_state_path = self._charm_root / self._charm_state_path
+
+        use_juju_for_storage = self._use_juju_for_storage
+        if use_juju_for_storage and not ops.storage.juju_backend_available():
+            # raise an exception; the charm is broken and needs fixing.
+            msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
+            raise RuntimeError(msg.format(JujuVersion.from_environ()))
+
+        if use_juju_for_storage is None:
+            use_juju_for_storage = _should_use_controller_storage(
+                charm_state_path,
+                self._charm_meta
+            )
+        elif use_juju_for_storage:
+            warnings.warn("Controller storage is deprecated; it's intended for "
+                          "podspec charms and will be removed in a future release.",
+                          category=DeprecationWarning)
+
+        if use_juju_for_storage and dispatcher.is_restricted_context():
             # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
             #  Though we eventually expect that Juju will run collect-metrics in a
-            #  non-restricted context. Once we can determine that we are running collect-metrics
-            #  in a non-restricted context, we should fire the event as normal.
+            #  non-restricted context. Once we can determine that we are running
+            #  collect-metrics in a non-restricted context, we should fire the event as normal.
             logger.debug('"%s" is not supported when using Juju for storage\n'
                          'see: https://github.com/canonical/operator/issues/348',
                          dispatcher.event_name)
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
-            return
-        store = ops.storage.JujuStorage()
-    else:
-        store = ops.storage.SQLiteStorage(charm_state_path)
-    framework = ops.framework.Framework(store, charm_dir, meta, model,
-                                        event_name=dispatcher.event_name)
-    framework.set_breakpointhook()
-    try:
-        charm = charm_class(framework)
-        dispatcher.ensure_event_links(charm)
+            raise _Abort(0)
 
+        if self._use_juju_for_storage:
+            store = ops.storage.JujuStorage()
+        else:
+            store = ops.storage.SQLiteStorage(charm_state_path)
+        return store
+
+    def _make_framework(
+            self,
+            dispatcher: _Dispatcher
+    ):
+        # If we are in a RelationBroken event, we want to know which relation is
+        # broken within the model, not only in the event's `.relation` attribute.
+        if os.environ.get('JUJU_DISPATCH_PATH', '').endswith('-relation-broken'):
+            broken_relation_id = _get_juju_relation_id()
+        else:
+            broken_relation_id = None
+
+        model = ops.model.Model(self._charm_meta, self._model_backend,
+                                broken_relation_id=broken_relation_id)
+        store = self._make_storage(dispatcher)
+        framework = ops.framework.Framework(store, self._charm_root, self._charm_meta, model,
+                                            event_name=dispatcher.event_name)
+        framework.set_breakpointhook()
+        return framework
+
+    def _emit(self):
+        """Emit the event on the charm."""
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made. Also adjust the docstring on
         #       EventBase.defer().
         #
         # Skip reemission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
-        if not dispatcher.is_restricted_context():
-            framework.reemit()
+        if not self.dispatcher.is_restricted_context():
+            # Re-emit any deferred events from the previous run.
+            self.framework.reemit()
 
-        _emit_charm_event(charm, dispatcher.event_name)
+        # Emit the Juju event.
+        _emit_charm_event(self.charm, self.dispatcher.event_name)
+        # Emit collect-status events.
+        ops.charm._evaluate_status(self.charm)
 
-        ops.charm._evaluate_status(charm)
+    def _commit(self):
+        """Commit the framework and gracefully teardown."""
+        self.framework.commit()
 
-        framework.commit()
-    finally:
-        framework.close()
+    def run(self):
+        """Emit and then commit the framework."""
+        try:
+            self._emit()
+            self._commit()
+        finally:
+            self.framework.close()
+
+
+def main(charm_class: Type[ops.charm.CharmBase],
+         use_juju_for_storage: Optional[bool] = None):
+    """Set up the charm and dispatch the observed event.
+
+    The event name is based on the way this executable was called (argv[0]).
+
+    Args:
+        charm_class: the charm class to instantiate and receive the event.
+        use_juju_for_storage: whether to use controller-side storage. If not specified
+            then Kubernetes charms that haven't previously used local storage and that
+            are running on a new enough Juju default to controller-side storage,
+            otherwise local storage is used.
+    """
+    try:
+        manager = _Manager(
+            charm_class,
+            use_juju_for_storage=use_juju_for_storage)
+
+        manager.run()
+    except _Abort as e:
+        sys.exit(e.exit_code)
 
 
 # Make this module callable and call main(), so that "import ops" and then

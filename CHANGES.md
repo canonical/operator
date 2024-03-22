@@ -12,6 +12,9 @@ Fixes:
 * `Model.relation.app` type changed from `Application|None` to `Application` (#1151)
 * Fixed attaching storage in Harness before `begin` (#1150)
 
+Refactoring:
+* Refactored main.py, creating a new `_Manager` class (#1085)
+
 Documentation:
 
 * We now use "integrate with" rather than "relate to" (#1145)

@@ -45,7 +45,6 @@ from typing import (
     Mapping,
     MutableMapping,
     Optional,
-    Sequence,
     Set,
     TextIO,
     Tuple,
@@ -876,8 +875,6 @@ class RelationMapping(Mapping[str, List['Relation']]):
                                 self._our_unit, self._backend, self._cache, active=False)
         relations = self[relation_name]
         num_related = len(relations)
-        self._backend._validate_relation_access(
-            relation_name, relations)
         if num_related == 0:
             return None
         elif num_related == 1:
@@ -3038,14 +3035,6 @@ class _ModelBackend:
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
         return 'relation not found' in str(model_error)
-
-    def _validate_relation_access(self, relation_name: str, relations: Sequence['Relation']):
-        """Checks for relation usage inconsistent with the framework/backend state.
-
-        This is used for catching Harness configuration errors and the production implementation
-        here should remain empty.
-        """
-        pass
 
     def relation_ids(self, relation_name: str) -> List[int]:
         relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
