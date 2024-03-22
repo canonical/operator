@@ -666,9 +666,6 @@ class Framework(Object):
 
         The ``breakpoint()`` function is a Python >= 3.7 feature.
 
-        This method was added in ops 1.0; before that, it was done as
-        part of the Framework's ``__init__``.
-
         Returns:
             The old value of ``sys.breakpointhook``.
         """

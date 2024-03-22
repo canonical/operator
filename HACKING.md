@@ -166,10 +166,6 @@ Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
 takes you to the corresponding Discourse page where docs can be commented on
 and edited (if you have earned those privileges).
 
-The ops library's API reference is automatically built and published to
-[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/).  Please be complete with
-docstrings and keep them informative for _users_.
-
 Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted (for example, as done for [File and directory existence in 1.4](https://juju.is/docs/sdk/interact-with-pebble#heading--file-exists)) with Markdown like this:
 
 ```markdown
@@ -178,7 +174,22 @@ Currently we don't publish separate versions of documentation for separate relea
 
 next to the relevant content (e.g. headings, etc.).
 
-Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
+The ops library's API reference is automatically built and published to
+[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/).  Please be complete with
+docstrings and keep them informative for _users_. The published docs are always
+for the in-development (main branch) of ops, and do not include any notes
+indicating changes or additions across versions - we encourage all charmers to
+promptly upgrade to the latest version of ops, and to refer to the release notes
+and changelog for learning about changes.
+
+Changes should also get a new entry in [CHANGES.md](CHANGES.md). These are
+grouped into the same groupings as
+[commit messages](https://www.conventionalcommits.org/en/)
+(feature, fix, documentation, performance, etc). The only exceptions are changes
+that are not visible to the built releases, such as CI workflow changes, or are
+implicit, such as bumping the ops version number. Each entry should be a short,
+single line, bullet point, and should reference the GitHub PR that introduced
+the change (as plain text, not a link).
 
 As noted above, you can generate a local copy of the API reference docs with tox:
 
