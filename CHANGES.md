@@ -1,7 +1,20 @@
 # 2.12.0
 
-* Updated Pebble Notices `get_notices` parameter name to `users=all` (previously `select=all`).
-* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed.
+Features:
+
+* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
+
+Fixes:
+
+* Updated Pebble Notices `get_notices` parameter name to `users=all` (previously `select=all`) (#1146)
+* We now warn when an observer weakref is lost (#1142)
+* Validating observer signatures is more robust (#1147)
+* `Model.relation.app` type changed from `Application|None` to `Application` (#1151)
+* Fixed attaching storage in Harness before `begin` (#1150)
+
+Documentation:
+
+* We now use "integrate with" rather than "relate to" (#1145)
 
 # 2.11.0
 
