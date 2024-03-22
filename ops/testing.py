@@ -179,10 +179,10 @@ class Harness(Generic[CharmType]):
     Always call ``harness.cleanup()`` after creating a :class:`Harness`::
 
         @pytest.fixture()
-            def harness():
-                harness = Harness(MyCharm)
-                yield harness
-                harness.cleanup()
+        def harness():
+            harness = Harness(MyCharm)
+            yield harness
+            harness.cleanup()
 
     Below is an example test using :meth:`begin_with_initial_hooks` that ensures
     the charm responds correctly to config changes (the parameter ``harness`` in the
@@ -1930,7 +1930,7 @@ class Harness(Generic[CharmType]):
 
             # test_charm.py
             def test_start(harness):
-                cloud_spec_dict = {
+                cloud_spec = ops.model.CloudSpec.from_dict({
                     'name': 'localhost',
                     'type': 'lxd',
                     'endpoint': 'https://127.0.0.1:8443',
@@ -1942,12 +1942,11 @@ class Harness(Generic[CharmType]):
                             'server-cert': 'baz'
                         },
                     },
-                }
-                harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
+                })
+                harness.set_cloud_spec(cloud_spec)
                 harness.begin()
                 harness.charm.on.start.emit()
-                expected = ops.model.CloudSpec.from_dict(cloud_spec_dict)
-                assert harness.charm.cloud_spec == expected
+                assert harness.charm.cloud_spec == cloud_spec
 
         """
         self._backend._cloud_spec = spec
