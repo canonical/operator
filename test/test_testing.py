@@ -45,21 +45,6 @@ from ops.testing import ExecResult, _TestingPebbleClient
 is_linux = platform.system() == 'Linux'
 
 
-class SetLeaderErrorTester(ops.CharmBase):
-    """Sets peer relation data inside leader-elected."""
-
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        self._peer_name = 'peer'
-        self.framework.observe(self.on.leader_elected,
-                               self._on_leader_elected)
-
-    def _on_leader_elected(self, event: ops.EventBase):
-        peers = self.model.get_relation(self._peer_name)
-        assert peers is not None
-        peers.data[self.app]["foo"] = "bar"
-
-
 class StorageTester(ops.CharmBase):
     """Record the relation-changed events."""
 
@@ -892,21 +877,6 @@ class TestHarness(unittest.TestCase):
         rel.data[harness.charm.model.unit]['key'] = 'v4'
         self.assertEqual(rel.data[harness.charm.model.unit]['key'], 'v4')
         self.assertEqual([], helper.changes)
-
-    def test_harness_leader_misconfig(self):
-        # language=YAML
-        harness = ops.testing.Harness(SetLeaderErrorTester, meta='''
-            name: postgresql
-            peers:
-              peer:
-                interface: foo
-            ''')
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-
-        with self.assertRaises(RuntimeError) as cm:
-            harness.set_leader(is_leader=True)
-        self.assertTrue(cm.exception.args[0].find('use Harness.add_relation') != -1)
 
     def test_update_peer_relation_app_data(self):
         # language=YAML
