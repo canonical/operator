@@ -176,15 +176,18 @@ class Harness(Generic[CharmType]):
 
     The model created is from the viewpoint of the charm that is being tested.
 
-    Below is an example test using :meth:`begin_with_initial_hooks` that ensures
-    the charm responds correctly to config changes::
+    Always call ``harness.cleanup()`` after creating a :class:`Harness`::
 
         @pytest.fixture()
-        def harness():
-            harness = Harness(MyCharm)
-            yield harness
-            harness.cleanup()
+            def harness():
+                harness = Harness(MyCharm)
+                yield harness
+                harness.cleanup()
 
+    Below is an example test using :meth:`begin_with_initial_hooks` that ensures
+    the charm responds correctly to config changes (the parameter ``harness`` in the 
+    test function is a pytest fixture that does setup/teardown, see :class:`Harness`)::
+        
         def test_foo(harness):
             # Instantiate the charm and trigger events that Juju would on startup
             harness.begin_with_initial_hooks()
@@ -200,7 +203,8 @@ class Harness(Generic[CharmType]):
     To set up the model without triggering events (or calling charm code), perform the
     harness actions before calling :meth:`begin`. Below is an example that adds a
     relation before calling ``begin``, and then updates config to trigger the
-    ``config-changed`` event in the charm::
+    ``config-changed`` event in the charm (the parameter ``harness`` in the test function
+    is a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
         def test_bar(harness):
             # Set up model before "begin" (no events triggered)
@@ -1696,7 +1700,8 @@ class Harness(Generic[CharmType]):
         ownership. To circumvent this limitation, the testing harness maps all user and group
         options related to file operations to match the current user and group.
 
-        Example usage::
+        Example usage (the parameter ``harness`` in the test function is a pytest fixture
+        that does setup/teardown, see :class:`Harness`)::
 
             # charm.py
             class ExampleCharm(ops.CharmBase):
@@ -1709,12 +1714,6 @@ class Harness(Generic[CharmType]):
                     self.hostname = event.workload.pull("/etc/hostname").read()
 
             # test_charm.py
-            @pytest.fixture()
-            def harness():
-                harness = Harness(ExampleCharm)
-                yield harness
-                harness.cleanup()
-
             def test_hostname(harness):
                 root = harness.get_filesystem_root("mycontainer")
                 (root / "etc").mkdir()
@@ -1917,7 +1916,8 @@ class Harness(Generic[CharmType]):
 
         Call this method before the charm calls :meth:`ops.Model.get_cloud_spec`.
 
-        Example usage::
+        Example usage (the parameter ``harness`` in the test function is
+        a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
             # charm.py
             class MyVMCharm(ops.CharmBase):
@@ -1929,9 +1929,8 @@ class Harness(Generic[CharmType]):
                     self.cloud_spec = self.model.get_cloud_spec()
 
             # test_charm.py
-            @pytest.fixture()
-            def cloud_spec_dict():
-                return {
+            def test_start(harness):
+                cloud_spec_dict = {
                     'name': 'localhost',
                     'type': 'lxd',
                     'endpoint': 'https://127.0.0.1:8443',
@@ -1944,18 +1943,9 @@ class Harness(Generic[CharmType]):
                         },
                     },
                 }
-
-            @pytest.fixture()
-            def harness(cloud_spec_dict):
-                harness = Harness(MyVMCharm)
                 harness.set_cloud_spec(ops.model.CloudSpec.from_dict(cloud_spec_dict))
-                yield harness
-                harness.cleanup()
-
-            def test_start(harness, cloud_spec_dict):
                 harness.begin()
                 harness.charm.on.start.emit()
-                print(harness.charm.cloud_spec)
                 expected = ops.model.CloudSpec.from_dict(cloud_spec_dict)
                 assert harness.charm.cloud_spec == expected
 
