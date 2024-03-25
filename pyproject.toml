@@ -23,12 +23,19 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 docs = [
-    "sphinx==6.2.1",
-    "sphinx-design",
+    "canonical-sphinx-extensions",
     "furo",
-    "sphinx-tabs",
-    "lxd-sphinx-extensions",
+    "linkify-it-py",
+    "myst-parser",
+    "pyspelling",
+    "sphinx",
+    "sphinx-autobuild",
     "sphinx-copybutton",
+    "sphinx-design",
+    "sphinx-notfound-page",
+    "sphinx-tabs",
+    "sphinxcontrib-jquery",
+    "sphinxext-opengraph"
 ]
 
 [project.urls]
