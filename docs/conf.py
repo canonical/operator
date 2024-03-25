@@ -83,7 +83,7 @@ extensions = DeduplicateExtensions(extensions)
 ### Configuration for extensions
 
 # Used for related links
-if not 'discourse_prefix' in html_context and 'discourse' in html_context:
+if 'discourse_prefix' not in html_context and 'discourse' in html_context:
     html_context['discourse_prefix'] = html_context['discourse'] + '/t/'
 
 # The URL prefix for the notfound extension depends on whether the documentation uses versions.
@@ -103,7 +103,7 @@ if 'READTHEDOCS_CANONICAL_URL' in os.environ and os.environ['READTHEDOCS_CANONIC
 
 # Set notfound_urls_prefix to the slug (if defined) and the version/language affix
 if slug:
-    notfound_urls_prefix = '/' + slug  + '/' + url_lang + url_version
+    notfound_urls_prefix = '/' + slug + '/' + url_lang + url_version
 elif len(url_lang + url_version) > 0:
     notfound_urls_prefix = '/' + url_lang + url_version
 else:
@@ -116,7 +116,7 @@ notfound_context = {
 
 # Default image for OGP (to prevent font errors, see
 # https://github.com/canonical/sphinx-docs-starter-pack/pull/54 )
-if not 'ogp_image' in locals():
+if 'ogp_image' not in locals():
     ogp_image = 'https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg'
 
 ############################################################
@@ -136,7 +136,7 @@ source_suffix = {
     '.md': 'markdown',
 }
 
-if not 'conf_py_path' in html_context and 'github_folder' in html_context:
+if 'conf_py_path' not in html_context and 'github_folder' in html_context:
     html_context['conf_py_path'] = html_context['github_folder']
 
 # For ignoring specific links
@@ -156,7 +156,7 @@ for tag in custom_tags:
 # Find the current builder
 builder = 'dirhtml'
 if '-b' in sys.argv:
-    builder = sys.argv[sys.argv.index('-b')+1]
+    builder = sys.argv[sys.argv.index('-b') + 1]
 
 # Setting templates_path for epub makes the build fail
 if builder == 'dirhtml' or builder == 'html':
