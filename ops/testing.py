@@ -176,47 +176,49 @@ class Harness(Generic[CharmType]):
 
     The model created is from the viewpoint of the charm that is being tested.
 
+    Always call ``harness.cleanup()`` after creating a :class:`Harness`::
+
+        @pytest.fixture()
+        def harness():
+            harness = Harness(MyCharm)
+            yield harness
+            harness.cleanup()
+
     Below is an example test using :meth:`begin_with_initial_hooks` that ensures
-    the charm responds correctly to config changes::
+    the charm responds correctly to config changes (the parameter ``harness`` in the
+    test function is a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
-        class TestCharm(unittest.TestCase):
-            def test_foo(self):
-                harness = Harness(MyCharm)
-                self.addCleanup(harness.cleanup)  # always clean up after ourselves
+        def test_foo(harness):
+            # Instantiate the charm and trigger events that Juju would on startup
+            harness.begin_with_initial_hooks()
 
-                # Instantiate the charm and trigger events that Juju would on startup
-                harness.begin_with_initial_hooks()
+            # Update charm config and trigger config-changed
+            harness.update_config({'log_level': 'warn'})
 
-                # Update charm config and trigger config-changed
-                harness.update_config({'log_level': 'warn'})
-
-                # Check that charm properly handled config-changed, for example,
-                # the charm added the correct Pebble layer
-                plan = harness.get_container_pebble_plan('prometheus')
-                self.assertIn('--log.level=warn', plan.services['prometheus'].command)
+            # Check that charm properly handled config-changed, for example,
+            # the charm added the correct Pebble layer
+            plan = harness.get_container_pebble_plan('prometheus')
+            assert '--log.level=warn' in plan.services['prometheus'].command
 
     To set up the model without triggering events (or calling charm code), perform the
     harness actions before calling :meth:`begin`. Below is an example that adds a
     relation before calling ``begin``, and then updates config to trigger the
-    ``config-changed`` event in the charm::
+    ``config-changed`` event in the charm (the parameter ``harness`` in the test function
+    is a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
-        class TestCharm(unittest.TestCase):
-            def test_bar(self):
-                harness = Harness(MyCharm)
-                self.addCleanup(harness.cleanup)  # always clean up after ourselves
+        def test_bar(harness):
+            # Set up model before "begin" (no events triggered)
+            harness.set_leader(True)
+            harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
 
-                # Set up model before "begin" (no events triggered)
-                harness.set_leader(True)
-                harness.add_relation('db', 'postgresql', unit_data={'key': 'val'})
+            # Now instantiate the charm to start triggering events as the model changes
+            harness.begin()
+            harness.update_config({'some': 'config'})
 
-                # Now instantiate the charm to start triggering events as the model changes
-                harness.begin()
-                harness.update_config({'some': 'config'})
-
-                # Check that charm has properly handled config-changed, for example,
-                # has written the app's config file
-                root = harness.get_filesystem_root('container')
-                assert (root / 'etc' / 'app.conf').exists()
+            # Check that charm has properly handled config-changed, for example,
+            # has written the app's config file
+            root = harness.get_filesystem_root('container')
+            assert (root / 'etc' / 'app.conf').exists()
 
     Args:
         charm_cls: The Charm class to test.
@@ -962,8 +964,8 @@ class Harness(Generic[CharmType]):
 
         Example::
 
-          rel_id = harness.add_relation('db', 'postgresql')
-          harness.add_relation_unit(rel_id, 'postgresql/0')
+            rel_id = harness.add_relation('db', 'postgresql')
+            harness.add_relation_unit(rel_id, 'postgresql/0')
 
         Args:
             relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
@@ -1004,10 +1006,10 @@ class Harness(Generic[CharmType]):
 
         Example::
 
-          rel_id = harness.add_relation('db', 'postgresql')
-          harness.add_relation_unit(rel_id, 'postgresql/0')
-          ...
-          harness.remove_relation_unit(rel_id, 'postgresql/0')
+            rel_id = harness.add_relation('db', 'postgresql')
+            harness.add_relation_unit(rel_id, 'postgresql/0')
+            ...
+            harness.remove_relation_unit(rel_id, 'postgresql/0')
 
         This will trigger a `relation_departed` event. This would
         normally be followed by a `relation_changed` event triggered
@@ -1698,7 +1700,8 @@ class Harness(Generic[CharmType]):
         ownership. To circumvent this limitation, the testing harness maps all user and group
         options related to file operations to match the current user and group.
 
-        Example usage::
+        Example usage (the parameter ``harness`` in the test function is a pytest fixture
+        that does setup/teardown, see :class:`Harness`)::
 
             # charm.py
             class ExampleCharm(ops.CharmBase):
@@ -1711,15 +1714,12 @@ class Harness(Generic[CharmType]):
                     self.hostname = event.workload.pull("/etc/hostname").read()
 
             # test_charm.py
-            class TestCharm(unittest.TestCase):
-                def test_hostname(self):
-                    harness = Harness(ExampleCharm)
-                    self.addCleanup(harness.cleanup)
-                    root = harness.get_filesystem_root("mycontainer")
-                    (root / "etc").mkdir()
-                    (root / "etc" / "hostname").write_text("hostname.example.com")
-                    harness.begin_with_initial_hooks()
-                    assert harness.charm.hostname == "hostname.example.com"
+            def test_hostname(harness):
+                root = harness.get_filesystem_root("mycontainer")
+                (root / "etc").mkdir()
+                (root / "etc" / "hostname").write_text("hostname.example.com")
+                harness.begin_with_initial_hooks()
+                assert harness.charm.hostname == "hostname.example.com"
 
         Args:
             container: The name of the container or the container instance.
@@ -1916,8 +1916,10 @@ class Harness(Generic[CharmType]):
 
         Call this method before the charm calls :meth:`ops.Model.get_cloud_spec`.
 
-        Example usage::
+        Example usage (the parameter ``harness`` in the test function is
+        a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
+            # charm.py
             class MyVMCharm(ops.CharmBase):
                 def __init__(self, framework: ops.Framework):
                     super().__init__(framework)
@@ -1926,30 +1928,25 @@ class Harness(Generic[CharmType]):
                 def _on_start(self, event: ops.StartEvent):
                     self.cloud_spec = self.model.get_cloud_spec()
 
-            class TestCharm(unittest.TestCase):
-                def setUp(self):
-                    self.harness = ops.testing.Harness(MyVMCharm)
-                    self.addCleanup(self.harness.cleanup)
-
-                def test_start(self):
-                    cloud_spec_dict = {
-                        'name': 'localhost',
-                        'type': 'lxd',
-                        'endpoint': 'https://127.0.0.1:8443',
-                        'credential': {
-                            'authtype': 'certificate',
-                            'attrs': {
-                                'client-cert': 'foo',
-                                'client-key': 'bar',
-                                'server-cert': 'baz'
-                            },
+            # test_charm.py
+            def test_start(harness):
+                cloud_spec = ops.model.CloudSpec.from_dict({
+                    'name': 'localhost',
+                    'type': 'lxd',
+                    'endpoint': 'https://127.0.0.1:8443',
+                    'credential': {
+                        'auth-type': 'certificate',
+                        'attrs': {
+                            'client-cert': 'foo',
+                            'client-key': 'bar',
+                            'server-cert': 'baz'
                         },
-                    }
-                    self.harness.set_cloud_spec(ops.CloudSpec.from_dict(cloud_spec_dict))
-                    self.harness.begin()
-                    self.harness.charm.on.start.emit()
-                    expected = ops.CloudSpec.from_dict(cloud_spec_dict)
-                    self.assertEqual(harness.charm.cloud_spec, expected)
+                    },
+                })
+                harness.set_cloud_spec(cloud_spec)
+                harness.begin()
+                harness.charm.on.start.emit()
+                assert harness.charm.cloud_spec == cloud_spec
 
         """
         self._backend._cloud_spec = spec
