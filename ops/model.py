@@ -2713,6 +2713,7 @@ class Container:
 
         Raises:
             ExecError: if the command exits with a non-zero exit code.
+            TimeoutError: if the maximum timeout is reached.
         """
         if service_context is not None:
             version = JujuVersion.from_environ()

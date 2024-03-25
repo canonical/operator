@@ -18,6 +18,7 @@ import email.parser
 import io
 import json
 import signal
+import socket
 import tempfile
 import test.fake_pebble as fake_pebble
 import typing
@@ -2027,6 +2028,18 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ])
+
+    def test_wait_change_socket_timeout(self):
+        def timeout_response(n: float):
+            self.time.sleep(n)
+            raise socket.timeout("socket.timeout: timed out")
+
+        self.client.responses.append(lambda: timeout_response(3))
+
+        with self.assertRaises(pebble.TimeoutError) as cm:
+            self.client.wait_change(pebble.ChangeID('70'), timeout=3)
+        self.assertIsInstance(cm.exception, pebble.Error)
+        self.assertIsInstance(cm.exception, TimeoutError)
 
     def test_add_layer(self):
         okay_response = {
