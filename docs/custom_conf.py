@@ -68,7 +68,7 @@ html_context = {
     # For example: "ubuntu.com/lxd" or "microcloud.is"
     # If there is no product website, edit the header template to remove the
     # link (see the readme for instructions).
-    'product_page': 'documentation.ubuntu.com',
+    'product_page': 'juju.is/docs/sdk',
 
     # Add your product tag (the orange part of your logo, will be used in the
     # header) to ".sphinx/_static" and change the path here (start with "_static")
@@ -82,7 +82,11 @@ html_context = {
 
     # Change to the Mattermost channel you want to link to
     # (use an empty value if you don't want to link)
-    'mattermost': 'https://chat.canonical.com/canonical/channels/documentation',
+    'mattermost': '',
+
+    # Change to the Matrix channel you want to link to
+    # (use an empty value if you don't want to link)
+    'matrix': 'https://matrix.to/#/#charmhub-charmdev:ubuntu.com',
 
     # Change to the GitHub URL for your project
     'github_url': 'https://github.com/canonical/operator',

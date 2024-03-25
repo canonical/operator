@@ -86,6 +86,12 @@
     </div>
     {% endif %}
 
+    {% if matrix %}
+    <div class="ask-matrix">
+      <a class="muted-link" href="{{ matrix }}">Ask a question on Matrix</a>
+    </div>
+    {% endif %}
+
     {% if github_url and github_version and github_folder %}
 
     {% if github_issues %}
