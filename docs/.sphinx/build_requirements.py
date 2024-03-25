@@ -79,7 +79,7 @@ if __name__ == "__main__":
     requirements = [
         "furo",
         "pyspelling",
-        "sphinx",
+        "sphinx==6.2.1",
         "sphinx-autobuild",
         "sphinx-copybutton",
         "sphinx-design",
