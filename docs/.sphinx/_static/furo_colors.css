@@ -8,7 +8,7 @@ body {
     --color-foreground-secondary: var(--color-foreground-primary);
     --color-foreground-muted: #333;
     --color-background-secondary: #FFF;
-    --color-background-hover: #f2f2f2;
+    --color-background-hover: #CDCDCD;
     --color-brand-primary: #111;
     --color-brand-content: #06C;
     --color-api-background: #f2f2f2;
@@ -39,7 +39,7 @@ body {
         --color-foreground-secondary: var(--color-foreground-primary);
         --color-foreground-muted: #CDCDCD;
         --color-background-secondary: var(--color-background-primary);
-        --color-background-hover: #CDCDCD;
+        --color-background-hover: #666;
         --color-brand-primary: #fff;
         --color-brand-content: #06C;
         --color-api-background: #333;
@@ -68,7 +68,7 @@ body {
             --color-foreground-secondary: var(--color-foreground-primary);
             --color-foreground-muted: #CDCDCD;
             --color-background-secondary: var(--color-background-primary);
-            --color-background-hover: #CDCDCD;
+            --color-background-hover: #666;
             --color-brand-primary: #fff;
             --color-brand-content: #06C;
             --color-api-background: #333;
