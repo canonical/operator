@@ -1,4 +1,5 @@
-import datetime
+# ruff: noqa
+import datetime 
 
 # Custom configuration for the Sphinx documentation builder.
 # All configuration specific to your project should be done in this file.
@@ -19,8 +20,8 @@ import datetime
 ############################################################
 
 # Product name
-project = 'Documentation starter pack'
-author = 'Canonical Group Ltd'
+project = 'The ops library'
+author = 'Canonical Ltd.'
 
 # The title you want to display for the documentation in the sidebar.
 # You might want to include a version number here.
@@ -67,7 +68,7 @@ html_context = {
     # For example: "ubuntu.com/lxd" or "microcloud.is"
     # If there is no product website, edit the header template to remove the
     # link (see the readme for instructions).
-    'product_page': 'documentation.ubuntu.com',
+    'product_page': 'juju.is/docs/sdk',
 
     # Add your product tag (the orange part of your logo, will be used in the
     # header) to ".sphinx/_static" and change the path here (start with "_static")
@@ -77,21 +78,25 @@ html_context = {
     # Change to the discourse instance you want to be able to link to
     # using the :discourse: metadata at the top of a file
     # (use an empty value if you don't want to link)
-    'discourse': 'https://discourse.ubuntu.com',
+    'discourse': 'https://discourse.charmhub.io/',
 
     # Change to the Mattermost channel you want to link to
     # (use an empty value if you don't want to link)
-    'mattermost': 'https://chat.canonical.com/canonical/channels/documentation',
+    'mattermost': '',
+
+    # Change to the Matrix channel you want to link to
+    # (use an empty value if you don't want to link)
+    'matrix': 'https://matrix.to/#/#charmhub-charmdev:ubuntu.com',
 
     # Change to the GitHub URL for your project
-    'github_url': 'https://github.com/canonical/starter-pack',
+    'github_url': 'https://github.com/canonical/operator',
 
     # Change to the branch for this version of the documentation
     'github_version': 'main',
 
     # Change to the folder that contains the documentation
     # (usually "/" or "/docs/")
-    'github_folder': '/',
+    'github_folder': '/docs/',
 
     # Change to an empty value if your GitHub repo doesn't have issues enabled.
     # This will disable the feedback button and the issue link in the footer.
@@ -151,7 +156,13 @@ custom_extensions = [
     'canonical.related-links',
     'canonical.custom-rst-roles',
     'canonical.terminal-output',
-    'notfound.extension'
+    'notfound.extension',
+
+    'sphinx.ext.autodoc',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
     ]
 
 # Add custom required Python modules that must be added to the
@@ -200,3 +211,131 @@ rst_prolog = '''
 .. role:: center
    :class: align-center
 '''
+
+
+# -- Options for sphinx.ext.todo ---------------------------------------------
+
+#  If this is True, todo and todolist produce output, else they
+#  produce nothing. The default is False.
+todo_include_todos = False
+
+
+# -- Options for sphinx.ext.autodoc ------------------------------------------
+
+# This value controls how to represents typehints. The setting takes the
+# following values:
+#     'signature' – Show typehints as its signature (default)
+#     'description' – Show typehints as content of function or method
+#     'none' – Do not show typehints
+autodoc_typehints = 'signature'
+
+# This value selects what content will be inserted into the main body of an
+# autoclass directive. The possible values are:
+#     'class' - Only the class’ docstring is inserted. This is the
+#               default. You can still document __init__ as a separate method
+#               using automethod or the members option to autoclass.
+#     'both' - Both the class’ and the __init__ method’s docstring are
+#              concatenated and inserted.
+#     'init' - Only the __init__ method’s docstring is inserted.
+autoclass_content = 'class'
+
+# This value selects if automatically documented members are sorted
+# alphabetical (value 'alphabetical'), by member type (value
+# 'groupwise') or by source order (value 'bysource'). The default is
+# alphabetical.
+autodoc_member_order = 'alphabetical'
+
+autodoc_default_options = {
+    'members': None,            # None here means "yes"
+    'undoc-members': None,
+    'show-inheritance': None,
+}
+
+
+# -- General configuration ---------------------------------------------------
+
+# If true, Sphinx will warn about all references where the target
+# cannot be found.
+nitpicky = True
+
+# A list of (type, target) tuples (by default empty) that should be ignored when
+# generating warnings in “nitpicky mode”. Note that type should include the
+# domain name if present. Example entries would be ('py:func', 'int') or
+# ('envvar', 'LD_LIBRARY_PATH').
+nitpick_ignore = [
+    # Please keep this list sorted alphabetically.
+    ('py:class', '_ChangeDict'),
+    ('py:class', '_CheckInfoDict'),
+    ('py:class', '_FileInfoDict'),
+    ('py:class', '_NoticeDict'),
+    ('py:class', '_ProgressDict'),
+    ('py:class', '_Readable'),
+    ('py:class', '_RelationMetaDict'),
+    ('py:class', '_ResourceMetaDict'),
+    ('py:class', '_StorageMetaDict'),
+    ('py:class', '_TaskDict'),
+    ('py:class', '_TextOrBinaryIO'),
+    ('py:class', '_WarningDict'),
+    ('py:class', '_Writeable'),
+    ('py:class', 'ops.charm._ContainerBaseDict'),
+    ('py:class', 'ops.model._AddressDict'),
+    ('py:class', 'ops.model._ConfigOption'),
+    ('py:class', 'ops.model._ModelBackend'),
+    ('py:class', 'ops.model._ModelCache'),
+    ('py:class', 'ops.model._NetworkDict'),
+    ('py:class', 'ops.pebble._FileLikeIO'),
+    ('py:class', 'ops.pebble._IOSource'),
+    ('py:class', 'ops.pebble._ServiceInfoDict'),
+    ('py:class', 'ops.pebble._SystemInfoDict'),
+    ('py:class', 'ops.pebble._WebSocket'),
+    ('py:class', 'ops.storage.JujuStorage'),
+    ('py:class', 'ops.storage.SQLiteStorage'),
+    ('py:class', 'ops.testing.CharmType'),
+    ('py:obj', 'ops.testing.CharmType'),
+]
+
+
+# -- Options for sphinx.ext.todo ---------------------------------------------
+
+#  If this is True, todo and todolist produce output, else they
+#  produce nothing. The default is False.
+todo_include_todos = False
+
+
+# -- Options for sphinx.ext.autodoc ------------------------------------------
+
+# This value controls how to represents typehints. The setting takes the
+# following values:
+#     'signature' – Show typehints as its signature (default)
+#     'description' – Show typehints as content of function or method
+#     'none' – Do not show typehints
+autodoc_typehints = 'signature'
+
+# This value selects what content will be inserted into the main body of an
+# autoclass directive. The possible values are:
+#     'class' - Only the class’ docstring is inserted. This is the
+#               default. You can still document __init__ as a separate method
+#               using automethod or the members option to autoclass.
+#     'both' - Both the class’ and the __init__ method’s docstring are
+#              concatenated and inserted.
+#     'init' - Only the __init__ method’s docstring is inserted.
+autoclass_content = 'class'
+
+# This value selects if automatically documented members are sorted
+# alphabetical (value 'alphabetical'), by member type (value
+# 'groupwise') or by source order (value 'bysource'). The default is
+# alphabetical.
+autodoc_member_order = 'alphabetical'
+
+autodoc_default_options = {
+    'members': None,            # None here means "yes"
+    'undoc-members': None,
+    'show-inheritance': None,
+}
+
+
+# -- Options for sphinx.ext.intersphinx --------------------------------------
+
+# This config value contains the locations and names of other projects
+# that should be linked to in this documentation.
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
