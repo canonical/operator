@@ -2592,7 +2592,6 @@ class Client:
             APIError: if an error occurred communicating with pebble, or if the command is not
                 found.
             ExecError: if the command exits with a non-zero exit code.
-            TimeoutError: if the maximum timeout is reached.
         """
         if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
             raise TypeError(f'command must be a list of str, not {type(command).__name__}')
