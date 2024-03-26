@@ -707,8 +707,6 @@ class Unit:
         Use :meth:`open_port` and :meth:`close_port` to manage ports
         individually.
 
-        *New in version 2.7*
-
         Args:
             ports: The ports to open. Provide an int to open a TCP port, or
                 a :class:`Port` to open a port for another protocol.
@@ -742,8 +740,6 @@ class Unit:
 
         This is not supported on Kubernetes charms, can only be called for the current unit,
         and cannot be used in an action hook.
-
-        *New in version 2.8*
 
         Args:
             now: terminate immediately without waiting for the current hook to complete,
