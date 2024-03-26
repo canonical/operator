@@ -1093,6 +1093,22 @@ class TestHarness(unittest.TestCase):
                         default: False
                 ''')
 
+    def test_config_secret_option(self):
+        harness = ops.testing.Harness(RecordingCharm, config='''
+            options:
+                a:
+                    description: a config option
+                    type: secret
+                    default: ""
+            ''')
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        # [jam] I don't think this is right, as user-secrets aren't owned by the app
+        secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
+        harness.update_config(key_values={'a': secret_id})
+        self.assertEqual(harness.charm.changes,
+            [{'name': 'config-changed', 'data': {'a': secret_id}}])
+
     def test_no_config_option_type(self):
         with self.assertRaises(RuntimeError):
             ops.testing.Harness(RecordingCharm, config='''
@@ -3095,6 +3111,7 @@ class RecordingCharm(ops.CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.secret_changed, self._on_secret_changed)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.update_status, self._on_update_status)
 
@@ -3126,6 +3143,9 @@ class RecordingCharm(ops.CharmBase):
 
     def _on_leader_settings_changed(self, _: ops.LeaderSettingsChangedEvent):
         self.changes.append({'name': 'leader-settings-changed'})
+
+    def _on_secret_changed(self, _: ops.SecretChangedEvent):
+        self.changes.append({'name': 'secret-changed'})
 
     def _on_upgrade_charm(self, _: ops.UpgradeCharmEvent):
         self.changes.append({'name': 'upgrade-charm'})
