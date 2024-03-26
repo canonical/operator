@@ -2,7 +2,7 @@
 
 ## Features
 
-* Add `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
+* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
 
 ## Fixes
 
@@ -19,6 +19,7 @@
 ## Documentation
 
 * Use "integrate with" rather than "relate to" (#1145)
+* Updated code examples in the docstring of `ops.testing` from unittest to pytest style (#1157)
 
 # 2.11.0 - 29 Feb 2024
 
