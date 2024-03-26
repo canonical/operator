@@ -18,6 +18,7 @@ For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
 import binascii
+import builtins
 import copy
 import dataclasses
 import datetime
@@ -1722,6 +1723,11 @@ class Client:
     connecting to or transferring data with Pebble will raise a :class:`ConnectionError`. When an
     error occurs executing the request, such as trying to add an invalid layer or execute a command
     that does not exist, an :class:`APIError` is raised.
+
+    The ``timeout`` parameter specifies a timeout in seconds for blocking operations like the
+    connection attempt to Pebble; used by ``urllib.request.OpenerDirector.open``. It's not for
+    methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
+    for the command execution timeout defined in method :meth:`Client.exec`.
     """
 
     _chunk_size = 8192
@@ -2029,8 +2035,10 @@ class Client:
 
             try:
                 return self._wait_change(change_id, this_timeout)
-            except TimeoutError:
-                # Catch timeout from wait endpoint and loop to check deadline
+            except (socket.timeout, builtins.TimeoutError):
+                # NOTE: in Python 3.10 socket.timeout is an alias of TimeoutError,
+                # but we still need to support Python 3.8, so catch both.
+                # Catch timeout from wait endpoint and loop to check deadline.
                 pass
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
