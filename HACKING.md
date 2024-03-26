@@ -166,10 +166,6 @@ Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
 takes you to the corresponding Discourse page where docs can be commented on
 and edited (if you have earned those privileges).
 
-The ops library's API reference is automatically built and published to
-[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/).  Please be complete with
-docstrings and keep them informative for _users_.
-
 Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted (for example, as done for [File and directory existence in 1.4](https://juju.is/docs/sdk/interact-with-pebble#heading--file-exists)) with Markdown like this:
 
 ```markdown
@@ -178,7 +174,22 @@ Currently we don't publish separate versions of documentation for separate relea
 
 next to the relevant content (e.g. headings, etc.).
 
-Noteworthy changes should also get a new entry in [CHANGES.md](CHANGES.md).
+The ops library's API reference is automatically built and published to
+[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/).  Please be complete with
+docstrings and keep them informative for _users_. The published docs are always
+for the in-development (main branch) of ops, and do not include any notes
+indicating changes or additions across versions - we encourage all charmers to
+promptly upgrade to the latest version of ops, and to refer to the release notes
+and changelog for learning about changes.
+
+During the release process, changes also get a new entry in [CHANGES.md](CHANGES.md).
+These are grouped into the same groupings as
+[commit messages](https://www.conventionalcommits.org/en/)
+(feature, fix, documentation, performance, etc). The only exceptions are changes
+that are not visible to the built releases, such as CI workflow changes, or are
+implicit, such as bumping the ops version number. Each entry should be a short,
+single line, bullet point, and should reference the GitHub PR that introduced
+the change (as plain text, not a link).
 
 As noted above, you can generate a local copy of the API reference docs with tox:
 
@@ -223,23 +234,42 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 To make a release of the ops library, do the following:
 
-1. Open a PR to change [version.py][ops/version.py]'s `version` to the
-   [appropriate string](https://semver.org/), and get that merged to main.
-2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
-3. Click "Draft a new release"
-4. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
+2. Click "Draft a new release"
+3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
    and a brief summary of the main changes in the release
    E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
-5. Drop notes and a changelog in the description.
-6. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".) Wait for the new version to be published successfully to [the PyPI project](https://pypi.org/project/ops/).
-7. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
-   next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
-   `'3.14.1.dev0'`).
+4. Use the "Generate Release Notes" button to get a copy of the changes into the
+   notes field.
+5. Group the changes by the commit type (feat, fix, etc), stripping that prefix
+   from the bullet point, and using the full name ("Features", not "feat") for
+   the group heading.
+6. Where appropriate, collapse multiple tightly related bullet points into a
+   single point that refers to multiple commits.
+7. Create a new branch, and copy this text to the [CHANGES.md](CHANGES.md) file,
+   stripping out links, who did each commit, the new contributor list, and the
+   link to the full changelog.
+8. Change [version.py][ops/version.py]'s `version` to the
+   [appropriate string](https://semver.org/).
+9. Add, commit, and push, and open a PR to get the changelog and version bump
+   into main (and get it merged).
+10. Back in the GitHub releases page, tweak the release notes - for example,
+   you might want to have a short paragraph at the intro on particularly
+   noteworthy changes.
+11. Have someone else in the Charm-Tech team proofread the release notes.
+12. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
 
-This will trigger an automatic build for the Python package and publish it to PyPI (authorization is handled via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
+This will trigger an automatic build for the Python package and publish it to
+[PyPI](https://pypi.org/project/ops/)) (authorisation is handled via a
+[Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
+Note that it sometimes take a bit of time for the new release to show up.
 
 See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the GitHub actions, not the versions of the ops library.)
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
+13. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
+
+14. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
+   next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
+   `'3.14.1.dev0'`).
