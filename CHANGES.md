@@ -11,6 +11,7 @@
 * More robust validation of observer signatures (#1147)
 * Change `Model.relation.app` type from `Application|None` to `Application` (#1151)
 * Fix attaching storage in Harness before `begin` (#1150)
+* Fixed an issue where `pebble.Client.exec` might leak a `socket.timeout` (`builtins.TimeoutError`) exception (#1155)
 
 ## Refactoring
 
