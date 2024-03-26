@@ -187,6 +187,33 @@ tox -e docs
 open docs/_build/html/index.html
 ```
 
+## How to Pull in Style Changes
+
+The documentation uses Canonical styling which is customised on top of the [Furo Sphinx theme](https://github.com/pradyunsg/furo). The easiest way to pull in Canonical style changes is by using the Canonical documentation starter pack, see docs [here](https://canonical-starter-pack.readthedocs-hosted.com/) and repository [here](https://github.com/canonical/sphinx-docs-starter-pack).
+
+TL;DR:
+
+- Clone the starter pack repository to a local directory: `git clone git@github.com:canonical/sphinx-docs-starter-pack`.
+- Copy the folder `.sphinx` under the starter pack repo to the operator repo `docs/.sphinx`.
+
+## How to Customise Configurations
+
+There are two configuration files: [`docs/conf.py`](./docs/conf.py) and [`docs/custom_conf.py`](./docs/custom_conf.py), copied and customised from the starter pack repo.
+
+To customise, change the file [`docs/custom_conf.py`](./docs/custom_conf.py) only, and theoretically, we should not change [`docs/conf.py`](./docs/conf.py) (however, some changes are made to [`docs/conf.py`](./docs/conf.py), such as adding autodoc, PATH, fixing issues, etc.)
+
+## How to Pull in Dependency Changes
+
+The Canonical documentation starter pack uses Make to build the documentation, which will run the script [`docs/.sphinx/build_requirements.py`](./docs/.sphinx/build_requirements.py) and generate a requirement file `requirements.txt` under `docs/.sphinx/`.
+
+To pull in new dependency changes from the starter pack, change to the starter pack repository directory, and build with the following command. This will create a virtual environment, generate a dependency file, install the software dependencies, and build the documentation:
+
+```bash
+make html
+```
+
+Then, check out the generated file `.sphinx/requirements.txt`, and make changes to [`pyproject.toml`](./pyproject.toml) accordingly.
+
 # Dependencies
 
 The Python dependencies of `ops` are kept as minimal as possible, to avoid
