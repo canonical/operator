@@ -21,6 +21,7 @@
 
 * Use "integrate with" rather than "relate to" (#1145)
 * Updated code examples in the docstring of `ops.testing` from unittest to pytest style (#1157)
+* Add peer relation details in `Harness.add_relation` docstring (#1168)
 
 # 2.11.0 - 29 Feb 2024
 
