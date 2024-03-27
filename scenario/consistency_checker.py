@@ -327,7 +327,7 @@ def check_storages_consistency(
     return Results(errors, [])
 
 
-def _is_secret_identifier(value):
+def _is_secret_identifier(value: str):
     """Return true iff the value is in the form `secret:{secret id}`."""
     # cf. https://github.com/juju/juju/blob/13eb9df3df16a84fd471af8a3c95ddbd04389b71/core/secrets/secret.go#L48
     return re.match(r"secret:[0-9a-z]{20}$", secret_id)
