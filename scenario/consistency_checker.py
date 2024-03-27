@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from collections.abc import Sequence
 from numbers import Number
-from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple
+from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple, Union
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
@@ -327,10 +327,10 @@ def check_storages_consistency(
     return Results(errors, [])
 
 
-def _is_secret_identifier(value: str):
+def _is_secret_identifier(value: Union[str, int, float, bool]):
     """Return true iff the value is in the form `secret:{secret id}`."""
     # cf. https://github.com/juju/juju/blob/13eb9df3df16a84fd471af8a3c95ddbd04389b71/core/secrets/secret.go#L48
-    return re.match(r"secret:[0-9a-z]{20}$", secret_id)
+    return re.match(r"secret:[0-9a-z]{20}$", str(value))
 
 
 def check_config_consistency(
