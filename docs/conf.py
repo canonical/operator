@@ -156,7 +156,7 @@ for tag in custom_tags:
 # Find the current builder
 builder = 'dirhtml'
 if '-b' in sys.argv:
-    builder = sys.argv[sys.argv.index('-b')+1]
+    builder = sys.argv[sys.argv.index('-b') + 1]
 
 # Setting templates_path for epub makes the build fail
 if builder == 'dirhtml' or builder == 'html':
