@@ -32,7 +32,7 @@ def test_config_get(mycharm):
         "update_status",
         mycharm,
         meta={"name": "foo"},
-        config={"options": {"foo": {"type": "string"}, "baz": {"type": "integer"}}},
+        config={"options": {"foo": {"type": "string"}, "baz": {"type": "int"}}},
         post_event=check_cfg,
     )
 

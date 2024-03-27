@@ -2,6 +2,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import os
+import re
 from collections import Counter
 from collections.abc import Sequence
 from numbers import Number
@@ -326,10 +327,20 @@ def check_storages_consistency(
     return Results(errors, [])
 
 
+def _is_secret_identifier(value):
+    """Return true iff the value is in the form `secret:{secret id}`."""
+    if not value.startswith("secret:"):
+        return False
+    secret_id = value.split(":", 1)[1]
+    # cf. https://github.com/juju/juju/blob/13eb9df3df16a84fd471af8a3c95ddbd04389b71/core/secrets/secret.go#L48
+    return re.match(r"^[0-9a-z]{20}$", secret_id)
+
+
 def check_config_consistency(
     *,
     state: "State",
     charm_spec: "_CharmSpec",
+    juju_version: Tuple[int, ...],
     **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the consistency of the state.config with the charm_spec.config (config.yaml)."""
@@ -348,10 +359,15 @@ def check_config_consistency(
         converters = {
             "string": str,
             "int": int,
-            "integer": int,  # fixme: which one is it?
-            "number": float,
+            "float": float,
             "boolean": bool,
             # "attrs": NotImplemented,  # fixme: wot?
+        }
+        if juju_version >= (3, 4):
+            converters["secret"] = str
+
+        validators = {
+            "secret": _is_secret_identifier,
         }
 
         expected_type_name = meta_config[key].get("type", None)
@@ -369,6 +385,13 @@ def check_config_consistency(
             errors.append(
                 f"config invalid; option {key!r} should be of type {expected_type} "
                 f"but is of type {type(value)}.",
+            )
+
+        elif expected_type_name in validators and not validators[expected_type_name](
+            value,
+        ):
+            errors.append(
+                f"config invalid: option {key!r} value {value!r} is not valid.",
             )
 
     return Results(errors, [])
