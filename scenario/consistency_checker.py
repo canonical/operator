@@ -384,9 +384,7 @@ def check_config_consistency(
                 f"but is of type {type(value)}.",
             )
 
-        elif expected_type_name in validators and not validators[expected_type_name](
-            value,
-        ):
+        elif not validators.get(expected_type_name, lambda _: True)(value):
             errors.append(
                 f"config invalid: option {key!r} value {value!r} is not valid.",
             )
