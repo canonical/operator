@@ -157,7 +157,6 @@ custom_extensions = [
     'canonical.custom-rst-roles',
     'canonical.terminal-output',
     'notfound.extension',
-
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
