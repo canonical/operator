@@ -23,12 +23,19 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 docs = [
-    "sphinx==6.2.1",
-    "sphinx-design",
+    "canonical-sphinx-extensions",
     "furo",
-    "sphinx-tabs",
-    "lxd-sphinx-extensions",
+    "linkify-it-py",
+    "myst-parser",
+    "pyspelling",
+    "sphinx==6.2.1",
+    "sphinx-autobuild",
     "sphinx-copybutton",
+    "sphinx-design",
+    "sphinx-notfound-page",
+    "sphinx-tabs",
+    "sphinxcontrib-jquery",
+    "sphinxext-opengraph"
 ]
 
 [project.urls]
@@ -158,14 +165,6 @@ ignore = [
 
     # "Useless" expression.
     "B018"
-]
-"docs/conf.py" = [
-    "CPY001",  # Missing copyright notice at top of file
-    "D100",  # Missing docstring in public module
-    "I001",  # [*] Import block is un-sorted or un-formatted
-    "A001",  # Variable `copyright` is shadowing a Python builtin
-    "RUF003",  # Comment contains ambiguous {}
-    "RUF019",  # [*] Unnecessary key check before dictionary access
 ]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
