@@ -818,9 +818,9 @@ class Harness(Generic[CharmType]):
         Alternatively, charm tests can call :meth:`add_relation_unit` and
         :meth:`update_relation_data` explicitly.
 
-        For peer relations defined in `charmcraft.yaml`, :meth:`begin_with_initial_hooks` will
-        create them automatically, so the caller doesn't need to call :meth:`add_relation`. If
-        the caller chooses to add a peer relation by themselves, make sure to call
+        For peer relations defined in the charm's metadata, :meth:`begin_with_initial_hooks`
+        will create them automatically, so the caller doesn't need to call :meth:`add_relation`.
+        If the caller chooses to add a peer relation by themselves, make sure to call
         :meth:`add_relation` before :meth:`begin_with_initial_hooks` so that Harness won't
         create it again.
 
