@@ -2012,7 +2012,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         'boolean': bool,
         'int': int,
         'float': float,
-        'secret': str,  # there is some special struture, but they are strings
+        'secret': str,  # There is some special structure, but they are strings.
     }
 
     def __init__(self, config: '_RawConfig'):
