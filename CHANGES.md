@@ -1,28 +1,34 @@
-# Next - TBD
+# 2.12.0 - 28 Mar 2024
 
 ## Features
 
-* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
+* feat(Model): support credential-get hook tool in both model and harness (#1152)
+* feat(Harness): add some support for user secrets (#1167)
 
 ## Fixes
 
-* Update Pebble Notices `get_notices` parameter name to `users=all` (previously `select=all`) (#1146)
-* Warn when an observer weakref is lost (#1142)
-* More robust validation of observer signatures (#1147)
-* Change `Model.relation.app` type from `Application|None` to `Application` (#1151)
-* Fix attaching storage in Harness before `begin` (#1150)
-* Fixed an issue where `pebble.Client.exec` might leak a `socket.timeout` (`builtins.TimeoutError`) exception (#1155)
-
-## Refactoring
-
-* Refactor main.py, creating a new `_Manager` class (#1085)
+* fix: add_relation consistency check and default network (#1138)
+* fix(framework): add warning on lost observer weakref (#1142)
+* fix(pebble)!: change select=all to users=all for pebble get_notices (#1146)
+* fix: inspect the correct signature when validating observe arguments (#1147)
+* fix(harness): don't error out when attempting attaching storage before begin (#1150)
+* fix(model): change model.relation.app type from optional to mandatory (#1151)
+* fix(pebble): catch socket.timeout exception in pebble.Client.exec() (#1155)
+* fix(Harness): remove special-casing for `get_relation` in leader-elected (#1156)
 
 ## Documentation
 
-* Use "integrate with" rather than "relate to" (#1145)
-* Updated code examples in the docstring of `ops.testing` from unittest to pytest style (#1157)
-* Add peer relation details in `Harness.add_relation` docstring (#1168)
-* Update Read the Docs Sphinx Furo theme to use Canonical's latest styling (#1163, #1164, #1165)
+* docs: use 'integrate with' rather than 'relate to' (#1145)
+* docs(testing): update code samples in ops.testing from unittest to pytest style (#1157)
+* docs: adjust change log entries, and update HACKING.md to match (#1159)
+* docs: update read the docs to canonical starter pack (#1163, #1164, #1165)
+* docs(Harness): add a paragraph on peer relations in add_relation (#1168)
+
+## Tooling
+
+* chore: Refactor main.py to add a new _Manager class (#1085)
+* chore: adjust version number to work on the 2.12.0 release (#1141)
+* chore: adjust the imports so that both ruff and isort pass (#1143)
 
 # 2.11.0 - 29 Feb 2024
 
