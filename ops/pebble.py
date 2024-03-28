@@ -1314,7 +1314,17 @@ class CheckInfo:
 class NoticeType(enum.Enum):
     """Enum of notice types."""
 
+    CHANGE_UPDATE = 'change-update'
+    """Recorded whenever a change is updated, that is, when it is first
+    spawned or its status was updated. The key for change-update notices is
+    the change ID.
+    """
+
     CUSTOM = 'custom'
+    """A custom notice reported via the Pebble client API or "pebble notify".
+    The key and data fields are provided by the user. The key must be in
+    the format "mydomain.io/mykey" to ensure well-namespaced notice keys.
+    """
 
 
 class NoticesUsers(enum.Enum):
