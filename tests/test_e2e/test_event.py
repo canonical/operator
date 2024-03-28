@@ -17,6 +17,8 @@ from scenario.state import Event, State, _CharmSpec, _EventType
         ("foo_bar_baz_storage_detaching", _EventType.storage),
         ("foo_pebble_ready", _EventType.workload),
         ("foo_bar_baz_pebble_ready", _EventType.workload),
+        ("foo_pebble_custom_notice", _EventType.workload),
+        ("foo_bar_baz_pebble_custom_notice", _EventType.workload),
         ("secret_removed", _EventType.secret),
         ("pre_commit", _EventType.framework),
         ("commit", _EventType.framework),

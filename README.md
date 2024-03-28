@@ -718,6 +718,45 @@ def test_pebble_exec():
     )
 ```
 
+### Pebble Notices
+
+Pebble can generate notices, which Juju will detect, and wake up the charm to
+let it know that something has happened in the container. The most common
+use-case is Pebble custom notices, which is a mechanism for the workload
+application to trigger a charm event.
+
+When the charm is notified, there might be a queue of existing notices, or just
+the one that has triggered the event:
+
+```python
+import ops
+import scenario
+
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework):
+        super().__init__(framework)
+        framework.observe(self.on["cont"].pebble_custom_notice, self._on_notice)
+
+    def _on_notice(self, event):
+        event.notice.key  # == "example.com/c"
+        for notice in self.unit.get_container("cont").get_notices():
+            ...
+
+ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": "cont": {}})
+notices = [
+    scenario.PebbleNotice(key="example.com/a", occurences=10),
+    scenario.PebbleNotice(key="example.com/b", last_data={"bar": "baz"}),
+    scenario.PebbleNotice(key="example.com/c"),
+]
+cont = scenario.Container(notices=notices)
+ctx.run(cont.custom_notice_event, scenario.State(containers=[cont]))
+```
+
+Note that the `custom_notice_event` is accessed via the container, not the notice,
+and is always for the last notice in the list. An `ops.pebble.Notice` does not
+know which container it is in, but an `ops.PebbleCustomNoticeEvent` does know
+which container did the notifying.
+
 # Storage
 
 If your charm defines `storage` in its metadata, you can use `scenario.state.Storage` to instruct Scenario to make (mocked) filesystem storage available to the charm at runtime.

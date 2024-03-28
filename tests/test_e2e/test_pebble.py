@@ -8,7 +8,7 @@ from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import Container, ExecOutput, Mount, Port, State
+from scenario.state import Container, ExecOutput, Mount, PebbleNotice, Port, State
 from tests.helpers import trigger
 
 
@@ -365,3 +365,23 @@ def test_exec_wait_output_error(charm_cls):
         proc = container.exec(["foo"])
         with pytest.raises(ExecError):
             proc.wait_output()
+
+
+def test_pebble_custom_notice(charm_cls):
+    notices = [
+        PebbleNotice(key="example.com/foo"),
+        PebbleNotice(key="example.com/bar", last_data={"a": "b"}),
+        PebbleNotice(key="example.com/baz", occurrences=42),
+    ]
+    cont = Container(
+        name="foo",
+        can_connect=True,
+        notices=notices,
+    )
+
+    state = State(containers=[cont])
+    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
+        cont.custom_notice_event, state
+    ) as mgr:
+        container = mgr.charm.unit.get_container("foo")
+        assert container.get_notices() == [n._to_pebble_notice() for n in notices]

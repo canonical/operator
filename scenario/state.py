@@ -87,6 +87,7 @@ FRAMEWORK_EVENTS = {
     "collect_unit_status",
 }
 PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
+PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = "_pebble_custom_notice"
 RELATION_EVENTS_SUFFIX = {
     "_relation_changed",
     "_relation_broken",
@@ -609,6 +610,72 @@ class Mount(_DCBase):
     src: Union[str, Path]
 
 
+def _now_utc():
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+# Ideally, this would be a subclass of pebble.Notice, but we want to make it
+# easier to use in tests by providing sensible default values, but there's no
+# default key value, so that would need to be first, and that's not the case
+# in pebble.Notice, so it's easier to just be explicit and repetitive here.
+@dataclasses.dataclass(frozen=True)
+class PebbleNotice(_DCBase):
+    key: str
+    """The notice key, a string that differentiates notices of this type.
+
+    This is in the format ``example.com/path``.
+    """
+
+    id: str = dataclasses.field(default_factory=lambda: str(uuid4()))
+    """Unique ID for this notice."""
+
+    user_id: Optional[int] = None
+    """UID of the user who may view this notice (None means notice is public)."""
+
+    type: Union[pebble.NoticeType, str] = pebble.NoticeType.CUSTOM
+    """Type of the notice."""
+
+    first_occurred: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    """The first time one of these notices (type and key combination) occurs."""
+
+    last_occurred: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    """The last time one of these notices occurred."""
+
+    last_repeated: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    """The time this notice was last repeated.
+
+    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    for an explanation of what "repeated" means.
+    """
+
+    occurrences: int = 1
+    """The number of times one of these notices has occurred."""
+
+    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """Additional data captured from the last occurrence of one of these notices."""
+
+    repeat_after: Optional[datetime.timedelta] = None
+    """Minimum time after one of these was last repeated before Pebble will repeat it again."""
+
+    expire_after: Optional[datetime.timedelta] = None
+    """How long since one of these last occurred until Pebble will drop the notice."""
+
+    def _to_pebble_notice(self) -> pebble.Notice:
+        return pebble.Notice(
+            id=self.id,
+            user_id=self.user_id,
+            type=self.type,
+            key=self.key,
+            first_occurred=self.first_occurred,
+            last_occurred=self.last_occurred,
+            last_repeated=self.last_repeated,
+            occurrences=self.occurrences,
+            last_data=self.last_data,
+            repeat_after=self.repeat_after,
+            expire_after=self.expire_after,
+        )
+
+
 @dataclasses.dataclass(frozen=True)
 class Container(_DCBase):
     name: str
@@ -645,6 +712,8 @@ class Container(_DCBase):
     mounts: Dict[str, Mount] = dataclasses.field(default_factory=dict)
 
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
+
+    notices: List[PebbleNotice] = dataclasses.field(default_factory=list)
 
     def _render_services(self):
         # copied over from ops.testing._TestingPebbleClient._render_services()
@@ -712,6 +781,21 @@ class Container(_DCBase):
                 "but that's most likely not what you want.",
             )
         return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
+
+    @property
+    def custom_notice_event(self):
+        """Sugar to generate a <this container's name>-pebble-custom-notice event for the latest notice."""
+        if not self.notices:
+            raise RuntimeError("This container does not have any notices.")
+        if not self.can_connect:
+            logger.warning(
+                "you **can** fire pebble-custom-notice while the container cannot connect, "
+                "but that's most likely not what you want.",
+            )
+        return Event(
+            path=normalize_name(self.name + "-pebble-custom-notice"),
+            container=self,
+        )
 
 
 _RawStatusLiteral = Literal[
@@ -1191,6 +1275,8 @@ class _EventPath(str):
         # Whether the event name indicates that this is a workload event.
         if s.endswith(PEBBLE_READY_EVENT_SUFFIX):
             return PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
+            return PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.workload
 
         if s in BUILTIN_EVENTS:
             return "", _EventType.builtin
@@ -1397,6 +1483,17 @@ class Event(_DCBase):
             snapshot_data = {
                 "container_name": container.name,
             }
+            if self._path.suffix == PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX:
+                if not container.notices:
+                    raise RuntimeError("Container has no notices.")
+                notice = container.notices[-1]
+                snapshot_data.update(
+                    {
+                        "notice_id": notice.id,
+                        "notice_key": notice.key,
+                        "notice_type": str(notice.type),
+                    },
+                )
 
         elif self._is_relation_event:
             # this is a RelationEvent.

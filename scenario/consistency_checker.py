@@ -517,10 +517,10 @@ def check_containers_consistency(
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
     # not fine if:
-    # - you're processing a pebble-ready event and that container is not in state.containers or
+    # - you're processing a Pebble event and that container is not in state.containers or
     #   meta.containers
     if event._is_workload_event:
-        evt_container_name = event.name[: -len("-pebble-ready")]
+        evt_container_name = event.name.split("_pebble_")[0]
         if evt_container_name not in meta_containers:
             errors.append(
                 f"the event being processed concerns container {evt_container_name!r}, but a "
@@ -529,8 +529,8 @@ def check_containers_consistency(
         if evt_container_name not in state_containers:
             errors.append(
                 f"the event being processed concerns container {evt_container_name!r}, but a "
-                f"container with that name is not present in the state. It's odd, but consistent, "
-                f"if it cannot connect; but it should at least be there.",
+                f"container with that name is not present in the state. It's odd, but "
+                f"consistent, if it cannot connect; but it should at least be there.",
             )
 
     # - a container in state.containers is not in meta.containers

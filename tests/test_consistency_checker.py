@@ -60,6 +60,16 @@ def test_workload_event_without_container():
         Event("foo-pebble-ready", container=Container("foo")),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
+    assert_inconsistent(
+        State(),
+        Event("foo-pebble-custom-notice", container=Container("foo")),
+        _CharmSpec(MyCharm, {}),
+    )
+    assert_consistent(
+        State(containers=[Container("foo")]),
+        Event("foo-pebble-custom-notice", container=Container("foo")),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
 
 
 def test_container_meta_mismatch():
