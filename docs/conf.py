@@ -1,3 +1,4 @@
+# ruff: noqa
 import sys
 import os
 
@@ -97,12 +98,6 @@ exclude_patterns = [
     '.sphinx',
 ]
 exclude_patterns.extend(custom_excludes)
-
-rst_epilog = '''
-.. include:: /reuse/links.txt
-'''
-if 'custom_rst_epilog' in locals():
-    rst_epilog = custom_rst_epilog
 
 source_suffix = {
     '.rst': 'restructuredtext',
