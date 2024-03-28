@@ -22,11 +22,10 @@
 
 ## Documentation
 
-* docs: use 'integrate with' rather than 'relate to' (#1145)
-* docs(testing): update code samples in ops.testing from unittest to pytest style (#1157)
-* docs: adjust change log entries, and update HACKING.md to match (#1159)
-* docs: update read the docs to canonical starter pack (#1163, #1164, #1165)
-* docs(Harness): add a paragraph on peer relations in add_relation (#1168)
+* Use "integrate with" rather than "relate to" (#1145)
+* Updated code examples in the docstring of `ops.testing` from unittest to pytest style (#1157)
+* Add peer relation details in `Harness.add_relation` docstring (#1168)
+* Update Read the Docs Sphinx Furo theme to use Canonical's latest styling (#1163, #1164, #1165)
 
 ## Tooling
 
