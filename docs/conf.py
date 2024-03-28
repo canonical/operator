@@ -1,43 +1,11 @@
-import os
-import pathlib
+# ruff: noqa
 import sys
-
-import furo
-import furo.navigation
+import os
 
 sys.path.append('./')
 from custom_conf import *
 sys.path.append('.sphinx/')
 from build_requirements import *
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
-
-# Furo patch to get local TOC to show in sidebar (as sphinx-rtd-theme did)
-# See https://github.com/pradyunsg/furo/blob/490527b2aef00b1198770c3389a1979911ee1fcb/src/furo/__init__.py#L115-L128
-
-_old_compute_navigation_tree = furo._compute_navigation_tree
-
-
-def _compute_navigation_tree(context):
-    tree_html = _old_compute_navigation_tree(context)
-    if not tree_html and context.get("toc"):
-        tree_html = furo.navigation.get_navigation_tree(context["toc"])
-    return tree_html
-
-
-furo._compute_navigation_tree = _compute_navigation_tree
-
-# Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
-# "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
-import re  # noqa: E402
-import sphinx.ext.autodoc  # noqa: E402
-sphinx.ext.autodoc.py_ext_sig_re = re.compile(
-    r'''^ ([\w.]+::)?            # explicit module name
-          ([\w.]+\.)?            # module and/or class name(s)
-          ([^.()]+)  \s*         # thing name
-          (?: \((.*)\)           # optional: arguments
-           (?:\s* -> \s* (.*))?  #           return annotation
-          )? $                   # and nothing more
-          ''', re.VERBOSE)
 
 # Configuration file for the Sphinx documentation builder.
 # You should not do any modifications to this file. Put your custom
@@ -83,7 +51,7 @@ extensions = DeduplicateExtensions(extensions)
 ### Configuration for extensions
 
 # Used for related links
-if 'discourse_prefix' not in html_context and 'discourse' in html_context:
+if not 'discourse_prefix' in html_context and 'discourse' in html_context:
     html_context['discourse_prefix'] = html_context['discourse'] + '/t/'
 
 # The URL prefix for the notfound extension depends on whether the documentation uses versions.
@@ -103,7 +71,7 @@ if 'READTHEDOCS_CANONICAL_URL' in os.environ and os.environ['READTHEDOCS_CANONIC
 
 # Set notfound_urls_prefix to the slug (if defined) and the version/language affix
 if slug:
-    notfound_urls_prefix = '/' + slug + '/' + url_lang + url_version
+    notfound_urls_prefix = '/' + slug  + '/' + url_lang + url_version
 elif len(url_lang + url_version) > 0:
     notfound_urls_prefix = '/' + url_lang + url_version
 else:
@@ -116,7 +84,7 @@ notfound_context = {
 
 # Default image for OGP (to prevent font errors, see
 # https://github.com/canonical/sphinx-docs-starter-pack/pull/54 )
-if 'ogp_image' not in locals():
+if not 'ogp_image' in locals():
     ogp_image = 'https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg'
 
 ############################################################
@@ -136,7 +104,7 @@ source_suffix = {
     '.md': 'markdown',
 }
 
-if 'conf_py_path' not in html_context and 'github_folder' in html_context:
+if not 'conf_py_path' in html_context and 'github_folder' in html_context:
     html_context['conf_py_path'] = html_context['github_folder']
 
 # For ignoring specific links
@@ -156,7 +124,7 @@ for tag in custom_tags:
 # Find the current builder
 builder = 'dirhtml'
 if '-b' in sys.argv:
-    builder = sys.argv[sys.argv.index('-b') + 1]
+    builder = sys.argv[sys.argv.index('-b')+1]
 
 # Setting templates_path for epub makes the build fail
 if builder == 'dirhtml' or builder == 'html':

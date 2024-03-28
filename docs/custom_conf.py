@@ -1,5 +1,40 @@
 # ruff: noqa
 import datetime 
+import pathlib
+import sys
+
+import furo
+import furo.navigation
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
+# Furo patch to get local TOC to show in sidebar (as sphinx-rtd-theme did)
+# See https://github.com/pradyunsg/furo/blob/490527b2aef00b1198770c3389a1979911ee1fcb/src/furo/__init__.py#L115-L128
+
+_old_compute_navigation_tree = furo._compute_navigation_tree
+
+
+def _compute_navigation_tree(context):
+    tree_html = _old_compute_navigation_tree(context)
+    if not tree_html and context.get("toc"):
+        tree_html = furo.navigation.get_navigation_tree(context["toc"])
+    return tree_html
+
+
+furo._compute_navigation_tree = _compute_navigation_tree
+
+# Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
+# "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
+import re  # noqa: E402
+import sphinx.ext.autodoc  # noqa: E402
+sphinx.ext.autodoc.py_ext_sig_re = re.compile(
+    r'''^ ([\w.]+::)?            # explicit module name
+          ([\w.]+\.)?            # module and/or class name(s)
+          ([^.()]+)  \s*         # thing name
+          (?: \((.*)\)           # optional: arguments
+           (?:\s* -> \s* (.*))?  #           return annotation
+          )? $                   # and nothing more
+          ''', re.VERBOSE)
 
 # Custom configuration for the Sphinx documentation builder.
 # All configuration specific to your project should be done in this file.
@@ -250,6 +285,11 @@ autodoc_default_options = {
     'show-inheritance': None,
 }
 
+# -- Options for sphinx.ext.intersphinx --------------------------------------
+
+# This config value contains the locations and names of other projects
+# that should be linked to in this documentation.
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 # -- General configuration ---------------------------------------------------
 
@@ -292,49 +332,3 @@ nitpick_ignore = [
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
 ]
-
-
-# -- Options for sphinx.ext.todo ---------------------------------------------
-
-#  If this is True, todo and todolist produce output, else they
-#  produce nothing. The default is False.
-todo_include_todos = False
-
-
-# -- Options for sphinx.ext.autodoc ------------------------------------------
-
-# This value controls how to represents typehints. The setting takes the
-# following values:
-#     'signature' – Show typehints as its signature (default)
-#     'description' – Show typehints as content of function or method
-#     'none' – Do not show typehints
-autodoc_typehints = 'signature'
-
-# This value selects what content will be inserted into the main body of an
-# autoclass directive. The possible values are:
-#     'class' - Only the class’ docstring is inserted. This is the
-#               default. You can still document __init__ as a separate method
-#               using automethod or the members option to autoclass.
-#     'both' - Both the class’ and the __init__ method’s docstring are
-#              concatenated and inserted.
-#     'init' - Only the __init__ method’s docstring is inserted.
-autoclass_content = 'class'
-
-# This value selects if automatically documented members are sorted
-# alphabetical (value 'alphabetical'), by member type (value
-# 'groupwise') or by source order (value 'bysource'). The default is
-# alphabetical.
-autodoc_member_order = 'alphabetical'
-
-autodoc_default_options = {
-    'members': None,            # None here means "yes"
-    'undoc-members': None,
-    'show-inheritance': None,
-}
-
-
-# -- Options for sphinx.ext.intersphinx --------------------------------------
-
-# This config value contains the locations and names of other projects
-# that should be linked to in this documentation.
-intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}

@@ -166,19 +166,6 @@ ignore = [
     # "Useless" expression.
     "B018"
 ]
-"docs/conf.py" = [
-    "CPY001",  # Missing copyright notice at top of file
-    "D100",  # Missing docstring in public module
-    "I001",  # [*] Import block is un-sorted or un-formatted
-    "A001",  # Variable `copyright` is shadowing a Python builtin
-    "RUF003",  # Comment contains ambiguous {}
-    "RUF019",  # [*] Unnecessary key check before dictionary access
-    "E266",  # Too many leading `#` before block comment
-    "F405", # may be undefined, or defined from star imports
-    "E501", # Line too long    
-    "F403", # `from foo import *` used; unable to detect undefined names
-]
-
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
