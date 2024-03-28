@@ -27,10 +27,6 @@
 * Add peer relation details in `Harness.add_relation` docstring (#1168)
 * Update Read the Docs Sphinx Furo theme to use Canonical's latest styling (#1163, #1164, #1165)
 
-## Tooling
-
-* chore: Refactor main.py to add a new _Manager class (#1085)
-
 # 2.11.0 - 29 Feb 2024
 
 ## Features
