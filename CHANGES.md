@@ -16,6 +16,10 @@
 * Don't special-case `get_relation` behaviour in `leader-elected` (#1156)
 * Accept `type: secret` for config options (#1167)
 
+## Refactoring
+
+* Refactor main.py, creating a new `_Manager` class (#1085)
+
 ## Documentation
 
 * docs: use 'integrate with' rather than 'relate to' (#1145)
