@@ -1,4 +1,4 @@
-# Next - TBD
+# 2.12.0 - 28 Mar 2024
 
 ## Features
 
@@ -12,6 +12,9 @@
 * Change `Model.relation.app` type from `Application|None` to `Application` (#1151)
 * Fix attaching storage in Harness before `begin` (#1150)
 * Fixed an issue where `pebble.Client.exec` might leak a `socket.timeout` (`builtins.TimeoutError`) exception (#1155)
+* Add a consistency check and default network to `add_relation` (#1138)
+* Don't special-case `get_relation` behaviour in `leader-elected` (#1156)
+* Accept `type: secret` for config options (#1167)
 
 ## Refactoring
 
