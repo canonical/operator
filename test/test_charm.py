@@ -369,11 +369,18 @@ storage:
                         self.on[workload].pebble_custom_notice,
                         self.on_any_pebble_custom_notice,
                     )
+                    self.framework.observe(
+                        self.on[workload].pebble_change_updated,
+                        self.on_any_pebble_change_updated,
+                    )
 
             def on_any_pebble_ready(self, event: ops.PebbleReadyEvent):
                 self.seen.append(type(event).__name__)
 
             def on_any_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
+                self.seen.append(type(event).__name__)
+
+            def on_any_pebble_change_updated(self, event: ops.PebbleChangeUpdatedEvent):
                 self.seen.append(type(event).__name__)
 
         # language=YAML
@@ -399,11 +406,18 @@ containers:
         charm.on['containerb'].pebble_custom_notice.emit(
             charm.framework.model.unit.get_container('containerb'), '2', 'custom', 'y')
 
+        charm.on['container-a'].pebble_change_updated.emit(
+            charm.framework.model.unit.get_container('container-a'), '1', 'change-update', '42')
+        charm.on['containerb'].pebble_change_updated.emit(
+            charm.framework.model.unit.get_container('containerb'), '2', 'change-update', '42')
+
         self.assertEqual(charm.seen, [
             'PebbleReadyEvent',
             'PebbleReadyEvent',
             'PebbleCustomNoticeEvent',
             'PebbleCustomNoticeEvent',
+            'PebbleChangeUpdatedEvent',
+            'PebbleChangeUpdatedEvent',
         ])
 
     def test_relations_meta(self):

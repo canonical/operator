@@ -808,6 +808,10 @@ class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats."""
 
 
+class PebbleChangeUpdatedEvent(PebbleNoticeEvent):
+    """Event triggered when a Pebble notice of type "change-update" is created or repeats."""
+
+
 class SecretEvent(HookEvent):
     """Base class for all secret events."""
 
@@ -1187,6 +1191,9 @@ class CharmBase(Object):
             container_name = container_name.replace('-', '_')
             self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
             self.on.define_event(f"{container_name}_pebble_custom_notice", PebbleCustomNoticeEvent)
+            self.on.define_event(
+                f"{container_name}_pebble_change_updated",
+                PebbleChangeUpdatedEvent)
 
     @property
     def app(self) -> model.Application:
