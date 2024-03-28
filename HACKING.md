@@ -223,7 +223,7 @@ To pull in new dependency changes from the starter pack, change to the starter p
 make html
 ```
 
-Then, check out the generated file `.sphinx/requirements.txt`, and make changes to [`pyproject.toml`](./pyproject.toml) accordingly.
+Then, compare the generated file `.sphinx/requirements.txt`and the `project.optional-dependencies.docs` section of [`pyproject.toml`](./pyproject.toml) and adjust the `pyproject.toml` file accordingly.
 
 # Dependencies
 
