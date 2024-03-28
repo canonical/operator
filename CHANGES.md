@@ -21,7 +21,7 @@
 
 * Use "integrate with" rather than "relate to" (#1145)
 * Updated code examples in the docstring of `ops.testing` from unittest to pytest style (#1157)
-* Update read the docs sphinx furo theme to use Canonical's latest styling (#1163 #1164 #1165)
+* Update Read the Docs Sphinx Furo theme to use Canonical's latest styling (#1163 #1164 #1165)
 
 # 2.11.0 - 29 Feb 2024
 
