@@ -6,14 +6,15 @@
 
 ## Fixes
 
-* fix: add_relation consistency check and default network (#1138)
-* fix(framework): add warning on lost observer weakref (#1142)
-* fix(pebble)!: change select=all to users=all for pebble get_notices (#1146)
-* fix: inspect the correct signature when validating observe arguments (#1147)
-* fix(harness): don't error out when attempting attaching storage before begin (#1150)
-* fix(model): change model.relation.app type from optional to mandatory (#1151)
-* fix(pebble): catch socket.timeout exception in pebble.Client.exec() (#1155)
-* fix(Harness): remove special-casing for `get_relation` in leader-elected (#1156)
+* Update Pebble Notices `get_notices` parameter name to `users=all` (previously `select=all`) (#1146)
+* Warn when an observer weakref is lost (#1142)
+* More robust validation of observer signatures (#1147)
+* Change `Model.relation.app` type from `Application|None` to `Application` (#1151)
+* Fix attaching storage in Harness before `begin` (#1150)
+* Fixed an issue where `pebble.Client.exec` might leak a `socket.timeout` (`builtins.TimeoutError`) exception (#1155)
+* Add a consistency check and default network to `add_relation` (#1138)
+* Don't special-case `get_relation` behaviour in `leader-elected` (#1156)
+* Accept `type: secret` for config options (#1167)
 
 ## Documentation
 
