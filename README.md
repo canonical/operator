@@ -231,6 +231,8 @@ assert ctx.workload_version_history == ['1', '1.2', '1.5']
 # ...
 ```
 
+Note that the *current* version is not in the version history, as with the status history.
+
 ## Emitted events
 
 If your charm deals with deferred events, custom events, and charm libs that in turn emit their own custom events, it
@@ -807,7 +809,6 @@ state2 = ctx.run("stop", state1)
 assert state2.opened_ports == []
 ```
 
-
 ## Secrets
 
 Scenario has secrets. Here's how you use them.
@@ -925,6 +926,26 @@ with ctx.manager("start", scenario.State(resources={'foo': '/path/to/resource.ta
     # If the charm, at runtime, were to call self.model.resources.fetch("foo"), it would get '/path/to/resource.tar' back.
     path = mgr.charm.model.resources.fetch('foo')
     assert path == '/path/to/resource.tar'
+```
+
+## Model
+
+Charms don't usually need to be aware of the model in which they are deployed,
+but if you need to set the model name or UUID, you can provide a `scenario.Model`
+to the state:
+
+```python
+import ops
+import scenario
+
+class MyCharm(ops.CharmBase):
+    pass
+
+ctx = scenario.Context(MyCharm, meta={"name": "foo"})
+state_in = scenario.State(model=scenario.Model(name="my-model"))
+out = ctx.run("start", state_in)
+assert out.model.name == "my-model"
+assert out.model.uuid == state_in.model.uuid
 ```
 
 # Actions
