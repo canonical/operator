@@ -27,8 +27,6 @@
 ## Tooling
 
 * chore: Refactor main.py to add a new _Manager class (#1085)
-* chore: adjust version number to work on the 2.12.0 release (#1141)
-* chore: adjust the imports so that both ruff and isort pass (#1143)
 
 # 2.11.0 - 29 Feb 2024
 
