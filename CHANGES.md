@@ -2,8 +2,7 @@
 
 ## Features
 
-* feat(Model): support credential-get hook tool in both model and harness (#1152)
-* feat(Harness): add some support for user secrets (#1167)
+* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
 
 ## Fixes
 
