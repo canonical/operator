@@ -200,7 +200,7 @@ open docs/_build/html/index.html
 
 ## How to Pull in Style Changes
 
-The documentation uses Canonical styling which is customised on top of the [Furo Sphinx theme](https://github.com/pradyunsg/furo). The easiest way to pull in Canonical style changes is by using the Canonical documentation starter pack, see docs [here](https://canonical-starter-pack.readthedocs-hosted.com/) and repository [here](https://github.com/canonical/sphinx-docs-starter-pack).
+The documentation uses Canonical styling which is customised on top of the [Furo Sphinx theme](https://github.com/pradyunsg/furo). The easiest way to pull in Canonical style changes is by using the Canonical documentation starter pack, see [docs](https://canonical-starter-pack.readthedocs-hosted.com/) and [repository](https://github.com/canonical/sphinx-docs-starter-pack).
 
 TL;DR:
 
