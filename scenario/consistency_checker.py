@@ -358,7 +358,6 @@ def check_config_consistency(
             "int": int,
             "float": float,
             "boolean": bool,
-            # "attrs": NotImplemented,  # fixme: wot?
         }
         if juju_version >= (3, 4):
             converters["secret"] = str
