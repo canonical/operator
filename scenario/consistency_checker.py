@@ -327,10 +327,10 @@ def check_storages_consistency(
     return Results(errors, [])
 
 
-def _is_secret_identifier(value: Union[str, int, float, bool]):
+def _is_secret_identifier(value: Union[str, int, float, bool]) -> bool:
     """Return true iff the value is in the form `secret:{secret id}`."""
     # cf. https://github.com/juju/juju/blob/13eb9df3df16a84fd471af8a3c95ddbd04389b71/core/secrets/secret.go#L48
-    return re.match(r"secret:[0-9a-z]{20}$", str(value))
+    return bool(re.match(r"secret:[0-9a-z]{20}$", str(value)))
 
 
 def check_config_consistency(
@@ -371,6 +371,7 @@ def check_config_consistency(
         if not expected_type_name:
             errors.append(f"config.yaml invalid; option {key!r} has no 'type'.")
             continue
+        validator = validators.get(expected_type_name)
 
         expected_type = converters.get(expected_type_name)
         if not expected_type:
@@ -384,7 +385,7 @@ def check_config_consistency(
                 f"but is of type {type(value)}.",
             )
 
-        elif not validators.get(expected_type_name, lambda _: True)(value):
+        elif validator and not validator(value):
             errors.append(
                 f"config invalid: option {key!r} value {value!r} is not valid.",
             )
