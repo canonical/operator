@@ -20,6 +20,7 @@ from scenario.state import (
     Secret,
     State,
     Storage,
+    StoredState,
     SubordinateRelation,
     _CharmSpec,
 )
@@ -622,5 +623,50 @@ def test_cloudspec_consistency():
         _CharmSpec(
             MyCharm,
             meta={"name": "MyK8sCharm"},
+        ),
+    )
+
+
+def test_storedstate_consistency():
+    assert_consistent(
+        State(
+            stored_state=[
+                StoredState(None, content={"foo": "bar"}),
+                StoredState(None, "my_stored_state", content={"foo": 1}),
+                StoredState("MyCharmLib", content={"foo": None}),
+                StoredState("OtherCharmLib", content={"foo": (1, 2, 3)}),
+            ]
+        ),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "foo",
+            },
+        ),
+    )
+    assert_inconsistent(
+        State(
+            stored_state=[
+                StoredState(None, content={"foo": "bar"}),
+                StoredState(None, "_stored", content={"foo": "bar"}),
+            ]
+        ),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "foo",
+            },
+        ),
+    )
+    assert_inconsistent(
+        State(stored_state=[StoredState(None, content={"secret": Secret("foo", {})})]),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                "name": "foo",
+            },
         ),
     )

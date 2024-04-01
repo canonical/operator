@@ -980,13 +980,17 @@ class StoredState:
     owner_path: Optional[str]
 
     name: str = "_stored"
+    # Ideally, the type here would be only marshallable types, rather than Any.
+    # However, it's complex to describe those types, since it's a recursive
+    # definition - even in TypeShed the _Marshallable type includes containers
+    # like list[Any], which seems to defeat the point.
     content: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
-    data_type_name: str = "StoredStateData"
+    _data_type_name: str = "StoredStateData"
 
     @property
     def handle_path(self):
-        return f"{self.owner_path or ''}/{self.data_type_name}[{self.name}]"
+        return f"{self.owner_path or ''}/{self._data_type_name}[{self.name}]"
 
 
 _RawPortProtocolLiteral = Literal["tcp", "udp", "icmp"]
