@@ -26,6 +26,9 @@ tox -e unit test/test_charm.py
 # Format the code using isort and autopep8
 tox -e fmt
 
+# Compile the requirements.txt file for docs
+tox -e docs-deps
+
 # Generate a local copy of the Sphinx docs in docs/_build
 tox -e docs
 
@@ -196,6 +199,13 @@ As noted above, you can generate a local copy of the API reference docs with tox
 ```sh
 tox -e docs
 open docs/_build/html/index.html
+```
+
+If dependencies are updated in `pyproject.toml`, you can run the following command
+before generating docs to recompile the `requirements.txt` file used for docs:
+
+```sh
+tox -e docs-deps
 ```
 
 ## How to Pull in Style Changes
