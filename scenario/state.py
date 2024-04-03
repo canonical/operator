@@ -623,7 +623,8 @@ class PebbleNotice(_DCBase):
     key: str
     """The notice key, a string that differentiates notices of this type.
 
-    This is in the format ``example.com/path``.
+    This is in the format ``domain/path``; for example:
+    ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
     """
 
     id: str = dataclasses.field(default_factory=lambda: str(uuid4()))
