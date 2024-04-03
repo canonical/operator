@@ -1107,7 +1107,7 @@ class TestHarness(unittest.TestCase):
         secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         self.assertEqual(harness.charm.changes,
-            [{'name': 'config-changed', 'data': {'a': secret_id}}])
+                         [{'name': 'config-changed', 'data': {'a': secret_id}}])
 
     def test_no_config_option_type(self):
         with self.assertRaises(RuntimeError):
@@ -5188,6 +5188,86 @@ class TestSecrets(unittest.TestCase):
             secret.set_content({"password": "5678"})
         with self.assertRaises(ops.model.SecretNotFoundError):
             secret.remove_all_revisions()
+
+    def test_add_charm_secret(self):
+        # add_charm_secret is an alias to add_model_secret, which is thoroughly
+        # tested already, so here only basic functionality is tested for
+        # add_charm_secret.
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
+        ))
+        self.addCleanup(harness.cleanup)
+        relation_id = harness.add_relation('db', 'database')
+        harness.add_relation_unit(relation_id, 'database/0')
+
+        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'hunter2'})
+
+    def test_add_user_secret(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        secret_content = {'password': 'foo'}
+        secret_id = harness.add_user_secret(secret_content)
+        harness.grant_secret(secret_id, 'webapp')
+
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), secret_content)
+
+    def test_get_user_secret_without_grant(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        with self.assertRaises(ops.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_revoke_user_secret(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        secret_content = {'password': 'foo'}
+        secret_id = harness.add_user_secret(secret_content)
+        harness.grant_secret(secret_id, 'webapp')
+        harness.revoke_secret(secret_id, 'webapp')
+        with self.assertRaises(ops.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_get_user_secret_grants(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        self.assertEqual(harness.get_user_secret_grants(secret_id), set())
+        harness.grant_secret(secret_id, 'webapp')
+        self.assertEqual(harness.get_user_secret_grants(secret_id), set(['webapp']))
+
+    def test_set_user_secret_content(self):
+        harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'foo'})
+        harness.set_secret_content(secret_id, {'password': 'bar'})
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(refresh=True), {'password': 'bar'})
 
 
 class EventRecorder(ops.CharmBase):
