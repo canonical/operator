@@ -268,9 +268,9 @@ To make a release of the ops library, do the following:
    E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
 4. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field.
-5. Group the changes by the commit type (feat, fix, etc), stripping that prefix
-   from the bullet point, and using the full name ("Features", not "feat") for
-   the group heading.
+5. Group the changes by the commit type (feat, fix, etc.) and use full names (e.g., "Features",
+   not "feat") for group headings. Strip the commit type prefix from the bullet point. Strip the
+   username (who did each commit) if the author is a member of the Charm Tech team.
 6. Where appropriate, collapse multiple tightly related bullet points into a
    single point that refers to multiple commits.
 7. Create a new branch, and copy this text to the [CHANGES.md](CHANGES.md) file,
