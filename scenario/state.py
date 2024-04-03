@@ -627,7 +627,7 @@ class PebbleNotice(_DCBase):
     ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
     """
 
-    id: str = dataclasses.field(default_factory=lambda: str(uuid4()))
+    notice_id: str = dataclasses.field(default_factory=lambda: str(uuid4()))
     """Unique ID for this notice."""
 
     user_id: Optional[int] = None
@@ -663,7 +663,7 @@ class PebbleNotice(_DCBase):
 
     def _to_pebble_notice(self) -> pebble.Notice:
         return pebble.Notice(
-            id=self.id,
+            id=self.notice_id,
             user_id=self.user_id,
             type=self.type,
             key=self.key,
@@ -1490,7 +1490,7 @@ class Event(_DCBase):
                 notice = container.notices[-1]
                 snapshot_data.update(
                     {
-                        "notice_id": notice.id,
+                        "notice_id": notice.notice_id,
                         "notice_key": notice.key,
                         "notice_type": str(notice.type),
                     },

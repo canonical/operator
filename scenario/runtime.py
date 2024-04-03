@@ -259,7 +259,7 @@ class Runtime:
             notice = event.container.notices[-1]
             env.update(
                 {
-                    "JUJU_NOTICE_ID": notice.id,
+                    "JUJU_NOTICE_ID": notice.notice_id,
                     "JUJU_NOTICE_TYPE": str(notice.type),
                     "JUJU_NOTICE_KEY": notice.key,
                 },
