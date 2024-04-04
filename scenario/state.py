@@ -353,7 +353,7 @@ class RelationBase(_DCBase):
     """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
     If left empty, it will be automatically derived from metadata.yaml."""
 
-    relation_id: int = dataclasses.field(default_factory=next_relation_id)
+    id: int = dataclasses.field(default_factory=next_relation_id)
     """Juju relation ID. Every new Relation instance gets a unique one,
     if there's trouble, override."""
 
@@ -1410,7 +1410,7 @@ class Event(_DCBase):
 
             snapshot_data = {
                 "relation_name": relation.endpoint,
-                "relation_id": relation.relation_id,
+                "relation_id": relation.id,
                 "app_name": remote_app,
                 "unit_name": f"{remote_app}/{self.relation_remote_unit_id}",
             }

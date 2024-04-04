@@ -388,7 +388,7 @@ def test_relation_ids():
     initial_id = _next_relation_id_counter
     for i in range(10):
         rel = Relation("foo")
-        assert rel.relation_id == initial_id + i
+        assert rel.id == initial_id + i
 
 
 def test_broken_relation_not_in_model_relations(mycharm):

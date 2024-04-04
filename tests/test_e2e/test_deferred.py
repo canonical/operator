@@ -150,7 +150,7 @@ def test_deferred_relation_event_from_relation(mycharm):
     assert out.deferred[0].name == "foo_relation_changed"
     assert out.deferred[0].snapshot_data == {
         "relation_name": rel.endpoint,
-        "relation_id": rel.relation_id,
+        "relation_id": rel.id,
         "app_name": "remote",
         "unit_name": "remote/1",
     }
