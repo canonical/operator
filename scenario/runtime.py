@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import copy
+import dataclasses
 import marshal
 import os
 import re
@@ -379,7 +381,7 @@ class Runtime:
         store = self._get_state_db(temporary_charm_root)
         deferred = store.get_deferred_events()
         stored_state = store.get_stored_state()
-        return state.replace(deferred=deferred, stored_state=stored_state)
+        return dataclasses.replace(state, deferred=deferred, stored_state=stored_state)
 
     @contextmanager
     def _exec_ctx(self, ctx: "Context"):
@@ -418,7 +420,7 @@ class Runtime:
         logger.info(f"Preparing to fire {event.name} on {charm_type.__name__}")
 
         # we make a copy to avoid mutating the input state
-        output_state = state.copy()
+        output_state = copy.deepcopy(state)
 
         logger.info(" - generating virtual charm root")
         with self._exec_ctx(context) as (temporary_charm_root, captured):
@@ -441,7 +443,8 @@ class Runtime:
                     state=output_state,
                     event=event,
                     context=context,
-                    charm_spec=self._charm_spec.replace(
+                    charm_spec=dataclasses.replace(
+                        self._charm_spec,
                         charm_type=self._wrap(charm_type),
                     ),
                 )

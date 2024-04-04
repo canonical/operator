@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import copy
+import dataclasses
 import typing
 from itertools import chain
 from typing import Any, Callable, Dict, Iterable, Optional, TextIO, Type, Union
@@ -36,21 +38,24 @@ def decompose_meta_event(meta_event: Event, state: State):
         for relation in state.relations:
             event = relation.broken_event
             logger.debug(f"decomposed meta {meta_event.name}: {event}")
-            yield event, state.copy()
+            yield event, copy.deepcopy(state)
     elif is_rel_created_meta_event:
         for relation in state.relations:
             event = relation.created_event
             logger.debug(f"decomposed meta {meta_event.name}: {event}")
-            yield event, state.copy()
+            yield event, copy.deepcopy(state)
     else:
         raise RuntimeError(f"unknown meta-event {meta_event.name}")
 
 
 def generate_startup_sequence(state_template: State):
     yield from chain(
-        decompose_meta_event(Event(ATTACH_ALL_STORAGES), state_template.copy()),
-        ((Event("start"), state_template.copy()),),
-        decompose_meta_event(Event(CREATE_ALL_RELATIONS), state_template.copy()),
+        decompose_meta_event(Event(ATTACH_ALL_STORAGES), copy.deepcopy(state_template)),
+        ((Event("start"), copy.deepcopy(state_template)),),
+        decompose_meta_event(
+            Event(CREATE_ALL_RELATIONS),
+            copy.deepcopy(state_template),
+        ),
         (
             (
                 Event(
@@ -60,21 +65,21 @@ def generate_startup_sequence(state_template: State):
                         else "leader_settings_changed"
                     ),
                 ),
-                state_template.copy(),
+                copy.deepcopy(state_template),
             ),
-            (Event("config_changed"), state_template.copy()),
-            (Event("install"), state_template.copy()),
+            (Event("config_changed"), copy.deepcopy(state_template)),
+            (Event("install"), copy.deepcopy(state_template)),
         ),
     )
 
 
 def generate_teardown_sequence(state_template: State):
     yield from chain(
-        decompose_meta_event(Event(BREAK_ALL_RELATIONS), state_template.copy()),
-        decompose_meta_event(Event(DETACH_ALL_STORAGES), state_template.copy()),
+        decompose_meta_event(Event(BREAK_ALL_RELATIONS), copy.deepcopy(state_template)),
+        decompose_meta_event(Event(DETACH_ALL_STORAGES), copy.deepcopy(state_template)),
         (
-            (Event("stop"), state_template.copy()),
-            (Event("remove"), state_template.copy()),
+            (Event("stop"), copy.deepcopy(state_template)),
+            (Event("remove"), copy.deepcopy(state_template)),
         ),
     )
 
@@ -112,8 +117,8 @@ def check_builtin_sequences(
 
     for event, state in generate_builtin_sequences(
         (
-            template.replace(leader=True),
-            template.replace(leader=False),
+            dataclasses.replace(template, leader=True),
+            dataclasses.replace(template, leader=False),
         ),
     ):
         ctx = Context(charm_type=charm_type, meta=meta, actions=actions, config=config)

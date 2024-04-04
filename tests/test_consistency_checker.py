@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 from ops.charm import CharmBase
 
@@ -490,14 +492,14 @@ def test_storage_states():
         _CharmSpec(MyCharm, meta={"name": "everett"}),
     )
     assert_consistent(
-        State(storage=[storage1, storage2.replace(index=2)]),
+        State(storage=[storage1, dataclasses.replace(storage2, index=2)]),
         Event("start"),
         _CharmSpec(
             MyCharm, meta={"name": "frank", "storage": {"foo": {"type": "filesystem"}}}
         ),
     )
     assert_consistent(
-        State(storage=[storage1, storage2.replace(name="marx")]),
+        State(storage=[storage1, dataclasses.replace(storage2, name="marx")]),
         Event("start"),
         _CharmSpec(
             MyCharm,

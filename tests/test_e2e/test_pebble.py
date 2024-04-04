@@ -1,4 +1,5 @@
 import datetime
+import dataclasses
 import tempfile
 from pathlib import Path
 
@@ -158,7 +159,7 @@ def test_fs_pull(charm_cls, make_dirs):
 
     else:
         # nothing has changed
-        out_purged = out.replace(stored_state=state.stored_state)
+        out_purged = dataclasses.replace(out, stored_state=state.stored_state)
         assert not jsonpatch_delta(out_purged, state)
 
 

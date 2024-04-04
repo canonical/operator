@@ -1,4 +1,4 @@
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Type
 
 import pytest
@@ -57,7 +57,7 @@ def state():
 
 def test_bare_event(state, mycharm):
     out = trigger(state, "start", mycharm, meta={"name": "foo"})
-    out_purged = out.replace(stored_state=state.stored_state)
+    out_purged = replace(out, stored_state=state.stored_state)
     assert jsonpatch_delta(state, out_purged) == []
 
 
@@ -96,7 +96,7 @@ def test_status_setting(state, mycharm):
     assert out.workload_version == ""
 
     # ignore stored state in the delta
-    out_purged = out.replace(stored_state=state.stored_state)
+    out_purged = replace(out, stored_state=state.stored_state)
     assert jsonpatch_delta(out_purged, state) == sort_patch(
         [
             {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
@@ -224,7 +224,8 @@ def test_relation_set(mycharm):
     assert mycharm.called
 
     assert asdict(out.relations[0]) == asdict(
-        relation.replace(
+        replace(
+            relation,
             local_app_data={"a": "b"},
             local_unit_data={"c": "d", **DEFAULT_JUJU_DATABAG},
         )

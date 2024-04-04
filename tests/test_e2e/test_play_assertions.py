@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
@@ -60,7 +62,7 @@ def test_charm_heals_on_start(mycharm):
 
     assert out.unit_status == ActiveStatus("yabadoodle")
 
-    out_purged = out.replace(stored_state=initial_state.stored_state)
+    out_purged = dataclasses.replace(out, stored_state=initial_state.stored_state)
     assert jsonpatch_delta(out_purged, initial_state) == [
         {
             "op": "replace",
