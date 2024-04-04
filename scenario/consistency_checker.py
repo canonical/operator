@@ -513,7 +513,7 @@ def check_containers_consistency(
     meta = charm_spec.meta
     meta_containers = list(map(normalize_name, meta.get("containers", {})))
     state_containers = [normalize_name(c.name) for c in state.containers]
-    all_notices = [notice.id for c in state.containers for notice in c.notices]
+    all_notices = {notice.id for c in state.containers for notice in c.notices}
     errors = []
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
