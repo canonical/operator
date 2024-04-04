@@ -9,6 +9,7 @@ from scenario.state import (
     Container,
     Event,
     Network,
+    PebbleNotice,
     PeerRelation,
     Relation,
     Secret,
@@ -65,9 +66,15 @@ def test_workload_event_without_container():
         Event("foo-pebble-custom-notice", container=Container("foo")),
         _CharmSpec(MyCharm, {}),
     )
+    notice = PebbleNotice("example.com/foo")
     assert_consistent(
+        State(containers=[Container("foo", notices=[notice])]),
+        Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
+    assert_inconsistent(
         State(containers=[Container("foo")]),
-        Event("foo-pebble-custom-notice", container=Container("foo")),
+        Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
 
