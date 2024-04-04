@@ -614,10 +614,17 @@ def _now_utc():
     return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
-# Ideally, this would be a subclass of pebble.Notice, but we want to make it
-# easier to use in tests by providing sensible default values, but there's no
-# default key value, so that would need to be first, and that's not the case
-# in pebble.Notice, so it's easier to just be explicit and repetitive here.
+_next_notice_id_counter = 1
+
+
+def next_notice_id(update=True):
+    global _next_notice_id_counter
+    cur = _next_notice_id_counter
+    if update:
+        _next_notice_id_counter += 1
+    return str(cur)
+
+
 @dataclasses.dataclass(frozen=True)
 class PebbleNotice(_DCBase):
     key: str
@@ -627,7 +634,7 @@ class PebbleNotice(_DCBase):
     ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
     """
 
-    id: str = dataclasses.field(default_factory=lambda: str(uuid4()))
+    id: str = dataclasses.field(default_factory=next_notice_id)
     """Unique ID for this notice."""
 
     user_id: Optional[int] = None
@@ -661,7 +668,7 @@ class PebbleNotice(_DCBase):
     expire_after: Optional[datetime.timedelta] = None
     """How long since one of these last occurred until Pebble will drop the notice."""
 
-    def _to_pebble_notice(self) -> pebble.Notice:
+    def _to_ops_notice(self) -> pebble.Notice:
         return pebble.Notice(
             id=self.id,
             user_id=self.user_id,
@@ -784,18 +791,24 @@ class Container(_DCBase):
         return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
 
     @property
-    def custom_notice_event(self):
+    def notice_event(self):
         """Sugar to generate a <this container's name>-pebble-custom-notice event for the latest notice."""
         if not self.notices:
             raise RuntimeError("This container does not have any notices.")
+        # We assume this event is about the most recent notice.
+        notice = self.notices[-1]
+        if notice.type != pebble.NoticeType.CUSTOM:
+            raise RuntimeError("Scenario only knows about custom notices at this time.")
+        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX.replace("_", "-")
         if not self.can_connect:
             logger.warning(
                 "you **can** fire pebble-custom-notice while the container cannot connect, "
                 "but that's most likely not what you want.",
             )
         return Event(
-            path=normalize_name(self.name + "-pebble-custom-notice"),
+            path=normalize_name(self.name + suffix),
             container=self,
+            notice=notice,
         )
 
 
@@ -1304,6 +1317,9 @@ class Event(_DCBase):
     # if this is a workload (container) event, the container it refers to
     container: Optional[Container] = None
 
+    # if this is a Pebble notice event, the notice it refers to
+    notice: Optional[PebbleNotice] = None
+
     # if this is an action event, the Action instance
     action: Optional["Action"] = None
 
@@ -1484,15 +1500,12 @@ class Event(_DCBase):
             snapshot_data = {
                 "container_name": container.name,
             }
-            if self._path.suffix == PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX:
-                if not container.notices:
-                    raise RuntimeError("Container has no notices.")
-                notice = container.notices[-1]
+            if self.notice:
                 snapshot_data.update(
                     {
-                        "notice_id": notice.id,
-                        "notice_key": notice.key,
-                        "notice_type": str(notice.type),
+                        "notice_id": self.notice.id,
+                        "notice_key": self.notice.key,
+                        "notice_type": str(self.notice.type),
                     },
                 )
 
@@ -1558,8 +1571,9 @@ def deferred(
     event_id: int = 1,
     relation: Optional["Relation"] = None,
     container: Optional["Container"] = None,
+    notice: Optional["PebbleNotice"] = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
-        event = Event(event, relation=relation, container=container)
+        event = Event(event, relation=relation, container=container, notice=notice)
     return event.deferred(handler=handler, event_id=event_id)

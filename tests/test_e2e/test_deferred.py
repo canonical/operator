@@ -107,11 +107,12 @@ def test_deferred_workload_evt(mycharm):
 def test_deferred_notice_evt(mycharm):
     notice = PebbleNotice(key="example.com/bar")
     ctr = Container("foo", notices=[notice])
-    evt1 = ctr.custom_notice_event.deferred(handler=mycharm._on_event)
+    evt1 = ctr.notice_event.deferred(handler=mycharm._on_event)
     evt2 = deferred(
         event="foo_pebble_custom_notice",
         handler=mycharm._on_event,
         container=ctr,
+        notice=notice,
     )
 
     assert asdict(evt2) == asdict(evt1)

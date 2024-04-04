@@ -17,12 +17,7 @@ from ops.storage import NoSnapshotError, SQLiteStorage
 from scenario.capture_events import capture_events
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
-from scenario.state import (
-    PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX,
-    DeferredEvent,
-    PeerRelation,
-    StoredState,
-)
+from scenario.state import DeferredEvent, PeerRelation, StoredState
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
@@ -253,10 +248,7 @@ class Runtime:
         if container := event.container:
             env.update({"JUJU_WORKLOAD_NAME": container.name})
 
-        if event.name.endswith(PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
-            if not event.container or not event.container.notices:
-                raise RuntimeError("Pebble notice with no container or notice.")
-            notice = event.container.notices[-1]
+        if notice := event.notice:
             env.update(
                 {
                     "JUJU_NOTICE_ID": notice.id,
