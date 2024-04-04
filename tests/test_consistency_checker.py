@@ -156,6 +156,69 @@ def test_bad_config_option_type():
     )
 
 
+@pytest.mark.parametrize(
+    "config_type",
+    (
+        ("string", "foo", 1),
+        ("int", 1, "1"),
+        ("float", 1.0, 1),
+        ("boolean", False, "foo"),
+    ),
+)
+def test_config_types(config_type):
+    type_name, valid_value, invalid_value = config_type
+    assert_consistent(
+        State(config={"foo": valid_value}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": type_name}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": invalid_value}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": type_name}}}),
+    )
+
+
+@pytest.mark.parametrize("juju_version", ("3.4", "3.5", "4.0"))
+def test_config_secret(juju_version):
+    assert_consistent(
+        State(config={"foo": "secret:co28kefmp25c77utl3n0"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+        juju_version=juju_version,
+    )
+    assert_inconsistent(
+        State(config={"foo": 1}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": "co28kefmp25c77utl3n0"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": "secret:secret"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": "secret:co28kefmp25c77utl3n!"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+
+
+@pytest.mark.parametrize("juju_version", ("2.9", "3.3"))
+def test_config_secret_old_juju(juju_version):
+    assert_inconsistent(
+        State(config={"foo": "secret:co28kefmp25c77utl3n0"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+        juju_version=juju_version,
+    )
+
+
 @pytest.mark.parametrize("bad_v", ("1.0", "0", "1.2", "2.35.42", "2.99.99", "2.99"))
 def test_secrets_jujuv_bad(bad_v):
     secret = Secret("secret:foo", {0: {"a": "b"}})
