@@ -1255,23 +1255,6 @@ class State(_DCBase):
         """Get all storages with this name."""
         return tuple(s for s in self.storage if s.name == name)
 
-    # FIXME: not a great way to obtain a delta, but is "complete". todo figure out a better way.
-    def jsonpatch_delta(self, other: "State"):
-        try:
-            import jsonpatch  # type: ignore
-        except ModuleNotFoundError:
-            logger.error(
-                "cannot import jsonpatch: using the .delta() "
-                "extension requires jsonpatch to be installed."
-                "Fetch it with pip install jsonpatch.",
-            )
-            return NotImplemented
-        patch = jsonpatch.make_patch(
-            dataclasses.asdict(other),
-            dataclasses.asdict(self),
-        ).patch
-        return sort_patch(patch)
-
 
 def _is_valid_charmcraft_25_metadata(meta: Dict[str, Any]):
     # Check whether this dict has the expected mandatory metadata fields according to the
@@ -1367,10 +1350,6 @@ class _CharmSpec(_DCBase, Generic[CharmType]):
                 self.meta.get("peers", {}).items(),
             ),
         )
-
-
-def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
-    return sorted(patch, key=key)
 
 
 @dataclasses.dataclass(frozen=True)

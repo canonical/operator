@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from pathlib import Path
 from typing import (
@@ -5,12 +6,14 @@ from typing import (
     Any,
     Callable,
     Dict,
+    List,
     Optional,
-    Sequence,
     Type,
     TypeVar,
     Union,
 )
+
+import jsonpatch
 
 from scenario.context import DEFAULT_JUJU_VERSION, Context
 
@@ -52,3 +55,15 @@ def trigger(
         pre_event=pre_event,
         post_event=post_event,
     )
+
+
+def jsonpatch_delta(input: "State", output: "State"):
+    patch = jsonpatch.make_patch(
+        dataclasses.asdict(output),
+        dataclasses.asdict(input),
+    ).patch
+    return sort_patch(patch)
+
+
+def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
+    return sorted(patch, key=key)

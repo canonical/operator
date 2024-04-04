@@ -6,8 +6,8 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.state import DEFAULT_JUJU_DATABAG, Container, Relation, State, sort_patch
-from tests.helpers import trigger
+from scenario.state import DEFAULT_JUJU_DATABAG, Container, Relation, State
+from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
@@ -58,7 +58,7 @@ def state():
 def test_bare_event(state, mycharm):
     out = trigger(state, "start", mycharm, meta={"name": "foo"})
     out_purged = out.replace(stored_state=state.stored_state)
-    assert state.jsonpatch_delta(out_purged) == []
+    assert jsonpatch_delta(state, out_purged) == []
 
 
 def test_leader_get(state, mycharm):
@@ -97,7 +97,7 @@ def test_status_setting(state, mycharm):
 
     # ignore stored state in the delta
     out_purged = out.replace(stored_state=state.stored_state)
-    assert out_purged.jsonpatch_delta(state) == sort_patch(
+    assert jsonpatch_delta(out_purged, state) == sort_patch(
         [
             {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
             {"op": "replace", "path": "/app_status/name", "value": "waiting"},
