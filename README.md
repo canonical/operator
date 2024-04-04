@@ -731,7 +731,7 @@ import scenario
 class MyCharm(ops.CharmBase):
     def __init__(self, framework):
         super().__init__(framework)
-        framework.observe(self.on["cont"].pebble_custom_notice, self._on_notice)
+        framework.observe(self.on["cont"].pebble_notice, self._on_notice)
 
     def _on_notice(self, event):
         event.notice.key  # == "example.com/c"
@@ -748,7 +748,7 @@ cont = scenario.Container(notices=notices)
 ctx.run(cont.notice_event, scenario.State(containers=[cont]))
 ```
 
-Note that the `custom_notice_event` is accessed via the container, not the notice,
+Note that the `custom_event` is accessed via the container, not the notice,
 and is always for the last notice in the list. An `ops.pebble.Notice` does not
 know which container it is in, but an `ops.PebbleCustomNoticeEvent` does know
 which container did the notifying. If you need to generate an event for a different
