@@ -8,7 +8,7 @@ from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import Container, ExecOutput, Mount, PebbleNotice, Port, State
+from scenario.state import Container, ExecOutput, Mount, Notice, Port, State
 from tests.helpers import trigger
 
 
@@ -369,9 +369,9 @@ def test_exec_wait_output_error(charm_cls):
 
 def test_pebble_custom_notice(charm_cls):
     notices = [
-        PebbleNotice(key="example.com/foo"),
-        PebbleNotice(key="example.com/bar", last_data={"a": "b"}),
-        PebbleNotice(key="example.com/baz", occurrences=42),
+        Notice(key="example.com/foo"),
+        Notice(key="example.com/bar", last_data={"a": "b"}),
+        Notice(key="example.com/baz", occurrences=42),
     ]
     cont = Container(
         name="foo",

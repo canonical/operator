@@ -626,7 +626,7 @@ def next_notice_id(update=True):
 
 
 @dataclasses.dataclass(frozen=True)
-class PebbleNotice(_DCBase):
+class Notice(_DCBase):
     key: str
     """The notice key, a string that differentiates notices of this type.
 
@@ -721,7 +721,7 @@ class Container(_DCBase):
 
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
 
-    notices: List[PebbleNotice] = dataclasses.field(default_factory=list)
+    notices: List[Notice] = dataclasses.field(default_factory=list)
 
     def _render_services(self):
         # copied over from ops.testing._TestingPebbleClient._render_services()
@@ -1318,7 +1318,7 @@ class Event(_DCBase):
     container: Optional[Container] = None
 
     # if this is a Pebble notice event, the notice it refers to
-    notice: Optional[PebbleNotice] = None
+    notice: Optional[Notice] = None
 
     # if this is an action event, the Action instance
     action: Optional["Action"] = None
@@ -1571,7 +1571,7 @@ def deferred(
     event_id: int = 1,
     relation: Optional["Relation"] = None,
     container: Optional["Container"] = None,
-    notice: Optional["PebbleNotice"] = None,
+    notice: Optional["Notice"] = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):

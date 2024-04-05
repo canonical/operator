@@ -12,14 +12,7 @@ from ops.charm import (
 from ops.framework import Framework
 
 from scenario import Context
-from scenario.state import (
-    Container,
-    DeferredEvent,
-    PebbleNotice,
-    Relation,
-    State,
-    deferred,
-)
+from scenario.state import Container, DeferredEvent, Notice, Relation, State, deferred
 from tests.helpers import trigger
 
 CHARM_CALLED = 0
@@ -105,7 +98,7 @@ def test_deferred_workload_evt(mycharm):
 
 
 def test_deferred_notice_evt(mycharm):
-    notice = PebbleNotice(key="example.com/bar")
+    notice = Notice(key="example.com/bar")
     ctr = Container("foo", notices=[notice])
     evt1 = ctr.notice_event.deferred(handler=mycharm._on_event)
     evt2 = deferred(

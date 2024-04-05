@@ -740,9 +740,9 @@ class MyCharm(ops.CharmBase):
 
 ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": {"my-container": {}}})
 notices = [
-    scenario.PebbleNotice(key="example.com/a", occurences=10),
-    scenario.PebbleNotice(key="example.com/b", last_data={"bar": "baz"}),
-    scenario.PebbleNotice(key="example.com/c"),
+    scenario.Notice(key="example.com/a", occurences=10),
+    scenario.Notice(key="example.com/b", last_data={"bar": "baz"}),
+    scenario.Notice(key="example.com/c"),
 ]
 cont = scenario.Container(notices=notices)
 ctx.run(cont.notice_event, scenario.State(containers=[cont]))
@@ -757,9 +757,9 @@ notice, you can override the notice:
 ```python
 ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": "cont": {}})
 notices = [
-    scenario.PebbleNotice(key="example.com/a", occurences=10),
-    scenario.PebbleNotice(key="example.com/b", last_data={"bar": "baz"}),
-    scenario.PebbleNotice(key="example.com/c"),
+    scenario.Notice(key="example.com/a", occurences=10),
+    scenario.Notice(key="example.com/b", last_data={"bar": "baz"}),
+    scenario.Notice(key="example.com/c"),
 ]
 cont = scenario.Container(notices=notices)
 ctx.run(cont.notice_event(notice=notices[0]), scenario.State(containers=[cont]))
