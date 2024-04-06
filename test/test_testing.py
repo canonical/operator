@@ -1104,7 +1104,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.begin()
         # [jam] I don't think this is right, as user-secrets aren't owned by the app
-        secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
+        secret_id = harness.add_charm_secret('mycharm', {'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         self.assertEqual(harness.charm.changes,
                          [{'name': 'config-changed', 'data': {'a': secret_id}}])
@@ -4831,7 +4831,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
 
 
 class TestSecrets(unittest.TestCase):
-    def test_add_model_secret_by_app_name_str(self):
+    def test_add_charm_secret_by_app_name_str(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
             {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
@@ -4839,13 +4839,13 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
         harness.grant_secret(secret_id, 'webapp')
         secret = harness.model.get_secret(id=secret_id)
         self.assertEqual(secret.id, secret_id)
         self.assertEqual(secret.get_content(), {'password': 'hunter2'})
 
-    def test_add_model_secret_by_app_instance(self):
+    def test_add_charm_secret_by_app_instance(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
             {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
@@ -4854,13 +4854,13 @@ class TestSecrets(unittest.TestCase):
         harness.add_relation_unit(relation_id, 'database/0')
 
         app = harness.model.get_app('database')
-        secret_id = harness.add_model_secret(app, {'password': 'hunter3'})
+        secret_id = harness.add_charm_secret(app, {'password': 'hunter3'})
         harness.grant_secret(secret_id, 'webapp')
         secret = harness.model.get_secret(id=secret_id)
         self.assertEqual(secret.id, secret_id)
         self.assertEqual(secret.get_content(), {'password': 'hunter3'})
 
-    def test_add_model_secret_by_unit_instance(self):
+    def test_add_charm_secret_by_unit_instance(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
             {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
@@ -4869,7 +4869,7 @@ class TestSecrets(unittest.TestCase):
         harness.add_relation_unit(relation_id, 'database/0')
 
         unit = harness.model.get_unit('database/0')
-        secret_id = harness.add_model_secret(unit, {'password': 'hunter4'})
+        secret_id = harness.add_charm_secret(unit, {'password': 'hunter4'})
         harness.grant_secret(secret_id, 'webapp')
         secret = harness.model.get_secret(id=secret_id)
         self.assertEqual(secret.id, secret_id)
@@ -4930,12 +4930,12 @@ class TestSecrets(unittest.TestCase):
         secret = harness.model.get_secret(label="other-name")
         self.assertEqual(secret.get_content(), {'password': 'hunter9'})
 
-    def test_add_model_secret_invalid_content(self):
+    def test_add_charm_secret_invalid_content(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
 
         with self.assertRaises(ValueError):
-            harness.add_model_secret('database', {'x': 'y'})  # key too short
+            harness.add_charm_secret('database', {'x': 'y'})  # key too short
 
     def test_set_secret_content(self):
         harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
@@ -4945,7 +4945,7 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        secret_id = harness.add_model_secret('database', {'foo': '1'})
+        secret_id = harness.add_charm_secret('database', {'foo': '1'})
         harness.grant_secret(secret_id, 'webapp')
         harness.begin()
         harness.framework.observe(harness.charm.on.secret_changed, harness.charm.record_event)
@@ -4981,7 +4981,7 @@ class TestSecrets(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
 
-        secret_id = harness.add_model_secret('database', {'foo': 'bar'})
+        secret_id = harness.add_charm_secret('database', {'foo': 'bar'})
         with self.assertRaises(ValueError):
             harness.set_secret_content(secret_id, {'x': 'y'})
 
@@ -4993,7 +4993,7 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
         harness.grant_secret(secret_id, 'webapp')
         secret = harness.model.get_secret(id=secret_id)
         self.assertEqual(secret.id, secret_id)
@@ -5011,7 +5011,7 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
         harness.grant_secret(secret_id, 'otherapp')
         with self.assertRaises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret_id)
@@ -5024,7 +5024,7 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
         harness.grant_secret(secret_id, 'webapp/1')  # should be webapp/0
         with self.assertRaises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret_id)
@@ -5033,7 +5033,7 @@ class TestSecrets(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
 
-        secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
         with self.assertRaises(RuntimeError):
             harness.grant_secret(secret_id, 'webapp')
 
@@ -5189,10 +5189,10 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(ops.model.SecretNotFoundError):
             secret.remove_all_revisions()
 
-    def test_add_charm_secret(self):
-        # add_charm_secret is an alias to add_model_secret, which is thoroughly
-        # tested already, so here only basic functionality is tested for
-        # add_charm_secret.
+    def test_add_model_secret(self):
+        # add_model_secret is an alias to add_charm_secret, which is thoroughly
+        # tested already, so here only the basic functionality is tested and it
+        # asserts the pending deprecation warning.
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
             {'name': 'webapp', 'requires': {'db': {'interface': 'pgsql'}}}
         ))
@@ -5200,7 +5200,9 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        secret_id = harness.add_charm_secret('database', {'password': 'hunter2'})
+        with self.assertWarnsRegex(PendingDeprecationWarning, 'add_charm_secret'):
+            secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
+
         harness.grant_secret(secret_id, 'webapp')
         secret = harness.model.get_secret(id=secret_id)
         self.assertEqual(secret.id, secret_id)

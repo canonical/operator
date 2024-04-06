@@ -826,7 +826,7 @@ class Harness(Generic[CharmType]):
 
         Example usage::
 
-            secret_id = harness.add_model_secret('mysql', {'password': 'SECRET'})
+            secret_id = harness.add_charm_secret('mysql', {'password': 'SECRET'})
             harness.add_relation('db', 'mysql', unit_data={
                 'host': 'mysql.localhost,
                 'username': 'appuser',
@@ -1527,6 +1527,8 @@ class Harness(Generic[CharmType]):
 
     def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
         """An alias for :meth:`add_charm_secret` for backward compatibility."""
+        warnings.warn("add_model_secret is going to be deprecated, use add_charm_secret instead.",
+                      category=PendingDeprecationWarning)
         return self.add_charm_secret(owner, content)
 
     def add_user_secret(self, content: Dict[str, str]) -> str:
@@ -1541,6 +1543,20 @@ class Harness(Generic[CharmType]):
 
         Return:
             The ID of the newly-secret added.
+
+        Example usage (the parameter ``harness`` in the test function is
+        a pytest fixture that does setup/teardown, see :class:`Harness`)::
+
+            # test_charm.py
+            def test_start(harness):
+                secret_content = {'password': 'foo'}
+                secret_id = harness.add_user_secret(secret_content)
+                # grant the user secret to the app
+                harness.grant_secret(secret_id, 'webapp')
+                secret = harness.model.get_secret(id=secret_id)
+                assert secret.id == secret_id
+                assert secret.get_content() == secret_content
+
         """
         model.Secret._validate_content(content)
         return self._backend._secret_add(content, self.model.uuid)
