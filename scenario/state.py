@@ -32,7 +32,7 @@ from uuid import uuid4
 import yaml
 from ops import pebble
 from ops.charm import CharmBase, CharmEvents
-from ops.model import SecretRotate, StatusBase
+from ops.model import CloudSpec, SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 
@@ -919,6 +919,7 @@ class State(_DCBase):
     """Status of the unit."""
     workload_version: str = ""
     """Workload version."""
+    cloud_spec: Optional[CloudSpec] = None
 
     def __post_init__(self):
         for name in ["app_status", "unit_status"]:
