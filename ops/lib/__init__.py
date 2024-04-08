@@ -60,7 +60,7 @@ def use(name: str, api: int, author: str) -> ModuleType:
         TypeError: if the name, api, or author are the wrong type.
         ValueError: if the name, api, or author are invalid.
 
-    .. deprecated:: 2.1.0\
+    .. deprecated:: 2.1.0
         This function is deprecated. Prefer charm libraries instead
         (https://juju.is/docs/sdk/library).
     """
