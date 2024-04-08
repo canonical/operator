@@ -5247,16 +5247,6 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret_id)
 
-    def test_get_user_secret_grants(self):
-        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
-            {'name': 'webapp'}
-        ))
-        self.addCleanup(harness.cleanup)
-        secret_id = harness.add_user_secret({'password': 'foo'})
-        self.assertEqual(harness.get_user_secret_grants(secret_id), set())
-        harness.grant_secret(secret_id, 'webapp')
-        self.assertEqual(harness.get_user_secret_grants(secret_id), set(['webapp']))
-
     def test_set_user_secret_content(self):
         harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
             {'name': 'webapp'}

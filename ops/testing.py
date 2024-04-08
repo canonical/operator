@@ -1670,15 +1670,6 @@ class Harness(Generic[CharmType]):
         secret = self._ensure_secret(secret_id)
         return secret.grants.get(relation_id, set())
 
-    def get_user_secret_grants(self, secret_id: str) -> Set[str]:
-        """Return the set of app names granted to this user secret.
-
-        Args:
-            secret_id: The ID of the user secret to get grants for.
-        """
-        secret = self._ensure_secret(secret_id)
-        return secret.user_secrets_grants
-
     def get_secret_revisions(self, secret_id: str) -> List[int]:
         """Return the list of revision IDs for the given secret, oldest first.
 
