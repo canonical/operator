@@ -1711,7 +1711,7 @@ class Harness(Generic[CharmType]):
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name == self.model.uuid:
-            raise RuntimeError(f"Cannot trigger a secret-rotate event for user secret.")
+            raise RuntimeError("Cannot trigger a secret-rotate event for user secret.")
         if label is None:
             label = secret.label
         self.charm.on.secret_rotate.emit(secret_id, label)
@@ -1753,7 +1753,7 @@ class Harness(Generic[CharmType]):
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name == self.model.uuid:
-            raise RuntimeError(f"Cannot trigger a secret-expired event for user secret.")
+            raise RuntimeError("Cannot trigger a secret-expired event for user secret.")
         if label is None:
             label = secret.label
         self.charm.on.secret_expired.emit(secret_id, label, revision)

@@ -5093,7 +5093,7 @@ class TestSecrets(unittest.TestCase):
         secret_id = harness.add_user_secret({'foo': 'bar'})
         assert secret_id is not None
         harness.begin()
-        
+
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_rotation(secret_id)
 
@@ -5160,7 +5160,7 @@ class TestSecrets(unittest.TestCase):
         secret_id = harness.add_user_secret({'foo': 'bar'})
         assert secret_id is not None
         harness.begin()
-        
+
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_expiration(secret_id, 1)
 
