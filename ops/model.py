@@ -181,6 +181,8 @@ class Model:
 
         Use :meth:`Pod.set_spec` to set the container specification for legacy
         Kubernetes charms.
+
+        .. deprecated:: 2.4.0
         """
         return self._pod
 
@@ -1910,6 +1912,8 @@ class Pod:
 
     Currently only supports simple access to setting the Juju pod spec via
     :attr:`.set_spec`.
+
+    .. deprecated:: 2.4.0
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -2000,7 +2004,11 @@ class Storage:
 
     @property
     def id(self) -> int:
-        """DEPRECATED. Use :attr:`Storage.index` instead."""
+        """DEPRECATED. Use :attr:`Storage.index` instead.
+
+        .. deprecated:: 2.4.0
+            Use :attr:`Storage.index` instead.
+        """
         logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
         return self.index
 

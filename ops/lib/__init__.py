@@ -17,6 +17,8 @@
 DEPRECATED: The ops.lib functionality is deprecated, and is superseded by
 charm libraries (https://juju.is/docs/sdk/library) and regular Python imports.
 We now prefer to do version selection at build (charmcraft pack) time.
+
+.. deprecated:: 2.1.0
 """
 
 import logging
@@ -61,6 +63,8 @@ def use(name: str, api: int, author: str) -> ModuleType:
         ImportError: if the library cannot be found.
         TypeError: if the name, api, or author are the wrong type.
         ValueError: if the name, api, or author are invalid.
+
+    .. deprecated:: 2.1.0
     """
     warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
                   category=DeprecationWarning)
@@ -103,6 +107,8 @@ def autoimport():
 
     DEPRECATED: This function is deprecated. Prefer charm libraries instead
     (https://juju.is/docs/sdk/library).
+
+    .. deprecated:: 2.1.0
     """
     warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
                   category=DeprecationWarning)
