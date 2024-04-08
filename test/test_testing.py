@@ -5086,6 +5086,17 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_rotation('nosecret')
 
+    def test_trigger_secret_rotation_on_user_secret(self):
+        harness = ops.testing.Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_user_secret({'foo': 'bar'})
+        assert secret_id is not None
+        harness.begin()
+        
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_rotation(secret_id)
+
     def test_trigger_secret_removal(self):
         harness = ops.testing.Harness(EventRecorder, meta='name: database')
         self.addCleanup(harness.cleanup)
@@ -5141,6 +5152,17 @@ class TestSecrets(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
+
+    def test_trigger_secret_expiration_on_user_secret(self):
+        harness = ops.testing.Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_user_secret({'foo': 'bar'})
+        assert secret_id is not None
+        harness.begin()
+        
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_expiration(secret_id, 1)
 
     def test_secret_permissions_unit(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
