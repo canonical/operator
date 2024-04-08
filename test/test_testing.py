@@ -1103,8 +1103,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
-        # [jam] I don't think this is right, as user-secrets aren't owned by the app
-        secret_id = harness.add_charm_secret('mycharm', {'key': 'value'})
+        secret_id = harness.add_user_secret({'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         self.assertEqual(harness.charm.changes,
                          [{'name': 'config-changed', 'data': {'a': secret_id}}])
@@ -5200,7 +5199,7 @@ class TestSecrets(unittest.TestCase):
         relation_id = harness.add_relation('db', 'database')
         harness.add_relation_unit(relation_id, 'database/0')
 
-        with self.assertWarnsRegex(PendingDeprecationWarning, 'add_charm_secret'):
+        with self.assertWarnsRegex(DeprecationWarning, 'add_charm_secret'):
             secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
 
         harness.grant_secret(secret_id, 'webapp')

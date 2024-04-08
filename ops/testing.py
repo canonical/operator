@@ -1519,7 +1519,7 @@ class Harness(Generic[CharmType]):
                 for example :code:`{"password": "foo123"}`.
 
         Return:
-            The ID of the newly-secret added.
+            The ID of the newly-added secret.
         """
         owner_name = _get_app_or_unit_name(owner)
         model.Secret._validate_content(content)
@@ -1527,38 +1527,56 @@ class Harness(Generic[CharmType]):
 
     def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
         """An alias for :meth:`add_charm_secret` for backward compatibility."""
-        warnings.warn("add_model_secret is going to be deprecated, use add_charm_secret instead.",
-                      category=PendingDeprecationWarning)
+        warnings.warn("add_model_secret is deprecated, use add_charm_secret instead.",
+                      category=DeprecationWarning)
         return self.add_charm_secret(owner, content)
 
     def add_user_secret(self, content: Dict[str, str]) -> str:
         """Add a secret owned by the user, simulating the `juju add-secret` command.
-
-        Although it's named a user-owned secret in juju, technically, the owner is the
-        Model, so the secret's owner is set to :attr:`Model.uuid <ops.Model.uuid>`.
 
         Args:
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
 
         Return:
-            The ID of the newly-secret added.
+            The ID of the newly-added secret.
 
         Example usage (the parameter ``harness`` in the test function is
         a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
+            # config.yaml
+            options:
+              mysec:
+                type: secret
+                description: "tell me your secrets"
+
+            # charm.py
+            class MyVMCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.config_changed, self._on_config_changed)
+
+                def _on_config_changed(self, event: ops.StartEvent):
+                    mysec = self.config.get('mysec')
+                    if mysec:
+                        sec = self.model.get_secret(id=mysec, label="mysec")
+                        self.config_from_secret = sec.get_content()
+
             # test_charm.py
-            def test_start(harness):
+            def test_config_changed(harness):
                 secret_content = {'password': 'foo'}
                 secret_id = harness.add_user_secret(secret_content)
                 # grant the user secret to the app
                 harness.grant_secret(secret_id, 'webapp')
-                secret = harness.model.get_secret(id=secret_id)
-                assert secret.id == secret_id
-                assert secret.get_content() == secret_content
+                harness.begin()
+                harness.update_config({'mysec': secret_id})
+                secret = harness.model.get_secret(id=secret_id).get_content()
+                assert harness.charm.config_from_secret == secret.get_content()
 
         """
         model.Secret._validate_content(content)
+        # Although it's named a user-owned secret in juju, technically, the owner is the
+        # Model, so the secret's owner is set to :attr:`Model.uuid <ops.Model.uuid>`.
         return self._backend._secret_add(content, self.model.uuid)
 
     def _ensure_secret(self, secret_id: str) -> '_Secret':
@@ -1590,7 +1608,7 @@ class Harness(Generic[CharmType]):
     def grant_secret(self, secret_id: str, observer: AppUnitOrName):
         """Grant read access to this secret for the given observer application or unit.
 
-        For user secrets, grant access to the application, simulate the
+        For user secrets, grant access to the application, simulating the
         `juju grant-secret` command.
 
         If the given application or unit has already been granted access to
@@ -1606,12 +1624,12 @@ class Harness(Generic[CharmType]):
         secret = self._ensure_secret(secret_id)
         app_or_unit_name = _get_app_or_unit_name(observer)
 
-        # user secrets
+        # User secrets:
         if secret.owner_name == self.model.uuid:
             secret.user_secrets_grants.add(app_or_unit_name)
             return
 
-        # charm secrets
+        # Charm secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call grant_secret")
@@ -1636,13 +1654,13 @@ class Harness(Generic[CharmType]):
         secret = self._ensure_secret(secret_id)
         app_or_unit_name = _get_app_or_unit_name(observer)
 
-        # user secrets
+        # User secrets:
         if secret.owner_name == self.model.uuid:
             secret.user_secrets_grants.discard(app_or_unit_name)
             return
 
-        # charm secrets
-        if secret.owner_name in [self.model.app.name, self.model.unit.name, self.model.uuid]:
+        # Charm secrets:
+        if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call revoke_secret")
 
@@ -2579,12 +2597,12 @@ class _TestingModelBackend:
         secret = self._ensure_secret_id_or_label(id, label)
 
         if secret.owner_name == self.model_uuid:
-            # user secret
+            # This is a user secret - charms only ever have view access.
             if self.app_name not in secret.user_secrets_grants:
                 raise model.SecretNotFoundError(
                     f'Secret {id!r} not granted access to {self.app_name!r}')
         elif secret.owner_name not in [self.app_name, self.unit_name]:
-            # charm secret
+            # This is a charm secret - the charm might have admin or view access.
             # Check that caller has permission to get this secret
             # Observer is calling: does secret have a grant on relation between
             # this charm (the observer) and the secret owner's app?
@@ -2625,7 +2643,7 @@ class _TestingModelBackend:
         app_secret = secret.owner_name == self.app_name
         user_secret = secret.owner_name == self.model_uuid
 
-        if unit_secret or (app_secret and self.is_leader()) or user_secret:
+        if (unit_secret or (app_secret and self.is_leader())) and not user_secret:
             return
         raise model.SecretNotFoundError(
             f'You must own secret {secret.id!r} to perform this operation')
