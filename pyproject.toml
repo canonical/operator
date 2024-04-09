@@ -119,6 +119,8 @@ ignore = [
     # No explicit `stacklevel` keyword argument found
     "B028",
 
+    # Return condition directly, sometimes the error message isn't correct.
+    "SIM103",
     # Use contextlib.suppress() instead of try/except: pass
     "SIM105",
     # Use a single `with` statement with multiple contexts instead of nested `with` statements

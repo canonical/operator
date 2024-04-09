@@ -3466,6 +3466,6 @@ class _TestingPebbleClient:
             return False
         if types is not None and notice.type not in types:
             return False
-        if keys is not None and notice.key not in keys:  # noqa: SIM103
+        if keys is not None and notice.key not in keys:
             return False
         return True
