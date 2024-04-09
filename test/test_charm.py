@@ -18,12 +18,14 @@ import shutil
 import tempfile
 import typing
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import yaml
 
 import ops
 import ops.charm
+from ops import pebble
 from ops.model import ModelError, _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -354,7 +356,19 @@ storage:
             'StorageAttachedEvent',
         ])
 
-    def test_workload_events(self):
+    @unittest.mock.patch('ops.pebble.Client.get_change')
+    def test_workload_events(self, mock_get_change: unittest.mock.MagicMock):
+        def get_change(change_id: pebble.ChangeID) -> pebble.Change:
+            return pebble.Change.from_dict({
+                'id': pebble.ChangeID(change_id),
+                'kind': 'exec',
+                'ready': False,
+                'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
+                'status': 'Doing',
+                'summary': 'Exec command "foo"',
+            })
+
+        mock_get_change.side_effect = get_change
 
         class MyCharm(ops.CharmBase):
             def __init__(self, *args: typing.Any):
@@ -369,12 +383,22 @@ storage:
                         self.on[workload].pebble_custom_notice,
                         self.on_any_pebble_custom_notice,
                     )
+                    self.framework.observe(
+                        self.on[workload].pebble_change_updated,
+                        self.on_any_pebble_change_updated,
+                    )
 
             def on_any_pebble_ready(self, event: ops.PebbleReadyEvent):
                 self.seen.append(type(event).__name__)
 
             def on_any_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
                 self.seen.append(type(event).__name__)
+
+            def on_any_pebble_change_updated(self, event: ops.PebbleChangeUpdatedEvent):
+                self.seen.append(type(event).__name__)
+                change = event.get_change()
+                assert change.id == event.notice.key
+                assert change.kind == 'exec'
 
         # language=YAML
         self.meta = ops.CharmMeta.from_yaml(metadata='''
@@ -399,11 +423,18 @@ containers:
         charm.on['containerb'].pebble_custom_notice.emit(
             charm.framework.model.unit.get_container('containerb'), '2', 'custom', 'y')
 
+        charm.on['container-a'].pebble_change_updated.emit(
+            charm.framework.model.unit.get_container('container-a'), '1', 'change-update', '42')
+        charm.on['containerb'].pebble_change_updated.emit(
+            charm.framework.model.unit.get_container('containerb'), '2', 'change-update', '42')
+
         self.assertEqual(charm.seen, [
             'PebbleReadyEvent',
             'PebbleReadyEvent',
             'PebbleCustomNoticeEvent',
             'PebbleCustomNoticeEvent',
+            'PebbleChangeUpdatedEvent',
+            'PebbleChangeUpdatedEvent',
         ])
 
     def test_relations_meta(self):
