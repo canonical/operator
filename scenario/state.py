@@ -32,7 +32,7 @@ from uuid import uuid4
 import yaml
 from ops import pebble
 from ops.charm import CharmBase, CharmEvents
-from ops.model import CloudSpec, SecretRotate, StatusBase
+from ops.model import SecretRotate, StatusBase
 
 from scenario.logger import logger as scenario_logger
 
@@ -138,6 +138,83 @@ class _DCBase:
     def copy(self) -> "Self":
         """Produce a deep copy of this object."""
         return copy.deepcopy(self)
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudCredential:
+    auth_type: str
+    """Authentication type."""
+
+    attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """A dictionary containing cloud credentials.
+
+    For example, for AWS, it contains `access-key` and `secret-key`;
+    for Azure, `application-id`, `application-password` and `subscription-id`
+    can be found here.
+    """
+
+    redacted: List[str] = dataclasses.field(default_factory=list)
+    """A list of redacted secrets."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "CloudCredential":
+        """Create a new CloudCredential object from a dictionary."""
+        return cls(
+            auth_type=d["auth-type"],
+            attributes=d.get("attrs") or {},
+            redacted=d.get("redacted") or [],
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudSpec:
+    type: str
+    """Type of the cloud."""
+
+    name: str
+    """Juju cloud name."""
+
+    region: Optional[str] = None
+    """Region of the cloud."""
+
+    endpoint: Optional[str] = None
+    """Endpoint of the cloud."""
+
+    identity_endpoint: Optional[str] = None
+    """Identity endpoint of the cloud."""
+
+    storage_endpoint: Optional[str] = None
+    """Storage endpoint of the cloud."""
+
+    credential: Optional[CloudCredential] = None
+    """Cloud credentials with key-value attributes."""
+
+    ca_certificates: List[str] = dataclasses.field(default_factory=list)
+    """A list of CA certificates."""
+
+    skip_tls_verify: bool = False
+    """Whether to skip TLS verfication."""
+
+    is_controller_cloud: bool = False
+    """If this is the cloud used by the controller, defaults to False."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "CloudSpec":
+        """Create a new CloudSpec object from a dict parsed from JSON."""
+        return cls(
+            type=d["type"],
+            name=d["name"],
+            region=d.get("region") or None,
+            endpoint=d.get("endpoint") or None,
+            identity_endpoint=d.get("identity-endpoint") or None,
+            storage_endpoint=d.get("storage-endpoint") or None,
+            credential=CloudCredential.from_dict(d["credential"])
+            if d.get("credential")
+            else None,
+            ca_certificates=d.get("cacertificates") or [],
+            skip_tls_verify=d.get("skip-tls-verify") or False,
+            is_controller_cloud=d.get("is-controller-cloud") or False,
+        )
 
 
 @dataclasses.dataclass(frozen=True)

@@ -21,7 +21,7 @@ from typing import (
 )
 
 from ops import JujuVersion, pebble
-from ops.model import CloudSpec, ModelError, RelationNotFoundError
+from ops.model import ModelError, RelationNotFoundError
 from ops.model import Secret as Secret_Ops  # lol
 from ops.model import (
     SecretInfo,
@@ -35,6 +35,7 @@ from ops.testing import _TestingPebbleClient
 
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
+    CloudSpec,
     JujuLogLine,
     Mount,
     Network,

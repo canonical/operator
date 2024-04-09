@@ -2,6 +2,7 @@ import ops
 import pytest
 
 import scenario
+from scenario.state import CloudSpec
 
 
 @pytest.fixture(scope="function")
@@ -19,7 +20,7 @@ def mycharm():
 
 
 def test_get_cloud_spec(mycharm):
-    cloud_spec = ops.model.CloudSpec.from_dict(
+    cloud_spec = CloudSpec.from_dict(
         {
             "name": "localhost",
             "type": "lxd",
@@ -38,3 +39,10 @@ def test_get_cloud_spec(mycharm):
     ctx = scenario.Context(mycharm, meta={"name": "foo"})
     with ctx.manager("start", scenario.State(cloud_spec=cloud_spec)) as mgr:
         assert mgr.charm.model.get_cloud_spec() == cloud_spec
+
+
+def test_get_cloud_spec(mycharm):
+    ctx = scenario.Context(mycharm, meta={"name": "foo"})
+    with ctx.manager("start", scenario.State()) as mgr:
+        with pytest.raises(ops.ModelError):
+            mgr.charm.model.get_cloud_spec()
