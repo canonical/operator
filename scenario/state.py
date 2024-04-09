@@ -200,7 +200,7 @@ class CloudSpec:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CloudSpec":
-        """Create a new CloudSpec object from a dict parsed from JSON."""
+        """Create a new CloudSpec object from a dict."""
         return cls(
             type=d["type"],
             name=d["name"],
