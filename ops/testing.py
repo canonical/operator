@@ -1532,7 +1532,7 @@ class Harness(Generic[CharmType]):
         return self.add_charm_secret(owner, content)
 
     def add_user_secret(self, content: Dict[str, str]) -> str:
-        """Add a secret owned by the user, simulating the `juju add-secret` command.
+        """Add a secret owned by the user, simulating the ``juju add-secret`` command.
 
         Args:
             content: A key-value mapping containing the payload of the secret,
@@ -1566,7 +1566,6 @@ class Harness(Generic[CharmType]):
             def test_config_changed(harness):
                 secret_content = {'password': 'foo'}
                 secret_id = harness.add_user_secret(secret_content)
-                # grant the user secret to the app
                 harness.grant_secret(secret_id, 'webapp')
                 harness.begin()
                 harness.update_config({'mysec': secret_id})
@@ -1609,7 +1608,7 @@ class Harness(Generic[CharmType]):
         """Grant read access to this secret for the given observer application or unit.
 
         For user secrets, grant access to the application, simulating the
-        `juju grant-secret` command.
+        ``juju grant-secret`` command.
 
         If the given application or unit has already been granted access to
         this secret, do nothing.
@@ -1711,7 +1710,7 @@ class Harness(Generic[CharmType]):
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name == self.model.uuid:
-            raise RuntimeError("Cannot trigger a secret-rotate event for user secret.")
+            raise RuntimeError("Cannot trigger the secret-rotate event for a user secret.")
         if label is None:
             label = secret.label
         self.charm.on.secret_rotate.emit(secret_id, label)
@@ -1753,7 +1752,7 @@ class Harness(Generic[CharmType]):
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name == self.model.uuid:
-            raise RuntimeError("Cannot trigger a secret-expired event for user secret.")
+            raise RuntimeError("Cannot trigger the secret-expired event for a user secret.")
         if label is None:
             label = secret.label
         self.charm.on.secret_expired.emit(secret_id, label, revision)
@@ -2645,9 +2644,8 @@ class _TestingModelBackend:
         # https://discourse.charmhub.io/t/secret-access-permissions/12627
         unit_secret = secret.owner_name == self.unit_name
         app_secret = secret.owner_name == self.app_name
-        user_secret = secret.owner_name == self.model_uuid
 
-        if (unit_secret or (app_secret and self.is_leader())) and not user_secret:
+        if unit_secret or (app_secret and self.is_leader()):
             return
         raise model.SecretNotFoundError(
             f'You must own secret {secret.id!r} to perform this operation')
