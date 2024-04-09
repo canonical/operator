@@ -1321,9 +1321,9 @@ class NoticeType(enum.Enum):
     """
 
     CUSTOM = 'custom'
-    """A custom notice reported via the Pebble client API or "pebble notify".
+    """A custom notice reported via the Pebble client API or ``pebble notify``.
     The key and data fields are provided by the user. The key must be in
-    the format "mydomain.io/mykey" to ensure well-namespaced notice keys.
+    the format ``example.com/path`` to ensure well-namespaced notice keys.
     """
 
 
