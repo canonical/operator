@@ -635,7 +635,7 @@ class _MockModelBackend(_ModelBackend):
     def credential_get(self) -> CloudSpec:
         if not self._state.cloud_spec:
             raise ModelError(
-                "ERROR cloud spec is empty, initialise it with `scenario.State(cloud_spec=...)`",
+                "ERROR cloud spec is empty, initialise it with `scenario.State(cloud_spec=scenario.state.CloudSpec(...))`",
             )
         return self._state.cloud_spec
 
