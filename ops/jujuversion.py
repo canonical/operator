@@ -135,7 +135,7 @@ class JujuVersion:
         if (self.major, self.minor, self.patch) < (3, 1, 6):
             # First released in 3.1.6
             return False
-        if (self.major, self.minor, self.patch) == (3, 2, 0):
+        if (self.major, self.minor, self.patch) == (3, 2, 0):  # noqa: SIM103
             # 3.2.0 was released before Pebble was updated, but all other 3.2
             # releases have the change (3.2.1 tag was never released).
             return False

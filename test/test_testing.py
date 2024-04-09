@@ -1107,7 +1107,7 @@ class TestHarness(unittest.TestCase):
         secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         self.assertEqual(harness.charm.changes,
-            [{'name': 'config-changed', 'data': {'a': secret_id}}])
+                         [{'name': 'config-changed', 'data': {'a': secret_id}}])
 
     def test_no_config_option_type(self):
         with self.assertRaises(RuntimeError):

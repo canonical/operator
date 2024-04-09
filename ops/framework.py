@@ -315,11 +315,9 @@ class BoundEvent:
     """Event bound to an Object."""
 
     def __repr__(self):
-        return '<BoundEvent {} bound to {}.{} at {}>'.format(
-            self.event_type.__name__,
-            type(self.emitter).__name__,
-            self.event_kind,
-            hex(id(self)),
+        return (
+            f'<BoundEvent {self.event_type.__name__} bound to '
+            f'{type(self.emitter).__name__}.{self.event_kind} at {hex(id(self))}>'
         )
 
     def __init__(self, emitter: 'Object',
@@ -1106,8 +1104,8 @@ class BoundStoredState:
 
         if not isinstance(unwrapped, (type(None), int, float, str, bytes, list, dict, set)):
             raise AttributeError(
-                'attribute {!r} cannot be a {}: must be int/float/dict/list/etc'.format(
-                    key, type(unwrapped).__name__))
+                f'attribute {key!r} cannot be a {type(unwrapped).__name__}: '
+                'must be int/float/dict/list/etc')
 
         self._data[key] = unwrapped
 
@@ -1191,8 +1189,9 @@ class StoredState:
                 if bound is not None:
                     # the StoredState instance is being stored in two different
                     # attributes -> unclear what is expected of us -> bail out
-                    raise RuntimeError("StoredState shared by {0}.{1} and {0}.{2}".format(
-                        cls.__name__, self.attr_name, attr_name))
+                    raise RuntimeError(
+                        f"StoredState shared by {cls.__name__}.{self.attr_name} and "
+                        f"{cls.__name__}.{attr_name}")
                 # we've found ourselves for the first time; save where, and bind the object
                 self.attr_name = attr_name
                 self.parent_type = cls
