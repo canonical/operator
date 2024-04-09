@@ -997,6 +997,7 @@ class State(_DCBase):
     workload_version: str = ""
     """Workload version."""
     cloud_spec: Optional[CloudSpec] = None
+    """Cloud specification information (metadata) including credentials."""
 
     def __post_init__(self):
         for name in ["app_status", "unit_status"]:
