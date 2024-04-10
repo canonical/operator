@@ -140,9 +140,22 @@ class _DCBase:
         return copy.deepcopy(self)
 
 
+class CloudAuthType(str, Enum):
+    access_key_auth_type = "access-key"
+    instance_role_auth_type = "instance-role"
+    user_pass_auth_type = "userpass"
+    o_auth1_auth_type = "oauth1"
+    o_auth2_auth_type = "oauth2"
+    json_file_auth_type = "jsonfile"
+    client_certificate_auth_type = "clientcertificate"
+    http_sig_auth_type = "httpsig"
+    interactive_auth_type = "interactive"
+    empty_auth_type = "empty"
+
+
 @dataclasses.dataclass(frozen=True)
 class CloudCredential:
-    auth_type: str
+    auth_type: CloudAuthType
     """Authentication type."""
 
     attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
@@ -156,22 +169,13 @@ class CloudCredential:
     redacted: List[str] = dataclasses.field(default_factory=list)
     """A list of redacted secrets."""
 
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "CloudCredential":
-        """Create a new CloudCredential object from a dictionary."""
-        return cls(
-            auth_type=d["auth-type"],
-            attributes=d.get("attrs") or {},
-            redacted=d.get("redacted") or [],
-        )
-
 
 @dataclasses.dataclass(frozen=True)
 class CloudSpec:
     type: str
     """Type of the cloud."""
 
-    name: str
+    name: str = "localhost"
     """Juju cloud name."""
 
     region: Optional[str] = None
@@ -196,25 +200,7 @@ class CloudSpec:
     """Whether to skip TLS verfication."""
 
     is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to False."""
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "CloudSpec":
-        """Create a new CloudSpec object from a dict."""
-        return cls(
-            type=d["type"],
-            name=d["name"],
-            region=d.get("region") or None,
-            endpoint=d.get("endpoint") or None,
-            identity_endpoint=d.get("identity-endpoint") or None,
-            storage_endpoint=d.get("storage-endpoint") or None,
-            credential=CloudCredential.from_dict(d["credential"])
-            if d.get("credential")
-            else None,
-            ca_certificates=d.get("cacertificates") or [],
-            skip_tls_verify=d.get("skip-tls-verify") or False,
-            is_controller_cloud=d.get("is-controller-cloud") or False,
-        )
+    """If this is the cloud used by the controller."""
 
 
 @dataclasses.dataclass(frozen=True)

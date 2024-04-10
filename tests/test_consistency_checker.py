@@ -1,11 +1,15 @@
 import pytest
 from ops.charm import CharmBase
 
+from scenario import Model
 from scenario.consistency_checker import check_consistency
 from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Action,
+    CloudAuthType,
+    CloudCredential,
+    CloudSpec,
     Container,
     Event,
     Network,
@@ -566,5 +570,38 @@ def test_networks_consistency():
                 "extra-bindings": {"foo": {}},
                 "requires": {"bar": {"interface": "bar"}},
             },
+        ),
+    )
+
+
+def test_cloudspec_consistency():
+    cloud_spec = CloudSpec(
+        type="lxd",
+        endpoint="https://127.0.0.1:8443",
+        credential=CloudCredential(
+            auth_type=CloudAuthType.client_certificate_auth_type,
+            attributes={
+                "client-cert": "foo",
+                "client-key": "bar",
+                "server-cert": "baz",
+            },
+        ),
+    )
+
+    assert_consistent(
+        State(cloud_spec=cloud_spec, model=Model(name="lxd-model", type="lxd")),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "MyVMCharm"},
+        ),
+    )
+
+    assert_inconsistent(
+        State(cloud_spec=cloud_spec, model=Model(name="k8s-model", type="kubernetes")),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "MyVMCharm"},
         ),
     )
