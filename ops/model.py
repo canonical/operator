@@ -1675,8 +1675,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # is it OUR UNIT's?
             if self._backend.unit_name != self._entity.name:
                 raise RelationDataAccessError(
-                    f"{self._backend.unit_name} cannot write databag of {self._entity.name}: "
-                    "not the same unit."
+                    f'{self._backend.unit_name} cannot write databag of {self._entity.name}: '
+                    f'not the same unit.'
                 )
 
     def __setitem__(self, key: str, value: str):
