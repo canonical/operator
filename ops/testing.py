@@ -60,7 +60,7 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError, _ConfigOption, _NetworkDict
+from ops.model import Container, RelationNotFoundError, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -83,6 +83,11 @@ _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
 _RawStatus = TypedDict('_RawStatus', {
     'status': _StatusName,
     'message': str,
+})
+_ConfigOption = TypedDict('_ConfigOption', {
+    'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
+    'description': str,
+    'default': Union[str, int, float, bool],
 })
 _RawConfig = TypedDict("_RawConfig", {'options': Dict[str, _ConfigOption]})
 

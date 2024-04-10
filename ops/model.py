@@ -62,12 +62,6 @@ from ops.jujuversion import JujuVersion
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
 
-_ConfigOption = TypedDict('_ConfigOption', {
-    'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
-    'description': str,
-    'default': Union[str, int, float, bool],
-})
-
 _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
