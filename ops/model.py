@@ -1630,8 +1630,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
-                f"{self._backend.unit_name} is not leader and cannot read its own "
-                "application databag"
+                f'{self._backend.unit_name} is not leader and cannot read its own '
+                f'application databag'
             )
 
         return True
@@ -1660,8 +1660,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
-                    f"{self._backend.app_name} cannot write the data of remote application "
-                    f"{self._entity.name}")
+                    f'{self._backend.app_name} cannot write the data of remote application '
+                    f'{self._entity.name}')
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
@@ -1675,8 +1675,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # is it OUR UNIT's?
             if self._backend.unit_name != self._entity.name:
                 raise RelationDataAccessError(
-                    f"{self._backend.unit_name} cannot write databag of {self._entity.name}: "
-                    "not the same unit."
+                    f'{self._backend.unit_name} cannot write databag of {self._entity.name}: '
+                    f'not the same unit.'
                 )
 
     def __setitem__(self, key: str, value: str):
@@ -2950,8 +2950,8 @@ def _format_action_result_dict(input: Dict[str, Any],
             raise ValueError(f'invalid key {key!r}; must be a string')
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError(
-                f"key '{key!r}' is invalid: must be similar to 'key', 'some-key2', "
-                "or 'some.key'")
+                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', "
+                f"or 'some.key'")
 
         if parent_key:
             key = f"{parent_key}.{key}"
