@@ -1722,7 +1722,7 @@ class ConfigData(LazyMapping):
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def _load(self):
+    def _load(self) -> Dict[str, Union[bool, int, float, str]]:
         return self._backend.config_get()
 
 
