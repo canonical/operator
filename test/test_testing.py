@@ -5282,6 +5282,18 @@ class TestSecrets(unittest.TestCase):
         secret = harness.model.get_secret(id=secret_id)
         self.assertEqual(secret.get_content(refresh=True), {'password': 'bar'})
 
+    def test_get_user_secret_info(self):
+        harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        with self.assertRaises(ops.SecretNotFoundError):
+            secret.get_info()
+
 
 class EventRecorder(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
