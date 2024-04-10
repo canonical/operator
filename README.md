@@ -738,7 +738,7 @@ class MyCharm(ops.CharmBase):
         for notice in self.unit.get_container("cont").get_notices():
             ...
 
-ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": "cont": {}})
+ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": {"my-container": {}}})
 notices = [
     scenario.PebbleNotice(key="example.com/a", occurences=10),
     scenario.PebbleNotice(key="example.com/b", last_data={"bar": "baz"}),
