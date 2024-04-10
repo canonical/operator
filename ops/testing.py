@@ -60,7 +60,7 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError, _ConfigOption, _NetworkDict
+from ops.model import Container, RelationNotFoundError, Secret, _ConfigOption, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -1307,7 +1307,7 @@ class Harness(Generic[CharmType]):
 
     def _update_config(
             self,
-            key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
+            key_values: Optional[Mapping[str, Union[str, int, float, bool, Secret]]] = None,
             unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
@@ -1330,6 +1330,9 @@ class Harness(Generic[CharmType]):
             for key, value in key_values.items():
                 if key in config._defaults:
                     if value is not None:
+                        if self._meta.config[key].type == 'secret' and isinstance(value, str):
+                            # Promote this to an actual Secret object.
+                            value = Secret(self._backend, value)
                         config._config_set(key, value)
                 else:
                     raise ValueError(f"unknown config option: '{key}'")
@@ -1344,7 +1347,7 @@ class Harness(Generic[CharmType]):
 
     def update_config(
             self,
-            key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
+            key_values: Optional[Mapping[str, Union[str, int, float, bool, Secret]]] = None,
             unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.

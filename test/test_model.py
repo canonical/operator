@@ -59,6 +59,10 @@ class TestModel(unittest.TestCase):
                 type: int
             qux:
                 type: boolean
+            secretfoo:
+                type: secret
+            secretbar:
+                type: secret
         ''')
         self.addCleanup(self.harness.cleanup)
         self.relation_id_db0 = self.harness.add_relation('db0', 'db')
@@ -618,11 +622,17 @@ class TestModel(unittest.TestCase):
 
     def test_config(self):
         self.harness._get_backend_calls(reset=True)
-        self.harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True})
+        secretfoo_id = self.harness.add_user_secret({"password": "xxxxxxxx"})
+        secretbar_id = self.harness.add_user_secret({"certificate": "xxxxxxxx"})
+        secretbar = self.model.get_secret(id=secretbar_id)
+        self.harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True,
+                                   'secretfoo': secretfoo_id, 'secretbar': secretbar})
         self.assertEqual(self.model.config, {
             'foo': 'foo',
             'bar': 1,
             'qux': True,
+            'secretfoo': self.model.get_secret(id=secretfoo_id),
+            'secretbar': secretbar,
         })
         with self.assertRaises(TypeError):
             # Confirm that we cannot modify config values.

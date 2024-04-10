@@ -118,7 +118,7 @@ class Model:
         relations: Dict[str, 'ops.RelationMeta'] = meta.relations
         self._relations = RelationMapping(relations, self.unit, self._backend, self._cache,
                                           broken_relation_id=broken_relation_id)
-        self._config = ConfigData(self._backend)
+        self._config = ConfigData(self._backend, meta.config)
         resources: Iterable[str] = meta.resources
         self._resources = Resources(list(resources), self._backend)
         self._pod = Pod(self._backend)
@@ -1724,11 +1724,20 @@ class ConfigData(LazyMapping):
     This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
     """
 
-    def __init__(self, backend: '_ModelBackend'):
+    def __init__(self, backend: '_ModelBackend',
+                 config: Optional[Dict[str, 'ops.ConfigMeta']] = None):
         self._backend = backend
+        self._config = config
 
     def _load(self):
-        return self._backend.config_get()
+        data = self._backend.config_get()
+        if self._config:
+            # Convert any type:secret options to Secret objects.
+            # The simple types (bool, int, float, str) are correctly typed in the JSON.
+            for option in self._config.values():
+                if option.type == "secret" and option.name in data:
+                    data[option.name] = Secret(self._backend, data[option.name])
+        return data
 
 
 class StatusBase:
