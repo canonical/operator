@@ -1327,10 +1327,15 @@ class CharmMeta:
     actions: Dict[str, 'ActionMeta']
     """Actions the charm has defined."""
 
+    config: Dict[str, 'ConfigMeta']
+    """Config the charm has defined."""
+
     def __init__(self, raw: Optional[Dict[str, Any]] = None,
-                 actions_raw: Optional[Dict[str, Any]] = None):
+                 actions_raw: Optional[Dict[str, Any]] = None,
+                 config_raw: Optional[Dict[str, Any]] = None):
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
+        config_raw_: Dict[str, Any] = config_raw or {}
 
         # When running in production, this data is generally loaded from
         # metadata.yaml. However, when running tests, this data is
@@ -1382,6 +1387,7 @@ class CharmMeta:
                          for name, payload in raw_.get('payloads', {}).items()}
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
+        self.config = {name: ConfigMeta(name, config) for name, config in config_raw_.items()}
         self.containers = {name: ContainerMeta(name, container)
                            for name, container in raw_.get('containers', {}).items()}
 
@@ -1395,13 +1401,18 @@ class CharmMeta:
             meta = yaml.safe_load(f.read())
 
         actions = None
-
         actions_path = _charm_root / "actions.yaml"
         if actions_path.exists():
             with actions_path.open() as f:
                 actions = yaml.safe_load(f.read())
 
-        return CharmMeta(meta, actions)
+        config = None
+        config_path = _charm_root / "config.yaml"
+        if config_path.exists():
+            with config_path.open() as f:
+                config = yaml.safe_load(f.read())
+
+        return CharmMeta(meta, actions, config)
 
     def _load_links(self, raw: Dict[str, Any]):
         websites = raw.get('website', [])
@@ -1435,13 +1446,15 @@ class CharmMeta:
     @classmethod
     def from_yaml(
             cls, metadata: Union[str, TextIO],
-            actions: Optional[Union[str, TextIO]] = None) -> 'CharmMeta':
+            actions: Optional[Union[str, TextIO]] = None,
+            config: Optional[Union[str, TextIO]] = None) -> 'CharmMeta':
         """Instantiate a :class:`CharmMeta` from a YAML description of ``metadata.yaml``.
 
         Args:
             metadata: A YAML description of charm metadata (name, relations, etc.)
                 This can be a simple string, or a file-like object (passed to ``yaml.safe_load``).
             actions: YAML description of Actions for this charm (e.g., actions.yaml)
+            config: YAML description of Config for this charm (e.g. config.yaml)
         """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
@@ -1449,7 +1462,10 @@ class CharmMeta:
             raw_actions = cast(Optional[Dict[str, Any]], yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
-        return cls(meta, raw_actions)
+        raw_config = {}
+        if config is not None:
+            raw_config = cast(Optional[Dict[str, Any]], yaml.safe_load(config))
+        return cls(meta, raw_actions, raw_config)
 
 
 class RelationRole(enum.Enum):
@@ -1684,6 +1700,16 @@ class ActionMeta:
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
         self.additional_properties = raw.get('additionalProperties', True)
+
+
+class ConfigMeta:
+    """Object containing metadata about a config's definition."""
+
+    def __init__(self, name: str, raw: Optional[Dict[str, Any]] = None):
+        raw = raw or {}
+        self.name = name
+        self.type = raw['type']
+        self.default = raw.get('default')
 
 
 @dataclasses.dataclass(frozen=True)
