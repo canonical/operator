@@ -2646,7 +2646,7 @@ class _TestingModelBackend:
         # secrets, the leader has manage permissions and other units only have
         # view permissions.
         # https://discourse.charmhub.io/t/secret-access-permissions/12627
-        # For user secrets the secret owner is the model, that is, 
+        # For user secrets the secret owner is the model, that is,
         # `secret.owner_name == self.model.uuid`, only model admins have
         # manage permissions: https://juju.is/docs/juju/secret.
 
