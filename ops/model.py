@@ -50,7 +50,6 @@ from typing import (
     Type,
     TypedDict,
     Union,
-    cast,
 )
 
 import ops
@@ -763,7 +762,10 @@ class Port:
 OpenedPort = Port  # Alias for backwards compatibility.
 
 
-class LazyMapping(Mapping[str, Union[bool, int, float, str]], ABC):
+_LazyValueType = typing.TypeVar("_LazyValueType")
+
+
+class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
     """Represents a dict that isn't populated until it is accessed.
 
     Charm authors should generally never need to use this directly, but it forms
@@ -771,14 +773,14 @@ class LazyMapping(Mapping[str, Union[bool, int, float, str]], ABC):
     """
 
     # key-value mapping
-    _lazy_data: Optional[Dict[str, Union[bool, int, float, str]]] = None
+    _lazy_data: Optional[Dict[str, _LazyValueType]] = None
 
     @abstractmethod
-    def _load(self) -> Dict[str, Union[bool, int, float, str]]:
+    def _load(self) -> Dict[str, _LazyValueType]:
         raise NotImplementedError()
 
     @property
-    def _data(self) -> Dict[str, Union[bool, int, float, str]]:
+    def _data(self) -> Dict[str, _LazyValueType]:
         data = self._lazy_data
         if data is None:
             data = self._lazy_data = self._load()
@@ -790,17 +792,25 @@ class LazyMapping(Mapping[str, Union[bool, int, float, str]], ABC):
     def __contains__(self, key: str) -> bool:
         return key in self._data
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: str) -> Union[bool, int, float, str]:
+    def __getitem__(self, key: str) -> _LazyValueType:
         return self._data[key]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self._data)
+
+
+class LazyMapping(_GenericLazyMapping[str]):
+    """Represents a dict[str, str] that isn't populated until it is accessed.
+
+    Charm authors should generally never need to use this directly, but it forms
+    the basis for many of the dicts that the framework tracks.
+    """
 
 
 class RelationMapping(Mapping[str, List['Relation']]):
@@ -1696,15 +1706,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __getitem__(self, key: str) -> str:
         self._validate_read()
-        return cast(str, super().__getitem__(key))
-
-    # This is provided by Mapping, but we need to make the return type more explicit.
-    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        """Return the vaule for key if key is in the data, else default."""
-        try:
-            return self.__getitem__(key)
-        except KeyError:
-            return default
+        return super().__getitem__(key)
 
     def __delitem__(self, key: str):
         self._validate_write(key, '')
@@ -1713,14 +1715,14 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self.__setitem__(key, '')
 
     def __repr__(self):
-        try:
+        try:    # key-value mapping
             self._validate_read()
         except RelationDataAccessError:
             return '<n/a>'
         return super().__repr__()
 
 
-class ConfigData(LazyMapping):
+class ConfigData(_GenericLazyMapping[Union[bool, int, float, str]]):
     """Configuration data.
 
     This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
