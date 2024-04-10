@@ -61,41 +61,49 @@ from ops.jujuversion import JujuVersion
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
 
-_ConfigOption = TypedDict('_ConfigOption', {
-    'type': Literal['string', 'int', 'float', 'boolean'],
-    'description': str,
-    'default': Union[str, int, float, bool],
-})
+_ConfigOption = TypedDict(
+    "_ConfigOption",
+    {
+        "type": Literal["string", "int", "float", "boolean"],
+        "description": str,
+        "default": Union[str, int, float, bool],
+    },
+)
 
-_StorageDictType = Dict[str, Optional[List['Storage']]]
-_BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
+_StorageDictType = Dict[str, Optional[List["Storage"]]]
+_BindingDictType = Dict[Union[str, "Relation"], "Binding"]
 
-_StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
+_StatusDict = TypedDict("_StatusDict", {"status": str, "message": str})
 
 # mapping from relation name to a list of relation objects
-_RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
+_RelationMapping_Raw = Dict[str, Optional[List["Relation"]]]
 # mapping from container name to container metadata
-_ContainerMeta_Raw = Dict[str, 'ops.charm.ContainerMeta']
+_ContainerMeta_Raw = Dict[str, "ops.charm.ContainerMeta"]
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
 _RelationDataContent_Raw = Dict[str, str]
-UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
+UnitOrApplicationType = Union[Type["Unit"], Type["Application"]]
 
-_AddressDict = TypedDict('_AddressDict', {
-    'address': str,  # Juju < 2.9
-    'value': str,  # Juju >= 2.9
-    'cidr': str
-})
-_BindAddressDict = TypedDict('_BindAddressDict', {
-    'interface-name': str,
-    'addresses': List[_AddressDict]
-})
-_NetworkDict = TypedDict('_NetworkDict', {
-    'bind-addresses': List[_BindAddressDict],
-    'ingress-addresses': List[str],
-    'egress-subnets': List[str]
-})
+_AddressDict = TypedDict(
+    "_AddressDict",
+    {
+        "address": str,  # Juju < 2.9
+        "value": str,  # Juju >= 2.9
+        "cidr": str,
+    },
+)
+_BindAddressDict = TypedDict(
+    "_BindAddressDict", {"interface-name": str, "addresses": List[_AddressDict]}
+)
+_NetworkDict = TypedDict(
+    "_NetworkDict",
+    {
+        "bind-addresses": List[_BindAddressDict],
+        "ingress-addresses": List[str],
+        "egress-subnets": List[str],
+    },
+)
 
 
 logger = logging.getLogger(__name__)
@@ -110,14 +118,19 @@ class Model:
     as ``self.model`` from any class that derives from :class:`Object`.
     """
 
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend',
-                 broken_relation_id: Optional[int] = None):
+    def __init__(
+        self,
+        meta: "ops.charm.CharmMeta",
+        backend: "_ModelBackend",
+        broken_relation_id: Optional[int] = None,
+    ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        relations: Dict[str, 'ops.RelationMeta'] = meta.relations
-        self._relations = RelationMapping(relations, self.unit, self._backend, self._cache,
-                                          broken_relation_id=broken_relation_id)
+        relations: Dict[str, "ops.RelationMeta"] = meta.relations
+        self._relations = RelationMapping(
+            relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
+        )
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
         self._resources = Resources(list(resources), self._backend)
@@ -127,7 +140,7 @@ class Model:
         self._bindings = BindingMapping(self._backend)
 
     @property
-    def unit(self) -> 'Unit':
+    def unit(self) -> "Unit":
         """The unit that is running this code.
 
         Use :meth:`get_unit` to get an arbitrary unit by name.
@@ -135,7 +148,7 @@ class Model:
         return self._unit
 
     @property
-    def app(self) -> 'Application':
+    def app(self) -> "Application":
         """The application this unit is a part of.
 
         Use :meth:`get_app` to get an arbitrary application by name.
@@ -143,7 +156,7 @@ class Model:
         return self._unit.app
 
     @property
-    def relations(self) -> 'RelationMapping':
+    def relations(self) -> "RelationMapping":
         """Mapping of endpoint to list of :class:`Relation`.
 
         Answers the question "what am I currently integrated with".
@@ -155,12 +168,12 @@ class Model:
         return self._relations
 
     @property
-    def config(self) -> 'ConfigData':
+    def config(self) -> "ConfigData":
         """Return a mapping of config for the current application."""
         return self._config
 
     @property
-    def resources(self) -> 'Resources':
+    def resources(self) -> "Resources":
         """Access to resources for this charm.
 
         Use ``model.resources.fetch(resource_name)`` to get the path on disk
@@ -169,12 +182,12 @@ class Model:
         return self._resources
 
     @property
-    def storages(self) -> 'StorageMapping':
+    def storages(self) -> "StorageMapping":
         """Mapping of storage_name to :class:`Storage` as defined in metadata.yaml."""
         return self._storages
 
     @property
-    def pod(self) -> 'Pod':
+    def pod(self) -> "Pod":
         """Represents the definition of a pod spec in legacy Kubernetes models.
 
         DEPRECATED: New charms should use the sidecar pattern with Pebble.
@@ -200,7 +213,7 @@ class Model:
         """
         return self._backend.model_uuid
 
-    def get_unit(self, unit_name: str) -> 'Unit':
+    def get_unit(self, unit_name: str) -> "Unit":
         """Get an arbitrary unit by name.
 
         Use :attr:`unit` to get the current unit.
@@ -210,7 +223,7 @@ class Model:
         """
         return self._cache.get(Unit, unit_name)
 
-    def get_app(self, app_name: str) -> 'Application':
+    def get_app(self, app_name: str) -> "Application":
         """Get an application by name.
 
         Use :attr:`app` to get this charm's application.
@@ -221,8 +234,8 @@ class Model:
         return self._cache.get(Application, app_name)
 
     def get_relation(
-            self, relation_name: str,
-            relation_id: Optional[int] = None) -> Optional['Relation']:
+        self, relation_name: str, relation_id: Optional[int] = None
+    ) -> Optional["Relation"]:
         """Get a specific Relation instance.
 
         If relation_id is not given, this will return the Relation instance if the
@@ -240,7 +253,7 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key: Union[str, 'Relation']) -> Optional['Binding']:
+    def get_binding(self, binding_key: Union[str, "Relation"]) -> Optional["Binding"]:
         """Get a network space binding.
 
         Args:
@@ -254,7 +267,7 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
-    def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> 'Secret':
+    def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> "Secret":
         """Get the :class:`Secret` with the given ID or label.
 
         The caller must provide at least one of `id` (the secret's locator ID)
@@ -273,14 +286,14 @@ class Model:
             SecretNotFoundError: If a secret with this ID or label doesn't exist.
         """
         if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
+            raise TypeError("Must provide an id or label, or both")
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id)
         content = self._backend.secret_get(id=id, label=label)
         return Secret(self._backend, id=id, label=label, content=content)
 
-    def get_cloud_spec(self) -> 'CloudSpec':
+    def get_cloud_spec(self) -> "CloudSpec":
         """Get details of the cloud in which the model is deployed.
 
         Note: This information is only available for machine charms,
@@ -299,22 +312,22 @@ class Model:
 if typing.TYPE_CHECKING:
     # (entity type, name): instance.
     _WeakCacheType = weakref.WeakValueDictionary[
-        Tuple['UnitOrApplicationType', str],
-        Optional[Union['Unit', 'Application']]]
+        Tuple["UnitOrApplicationType", str], Optional[Union["Unit", "Application"]]
+    ]
 
 
 class _ModelCache:
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
+    def __init__(self, meta: "ops.charm.CharmMeta", backend: "_ModelBackend"):
         self._meta = meta
         self._backend = backend
         self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
-    def get(self, entity_type: Type['Unit'], name: str) -> 'Unit': ...
+    def get(self, entity_type: Type["Unit"], name: str) -> "Unit": ...
     @typing.overload
-    def get(self, entity_type: Type['Application'], name: str) -> 'Application': ...
+    def get(self, entity_type: Type["Application"], name: str) -> "Application": ...
 
-    def get(self, entity_type: 'UnitOrApplicationType', name: str):
+    def get(self, entity_type: "UnitOrApplicationType", name: str):
         """Fetch the cached entity of type `entity_type` with name `name`."""
         key = (entity_type, name)
         entity = self._weakrefs.get(key)
@@ -340,20 +353,21 @@ class Application:
     the charm, if the user has deployed it to a different name.
     """
 
-    def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
-                 backend: '_ModelBackend', cache: _ModelCache):
+    def __init__(
+        self, name: str, meta: "ops.charm.CharmMeta", backend: "_ModelBackend", cache: _ModelCache
+    ):
         self.name = name
         self._backend = backend
         self._cache = cache
         self._is_our_app = self.name == self._backend.app_name
         self._status = None
-        self._collected_statuses: 'List[StatusBase]' = []
+        self._collected_statuses: "List[StatusBase]" = []
 
     def _invalidate(self):
         self._status = None
 
     @property
-    def status(self) -> 'StatusBase':
+    def status(self) -> "StatusBase":
         """Used to report or read the status of the overall application.
 
         Changes to status take effect immediately, unlike other Juju operations
@@ -381,30 +395,30 @@ class Application:
             return UnknownStatus()
 
         if not self._backend.is_leader():
-            raise RuntimeError('cannot get application status as a non-leader unit')
+            raise RuntimeError("cannot get application status as a non-leader unit")
 
         if self._status:
             return self._status
 
         s = self._backend.status_get(is_app=True)
-        self._status = StatusBase.from_name(s['status'], s['message'])
+        self._status = StatusBase.from_name(s["status"], s["message"])
         return self._status
 
     @status.setter
-    def status(self, value: 'StatusBase'):
+    def status(self, value: "StatusBase"):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
-                f'invalid value provided for application {self} status: {value}'
+                f"invalid value provided for application {self} status: {value}"
             )
 
         if not self._is_our_app:
-            raise RuntimeError(f'cannot set status for a remote application {self}')
+            raise RuntimeError(f"cannot set status for a remote application {self}")
 
         if not self._backend.is_leader():
-            raise RuntimeError('cannot set application status as a non-leader unit')
+            raise RuntimeError("cannot set application status as a non-leader unit")
 
-        for _key in {'name', 'message'}:
-            assert isinstance(getattr(value, _key), str), f'status.{_key} must be a string'
+        for _key in {"name", "message"}:
+            assert isinstance(getattr(value, _key), str), f"status.{_key} must be a string"
         self._backend.status_set(value.name, value.message, is_app=True)
         self._status = value
 
@@ -426,19 +440,22 @@ class Application:
             RuntimeError: on trying to get the planned units for a remote application.
         """
         if not self._is_our_app:
-            raise RuntimeError(
-                f'cannot get planned units for a remote application {self}.')
+            raise RuntimeError(f"cannot get planned units for a remote application {self}.")
 
         return self._backend.planned_units()
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+        return f"<{type(self).__module__}.{type(self).__name__} {self.name}>"
 
-    def add_secret(self, content: Dict[str, str], *,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional['SecretRotate'] = None) -> 'Secret':
+    def add_secret(
+        self,
+        content: Dict[str, str],
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+        rotate: Optional["SecretRotate"] = None,
+    ) -> "Secret":
         """Create a :class:`Secret` owned by this application.
 
         Args:
@@ -465,12 +482,14 @@ class Application:
             description=description,
             expire=_calculate_expiry(expire),
             rotate=rotate,
-            owner='application')
+            owner="application",
+        )
         return Secret(self._backend, id=id, label=label, content=content)
 
 
-def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedelta]],
-                      ) -> Optional[datetime.datetime]:
+def _calculate_expiry(
+    expire: Optional[Union[datetime.datetime, datetime.timedelta]],
+) -> Optional[datetime.datetime]:
     if expire is None:
         return None
     if isinstance(expire, datetime.datetime):
@@ -478,8 +497,10 @@ def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedel
     elif isinstance(expire, datetime.timedelta):
         return datetime.datetime.now() + expire
     else:
-        raise TypeError('Expiration time must be a datetime or timedelta from now, not '
-                        + type(expire).__name__)
+        raise TypeError(
+            "Expiration time must be a datetime or timedelta from now, not "
+            + type(expire).__name__
+        )
 
 
 class Unit:
@@ -495,18 +516,23 @@ class Unit:
     app: Application
     """Application the unit is part of."""
 
-    def __init__(self, name: str, meta: 'ops.charm.CharmMeta',
-                 backend: '_ModelBackend', cache: '_ModelCache'):
+    def __init__(
+        self,
+        name: str,
+        meta: "ops.charm.CharmMeta",
+        backend: "_ModelBackend",
+        cache: "_ModelCache",
+    ):
         self.name = name
 
-        app_name = name.split('/')[0]
+        app_name = name.split("/")[0]
         self.app = cache.get(Application, app_name)
 
         self._backend = backend
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
-        self._collected_statuses: 'List[StatusBase]' = []
+        self._collected_statuses: "List[StatusBase]" = []
 
         if self._is_our_unit and hasattr(meta, "containers"):
             containers: _ContainerMeta_Raw = meta.containers
@@ -516,7 +542,7 @@ class Unit:
         self._status = None
 
     @property
-    def status(self) -> 'StatusBase':
+    def status(self) -> "StatusBase":
         """Used to report or read the status of a specific unit.
 
         Changes to status take effect immediately, unlike other Juju operations
@@ -544,25 +570,23 @@ class Unit:
             return self._status
 
         s = self._backend.status_get(is_app=False)
-        self._status = StatusBase.from_name(s['status'], s['message'])
+        self._status = StatusBase.from_name(s["status"], s["message"])
         return self._status
 
     @status.setter
-    def status(self, value: 'StatusBase'):
+    def status(self, value: "StatusBase"):
         if not isinstance(value, StatusBase):
-            raise InvalidStatusError(
-                f'invalid value provided for unit {self} status: {value}'
-            )
+            raise InvalidStatusError(f"invalid value provided for unit {self} status: {value}")
 
         if not self._is_our_unit:
-            raise RuntimeError(f'cannot set status for a remote unit {self}')
+            raise RuntimeError(f"cannot set status for a remote unit {self}")
 
         # fixme: if value.messages
         self._backend.status_set(value.name, value.message, is_app=False)
         self._status = value
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
+        return f"<{type(self).__module__}.{type(self).__name__} {self.name}>"
 
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
@@ -578,7 +602,7 @@ class Unit:
             return self._backend.is_leader()
         else:
             raise RuntimeError(
-                f'leadership status of remote units ({self}) is not visible to other applications'
+                f"leadership status of remote units ({self}) is not visible to other applications"
             )
 
     def set_workload_version(self, version: str) -> None:
@@ -589,21 +613,22 @@ class Unit:
         """
         if not isinstance(version, str):
             raise TypeError(
-                f'workload version must be a str, not {type(version).__name__}: {version!r}')
+                f"workload version must be a str, not {type(version).__name__}: {version!r}"
+            )
         self._backend.application_version_set(version)
 
     @property
-    def containers(self) -> Mapping[str, 'Container']:
+    def containers(self) -> Mapping[str, "Container"]:
         """Return a mapping of containers indexed by name.
 
         Raises:
             RuntimeError: if called for another unit
         """
         if not self._is_our_unit:
-            raise RuntimeError(f'cannot get container for a remote unit {self}')
+            raise RuntimeError(f"cannot get container for a remote unit {self}")
         return self._containers
 
-    def get_container(self, container_name: str) -> 'Container':
+    def get_container(self, container_name: str) -> "Container":
         """Get a single container by name.
 
         Raises:
@@ -612,13 +637,17 @@ class Unit:
         try:
             return self.containers[container_name]
         except KeyError:
-            raise ModelError(f'container {container_name!r} not found') from None
+            raise ModelError(f"container {container_name!r} not found") from None
 
-    def add_secret(self, content: Dict[str, str], *,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                   rotate: Optional['SecretRotate'] = None) -> 'Secret':
+    def add_secret(
+        self,
+        content: Dict[str, str],
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+        rotate: Optional["SecretRotate"] = None,
+    ) -> "Secret":
         """Create a :class:`Secret` owned by this unit.
 
         See :meth:`Application.add_secret` for parameter details.
@@ -633,11 +662,13 @@ class Unit:
             description=description,
             expire=_calculate_expiry(expire),
             rotate=rotate,
-            owner='unit')
+            owner="unit",
+        )
         return Secret(self._backend, id=id, label=label, content=content)
 
-    def open_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
-                  port: Optional[int] = None) -> None:
+    def open_port(
+        self, protocol: typing.Literal["tcp", "udp", "icmp"], port: Optional[int] = None
+    ) -> None:
         """Open a port with the given protocol for this unit.
 
         Some behaviour, such as whether the port is opened externally without
@@ -663,8 +694,9 @@ class Unit:
         """
         self._backend.open_port(protocol.lower(), port)
 
-    def close_port(self, protocol: typing.Literal['tcp', 'udp', 'icmp'],
-                   port: Optional[int] = None) -> None:
+    def close_port(
+        self, protocol: typing.Literal["tcp", "udp", "icmp"], port: Optional[int] = None
+    ) -> None:
         """Close a port with the given protocol for this unit.
 
         Some behaviour, such as whether the port is closed externally without
@@ -691,11 +723,11 @@ class Unit:
         """
         self._backend.close_port(protocol.lower(), port)
 
-    def opened_ports(self) -> Set['Port']:
+    def opened_ports(self) -> Set["Port"]:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
-    def set_ports(self, *ports: Union[int, 'Port']) -> None:
+    def set_ports(self, *ports: Union[int, "Port"]) -> None:
         """Set the open ports for this unit, closing any others that are open.
 
         Some behaviour, such as whether the port is opened or closed externally without
@@ -717,12 +749,9 @@ class Unit:
                 is ``None``.
         """
         # Normalise to get easier comparisons.
-        existing = {
-            (port.protocol, port.port)
-            for port in self._backend.opened_ports()
-        }
+        existing = {(port.protocol, port.port) for port in self._backend.opened_ports()}
         desired = {
-            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
+            ("tcp", port) if isinstance(port, int) else (port.protocol, port.port)
             for port in ports
         }
         for protocol, port in existing - desired:
@@ -751,7 +780,7 @@ class Unit:
 
         """
         if not self._is_our_unit:
-            raise RuntimeError(f'cannot reboot a remote unit {self}')
+            raise RuntimeError(f"cannot reboot a remote unit {self}")
         self._backend.reboot(now)
 
 
@@ -759,7 +788,7 @@ class Unit:
 class Port:
     """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
 
-    protocol: typing.Literal['tcp', 'udp', 'icmp']
+    protocol: typing.Literal["tcp", "udp", "icmp"]
     """The IP protocol."""
 
     port: Optional[int]
@@ -809,15 +838,17 @@ class LazyMapping(Mapping[str, str], ABC):
         return repr(self._data)
 
 
-class RelationMapping(Mapping[str, List['Relation']]):
+class RelationMapping(Mapping[str, List["Relation"]]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
-    def __init__(self,
-                 relations_meta: Dict[str, 'ops.RelationMeta'],
-                 our_unit: 'Unit',
-                 backend: '_ModelBackend',
-                 cache: '_ModelCache',
-                 broken_relation_id: Optional[int]):
+    def __init__(
+        self,
+        relations_meta: Dict[str, "ops.RelationMeta"],
+        our_unit: "Unit",
+        backend: "_ModelBackend",
+        cache: "_ModelCache",
+        broken_relation_id: Optional[int],
+    ):
         self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
@@ -837,7 +868,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
     def __iter__(self) -> Iterable[str]:
         return iter(self._data)
 
-    def __getitem__(self, relation_name: str) -> List['Relation']:
+    def __getitem__(self, relation_name: str) -> List["Relation"]:
         is_peer = relation_name in self._peers
         relation_list: Optional[List[Relation]] = self._data[relation_name]
         if not isinstance(relation_list, list):
@@ -845,8 +876,9 @@ class RelationMapping(Mapping[str, List['Relation']]):
             for rid in self._backend.relation_ids(relation_name):
                 if rid == self._broken_relation_id:
                     continue
-                relation = Relation(relation_name, rid, is_peer,
-                                    self._our_unit, self._backend, self._cache)
+                relation = Relation(
+                    relation_name, rid, is_peer, self._our_unit, self._backend, self._cache
+                )
                 relation_list.append(relation)
         return relation_list
 
@@ -863,16 +895,24 @@ class RelationMapping(Mapping[str, List['Relation']]):
         if relation_id is not None:
             if not isinstance(relation_id, int):
                 raise ModelError(
-                    f'relation id {relation_id} must be int or None, '
-                    f'not {type(relation_id).__name__}')
+                    f"relation id {relation_id} must be int or None, "
+                    f"not {type(relation_id).__name__}"
+                )
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
             else:
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
-                return Relation(relation_name, relation_id, is_peer,
-                                self._our_unit, self._backend, self._cache, active=False)
+                return Relation(
+                    relation_name,
+                    relation_id,
+                    is_peer,
+                    self._our_unit,
+                    self._backend,
+                    self._cache,
+                    active=False,
+                )
         relations = self[relation_name]
         num_related = len(relations)
         if num_related == 0:
@@ -885,18 +925,18 @@ class RelationMapping(Mapping[str, List['Relation']]):
             raise TooManyRelatedAppsError(relation_name, num_related, 1)
 
 
-class BindingMapping(Mapping[str, 'Binding']):
+class BindingMapping(Mapping[str, "Binding"]):
     """Mapping of endpoints to network bindings.
 
     Charm authors should not instantiate this directly, but access it via
     :meth:`Model.get_binding`
     """
 
-    def __init__(self, backend: '_ModelBackend'):
+    def __init__(self, backend: "_ModelBackend"):
         self._backend = backend
         self._data: _BindingDictType = {}
 
-    def get(self, binding_key: Union[str, 'Relation']) -> 'Binding':
+    def get(self, binding_key: Union[str, "Relation"]) -> "Binding":
         """Get a specific Binding for an endpoint/relation.
 
         Not used directly by Charm authors. See :meth:`Model.get_binding`
@@ -909,7 +949,7 @@ class BindingMapping(Mapping[str, 'Binding']):
             relation_id = None
         else:
             raise ModelError(
-                f'binding key must be str or relation instance, not {type(binding_key).__name__}'
+                f"binding key must be str or relation instance, not {type(binding_key).__name__}"
             )
         binding = self._data.get(binding_key)
         if binding is None:
@@ -918,10 +958,10 @@ class BindingMapping(Mapping[str, 'Binding']):
         return binding
 
     # implemented to satisfy the Mapping ABC, but not meant to be used.
-    def __getitem__(self, item: Union[str, 'Relation']) -> 'Binding':
+    def __getitem__(self, item: Union[str, "Relation"]) -> "Binding":
         raise NotImplementedError()
 
-    def __iter__(self) -> Iterable['Binding']:
+    def __iter__(self) -> Iterable["Binding"]:
         raise NotImplementedError()
 
     def __len__(self) -> int:
@@ -934,17 +974,17 @@ class Binding:
     name: str
     """The name of the endpoint this binding represents (eg, 'db')."""
 
-    def __init__(self, name: str, relation_id: Optional[int], backend: '_ModelBackend'):
+    def __init__(self, name: str, relation_id: Optional[int], backend: "_ModelBackend"):
         self.name = name
         self._relation_id = relation_id
         self._backend = backend
         self._network = None
 
-    def _network_get(self, name: str, relation_id: Optional[int] = None) -> 'Network':
+    def _network_get(self, name: str, relation_id: Optional[int] = None) -> "Network":
         return Network(self._backend.network_get(name, relation_id))
 
     @property
-    def network(self) -> 'Network':
+    def network(self) -> "Network":
         """The network information for this binding."""
         if self._network is None:
             try:
@@ -976,7 +1016,7 @@ class Network:
     definition from :meth:`Model.get_binding` and its :code:`network` attribute.
     """
 
-    interfaces: List['NetworkInterface']
+    interfaces: List["NetworkInterface"]
     """A list of network interface details. This includes the information
     about how the application should be configured (for example, what IP
     addresses should be bound to).
@@ -997,7 +1037,7 @@ class Network:
     be constrained to a single address (for example, 10.0.0.1/32).
     """
 
-    def __init__(self, network_info: '_NetworkDict'):
+    def __init__(self, network_info: "_NetworkDict"):
         """Initialize a Network instance.
 
         Args:
@@ -1006,19 +1046,19 @@ class Network:
         self.interfaces = []
         # Treat multiple addresses on an interface as multiple logical
         # interfaces with the same name.
-        for interface_info in network_info.get('bind-addresses', []):
-            interface_name: str = interface_info.get('interface-name')
-            addrs: Optional[List[_AddressDict]] = interface_info.get('addresses')
+        for interface_info in network_info.get("bind-addresses", []):
+            interface_name: str = interface_info.get("interface-name")
+            addrs: Optional[List[_AddressDict]] = interface_info.get("addresses")
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
 
         self.ingress_addresses = []
-        for address in network_info.get('ingress-addresses', []):
+        for address in network_info.get("ingress-addresses", []):
             self.ingress_addresses.append(_cast_network_address(address))
 
         self.egress_subnets = []
-        for subnet in network_info.get('egress-subnets', []):
+        for subnet in network_info.get("egress-subnets", []):
             self.egress_subnets.append(ipaddress.ip_network(subnet))
 
     @property
@@ -1035,8 +1075,9 @@ class Network:
             return None
 
     @property
-    def ingress_address(self) -> Optional[
-            Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
+    def ingress_address(
+        self,
+    ) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address, str]]:
         """The address other applications should use to connect to the current unit.
 
         Due to things like public/private addresses, NAT and tunneling, the address the charm
@@ -1067,20 +1108,20 @@ class NetworkInterface:
     (for example, '10.0.1.2/32').
     """
 
-    def __init__(self, name: str, address_info: '_AddressDict'):
+    def __init__(self, name: str, address_info: "_AddressDict"):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
 
-        address = address_info.get('value')
+        address = address_info.get("value")
         if address is None:
             # Compatibility with Juju <2.9: legacy address_info only had
             # an 'address' field instead of 'value'.
-            address = address_info.get('address')
+            address = address_info.get("address")
 
         # The value field may be empty.
         address_ = _cast_network_address(address) if address else None
         self.address = address_
-        cidr: str = address_info.get('cidr')
+        cidr: str = address_info.get("cidr")
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
             subnet = ipaddress.ip_network(cidr)
@@ -1096,25 +1137,27 @@ class NetworkInterface:
 class SecretRotate(enum.Enum):
     """Secret rotation policies."""
 
-    NEVER = 'never'  # the default in juju
-    HOURLY = 'hourly'
-    DAILY = 'daily'
-    WEEKLY = 'weekly'
-    MONTHLY = 'monthly'
-    QUARTERLY = 'quarterly'
-    YEARLY = 'yearly'
+    NEVER = "never"  # the default in juju
+    HOURLY = "hourly"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    YEARLY = "yearly"
 
 
 class SecretInfo:
     """Secret information (metadata)."""
 
-    def __init__(self,
-                 id: str,
-                 label: Optional[str],
-                 revision: int,
-                 expires: Optional[datetime.datetime],
-                 rotation: Optional[SecretRotate],
-                 rotates: Optional[datetime.datetime]):
+    def __init__(
+        self,
+        id: str,
+        label: Optional[str],
+        revision: int,
+        expires: Optional[datetime.datetime],
+        rotation: Optional[SecretRotate],
+        rotates: Optional[datetime.datetime],
+    ):
         self.id = Secret._canonicalize_id(id)
         self.label = label
         self.revision = revision
@@ -1123,32 +1166,33 @@ class SecretInfo:
         self.rotates = rotates
 
     @classmethod
-    def from_dict(cls, id: str, d: Dict[str, Any]) -> 'SecretInfo':
+    def from_dict(cls, id: str, d: Dict[str, Any]) -> "SecretInfo":
         """Create new SecretInfo object from ID and dict parsed from JSON."""
-        expires = typing.cast(Optional[str], d.get('expires'))
+        expires = typing.cast(Optional[str], d.get("expires"))
         try:
-            rotation = SecretRotate(typing.cast(Optional[str], d.get('rotation')))
+            rotation = SecretRotate(typing.cast(Optional[str], d.get("rotation")))
         except ValueError:
             rotation = None
-        rotates = typing.cast(Optional[str], d.get('rotates'))
+        rotates = typing.cast(Optional[str], d.get("rotates"))
         return cls(
             id=id,
-            label=typing.cast(Optional[str], d.get('label')),
-            revision=typing.cast(int, d['revision']),
+            label=typing.cast(Optional[str], d.get("label")),
+            revision=typing.cast(int, d["revision"]),
             expires=timeconv.parse_rfc3339(expires) if expires is not None else None,
             rotation=rotation,
             rotates=timeconv.parse_rfc3339(rotates) if rotates is not None else None,
         )
 
     def __repr__(self):
-        return ('SecretInfo('
-                f'id={self.id!r}, '
-                f'label={self.label!r}, '
-                f'revision={self.revision}, '
-                f'expires={self.expires!r}, '
-                f'rotation={self.rotation}, '
-                f'rotates={self.rotates!r})'
-                )
+        return (
+            "SecretInfo("
+            f"id={self.id!r}, "
+            f"label={self.label!r}, "
+            f"revision={self.revision}, "
+            f"expires={self.expires!r}, "
+            f"rotation={self.rotation}, "
+            f"rotates={self.rotates!r})"
+        )
 
 
 class Secret:
@@ -1162,14 +1206,17 @@ class Secret:
     :class:`Secret` associated with that event.
     """
 
-    _key_re = re.compile(r'^([a-z](?:-?[a-z0-9]){2,})$')  # copied from Juju code
+    _key_re = re.compile(r"^([a-z](?:-?[a-z0-9]){2,})$")  # copied from Juju code
 
-    def __init__(self, backend: '_ModelBackend',
-                 id: Optional[str] = None,
-                 label: Optional[str] = None,
-                 content: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        backend: "_ModelBackend",
+        id: Optional[str] = None,
+        label: Optional[str] = None,
+        content: Optional[Dict[str, str]] = None,
+    ):
         if not (id or label):
-            raise TypeError('Must provide an id or label, or both')
+            raise TypeError("Must provide an id or label, or both")
         if id is not None:
             id = self._canonicalize_id(id)
         self._backend = backend
@@ -1180,16 +1227,16 @@ class Secret:
     def __repr__(self):
         fields: List[str] = []
         if self._id is not None:
-            fields.append(f'id={self._id!r}')
+            fields.append(f"id={self._id!r}")
         if self._label is not None:
-            fields.append(f'label={self._label!r}')
+            fields.append(f"label={self._label!r}")
         return f"<Secret {' '.join(fields)}>"
 
     @staticmethod
     def _canonicalize_id(id: str) -> str:
         """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
         id = id.strip()
-        if not id.startswith('secret:'):
+        if not id.startswith("secret:"):
             id = f"secret:{id}"  # add the prefix if not there already
         return id
 
@@ -1197,9 +1244,9 @@ class Secret:
     def _validate_content(cls, content: Optional[Dict[str, str]]):
         """Ensure the given secret content is valid, or raise ValueError."""
         if not isinstance(content, dict):
-            raise TypeError(f'Secret content must be a dict, not {type(content).__name__}')
+            raise TypeError(f"Secret content must be a dict, not {type(content).__name__}")
         if not content:
-            raise ValueError('Secret content must not be empty')
+            raise ValueError("Secret content must not be empty")
 
         invalid_keys: List[str] = []
         invalid_value_keys: List[str] = []
@@ -1213,14 +1260,17 @@ class Secret:
 
         if invalid_keys:
             raise ValueError(
-                f'Invalid secret keys: {invalid_keys}. '
-                f'Keys should be lowercase letters and digits, at least 3 characters long, '
-                f'start with a letter, and not start or end with a hyphen.')
+                f"Invalid secret keys: {invalid_keys}. "
+                f"Keys should be lowercase letters and digits, at least 3 characters long, "
+                f"start with a letter, and not start or end with a hyphen."
+            )
 
         if invalid_value_keys:
-            invalid_types = ' or '.join(sorted(invalid_value_types))
-            raise TypeError(f'Invalid secret values for keys: {invalid_value_keys}. '
-                            f'Values should be of type str, not {invalid_types}.')
+            invalid_types = " or ".join(sorted(invalid_value_types))
+            raise TypeError(
+                f"Invalid secret values for keys: {invalid_value_keys}. "
+                f"Values should be of type str, not {invalid_types}."
+            )
 
     @property
     def id(self) -> Optional[str]:
@@ -1260,10 +1310,10 @@ class Secret:
         """
         if self._id is None:
             return None
-        if '/' in self._id:
-            return self._id.rsplit('/', 1)[-1]
-        elif self._id.startswith('secret:'):
-            return self._id[len('secret:'):]
+        if "/" in self._id:
+            return self._id.rsplit("/", 1)[-1]
+        elif self._id.startswith("secret:"):
+            return self._id[len("secret:") :]
         else:
             # Shouldn't get here as id is canonicalized, but just in case.
             return self._id
@@ -1316,8 +1366,7 @@ class Secret:
                 get the content of the currently-tracked revision.
         """
         if refresh or self._content is None:
-            self._content = self._backend.secret_get(
-                id=self.id, label=self.label, refresh=refresh)
+            self._content = self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
         return self._content.copy()
 
     def peek_content(self) -> Dict[str, str]:
@@ -1352,11 +1401,14 @@ class Secret:
         self._backend.secret_set(typing.cast(str, self.id), content=content)
         self._content = None  # invalidate cache so it's refetched next get_content()
 
-    def set_info(self, *,
-                 label: Optional[str] = None,
-                 description: Optional[str] = None,
-                 expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
-                 rotate: Optional[SecretRotate] = None):
+    def set_info(
+        self,
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[Union[datetime.datetime, datetime.timedelta]] = None,
+        rotate: Optional[SecretRotate] = None,
+    ):
         """Update this secret's information (metadata).
 
         This will not create a new secret revision (that applies only to
@@ -1370,17 +1422,20 @@ class Secret:
                 effect only after the currently-scheduled rotation.
         """
         if label is None and description is None and expire is None and rotate is None:
-            raise TypeError('Must provide a label, description, expiration time, '
-                            'or rotation policy')
+            raise TypeError(
+                "Must provide a label, description, expiration time, " "or rotation policy"
+            )
         if self._id is None:
             self._id = self.get_info().id
-        self._backend.secret_set(typing.cast(str, self.id),
-                                 label=label,
-                                 description=description,
-                                 expire=_calculate_expiry(expire),
-                                 rotate=rotate)
+        self._backend.secret_set(
+            typing.cast(str, self.id),
+            label=label,
+            description=description,
+            expire=_calculate_expiry(expire),
+            rotate=rotate,
+        )
 
-    def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
+    def grant(self, relation: "Relation", *, unit: Optional[Unit] = None):
         """Grant read access to this secret.
 
         If the application or unit has already been granted access to this
@@ -1394,11 +1449,10 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_grant(
-            typing.cast(str, self.id),
-            relation.id,
-            unit=unit.name if unit is not None else None)
+            typing.cast(str, self.id), relation.id, unit=unit.name if unit is not None else None
+        )
 
-    def revoke(self, relation: 'Relation', *, unit: Optional[Unit] = None):
+    def revoke(self, relation: "Relation", *, unit: Optional[Unit] = None):
         """Revoke read access to this secret.
 
         If the application or unit does not have access to this secret, do
@@ -1412,9 +1466,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_revoke(
-            typing.cast(str, self.id),
-            relation.id,
-            unit=unit.name if unit is not None else None)
+            typing.cast(str, self.id), relation.id, unit=unit.name if unit is not None else None
+        )
 
     def remove_revision(self, revision: int):
         """Remove the given secret revision.
@@ -1469,7 +1522,7 @@ class Relation:
     For subordinate relations, this set will include only one unit: the principal unit.
     """
 
-    data: 'RelationData'
+    data: "RelationData"
     """Holds the data buckets for each entity of a relation.
 
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
@@ -1483,8 +1536,15 @@ class Relation:
     """
 
     def __init__(
-            self, relation_name: str, relation_id: int, is_peer: bool, our_unit: Unit,
-            backend: '_ModelBackend', cache: '_ModelCache', active: bool = True):
+        self,
+        relation_name: str,
+        relation_id: int,
+        is_peer: bool,
+        our_unit: Unit,
+        backend: "_ModelBackend",
+        cache: "_ModelCache",
+        active: bool = True,
+    ):
         self.name = relation_name
         self.id = relation_id
         self.units: Set[Unit] = set()
@@ -1516,10 +1576,10 @@ class Relation:
         self.data = RelationData(self, our_unit, backend)
 
     def __repr__(self):
-        return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+        return f"<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>"
 
 
-class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent']):
+class RelationData(Mapping[Union["Unit", "Application"], "RelationDataContent"]):
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
@@ -1534,22 +1594,29 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     :attr:`Relation.data`
     """
 
-    def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
+    def __init__(self, relation: Relation, our_unit: Unit, backend: "_ModelBackend"):
         self.relation = weakref.proxy(relation)
-        self._data: Dict[Union['Unit', 'Application'], RelationDataContent] = {
+        self._data: Dict[Union["Unit", "Application"], RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
         }
-        self._data.update({
-            unit: RelationDataContent(self.relation, unit, backend)
-            for unit in self.relation.units})
+        self._data.update(
+            {
+                unit: RelationDataContent(self.relation, unit, backend)
+                for unit in self.relation.units
+            }
+        )
         # The relation might be dead so avoid a None key here.
         if self.relation.app is not None:
-            self._data.update({
-                self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
-            })
+            self._data.update(
+                {
+                    self.relation.app: RelationDataContent(
+                        self.relation, self.relation.app, backend
+                    ),
+                }
+            )
 
-    def __contains__(self, key: Union['Unit', 'Application']):
+    def __contains__(self, key: Union["Unit", "Application"]):
         return key in self._data
 
     def __len__(self):
@@ -1558,7 +1625,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: Union['Unit', 'Application']):
+    def __getitem__(self, key: Union["Unit", "Application"]):
         return self._data[key]
 
     def __repr__(self):
@@ -1570,8 +1637,9 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(self, relation: 'Relation', entity: Union['Unit', 'Application'],
-                 backend: '_ModelBackend'):
+    def __init__(
+        self, relation: "Relation", entity: Union["Unit", "Application"], backend: "_ModelBackend"
+    ):
         self.relation = relation
         self._entity = entity
         self._backend = backend
@@ -1584,7 +1652,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # unrestricted, allowing test code to read/write databags at will.
         return bool(self._backend._hook_is_running)
 
-    def _load(self) -> '_RelationDataContent_Raw':
+    def _load(self) -> "_RelationDataContent_Raw":
         """Load the data from the current entity / relation."""
         try:
             return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
@@ -1630,8 +1698,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
-                f'{self._backend.unit_name} is not leader and cannot read its own '
-                f'application databag'
+                f"{self._backend.unit_name} is not leader and cannot read its own "
+                f"application databag"
             )
 
         return True
@@ -1645,11 +1713,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # firstly, we validate WHAT we're trying to write.
         # this is independent of whether we're in testing code or production.
         if not isinstance(key, str):
-            raise RelationDataTypeError(
-                f'relation data keys must be strings, not {type(key)}')
+            raise RelationDataTypeError(f"relation data keys must be strings, not {type(key)}")
         if not isinstance(value, str):
-            raise RelationDataTypeError(
-                f'relation data values must be strings, not {type(value)}')
+            raise RelationDataTypeError(f"relation data values must be strings, not {type(value)}")
 
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
@@ -1660,8 +1726,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
-                    f'{self._backend.app_name} cannot write the data of remote application '
-                    f'{self._entity.name}')
+                    f"{self._backend.app_name} cannot write the data of remote application "
+                    f"{self._entity.name}"
+                )
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
@@ -1675,8 +1742,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # is it OUR UNIT's?
             if self._backend.unit_name != self._entity.name:
                 raise RelationDataAccessError(
-                    f'{self._backend.unit_name} cannot write databag of {self._entity.name}: '
-                    f'not the same unit.'
+                    f"{self._backend.unit_name} cannot write databag of {self._entity.name}: "
+                    f"not the same unit."
                 )
 
     def __setitem__(self, key: str, value: str):
@@ -1691,7 +1758,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is not None:
-            if value == '':
+            if value == "":
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.
                 self._data.pop(key, None)
@@ -1703,16 +1770,16 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return super().__getitem__(key)
 
     def __delitem__(self, key: str):
-        self._validate_write(key, '')
+        self._validate_write(key, "")
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
-        self.__setitem__(key, '')
+        self.__setitem__(key, "")
 
     def __repr__(self):
         try:
             self._validate_read()
         except RelationDataAccessError:
-            return '<n/a>'
+            return "<n/a>"
         return super().__repr__()
 
 
@@ -1722,7 +1789,7 @@ class ConfigData(LazyMapping):
     This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
     """
 
-    def __init__(self, backend: '_ModelBackend'):
+    def __init__(self, backend: "_ModelBackend"):
         self._backend = backend
 
     def _load(self):
@@ -1736,17 +1803,17 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: Dict[str, Type['StatusBase']] = {}
+    _statuses: Dict[str, Type["StatusBase"]] = {}
 
     # Subclasses should override this attribute
-    name = ''
+    name = ""
 
-    def __init__(self, message: str = ''):
+    def __init__(self, message: str = ""):
         if self.__class__ is StatusBase:
             raise TypeError("cannot instantiate a base class")
         self.message = message
 
-    def __eq__(self, other: 'StatusBase') -> bool:
+    def __eq__(self, other: "StatusBase") -> bool:
         if not isinstance(self, type(other)):
             return False
         return self.message == other.message
@@ -1768,32 +1835,34 @@ class StatusBase:
         Raises:
             KeyError: If ``name`` is not a registered status.
         """
-        if name == 'unknown':
+        if name == "unknown":
             # unknown is special
             return UnknownStatus()
         else:
             return cls._statuses[name](message)
 
     @classmethod
-    def register(cls, child: Type['StatusBase']):
+    def register(cls, child: Type["StatusBase"]):
         """Register a Status for the child's name."""
         if not isinstance(child.name, str):
-            raise TypeError(f"Can't register StatusBase subclass {child}: ",
-                            "missing required `name: str` class attribute")
+            raise TypeError(
+                f"Can't register StatusBase subclass {child}: ",
+                "missing required `name: str` class attribute",
+            )
         cls._statuses[child.name] = child
         return child
 
     _priorities = {
-        'error': 5,
-        'blocked': 4,
-        'maintenance': 3,
-        'waiting': 2,
-        'active': 1,
+        "error": 5,
+        "blocked": 4,
+        "maintenance": 3,
+        "waiting": 2,
+        "active": 1,
         # 'unknown' or any other status is handled below
     }
 
     @classmethod
-    def _get_highest_priority(cls, statuses: 'List[StatusBase]') -> 'StatusBase':
+    def _get_highest_priority(cls, statuses: "List[StatusBase]") -> "StatusBase":
         """Return the highest-priority status from a list of statuses.
 
         If there are multiple highest-priority statuses, return the first one.
@@ -1811,11 +1880,12 @@ class UnknownStatus(StatusBase):
     This status is read-only; trying to set unit or application status to
     ``UnknownStatus`` will raise :class:`ModelError`.
     """
-    name = 'unknown'
+
+    name = "unknown"
 
     def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
-        super().__init__('')
+        super().__init__("")
 
     def __repr__(self):
         return "UnknownStatus()"
@@ -1831,7 +1901,8 @@ class ErrorStatus(StatusBase):
     This status is read-only; trying to set unit or application status to
     ``ErrorStatus`` will raise :class:`ModelError`.
     """
-    name = 'error'
+
+    name = "error"
 
 
 @StatusBase.register
@@ -1840,9 +1911,10 @@ class ActiveStatus(StatusBase):
 
     The unit believes it is correctly offering all the services it has been asked to offer.
     """
-    name = 'active'
 
-    def __init__(self, message: str = ''):
+    name = "active"
+
+    def __init__(self, message: str = ""):
         super().__init__(message)
 
 
@@ -1852,7 +1924,8 @@ class BlockedStatus(StatusBase):
 
     An admin has to manually intervene to unblock the unit and let it proceed.
     """
-    name = 'blocked'
+
+    name = "blocked"
 
 
 @StatusBase.register
@@ -1864,7 +1937,8 @@ class MaintenanceStatus(StatusBase):
     reflects activity on the unit itself, not on peers or related units.
 
     """
-    name = 'maintenance'
+
+    name = "maintenance"
 
 
 @StatusBase.register
@@ -1875,13 +1949,14 @@ class WaitingStatus(StatusBase):
     it is integrated is not running.
 
     """
-    name = 'waiting'
+
+    name = "waiting"
 
 
 class Resources:
     """Object representing resources for the charm."""
 
-    def __init__(self, names: Iterable[str], backend: '_ModelBackend'):
+    def __init__(self, names: Iterable[str], backend: "_ModelBackend"):
         self._backend = backend
         self._paths: Dict[str, Optional[Path]] = {name: None for name in names}
 
@@ -1895,7 +1970,7 @@ class Resources:
             NameError: if the resource's path cannot be fetched.
         """
         if name not in self._paths:
-            raise NameError(f'invalid resource name: {name}')
+            raise NameError(f"invalid resource name: {name}")
         if self._paths[name] is None:
             self._paths[name] = Path(self._backend.resource_get(name))
         return typing.cast(Path, self._paths[name])
@@ -1910,10 +1985,10 @@ class Pod:
     :attr:`.set_spec`.
     """
 
-    def __init__(self, backend: '_ModelBackend'):
+    def __init__(self, backend: "_ModelBackend"):
         self._backend = backend
 
-    def set_spec(self, spec: 'K8sSpec', k8s_resources: Optional['K8sSpec'] = None):
+    def set_spec(self, spec: "K8sSpec", k8s_resources: Optional["K8sSpec"] = None):
         """Set the specification for pods that Juju should start in kubernetes.
 
         See ``juju help-tool pod-spec-set`` for details of what should be passed.
@@ -1923,17 +1998,18 @@ class Pod:
             k8s_resources: Additional kubernetes specific specification.
         """
         if not self._backend.is_leader():
-            raise ModelError('cannot set a pod spec as this unit is not a leader')
+            raise ModelError("cannot set a pod spec as this unit is not a leader")
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
-class StorageMapping(Mapping[str, List['Storage']]):
+class StorageMapping(Mapping[str, List["Storage"]]):
     """Map of storage names to lists of Storage instances."""
 
-    def __init__(self, storage_names: Iterable[str], backend: '_ModelBackend'):
+    def __init__(self, storage_names: Iterable[str], backend: "_ModelBackend"):
         self._backend = backend
-        self._storage_map: _StorageDictType = {storage_name: None
-                                               for storage_name in storage_names}
+        self._storage_map: _StorageDictType = {
+            storage_name: None for storage_name in storage_names
+        }
 
     def __contains__(self, key: str):  # pyright: ignore[reportIncompatibleMethodOverride]
         return key in self._storage_map
@@ -1944,11 +2020,10 @@ class StorageMapping(Mapping[str, List['Storage']]):
     def __iter__(self):
         return iter(self._storage_map)
 
-    def __getitem__(self, storage_name: str) -> List['Storage']:
+    def __getitem__(self, storage_name: str) -> List["Storage"]:
         if storage_name not in self._storage_map:
-            meant = ', or '.join(repr(k) for k in self._storage_map)
-            raise KeyError(
-                f'Storage {storage_name!r} not found. Did you mean {meant}?')
+            meant = ", or ".join(repr(k) for k in self._storage_map)
+            raise KeyError(f"Storage {storage_name!r} not found. Did you mean {meant}?")
         storage_list = self._storage_map[storage_name]
         if storage_list is None:
             storage_list = self._storage_map[storage_name] = []
@@ -1967,8 +2042,9 @@ class StorageMapping(Mapping[str, List['Storage']]):
             ModelError: if the storage is not in the charm's metadata.
         """
         if storage_name not in self._storage_map:
-            raise ModelError(f'cannot add storage {storage_name!r}:'
-                             ' it is not present in the charm metadata')
+            raise ModelError(
+                f"cannot add storage {storage_name!r}:" " it is not present in the charm metadata"
+            )
         self._backend.storage_add(storage_name, count)
 
     def _invalidate(self, storage_name: str):
@@ -1985,7 +2061,7 @@ class Storage:
     name: str
     """Name of the storage."""
 
-    def __init__(self, storage_name: str, storage_index: int, backend: '_ModelBackend'):
+    def __init__(self, storage_name: str, storage_index: int, backend: "_ModelBackend"):
         self.name = storage_name
         self._index = storage_index
         self._backend = backend
@@ -2005,7 +2081,7 @@ class Storage:
     @property
     def full_id(self) -> str:
         """Canonical storage name with index, for example "bigdisk/0"."""
-        return f'{self.name}/{self._index}'
+        return f"{self.name}/{self._index}"
 
     @property
     def location(self) -> Path:
@@ -2047,10 +2123,10 @@ class MultiPushPullError(Exception):
         self.errors = errors
 
     def __str__(self):
-        return f'{self.message} ({len(self.errors)} errors): {self.errors[0][1]}, ...'
+        return f"{self.message} ({len(self.errors)} errors): {self.errors[0][1]}, ..."
 
     def __repr__(self):
-        return f'MultiPushPullError({self.message!r}, {len(self.errors)} errors)'
+        return f"MultiPushPullError({self.message!r}, {len(self.errors)} errors)"
 
 
 class Container:
@@ -2076,12 +2152,13 @@ class Container:
     name: str
     """The name of the container from ``metadata.yaml``, for example "postgres"."""
 
-    def __init__(self, name: str, backend: '_ModelBackend',
-                 pebble_client: Optional[pebble.Client] = None):
+    def __init__(
+        self, name: str, backend: "_ModelBackend", pebble_client: Optional[pebble.Client] = None
+    ):
         self.name = name
 
         if pebble_client is None:
-            socket_path = f'/charm/containers/{name}/pebble.socket'
+            socket_path = f"/charm/containers/{name}/pebble.socket"
             pebble_client = backend.get_pebble(socket_path)
         self._pebble: pebble.Client = pebble_client
 
@@ -2129,14 +2206,14 @@ class Container:
     def start(self, *service_names: str):
         """Start given service(s) by name."""
         if not service_names:
-            raise TypeError('start expected at least 1 argument, got 0')
+            raise TypeError("start expected at least 1 argument, got 0")
 
         self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
         """Restart the given service(s) by name."""
         if not service_names:
-            raise TypeError('restart expected at least 1 argument, got 0')
+            raise TypeError("restart expected at least 1 argument, got 0")
 
         try:
             self._pebble.restart_services(service_names)
@@ -2144,8 +2221,9 @@ class Container:
             if e.code != 400:
                 raise e
             # support old Pebble instances that don't support the "restart" action
-            stop: Tuple[str, ...] = tuple(s.name for s in self.get_services(
-                *service_names).values() if s.is_running())
+            stop: Tuple[str, ...] = tuple(
+                s.name for s in self.get_services(*service_names).values() if s.is_running()
+            )
             if stop:
                 self._pebble.stop_services(stop)
             self._pebble.start_services(service_names)
@@ -2153,12 +2231,17 @@ class Container:
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
-            raise TypeError('stop expected at least 1 argument, got 0')
+            raise TypeError("stop expected at least 1 argument, got 0")
 
         self._pebble.stop_services(service_names)
 
-    def add_layer(self, label: str, layer: Union[str, pebble.LayerDict, pebble.Layer], *,
-                  combine: bool = False):
+    def add_layer(
+        self,
+        label: str,
+        layer: Union[str, pebble.LayerDict, pebble.Layer],
+        *,
+        combine: bool = False,
+    ):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
@@ -2183,7 +2266,7 @@ class Container:
         """
         return self._pebble.get_plan()
 
-    def get_services(self, *service_names: str) -> Mapping[str, 'pebble.ServiceInfo']:
+    def get_services(self, *service_names: str) -> Mapping[str, "pebble.ServiceInfo"]:
         """Fetch and return a mapping of status information indexed by service name.
 
         If no service names are specified, return status information for all
@@ -2201,15 +2284,14 @@ class Container:
         """
         services = self.get_services(service_name)
         if not services:
-            raise ModelError(f'service {service_name!r} not found')
+            raise ModelError(f"service {service_name!r} not found")
         if len(services) > 1:
-            raise RuntimeError(f'expected 1 service, got {len(services)}')
+            raise RuntimeError(f"expected 1 service, got {len(services)}")
         return services[service_name]
 
     def get_checks(
-            self,
-            *check_names: str,
-            level: Optional[pebble.CheckLevel] = None) -> 'CheckInfoMapping':
+        self, *check_names: str, level: Optional[pebble.CheckLevel] = None
+    ) -> "CheckInfoMapping":
         """Fetch and return a mapping of check information indexed by check name.
 
         Args:
@@ -2229,21 +2311,20 @@ class Container:
         """
         checks = self.get_checks(check_name)
         if not checks:
-            raise ModelError(f'check {check_name!r} not found')
+            raise ModelError(f"check {check_name!r} not found")
         if len(checks) > 1:
-            raise RuntimeError(f'expected 1 check, got {len(checks)}')
+            raise RuntimeError(f"expected 1 check, got {len(checks)}")
         return checks[check_name]
 
     @typing.overload
-    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO:
-        ...
+    def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO: ...
 
     @typing.overload
-    def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO:
-        ...
+    def pull(self, path: Union[str, PurePath], *, encoding: str = "utf-8") -> TextIO: ...
 
-    def pull(self, path: Union[str, PurePath], *,
-             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(
+        self, path: Union[str, PurePath], *, encoding: Optional[str] = "utf-8"
+    ) -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
         Args:
@@ -2262,17 +2343,19 @@ class Container:
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
-    def push(self,
-             path: Union[str, PurePath],
-             source: Union[bytes, str, BinaryIO, TextIO],
-             *,
-             encoding: str = 'utf-8',
-             make_dirs: bool = False,
-             permissions: Optional[int] = None,
-             user_id: Optional[int] = None,
-             user: Optional[str] = None,
-             group_id: Optional[int] = None,
-             group: Optional[str] = None):
+    def push(
+        self,
+        path: Union[str, PurePath],
+        source: Union[bytes, str, BinaryIO, TextIO],
+        *,
+        encoding: str = "utf-8",
+        make_dirs: bool = False,
+        permissions: Optional[int] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+    ):
         """Write content to a given file path on the remote system.
 
         Note that if another process has the file open on the remote system,
@@ -2297,14 +2380,21 @@ class Container:
             group: Group name for file. Group's GID must match group_id if
                 both are specified.
         """
-        self._pebble.push(str(path), source, encoding=encoding,
-                          make_dirs=make_dirs,
-                          permissions=permissions,
-                          user_id=user_id, user=user,
-                          group_id=group_id, group=group)
+        self._pebble.push(
+            str(path),
+            source,
+            encoding=encoding,
+            make_dirs=make_dirs,
+            permissions=permissions,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+        )
 
-    def list_files(self, path: Union[str, PurePath], *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List[pebble.FileInfo]:
+    def list_files(
+        self, path: Union[str, PurePath], *, pattern: Optional[str] = None, itself: bool = False
+    ) -> List[pebble.FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2318,12 +2408,13 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
-        return self._pebble.list_files(str(path),
-                                       pattern=pattern, itself=itself)
+        return self._pebble.list_files(str(path), pattern=pattern, itself=itself)
 
-    def push_path(self,
-                  source_path: Union[str, Path, Iterable[Union[str, Path]]],
-                  dest_dir: Union[str, PurePath]):
+    def push_path(
+        self,
+        source_path: Union[str, Path, Iterable[Union[str, Path]]],
+        dest_dir: Union[str, PurePath],
+    ):
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2370,7 +2461,7 @@ class Container:
             dest_dir: Remote destination directory inside which the source
                 dir/files will be placed. This must be an absolute path.
         """
-        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+        if hasattr(source_path, "__iter__") and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
             source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
@@ -2399,15 +2490,18 @@ class Container:
                             user_id=info.user_id,
                             user=info.user,
                             group_id=info.group_id,
-                            group=info.group)
+                            group=info.group,
+                        )
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
-            raise MultiPushPullError('failed to push one or more files', errors)
+            raise MultiPushPullError("failed to push one or more files", errors)
 
-    def pull_path(self,
-                  source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
-                  dest_dir: Union[str, Path]):
+    def pull_path(
+        self,
+        source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
+        dest_dir: Union[str, Path],
+    ):
         """Recursively pull a remote path or files to the local system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
@@ -2455,7 +2549,7 @@ class Container:
             dest_dir: Local destination directory inside which the source
                 dir/files will be placed.
         """
-        if hasattr(source_path, '__iter__') and not isinstance(source_path, str):
+        if hasattr(source_path, "__iter__") and not isinstance(source_path, str):
             source_paths = typing.cast(Iterable[Union[str, Path]], source_path)
         else:
             source_paths = typing.cast(Iterable[Union[str, Path]], [source_path])
@@ -2472,12 +2566,12 @@ class Container:
                         continue
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
-                        with dstpath.open(mode='wb') as dst:
+                        with dstpath.open(mode="wb") as dst:
                             shutil.copyfileobj(src, dst)
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
-            raise MultiPushPullError('failed to pull one or more files', errors)
+            raise MultiPushPullError("failed to pull one or more files", errors)
 
     @staticmethod
     def _build_fileinfo(path: Union[str, Path]) -> pebble.FileInfo:
@@ -2494,6 +2588,7 @@ class Container:
 
         import grp
         import pwd
+
         info = path.lstat()
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
@@ -2515,11 +2610,13 @@ class Container:
             user_id=info.st_uid,
             user=pw_name,
             group_id=info.st_gid,
-            group=gr_name)
+            group=gr_name,
+        )
 
     @staticmethod
-    def _list_recursive(list_func: Callable[[Path], Iterable[pebble.FileInfo]],
-                        path: Path) -> Generator[pebble.FileInfo, None, None]:
+    def _list_recursive(
+        list_func: Callable[[Path], Iterable[pebble.FileInfo]], path: Path
+    ) -> Generator[pebble.FileInfo, None, None]:
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -2527,7 +2624,7 @@ class Container:
                 representing files residing directly inside the given path.
             path: Filepath to recursively list.
         """
-        if path.name == '*':
+        if path.name == "*":
             # ignore trailing '/*' that we just use for determining how to build paths
             # at destination
             path = path.parent
@@ -2542,13 +2639,13 @@ class Container:
                 yield info
             else:
                 logger.debug(
-                    'skipped unsupported file in Container.[push/pull]_path: %s', info.path)
+                    "skipped unsupported file in Container.[push/pull]_path: %s", info.path
+                )
 
     @staticmethod
     def _build_destpath(
-            file_path: Union[str, Path],
-            source_path: Union[str, Path],
-            dest_dir: Union[str, Path]) -> Path:
+        file_path: Union[str, Path], source_path: Union[str, Path], dest_dir: Union[str, Path]
+    ) -> Path:
         """Converts a source file and destination dir into a full destination filepath.
 
         file_path:
@@ -2563,9 +2660,8 @@ class Container:
         # /src --> /dst/src
         file_path, source_path, dest_dir = Path(file_path), Path(source_path), Path(dest_dir)
         prefix = str(source_path.parent)
-        if prefix != '.' and os.path.commonprefix([prefix, str(file_path)]) != prefix:
-            raise RuntimeError(
-                f'file "{file_path}" does not have specified prefix "{prefix}"')
+        if prefix != "." and os.path.commonprefix([prefix, str(file_path)]) != prefix:
+            raise RuntimeError(f'file "{file_path}" does not have specified prefix "{prefix}"')
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
@@ -2590,15 +2686,16 @@ class Container:
         return files[0].type == pebble.FileType.DIRECTORY
 
     def make_dir(
-            self,
-            path: Union[str, PurePath],
-            *,
-            make_parents: bool = False,
-            permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None):
+        self,
+        path: Union[str, PurePath],
+        *,
+        make_parents: bool = False,
+        permissions: Optional[int] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+    ):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2613,10 +2710,15 @@ class Container:
             group: Group name for directory. Group's GID must match group_id
                 if both are specified.
         """
-        self._pebble.make_dir(str(path), make_parents=make_parents,
-                              permissions=permissions,
-                              user_id=user_id, user=user,
-                              group_id=group_id, group=group)
+        self._pebble.make_dir(
+            str(path),
+            make_parents=make_parents,
+            permissions=permissions,
+            user_id=user_id,
+            user=user,
+            group_id=group_id,
+            group=group,
+        )
 
     def remove_path(self, path: Union[str, PurePath], *, recursive: bool = False):
         """Remove a file or directory on the remote system.
@@ -2651,10 +2753,9 @@ class Container:
         stdin: Optional[Union[str, TextIO]] = None,
         stdout: Optional[TextIO] = None,
         stderr: Optional[TextIO] = None,
-        encoding: str = 'utf-8',
-        combine_stderr: bool = False
-    ) -> pebble.ExecProcess[str]:
-        ...
+        encoding: str = "utf-8",
+        combine_stderr: bool = False,
+    ) -> pebble.ExecProcess[str]: ...
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
@@ -2674,9 +2775,8 @@ class Container:
         stdout: Optional[BinaryIO] = None,
         stderr: Optional[BinaryIO] = None,
         encoding: None = None,
-        combine_stderr: bool = False
-    ) -> pebble.ExecProcess[bytes]:
-        ...
+        combine_stderr: bool = False,
+    ) -> pebble.ExecProcess[bytes]: ...
 
     def exec(
         self,
@@ -2693,8 +2793,8 @@ class Container:
         stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
         stdout: Optional[Union[TextIO, BinaryIO]] = None,
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
-        encoding: Optional[str] = 'utf-8',
-        combine_stderr: bool = False
+        encoding: Optional[str] = "utf-8",
+        combine_stderr: bool = False,
     ) -> pebble.ExecProcess[Any]:
         """Execute the given command on the remote system.
 
@@ -2712,7 +2812,8 @@ class Container:
             version = JujuVersion.from_environ()
             if not version.supports_exec_service_context:
                 raise RuntimeError(
-                    f'exec with service_context not supported on Juju version {version}')
+                    f"exec with service_context not supported on Juju version {version}"
+                )
         return self._pebble.exec(
             command,
             service_context=service_context,
@@ -2743,7 +2844,7 @@ class Container:
                 not currently running.
         """
         if not service_names:
-            raise TypeError('send_signal expected at least 1 service name, got 0')
+            raise TypeError("send_signal expected at least 1 service name, got 0")
 
         self._pebble.send_signal(sig, service_names)
 
@@ -2757,7 +2858,7 @@ class Container:
             return self._pebble.get_notice(id)
         except pebble.APIError as e:
             if e.code == 404:
-                raise ModelError(f'notice {id!r} not found') from e
+                raise ModelError(f"notice {id!r} not found") from e
             raise
 
     def get_notices(
@@ -2794,7 +2895,7 @@ class ContainerMapping(Mapping[str, Container]):
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, names: Iterable[str], backend: '_ModelBackend'):
+    def __init__(self, names: Iterable[str], backend: "_ModelBackend"):
         self._containers = {name: Container(name, backend) for name in names}
 
     def __getitem__(self, key: str):
@@ -2858,6 +2959,7 @@ class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
 
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model."""
+
     pass
 
 
@@ -2866,7 +2968,7 @@ class TooManyRelatedAppsError(ModelError):
 
     def __init__(self, relation_name: str, num_related: int, max_supported: int):
         super().__init__(
-            f'Too many remote applications on {relation_name} ({num_related} > {max_supported})'
+            f"Too many remote applications on {relation_name} ({num_related} > {max_supported})"
         )
         self.relation_name = relation_name
         self.num_related = num_related
@@ -2906,13 +3008,14 @@ class SecretNotFoundError(ModelError):
     """Raised when the specified secret does not exist."""
 
 
-_ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+_ACTION_RESULT_KEY_REGEX = re.compile(r"^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$")
 
 
-def _format_action_result_dict(input: Dict[str, Any],
-                               parent_key: Optional[str] = None,
-                               output: Optional[Dict[str, str]] = None
-                               ) -> Dict[str, str]:
+def _format_action_result_dict(
+    input: Dict[str, Any],
+    parent_key: Optional[str] = None,
+    output: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
     """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
@@ -2947,11 +3050,11 @@ def _format_action_result_dict(input: Dict[str, Any],
         if not isinstance(key, str):
             # technically a type error, but for consistency with the
             # other exceptions raised on key validation...
-            raise ValueError(f'invalid key {key!r}; must be a string')
+            raise ValueError(f"invalid key {key!r}; must be a string")
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError(
-                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', "
-                f"or 'some.key'")
+                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', " f"or 'some.key'"
+            )
 
         if parent_key:
             key = f"{parent_key}.{key}"
@@ -2978,45 +3081,51 @@ class _ModelBackend:
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
     _STORAGE_KEY_RE = re.compile(
-        r'.*^-s\s+\(=\s+(?P<storage_key>.*?)\)\s*?$',
-        re.MULTILINE | re.DOTALL
+        r".*^-s\s+\(=\s+(?P<storage_key>.*?)\)\s*?$", re.MULTILINE | re.DOTALL
     )
 
-    def __init__(self, unit_name: Optional[str] = None,
-                 model_name: Optional[str] = None,
-                 model_uuid: Optional[str] = None):
-
+    def __init__(
+        self,
+        unit_name: Optional[str] = None,
+        model_name: Optional[str] = None,
+        model_uuid: Optional[str] = None,
+    ):
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
-        unit_name_ = unit_name or os.getenv('JUJU_UNIT_NAME')
+        unit_name_ = unit_name or os.getenv("JUJU_UNIT_NAME")
         if unit_name_ is None:
-            raise ValueError('JUJU_UNIT_NAME not set')
+            raise ValueError("JUJU_UNIT_NAME not set")
         self.unit_name: str = unit_name_
 
         # we can cast to str because these envvars are guaranteed to be set
-        self.model_name: str = model_name or typing.cast(str, os.getenv('JUJU_MODEL_NAME'))
-        self.model_uuid: str = model_uuid or typing.cast(str, os.getenv('JUJU_MODEL_UUID'))
-        self.app_name: str = self.unit_name.split('/')[0]
+        self.model_name: str = model_name or typing.cast(str, os.getenv("JUJU_MODEL_NAME"))
+        self.model_uuid: str = model_uuid or typing.cast(str, os.getenv("JUJU_MODEL_UUID"))
+        self.app_name: str = self.unit_name.split("/")[0]
 
         self._is_leader: Optional[bool] = None
         self._leader_check_time = None
-        self._hook_is_running = ''
+        self._hook_is_running = ""
 
-    def _run(self, *args: str, return_output: bool = False,
-             use_json: bool = False, input_stream: Optional[str] = None
-             ) -> Union[str, Any, None]:
+    def _run(
+        self,
+        *args: str,
+        return_output: bool = False,
+        use_json: bool = False,
+        input_stream: Optional[str] = None,
+    ) -> Union[str, Any, None]:
         kwargs = {
-            'stdout': subprocess.PIPE,
-            'stderr': subprocess.PIPE,
-            'check': True,
-            'encoding': 'utf-8'}
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "check": True,
+            "encoding": "utf-8",
+        }
         if input_stream:
             kwargs.update({"input": input_stream})
         which_cmd = shutil.which(args[0])
         if which_cmd is None:
-            raise RuntimeError(f'command not found: {args[0]}')
+            raise RuntimeError(f"command not found: {args[0]}")
         args = (which_cmd,) + args[1:]
         if use_json:
-            args += ('--format=json',)
+            args += ("--format=json",)
         # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
         #                been fighting with Pyright for half an hour now...
         try:
@@ -3025,7 +3134,7 @@ class _ModelBackend:
             raise ModelError(e.stderr) from e
         if return_output:
             if result.stdout is None:  # type: ignore
-                return ''
+                return ""
             else:
                 text: str = result.stdout  # type: ignore
                 if use_json:
@@ -3035,17 +3144,18 @@ class _ModelBackend:
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
-        return 'relation not found' in str(model_error)
+        return "relation not found" in str(model_error)
 
     def relation_ids(self, relation_name: str) -> List[int]:
-        relation_ids = self._run('relation-ids', relation_name, return_output=True, use_json=True)
+        relation_ids = self._run("relation-ids", relation_name, return_output=True, use_json=True)
         relation_ids = typing.cast(Iterable[str], relation_ids)
-        return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
+        return [int(relation_id.split(":")[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id: int) -> List[str]:
         try:
-            rel_list = self._run('relation-list', '-r', str(relation_id),
-                                 return_output=True, use_json=True)
+            rel_list = self._run(
+                "relation-list", "-r", str(relation_id), return_output=True, use_json=True
+            )
             return typing.cast(List[str], rel_list)
         except ModelError as e:
             if self._is_relation_not_found(e):
@@ -3054,47 +3164,50 @@ class _ModelBackend:
 
     def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
         """Return remote app name for given relation ID, or None if not known."""
-        if 'JUJU_RELATION_ID' in os.environ and 'JUJU_REMOTE_APP' in os.environ:
-            event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        if "JUJU_RELATION_ID" in os.environ and "JUJU_REMOTE_APP" in os.environ:
+            event_relation_id = int(os.environ["JUJU_RELATION_ID"].split(":")[-1])
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return os.getenv('JUJU_REMOTE_APP') or None
+                return os.getenv("JUJU_REMOTE_APP") or None
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
         try:
-            rel_id = self._run('relation-list', '-r', str(relation_id), '--app',
-                               return_output=True, use_json=True)
+            rel_id = self._run(
+                "relation-list", "-r", str(relation_id), "--app", return_output=True, use_json=True
+            )
             # if it returned anything at all, it's a str.
             return typing.cast(str, rel_id)
 
         except ModelError as e:
             if self._is_relation_not_found(e):
                 return None
-            if 'option provided but not defined: --app' in str(e):
+            if "option provided but not defined: --app" in str(e):
                 # "--app" was introduced to relation-list in Juju 2.8.1, so
                 # handle previous versions of Juju gracefully
                 return None
             raise
 
-    def relation_get(self, relation_id: int, member_name: str, is_app: bool
-                     ) -> '_RelationDataContent_Raw':
+    def relation_get(
+        self, relation_id: int, member_name: str, is_app: bool
+    ) -> "_RelationDataContent_Raw":
         if not isinstance(is_app, bool):
-            raise TypeError('is_app parameter to relation_get must be a boolean')
+            raise TypeError("is_app parameter to relation_get must be a boolean")
 
         if is_app:
             version = JujuVersion.from_environ()
             if not version.has_app_data():
                 raise RuntimeError(
-                    f'getting application data is not supported on Juju version {version}')
+                    f"getting application data is not supported on Juju version {version}"
+                )
 
-        args = ['relation-get', '-r', str(relation_id), '-', member_name]
+        args = ["relation-get", "-r", str(relation_id), "-", member_name]
         if is_app:
-            args.append('--app')
+            args.append("--app")
 
         try:
             raw_data_content = self._run(*args, return_output=True, use_json=True)
-            return typing.cast('_RelationDataContent_Raw', raw_data_content)
+            return typing.cast("_RelationDataContent_Raw", raw_data_content)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
@@ -3102,17 +3215,18 @@ class _ModelBackend:
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
         if not isinstance(is_app, bool):
-            raise TypeError('is_app parameter to relation_set must be a boolean')
+            raise TypeError("is_app parameter to relation_set must be a boolean")
 
         if is_app:
             version = JujuVersion.from_environ()
             if not version.has_app_data():
                 raise RuntimeError(
-                    f'setting application data is not supported on Juju version {version}')
+                    f"setting application data is not supported on Juju version {version}"
+                )
 
-        args = ['relation-set', '-r', str(relation_id)]
+        args = ["relation-set", "-r", str(relation_id)]
         if is_app:
-            args.append('--app')
+            args.append("--app")
         args.extend(["--file", "-"])
 
         try:
@@ -3123,9 +3237,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self) -> Dict[str, '_ConfigOption']:
-        out = self._run('config-get', return_output=True, use_json=True)
-        return typing.cast(Dict[str, '_ConfigOption'], out)
+    def config_get(self) -> Dict[str, "_ConfigOption"]:
+        out = self._run("config-get", return_output=True, use_json=True)
+        return typing.cast(Dict[str, "_ConfigOption"], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -3137,39 +3251,40 @@ class _ModelBackend:
             check = True
         else:
             time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
-            check = (time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None)
+            check = time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None
         if check:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = now
-            is_leader = self._run('is-leader', return_output=True, use_json=True)
+            is_leader = self._run("is-leader", return_output=True, use_json=True)
             self._is_leader = typing.cast(bool, is_leader)
 
         # we can cast to bool now since if we're here it means we checked.
         return typing.cast(bool, self._is_leader)
 
     def resource_get(self, resource_name: str) -> str:
-        out = self._run('resource-get', resource_name, return_output=True)
+        out = self._run("resource-get", resource_name, return_output=True)
         return typing.cast(str, out).strip()
 
-    def pod_spec_set(self, spec: Mapping[str, Any],
-                     k8s_resources: Optional[Mapping[str, Any]] = None):
-        tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
+    def pod_spec_set(
+        self, spec: Mapping[str, Any], k8s_resources: Optional[Mapping[str, Any]] = None
+    ):
+        tmpdir = Path(tempfile.mkdtemp("-pod-spec-set"))
         try:
-            spec_path = tmpdir / 'spec.yaml'
+            spec_path = tmpdir / "spec.yaml"
             with spec_path.open("wt", encoding="utf8") as f:
                 yaml.safe_dump(spec, stream=f)
-            args = ['--file', str(spec_path)]
+            args = ["--file", str(spec_path)]
             if k8s_resources:
-                k8s_res_path = tmpdir / 'k8s-resources.yaml'
+                k8s_res_path = tmpdir / "k8s-resources.yaml"
                 with k8s_res_path.open("wt", encoding="utf8") as f:
                     yaml.safe_dump(k8s_resources, stream=f)
-                args.extend(['--k8s-resources', str(k8s_res_path)])
-            self._run('pod-spec-set', *args)
+                args.extend(["--k8s-resources", str(k8s_res_path)])
+            self._run("pod-spec-set", *args)
         finally:
             shutil.rmtree(str(tmpdir))
 
-    def status_get(self, *, is_app: bool = False) -> '_StatusDict':
+    def status_get(self, *, is_app: bool = False) -> "_StatusDict":
         """Get a status of a unit or an application.
 
         Args:
@@ -3177,9 +3292,12 @@ class _ModelBackend:
                 or an application.
         """
         content = self._run(
-            'status-get', '--include-data', f'--application={is_app}',
+            "status-get",
+            "--include-data",
+            f"--application={is_app}",
             use_json=True,
-            return_output=True)
+            return_output=True,
+        )
         # Unit status looks like (in YAML):
         # message: 'load: 0.28 0.26 0.26'
         # status: active
@@ -3197,13 +3315,12 @@ class _ModelBackend:
 
         if is_app:
             content = typing.cast(Dict[str, Dict[str, str]], content)
-            app_status = content['application-status']
-            return {'status': app_status['status'],
-                    'message': app_status['message']}
+            app_status = content["application-status"]
+            return {"status": app_status["status"], "message": app_status["message"]}
         else:
-            return typing.cast('_StatusDict', content)
+            return typing.cast("_StatusDict", content)
 
-    def status_set(self, status: str, message: str = '', *, is_app: bool = False) -> None:
+    def status_set(self, status: str, message: str = "", *, is_app: bool = False) -> None:
         """Set a status of a unit or an application.
 
         Args:
@@ -3213,21 +3330,21 @@ class _ModelBackend:
                     application.
         """
         if not isinstance(is_app, bool):
-            raise TypeError('is_app parameter must be boolean')
-        self._run('status-set', f'--application={is_app}', status, message)
+            raise TypeError("is_app parameter must be boolean")
+        self._run("status-set", f"--application={is_app}", status, message)
 
     def storage_list(self, name: str) -> List[int]:
-        storages = self._run('storage-list', name, return_output=True, use_json=True)
+        storages = self._run("storage-list", name, return_output=True, use_json=True)
         storages = typing.cast(List[str], storages)
-        return [int(s.split('/')[1]) for s in storages]
+        return [int(s.split("/")[1]) for s in storages]
 
     def _storage_event_details(self) -> Tuple[int, str]:
-        output = self._run('storage-get', '--help', return_output=True)
+        output = self._run("storage-get", "--help", return_output=True)
         output = typing.cast(str, output)
         # Match the entire string at once instead of going line by line
         match = self._STORAGE_KEY_RE.match(output)
         if match is None:
-            raise RuntimeError(f'unable to find storage key in {output!r}')
+            raise RuntimeError(f"unable to find storage key in {output!r}")
         key = match.groupdict()["storage_key"]
 
         index = int(key.split("/")[1])
@@ -3236,39 +3353,43 @@ class _ModelBackend:
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
         if not len(attribute) > 0:  # assume it's an empty string.
-            raise RuntimeError('calling storage_get with `attribute=""` will return a dict '
-                               'and not a string. This usage is not supported.')
-        out = self._run('storage-get', '-s', storage_name_id, attribute,
-                        return_output=True, use_json=True)
+            raise RuntimeError(
+                'calling storage_get with `attribute=""` will return a dict '
+                "and not a string. This usage is not supported."
+            )
+        out = self._run(
+            "storage-get", "-s", storage_name_id, attribute, return_output=True, use_json=True
+        )
         return typing.cast(str, out)
 
     def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
-            raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
-        self._run('storage-add', f'{name}={count}')
+            raise TypeError(f"storage count must be integer, got: {count} ({type(count)})")
+        self._run("storage-add", f"{name}={count}")
 
     def action_get(self) -> Dict[str, Any]:
-        out = self._run('action-get', return_output=True, use_json=True)
+        out = self._run("action-get", return_output=True, use_json=True)
         return typing.cast(Dict[str, Any], out)
 
     def action_set(self, results: Dict[str, Any]) -> None:
         # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
-        self._run('action-set', *[f"{k}={v}" for k, v in flat_results.items()])
+        self._run("action-set", *[f"{k}={v}" for k, v in flat_results.items()])
 
     def action_log(self, message: str) -> None:
-        self._run('action-log', message)
+        self._run("action-log", message)
 
-    def action_fail(self, message: str = '') -> None:
-        self._run('action-fail', message)
+    def action_fail(self, message: str = "") -> None:
+        self._run("action-fail", message)
 
     def application_version_set(self, version: str) -> None:
-        self._run('application-version-set', '--', version)
+        self._run("application-version-set", "--", version)
 
     @classmethod
-    def log_split(cls, message: str, max_len: int = MAX_LOG_LINE_LEN
-                  ) -> Generator[str, None, None]:
+    def log_split(
+        cls, message: str, max_len: int = MAX_LOG_LINE_LEN
+    ) -> Generator[str, None, None]:
         """Helper to handle log messages that are potentially too long.
 
         This is a generator that splits a message string into multiple chunks if it is too long
@@ -3284,42 +3405,43 @@ class _ModelBackend:
     def juju_log(self, level: str, message: str) -> None:
         """Pass a log message on to the juju logger."""
         for line in self.log_split(message):
-            self._run('juju-log', '--log-level', level, "--", line)
+            self._run("juju-log", "--log-level", level, "--", line)
 
-    def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> '_NetworkDict':
+    def network_get(self, binding_name: str, relation_id: Optional[int] = None) -> "_NetworkDict":
         """Return network info provided by network-get for a given binding.
 
         Args:
             binding_name: A name of a binding (relation name or extra-binding name).
             relation_id: An optional relation id to get network info for.
         """
-        cmd = ['network-get', binding_name]
+        cmd = ["network-get", binding_name]
         if relation_id is not None:
-            cmd.extend(['-r', str(relation_id)])
+            cmd.extend(["-r", str(relation_id)])
         try:
             network = self._run(*cmd, return_output=True, use_json=True)
-            return typing.cast('_NetworkDict', network)
+            return typing.cast("_NetworkDict", network)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
             raise
 
-    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
-                    labels: Optional[Mapping[str, str]] = None) -> None:
-        cmd: List[str] = ['add-metric']
+    def add_metrics(
+        self, metrics: Mapping[str, Union[int, float]], labels: Optional[Mapping[str, str]] = None
+    ) -> None:
+        cmd: List[str] = ["add-metric"]
         if labels:
             label_args: List[str] = []
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
-                label_args.append(f'{k}={v}')
-            cmd.extend(['--labels', ','.join(label_args)])
+                label_args.append(f"{k}={v}")
+            cmd.extend(["--labels", ",".join(label_args)])
 
         metric_args: List[str] = []
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
-            metric_args.append(f'{k}={metric_value}')
+            metric_args.append(f"{k}={metric_value}")
         cmd.extend(metric_args)
         self._run(*cmd)
 
@@ -3337,143 +3459,156 @@ class _ModelBackend:
         # The goal-state tool will return the information that we need. Goal state as a general
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
-        app_state = self._run('goal-state', return_output=True, use_json=True)
+        app_state = self._run("goal-state", return_output=True, use_json=True)
         app_state = typing.cast(Dict[str, Dict[str, Any]], app_state)
 
         # Planned units can be zero. We don't need to do error checking here.
         # But we need to filter out dying units as they may be reported before being deleted
-        units = app_state.get('units', {})
-        num_alive = sum(1 for unit in units.values() if unit['status'] != 'dying')
+        units = app_state.get("units", {})
+        num_alive = sum(1 for unit in units.values() if unit["status"] != "dying")
         return num_alive
 
-    def update_relation_data(self, relation_id: int, _entity: Union['Unit', 'Application'],
-                             key: str, value: str):
+    def update_relation_data(
+        self, relation_id: int, _entity: Union["Unit", "Application"], key: str, value: str
+    ):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
 
-    def secret_get(self, *,
-                   id: Optional[str] = None,
-                   label: Optional[str] = None,
-                   refresh: bool = False,
-                   peek: bool = False) -> Dict[str, str]:
+    def secret_get(
+        self,
+        *,
+        id: Optional[str] = None,
+        label: Optional[str] = None,
+        refresh: bool = False,
+        peek: bool = False,
+    ) -> Dict[str, str]:
         args: List[str] = []
         if id is not None:
             args.append(id)
         if label is not None:
-            args.extend(['--label', label])
+            args.extend(["--label", label])
         if refresh:
-            args.append('--refresh')
+            args.append("--refresh")
         if peek:
-            args.append('--peek')
+            args.append("--peek")
         # IMPORTANT: Don't call shared _run_for_secret method here; we want to
         # be extra sensitive inside secret_get to ensure we never
         # accidentally log or output secrets, even if _run_for_secret changes.
         try:
-            result = self._run('secret-get', *args, return_output=True, use_json=True)
+            result = self._run("secret-get", *args, return_output=True, use_json=True)
         except ModelError as e:
-            if 'not found' in str(e):
+            if "not found" in str(e):
                 raise SecretNotFoundError() from e
             raise
         return typing.cast(Dict[str, str], result)
 
-    def _run_for_secret(self, *args: str, return_output: bool = False,
-                        use_json: bool = False) -> Union[str, Any, None]:
+    def _run_for_secret(
+        self, *args: str, return_output: bool = False, use_json: bool = False
+    ) -> Union[str, Any, None]:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
-            if 'not found' in str(e):
+            if "not found" in str(e):
                 raise SecretNotFoundError() from e
             raise
 
-    def secret_info_get(self, *,
-                        id: Optional[str] = None,
-                        label: Optional[str] = None) -> SecretInfo:
+    def secret_info_get(
+        self, *, id: Optional[str] = None, label: Optional[str] = None
+    ) -> SecretInfo:
         args: List[str] = []
         if id is not None:
             args.append(id)
         elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
-            args.extend(['--label', label])
-        result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
+            args.extend(["--label", label])
+        result = self._run_for_secret("secret-info-get", *args, return_output=True, use_json=True)
         info_dicts = typing.cast(Dict[str, Any], result)
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(id, typing.cast(Dict[str, Any], info_dicts[id]))
 
-    def secret_set(self, id: str, *,
-                   content: Optional[Dict[str, str]] = None,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional[SecretRotate] = None):
+    def secret_set(
+        self,
+        id: str,
+        *,
+        content: Optional[Dict[str, str]] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+    ):
         args = [id]
         if label is not None:
-            args.extend(['--label', label])
+            args.extend(["--label", label])
         if description is not None:
-            args.extend(['--description', description])
+            args.extend(["--description", description])
         if expire is not None:
-            args.extend(['--expire', expire.isoformat()])
+            args.extend(["--expire", expire.isoformat()])
         if rotate is not None:
-            args += ['--rotate', rotate.value]
+            args += ["--rotate", rotate.value]
         if content is not None:
             # The content has already been validated with Secret._validate_content
             for k, v in content.items():
-                args.append(f'{k}={v}')
-        self._run_for_secret('secret-set', *args)
+                args.append(f"{k}={v}")
+        self._run_for_secret("secret-set", *args)
 
-    def secret_add(self, content: Dict[str, str], *,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional[SecretRotate] = None,
-                   owner: Optional[str] = None) -> str:
+    def secret_add(
+        self,
+        content: Dict[str, str],
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[SecretRotate] = None,
+        owner: Optional[str] = None,
+    ) -> str:
         args: List[str] = []
         if label is not None:
-            args.extend(['--label', label])
+            args.extend(["--label", label])
         if description is not None:
-            args.extend(['--description', description])
+            args.extend(["--description", description])
         if expire is not None:
-            args.extend(['--expire', expire.isoformat()])
+            args.extend(["--expire", expire.isoformat()])
         if rotate is not None:
-            args += ['--rotate', rotate.value]
+            args += ["--rotate", rotate.value]
         if owner is not None:
-            args += ['--owner', owner]
+            args += ["--owner", owner]
         # The content has already been validated with Secret._validate_content
         for k, v in content.items():
-            args.append(f'{k}={v}')
-        result = self._run('secret-add', *args, return_output=True)
+            args.append(f"{k}={v}")
+        result = self._run("secret-add", *args, return_output=True)
         secret_id = typing.cast(str, result)
         return secret_id.strip()
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
-        args = [id, '--relation', str(relation_id)]
+        args = [id, "--relation", str(relation_id)]
         if unit is not None:
-            args += ['--unit', str(unit)]
-        self._run_for_secret('secret-grant', *args)
+            args += ["--unit", str(unit)]
+        self._run_for_secret("secret-grant", *args)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
-        args = [id, '--relation', str(relation_id)]
+        args = [id, "--relation", str(relation_id)]
         if unit is not None:
-            args += ['--unit', str(unit)]
-        self._run_for_secret('secret-revoke', *args)
+            args += ["--unit", str(unit)]
+        self._run_for_secret("secret-revoke", *args)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None):
         args = [id]
         if revision is not None:
-            args.extend(['--revision', str(revision)])
-        self._run_for_secret('secret-remove', *args)
+            args.extend(["--revision", str(revision)])
+        self._run_for_secret("secret-remove", *args)
 
     def open_port(self, protocol: str, port: Optional[int] = None):
-        arg = f'{port}/{protocol}' if port is not None else protocol
-        self._run('open-port', arg)
+        arg = f"{port}/{protocol}" if port is not None else protocol
+        self._run("open-port", arg)
 
     def close_port(self, protocol: str, port: Optional[int] = None):
-        arg = f'{port}/{protocol}' if port is not None else protocol
-        self._run('close-port', arg)
+        arg = f"{port}/{protocol}" if port is not None else protocol
+        self._run("close-port", arg)
 
     def opened_ports(self) -> Set[Port]:
         # We could use "opened-ports --format=json", but it's not really
         # structured; it's just an array of strings which are the lines of the
         # text output, like ["icmp","8081/udp"]. So it's probably just as
         # likely to change as the text output, and doesn't seem any better.
-        output = typing.cast(str, self._run('opened-ports', return_output=True))
+        output = typing.cast(str, self._run("opened-ports", return_output=True))
         ports: Set[Port] = set()
         for line in output.splitlines():
             line = line.strip()
@@ -3486,16 +3621,16 @@ class _ModelBackend:
 
     @classmethod
     def _parse_opened_port(cls, port_str: str) -> Optional[Port]:
-        if port_str == 'icmp':
-            return Port('icmp', None)
-        port_range, slash, protocol = port_str.partition('/')
-        if not slash or protocol not in ['tcp', 'udp']:
-            logger.warning('Unexpected opened-ports protocol: %s', port_str)
+        if port_str == "icmp":
+            return Port("icmp", None)
+        port_range, slash, protocol = port_str.partition("/")
+        if not slash or protocol not in ["tcp", "udp"]:
+            logger.warning("Unexpected opened-ports protocol: %s", port_str)
             return None
-        port, hyphen, _ = port_range.partition('-')
+        port, hyphen, _ = port_range.partition("-")
         if hyphen:
-            logger.warning('Ignoring opened-ports port range: %s', port_str)
-        protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
+            logger.warning("Ignoring opened-ports port range: %s", port_str)
+        protocol_lit = typing.cast(typing.Literal["tcp", "udp"], protocol)
         return Port(protocol_lit, int(port))
 
     def reboot(self, now: bool = False):
@@ -3508,43 +3643,46 @@ class _ModelBackend:
         else:
             self._run("juju-reboot")
 
-    def credential_get(self) -> 'CloudSpec':
+    def credential_get(self) -> "CloudSpec":
         """Access cloud credentials by running the credential-get hook tool.
 
         Returns the cloud specification used by the model.
         """
-        result = self._run('credential-get', return_output=True, use_json=True)
+        result = self._run("credential-get", return_output=True, use_json=True)
         return CloudSpec.from_dict(typing.cast(Dict[str, Any], result))
 
 
 class _ModelBackendValidator:
     """Provides facilities for validating inputs and formatting them for model backends."""
 
-    METRIC_KEY_REGEX = re.compile(r'^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$')
+    METRIC_KEY_REGEX = re.compile(r"^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$")
 
     @classmethod
     def validate_metric_key(cls, key: str):
         if cls.METRIC_KEY_REGEX.match(key) is None:
             raise ModelError(
-                f'invalid metric key {key!r}: must match {cls.METRIC_KEY_REGEX.pattern}')
+                f"invalid metric key {key!r}: must match {cls.METRIC_KEY_REGEX.pattern}"
+            )
 
     @classmethod
     def validate_metric_label(cls, label_name: str):
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
             raise ModelError(
-                f'invalid metric label name {label_name!r}: '
-                f'must match {cls.METRIC_KEY_REGEX.pattern}'
+                f"invalid metric label name {label_name!r}: "
+                f"must match {cls.METRIC_KEY_REGEX.pattern}"
             )
 
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise ModelError(f'invalid metric value {value!r} provided:'
-                             ' must be a positive finite float')
+            raise ModelError(
+                f"invalid metric value {value!r} provided:" " must be a positive finite float"
+            )
 
         if math.isnan(value) or math.isinf(value) or value < 0:
-            raise ModelError(f'invalid metric value {value!r} provided:'
-                             ' must be a positive finite float')
+            raise ModelError(
+                f"invalid metric value {value!r} provided:" " must be a positive finite float"
+            )
         return str(value)
 
     @classmethod
@@ -3552,12 +3690,10 @@ class _ModelBackendValidator:
         # Label values cannot be empty, contain commas or equal signs as those are
         # used by add-metric as separators.
         if not value:
-            raise ModelError(
-                f'metric label {label} has an empty value, which is not allowed')
+            raise ModelError(f"metric label {label} has an empty value, which is not allowed")
         v = str(value)
-        if re.search('[,=]', v) is not None:
-            raise ModelError(
-                f'metric label values must not contain "," or "=": {label}={value!r}')
+        if re.search("[,=]", v) is not None:
+            raise ModelError(f'metric label values must not contain "," or "=": {label}={value!r}')
 
 
 class LazyNotice:
@@ -3593,7 +3729,7 @@ class LazyNotice:
 
     def __repr__(self):
         type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
-        return f'LazyNotice(id={self.id!r}, type={type_repr}, key={self.key!r})'
+        return f"LazyNotice(id={self.id!r}, type={type_repr}, key={self.key!r})"
 
     def __getattr__(self, item: str):
         # Note: not called for defined attributes (id, type, key)
@@ -3630,12 +3766,12 @@ class CloudCredential:
     """A list of redacted secrets."""
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> 'CloudCredential':
+    def from_dict(cls, d: Dict[str, Any]) -> "CloudCredential":
         """Create a new CloudCredential object from a dictionary."""
         return cls(
-            auth_type=d['auth-type'],
-            attributes=d.get('attrs') or {},
-            redacted=d.get('redacted') or [],
+            auth_type=d["auth-type"],
+            attributes=d.get("attrs") or {},
+            redacted=d.get("redacted") or [],
         )
 
 
@@ -3674,17 +3810,17 @@ class CloudSpec:
     """If this is the cloud used by the controller, defaults to False."""
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> 'CloudSpec':
+    def from_dict(cls, d: Dict[str, Any]) -> "CloudSpec":
         """Create a new CloudSpec object from a dict parsed from JSON."""
         return cls(
-            type=d['type'],
-            name=d['name'],
-            region=d.get('region') or None,
-            endpoint=d.get('endpoint') or None,
-            identity_endpoint=d.get('identity-endpoint') or None,
-            storage_endpoint=d.get('storage-endpoint') or None,
-            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
-            ca_certificates=d.get('cacertificates') or [],
-            skip_tls_verify=d.get('skip-tls-verify') or False,
-            is_controller_cloud=d.get('is-controller-cloud') or False,
+            type=d["type"],
+            name=d["name"],
+            region=d.get("region") or None,
+            endpoint=d.get("endpoint") or None,
+            identity_endpoint=d.get("identity-endpoint") or None,
+            storage_endpoint=d.get("storage-endpoint") or None,
+            credential=CloudCredential.from_dict(d["credential"]) if d.get("credential") else None,
+            ca_certificates=d.get("cacertificates") or [],
+            skip_tls_verify=d.get("skip-tls-verify") or False,
+            is_controller_cloud=d.get("is-controller-cloud") or False,
         )
