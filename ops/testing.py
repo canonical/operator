@@ -1521,6 +1521,9 @@ class Harness(Generic[CharmType]):
         Return:
             The ID of the newly-added secret.
         """
+        # This is named `add_charm_secret` instead of `add_secret` to avoid confusion
+        # with the `ops.Application.add_secret` and `ops.Unit.add_secret` methods used
+        # by secret owner charms.
         owner_name = _get_app_or_unit_name(owner)
         model.Secret._validate_content(content)
         return self._backend._secret_add(content, owner_name)
@@ -1544,11 +1547,12 @@ class Harness(Generic[CharmType]):
         Example usage (the parameter ``harness`` in the test function is
         a pytest fixture that does setup/teardown, see :class:`Harness`)::
 
-            # config.yaml
-            options:
-              mysec:
-                type: secret
-                description: "tell me your secrets"
+            # charmcraft.yaml
+            config:
+              options:
+                mysec:
+                  type: secret
+                  description: "tell me your secrets"
 
             # charm.py
             class MyVMCharm(ops.CharmBase):
@@ -1556,7 +1560,7 @@ class Harness(Generic[CharmType]):
                     super().__init__(framework)
                     framework.observe(self.on.config_changed, self._on_config_changed)
 
-                def _on_config_changed(self, event: ops.StartEvent):
+                def _on_config_changed(self, event: ops.ConfigChangedEvent):
                     mysec = self.config.get('mysec')
                     if mysec:
                         sec = self.model.get_secret(id=mysec, label="mysec")
@@ -1566,7 +1570,7 @@ class Harness(Generic[CharmType]):
             def test_config_changed(harness):
                 secret_content = {'password': 'foo'}
                 secret_id = harness.add_user_secret(secret_content)
-                harness.grant_secret(secret_id, 'webapp')
+                harness.grant_secret(secret_id, 'test-charm')
                 harness.begin()
                 harness.update_config({'mysec': secret_id})
                 secret = harness.model.get_secret(id=secret_id).get_content()
@@ -1574,8 +1578,8 @@ class Harness(Generic[CharmType]):
 
         """
         model.Secret._validate_content(content)
-        # Although it's named a user-owned secret in juju, technically, the owner is the
-        # Model, so the secret's owner is set to :attr:`Model.uuid <ops.Model.uuid>`.
+        # Although it's named a user-owned secret in Juju, technically, the owner is the
+        # Model, so the secret's owner is set to `Model.uuid`.
         return self._backend._secret_add(content, self.model.uuid)
 
     def _ensure_secret(self, secret_id: str) -> '_Secret':
