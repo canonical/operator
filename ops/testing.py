@@ -990,7 +990,7 @@ class Harness(Generic[CharmType]):
         app = relation.app
         if not remote_unit_name.startswith(app.name):
             warnings.warn(
-                'Remote unit name invalid: '
+                f'Remote unit name invalid: '
                 f'the remote application of {relation_name} is called {app.name!r}; '
                 f'the remote unit name should be {app.name}/<some-number>, '
                 f'not {remote_unit_name!r}.'
