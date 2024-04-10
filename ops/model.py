@@ -51,6 +51,7 @@ from typing import (
     Type,
     TypedDict,
     Union,
+    cast,
 )
 
 import ops
@@ -62,7 +63,7 @@ from ops.jujuversion import JujuVersion
 K8sSpec = Mapping[str, Any]
 
 _ConfigOption = TypedDict('_ConfigOption', {
-    'type': Literal['string', 'int', 'float', 'boolean'],
+    'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
     'description': str,
     'default': Union[str, int, float, bool],
 })
@@ -769,7 +770,7 @@ class Port:
 OpenedPort = Port  # Alias for backwards compatibility.
 
 
-class LazyMapping(Mapping[str, str], ABC):
+class LazyMapping(Mapping[str, Union[bool, int, float, str]], ABC):
     """Represents a dict that isn't populated until it is accessed.
 
     Charm authors should generally never need to use this directly, but it forms
@@ -777,14 +778,14 @@ class LazyMapping(Mapping[str, str], ABC):
     """
 
     # key-value mapping
-    _lazy_data: Optional[Dict[str, str]] = None
+    _lazy_data: Optional[Dict[str, Union[bool, int, float, str]]] = None
 
     @abstractmethod
-    def _load(self) -> Dict[str, str]:
+    def _load(self) -> Dict[str, Union[bool, int, float, str]]:
         raise NotImplementedError()
 
     @property
-    def _data(self) -> Dict[str, str]:
+    def _data(self) -> Dict[str, Union[bool, int, float, str]]:
         data = self._lazy_data
         if data is None:
             data = self._lazy_data = self._load()
@@ -802,7 +803,7 @@ class LazyMapping(Mapping[str, str], ABC):
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: str) -> str:
+    def __getitem__(self, key: str) -> Union[bool, int, float, str]:
         return self._data[key]
 
     def __repr__(self):
@@ -1702,7 +1703,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __getitem__(self, key: str) -> str:
         self._validate_read()
-        return super().__getitem__(key)
+        return cast(str, super().__getitem__(key))
 
     def __delitem__(self, key: str):
         self._validate_write(key, '')
@@ -3122,9 +3123,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self) -> Dict[str, '_ConfigOption']:
+    def config_get(self) -> Dict[str, Union[bool, int, float, str]]:
         out = self._run('config-get', return_output=True, use_json=True)
-        return typing.cast(Dict[str, '_ConfigOption'], out)
+        return typing.cast(Dict[str, Union[bool, int, float, str]], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
