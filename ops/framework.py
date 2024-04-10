@@ -1190,8 +1190,8 @@ class StoredState:
                     # the StoredState instance is being stored in two different
                     # attributes -> unclear what is expected of us -> bail out
                     raise RuntimeError(
-                        f"StoredState shared by {cls.__name__}.{self.attr_name} and "
-                        f"{cls.__name__}.{attr_name}")
+                        f'StoredState shared by {cls.__name__}.{self.attr_name} and '
+                        f'{cls.__name__}.{attr_name}')
                 # we've found ourselves for the first time; save where, and bind the object
                 self.attr_name = attr_name
                 self.parent_type = cls
