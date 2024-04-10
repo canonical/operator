@@ -41,7 +41,6 @@ from typing import (
     Generator,
     Iterable,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
