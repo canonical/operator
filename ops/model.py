@@ -1715,7 +1715,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self.__setitem__(key, '')
 
     def __repr__(self):
-        try:    # key-value mapping
+        try:
             self._validate_read()
         except RelationDataAccessError:
             return '<n/a>'
