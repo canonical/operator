@@ -1698,6 +1698,13 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return cast(str, super().__getitem__(key))
 
+    # This is provided by Mapping, but we need to make the return type more explicit.
+    def get(self, key: str, default: str) -> str:
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
+
     def __delitem__(self, key: str):
         self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
