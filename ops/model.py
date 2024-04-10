@@ -2950,8 +2950,8 @@ def _format_action_result_dict(input: Dict[str, Any],
             raise ValueError(f'invalid key {key!r}; must be a string')
         if not _ACTION_RESULT_KEY_REGEX.match(key):
             raise ValueError(
-                f"key '{key!r}' is invalid: must be similar to 'key', 'some-key2', "
-                "or 'some.key'")
+                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', "
+                f"or 'some.key'")
 
         if parent_key:
             key = f"{parent_key}.{key}"
