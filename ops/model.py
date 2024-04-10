@@ -1699,7 +1699,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return cast(str, super().__getitem__(key))
 
     # This is provided by Mapping, but we need to make the return type more explicit.
-    def get(self, key: str, default: str) -> str:
+    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
         try:
             return self.__getitem__(key)
         except KeyError:
