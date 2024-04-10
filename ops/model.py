@@ -1630,8 +1630,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
-                f"{self._backend.unit_name} is not leader and cannot read its own "
-                "application databag"
+                f'{self._backend.unit_name} is not leader and cannot read its own '
+                f'application databag'
             )
 
         return True
