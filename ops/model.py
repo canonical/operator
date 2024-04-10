@@ -1660,8 +1660,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
-                    f"{self._backend.app_name} cannot write the data of remote application "
-                    f"{self._entity.name}")
+                    f'{self._backend.app_name} cannot write the data of remote application '
+                    f'{self._entity.name}')
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
