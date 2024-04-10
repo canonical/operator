@@ -34,7 +34,7 @@ from typing import (
     cast,
 )
 
-from ops import model
+from ops import model, pebble
 from ops._private import yaml
 from ops.framework import (
     EventBase,
@@ -808,6 +808,15 @@ class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats."""
 
 
+class PebbleChangeUpdatedEvent(PebbleNoticeEvent):
+    """Event triggered when a Pebble notice of type "change-update" is created or repeats."""
+
+    def get_change(self) -> pebble.Change:
+        """Get the Pebble change associated with this event."""
+        change_id = pebble.ChangeID(self.notice.key)
+        return self.workload.pebble.get_change(change_id)
+
+
 class SecretEvent(HookEvent):
     """Base class for all secret events."""
 
@@ -1187,6 +1196,9 @@ class CharmBase(Object):
             container_name = container_name.replace('-', '_')
             self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
             self.on.define_event(f"{container_name}_pebble_custom_notice", PebbleCustomNoticeEvent)
+            self.on.define_event(
+                f"{container_name}_pebble_change_updated",
+                PebbleChangeUpdatedEvent)
 
     @property
     def app(self) -> model.Application:
