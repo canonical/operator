@@ -589,7 +589,7 @@ class Unit:
         """
         if not isinstance(version, str):
             raise TypeError(
-                f"workload version must be a str, not {type(version).__name__}: {version!r}")
+                f'workload version must be a str, not {type(version).__name__}: {version!r}')
         self._backend.application_version_set(version)
 
     @property
