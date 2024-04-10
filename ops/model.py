@@ -1551,7 +1551,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: Union['Unit', 'Application']):
+    def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
 
     def __repr__(self):
