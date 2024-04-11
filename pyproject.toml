@@ -119,6 +119,8 @@ ignore = [
     # No explicit `stacklevel` keyword argument found
     "B028",
 
+    # Return condition directly, prefer readability.
+    "SIM103",
     # Use contextlib.suppress() instead of try/except: pass
     "SIM105",
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -169,6 +171,10 @@ ignore = [
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+]
+"test/test_helpers.py" = [
+    "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+    "S607",  # Starting a process with a partial executable path
 ]
 
 [tool.ruff.lint.pydocstyle]

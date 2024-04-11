@@ -581,8 +581,8 @@ class Unit:
         shown in the output of 'juju status'.
         """
         if not isinstance(version, str):
-            raise TypeError("workload version must be a str, not {}: {!r}".format(
-                type(version).__name__, version))
+            raise TypeError(
+                f'workload version must be a str, not {type(version).__name__}: {version!r}')
         self._backend.application_version_set(version)
 
     @property
@@ -866,9 +866,9 @@ class RelationMapping(Mapping[str, List['Relation']]):
     def _get_unique(self, relation_name: str, relation_id: Optional[int] = None):
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError('relation id {} must be int or None not {}'.format(
-                    relation_id,
-                    type(relation_id).__name__))
+                raise ModelError(
+                    f'relation id {relation_id} must be int or None, '
+                    f'not {type(relation_id).__name__}')
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -912,8 +912,9 @@ class BindingMapping(Mapping[str, 'Binding']):
             binding_name = binding_key
             relation_id = None
         else:
-            raise ModelError('binding key must be str or relation instance, not {}'
-                             ''.format(type(binding_key).__name__))
+            raise ModelError(
+                f'binding key must be str or relation instance, not {type(binding_key).__name__}'
+            )
         binding = self._data.get(binding_key)
         if binding is None:
             binding = Binding(binding_name, relation_id, self._backend)
@@ -1633,9 +1634,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
-                "{} is not leader and cannot read its own application databag".format(
-                    self._backend.unit_name
-                )
+                f'{self._backend.unit_name} is not leader and cannot read its own '
+                f'application databag'
             )
 
         return True
@@ -1664,9 +1664,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
-                    "{} cannot write the data of remote application {}".format(
-                        self._backend.app_name, self._entity.name
-                    ))
+                    f'{self._backend.app_name} cannot write the data of remote application '
+                    f'{self._entity.name}')
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
@@ -1680,9 +1679,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # is it OUR UNIT's?
             if self._backend.unit_name != self._entity.name:
                 raise RelationDataAccessError(
-                    "{} cannot write databag of {}: not the same unit.".format(
-                        self._backend.unit_name, self._entity.name
-                    )
+                    f'{self._backend.unit_name} cannot write databag of {self._entity.name}: '
+                    f'not the same unit.'
                 )
 
     def __setitem__(self, key: str, value: str):
@@ -2871,8 +2869,9 @@ class TooManyRelatedAppsError(ModelError):
     """Raised by :meth:`Model.get_relation` if there is more than one integrated application."""
 
     def __init__(self, relation_name: str, num_related: int, max_supported: int):
-        super().__init__('Too many remote applications on {} ({} > {})'.format(
-            relation_name, num_related, max_supported))
+        super().__init__(
+            f'Too many remote applications on {relation_name} ({num_related} > {max_supported})'
+        )
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -2954,8 +2953,9 @@ def _format_action_result_dict(input: Dict[str, Any],
             # other exceptions raised on key validation...
             raise ValueError(f'invalid key {key!r}; must be a string')
         if not _ACTION_RESULT_KEY_REGEX.match(key):
-            raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
-                             "'some.key'".format(key))
+            raise ValueError(
+                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', "
+                f"or 'some.key'")
 
         if parent_key:
             key = f"{parent_key}.{key}"
@@ -2964,8 +2964,9 @@ def _format_action_result_dict(input: Dict[str, Any],
             value = typing.cast(Dict[str, Any], value)
             output_ = _format_action_result_dict(value, key, output_)
         elif key in output_:
-            raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
-                             .format(key))
+            raise ValueError(
+                f"duplicate key detected in dictionary passed to 'action-set': {key!r}"
+            )
         else:
             output_[key] = value  # type: ignore
 
@@ -3535,8 +3536,9 @@ class _ModelBackendValidator:
     def validate_metric_label(cls, label_name: str):
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
             raise ModelError(
-                'invalid metric label name {!r}: must match {}'.format(
-                    label_name, cls.METRIC_KEY_REGEX.pattern))
+                f'invalid metric label name {label_name!r}: '
+                f'must match {cls.METRIC_KEY_REGEX.pattern}'
+            )
 
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
