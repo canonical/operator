@@ -17,7 +17,8 @@ import subprocess
 import sys
 import tempfile
 import typing
-import unittest
+
+import pytest
 
 
 def get_python_filepaths(include_tests: bool = True):
@@ -34,30 +35,21 @@ def get_python_filepaths(include_tests: bool = True):
     return python_paths
 
 
-class ImportersTestCase(unittest.TestCase):
-
+class TestImporters:
     template = "from ops import {module_name}"
 
-    def test_imports(self):
-        mod_names = [
-            'charm',
-            'framework',
-            'main',
-            'model',
-            'testing',
-        ]
-
-        for name in mod_names:
-            with self.subTest(name=name):
-                self.check(name)
-
-    def check(self, name: str):
-        """Helper function to run the test."""
+    @pytest.mark.parametrize("mod_name", [
+        'charm',
+        'framework',
+        'main',
+        'model',
+        'testing',
+    ])
+    def test_import(self, mod_name: str):
         fd, testfile = tempfile.mkstemp()
-        self.addCleanup(os.unlink, testfile)
 
         with open(fd, 'w', encoding='utf8') as fh:
-            fh.write(self.template.format(module_name=name))
+            fh.write(self.template.format(module_name=mod_name))
 
         environ = os.environ.copy()
         if 'PYTHONPATH' in environ:
@@ -65,4 +57,5 @@ class ImportersTestCase(unittest.TestCase):
         else:
             environ['PYTHONPATH'] = os.getcwd()
         proc = subprocess.run([sys.executable, testfile], env=environ)
-        self.assertEqual(proc.returncode, 0)
+        assert proc.returncode == 0
+        os.unlink(testfile)

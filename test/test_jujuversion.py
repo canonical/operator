@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import os
-import unittest.mock  # in this file, importing just 'patch' would be confusing
+import typing
+
+import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 import ops
 
 
-class TestJujuVersion(unittest.TestCase):
-
+class TestJujuVersion:
     def test_parsing(self):
         test_cases = [
             ("0.0.0", 0, 0, '', 0, 0),
@@ -35,61 +37,61 @@ class TestJujuVersion(unittest.TestCase):
 
         for vs, major, minor, tag, patch, build in test_cases:
             v = ops.JujuVersion(vs)
-            self.assertEqual(v.major, major)
-            self.assertEqual(v.minor, minor)
-            self.assertEqual(v.tag, tag)
-            self.assertEqual(v.patch, patch)
-            self.assertEqual(v.build, build)
+            assert v.major == major
+            assert v.minor == minor
+            assert v.tag == tag
+            assert v.patch == patch
+            assert v.build == build
 
-    @unittest.mock.patch('os.environ', new={})  # type: ignore
-    def test_from_environ(self):
+    def test_from_environ(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setattr(os, 'environ', {})
         # JUJU_VERSION is not set
         v = ops.JujuVersion.from_environ()
-        self.assertEqual(v, ops.JujuVersion('0.0.0'))
+        assert v == ops.JujuVersion('0.0.0')
 
         os.environ['JUJU_VERSION'] = 'no'
-        with self.assertRaisesRegex(RuntimeError, 'not a valid Juju version'):
+        with pytest.raises(RuntimeError, match='not a valid Juju version'):
             ops.JujuVersion.from_environ()
 
         os.environ['JUJU_VERSION'] = '2.8.0'
         v = ops.JujuVersion.from_environ()
-        self.assertEqual(v, ops.JujuVersion('2.8.0'))
+        assert v == ops.JujuVersion('2.8.0')
 
     def test_has_app_data(self):
-        self.assertTrue(ops.JujuVersion('2.8.0').has_app_data())
-        self.assertTrue(ops.JujuVersion('2.7.0').has_app_data())
-        self.assertFalse(ops.JujuVersion('2.6.9').has_app_data())
+        assert ops.JujuVersion('2.8.0').has_app_data()
+        assert ops.JujuVersion('2.7.0').has_app_data()
+        assert not ops.JujuVersion('2.6.9').has_app_data()
 
     def test_is_dispatch_aware(self):
-        self.assertTrue(ops.JujuVersion('2.8.0').is_dispatch_aware())
-        self.assertFalse(ops.JujuVersion('2.7.9').is_dispatch_aware())
+        assert ops.JujuVersion('2.8.0').is_dispatch_aware()
+        assert not ops.JujuVersion('2.7.9').is_dispatch_aware()
 
     def test_has_controller_storage(self):
-        self.assertTrue(ops.JujuVersion('2.8.0').has_controller_storage())
-        self.assertFalse(ops.JujuVersion('2.7.9').has_controller_storage())
+        assert ops.JujuVersion('2.8.0').has_controller_storage()
+        assert not ops.JujuVersion('2.7.9').has_controller_storage()
 
     def test_has_secrets(self):
-        self.assertTrue(ops.JujuVersion('3.0.3').has_secrets)
-        self.assertTrue(ops.JujuVersion('3.1.0').has_secrets)
-        self.assertFalse(ops.JujuVersion('3.0.2').has_secrets)
-        self.assertFalse(ops.JujuVersion('2.9.30').has_secrets)
+        assert ops.JujuVersion('3.0.3').has_secrets
+        assert ops.JujuVersion('3.1.0').has_secrets
+        assert not ops.JujuVersion('3.0.2').has_secrets
+        assert not ops.JujuVersion('2.9.30').has_secrets
 
     def test_supports_open_port_on_k8s(self):
-        self.assertTrue(ops.JujuVersion('3.0.3').supports_open_port_on_k8s)
-        self.assertTrue(ops.JujuVersion('3.3.0').supports_open_port_on_k8s)
-        self.assertFalse(ops.JujuVersion('3.0.2').supports_open_port_on_k8s)
-        self.assertFalse(ops.JujuVersion('2.9.30').supports_open_port_on_k8s)
+        assert ops.JujuVersion('3.0.3').supports_open_port_on_k8s
+        assert ops.JujuVersion('3.3.0').supports_open_port_on_k8s
+        assert not ops.JujuVersion('3.0.2').supports_open_port_on_k8s
+        assert not ops.JujuVersion('2.9.30').supports_open_port_on_k8s
 
     def test_supports_exec_service_context(self):
-        self.assertFalse(ops.JujuVersion('2.9.30').supports_exec_service_context)
-        self.assertTrue(ops.JujuVersion('4.0.0').supports_exec_service_context)
-        self.assertFalse(ops.JujuVersion('3.0.0').supports_exec_service_context)
-        self.assertFalse(ops.JujuVersion('3.1.5').supports_exec_service_context)
-        self.assertTrue(ops.JujuVersion('3.1.6').supports_exec_service_context)
-        self.assertFalse(ops.JujuVersion('3.2.0').supports_exec_service_context)
-        self.assertTrue(ops.JujuVersion('3.2.2').supports_exec_service_context)
-        self.assertTrue(ops.JujuVersion('3.3.0').supports_exec_service_context)
-        self.assertTrue(ops.JujuVersion('3.4.0').supports_exec_service_context)
+        assert not ops.JujuVersion('2.9.30').supports_exec_service_context
+        assert ops.JujuVersion('4.0.0').supports_exec_service_context
+        assert not ops.JujuVersion('3.0.0').supports_exec_service_context
+        assert not ops.JujuVersion('3.1.5').supports_exec_service_context
+        assert ops.JujuVersion('3.1.6').supports_exec_service_context
+        assert not ops.JujuVersion('3.2.0').supports_exec_service_context
+        assert ops.JujuVersion('3.2.2').supports_exec_service_context
+        assert ops.JujuVersion('3.3.0').supports_exec_service_context
+        assert ops.JujuVersion('3.4.0').supports_exec_service_context
 
     def test_parsing_errors(self):
         invalid_versions = [
@@ -107,7 +109,7 @@ class TestJujuVersion(unittest.TestCase):
             "1.21-alpha123dev3",  # Non-numeric string after the patch number.
         ]
         for v in invalid_versions:
-            with self.assertRaises(RuntimeError):
+            with pytest.raises(RuntimeError):
                 ops.JujuVersion(v)
 
     def test_equality(self):
@@ -136,43 +138,41 @@ class TestJujuVersion(unittest.TestCase):
         ]
 
         for a, b, expected in test_cases:
-            self.assertEqual(ops.JujuVersion(a) == ops.JujuVersion(b), expected)
-            self.assertEqual(ops.JujuVersion(a) == b, expected)
+            assert (ops.JujuVersion(a) == ops.JujuVersion(b)) == expected
+            assert (ops.JujuVersion(a) == b) == expected
 
-    def test_comparison(self):
-        test_cases = [
-            ("1.0.0", "1.0.0", False, True),
-            ("01.0.0", "1.0.0", False, True),
-            ("10.0.0", "9.0.0", False, False),
-            ("1.0.0", "1.0.1", True, True),
-            ("1.0.1", "1.0.0", False, False),
-            ("1.0.0", "1.1.0", True, True),
-            ("1.1.0", "1.0.0", False, False),
-            ("1.0.0", "2.0.0", True, True),
-            ("1.2-alpha1", "1.2.0", True, True),
-            ("1.2-alpha2", "1.2-alpha1", False, False),
-            ("1.2-alpha2.1", "1.2-alpha2", False, False),
-            ("1.2-alpha2.2", "1.2-alpha2.1", False, False),
-            ("1.2-beta1", "1.2-alpha1", False, False),
-            ("1.2-beta1", "1.2-alpha2.1", False, False),
-            ("1.2-beta1", "1.2.0", True, True),
-            ("1.2.1", "1.2.0", False, False),
-            ("2.0.0", "1.0.0", False, False),
-            ("2.0.0.0", "2.0.0", False, True),
-            ("2.0.0.0", "2.0.0.0", False, True),
-            ("2.0.0.1", "2.0.0.0", False, False),
-            ("2.0.1.10", "2.0.0.0", False, False),
-            ("2.10.0", "2.8.0", False, False),
-        ]
-
-        for a, b, expected_strict, expected_weak in test_cases:
-            with self.subTest(a=a, b=b):
-                self.assertEqual(ops.JujuVersion(a) < ops.JujuVersion(b), expected_strict)
-                self.assertEqual(ops.JujuVersion(a) <= ops.JujuVersion(b), expected_weak)
-                self.assertEqual(ops.JujuVersion(b) > ops.JujuVersion(a), expected_strict)
-                self.assertEqual(ops.JujuVersion(b) >= ops.JujuVersion(a), expected_weak)
-                # Implicit conversion.
-                self.assertEqual(ops.JujuVersion(a) < b, expected_strict)
-                self.assertEqual(ops.JujuVersion(a) <= b, expected_weak)
-                self.assertEqual(b > ops.JujuVersion(a), expected_strict)
-                self.assertEqual(b >= ops.JujuVersion(a), expected_weak)
+    @pytest.mark.parametrize("test_case", [
+        ("1.0.0", "1.0.0", False, True),
+        ("01.0.0", "1.0.0", False, True),
+        ("10.0.0", "9.0.0", False, False),
+        ("1.0.0", "1.0.1", True, True),
+        ("1.0.1", "1.0.0", False, False),
+        ("1.0.0", "1.1.0", True, True),
+        ("1.1.0", "1.0.0", False, False),
+        ("1.0.0", "2.0.0", True, True),
+        ("1.2-alpha1", "1.2.0", True, True),
+        ("1.2-alpha2", "1.2-alpha1", False, False),
+        ("1.2-alpha2.1", "1.2-alpha2", False, False),
+        ("1.2-alpha2.2", "1.2-alpha2.1", False, False),
+        ("1.2-beta1", "1.2-alpha1", False, False),
+        ("1.2-beta1", "1.2-alpha2.1", False, False),
+        ("1.2-beta1", "1.2.0", True, True),
+        ("1.2.1", "1.2.0", False, False),
+        ("2.0.0", "1.0.0", False, False),
+        ("2.0.0.0", "2.0.0", False, True),
+        ("2.0.0.0", "2.0.0.0", False, True),
+        ("2.0.0.1", "2.0.0.0", False, False),
+        ("2.0.1.10", "2.0.0.0", False, False),
+        ("2.10.0", "2.8.0", False, False),
+    ])
+    def test_comparison(self, test_case: typing.Tuple[str, str, bool, bool]):
+        a, b, expected_strict, expected_weak = test_case
+        assert (ops.JujuVersion(a) < ops.JujuVersion(b)) == expected_strict
+        assert (ops.JujuVersion(a) <= ops.JujuVersion(b)) == expected_weak
+        assert (ops.JujuVersion(b) > ops.JujuVersion(a)) == expected_strict
+        assert (ops.JujuVersion(b) >= ops.JujuVersion(a)) == expected_weak
+        # Implicit conversion.
+        assert (ops.JujuVersion(a) < b) == expected_strict
+        assert (ops.JujuVersion(a) <= b) == expected_weak
+        assert (b > ops.JujuVersion(a)) == expected_strict
+        assert (b >= ops.JujuVersion(a)) == expected_weak

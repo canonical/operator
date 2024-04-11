@@ -21,6 +21,7 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
+import pytest
 import yaml
 
 import ops
@@ -30,6 +31,110 @@ from ops.model import ModelError, _ModelBackend
 from ops.storage import SQLiteStorage
 
 from .test_helpers import fake_script, fake_script_calls
+
+
+@pytest.fixture
+def tmpdir():
+    tmpdir = Path(tempfile.mkdtemp())
+    yield tmpdir
+    shutil.rmtree(str(tmpdir))
+
+
+@pytest.fixture
+def env():
+    original_env = os.environ.copy()
+    os.environ['PATH'] = os.pathsep.join([
+        str(Path(__file__).parent / 'bin'),
+        os.environ['PATH']])
+    os.environ['JUJU_UNIT_NAME'] = 'local/0'
+    yield
+    os.environ.clear()
+    os.environ.update(original_env)
+
+
+@pytest.fixture
+def events():
+    class CustomEvent(ops.EventBase):
+        pass
+
+    class TestCharmEvents(ops.CharmEvents):
+        custom = ops.EventSource(CustomEvent)
+
+    # Relations events are defined dynamically and modify the class attributes.
+    # We use a subclass temporarily to prevent these side effects from leaking.
+    ops.CharmBase.on = TestCharmEvents()  # type: ignore
+    yield
+    ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+
+
+@pytest.fixture
+def framework(tmpdir: Path, env, events):  # type: ignore
+    meta = ops.CharmMeta()
+    model = ops.Model(meta, _ModelBackend('local/0'))
+    # we can pass foo_event as event_name because we're not actually testing dispatch
+    framework = ops.Framework(SQLiteStorage(':memory__'), tmpdir, meta, model)
+    yield framework
+    framework.close()
+
+
+class TestCharmNew:
+    def test_basic(self, framework: ops.Framework):
+        class MyCharm(ops.CharmBase):
+
+            def __init__(self, *args: typing.Any):
+                super().__init__(*args)
+
+                self.started = False
+                framework.observe(self.on.start, self._on_start)
+
+            def _on_start(self, event: ops.EventBase):
+                self.started = True
+
+        events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
+        assert 'install' in events
+        assert 'custom' in events
+
+        charm = MyCharm(framework)
+        charm.on.start.emit()
+        assert charm.started
+
+        with pytest.raises(TypeError):
+            framework.observe(charm.on.start, charm)  # type: ignore
+
+    def test_observe_decorated_method(self, framework: ops.Framework):
+        # we test that charm methods decorated with @functools.wraps(wrapper)
+        # can be observed by Framework. Simpler decorators won't work because
+        # Framework searches for __self__ and other method things; functools.wraps
+        # is more careful and it still works, this test is here to ensure that
+        # it keeps working in future releases, as this is presently the only
+        # way we know of to cleanly decorate charm event observers.
+        events: typing.List[ops.EventBase] = []
+
+        def dec(fn: typing.Any) -> typing.Callable[..., None]:
+            # simple decorator that appends to the nonlocal
+            # `events` list all events it receives
+            @functools.wraps(fn)
+            def wrapper(charm: 'MyCharm', evt: ops.EventBase):
+                events.append(evt)
+                fn(charm, evt)
+            return wrapper
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, *args: typing.Any):
+                super().__init__(*args)
+                framework.observe(self.on.start, self._on_start)
+                self.seen = None
+
+            @dec
+            def _on_start(self, event: ops.EventBase):
+                self.seen = event
+
+        charm = MyCharm(framework)
+        charm.on.start.emit()
+        # check that the event has been seen by the decorator
+        assert len(events) == 1
+        # check that the event has been seen by the observer
+        isinstance(charm.seen, ops.StartEvent)
 
 
 class TestCharm(unittest.TestCase):
@@ -70,68 +175,6 @@ class TestCharm(unittest.TestCase):
                                   model)
         self.addCleanup(framework.close)
         return framework
-
-    def test_basic(self):
-
-        class MyCharm(ops.CharmBase):
-
-            def __init__(self, *args: typing.Any):
-                super().__init__(*args)
-
-                self.started = False
-                framework.observe(self.on.start, self._on_start)
-
-            def _on_start(self, event: ops.EventBase):
-                self.started = True
-
-        events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
-        self.assertIn('install', events)
-        self.assertIn('custom', events)
-
-        framework = self.create_framework()
-        charm = MyCharm(framework)
-        charm.on.start.emit()
-
-        self.assertEqual(charm.started, True)
-
-        with self.assertRaises(TypeError):
-            framework.observe(charm.on.start, charm)  # type: ignore
-
-    def test_observe_decorated_method(self):
-        # we test that charm methods decorated with @functools.wraps(wrapper)
-        # can be observed by Framework. Simpler decorators won't work because
-        # Framework searches for __self__ and other method things; functools.wraps
-        # is more careful and it still works, this test is here to ensure that
-        # it keeps working in future releases, as this is presently the only
-        # way we know of to cleanly decorate charm event observers.
-        events: typing.List[ops.EventBase] = []
-
-        def dec(fn: typing.Any) -> typing.Callable[..., None]:
-            # simple decorator that appends to the nonlocal
-            # `events` list all events it receives
-            @functools.wraps(fn)
-            def wrapper(charm: 'MyCharm', evt: ops.EventBase):
-                events.append(evt)
-                fn(charm, evt)
-            return wrapper
-
-        class MyCharm(ops.CharmBase):
-            def __init__(self, *args: typing.Any):
-                super().__init__(*args)
-                framework.observe(self.on.start, self._on_start)
-                self.seen = None
-
-            @dec
-            def _on_start(self, event: ops.EventBase):
-                self.seen = event
-
-        framework = self.create_framework()
-        charm = MyCharm(framework)
-        charm.on.start.emit()
-        # check that the event has been seen by the decorator
-        self.assertEqual(1, len(events))
-        # check that the event has been seen by the observer
-        self.assertIsInstance(charm.seen, ops.StartEvent)
 
     def test_observer_not_referenced_warning(self):
         class MyObj(ops.Object):
