@@ -92,6 +92,10 @@ _NetworkDict = TypedDict('_NetworkDict', {
 
 
 # Copied from typeshed.
+_KT = typing.TypeVar("_KT")
+_VT_co = typing.TypeVar("_VT_co", covariant=True)
+
+
 class _SupportsKeysAndGetItem(typing.Protocol[_KT, _VT_co]):
     def keys(self) -> typing.Iterable[_KT]: ...
     def __getitem__(self, __key: _KT) -> _VT_co: ...
@@ -1713,6 +1717,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return super().__getitem__(key)
 
     def update(self, other: _SupportsKeysAndGetItem[str, str], **kwargs: str):
+        """Update the data from dict/iterable other and the kwargs."""
         super().update(other, **kwargs)
 
     def __delitem__(self, key: str):
