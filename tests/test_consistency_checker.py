@@ -7,7 +7,6 @@ from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Action,
-    CloudAuthType,
     CloudCredential,
     CloudSpec,
     Container,
@@ -579,7 +578,7 @@ def test_cloudspec_consistency():
         type="lxd",
         endpoint="https://127.0.0.1:8443",
         credential=CloudCredential(
-            auth_type=CloudAuthType.client_certificate_auth_type,
+            auth_type="clientcertificate",
             attributes={
                 "client-cert": "foo",
                 "client-key": "bar",
@@ -602,6 +601,6 @@ def test_cloudspec_consistency():
         Event("start"),
         _CharmSpec(
             MyCharm,
-            meta={"name": "MyVMCharm"},
+            meta={"name": "MyK8sCharm"},
         ),
     )

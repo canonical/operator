@@ -140,22 +140,9 @@ class _DCBase:
         return copy.deepcopy(self)
 
 
-class CloudAuthType(str, Enum):
-    access_key_auth_type = "access-key"
-    instance_role_auth_type = "instance-role"
-    user_pass_auth_type = "userpass"
-    o_auth1_auth_type = "oauth1"
-    o_auth2_auth_type = "oauth2"
-    json_file_auth_type = "jsonfile"
-    client_certificate_auth_type = "clientcertificate"
-    http_sig_auth_type = "httpsig"
-    interactive_auth_type = "interactive"
-    empty_auth_type = "empty"
-
-
 @dataclasses.dataclass(frozen=True)
 class CloudCredential:
-    auth_type: CloudAuthType
+    auth_type: str
     """Authentication type."""
 
     attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
