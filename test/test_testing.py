@@ -1402,6 +1402,26 @@ class TestHarness(unittest.TestCase):
         self.assertEqual(harness.model.config['opt_int'], 1)
         self.assertIsInstance(harness.model.config['opt_int'], int)
 
+    def test_config_in_repl(self):
+        # In a REPL, there is no "source file", but we should still be able to
+        # provide explicit metadata, and fall back to the default otherwise.
+        with patch.object(inspect, 'getfile', side_effect=OSError()):
+            harness = ops.testing.Harness(ops.CharmBase, meta='''
+                name: repl-charm
+            ''', config='''
+                options:
+                    foo:
+                        type: int
+                        default: 42
+            ''')
+            self.addCleanup(harness.cleanup)
+            harness.begin()
+            self.assertEqual(harness._meta.name, "repl-charm")
+            self.assertEqual(harness.charm.model.config['foo'], 42)
+            harness = ops.testing.Harness(ops.CharmBase)
+            self.addCleanup(harness.cleanup)
+            self.assertEqual(harness._meta.name, "test-charm")
+
     def test_set_model_name(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test-charm
