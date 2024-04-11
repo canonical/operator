@@ -990,9 +990,11 @@ class Harness(Generic[CharmType]):
         app = relation.app
         if not remote_unit_name.startswith(app.name):
             warnings.warn(
-                'Remote unit name invalid: the remote application of {} is called {!r}; '
-                'the remote unit name should be {}/<some-number>, not {!r}.'
-                ''.format(relation_name, app.name, app.name, remote_unit_name))
+                f'Remote unit name invalid: '
+                f'the remote application of {relation_name} is called {app.name!r}; '
+                f'the remote unit name should be {app.name}/<some-number>, '
+                f'not {remote_unit_name!r}.'
+            )
         app_and_units = self._backend._relation_app_and_units
         app_and_units[relation_id]["units"].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
