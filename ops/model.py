@@ -91,6 +91,12 @@ _NetworkDict = TypedDict('_NetworkDict', {
 })
 
 
+# Copied from typeshed.
+class _SupportsKeysAndGetItem(typing.Protocol[_KT, _VT_co]):
+    def keys(self) -> typing.Iterable[_KT]: ...
+    def __getitem__(self, __key: _KT) -> _VT_co: ...
+
+
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -1705,6 +1711,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def __getitem__(self, key: str) -> str:
         self._validate_read()
         return super().__getitem__(key)
+
+    def update(self, other: _SupportsKeysAndGetItem[str, str], **kwargs: str):
+        super().update(other, **kwargs)
 
     def __delitem__(self, key: str):
         self._validate_write(key, '')
