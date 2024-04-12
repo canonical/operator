@@ -47,12 +47,6 @@ def test_get_cloud_spec():
         model=scenario.Model(name="lxd-model", type="lxd"),
     )
     with ctx.manager("start", state=state) as mgr:
-        print("-==============")
-        print(mgr.charm.model.get_cloud_spec())
-        print("-==============")
-        print(expected_cloud_spec)
-        print("-==============")
-
         assert mgr.charm.model.get_cloud_spec() == expected_cloud_spec
 
 
