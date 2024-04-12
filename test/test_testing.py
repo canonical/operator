@@ -1103,8 +1103,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
-        # [jam] I don't think this is right, as user-secrets aren't owned by the app
-        secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
+        secret_id = harness.add_user_secret({'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         self.assertEqual(harness.charm.changes,
             [{'name': 'config-changed', 'data': {'a': secret_id}}])
@@ -5087,6 +5086,17 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_rotation('nosecret')
 
+    def test_trigger_secret_rotation_on_user_secret(self):
+        harness = ops.testing.Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_user_secret({'foo': 'bar'})
+        assert secret_id is not None
+        harness.begin()
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_rotation(secret_id)
+
     def test_trigger_secret_removal(self):
         harness = ops.testing.Harness(EventRecorder, meta='name: database')
         self.addCleanup(harness.cleanup)
@@ -5143,6 +5153,17 @@ class TestSecrets(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
 
+    def test_trigger_secret_expiration_on_user_secret(self):
+        harness = ops.testing.Harness(EventRecorder, meta='name: database')
+        self.addCleanup(harness.cleanup)
+
+        secret_id = harness.add_user_secret({'foo': 'bar'})
+        assert secret_id is not None
+        harness.begin()
+
+        with self.assertRaises(RuntimeError):
+            harness.trigger_secret_expiration(secret_id, 1)
+
     def test_secret_permissions_unit(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
         self.addCleanup(harness.cleanup)
@@ -5188,6 +5209,71 @@ class TestSecrets(unittest.TestCase):
             secret.set_content({"password": "5678"})
         with self.assertRaises(ops.model.SecretNotFoundError):
             secret.remove_all_revisions()
+
+    def test_add_user_secret(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        secret_content = {'password': 'foo'}
+        secret_id = harness.add_user_secret(secret_content)
+        harness.grant_secret(secret_id, 'webapp')
+
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), secret_content)
+
+    def test_get_user_secret_without_grant(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        with self.assertRaises(ops.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_revoke_user_secret(self):
+        harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+
+        secret_content = {'password': 'foo'}
+        secret_id = harness.add_user_secret(secret_content)
+        harness.grant_secret(secret_id, 'webapp')
+        harness.revoke_secret(secret_id, 'webapp')
+        with self.assertRaises(ops.SecretNotFoundError):
+            harness.model.get_secret(id=secret_id)
+
+    def test_set_user_secret_content(self):
+        harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(), {'password': 'foo'})
+        harness.set_secret_content(secret_id, {'password': 'bar'})
+        secret = harness.model.get_secret(id=secret_id)
+        self.assertEqual(secret.get_content(refresh=True), {'password': 'bar'})
+
+    def test_get_user_secret_info(self):
+        harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
+            {'name': 'webapp'}
+        ))
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        secret_id = harness.add_user_secret({'password': 'foo'})
+        harness.grant_secret(secret_id, 'webapp')
+        secret = harness.model.get_secret(id=secret_id)
+        with self.assertRaises(ops.SecretNotFoundError):
+            secret.get_info()
 
 
 class EventRecorder(ops.CharmBase):
