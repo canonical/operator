@@ -577,7 +577,8 @@ def check_cloudspec_consistency(
 ) -> Results:
     """Check that Kubernetes charms/models don't have `state.cloud_spec`."""
 
-    errors, warnings = [], []
+    errors = []
+    warnings = []
 
     if state.model.type == "kubernetes" and state.cloud_spec:
         errors.append(

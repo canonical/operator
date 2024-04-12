@@ -29,6 +29,7 @@ from typing import (
 )
 from uuid import uuid4
 
+import ops
 import yaml
 from ops import pebble
 from ops.charm import CharmBase, CharmEvents
@@ -156,6 +157,13 @@ class CloudCredential:
     redacted: List[str] = dataclasses.field(default_factory=list)
     """A list of redacted secrets."""
 
+    def to_ops_cloud_credential(self):
+        return ops.CloudCredential(
+            auth_type=self.auth_type,
+            attributes=self.attributes,
+            redacted=self.redacted,
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class CloudSpec:
@@ -188,6 +196,22 @@ class CloudSpec:
 
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
+
+    def to_ops_cloud_spec(self) -> ops.CloudSpec:
+        return ops.CloudSpec(
+            type=self.type,
+            name=self.name,
+            region=self.region,
+            endpoint=self.endpoint,
+            identity_endpoint=self.identity_endpoint,
+            storage_endpoint=self.storage_endpoint,
+            credential=None
+            if not self.credential
+            else self.credential.to_ops_cloud_credential(),
+            ca_certificates=self.ca_certificates,
+            skip_tls_verify=self.skip_tls_verify,
+            is_controller_cloud=self.is_controller_cloud,
+        )
 
 
 @dataclasses.dataclass(frozen=True)
