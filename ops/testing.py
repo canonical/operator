@@ -1168,13 +1168,8 @@ class Harness(Generic[CharmType]):
 
         id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
 
-        if self._charm is not None and new_or_repeated:
-            if type == pebble.NoticeType.CUSTOM:
-                self.charm.on[container_name].pebble_custom_notice.emit(
-                    container, id, type.value, key)
-            elif type == pebble.NoticeType.CHANGE_UPDATE:
-                self.charm.on[container_name].pebble_change_updated.emit(
-                    container, id, type.value, key)
+        if self._charm is not None and type == pebble.NoticeType.CUSTOM and new_or_repeated:
+            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type.value, key)
 
         return id
 
@@ -3450,6 +3445,10 @@ class _TestingPebbleClient:
 
         Return a tuple of (notice_id, new_or_repeated).
         """
+        if type != pebble.NoticeType.CUSTOM:
+            message = f'invalid type "{type.value}" (can only add "custom" notices)'
+            raise self._api_error(400, message)
+
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
 
