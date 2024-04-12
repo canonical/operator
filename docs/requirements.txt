@@ -33,7 +33,7 @@ furo==2024.1.29
     # via ops (pyproject.toml)
 html5lib==1.1
     # via pyspelling
-idna==3.6
+idna==3.7
     # via requests
 imagesize==1.4.1
     # via sphinx
