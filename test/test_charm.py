@@ -21,6 +21,7 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
+import pytest
 import yaml
 
 import ops
@@ -94,7 +95,7 @@ class TestCharm(unittest.TestCase):
 
         assert charm.started
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             framework.observe(charm.on.start, charm)  # type: ignore
 
     def test_observe_decorated_method(self):
@@ -460,7 +461,7 @@ requires:
         assert self.meta.requires['metrics'].optional
 
     def test_relations_meta_limit_type_validation(self):
-        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
+        with pytest.raises(TypeError, match=r"limit should be an int, not <class 'str'>"):
             # language=YAML
             self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -471,8 +472,10 @@ requires:
 ''')
 
     def test_relations_meta_scope_type_validation(self):
-        with self.assertRaisesRegex(TypeError,
-                                    "scope should be one of 'global', 'container'; not 'foobar'"):
+        with pytest.raises(
+            TypeError,
+            match="scope should be one of 'global', 'container'; not 'foobar'"
+        ):
             # language=YAML
             self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -611,7 +614,7 @@ start:
                 {'aBc': 'd'}):
             charm.res = bad_res
 
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 charm.on.foo_bar_action.emit(id='1')
 
     def _test_action_event_defer_fails(self, cmd_type: str):
@@ -632,7 +635,7 @@ start:
         framework = self.create_framework()
         charm = MyCharm(framework)
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             charm.on.start_action.emit(id='2')
 
     def test_action_event_defer_fails(self):
@@ -698,7 +701,7 @@ containers:
         assert meta.containers['test2'].bases[1].channel == '23.04/stable/fips'
         assert meta.containers['test2'].bases[1].architectures == ['arm']
         # It's an error to specify both the 'resource' and the 'bases' fields.
-        with self.assertRaises(ModelError):
+        with pytest.raises(ModelError):
             ops.CharmMeta.from_yaml("""
 name: invalid-charm
 containers:
@@ -731,7 +734,7 @@ containers:
             '/test/storagemount'
         assert meta.containers['test1'].mounts["data"].locations[1] == '/test/otherdata'
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             meta.containers["test1"].mounts["data"].location
 
     def test_secret_events(self):
@@ -918,7 +921,7 @@ containers:
         fake_script(self, 'is-leader', 'echo true')
 
         charm = MyCharm(self.create_framework())
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.charm._evaluate_status(charm)
 
     def test_collect_status_priority(self):

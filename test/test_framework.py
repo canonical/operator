@@ -65,13 +65,13 @@ class TestFramework(BaseTestCase):
 
     def test_handle_attrs_readonly(self):
         handle = ops.Handle(None, 'kind', 'key')
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             handle.parent = 'foo'  # type: ignore
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             handle.kind = 'foo'  # type: ignore
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             handle.key = 'foo'  # type: ignore
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             handle.path = 'foo'  # type: ignore
 
     def test_restore_unknown(self):
@@ -135,7 +135,7 @@ class TestFramework(BaseTestCase):
         framework3 = self.create_framework(tmpdir=self.tmpdir)
         framework3.register_type(Foo, None, handle.kind)
 
-        self.assertRaises(NoSnapshotError, framework3.load_snapshot, handle)
+        pytest.raises(NoSnapshotError, framework3.load_snapshot, handle)
 
     def test_simple_event_observer(self):
         framework = self.create_framework()
@@ -168,7 +168,7 @@ class TestFramework(BaseTestCase):
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
 
-        with self.assertRaisesRegex(TypeError, "^Framework.observe requires a method"):
+        with pytest.raises(TypeError, match="^Framework.observe requires a method"):
             framework.observe(pub.baz, obs)  # type: ignore
 
         pub.foo.emit()
@@ -267,11 +267,11 @@ class TestFramework(BaseTestCase):
         pub = MyNotifier(framework, "pub")
         obs = MyObserver(framework, "obs")
 
-        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
+        with pytest.raises(TypeError, match="only 'self' and the 'event'"):
             framework.observe(pub.foo, obs._on_foo)  # type: ignore
-        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
+        with pytest.raises(TypeError, match="only 'self' and the 'event'"):
             framework.observe(pub.bar, obs._on_bar)  # type: ignore
-        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
+        with pytest.raises(TypeError, match="only 'self' and the 'event'"):
             framework.observe(pub.baz, obs._on_baz)  # type: ignore
         framework.observe(pub.qux, obs._on_qux)
 
@@ -317,7 +317,7 @@ class TestFramework(BaseTestCase):
         assert obs._stored.myinitdata == 41  # type: ignore
         assert new_obs._stored.mydata == 42  # type: ignore
 
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             new_obs._stored.myotherdata  # type: ignore
 
     def test_defer_and_reemit(self):
@@ -386,9 +386,9 @@ class TestFramework(BaseTestCase):
         assert " ".join(obs2.seen) == "a b c a b c a b c a c a c c"
 
         # Now the event objects must all be gone from storage.
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_a_handle)
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
-        self.assertRaises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
+        pytest.raises(NoSnapshotError, framework.load_snapshot, ev_a_handle)
+        pytest.raises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
+        pytest.raises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
 
     def test_custom_event_data(self):
         framework = self.create_framework()
@@ -479,7 +479,7 @@ class TestFramework(BaseTestCase):
 
         o1 = MyObject(framework, "path")
         # Creating a second object at the same path should fail with RuntimeError
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             o2 = MyObject(framework, "path")
         # Unless we _forget the object first
         framework._forget(o1)
@@ -520,7 +520,7 @@ class TestFramework(BaseTestCase):
         o2 = framework.load_snapshot(o_handle)
         o2 = typing.cast(MyObject, o2)
         # Trying to load_snapshot a second object at the same path should fail with RuntimeError
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             framework.load_snapshot(o_handle)
         # Unless we _forget the object first
         framework._forget(o2)
@@ -528,7 +528,7 @@ class TestFramework(BaseTestCase):
         o3 = typing.cast(MyObject, o3)
         assert o2.value == o3.value
         # A loaded object also prevents direct creation of an object
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             MyObject(framework, "path")
         framework.close()
         # But we can create an object, or load a snapshot in a copy of the framework
@@ -591,26 +591,26 @@ class TestFramework(BaseTestCase):
         class MyEvents(ops.ObjectEvents):
             foo = event
 
-        with self.assertRaises(RuntimeError) as cm:
+        with pytest.raises(RuntimeError) as excinfo:
             class OtherEvents(ops.ObjectEvents):  # type: ignore
                 foo = event
         # Python 3.12+ raises the original exception with a note, but earlier
         # Python chains the exceptions.
-        if hasattr(cm.exception, "__notes__"):
-            cause = str(cm.exception)
+        if hasattr(excinfo.value, "__notes__"):
+            cause = str(excinfo.value)
         else:
-            cause = str(cm.exception.__cause__)
+            cause = str(excinfo.value.__cause__)
         assert cause == \
             "EventSource(MyEvent) reused as MyEvents.foo and OtherEvents.foo"
 
-        with self.assertRaises(RuntimeError) as cm:
+        with pytest.raises(RuntimeError) as excinfo:
             class MyNotifier(ops.Object):  # type: ignore
                 on = MyEvents()  # type: ignore
                 bar = event
-        if hasattr(cm.exception, "__notes__"):
-            cause = str(cm.exception)
+        if hasattr(excinfo.value, "__notes__"):
+            cause = str(excinfo.value)
         else:
-            cause = str(cm.exception.__cause__)
+            cause = str(excinfo.value.__cause__)
         assert cause == \
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar"
 
@@ -654,7 +654,7 @@ class TestFramework(BaseTestCase):
 
         # Register the type and check that the event is gone from storage.
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
-        self.assertRaises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
+        pytest.raises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
 
     def test_auto_register_event_types(self):
         framework = self.create_framework()
@@ -752,19 +752,19 @@ class TestFramework(BaseTestCase):
         assert obs.seen == ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"]
 
         # Definitions remained local to the specific type.
-        self.assertRaises(AttributeError, lambda: pub.on_a.bar)
-        self.assertRaises(AttributeError, lambda: pub.on_b.foo)
+        pytest.raises(AttributeError, lambda: pub.on_a.bar)
+        pytest.raises(AttributeError, lambda: pub.on_b.foo)
 
         # Try to use an event name which is not a valid python identifier.
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             pub.on_a.define_event("dead-beef", DeadBeefEvent)
 
         # Try to use a python keyword for an event name.
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             pub.on_a.define_event("None", NoneEvent)
 
         # Try to override an existing attribute.
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             pub.on_a.define_event("foo", MyFoo)
 
     def test_event_key_roundtrip(self):
@@ -830,9 +830,9 @@ class TestFramework(BaseTestCase):
 
     def test_ban_concurrent_frameworks(self):
         f = self.create_framework(tmpdir=self.tmpdir)
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as excinfo:
             self.create_framework(tmpdir=self.tmpdir)
-        assert 'database is locked' in str(cm.exception)
+        assert 'database is locked' in str(excinfo.value)
         f.close()
 
     def test_snapshot_saving_restricted_to_simple_types(self):
@@ -850,12 +850,12 @@ class TestFramework(BaseTestCase):
 
         framework = self.create_framework()
         framework.register_type(FooEvent, None, handle.kind)
-        with self.assertRaises(ValueError) as cm:
+        with pytest.raises(ValueError) as excinfo:
             framework.save_snapshot(event)
         expected = (
             "unable to save the data for FooEvent, it must contain only simple types: "
             "{'bar': <class 'test.test_framework.TestFramework'>}")
-        assert str(cm.exception) == expected
+        assert str(excinfo.value) == expected
 
     def test_unobserved_events_dont_leave_cruft(self):
         class FooEvent(ops.EventBase):
@@ -872,7 +872,7 @@ class TestFramework(BaseTestCase):
         e = Emitter(framework, 'key')
         e.on.foo.emit()
         ev_1_handle = ops.Handle(e.on, "foo", "1")
-        with self.assertRaises(NoSnapshotError):
+        with pytest.raises(NoSnapshotError):
             framework.load_snapshot(ev_1_handle)
         # Committing will save the framework's state, but no other snapshots should be saved
         framework.commit()
@@ -975,7 +975,7 @@ class TestFramework(BaseTestCase):
 
         framework = self.create_framework()
         charm = BadCharm(framework)
-        with self.assertRaisesRegex(TypeError, "only 'self' and the 'event'"):
+        with pytest.raises(TypeError, match="only 'self' and the 'event'"):
             framework.observe(charm.on.start, charm._on_event)
 
 
@@ -1012,12 +1012,12 @@ class TestStoredState(BaseTestCase):
 
     def test_stored_dict_repr(self):
         assert repr(ops.StoredDict(None, {})) == "ops.framework.StoredDict()"  # type: ignore
-        assert repr(ops.StoredDict(None, {"a": 1})
-                    ) == "ops.framework.StoredDict({'a': 1})"  # type: ignore
+        assert repr(ops.StoredDict(None, {"a": 1})  # type: ignore
+                    ) == "ops.framework.StoredDict({'a': 1})"
 
     def test_stored_list_repr(self):
         assert repr(ops.StoredList(None, [])) == "ops.framework.StoredList()"  # type: ignore
-        assert repr(ops.StoredList(None, [1, 2, 3])
+        assert repr(ops.StoredList(None, [1, 2, 3])   # type: ignore
                     ) == 'ops.framework.StoredList([1, 2, 3])'  # type: ignore
 
     def test_stored_set_repr(self):
@@ -1167,10 +1167,10 @@ class TestStoredState(BaseTestCase):
         framework = self.create_framework()
         obj = Mine(framework, None)
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             obj._stored.foo = 42
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             obj._stored2.foo = 42
 
         framework.close()
@@ -1197,7 +1197,7 @@ class TestStoredState(BaseTestCase):
         # exception, but that's an implementation detail
         a._stored.foo = 42
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             b._stored.foo = "xyzzy"
 
         framework.close()
@@ -1754,9 +1754,9 @@ class BreakpointTests(BaseTestCase):
         msg = 'breakpoint names must look like "foo" or "foo-bar"'
         for name in bad_names:
             with self.subTest(name=name):
-                with self.assertRaises(ValueError) as cm:
+                with pytest.raises(ValueError) as excinfo:
                     framework.breakpoint(name)
-                assert str(cm.exception) == msg
+                assert str(excinfo.value) == msg
 
         reserved_names = [
             'all',
@@ -1765,9 +1765,9 @@ class BreakpointTests(BaseTestCase):
         msg = 'breakpoint names "all" and "hook" are reserved'
         for name in reserved_names:
             with self.subTest(name=name):
-                with self.assertRaises(ValueError) as cm:
+                with pytest.raises(ValueError) as excinfo:
                     framework.breakpoint(name)
-                assert str(cm.exception) == msg
+                assert str(excinfo.value) == msg
 
         not_really_names = [
             123,
@@ -1776,9 +1776,9 @@ class BreakpointTests(BaseTestCase):
         ]
         for name in not_really_names:
             with self.subTest(name=name):
-                with self.assertRaises(TypeError) as cm:
+                with pytest.raises(TypeError) as excinfo:
                     framework.breakpoint(name)  # type: ignore
-                assert str(cm.exception) == 'breakpoint names must be strings'
+                assert str(excinfo.value) == 'breakpoint names must be strings'
 
     def check_trace_set(
             self,

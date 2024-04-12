@@ -81,18 +81,18 @@ class TestModel(unittest.TestCase):
         assert self.model.name is None
 
     def test_unit_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.unit = object()  # type: ignore
 
     def test_app_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.app = object()  # type: ignore
 
     def test_model_name_from_backend(self):
         self.harness.set_model_name('default')
         m = ops.Model(ops.CharmMeta(), self.harness._backend)
         assert m.name == 'default'
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             m.name = "changes-disallowed"  # type: ignore
 
     def test_relations_keys(self):
@@ -117,7 +117,7 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_relations_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.relations = {}  # type: ignore
 
     def test_get_relation(self):
@@ -129,7 +129,7 @@ class TestModel(unittest.TestCase):
         relation_id_db0_b = self.harness.add_relation('db0', 'another')
         self.resetBackendCalls()
 
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             # You have to specify it by just the integer ID
             self.model.get_relation('db1', f'db1:{relation_id_db1}')  # type: ignore
         rel_db1 = self.model.get_relation('db1', relation_id_db1)
@@ -153,7 +153,7 @@ class TestModel(unittest.TestCase):
             ('relation_ids', 'db2'),
         ])
         assert self.model.get_relation('db1') is rel_db1
-        with self.assertRaises(ops.TooManyRelatedAppsError):
+        with pytest.raises(ops.TooManyRelatedAppsError):
             self.model.get_relation('db0')
 
         self.assertBackendCalls([
@@ -192,14 +192,14 @@ class TestModel(unittest.TestCase):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         self.harness.add_relation_unit(relation_id, 'remoteapp1/0')
 
-        with self.assertRaises(ops.RelationDataError):
+        with pytest.raises(ops.RelationDataError):
             with self.harness._event_context('foo_event'):
                 self.harness.update_relation_data(
                     relation_id,
                     'remoteapp1/0',
                     {42: 'remoteapp1-0'})  # type: ignore
 
-        with self.assertRaises(ops.RelationDataError):
+        with pytest.raises(ops.RelationDataError):
             with self.harness._event_context('foo_event'):
                 self.harness.update_relation_data(
                     relation_id,
@@ -232,7 +232,7 @@ class TestModel(unittest.TestCase):
         self.resetBackendCalls()
 
         random_unit = self.model.get_unit('randomunit/0')
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.ensure_relation('db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
                                    self.ensure_relation('db1').units))
@@ -257,7 +257,7 @@ class TestModel(unittest.TestCase):
         rel_db1 = self.ensure_relation('db1')
         # Try to get relation data for an invalid remote application.
         random_app = self.model._cache.get(ops.Application, 'randomapp')
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             rel_db1.data[random_app]
 
         remoteapp1 = rel_db1.app
@@ -291,7 +291,7 @@ class TestModel(unittest.TestCase):
         assert repr(rel_db1.data[remoteapp1_0]) == "{'host': 'remoteapp1/0'}"
 
         with self.harness._event_context('foo_event'):
-            with self.assertRaises(ops.RelationDataError):
+            with pytest.raises(ops.RelationDataError):
                 rel_db1.data[remoteapp1_0]['foo'] = 'bar'
         assert 'foo' not in rel_db1.data[remoteapp1_0]
 
@@ -366,7 +366,7 @@ class TestModel(unittest.TestCase):
 
         with self.harness._event_context('foo_event'):
             # if we were inside an event context, we'd get:
-            with self.assertRaises(ops.RelationDataError):
+            with pytest.raises(ops.RelationDataError):
                 rel_db1.data[local_app]['password'] = 'foobar'
 
         self.assertBackendCalls([('relation_ids', 'db1'),
@@ -468,10 +468,10 @@ class TestModel(unittest.TestCase):
         assert 'host' in rel_db1.data[self.model.unit]
 
         with self.harness._event_context('foo_event'):
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 rel_db1.data[self.model.unit]['host'] = 'bar'
             assert rel_db1.data[self.model.unit]['host'] == 'myapp-0'
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 del rel_db1.data[self.model.unit]['host']
             assert 'host' in rel_db1.data[self.model.unit]
 
@@ -500,7 +500,7 @@ class TestModel(unittest.TestCase):
                 (1, 1),
                 (None, None)
         ):
-            with self.assertRaises(ops.RelationDataError):
+            with pytest.raises(ops.RelationDataError):
                 with self.harness.framework._event_context('foo_event'):
                     rel_db1.data[self.model.unit][key] = value  # type: ignore
 
@@ -583,7 +583,7 @@ class TestModel(unittest.TestCase):
         with self.harness._event_context('foo_event'):
             self.resetBackendCalls()
 
-            with self.assertRaises(ops.RelationDataError):
+            with pytest.raises(ops.RelationDataError):
                 # 'local' is there, but still:
                 rel_db1.data[local_app]['local']
 
@@ -624,14 +624,14 @@ class TestModel(unittest.TestCase):
             'bar': 1,
             'qux': True,
         }
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             # Confirm that we cannot modify config values.
             self.model.config['foo'] = 'bar'  # type: ignore
 
         self.assertBackendCalls([('config_get',)])
 
     def test_config_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.config = {}  # type: ignore
 
     def test_is_leader(self):
@@ -643,7 +643,7 @@ class TestModel(unittest.TestCase):
         def check_remote_units():
             # Cannot determine leadership for remote units.
             for u in self.ensure_relation('db1').units:
-                with self.assertRaises(RuntimeError):
+                with pytest.raises(RuntimeError):
                     u.is_leader()
 
         assert self.model.unit.is_leader()
@@ -670,26 +670,26 @@ class TestModel(unittest.TestCase):
         ])
 
     def test_workload_version_invalid(self):
-        with self.assertRaises(TypeError) as cm:
+        with pytest.raises(TypeError) as excinfo:
             self.model.unit.set_workload_version(5)  # type: ignore
-        assert str(cm.exception) == "workload version must be a str, not int: 5"
+        assert str(excinfo.value) == "workload version must be a str, not int: 5"
         self.assertBackendCalls([])
 
     def test_resources(self):
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.harness.model.resources.fetch('foo')
 
         self.harness.add_resource('foo', 'foo contents\n')
         self.harness.add_resource('bar', '')
 
-        with self.assertRaises(NameError):
+        with pytest.raises(NameError):
             self.harness.model.resources.fetch('qux')
 
         assert self.harness.model.resources.fetch('foo').name == 'foo.txt'
         assert self.harness.model.resources.fetch('bar').name == 'bar.txt'
 
     def test_resources_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.resources = object()  # type: ignore
 
     def test_pod_spec(self):
@@ -702,21 +702,21 @@ class TestModel(unittest.TestCase):
 
         # no leader -> no set pod spec
         self.harness.set_leader(False)
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.harness.model.pod.set_spec({'foo': 'bar'})
 
     def test_pod_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.pod = object()  # type: ignore
 
     def test_base_status_instance_raises(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.StatusBase('test')
 
         class NoNameStatus(ops.StatusBase):
             pass
 
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             ops.StatusBase.register_status(NoNameStatus)  # type: ignore
 
     def test_status_repr(self):
@@ -816,18 +816,18 @@ class TestModel(unittest.TestCase):
 
     def test_set_app_status_non_leader_raises(self):
         self.harness.set_leader(False)
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.model.app.status
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.model.app.status = ops.ActiveStatus()
 
     def test_set_unit_status_invalid(self):
-        with self.assertRaises(ops.InvalidStatusError):
+        with pytest.raises(ops.InvalidStatusError):
             self.model.unit.status = 'blocked'  # type: ignore
 
     def test_set_app_status_invalid(self):
-        with self.assertRaises(ops.InvalidStatusError):
+        with pytest.raises(ops.InvalidStatusError):
             self.model.app.status = 'blocked'  # type: ignore
 
     def test_remote_unit_status(self):
@@ -851,7 +851,7 @@ class TestModel(unittest.TestCase):
 
         for target_status in test_statuses:
             with self.subTest(target_status.name):
-                with self.assertRaises(RuntimeError):
+                with pytest.raises(RuntimeError):
                     remote_unit.status = target_status
         self.assertBackendCalls([])
 
@@ -875,7 +875,7 @@ class TestModel(unittest.TestCase):
         )
         for target_status in test_statuses:
             with self.subTest(target_status.name):
-                with self.assertRaises(RuntimeError):
+                with pytest.raises(RuntimeError):
                     remoteapp1.status = target_status
         self.assertBackendCalls([])
 
@@ -939,16 +939,16 @@ class TestModel(unittest.TestCase):
         ]
 
         # Try to add storage not present in charm metadata.
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             model.storages.request('deadbeef')
 
         # Invalid count parameter types.
         for count_v in [None, False, 2.0, 'a', b'beef', object]:
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 model.storages.request('data', count_v)  # type: ignore
 
     def test_storages_immutable(self):
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.model.storages = {}  # type: ignore
 
     def resetBackendCalls(self):  # noqa: N802
@@ -964,10 +964,10 @@ class TestModel(unittest.TestCase):
     def test_run_error(self):
         model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
         fake_script(self, 'status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             _ = model.unit.status.message
-        assert str(cm.exception) == 'ERROR cannot get status\n'
-        assert cm.exception.args[0] == 'ERROR cannot get status\n'
+        assert str(excinfo.value) == 'ERROR cannot get status\n'
+        assert excinfo.value.args[0] == 'ERROR cannot get status\n'
 
     @patch("grp.getgrgid")
     @patch("pwd.getpwuid")
@@ -1399,17 +1399,17 @@ class TestApplication(unittest.TestCase):
 
     def test_planned_units_garbage_values(self):
         # Planned units should be a positive integer, or zero.
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.harness.set_planned_units(-1)
         # Verify that we didn't set our value before raising the error.
         assert self.harness._backend._planned_units is None
         # Verify that we still get the default value back from .planned_units.
         assert self.app.planned_units() == 1
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.harness.set_planned_units("foo")  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.harness.set_planned_units(-3423000102312321090)
 
     def test_planned_units_override(self):
@@ -1459,10 +1459,10 @@ containers:
             assert isinstance(container, ops.Container)
             assert container.name == name
             assert isinstance(container.pebble, pebble.Client)
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             containers['c3']
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             other_unit = self.model.get_unit('other')
             other_unit.containers
 
@@ -1473,10 +1473,10 @@ containers:
             assert isinstance(container, ops.Container)
             assert container.name == name
             assert isinstance(container.pebble, pebble.Client)
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.get_container('c3')
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             other_unit = self.model.get_unit('other')
             other_unit.get_container('foo')
 
@@ -1519,7 +1519,7 @@ containers:
         ]
 
     def test_start_no_arguments(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.container.start()
 
     def test_stop(self):
@@ -1531,7 +1531,7 @@ containers:
         ]
 
     def test_stop_no_arguments(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.container.stop()
 
     def test_restart(self):
@@ -1572,12 +1572,12 @@ containers:
             raise pebble.APIError({}, 500, "", "")
 
         self.pebble.restart_services = restart_services
-        with self.assertRaises(pebble.APIError) as cm:
+        with pytest.raises(pebble.APIError) as excinfo:
             self.container.restart('foo')
-        assert cm.exception.code == 500
+        assert excinfo.value.code == 500
 
     def test_restart_no_arguments(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.container.restart()
 
     def test_type_errors(self):
@@ -1592,10 +1592,10 @@ containers:
         model = ops.Model(meta, backend)
         container = model.unit.containers['c1']
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             container.start(['foo'])  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             container.stop(['foo'])  # type: ignore
 
     def test_add_layer(self):
@@ -1611,7 +1611,7 @@ containers:
         ]
 
         # combine is a keyword-only arg (should be combine=True)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.container.add_layer('x', {}, True)  # type: ignore
 
     def test_get_plan(self):
@@ -1670,16 +1670,16 @@ containers:
 
         # If Pebble returns no services, should be a ops.ModelError
         self.pebble.responses.append([])
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             self.container.get_service('s2')
-        assert str(cm.exception) == "service 's2' not found"
+        assert str(excinfo.value) == "service 's2' not found"
 
         # If Pebble returns more than one service, RuntimeError is raised
         self.pebble.responses.append([
             self._make_service('s1', 'enabled', 'active'),
             self._make_service('s2', 'disabled', 'inactive'),
         ])
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.container.get_service('s1')
 
     def test_get_checks(self):
@@ -1747,9 +1747,9 @@ containers:
 
         # If Pebble returns no checks, should be a ops.ModelError
         self.pebble.responses.append([])
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             self.container.get_check('c2')
-        assert str(cm.exception) == "check 'c2' not found"
+        assert str(excinfo.value) == "check 'c2' not found"
 
         # If Pebble returns more than one check, RuntimeError is raised
         self.pebble.responses.append([
@@ -1767,7 +1767,7 @@ containers:
                 'threshold': 2,
             }),
         ])
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.container.get_check('c1')
 
     def test_pull(self):
@@ -1914,11 +1914,11 @@ containers:
 
     @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
     def test_exec_service_context_not_supported(self):
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.container.exec(['foo'], service_context='srv1')
 
     def test_send_signal(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.container.send_signal('SIGHUP')
 
         self.container.send_signal('SIGHUP', 's1')
@@ -1958,7 +1958,7 @@ containers:
         def raise_error(id: str):
             raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
         self.pebble.get_notice = raise_error
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.container.get_notice('123')
 
     def test_get_notices(self):
@@ -2220,7 +2220,7 @@ class TestModelBindings(unittest.TestCase):
     def test_invalid_keys(self):
         # Basic validation for passing invalid keys.
         for name in (object, 0):
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 self.model.get_binding(name)  # type: ignore
 
     def test_dead_relations(self):
@@ -2429,18 +2429,18 @@ class TestModelBackend(unittest.TestCase):
 
     def test_relation_get_set_is_app_arg(self):
         # No is_app provided.
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.relation_set(1, 'fookey', 'barval')  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.relation_get(1, 'fooentity')  # type: ignore
 
         # Invalid types for is_app.
         for is_app_v in [None, 1, 2.0, 'a', b'beef']:
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)  # type: ignore
 
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 self.backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
 
     def test_is_leader_refresh(self):
@@ -2514,7 +2514,7 @@ class TestModelBackend(unittest.TestCase):
         for i, (do_fake, run, exception, calls) in enumerate(test_cases):
             with self.subTest(i):
                 do_fake()
-                with self.assertRaises(exception):
+                with pytest.raises(exception):
                     run()
                 assert fake_script_calls(self, clear=True) == calls
 
@@ -2534,7 +2534,7 @@ class TestModelBackend(unittest.TestCase):
 
         # before 2.7.0, it just fails (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
-        with self.assertRaisesRegex(RuntimeError, 'not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script_calls(self) == []
 
@@ -2562,7 +2562,7 @@ class TestModelBackend(unittest.TestCase):
 
         # before 2.7.0, it just fails always (no --app support)
         os.environ['JUJU_VERSION'] = '2.6.9'
-        with self.assertRaisesRegex(RuntimeError, 'not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
         assert fake_script_calls(self) == []
 
@@ -2611,7 +2611,7 @@ class TestModelBackend(unittest.TestCase):
         )
 
         for case in test_cases:
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 case()
 
     def test_local_set_invalid_status(self):
@@ -2623,9 +2623,9 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'status-set', 'exit 1')
         fake_script(self, 'is-leader', 'echo true')
 
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             model.unit.status = ops.UnknownStatus()
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             model.unit.status = ops.ErrorStatus()
 
         assert fake_script_calls(self, True) == [
@@ -2633,9 +2633,9 @@ class TestModelBackend(unittest.TestCase):
             ['status-set', '--application=False', 'error', ''],
         ]
 
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             model.app.status = ops.UnknownStatus()
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             model.app.status = ops.ErrorStatus()
 
         # A leadership check is needed for application status.
@@ -2686,31 +2686,31 @@ class TestModelBackend(unittest.TestCase):
 
     def test_status_set_is_app_not_bool_raises(self):
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 self.backend.status_set(ops.ActiveStatus, is_app=is_app_v)  # type: ignore
 
     def test_storage_tool_errors(self):
         fake_script(self, 'storage-list', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.storage_list('foobar')
         assert fake_script_calls(self, clear=True) == \
             [['storage-list', 'foobar', '--format=json']]
         fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.storage_get('foobar', 'someattr')
         assert fake_script_calls(self, clear=True) == \
             [['storage-get', '-s', 'foobar', 'someattr', '--format=json']]
         fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.storage_add('foobar', count=2)
         assert fake_script_calls(self, clear=True) == \
             [['storage-add', 'foobar=2']]
         fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.storage_add('foobar', count=object),  # type: ignore
         assert fake_script_calls(self, clear=True) == []
         fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.storage_add('foobar', count=True)
         assert fake_script_calls(self, clear=True) == []
 
@@ -2766,14 +2766,14 @@ class TestModelBackend(unittest.TestCase):
         )]
         for do_fake, run, exception, calls in test_cases:
             do_fake()
-            with self.assertRaises(exception):
+            with pytest.raises(exception):
                 run()
             assert fake_script_calls(self, clear=True) == calls
 
     def test_action_get_error(self):
         fake_script(self, 'action-get', '')
         fake_script(self, 'action-get', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.action_get()
         calls = [['action-get', '--format=json']]
         assert fake_script_calls(self, clear=True) == calls
@@ -2781,7 +2781,7 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set_error(self):
         fake_script(self, 'action-get', '')
         fake_script(self, 'action-set', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
         self.assertCountEqual(
             ["action-set", "dead=beef cafe", "foo=bar"], fake_script_calls(self, clear=True)[0])
@@ -2789,7 +2789,7 @@ class TestModelBackend(unittest.TestCase):
     def test_action_log_error(self):
         fake_script(self, 'action-get', '')
         fake_script(self, 'action-log', 'echo fooerror >&2 ; exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.action_log('log-message')
         calls = [["action-log", "log-message"]]
         assert fake_script_calls(self, clear=True) == calls
@@ -2808,13 +2808,13 @@ class TestModelBackend(unittest.TestCase):
         self.assertCountEqual(['action-set', 'x=dead beef', 'y=1'], fake_script_calls(self)[0])
 
     def test_action_set_key_validation(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.backend.action_set({'X': 'dead beef', 'y': 1})
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.backend.action_set({'some&key': 'dead beef', 'y': 1})
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.backend.action_set({'someKey': 'dead beef', 'y': 1})
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.backend.action_set({'some_key': 'dead beef', 'y': 1})
 
     def test_action_set_nested(self):
@@ -2839,9 +2839,9 @@ class TestModelBackend(unittest.TestCase):
     def test_action_set_duplicated_keys(self):
         fake_script(self, 'action-get', 'exit 1')
         fake_script(self, 'action-set', 'exit 0')
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.backend.action_set({'a.b': 1, 'a': {'b': 2}, 'd': 3})
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4, 'a.d.e': 'foo'})
 
     def test_action_fail(self):
@@ -2863,9 +2863,9 @@ class TestModelBackend(unittest.TestCase):
 
     def test_application_version_set_invalid(self):
         fake_script(self, 'application-version-set', 'exit 0')
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.application_version_set(2)  # type: ignore
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.application_version_set()  # type: ignore
         assert fake_script_calls(self) == []
 
@@ -2875,12 +2875,12 @@ class TestModelBackend(unittest.TestCase):
         assert fake_script_calls(self, clear=True) == \
             [['juju-log', '--log-level', 'WARNING', '--', 'foo']]
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.backend.juju_log('DEBUG')  # type: ignore
         assert fake_script_calls(self, clear=True) == []
 
         fake_script(self, 'juju-log', 'exit 1')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.backend.juju_log('BAR', 'foo')
         assert fake_script_calls(self, clear=True) == \
             [['juju-log', '--log-level', 'BAR', '--', 'foo']]
@@ -2917,7 +2917,7 @@ class TestModelBackend(unittest.TestCase):
             ({'BAЯ': 4.2}, {}),
         ]
         for metrics, labels in invalid_inputs:
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
@@ -2929,7 +2929,7 @@ class TestModelBackend(unittest.TestCase):
             ({'foo': '1O'}, {}),  # type: ignore
         ]
         for metrics, labels in invalid_inputs:
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_labels(self):
@@ -2940,7 +2940,7 @@ class TestModelBackend(unittest.TestCase):
             ({'foo': 4.2}, {'BAЯ': 'baz'}),
         ]
         for metrics, labels in invalid_inputs:
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_label_values(self):
@@ -2950,7 +2950,7 @@ class TestModelBackend(unittest.TestCase):
             ({'foo': 4.2}, {'bar': 'b=az'}),
         ]
         for metrics, labels in invalid_inputs:
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 self.backend.add_metrics(metrics, labels)
 
     def test_relation_remote_app_name_env(self):
@@ -3123,8 +3123,7 @@ class TestSecrets(unittest.TestCase):
             ({'foo': 'x'}, {'expire': 7}, TypeError),
         ]
         for content, kwargs, exc_type in errors:
-            msg = f'expected {exc_type.__name__} when adding secret content {content}'
-            with self.assertRaises(exc_type, msg=msg):
+            with pytest.raises(exc_type):
                 self.unit.add_secret(content, **kwargs)  # type: ignore
 
     def test_add_secret_errors(self):
@@ -3144,10 +3143,9 @@ class TestSecrets(unittest.TestCase):
             ({'foo': 'x'}, {'expire': 7}, TypeError),
         ]
         for content, kwargs, exc_type in errors:
-            msg = f'expected {exc_type.__name__} when adding secret content {content}'
-            with self.assertRaises(exc_type, msg=msg):
+            with pytest.raises(exc_type):
                 self.app.add_secret(content, **kwargs)  # type: ignore
-            with self.assertRaises(exc_type, msg=msg):
+            with pytest.raises(exc_type):
                 self.unit.add_secret(content, **kwargs)  # type: ignore
 
     def test_get_secret_id(self):
@@ -3184,23 +3182,23 @@ class TestSecrets(unittest.TestCase):
             [['secret-get', 'secret:123', '--label', 'l', '--format=json']]
 
     def test_get_secret_no_args(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.model.get_secret()
 
     def test_get_secret_not_found(self):
         script = """echo 'ERROR secret "123" not found' >&2; exit 1"""
         fake_script(self, 'secret-get', script)
 
-        with self.assertRaises(ops.SecretNotFoundError):
+        with pytest.raises(ops.SecretNotFoundError):
             self.model.get_secret(id='123')
 
     def test_get_secret_other_error(self):
         script = """echo 'ERROR other error' >&2; exit 1"""
         fake_script(self, 'secret-get', script)
 
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             self.model.get_secret(id='123')
-        self.assertNotIsInstance(cm.exception, ops.SecretNotFoundError)
+        self.assertNotIsInstance(excinfo.value, ops.SecretNotFoundError)
 
     def test_secret_unique_identifier(self):
         fake_script(self, 'secret-get', """echo '{"foo": "g"}'""")
@@ -3420,7 +3418,7 @@ class TestSecretClass(unittest.TestCase):
         secret.set_content({'bar': 'foo'})
         assert secret.id == 'secret:z'
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
         assert fake_script_calls(self, clear=True) == [
@@ -3455,7 +3453,7 @@ class TestSecretClass(unittest.TestCase):
             ['secret-set', 'secret:z', '--label', 'lbl'],
         ]
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             secret.set_info()  # no args provided
 
     def test_grant(self):
@@ -3581,9 +3579,9 @@ class TestPorts(unittest.TestCase):
     def test_open_port_error(self):
         fake_script(self, 'open-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             self.unit.open_port('ftp', 8080)  # type: ignore
-        assert str(cm.exception) == 'ERROR bad protocol\n'
+        assert str(excinfo.value) == 'ERROR bad protocol\n'
 
         assert fake_script_calls(self, clear=True) == [
             ['open-port', '8080/ftp'],
@@ -3605,9 +3603,9 @@ class TestPorts(unittest.TestCase):
     def test_close_port_error(self):
         fake_script(self, 'close-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             self.unit.close_port('ftp', 8080)  # type: ignore
-        assert str(cm.exception) == 'ERROR bad protocol\n'
+        assert str(excinfo.value) == 'ERROR bad protocol\n'
 
         assert fake_script_calls(self, clear=True) == [
             ['close-port', '8080/ftp'],
@@ -3725,15 +3723,15 @@ class TestUnit(unittest.TestCase):
         assert fake_script_calls(self, clear=True) == [
             ['juju-reboot', ''],
         ]
-        with self.assertRaises(SystemExit):
+        with pytest.raises(SystemExit):
             self.unit.reboot(now=True)
         assert fake_script_calls(self, clear=True) == [
             ['juju-reboot', '--now'],
         ]
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.model.get_unit('other').reboot()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.model.get_unit('other').reboot(now=True)
 
 
@@ -3772,7 +3770,7 @@ class TestLazyNotice(unittest.TestCase):
         assert n.last_data == {'key': 'val'}
         assert calls == 1
 
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             assert n.not_exist
 
     def test_repr(self):
@@ -3907,9 +3905,9 @@ class TestGetCloudSpec(unittest.TestCase):
             self,
             'credential-get',
             """echo 'ERROR cannot access cloud credentials' >&2; exit 1""")
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             self.model.get_cloud_spec()
-        assert str(cm.exception) == 'ERROR cannot access cloud credentials\n'
+        assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
 
 
 if __name__ == "__main__":

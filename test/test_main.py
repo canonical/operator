@@ -28,6 +28,8 @@ import warnings
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import ops
 from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
@@ -158,7 +160,7 @@ class CharmInitTestCase(unittest.TestCase):
                 super().__init__(framework, somekey)  # type: ignore
 
         # Support for "key" has been deprecated since ops 0.7 and was removed in 2.0
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self._check(MyCharm)
 
     def test_init_signature_only_framework(self):
@@ -175,23 +177,23 @@ class CharmInitTestCase(unittest.TestCase):
         # here we patch juju_backend_available so it refuses to set it up
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = False
-            with self.assertRaisesRegex(
+            with pytest.raises(
                     RuntimeError,
-                    'charm set use_juju_for_storage=True, but Juju .* does not support it'):
+                    match='charm set use_juju_for_storage=True, but Juju .* does not support it'):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
     def test_storage_with_storage(self):
         # here we patch juju_backend_available, so it gets set up and falls over when used
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
-            with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+            with pytest.raises(FileNotFoundError, match='state-get'):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
     def test_controller_storage_deprecated(self):
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
             with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
-                with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+                with pytest.raises(FileNotFoundError, match='state-get'):
                     self._check(ops.CharmBase, use_juju_for_storage=True)
 
 
@@ -763,7 +765,7 @@ class _TestMain(abc.ABC):
                 fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
 
     def test_excepthook(self):
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(ops.InstallEvent, 'install',
                                            set_in_env={'TRY_EXCEPTHOOK': '1'}))
 
@@ -1035,7 +1037,7 @@ class _TestMainWithDispatch(_TestMain):
         self.fake_script_path = self.hooks_dir
         fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 42')
         event = EventSpec(ops.InstallEvent, 'install')
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(event)
         self.fake_script_path = old_path
 
@@ -1177,7 +1179,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         self.stderr = tempfile.TemporaryFile('w+t')
         self.addCleanup(self.stderr.close)
         fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(
                 ops.ActionEvent, 'keyerror_action',
                 env_var='JUJU_ACTION_NAME',

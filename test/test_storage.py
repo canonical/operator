@@ -26,6 +26,7 @@ import unittest.mock
 from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
 from textwrap import dedent
 
+import pytest
 import yaml
 
 import ops
@@ -136,37 +137,37 @@ class StoragePermutations(abc.ABC):
         store.save_snapshot('foo', {1: 2})
         assert store.load_snapshot('foo') == {1: 2}
         store.drop_snapshot('foo')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
     def test_save_snapshot_empty_string(self):
         store = self.create_storage()
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
         store.save_snapshot('foo', '')
         assert store.load_snapshot('foo') == ''
         store.drop_snapshot('foo')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
     def test_save_snapshot_none(self):
         store = self.create_storage()
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
         store.save_snapshot('bar', None)
         assert None is store.load_snapshot('bar')
         store.drop_snapshot('bar')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
 
     def test_save_snapshot_zero(self):
         store = self.create_storage()
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
         store.save_snapshot('zero', 0)
         assert store.load_snapshot('zero') == 0
         store.drop_snapshot('zero')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
 
     def test_save_notice(self):
@@ -243,7 +244,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             # Create an existing file, but the mock will simulate a race condition saying that it
             # does not exist.
             open(filename, "w").close()
-            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
     @unittest.mock.patch("os.chmod")
     def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
@@ -251,7 +252,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, ".unit-state.db")
             open(filename, "w").close()
-            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
 
 def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
@@ -355,11 +356,11 @@ class TestSimpleLoader(BaseTestCase):
 
     def assertRefused(self, obj: typing.Any):  # noqa: N802
         # We shouldn't allow them to be written
-        with self.assertRaises(yaml.representer.RepresenterError):
+        with pytest.raises(yaml.representer.RepresenterError):
             yaml.dump(obj, Dumper=ops.storage._SimpleDumper)
         # If they did somehow end up written, we shouldn't be able to load them
         raw = yaml.dump(obj, Dumper=yaml.Dumper)
-        with self.assertRaises(yaml.constructor.ConstructorError):
+        with pytest.raises(yaml.constructor.ConstructorError):
             yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
 
     def test_forbids_some_types(self):

@@ -16,6 +16,7 @@ import datetime
 import io
 import unittest
 
+import pytest
 import yaml as base_yaml
 
 from ops._private import timeconv, yaml
@@ -33,7 +34,7 @@ class TestYAML(unittest.TestCase):
         assert d['baz'] == 123
 
         # Should error -- it's not safe to load an instance of a user-defined class
-        with self.assertRaises(base_yaml.YAMLError):
+        with pytest.raises(base_yaml.YAMLError):
             yaml.safe_load('!!python/object:test.test_helpers.YAMLTest {}')
 
     def test_safe_dump(self):
@@ -45,7 +46,7 @@ class TestYAML(unittest.TestCase):
         assert f.getvalue() == 'baz: 123\nfoo: bar\n'
 
         # Should error -- it's not safe to dump an instance of a user-defined class
-        with self.assertRaises(base_yaml.YAMLError):
+        with pytest.raises(base_yaml.YAMLError):
             yaml.safe_dump(YAMLTest())
 
 
@@ -86,19 +87,19 @@ class TestStrconv(unittest.TestCase):
         assert timeconv.parse_rfc3339('2000-01-02T03:04:05.006000+04:00') == \
             datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             timeconv.parse_rfc3339('')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             timeconv.parse_rfc3339('foobar')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             timeconv.parse_rfc3339('2021-99-99T04:36:22Z')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777x')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777-99:99')
 
     def test_parse_duration(self):
@@ -180,5 +181,5 @@ class TestStrconv(unittest.TestCase):
             '3.4.5s',
         ]
         for input in cases:
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 timeconv.parse_duration(input)

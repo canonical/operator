@@ -351,9 +351,9 @@ class TestLib(TestCase):
         assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < \
             ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore  # noqa: B015, SIM300
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < 42  # type: ignore  # noqa: B015
 
         # these two might be surprising in that they don't raise an exception,
@@ -376,19 +376,19 @@ class TestLib(TestCase):
                 assert sorted(libs) == [a, b, c, d, e]
 
     def test_use_bad_args_types(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib.use(1, 2, 'bob@example.com')  # type: ignore
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib.use('foo', '2', 'bob@example.com')  # type: ignore
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib.use('foo', 2, ops.lib.use)  # type: ignore
 
     def test_use_bad_args_values(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ops.lib.use('--help', 2, 'alice@example.com')
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ops.lib.use('foo', -2, 'alice@example.com')
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ops.lib.use('foo', 1, 'example.com')
 
 
@@ -501,7 +501,7 @@ class TestLibFunctional(TestCase):
                         assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_none_found(self):
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             ops.lib.use('foo', 1, 'alice@example.com')
 
     def test_from_scratch(self):
@@ -571,10 +571,10 @@ class TestLibFunctional(TestCase):
         baz = ops.lib.use('baz', 2, 'alice@example.com')
         assert baz.LIBAPI == 2
 
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             ops.lib.use('baz', 1, 'alice@example.com')
 
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             ops.lib.use('baz', 2, 'bob@example.com')
 
 
@@ -585,5 +585,5 @@ class TestDeprecationWarning(TestCase):
 
     def test_use_deprecated(self):
         with self.assertWarns(DeprecationWarning):
-            with self.assertRaises(ImportError):
+            with pytest.raises(ImportError):
                 ops.lib.use('foo', 1, 'bob@example.com')

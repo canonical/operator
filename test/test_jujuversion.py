@@ -15,6 +15,8 @@
 import os
 import unittest.mock  # in this file, importing just 'patch' would be confusing
 
+import pytest
+
 import ops
 
 
@@ -48,7 +50,7 @@ class TestJujuVersion(unittest.TestCase):
         assert v == ops.JujuVersion('0.0.0')
 
         os.environ['JUJU_VERSION'] = 'no'
-        with self.assertRaisesRegex(RuntimeError, 'not a valid Juju version'):
+        with pytest.raises(RuntimeError, match='not a valid Juju version'):
             ops.JujuVersion.from_environ()
 
         os.environ['JUJU_VERSION'] = '2.8.0'
@@ -107,7 +109,7 @@ class TestJujuVersion(unittest.TestCase):
             "1.21-alpha123dev3",  # Non-numeric string after the patch number.
         ]
         for v in invalid_versions:
-            with self.assertRaises(RuntimeError):
+            with pytest.raises(RuntimeError):
                 ops.JujuVersion(v)
 
     def test_equality(self):
