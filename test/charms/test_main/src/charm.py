@@ -59,7 +59,6 @@ class Charm(ops.CharmBase):
             on_collect_metrics=[],
             on_test_pebble_ready=[],
             on_test_pebble_custom_notice=[],
-            on_test_pebble_change_updated=[],
 
             on_log_critical_action=[],
             on_log_error_action=[],
@@ -93,8 +92,6 @@ class Charm(ops.CharmBase):
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
         self.framework.observe(self.on.test_pebble_custom_notice,
                                self._on_test_pebble_custom_notice)
-        self.framework.observe(self.on.test_pebble_change_updated,
-                               self._on_test_pebble_change_updated)
 
         self.framework.observe(self.on.secret_remove, self._on_secret_remove)
         self.framework.observe(self.on.secret_rotate, self._on_secret_rotate)
@@ -199,13 +196,6 @@ class Charm(ops.CharmBase):
         self._stored.on_test_pebble_custom_notice.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.test_pebble_custom_notice_data = event.snapshot()
-
-    def _on_test_pebble_change_updated(self, event: ops.PebbleChangeUpdatedEvent):
-        assert event.workload is not None
-        assert isinstance(event.notice, ops.LazyNotice)
-        self._stored.on_test_pebble_change_updated.append(type(event).__name__)
-        self._stored.observed_event_types.append(type(event).__name__)
-        self._stored.test_pebble_change_updated_data = event.snapshot()
 
     def _on_start_action(self, event: ops.ActionEvent):
         assert event.handle.kind == 'start_action', (
