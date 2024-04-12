@@ -237,7 +237,7 @@ class TestModel(unittest.TestCase):
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
                                    self.ensure_relation('db1').units))
         assert self.ensure_relation('db1').data[remoteapp1_0] == \
-                         {'host': 'remoteapp1-0'}
+            {'host': 'remoteapp1-0'}
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
@@ -264,7 +264,7 @@ class TestModel(unittest.TestCase):
         assert remoteapp1 is not None
         assert remoteapp1.name == 'remoteapp1'
         assert rel_db1.data[remoteapp1] == \
-                         {'secret': 'cafedeadbeef'}
+            {'secret': 'cafedeadbeef'}
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
@@ -305,9 +305,9 @@ class TestModel(unittest.TestCase):
         with self.harness._event_context('foo_event'):
             data_repr = repr(rel_db1.data)
         assert data_repr == \
-            ('{<ops.model.Unit myapp/0>: {}, ' \
-             '<ops.model.Application myapp>: <n/a>, ' \
-             "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}, " \
+            ('{<ops.model.Unit myapp/0>: {}, '
+             '<ops.model.Application myapp>: <n/a>, '
+             "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}, "
              "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}}")
 
     def test_relation_data_modify_our(self):
@@ -408,7 +408,7 @@ class TestModel(unittest.TestCase):
         assert 'host' in rel_db1.data[self.model.unit]
         del rel_db1.data[self.model.unit]['host']
         assert 'host' not in rel_db1.data[self.model.unit]
-        assert {} == self.harness.get_relation_data(relation_id, 'myapp/0')
+        assert self.harness.get_relation_data(relation_id, 'myapp/0') == {}
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
@@ -431,8 +431,8 @@ class TestModel(unittest.TestCase):
             rel_db1.data[self.model.unit]['port'] = ''   # Same as a delete, should not fail.
         assert 'port' not in rel_db1.data[self.model.unit]
         with self.harness._event_context('foo_event'):
-            assert {'host': 'bar'} == \
-                             self.harness.get_relation_data(relation_id, 'myapp/0')
+            assert self.harness.get_relation_data(relation_id, 'myapp/0') == \
+                {'host': 'bar'}
 
         self.assertBackendCalls([
             ('relation_ids', 'db1'),
@@ -1431,7 +1431,7 @@ class TestApplication(unittest.TestCase):
 
         # Verify that we can clear the override.
         self.harness.reset_planned_units()
-        assert self.app.planned_units() == 4# self + 3 peers
+        assert self.app.planned_units() == 4  # self + 3 peers
 
 
 class TestContainers(unittest.TestCase):
@@ -1908,7 +1908,7 @@ containers:
                 stderr=stderr,
                 encoding="encoding",
                 combine_stderr=True,
-            )) \
+            ))
         ]
         assert p == 'fake_exec_process'
 
@@ -2193,9 +2193,9 @@ class TestModelBindings(unittest.TestCase):
         assert binding.network.ingress_address == ipaddress.ip_address('192.0.2.2')
         # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
         assert binding.network.egress_subnets == [ipaddress.ip_network('192.0.2.2/32'),
-                                                          ipaddress.ip_network('192.0.3.0/24'),
-                                                          ipaddress.ip_network('dead:beef::/64'),
-                                                          ipaddress.ip_network('2001:db8::3/128')]
+                                                  ipaddress.ip_network('192.0.3.0/24'),
+                                                  ipaddress.ip_network('dead:beef::/64'),
+                                                  ipaddress.ip_network('2001:db8::3/128')]
 
         for (i, (name, address, subnet)) in enumerate([
                 ('lo', '192.0.2.2', '192.0.2.0/24'),
@@ -2378,7 +2378,7 @@ class TestModelBindings(unittest.TestCase):
         binding_name = 'db0'
         binding = self.ensure_binding(self.ensure_relation(binding_name))
         assert binding.network.ingress_addresses == []
-        assert binding.network.ingress_address == None
+        assert binding.network.ingress_address is None
 
     def test_missing_egress_subnets(self):
         network_data = json.dumps({
@@ -2694,17 +2694,17 @@ class TestModelBackend(unittest.TestCase):
         with self.assertRaises(ops.ModelError):
             self.backend.storage_list('foobar')
         assert fake_script_calls(self, clear=True) == \
-                         [['storage-list', 'foobar', '--format=json']]
+            [['storage-list', 'foobar', '--format=json']]
         fake_script(self, 'storage-get', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.ModelError):
             self.backend.storage_get('foobar', 'someattr')
         assert fake_script_calls(self, clear=True) == \
-                         [['storage-get', '-s', 'foobar', 'someattr', '--format=json']]
+            [['storage-get', '-s', 'foobar', 'someattr', '--format=json']]
         fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(ops.ModelError):
             self.backend.storage_add('foobar', count=2)
         assert fake_script_calls(self, clear=True) == \
-                         [['storage-add', 'foobar=2']]
+            [['storage-add', 'foobar=2']]
         fake_script(self, 'storage-add', 'echo fooerror >&2 ; exit 1')
         with self.assertRaises(TypeError):
             self.backend.storage_add('foobar', count=object),  # type: ignore
@@ -2741,12 +2741,12 @@ class TestModelBackend(unittest.TestCase):
         network_info = self.backend.network_get('deadbeef')
         assert network_info == json.loads(network_get_out)
         assert fake_script_calls(self, clear=True) == \
-                         [['network-get', 'deadbeef', '--format=json']]
+            [['network-get', 'deadbeef', '--format=json']]
 
         network_info = self.backend.network_get('deadbeef', 1)
         assert network_info == json.loads(network_get_out)
         assert fake_script_calls(self, clear=True) == \
-                         [['network-get', 'deadbeef', '-r', '1', '--format=json']]
+            [['network-get', 'deadbeef', '-r', '1', '--format=json']]
 
     def test_network_get_errors(self):
         err_no_endpoint = 'ERROR no network config found for binding "$2"'
@@ -2798,7 +2798,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'action-get', """echo '{"foo-name": "bar", "silent": false}'""")
         params = self.backend.action_get()
         assert params['foo-name'] == 'bar'
-        assert params['silent'] == False
+        assert not params['silent']
         assert fake_script_calls(self) == [['action-get', '--format=json']]
 
     def test_action_set(self):
@@ -2873,7 +2873,7 @@ class TestModelBackend(unittest.TestCase):
         fake_script(self, 'juju-log', 'exit 0')
         self.backend.juju_log('WARNING', 'foo')
         assert fake_script_calls(self, clear=True) == \
-                         [['juju-log', '--log-level', 'WARNING', '--', 'foo']]
+            [['juju-log', '--log-level', 'WARNING', '--', 'foo']]
 
         with self.assertRaises(TypeError):
             self.backend.juju_log('DEBUG')  # type: ignore
@@ -2883,7 +2883,7 @@ class TestModelBackend(unittest.TestCase):
         with self.assertRaises(ops.ModelError):
             self.backend.juju_log('BAR', 'foo')
         assert fake_script_calls(self, clear=True) == \
-                         [['juju-log', '--log-level', 'BAR', '--', 'foo']]
+            [['juju-log', '--log-level', 'BAR', '--', 'foo']]
 
     def test_valid_metrics(self):
         fake_script(self, 'add-metric', 'exit 0')
@@ -3073,7 +3073,7 @@ class TestSecrets(unittest.TestCase):
         assert secret.label is None
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-add', '--owner', 'application', 'foo=x']]
+            [['secret-add', '--owner', 'application', 'foo=x']]
 
     def test_app_add_secret_args(self):
         fake_script(self, 'secret-add', 'echo secret:234')
@@ -3086,9 +3086,9 @@ class TestSecrets(unittest.TestCase):
         assert secret.get_content() == {'foo': 'x', 'bar': 'y'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-add', '--label', 'lbl', '--description', 'desc',
-                           '--expire', '2022-12-09T16:17:00', '--rotate', 'hourly',
-                           '--owner', 'application', 'foo=x', 'bar=y']]
+            [['secret-add', '--label', 'lbl', '--description', 'desc',
+              '--expire', '2022-12-09T16:17:00', '--rotate', 'hourly',
+              '--owner', 'application', 'foo=x', 'bar=y']]
 
     def test_unit_add_secret_simple(self):
         fake_script(self, 'secret-add', 'echo secret:345')
@@ -3099,7 +3099,7 @@ class TestSecrets(unittest.TestCase):
         assert secret.label is None
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-add', '--owner', 'unit', 'foo=x']]
+            [['secret-add', '--owner', 'unit', 'foo=x']]
 
     def test_unit_add_secret_args(self):
         fake_script(self, 'secret-add', 'echo secret:456')
@@ -3112,9 +3112,9 @@ class TestSecrets(unittest.TestCase):
         assert secret.get_content() == {'foo': 'w', 'bar': 'z'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-add', '--label', 'l2', '--description', 'xyz',
-                           '--expire', '2022-12-09T16:22:00', '--rotate', 'yearly',
-                           '--owner', 'unit', 'foo=w', 'bar=z']]
+            [['secret-add', '--label', 'l2', '--description', 'xyz',
+              '--expire', '2022-12-09T16:22:00', '--rotate', 'yearly',
+              '--owner', 'unit', 'foo=w', 'bar=z']]
 
     def test_unit_add_secret_errors(self):
         # Additional add_secret tests are done in TestApplication
@@ -3159,7 +3159,7 @@ class TestSecrets(unittest.TestCase):
         assert secret.get_content() == {'foo': 'g'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', 'secret:123', '--format=json']]
+            [['secret-get', 'secret:123', '--format=json']]
 
     def test_get_secret_label(self):
         fake_script(self, 'secret-get', """echo '{"foo": "g"}'""")
@@ -3170,7 +3170,7 @@ class TestSecrets(unittest.TestCase):
         assert secret.get_content() == {'foo': 'g'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', '--label', 'lbl', '--format=json']]
+            [['secret-get', '--label', 'lbl', '--format=json']]
 
     def test_get_secret_id_and_label(self):
         fake_script(self, 'secret-get', """echo '{"foo": "h"}'""")
@@ -3181,7 +3181,7 @@ class TestSecrets(unittest.TestCase):
         assert secret.get_content() == {'foo': 'h'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', 'secret:123', '--label', 'l', '--format=json']]
+            [['secret-get', 'secret:123', '--label', 'l', '--format=json']]
 
     def test_get_secret_no_args(self):
         with self.assertRaises(TypeError):
@@ -3324,7 +3324,7 @@ class TestSecretClass(unittest.TestCase):
         assert content == {'foo': 'refreshed'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', 'secret:y', '--refresh', '--format=json']]
+            [['secret-get', 'secret:y', '--refresh', '--format=json']]
 
     def test_get_content_uncached(self):
         fake_script(self, 'secret-get', """echo '{"foo": "notcached"}'""")
@@ -3334,7 +3334,7 @@ class TestSecretClass(unittest.TestCase):
         assert content == {'foo': 'notcached'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', 'secret:z', '--format=json']]
+            [['secret-get', 'secret:z', '--format=json']]
 
     def test_get_content_copies_dict(self):
         fake_script(self, 'secret-get', """echo '{"foo": "bar"}'""")
@@ -3346,7 +3346,7 @@ class TestSecretClass(unittest.TestCase):
         assert secret.get_content() == {'foo': 'bar'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', 'secret:z', '--format=json']]
+            [['secret-get', 'secret:z', '--format=json']]
 
     def test_set_content_invalidates_cache(self):
         fake_script(self, 'secret-get', """echo '{"foo": "bar"}'""")
@@ -3374,7 +3374,7 @@ class TestSecretClass(unittest.TestCase):
         assert content == {'foo': 'peeked'}
 
         assert fake_script_calls(self, clear=True) == \
-                         [['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']]
+            [['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']]
 
     def test_get_info(self):
         fake_script(self, 'secret-info-get', """echo '{"x": {"label": "y", "revision": 7}}'""")
@@ -3405,7 +3405,7 @@ class TestSecretClass(unittest.TestCase):
                 ['secret-info-get', 'secret:x', '--format=json'],
                 ['secret-info-get', '--label', 'y', '--format=json'],
                 ['secret-info-get', 'secret:x', '--format=json'],
-            ]
+        ]
 
     def test_set_content(self):
         fake_script(self, 'secret-set', """exit 0""")
@@ -3822,14 +3822,14 @@ class TestCloudSpec(unittest.TestCase):
         )
         assert cloud_spec.type == 'lxd'
         assert cloud_spec.name == 'localhost'
-        assert cloud_spec.region == None
-        assert cloud_spec.endpoint == None
-        assert cloud_spec.identity_endpoint == None
-        assert cloud_spec.storage_endpoint == None
+        assert cloud_spec.region is None
+        assert cloud_spec.endpoint is None
+        assert cloud_spec.identity_endpoint is None
+        assert cloud_spec.storage_endpoint is None
         assert cloud_spec.credential is None
         assert cloud_spec.ca_certificates == []
-        assert cloud_spec.skip_tls_verify == False
-        assert cloud_spec.is_controller_cloud == False
+        assert not cloud_spec.skip_tls_verify
+        assert not cloud_spec.is_controller_cloud
 
     def test_from_dict_full(self):
         cred = {
@@ -3862,8 +3862,8 @@ class TestCloudSpec(unittest.TestCase):
         assert cloud_spec.identity_endpoint == d['identity-endpoint']
         assert cloud_spec.storage_endpoint == d['storage-endpoint']
         assert cloud_spec.ca_certificates == d['cacertificates']
-        assert cloud_spec.skip_tls_verify == False
-        assert cloud_spec.is_controller_cloud == True
+        assert not cloud_spec.skip_tls_verify
+        assert cloud_spec.is_controller_cloud
 
     def test_from_dict_no_credential(self):
         d = {
@@ -3886,8 +3886,8 @@ class TestCloudSpec(unittest.TestCase):
         assert cloud_spec.identity_endpoint == d['identity-endpoint']
         assert cloud_spec.storage_endpoint == d['storage-endpoint']
         assert cloud_spec.ca_certificates == d['cacertificates']
-        assert cloud_spec.skip_tls_verify == False
-        assert cloud_spec.is_controller_cloud == True
+        assert not cloud_spec.skip_tls_verify
+        assert cloud_spec.is_controller_cloud
 
 
 class TestGetCloudSpec(unittest.TestCase):
@@ -3900,7 +3900,7 @@ class TestGetCloudSpec(unittest.TestCase):
         assert cloud_spec.type == 'lxd'
         assert cloud_spec.name == 'localhost'
         assert fake_script_calls(self, clear=True) == \
-                         [['credential-get', '--format=json']]
+            [['credential-get', '--format=json']]
 
     def test_error(self):
         fake_script(

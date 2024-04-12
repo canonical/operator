@@ -78,7 +78,7 @@ class StoragePermutations(abc.ABC):
         del s
         gc.collect()
         res = f.load_snapshot(handle)
-        assert data == res.content# type: ignore
+        assert data == res.content  # type: ignore
 
     def test_emit_event(self):
         f = self.create_framework()
@@ -118,23 +118,23 @@ class StoragePermutations(abc.ABC):
         s = Sample(f, 'key')
         f.register_type(Sample, None, Sample.handle_kind)
         s.on.event.emit('foo')
-        assert 'foo' == s.observed_content
+        assert s.observed_content == 'foo'
         s.on.event.emit(1)
-        assert 1 == s.observed_content
+        assert s.observed_content == 1
         s.on.event.emit(None)
         assert None is s.observed_content
 
     def test_save_and_overwrite_snapshot(self):
         store = self.create_storage()
         store.save_snapshot('foo', {1: 2})
-        assert {1: 2} == store.load_snapshot('foo')
+        assert store.load_snapshot('foo') == {1: 2}
         store.save_snapshot('foo', {'three': 4})
-        assert {'three': 4} == store.load_snapshot('foo')
+        assert store.load_snapshot('foo') == {'three': 4}
 
     def test_drop_snapshot(self):
         store = self.create_storage()
         store.save_snapshot('foo', {1: 2})
-        assert {1: 2} == store.load_snapshot('foo')
+        assert store.load_snapshot('foo') == {1: 2}
         store.drop_snapshot('foo')
         with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
@@ -144,7 +144,7 @@ class StoragePermutations(abc.ABC):
         with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
         store.save_snapshot('foo', '')
-        assert '' == store.load_snapshot('foo')
+        assert store.load_snapshot('foo') == ''
         store.drop_snapshot('foo')
         with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
@@ -164,7 +164,7 @@ class StoragePermutations(abc.ABC):
         with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
         store.save_snapshot('zero', 0)
-        assert 0 == store.load_snapshot('zero')
+        assert store.load_snapshot('zero') == 0
         store.drop_snapshot('zero')
         with self.assertRaises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')

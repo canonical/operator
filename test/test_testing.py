@@ -227,7 +227,7 @@ class TestHarness(unittest.TestCase):
         assert isinstance(rel_id, int)
         backend = harness._backend
         assert [rel_id] == backend.relation_ids('db')
-        assert {'app': 'data'} == backend.relation_get(rel_id, remote_app, is_app=True)
+        assert backend.relation_get(rel_id, remote_app, is_app=True) == {'app': 'data'}
 
     def test_add_relation_with_our_initial_data(self):
 
@@ -254,21 +254,21 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v1'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
         backend = harness._backend
-        assert {'k': 'v1'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v1'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
 
         harness.begin()
-        assert {'k': 'v1'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v1'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
         # Make sure no relation-changed events are emitted for our own data bags.
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
         # A remote unit can still update our app relation data bag since our unit is not a leader.
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
         # And we get an event
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
         # We can also update our own relation data, even if it is a bit 'cheaty'
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
         # But no event happens
@@ -277,7 +277,7 @@ class TestHarness(unittest.TestCase):
         harness.set_leader(True)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
     def test_add_peer_relation_with_initial_data_leader(self):
 
@@ -308,27 +308,27 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
         backend = harness._backend
-        assert {'k': 'v'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
 
         harness.begin()
-        assert {'k': 'v'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
         # Make sure no relation-changed events are emitted for our own data bags.
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
         # Updating our app relation data bag and our unit data bag does not trigger events
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
         # If our unit becomes a minion, updating app relation data indirectly becomes possible
         # and our charm gets notifications.
         harness.set_leader(False)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
-        assert {'k': 'v3'} == backend.relation_get(rel_id, 'test-app', is_app=True)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v3'}
         assert len(harness.charm.observed_events), 1
         assert isinstance(harness.charm.observed_events[0], ops.RelationEvent)
 
@@ -359,18 +359,18 @@ class TestHarness(unittest.TestCase):
         # Check relation broken event is raised with correct data
         changes = harness.charm.get_changes()
         assert changes[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/0',
-                                   'departing_unit': 'postgresql/0',
-                                   'relation_id': 0}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/0',
+                      'departing_unit': 'postgresql/0',
+                      'relation_id': 0}}
         assert changes[1] == \
-                         {'name': 'relation-broken',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': None,
-                                   'relation_id': rel_id}}
+            {'name': 'relation-broken',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': None,
+                      'relation_id': rel_id}}
 
     def test_remove_specific_relation_id(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -413,18 +413,18 @@ class TestHarness(unittest.TestCase):
         # Check relation broken event is raised with correct data
         changes = harness.charm.get_changes()
         assert changes[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/1',
-                                   'departing_unit': 'postgresql/1',
-                                   'relation_id': rel_id_2}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/1',
+                      'departing_unit': 'postgresql/1',
+                      'relation_id': rel_id_2}}
         assert changes[1] == \
-                         {'name': 'relation-broken',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': None,
-                                   'relation_id': rel_id_2}}
+            {'name': 'relation-broken',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': None,
+                      'relation_id': rel_id_2}}
 
     def test_removing_invalid_relation_id_raises_exception(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -487,19 +487,19 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db')
         assert rel is not None
         assert len(rel.units) == 0
-        assert not rel_unit in rel.data
+        assert rel_unit not in rel.data
         # Check relation departed was raised with correct data
-        assert {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/0',
-                                   'departing_unit': 'postgresql/0',
-                                   'relation_id': 0,
-                                   'relation_data': {'test-app/0': {},
-                                                     'test-app': {},
-                                                     'postgresql/0': {'foo': 'bar'},
-                                                     'postgresql': {}}}} == \
-                         harness.charm.get_changes()[0]
+        assert harness.charm.get_changes()[0] == \
+            {'name': 'relation-departed',
+                'relation': 'db',
+                'data': {'app': 'postgresql',
+                         'unit': 'postgresql/0',
+                         'departing_unit': 'postgresql/0',
+                         'relation_id': 0,
+                         'relation_data': {'test-app/0': {},
+                                           'test-app': {},
+                                           'postgresql/0': {'foo': 'bar'},
+                                           'postgresql': {}}}}
 
     def test_removing_relation_removes_remote_app_data(self):
         # language=YAML
@@ -520,7 +520,7 @@ class TestHarness(unittest.TestCase):
         # Check relation app data exists
         backend = harness._backend
         assert backend.relation_ids('db') == [rel_id]
-        assert {'app': 'data'} == backend.relation_get(rel_id, remote_app, is_app=True)
+        assert backend.relation_get(rel_id, remote_app, is_app=True) == {'app': 'data'}
         harness.remove_relation(rel_id)
         # Check relation and app data are removed
         assert backend.relation_ids('db') == []
@@ -549,7 +549,7 @@ class TestHarness(unittest.TestCase):
         # Check relation app data exists
         backend = harness._backend
         assert backend.relation_ids('db') == [rel_id]
-        assert {'app': 'data'} == backend.relation_get(rel_id, remote_app, is_app=True)
+        assert backend.relation_get(rel_id, remote_app, is_app=True) == {'app': 'data'}
         harness.remove_relation(rel_id)
         assert self._find_relation_in_model_by_id(harness, rel_id) is None
 
@@ -624,12 +624,12 @@ class TestHarness(unittest.TestCase):
                           is_app=False)
         # Check relation departed was raised with correct data
         assert harness.charm.get_changes()[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/0',
-                                   'departing_unit': 'postgresql/0',
-                                   'relation_id': rel_id}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/0',
+                      'departing_unit': 'postgresql/0',
+                      'relation_id': rel_id}}
 
     def test_removing_relation_unit_does_not_remove_other_unit_and_data(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -652,7 +652,7 @@ class TestHarness(unittest.TestCase):
         backend = harness._backend
         assert backend.relation_ids('db') == [rel_id]
         assert backend.relation_list(rel_id) == \
-                         ['postgresql/0', 'postgresql/1']
+            ['postgresql/0', 'postgresql/1']
         assert backend.relation_get(rel_id, 'postgresql/0', is_app=False) == \
             {'foo0': 'bar0'}
         assert backend.relation_get(rel_id, 'postgresql/1', is_app=False) == \
@@ -662,17 +662,17 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation_unit(rel_id, 'postgresql/1')
         # Check other unit and data still exists
         assert backend.relation_list(rel_id) == \
-                         ['postgresql/0']
+            ['postgresql/0']
         assert backend.relation_get(rel_id, 'postgresql/0', is_app=False) == \
             {'foo0': 'bar0'}
         # Check relation departed was raised with correct data
         assert harness.charm.get_changes()[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/1',
-                                   'departing_unit': 'postgresql/1',
-                                   'relation_id': rel_id}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/1',
+                      'departing_unit': 'postgresql/1',
+                      'relation_id': rel_id}}
 
     def test_relation_events(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -735,7 +735,7 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
         assert harness.get_relation_data(rel_id, 'test-app') == {}
         assert harness.get_relation_data(rel_id, 'test-app/0') == {}
-        assert harness.get_relation_data(rel_id, 'test-app/1') == None
+        assert harness.get_relation_data(rel_id, 'test-app/1') is None
         assert harness.get_relation_data(rel_id, 'postgresql') == {'remote': 'data'}
         with self.assertRaises(KeyError):
             # unknown relation id
@@ -748,7 +748,7 @@ class TestHarness(unittest.TestCase):
         t_unit1 = ops.Unit('test-app/1', meta, harness._backend, t_cache)
         assert harness.get_relation_data(rel_id, t_app) == {}
         assert harness.get_relation_data(rel_id, t_unit0) == {}
-        assert harness.get_relation_data(rel_id, t_unit1) == None
+        assert harness.get_relation_data(rel_id, t_unit1) is None
         pg_app = ops.Application('postgresql', meta, harness._backend, t_cache)
         assert harness.get_relation_data(rel_id, pg_app) == {'remote': 'data'}
 
@@ -802,7 +802,7 @@ class TestHarness(unittest.TestCase):
         assert viewer.changes == [{'initial': 'data'}]
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'value'})
         assert viewer.changes == [{'initial': 'data'},
-                                          {'initial': 'data', 'new': 'value'}]
+                                  {'initial': 'data', 'new': 'value'}]
 
     def test_update_relation_no_local_unit_change_event(self):
         # language=YAML
@@ -822,13 +822,13 @@ class TestHarness(unittest.TestCase):
         # there should be no event for updating our own data
         harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
         # but the data will be updated.
-        assert {'key': 'value', 'new': 'other'} == rel.data[harness.charm.model.unit]
+        assert rel.data[harness.charm.model.unit] == {'key': 'value', 'new': 'other'}
 
         rel.data[harness.charm.model.unit]['new'] = 'value'
         # Our unit data bag got updated.
         assert rel.data[harness.charm.model.unit]['new'] == 'value'
         # But there were no changed events registered by our unit.
-        assert [] == helper.changes
+        assert helper.changes == []
 
     def test_update_peer_relation_no_local_unit_change_event(self):
         # language=YAML
@@ -849,25 +849,25 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db')
         assert rel is not None
         harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v1'})
-        assert {'key': 'v1'} == rel.data[harness.charm.model.unit]
+        assert rel.data[harness.charm.model.unit] == {'key': 'v1'}
         # Make sure there was no event
-        assert [] == helper.changes
+        assert helper.changes == []
 
         rel.data[harness.charm.model.unit]['key'] = 'v2'
         # Our unit data bag got updated.
-        assert {'key': 'v2'} == dict(rel.data[harness.charm.model.unit])
+        assert dict(rel.data[harness.charm.model.unit]) == {'key': 'v2'}
         # But there were no changed events registered by our unit.
-        assert [] == helper.changes
+        assert helper.changes == []
 
         # Same for when our unit is a leader.
         harness.set_leader(is_leader=True)
         harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v3'})
-        assert {'key': 'v3'} == dict(rel.data[harness.charm.model.unit])
-        assert [] == helper.changes
+        assert dict(rel.data[harness.charm.model.unit]) == {'key': 'v3'}
+        assert helper.changes == []
 
         rel.data[harness.charm.model.unit]['key'] = 'v4'
         assert rel.data[harness.charm.model.unit]['key'] == 'v4'
-        assert [] == helper.changes
+        assert helper.changes == []
 
     def test_update_peer_relation_app_data(self):
         # language=YAML
@@ -886,14 +886,14 @@ class TestHarness(unittest.TestCase):
         assert rel is not None
         rel.data[harness.charm.app]['key'] = 'value'
         harness.update_relation_data(rel_id, 'postgresql', {'key': 'v1'})
-        assert {'key': 'v1'} == rel.data[harness.charm.app]
-        assert [] == helper.changes
+        assert rel.data[harness.charm.app] == {'key': 'v1'}
+        assert helper.changes == []
 
         rel.data[harness.charm.app]['key'] = 'v2'
         # Our unit data bag got updated.
         assert rel.data[harness.charm.model.app]['key'] == 'v2'
         # But there were no changed events registered by our unit.
-        assert [] == helper.changes
+        assert helper.changes == []
 
         # If our unit is not a leader unit we get an update about peer app relation data changes.
         harness.set_leader(is_leader=False)
@@ -1095,7 +1095,7 @@ class TestHarness(unittest.TestCase):
         secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         assert harness.charm.changes == \
-                         [{'name': 'config-changed', 'data': {'a': secret_id}}]
+            [{'name': 'config-changed', 'data': {'a': secret_id}}]
 
     def test_no_config_option_type(self):
         with self.assertRaises(RuntimeError):
@@ -1353,7 +1353,7 @@ class TestHarness(unittest.TestCase):
         assert isinstance(harness.model.config['opt_int'], int)
         assert harness.model.config['opt_float'] == 1.0
         assert isinstance(harness.model.config['opt_float'], float)
-        assert not 'opt_null' in harness.model.config
+        assert 'opt_null' not in harness.model.config
         assert harness._backend._config._defaults['opt_null'] is None
         assert harness._backend._config._defaults['opt_no_default'] is None
 
@@ -1391,7 +1391,7 @@ class TestHarness(unittest.TestCase):
         ''')
         self.addCleanup(harness.cleanup)
         harness.set_model_name('foo')
-        assert 'foo' == harness.model.name
+        assert harness.model.name == 'foo'
 
     def test_set_model_name_after_begin(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -1608,7 +1608,7 @@ class TestHarness(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             harness.detach_storage(f"test/{stor_id}")
         assert cm.exception.args[0] == \
-                         "cannot detach storage before Harness is initialised"
+            "cannot detach storage before Harness is initialised"
 
     def test_storage_with_hyphens_works(self):
         harness = ops.testing.Harness(StorageTester, meta='''
@@ -1922,8 +1922,8 @@ class TestHarness(unittest.TestCase):
         harness.add_relation_unit(rel_id, 'remote/0')
         rel = harness.charm.model.get_relation('db', rel_id)
         assert rel is not None
-        assert {'foo': 'bar'} == \
-                         harness.get_relation_data(rel_id, 'test-charm')
+        assert harness.get_relation_data(rel_id, 'test-charm') == \
+            {'foo': 'bar'}
 
         # now we're outside of the hook context:
         assert not harness._backend._hook_is_running
@@ -1945,7 +1945,7 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db', rel_id)
         assert rel is not None
         del rel.data[harness.charm.model.unit]['foo']
-        assert {} == harness.get_relation_data(rel_id, 'test-charm/0')
+        assert harness.get_relation_data(rel_id, 'test-charm/0') == {}
 
     def test_relation_set_nonstring(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -1987,40 +1987,40 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
 
         assert [
-                ('relation_ids', 'db'),
-                ('relation_list', rel_id),
-                ('relation_remote_app_name', 0),
-            ] == \
+            ('relation_ids', 'db'),
+            ('relation_list', rel_id),
+            ('relation_remote_app_name', 0),
+        ] == \
             harness._get_backend_calls()
 
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert [
-                ('relation_get', 0, 'test-charm/0', False),
-                ('update_relation_data', 0, test_charm_unit, 'foo', 'bar') \
-            ] == \
+            ('relation_get', 0, 'test-charm/0', False),
+            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar')
+        ] == \
             harness._get_backend_calls(reset=True)
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
         harness.add_relation_unit(rel_id, 'postgresql/0')
-        assert [] == harness._get_backend_calls(reset=False)
+        assert harness._get_backend_calls(reset=False) == []
         # however, update_relation_data does, because we are preparing relation-changed
         harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
         pgql_unit = harness.model.get_unit('postgresql/0')
 
         assert harness._get_backend_calls(reset=False) == [
-                ('relation_ids', 'db'),
-                ('relation_list', rel_id),
-                ('relation_get', 0, 'postgresql/0', False),
-                ('update_relation_data', 0, pgql_unit, 'foo', 'bar') \
-            ]
+            ('relation_ids', 'db'),
+            ('relation_list', rel_id),
+            ('relation_get', 0, 'postgresql/0', False),
+            ('update_relation_data', 0, pgql_unit, 'foo', 'bar')
+        ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
-                ('relation_ids', 'db'),
-                ('relation_list', rel_id),
-                ('relation_get', 0, 'postgresql/0', False),
-                ('update_relation_data', 0, pgql_unit, 'foo', 'bar') \
-            ]
+            ('relation_ids', 'db'),
+            ('relation_list', rel_id),
+            ('relation_get', 0, 'postgresql/0', False),
+            ('update_relation_data', 0, pgql_unit, 'foo', 'bar')
+        ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
 
@@ -2037,14 +2037,14 @@ class TestHarness(unittest.TestCase):
         # Reset the list, because we don't care what it took to get here
         harness._get_backend_calls(reset=True)
         unit.status = ops.ActiveStatus()
-        assert [('status_set', 'active', '', {'is_app': False})] == harness._get_backend_calls()
+        assert harness._get_backend_calls() == [('status_set', 'active', '', {'is_app': False})]
         harness.set_leader(True)
         app = harness.charm.model.app
         harness._get_backend_calls(reset=True)
         app.status = ops.ActiveStatus('message')
-        assert [('is_leader',),
-             ('status_set', 'active', 'message', {'is_app': True})] == \
-            harness._get_backend_calls()
+        assert harness._get_backend_calls() == \
+            [('is_leader',),
+                ('status_set', 'active', 'message', {'is_app': True})]
 
     def test_unit_status(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
@@ -2214,7 +2214,7 @@ class TestHarness(unittest.TestCase):
         assert path.name == 'foo.txt'
         assert path.parent.name == 'image'
         with path.open('rt') as f:
-            assert 'foo contents\n' == f.read()
+            assert f.read() == 'foo contents\n'
 
     def test_add_resource_bytes(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -2464,7 +2464,8 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
         harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
         harness.begin_with_initial_hooks()
-        assert [
+        assert harness.charm.changes == \
+            [
                 {'name': 'install'},
                 {'name': 'relation-created',
                  'relation': 'db',
@@ -2497,8 +2498,7 @@ class TestHarness(unittest.TestCase):
                      'unit': 'postgresql/0',
                      'app': 'postgresql',
                  }},
-            ] == \
-            harness.charm.changes
+            ]
 
     def test_begin_with_initial_hooks_with_multiple_units(self):
         class CharmWithDB(RelationEventCharm):
@@ -2908,10 +2908,10 @@ class TestNetwork(unittest.TestCase):
         assert network.bind_address == ipaddress.IPv4Address('10.0.0.10')
         assert network.ingress_address == ipaddress.IPv4Address('10.0.0.1')
         assert network.ingress_addresses == \
-                         [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')]
+            [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')]
         assert network.egress_subnets == \
-                         [ipaddress.IPv4Network('10.0.0.0/8'),
-                          ipaddress.IPv4Network('10.10.0.0/16')]
+            [ipaddress.IPv4Network('10.0.0.0/8'),
+             ipaddress.IPv4Network('10.10.0.0/16')]
         assert len(network.interfaces) == 1
         interface = network.interfaces[0]
         assert interface.name == 'eth1'
@@ -2932,7 +2932,7 @@ class TestNetwork(unittest.TestCase):
         foo_binding = self.harness.model.get_binding('foo')
         assert foo_binding is not None
         assert foo_binding.network.bind_address == \
-                         ipaddress.IPv4Address('10.0.0.1')
+            ipaddress.IPv4Address('10.0.0.1')
 
     def test_add_network_specific_relation(self):
         self.harness.add_network('10.0.0.1')
@@ -2952,7 +2952,7 @@ class TestNetwork(unittest.TestCase):
         foo_binding = self.harness.model.get_binding('foo')
         assert foo_binding is not None
         assert foo_binding.network.bind_address == \
-                         ipaddress.IPv4Address('10.0.0.1')
+            ipaddress.IPv4Address('10.0.0.1')
 
     def test_add_network_endpoint_fallback(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
@@ -3426,7 +3426,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         client = self.get_testing_client()
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
-        assert '{}\n' == plan.to_yaml()
+        assert plan.to_yaml() == '{}\n'
         client.add_layer('foo', pebble.Layer('''\
             summary: Foo
             description: |
@@ -3462,7 +3462,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         client = self.get_testing_client()
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
-        assert '{}\n' == plan.to_yaml()
+        assert plan.to_yaml() == '{}\n'
         client.add_layer('foo', pebble.Layer('''\
             summary: Foo
             description: |
@@ -3609,7 +3609,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         client = self.get_testing_client()
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
-        assert '{}\n' == plan.to_yaml()
+        assert plan.to_yaml() == '{}\n'
         service = textwrap.dedent('''\
             summary: Foo
             description: |
@@ -3790,7 +3790,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
     def test_get_services_none(self):
         client = self.get_testing_client()
         service_info = client.get_services()
-        assert [] == service_info
+        assert service_info == []
 
     def test_get_services_not_started(self):
         client = self.get_testing_client()
@@ -3808,15 +3808,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
         assert not bar_info.is_running()
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
         assert not foo_info.is_running()
 
     def test_get_services_autostart(self):
@@ -3836,15 +3836,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
         assert not bar_info.is_running()
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.ACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.ACTIVE
         assert foo_info.is_running()
 
     def test_get_services_start_stop(self):
@@ -3864,21 +3864,21 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Even though bar defaults to DISABLED, we explicitly started it
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.ACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.ACTIVE
         # foo would be started by autostart, but we only called start_services
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
         client.stop_services(['bar'])
         infos = client.get_services()
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.name == 'bar'
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
 
     def test_get_services_bad_request(self):
         client = self.get_testing_client()
@@ -3914,9 +3914,9 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services(['foo'])
         assert len(infos) == 1
         foo_info = infos[0]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
 
     def test_get_services_unknown(self):
         client = self.get_testing_client()
@@ -3974,9 +3974,9 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 1
         foo_info = infos[0]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
 
     def test_stop_services_unknown(self):
         client = self.get_testing_client()
@@ -3996,9 +3996,9 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 1
         foo_info = infos[0]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.ACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.ACTIVE
 
     def test_start_started_service(self):
         # Pebble maintains idempotency even if you start a service
@@ -4022,14 +4022,14 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.ACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.ACTIVE
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.ACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.ACTIVE
 
     def test_stop_stopped_service(self):
         # Pebble maintains idempotency even if you stop a service
@@ -4053,14 +4053,14 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
 
     @ unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
@@ -4237,7 +4237,7 @@ class PebbleStorageAPIsTestMixin:
 
         files = client.list_files(f"{self.prefix}/")
         assert {file.path for file in files} == \
-                         {self.prefix + file for file in ('/file1', '/file2', '/file3')}
+            {self.prefix + file for file in ('/file1', '/file2', '/file3')}
 
         # Let's pull the first file again and check its details
         file = [f for f in files if f.path == f"{self.prefix}/file1"][0]
@@ -4281,7 +4281,7 @@ class PebbleStorageAPIsTestMixin:
         assert cm.exception.code == 404
         assert cm.exception.status == 'Not Found'
         assert cm.exception.message == 'stat /not/existing/file/: no ' \
-                                               'such file or directory'
+            'such file or directory'
 
     def test_list_directory_object_itself(self):
         client = self.client
@@ -4317,7 +4317,7 @@ class PebbleStorageAPIsTestMixin:
             client.push(self.prefix + filename, data)
         files = client.list_files(f"{self.prefix}/", pattern='file*.gz')
         assert {file.path for file in files} == \
-                         {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')}
+            {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')}
 
     def test_make_directory(self):
         client = self.client
@@ -4365,10 +4365,8 @@ class PebbleStorageAPIsTestMixin:
         client.make_dir(f"{self.prefix}/dir2", permissions=0o777)
 
         files = client.list_files(f"{self.prefix}/", pattern='dir*')
-        assert [f for f in files if f.path == f"{self.prefix}/dir1"] \
-                         [0].permissions == 0o700
-        assert [f for f in files if f.path == f"{self.prefix}/dir2"] \
-                         [0].permissions == 0o777
+        assert [f for f in files if f.path == f"{self.prefix}/dir1"][0].permissions == 0o700
+        assert [f for f in files if f.path == f"{self.prefix}/dir2"][0].permissions == 0o777
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -4475,7 +4473,7 @@ class TestPebbleStorageAPIsUsingMocks(
         assert c1.exists(c1_fpath)
         fpath = os.path.join(str(harness.model.storages['store1'][0].location), 'foo.txt')
         with open(fpath) as f:
-            assert '42' == f.read()
+            assert f.read() == '42'
 
         # check that the file is not visible in c2 which has a different storage mount
         c2 = harness.model.unit.get_container('c2')
@@ -4487,11 +4485,11 @@ class TestPebbleStorageAPIsUsingMocks(
         c3_fpath = os.path.join('/mounts/bar', c1_fname)
         assert c3.exists(c3_fpath)
         with c3.pull(c3_fpath) as f:
-            assert '42' == f.read()
+            assert f.read() == '42'
 
         # test all other container file ops
         with c1.pull(c1_fpath) as f:
-            assert '42' == f.read()
+            assert f.read() == '42'
         files = c1.list_files(c1_fpath)
         assert [c1_fpath] == [fi.path for fi in files]
         c1.remove_path(c1_fpath)
@@ -4788,7 +4786,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
         assert harness.charm.locations[0] != harness.charm.locations[1]
         harness.add_storage('test-storage', 2, attach=True)
         assert harness.charm.attached == [
-                'test-storage/0', 'test-storage/1', 'test-storage/2', 'test-storage/3']
+            'test-storage/0', 'test-storage/1', 'test-storage/2', 'test-storage/3']
         assert len(set(harness.charm.locations)) == 4
 
 
@@ -5448,7 +5446,7 @@ class TestHandleExec(unittest.TestCase):
         self.harness.handle_exec(self.container, ["ls"], handler=handler)
 
         self.container.exec(["ls"], service_context="test").wait()
-        assert args_history[-1].working_dir == "/tmp"# noqa: S108
+        assert args_history[-1].working_dir == "/tmp"  # noqa: S108
         assert args_history[-1].user == "foo"
         assert args_history[-1].user_id == 1
         assert args_history[-1].group == "bar"

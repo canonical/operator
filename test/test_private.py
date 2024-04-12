@@ -55,36 +55,36 @@ class TestStrconv(unittest.TestCase):
         utc = datetime.timezone.utc
 
         assert timeconv.parse_rfc3339('2020-12-25T13:45:50+13:00') == \
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 0, tzinfo=nzdt)
+            datetime.datetime(2020, 12, 25, 13, 45, 50, 0, tzinfo=nzdt)
 
         assert timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789+13:00') == \
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=nzdt)
+            datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=nzdt)
 
         assert timeconv.parse_rfc3339('2021-02-10T04:36:22Z') == \
-                         datetime.datetime(2021, 2, 10, 4, 36, 22, 0, tzinfo=utc)
+            datetime.datetime(2021, 2, 10, 4, 36, 22, 0, tzinfo=utc)
 
         assert timeconv.parse_rfc3339('2021-02-10t04:36:22z') == \
-                         datetime.datetime(2021, 2, 10, 4, 36, 22, 0, tzinfo=utc)
+            datetime.datetime(2021, 2, 10, 4, 36, 22, 0, tzinfo=utc)
 
         assert timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777Z') == \
-                         datetime.datetime(2021, 2, 10, 4, 36, 22, 118971, tzinfo=utc)
+            datetime.datetime(2021, 2, 10, 4, 36, 22, 118971, tzinfo=utc)
 
         assert timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789+00:00') == \
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=utc)
+            datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=utc)
 
         assert timeconv.parse_rfc3339('2006-08-28T13:20:00.9999999Z') == \
-                         datetime.datetime(2006, 8, 28, 13, 20, 0, 999999, tzinfo=utc)
+            datetime.datetime(2006, 8, 28, 13, 20, 0, 999999, tzinfo=utc)
 
         assert timeconv.parse_rfc3339('2006-12-31T23:59:59.9999999Z') == \
-                         datetime.datetime(2006, 12, 31, 23, 59, 59, 999999, tzinfo=utc)
+            datetime.datetime(2006, 12, 31, 23, 59, 59, 999999, tzinfo=utc)
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=-11, minutes=-30))
         assert timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789-11:30') == \
-                         datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=tzinfo)
+            datetime.datetime(2020, 12, 25, 13, 45, 50, 123457, tzinfo=tzinfo)
 
         tzinfo = datetime.timezone(datetime.timedelta(hours=4))
         assert timeconv.parse_rfc3339('2000-01-02T03:04:05.006000+04:00') == \
-                         datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo)
+            datetime.datetime(2000, 1, 2, 3, 4, 5, 6000, tzinfo=tzinfo)
 
         with self.assertRaises(ValueError):
             timeconv.parse_rfc3339('')
@@ -127,7 +127,7 @@ class TestStrconv(unittest.TestCase):
             # different units
             ('10ns', datetime.timedelta(seconds=0.000_000_010)),
             ('11us', datetime.timedelta(seconds=0.000_011)),
-            ('12µs', datetime.timedelta(seconds=0.000_012)),  # U+00B5  # noqa: RUF001
+            ('12µs', datetime.timedelta(seconds=0.000_012)),  # U+00B5
             ('12μs', datetime.timedelta(seconds=0.000_012)),  # U+03BC
             ('13ms', datetime.timedelta(seconds=0.013)),
             ('14s', datetime.timedelta(seconds=14)),
@@ -155,7 +155,7 @@ class TestStrconv(unittest.TestCase):
         for input, expected in cases:
             output = timeconv.parse_duration(input)
             assert output == expected, \
-                             f'parse_duration({input!r}): expected {expected!r}, got {output!r}'
+                f'parse_duration({input!r}): expected {expected!r}, got {output!r}'
 
     def test_parse_duration_errors(self):
         cases = [

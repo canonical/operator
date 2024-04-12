@@ -360,7 +360,7 @@ class TestLib(TestCase):
         # but they are correct: our __eq__ bailing means Python falls back to
         # its default of checking object identity.
         assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
-        assert 42 != ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
 
     def test_lib_order(self):
         a = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 0)
@@ -459,7 +459,7 @@ class TestLibFunctional(TestCase):
                         baz = ops.lib.use('baz', 2, 'alice@example.com')
                         assert baz.LIBNAME == 'baz'
                         assert baz.LIBAPI == 2
-                        assert baz.LIBPATCH == max(patch_a, patch_b)
+                        assert max(patch_a, patch_b) == baz.LIBPATCH
                         assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_use_finds_best_diff_toplevel(self):
@@ -497,7 +497,7 @@ class TestLibFunctional(TestCase):
                         baz = ops.lib.use('baz', 2, 'alice@example.com')
                         assert baz.LIBNAME == 'baz'
                         assert baz.LIBAPI == 2
-                        assert baz.LIBPATCH == max(patch_a, patch_b)
+                        assert max(patch_a, patch_b) == baz.LIBPATCH
                         assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_none_found(self):

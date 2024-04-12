@@ -92,7 +92,7 @@ class TestCharm(unittest.TestCase):
         charm = MyCharm(framework)
         charm.on.start.emit()
 
-        assert charm.started == True
+        assert charm.started
 
         with self.assertRaises(TypeError):
             framework.observe(charm.on.start, charm)  # type: ignore
@@ -129,7 +129,7 @@ class TestCharm(unittest.TestCase):
         charm = MyCharm(framework)
         charm.on.start.emit()
         # check that the event has been seen by the decorator
-        assert 1 == len(events)
+        assert len(events) == 1
         # check that the event has been seen by the observer
         assert isinstance(charm.seen, ops.StartEvent)
 
@@ -456,7 +456,7 @@ requires:
 
         assert self.meta.requires['metrics'].interface_name == 'prometheus-scraping'
         assert self.meta.requires['metrics'].limit is None
-        assert self.meta.requires['metrics'].scope == 'global'# Default value
+        assert self.meta.requires['metrics'].scope == 'global'  # Default value
         assert self.meta.requires['metrics'].optional
 
     def test_relations_meta_limit_type_validation(self):
@@ -994,9 +994,9 @@ issues:
 """)
         assert meta.links.websites == ['https://example.com', 'https://example.org']
         assert meta.links.sources == [
-                'https://git.example.com', 'https://bzr.example.com']
+            'https://git.example.com', 'https://bzr.example.com']
         assert meta.links.issues == [
-                'https://bugs.example.com', 'https://features.example.com']
+            'https://bugs.example.com', 'https://features.example.com']
 
     def test_links_charmcraft_yaml(self):
         meta = ops.CharmMeta.from_yaml("""
@@ -1044,6 +1044,6 @@ assumes:
             ops.JujuAssumes(
                 [ops.JujuAssumes(['juju >= 2.9.44', 'juju < 3']),
                  ops.JujuAssumes(['juju >= 3.1.5', 'juju < 4'])],
-                ops.JujuAssumesCondition.ANY \
+                ops.JujuAssumesCondition.ANY
             ),
         ]

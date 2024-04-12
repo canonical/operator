@@ -305,8 +305,8 @@ class TestFramework(BaseTestCase):
 
         framework.commit()
 
-        assert obs._stored.myinitdata == 41# type: ignore
-        assert obs._stored.mydata == 42# type: ignore
+        assert obs._stored.myinitdata == 41  # type: ignore
+        assert obs._stored.mydata == 42  # type: ignore
         assert obs.seen, [ops.PreCommitEvent, ops.CommitEvent]
         framework.close()
 
@@ -314,8 +314,8 @@ class TestFramework(BaseTestCase):
 
         new_obs = PreCommitObserver(other_framework, None)
 
-        assert obs._stored.myinitdata == 41# type: ignore
-        assert new_obs._stored.mydata == 42# type: ignore
+        assert obs._stored.myinitdata == 41  # type: ignore
+        assert new_obs._stored.mydata == 42  # type: ignore
 
         with self.assertRaises(AttributeError):
             new_obs._stored.myotherdata  # type: ignore
@@ -1012,11 +1012,13 @@ class TestStoredState(BaseTestCase):
 
     def test_stored_dict_repr(self):
         assert repr(ops.StoredDict(None, {})) == "ops.framework.StoredDict()"  # type: ignore
-        assert repr(ops.StoredDict(None, {"a": 1})) == "ops.framework.StoredDict({'a': 1})"  # type: ignore
+        assert repr(ops.StoredDict(None, {"a": 1})
+                    ) == "ops.framework.StoredDict({'a': 1})"  # type: ignore
 
     def test_stored_list_repr(self):
         assert repr(ops.StoredList(None, [])) == "ops.framework.StoredList()"  # type: ignore
-        assert repr(ops.StoredList(None, [1, 2, 3])) == 'ops.framework.StoredList([1, 2, 3])'  # type: ignore
+        assert repr(ops.StoredList(None, [1, 2, 3])
+                    ) == 'ops.framework.StoredList([1, 2, 3])'  # type: ignore
 
     def test_stored_set_repr(self):
         assert repr(ops.StoredSet(None, set())) == 'ops.framework.StoredSet()'  # type: ignore
@@ -1122,7 +1124,7 @@ class TestStoredState(BaseTestCase):
         assert obj_copy._stored.foo == 42
         assert obj_copy._stored.bar == "s"
         assert obj_copy._stored.baz == 4.2
-        assert obj_copy._stored.bing == True
+        assert obj_copy._stored.bing
 
         framework_copy.close()
 
@@ -1285,7 +1287,9 @@ class TestStoredState(BaseTestCase):
             ['c'],
             ['a', ['c']],
             lambda a, b: a.append(b),
-            lambda res, expected_res: pytest.fail() if (res != expected_res or not isinstance(res[1], ops.StoredList)) else None
+            lambda res, expected_res: pytest.fail() if (
+                res != expected_res or not isinstance(
+                    res[1], ops.StoredList)) else None
         ), (
             lambda: ['a', ['c']],
             'b',
@@ -1297,14 +1301,18 @@ class TestStoredState(BaseTestCase):
             ['d'],
             ['b', ['d'], 'a', ['c']],
             lambda a, b: a.insert(1, b),
-            lambda res, expected_res: pytest.fail() if (res != expected_res or not isinstance(res[1], ops.StoredList)) else None
+            lambda res, expected_res: pytest.fail() if (
+                res != expected_res or not isinstance(
+                    res[1], ops.StoredList)) else None
         ), (
             lambda: ['b', 'a', ['c']],
             ['d'],
             ['b', ['d'], ['c']],
             # a[1] = b
             lambda a, b: a.__setitem__(1, b),
-            lambda res, expected_res: pytest.fail() if (res != expected_res or not isinstance(res[1], ops.StoredList)) else None
+            lambda res, expected_res: pytest.fail() if (
+                res != expected_res or not isinstance(
+                    res[1], ops.StoredList)) else None
         ), (
             lambda: ['b', ['d'], 'a', ['c']],
             0,
@@ -1801,8 +1809,8 @@ class BreakpointTests(BaseTestCase):
         with self.assertLogs(level="WARNING") as cm:
             self.check_trace_set('some-breakpoint', None, 0)
         assert cm.output == [
-            "WARNING:ops.framework:Breakpoint None skipped " \
-            "(not found in the requested breakpoints: {'some-breakpoint'})" \
+            "WARNING:ops.framework:Breakpoint None skipped "
+            "(not found in the requested breakpoints: {'some-breakpoint'})"
         ]
 
     def test_named_indicated_somethingelse(self, fake_stderr: io.StringIO):
@@ -1810,7 +1818,7 @@ class BreakpointTests(BaseTestCase):
         with self.assertLogs(level="WARNING") as cm:
             self.check_trace_set('some-breakpoint', 'other-name', 0)
         assert cm.output == [
-            "WARNING:ops.framework:Breakpoint 'other-name' skipped " \
+            "WARNING:ops.framework:Breakpoint 'other-name' skipped "
             "(not found in the requested breakpoints: {'some-breakpoint'})"]
 
     def test_named_indicated_ingroup(self, fake_stderr: io.StringIO):

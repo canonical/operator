@@ -671,7 +671,7 @@ class _TestMain(abc.ABC):
 
             if expected_event_data:
                 assert getattr(state, f"{event_spec.event_name}_data") == \
-                                 expected_event_data
+                    expected_event_data
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit."""
@@ -760,7 +760,7 @@ class _TestMain(abc.ABC):
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
             assert calls in \
-                          fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
+                fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
@@ -775,12 +775,11 @@ class _TestMain(abc.ABC):
 
         self.maxDiff = None
         assert re.search(
-            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n' \
-            'Traceback .most recent call last.:\n' \
-            '  .*' \
-            '    raise RuntimeError."failing as requested".\n' \
-            'RuntimeError: failing as requested'
-            , calls[0])
+            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
+            'Traceback .most recent call last.:\n'
+            '  .*'
+            '    raise RuntimeError."failing as requested".\n'
+            'RuntimeError: failing as requested', calls[0])
         assert len(calls) == 1, f"expected 1 call, but got extra: {calls[1:]}"
 
     def test_sets_model_name(self):
@@ -969,7 +968,7 @@ class _TestMainWithDispatch(_TestMain):
             assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
             for event_hook in all_event_hooks:
                 assert not (self.JUJU_CHARM_DIR / event_hook).exists(), \
-                                 f"Spurious hook: {event_hook}"
+                    f"Spurious hook: {event_hook}"
 
         for initial_event in initial_events:
             self._setup_charm_dir()

@@ -206,7 +206,7 @@ single log
         assert warning.message == 'Beware!'
         assert warning.first_added == datetime_utc(2021, 1, 1, 1, 1, 1)
         assert warning.last_added == datetime_utc(2021, 1, 26, 2, 3, 4)
-        assert warning.last_shown == None
+        assert warning.last_shown is None
         assert warning.expire_after == '1s'
         assert warning.repeat_after == '2s'
 
@@ -222,13 +222,13 @@ single log
         assert warning.message == 'Look out...'
         assert warning.first_added == datetime_nzdt(2020, 12, 25, 17, 18, 54, 16274)
         assert warning.last_added == datetime_nzdt(2021, 1, 26, 17, 1, 2, 123450)
-        assert warning.last_shown == None
+        assert warning.last_shown is None
         assert warning.expire_after == '1s'
         assert warning.repeat_after == '2s'
 
         d['last-shown'] = None
         warning = pebble.Warning.from_dict(d)
-        assert warning.last_shown == None
+        assert warning.last_shown is None
 
         d['last-shown'] = '2021-08-04T03:02:01.000000000+13:00'
         warning = pebble.Warning.from_dict(d)
@@ -338,7 +338,7 @@ single log
         assert change.id == '70'
         assert change.kind == 'autostart'
         assert change.err == 'SILLY'
-        assert change.ready == True
+        assert change.ready
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291517)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
         assert change.status == 'Done'
@@ -363,7 +363,7 @@ single log
         assert change.id == '70'
         assert change.kind == 'autostart'
         assert change.err == 'SILLY'
-        assert change.ready == True
+        assert change.ready
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
         assert change.status == 'Done'
@@ -847,7 +847,7 @@ summary: Sum Mary
         assert s.services['bar'].summary == 'Bar'
         assert s.services['bar'].command == 'echo bar'
         assert s.services['bar'].environment == \
-                         {'ENV1': 'value1', 'ENV2': 'value2'}
+            {'ENV1': 'value1', 'ENV2': 'value2'}
         assert s.services['bar'].user == 'bob'
         assert s.services['bar'].user_id == 1000
         assert s.services['bar'].group == 'staff'
@@ -940,7 +940,7 @@ class TestService(unittest.TestCase):
         assert service.backoff_delay == ''
         assert service.backoff_factor is None
         assert service.backoff_limit == ''
-        assert service.kill_delay is ''
+        assert service.kill_delay == ''
         assert service.to_dict() == {}
 
     def test_name_only(self):
@@ -1116,7 +1116,7 @@ class TestCheck(unittest.TestCase):
             'http': {'url': 'https://example.com/'},
         }
         check = pebble.Check('chk-http', d)
-        assert check.level == 'foobar!'# remains a string
+        assert check.level == 'foobar!'  # remains a string
 
     def test_equality(self):
         d: pebble.CheckDict = {
@@ -1663,11 +1663,11 @@ class TestClient(unittest.TestCase):
         assert change.tasks[0].progress.label == ''
         assert change.tasks[0].progress.total == 1
         assert change.tasks[0].ready_time == \
-                         datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219)
+            datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219)
         assert change.tasks[0].spawn_time == \
-                         datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158)
-        assert change.ready == True
-        assert change.err == None
+            datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158)
+        assert change.ready
+        assert change.err is None
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
 
@@ -2323,7 +2323,7 @@ Content-Disposition: form-data; name="response"\r
             self.client.pull('/etc/hosts')
         assert isinstance(cm.exception, pebble.Error)
         assert str(cm.exception) == \
-                         "expected Content-Type 'multipart/form-data', got 'c/t'"
+            "expected Content-Type 'multipart/form-data', got 'c/t'"
 
         self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
         with self.assertRaises(pebble.ProtocolError) as cm:
@@ -2626,7 +2626,7 @@ bad path\r
         assert infos[1].path == '/etc/nginx'
         assert infos[1].name == 'nginx'
         assert infos[1].type == pebble.FileType.DIRECTORY
-        assert infos[1].size == None
+        assert infos[1].size is None
         assert infos[1].permissions == 0o755
         assert infos[1].last_modified == datetime_nzdt(2020, 1, 1, 1, 1, 1, 0)
         assert infos[1].user_id is None
@@ -2892,7 +2892,7 @@ bad path\r
         checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
-        assert checks[0].level == 'foobar!'# stays a raw string
+        assert checks[0].level == 'foobar!'  # stays a raw string
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
@@ -3114,13 +3114,13 @@ class TestExecError(unittest.TestCase):
 
         e = pebble.ExecError(['a', 'b'], 1, 'out', 'err')
         assert str(e) == "non-zero exit code 1 executing ['a', 'b'], " \
-                                 + "stdout='out', stderr='err'"
+            + "stdout='out', stderr='err'"
 
     def test_str_truncated(self):
         e = pebble.ExecError(['foo'], 2, 'longout', 'longerr')
         e.STR_MAX_OUTPUT = 5  # type: ignore
         assert str(e) == "non-zero exit code 2 executing ['foo'], " \
-                                 + "stdout='longo' [truncated], stderr='longe' [truncated]"
+            + "stdout='longo' [truncated], stderr='longe' [truncated]"
 
 
 class MockWebsocket:
@@ -3222,7 +3222,7 @@ class TestExec(unittest.TestCase):
             process = self.client.exec(['true'])
             del process
         assert str(cm.warning) == 'ExecProcess instance garbage collected ' \
-                                          + 'without call to wait() or wait_output()'
+            + 'without call to wait() or wait_output()'
 
     def test_wait_exit_zero(self):
         self.add_responses('123', 0)
@@ -3326,14 +3326,14 @@ class TestExec(unittest.TestCase):
         assert len(control.sends) == num_sends
         assert control.sends[0][0] == 'TXT'
         assert json.loads(control.sends[0][1]) == \
-                         {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
+            {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
         if hasattr(signal, 'SIGHUP'):
             assert control.sends[1][0] == 'TXT'
             assert json.loads(control.sends[1][1]) == \
-                             {'command': 'signal', 'signal': {'name': signal.Signals(1).name}}
+                {'command': 'signal', 'signal': {'name': signal.Signals(1).name}}
             assert control.sends[2][0] == 'TXT'
             assert json.loads(control.sends[2][1]) == \
-                             {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
+                {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
 
     def test_wait_output(self):
         stdio, stderr, _ = self.add_responses('123', 0)
@@ -3643,7 +3643,6 @@ class TestExec(unittest.TestCase):
             ('BIN', b'Foo Bar\nbazz\n'),  # TextIOWrapper groups the writes together
             ('TXT', '{"command":"end"}'),
         ]
-
 
     def test_wait_returned_io_bytes(self):
         stdio = self.add_responses('123', 0)[0]
