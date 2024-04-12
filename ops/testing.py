@@ -826,7 +826,7 @@ class Harness(Generic[CharmType]):
 
         Example usage::
 
-            secret_id = harness.add_charm_secret('mysql', {'password': 'SECRET'})
+            secret_id = harness.add_model_secret('mysql', {'password': 'SECRET'})
             harness.add_relation('db', 'mysql', unit_data={
                 'host': 'mysql.localhost,
                 'username': 'appuser',
@@ -1514,30 +1514,24 @@ class Harness(Generic[CharmType]):
             self._backend._calls.clear()
         return calls
 
-    def add_charm_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
-        """Add a secret owned by the charm.
+    def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
+        """Add a secret owned by the remote application or unit specified.
+        This is named :code:`add_model_secret` instead of :code:`add_secret`
+        to avoid confusion with the :meth:`ops.Application.add_secret`
+        and :meth:`ops.Unit.add_secret` methods used by secret owner
+        charms.
 
         Args:
-            owner: The name of the remote application or a specific remote unit,
-                that will own the secret.
+            owner: The name of the remote application (or specific remote
+                unit) that will own the secret.
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
-
         Return:
-            The ID of the newly-added secret.
+            The ID of the newly-secret added.
         """
-        # This is named `add_charm_secret` instead of `add_secret` to avoid confusion
-        # with the `ops.Application.add_secret` and `ops.Unit.add_secret` methods used
-        # by secret owner charms.
         owner_name = _get_app_or_unit_name(owner)
         model.Secret._validate_content(content)
         return self._backend._secret_add(content, owner_name)
-
-    def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
-        """An alias for :meth:`add_charm_secret` for backward compatibility."""
-        warnings.warn("add_model_secret is deprecated, use add_charm_secret instead.",
-                      category=DeprecationWarning)
-        return self.add_charm_secret(owner, content)
 
     def add_user_secret(self, content: Dict[str, str]) -> str:
         """Add a secret owned by the user, simulating the ``juju add-secret`` command.
@@ -1598,7 +1592,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret to update. This should normally be
-                the return value of :meth:`add_charm_secret`.
+                the return value of :meth:`add_model_secret`.
             content: A key-value mapping containing the new payload.
         """
         model.Secret._validate_content(content)
@@ -1624,7 +1618,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret to grant access to. This should
-                normally be the return value of :meth:`add_charm_secret`.
+                normally be the return value of :meth:`add_model_secret`.
             observer: The name of the application (or specific unit) to grant
                 access to. A relation between this application and the charm
                 under test must already have been created.
@@ -1654,7 +1648,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret to revoke access for. This should
-                normally be the return value of :meth:`add_charm_secret`.
+                normally be the return value of :meth:`add_model_secret`.
             observer: The name of the application (or specific unit) to revoke
                 access to. A relation between this application and the charm under
                 test must have already been created.
