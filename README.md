@@ -731,7 +731,7 @@ import scenario
 class MyCharm(ops.CharmBase):
     def __init__(self, framework):
         super().__init__(framework)
-        framework.observe(self.on["cont"].pebble_notice, self._on_notice)
+        framework.observe(self.on["cont"].pebble_custom_notice, self._on_notice)
 
     def _on_notice(self, event):
         event.notice.key  # == "example.com/c"
