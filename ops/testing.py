@@ -1516,6 +1516,7 @@ class Harness(Generic[CharmType]):
 
     def add_model_secret(self, owner: AppUnitOrName, content: Dict[str, str]) -> str:
         """Add a secret owned by the remote application or unit specified.
+
         This is named :code:`add_model_secret` instead of :code:`add_secret`
         to avoid confusion with the :meth:`ops.Application.add_secret`
         and :meth:`ops.Unit.add_secret` methods used by secret owner
@@ -1526,6 +1527,7 @@ class Harness(Generic[CharmType]):
                 unit) that will own the secret.
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
+
         Return:
             The ID of the newly-secret added.
         """
@@ -1631,7 +1633,7 @@ class Harness(Generic[CharmType]):
             secret.user_secrets_grants.add(app_or_unit_name)
             return
 
-        # Charm secrets:
+        # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call grant_secret")
@@ -1661,7 +1663,7 @@ class Harness(Generic[CharmType]):
             secret.user_secrets_grants.discard(app_or_unit_name)
             return
 
-        # Charm secrets:
+        # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
                                f"can't call revoke_secret")
@@ -2608,7 +2610,7 @@ class _TestingModelBackend:
                 raise model.SecretNotFoundError(
                     f'Secret {id!r} not granted access to {self.app_name!r}')
         elif secret.owner_name not in [self.app_name, self.unit_name]:
-            # This is a charm secret - the charm might have admin or view access.
+            # This is a model secret - the model might have admin or view access.
             # Check that caller has permission to get this secret
             # Observer is calling: does secret have a grant on relation between
             # this charm (the observer) and the secret owner's app?
