@@ -1418,6 +1418,7 @@ class TestHarness(unittest.TestCase):
             harness.begin()
             self.assertEqual(harness._meta.name, "repl-charm")
             self.assertEqual(harness.charm.model.config['foo'], 42)
+
             harness = ops.testing.Harness(ops.CharmBase)
             self.addCleanup(harness.cleanup)
             self.assertEqual(harness._meta.name, "test-charm")
