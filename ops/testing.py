@@ -990,9 +990,11 @@ class Harness(Generic[CharmType]):
         app = relation.app
         if not remote_unit_name.startswith(app.name):
             warnings.warn(
-                'Remote unit name invalid: the remote application of {} is called {!r}; '
-                'the remote unit name should be {}/<some-number>, not {!r}.'
-                ''.format(relation_name, app.name, app.name, remote_unit_name))
+                f'Remote unit name invalid: '
+                f'the remote application of {relation_name} is called {app.name!r}; '
+                f'the remote unit name should be {app.name}/<some-number>, '
+                f'not {remote_unit_name!r}.'
+            )
         app_and_units = self._backend._relation_app_and_units
         app_and_units[relation_id]["units"].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
@@ -1166,8 +1168,13 @@ class Harness(Generic[CharmType]):
 
         id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
 
-        if self._charm is not None and type == pebble.NoticeType.CUSTOM and new_or_repeated:
-            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type.value, key)
+        if self._charm is not None and new_or_repeated:
+            if type == pebble.NoticeType.CUSTOM:
+                self.charm.on[container_name].pebble_custom_notice.emit(
+                    container, id, type.value, key)
+            elif type == pebble.NoticeType.CHANGE_UPDATE:
+                self.charm.on[container_name].pebble_change_updated.emit(
+                    container, id, type.value, key)
 
         return id
 
@@ -3362,10 +3369,6 @@ class _TestingPebbleClient:
 
         Return a tuple of (notice_id, new_or_repeated).
         """
-        if type != pebble.NoticeType.CUSTOM:
-            message = f'invalid type "{type.value}" (can only add "custom" notices)'
-            raise self._api_error(400, message)
-
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
 

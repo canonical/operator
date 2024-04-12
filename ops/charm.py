@@ -34,7 +34,7 @@ from typing import (
     cast,
 )
 
-from ops import model
+from ops import model, pebble
 from ops._private import yaml
 from ops.framework import (
     EventBase,
@@ -674,9 +674,10 @@ class StorageEvent(HookEvent):
                 (s for s in storages if s.index == storage_index),
                 None)  # type: ignore
             if self.storage is None:
-                msg = 'failed loading storage (name={!r}, index={!r}) from snapshot' \
-                    .format(storage_name, storage_index)
-                raise RuntimeError(msg)
+                raise RuntimeError(
+                    f'failed loading storage (name={storage_name!r}, '
+                    f'index={storage_index!r}) from snapshot'
+                )
             if storage_location is None:
                 raise RuntimeError(
                     'failed loading storage location from snapshot.'
@@ -807,6 +808,15 @@ class PebbleNoticeEvent(WorkloadEvent):
 
 class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats."""
+
+
+class PebbleChangeUpdatedEvent(PebbleNoticeEvent):
+    """Event triggered when a Pebble notice of type "change-update" is created or repeats."""
+
+    def get_change(self) -> pebble.Change:
+        """Get the Pebble change associated with this event."""
+        change_id = pebble.ChangeID(self.notice.key)
+        return self.workload.pebble.get_change(change_id)
 
 
 class SecretEvent(HookEvent):
@@ -1190,6 +1200,9 @@ class CharmBase(Object):
             container_name = container_name.replace('-', '_')
             self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
             self.on.define_event(f"{container_name}_pebble_custom_notice", PebbleCustomNoticeEvent)
+            self.on.define_event(
+                f"{container_name}_pebble_change_updated",
+                PebbleChangeUpdatedEvent)
 
     @property
     def app(self) -> model.Application:
