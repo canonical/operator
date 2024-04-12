@@ -1107,7 +1107,7 @@ class TestHarness(unittest.TestCase):
         secret_id = harness.add_model_secret('mycharm', {'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
         self.assertEqual(harness.charm.changes,
-                         [{'name': 'config-changed', 'data': {'a': secret_id}}])
+            [{'name': 'config-changed', 'data': {'a': secret_id}}])
 
     def test_no_config_option_type(self):
         with self.assertRaises(RuntimeError):
@@ -3223,8 +3223,6 @@ class ContainerEventCharm(RecordingCharm):
         self.framework.observe(self.on[container_name].pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on[container_name].pebble_custom_notice,
                                self._on_pebble_custom_notice)
-        self.framework.observe(self.on[container_name].pebble_change_updated,
-                               self._on_pebble_change_updated)
 
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
         self.changes.append({
@@ -3237,17 +3235,6 @@ class ContainerEventCharm(RecordingCharm):
                     else event.notice.type)
         self.changes.append({
             'name': 'pebble-custom-notice',
-            'container': event.workload.name,
-            'notice_id': event.notice.id,
-            'notice_type': type_str,
-            'notice_key': event.notice.key,
-        })
-
-    def _on_pebble_change_updated(self, event: ops.PebbleChangeUpdatedEvent):
-        type_str = (event.notice.type.value if isinstance(event.notice.type, pebble.NoticeType)
-                    else event.notice.type)
-        self.changes.append({
-            'name': 'pebble-change-updated',
             'container': event.workload.name,
             'notice_id': event.notice.id,
             'notice_type': type_str,
@@ -5776,36 +5763,6 @@ class TestNotify(unittest.TestCase):
         self.assertIsInstance(id, str)
         self.assertNotEqual(id, '')
         self.assertEqual(num_notices, 0)
-
-    def test_notify_change_update(self):
-        harness = ops.testing.Harness(ContainerEventCharm, meta="""
-            name: notifier
-            containers:
-              foo:
-                resource: foo-image
-        """)
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        harness.charm.observe_container_events('foo')
-
-        id1 = harness.pebble_notify('foo', '42', type=pebble.NoticeType.CHANGE_UPDATE)
-        id2 = harness.pebble_notify('foo', '43', type=pebble.NoticeType.CHANGE_UPDATE)
-        self.assertNotEqual(id1, id2)
-
-        expected_changes = [{
-            'name': 'pebble-change-updated',
-            'container': 'foo',
-            'notice_id': id1,
-            'notice_type': 'change-update',
-            'notice_key': '42',
-        }, {
-            'name': 'pebble-change-updated',
-            'container': 'foo',
-            'notice_id': id2,
-            'notice_type': 'change-update',
-            'notice_key': '43',
-        }]
-        self.assertEqual(harness.charm.changes, expected_changes)
 
 
 class PebbleNoticesMixin:
