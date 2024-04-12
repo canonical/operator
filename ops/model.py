@@ -767,7 +767,12 @@ class Port:
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
 
-OpenedPort = Port  # Alias for backwards compatibility.
+class OpenedPort(Port):
+    """Alias to Port for backwards compatibility.
+
+    .. deprecated:: 2.7.0
+        Use :class:`Port` instead.
+    """
 
 
 class LazyMapping(Mapping[str, str], ABC):
