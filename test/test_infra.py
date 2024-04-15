@@ -65,4 +65,4 @@ class ImportersTestCase(unittest.TestCase):
         else:
             environ['PYTHONPATH'] = os.getcwd()
         proc = subprocess.run([sys.executable, testfile], env=environ)
-        self.assertEqual(proc.returncode, 0)
+        assert proc.returncode == 0

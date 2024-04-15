@@ -102,8 +102,8 @@ class CharmInitTestCase(unittest.TestCase):
         with patch('pdb.Pdb.set_trace') as mock:
             breakpoint()
 
-        self.assertEqual(mock.call_count, 1)
-        self.assertIn('Starting pdb to debug charm operator', fake_stderr.getvalue())
+        assert mock.call_count == 1
+        assert 'Starting pdb to debug charm operator' in fake_stderr.getvalue()
 
     def test_no_debug_breakpoint(self):
         class MyCharm(ops.CharmBase):
@@ -113,7 +113,7 @@ class CharmInitTestCase(unittest.TestCase):
         with patch('pdb.Pdb.set_trace') as mock:
             breakpoint()
 
-        self.assertEqual(mock.call_count, 0)
+        assert mock.call_count == 0
 
     def _check(
             self,
@@ -149,7 +149,7 @@ class CharmInitTestCase(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as warn_cm:
             self._check(MyCharm)
-        self.assertEqual(warn_cm, [])
+        assert warn_cm == []
 
     def test_init_signature_old_key_argument(self):
         class MyCharm(ops.CharmBase):
@@ -169,7 +169,7 @@ class CharmInitTestCase(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as warn_cm:
             self._check(MyCharm)
-        self.assertEqual(warn_cm, [])
+        assert warn_cm == []
 
     def test_storage_no_storage(self):
         # here we patch juju_backend_available so it refuses to set it up
@@ -231,23 +231,23 @@ class TestDispatch(unittest.TestCase):
                         mock_charmdir.return_value = tmpdir
                         ops.main(MyCharm)  # type: ignore
 
-        self.assertEqual(mock_charm_event.call_count, 1)
+        assert mock_charm_event.call_count == 1
         return mock_charm_event.call_args[0][1]
 
     def test_most_legacy(self):
         """Without dispatch, sys.argv[0] is used."""
         event = self._check()
-        self.assertEqual(event, 'config_changed')
+        assert event == 'config_changed'
 
     def test_with_dispatch(self):
         """With dispatch, dispatch is used."""
         event = self._check(with_dispatch=True, dispatch_path='hooks/potatos')
-        self.assertEqual(event, 'potatos')
+        assert event == 'potatos'
 
     def test_with_dispatch_path_but_no_dispatch(self):
         """Dispatch path overwrites sys.argv[0] even if no actual dispatch."""
         event = self._check(with_dispatch=False, dispatch_path='hooks/foo')
-        self.assertEqual(event, 'foo')
+        assert event == 'foo'
 
 
 _event_test = typing.List[typing.Tuple[
@@ -465,18 +465,17 @@ class _TestMain(abc.ABC):
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
+        assert list(state.observed_event_types) == ['InstallEvent']
 
         state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(list(state.observed_event_types), ['ConfigChangedEvent'])
+        assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should pick the deferred config-changed.
         state = self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status'))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(
-            list(state.observed_event_types),
-            ['ConfigChangedEvent', 'UpdateStatusEvent'])
+        assert list(state.observed_event_types) == \
+            ['ConfigChangedEvent', 'UpdateStatusEvent']
 
     def test_no_reemission_on_collect_metrics(self):
         fake_script(typing.cast(unittest.TestCase, self), 'add-metric', 'exit 0')
@@ -484,17 +483,17 @@ class _TestMain(abc.ABC):
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
+        assert list(state.observed_event_types) == ['InstallEvent']
 
         state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(list(state.observed_event_types), ['ConfigChangedEvent'])
+        assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should not pick the deferred config-changed because
         # collect-metrics runs in a restricted context.
         state = self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect-metrics'))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(list(state.observed_event_types), ['CollectMetricsEvent'])
+        assert list(state.observed_event_types) == ['CollectMetricsEvent']
 
     def test_multiple_events_handled(self):
         self._prepare_actions()
@@ -653,16 +652,16 @@ class _TestMain(abc.ABC):
             handled_events = getattr(state, state_key, [])
 
             # Make sure that a handler for that event was called once.
-            self.assertEqual(len(handled_events), 1)
+            assert len(handled_events) == 1
             # Make sure the event handled by the Charm has the right type.
             handled_event_type = handled_events[0]
-            self.assertEqual(handled_event_type, event_spec.event_type.__name__)
+            assert handled_event_type == event_spec.event_type.__name__
 
-            self.assertEqual(list(state.observed_event_types), [event_spec.event_type.__name__])
+            assert list(state.observed_event_types) == [event_spec.event_type.__name__]
 
             if expected_event_data:
-                self.assertEqual(getattr(state, f"{event_spec.event_name}_data"),
-                                 expected_event_data)
+                assert getattr(state, f"{event_spec.event_name}_data") == \
+                                 expected_event_data
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit."""
@@ -701,7 +700,7 @@ class _TestMain(abc.ABC):
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
 
-        self.assertEqual(calls, expected)
+        assert calls == expected
 
     def test_custom_event(self):
         self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
@@ -720,9 +719,9 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         # Remove the "[key]>" suffix from the end of the event string
-        self.assertRegex(calls[2][-1], re.escape(custom_event_prefix) + '.*')
+        assert calls[2][-1].search(re.escape(custom_event_prefix) + '.*')
         calls[2][-1] = custom_event_prefix
-        self.assertEqual(calls, expected)
+        assert calls == expected
 
     def test_logger(self):
         fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
@@ -750,8 +749,8 @@ class _TestMain(abc.ABC):
 
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
-            self.assertIn(calls,
-                          fake_script_calls(typing.cast(unittest.TestCase, self), clear=True))
+            assert calls in \
+                          fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
 
     def test_excepthook(self):
         with self.assertRaises(subprocess.CalledProcessError):
@@ -760,20 +759,18 @@ class _TestMain(abc.ABC):
 
         calls = [' '.join(i) for i in fake_script_calls(typing.cast(unittest.TestCase, self))]
 
-        self.assertEqual(calls.pop(0), ' '.join(VERSION_LOGLINE))
-        self.assertRegex(calls.pop(0), 'Using local storage: not a Kubernetes podspec charm')
-        self.assertRegex(calls.pop(0), 'Initializing SQLite local storage: ')
+        assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
+        assert calls.pop(0).search('Using local storage: not a Kubernetes podspec charm')
+        assert calls.pop(0).search('Initializing SQLite local storage: ')
 
         self.maxDiff = None
-        self.assertRegex(
-            calls[0],
-            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
-            'Traceback .most recent call last.:\n'
-            '  .*'
-            '    raise RuntimeError."failing as requested".\n'
-            'RuntimeError: failing as requested'
-        )
-        self.assertEqual(len(calls), 1, f"expected 1 call, but got extra: {calls[1:]}")
+        assert calls[0].search(
+            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n' \
+            'Traceback .most recent call last.:\n' \
+            '  .*' \
+            '    raise RuntimeError."failing as requested".\n' \
+            'RuntimeError: failing as requested')
+        assert len(calls) == 1, f"expected 1 call, but got extra: {calls[1:]}"
 
     def test_sets_model_name(self):
         self._prepare_actions()
@@ -785,7 +782,7 @@ class _TestMain(abc.ABC):
             model_name='test-model-name',
             set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(state._on_get_model_name_action, ['test-model-name'])
+        assert state._on_get_model_name_action == ['test-model-name']
 
     def test_has_valid_status(self):
         self._prepare_actions()
@@ -798,8 +795,8 @@ class _TestMain(abc.ABC):
             env_var='JUJU_ACTION_NAME',
             set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(state.status_name, 'unknown')
-        self.assertEqual(state.status_message, '')
+        assert state.status_name == 'unknown'
+        assert state.status_message == ''
         fake_script(
             typing.cast(unittest.TestCase, self),
             'status-get',
@@ -809,8 +806,8 @@ class _TestMain(abc.ABC):
             env_var='JUJU_ACTION_NAME',
             set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
-        self.assertEqual(state.status_name, 'blocked')
-        self.assertEqual(state.status_message, 'help meeee')
+        assert state.status_name == 'blocked'
+        assert state.status_message == 'help meeee'
 
 
 class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
@@ -887,20 +884,20 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         initial_hooks = {f"hooks/{ev.event_name}" for ev in initial_events}
 
         def _assess_event_links(event_spec: EventSpec):
-            self.assertTrue(self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir())
+            assert self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir()
             for event_hook in all_event_hooks:
                 hook_path = self.JUJU_CHARM_DIR / event_hook
-                self.assertTrue(hook_path.exists(), f"Missing hook: {event_hook}")
+                assert hook_path.exists(), f"Missing hook: {event_hook}"
                 if self.hooks_are_symlinks:
-                    self.assertTrue(hook_path.is_symlink())
-                    self.assertEqual(os.readlink(str(hook_path)), self.charm_exec_path)
+                    assert hook_path.is_symlink()
+                    assert os.readlink(str(hook_path)) == self.charm_exec_path
                 elif event_hook in initial_hooks:
-                    self.assertFalse(hook_path.is_symlink())
+                    assert not hook_path.is_symlink()
                 else:
                     # hooks are not symlinks, and this hook is not one of the initial ones
                     # check that it's a symlink to the initial ones
-                    self.assertTrue(hook_path.is_symlink())
-                    self.assertEqual(os.readlink(str(hook_path)), event_spec.event_name)
+                    assert hook_path.is_symlink()
+                    assert os.readlink(str(hook_path)) == event_spec.event_name
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -915,7 +912,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         # foo-bar is one of the actions defined in actions.yaml
         action_hook = self.JUJU_CHARM_DIR / 'actions' / 'foo-bar'
-        self.assertTrue(action_hook.exists())
+        assert action_hook.exists()
 
 
 class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
@@ -958,10 +955,10 @@ class _TestMainWithDispatch(_TestMain):
         }
 
         def _assess_event_links(event_spec: EventSpec):
-            self.assertNotIn(self.hooks_dir / event_spec.event_name, self.hooks_dir.iterdir())
+            assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
             for event_hook in all_event_hooks:
-                self.assertFalse((self.JUJU_CHARM_DIR / event_hook).exists(),
-                                 f"Spurious hook: {event_hook}")
+                assert not (self.JUJU_CHARM_DIR / event_hook).exists(), \
+                                 f"Spurious hook: {event_hook}"
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -977,9 +974,9 @@ class _TestMainWithDispatch(_TestMain):
         assert isinstance(state, ops.BoundStoredState)
 
         # the script was called, *and*, the .on. was called
-        self.assertEqual(fake_script_calls(typing.cast(
-            unittest.TestCase, self)), [['install', '']])
-        self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
+        assert fake_script_calls(typing.cast(
+            unittest.TestCase, self)) == [['install', '']]
+        assert list(state.observed_event_types) == ['InstallEvent']
 
         self.fake_script_path = old_path
         hook = Path('hooks/install')
@@ -996,16 +993,16 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
-        self.assertRegex(' '.join(calls.pop(-3)),
+        assert ' '.join(calls.pop(-3)).search(
                          'Initializing SQLite local storage: ')
-        self.assertEqual(calls, expected)
+        assert calls == expected
 
     def test_non_executable_hook_and_dispatch(self):
         (self.hooks_dir / "install").write_text("")
         state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
 
-        self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
+        assert list(state.observed_event_types) == ['InstallEvent']
 
         expected = [
             VERSION_LOGLINE,
@@ -1018,9 +1015,9 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
-        self.assertRegex(' '.join(calls.pop(-3)),
+        assert ' '.join(calls.pop(-3)).search(
                          'Initializing SQLite local storage: ')
-        self.assertEqual(calls, expected)
+        assert calls == expected
 
     def test_hook_and_dispatch_with_failing_hook(self):
         self.stdout = self.stderr = tempfile.TemporaryFile()
@@ -1035,9 +1032,9 @@ class _TestMainWithDispatch(_TestMain):
         self.fake_script_path = old_path
 
         self.stdout.seek(0)
-        self.assertEqual(self.stdout.read(), b'')
+        assert self.stdout.read() == b''
         self.stderr.seek(0)
-        self.assertEqual(self.stderr.read(), b'')
+        assert self.stderr.read() == b''
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
         hook = Path('hooks/install')
         expected = [
@@ -1046,7 +1043,7 @@ class _TestMainWithDispatch(_TestMain):
             ['juju-log', '--log-level', 'WARNING', '--',
              f'Legacy {hook} exited with status 42.'],
         ]
-        self.assertEqual(calls, expected)
+        assert calls == expected
 
     def test_hook_and_dispatch_but_hook_is_dispatch(self):
         event = EventSpec(ops.InstallEvent, 'install')
@@ -1063,8 +1060,8 @@ class _TestMainWithDispatch(_TestMain):
         }.items():
             with self.subTest(path=path, rel=rel, ind=ind):
                 # sanity check
-                self.assertEqual(path.is_absolute(), not rel)
-                self.assertEqual(path.with_suffix('').name == 'dispatch', ind)
+                assert path.is_absolute() == not rel
+                assert path.with_suffix('').name == 'dispatch' == ind
                 try:
                     hook_path.symlink_to(path)
 
@@ -1072,8 +1069,8 @@ class _TestMainWithDispatch(_TestMain):
                     assert isinstance(state, ops.BoundStoredState)
 
                     # the .on. was only called once
-                    self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
-                    self.assertEqual(list(state.on_install), ['InstallEvent'])
+                    assert list(state.observed_event_types) == ['InstallEvent']
+                    assert list(state.on_install) == ['InstallEvent']
                 finally:
                     hook_path.unlink()
 
@@ -1087,8 +1084,8 @@ class _TestMainWithDispatch(_TestMain):
         assert isinstance(state, ops.BoundStoredState)
 
         # the .on. was only called once
-        self.assertEqual(list(state.observed_event_types), ['InstallEvent'])
-        self.assertEqual(list(state.on_install), ['InstallEvent'])
+        assert list(state.observed_event_types) == ['InstallEvent']
+        assert list(state.on_install) == ['InstallEvent']
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
@@ -1106,9 +1103,9 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
-        self.assertRegex(' '.join(calls.pop(-3)), 'Initializing SQLite local storage: ')
+        assert ' '.join(calls.pop(-3)).search('Initializing SQLite local storage: ')
 
-        self.assertEqual(calls, expected)
+        assert calls == expected
 
 
 class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
@@ -1179,8 +1176,8 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
                 set_in_env={'JUJU_ACTION_UUID': '1'}))
         self.stderr.seek(0)
         stderr = self.stderr.read()
-        self.assertIn('KeyError', stderr)
-        self.assertIn("'foo' not found in 'bar'", stderr)
+        assert 'KeyError' in stderr
+        assert "'foo' not found in 'bar'" in stderr
 
 
 class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
@@ -1247,19 +1244,19 @@ class TestStorageHeuristics(unittest.TestCase):
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "1.0"}):
-            self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
+            assert not _should_use_controller_storage(Path("/xyzzy"), meta)
 
     def test_fallback_to_current_juju_version__new_enough(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
-            self.assertTrue(_should_use_controller_storage(Path("/xyzzy"), meta))
+            assert _should_use_controller_storage(Path("/xyzzy"), meta)
 
     def test_not_if_not_in_k8s(self):
         meta = ops.CharmMeta.from_yaml("series: [ecs]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}):
-            self.assertFalse(_should_use_controller_storage(Path("/xyzzy"), meta))
+            assert not _should_use_controller_storage(Path("/xyzzy"), meta)
 
     def test_not_if_already_local(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "2.8"}), tempfile.NamedTemporaryFile() as fd:
-            self.assertFalse(_should_use_controller_storage(Path(fd.name), meta))
+            assert not _should_use_controller_storage(Path(fd.name), meta)

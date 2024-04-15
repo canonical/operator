@@ -79,13 +79,12 @@ class TestLibFinder(TestCase):
     def test_single(self):
         tmpdir = self._mkdtemp()
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
-        self.assertEqual(
-            _flatten(ops.lib._find_all_specs([tmpdir])),
-            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
+        assert _flatten(ops.lib._find_all_specs([tmpdir])) == \
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
     def test_multi(self):
         tmp_dir_a = self._mkdtemp()
@@ -113,7 +112,7 @@ class TestLibFinder(TestCase):
             os.path.join(tmp_dir_b, "baz", "opslib", "quux"),
         ]
 
-        self.assertEqual(_flatten(ops.lib._find_all_specs(dirs)), expected)
+        assert _flatten(ops.lib._find_all_specs(dirs)) == expected
 
     def test_cwd(self):
         tmpcwd = self._mkdtemp()
@@ -123,14 +122,13 @@ class TestLibFinder(TestCase):
 
         dirs = [""]
 
-        self.assertEqual(list(ops.lib._find_all_specs(dirs)), [])
+        assert list(ops.lib._find_all_specs(dirs)) == []
 
         _mklib(tmpcwd, "foo", "bar").write_text("")
 
         paths = _flatten(ops.lib._find_all_specs(dirs))
-        self.assertEqual(
-            [os.path.relpath(p) for p in paths],
-            [os.path.join('foo', 'opslib', 'bar')])
+        assert [os.path.relpath(p) for p in paths] == \
+            [os.path.join('foo', 'opslib', 'bar')]
 
     def test_bogus_topdir(self):
         """Check that having one bogus dir in sys.path doesn't cause the finder to abort."""
@@ -138,19 +136,18 @@ class TestLibFinder(TestCase):
 
         dirs = [tmpdir, "/bogus"]
 
-        self.assertEqual(list(ops.lib._find_all_specs(dirs)), [])
+        assert list(ops.lib._find_all_specs(dirs)) == []
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
-        self.assertEqual(
-            _flatten(ops.lib._find_all_specs(dirs)),
-            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
+        assert _flatten(ops.lib._find_all_specs(dirs)) == \
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
     def test_bogus_opsdir(self):
         """Check that having one bogus opslib doesn't cause the finder to abort."""
         tmpdir = self._mkdtemp()
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar").write_text('')
 
@@ -158,19 +155,18 @@ class TestLibFinder(TestCase):
         path.mkdir()
         (path / 'opslib').write_text('')
 
-        self.assertEqual(
-            _flatten(ops.lib._find_all_specs([tmpdir])),
-            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
+        assert _flatten(ops.lib._find_all_specs([tmpdir])) == \
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
     def test_namespace(self):
         """Check that namespace packages are ignored."""
         tmpdir = self._mkdtemp()
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar")  # no __init__.py  =>  a namespace package
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
 
 class TestLibParser(TestCase):
@@ -194,9 +190,9 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
     def test_libauthor_has_dashes(self):
         m = self._mkmod('foo', '''
@@ -207,9 +203,9 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice-someone@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice-someone@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice-someone@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice-someone@example.com, API 2, patch 42>'
 
     def test_lib_definitions_without_spaces(self):
         m = self._mkmod('foo', '''
@@ -220,9 +216,9 @@ class TestLibParser(TestCase):
         LIBANANA=True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
     def test_lib_definitions_trailing_comments(self):
         m = self._mkmod('foo', '''
@@ -233,9 +229,9 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
     def test_incomplete(self):
         """Check that if anything is missing, nothing is returned."""
@@ -244,7 +240,7 @@ class TestLibParser(TestCase):
         LIBAPI = 2
         LIBPATCH = 42
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_too_long(self):
         """Check that if the file is too long, nothing is returned."""
@@ -254,19 +250,19 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_no_origin(self):
         """Check that _parse_lib doesn't choke when given a spec with no origin."""
         # 'just don't crash'
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin=None))
-        self.assertIsNone(lib)
+        assert lib is None
 
     def test_bogus_origin(self):
         """Check that if the origin is messed up, we don't crash."""
         # 'just don't crash'
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin='/'))
-        self.assertIsNone(lib)
+        assert lib is None
 
     def test_bogus_lib(self):
         """Check our behaviour when the lib is messed up."""
@@ -277,7 +273,7 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_name_is_number(self):
         """Check our behaviour when the name in the lib is a number."""
@@ -287,7 +283,7 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_api_is_string(self):
         """Check our behaviour when the api in the lib is a string."""
@@ -297,7 +293,7 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_patch_is_string(self):
         """Check our behaviour when the patch in the lib is a string."""
@@ -307,7 +303,7 @@ class TestLibParser(TestCase):
         LIBPATCH = '42'
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_author_is_number(self):
         """Check our behaviour when the author in the lib is a number."""
@@ -317,7 +313,7 @@ class TestLibParser(TestCase):
         LIBPATCH = 42
         LIBAUTHOR = 43
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_other_encoding(self):
         """Check that we don't crash when a library is not UTF-8."""
@@ -325,7 +321,7 @@ class TestLibParser(TestCase):
         # This should never be the case, but we need to show type checkers
         # that it's not.
         if m.origin is None:
-            self.assertIsNotNone(m.origin)
+            assert m.origin is not None
             return
         with open(m.origin, 'w', encoding='latin-1') as f:
             f.write(dedent('''
@@ -335,31 +331,25 @@ class TestLibParser(TestCase):
             LIBAUTHOR = "alice@example.com"
             LIBANANA = "Ñoño"
             '''))
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
 
 class TestLib(TestCase):
 
     def test_lib_comparison(self):
-        self.assertNotEqual(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0),
-            ops.lib._Lib(_dummy_spec, "bar", "bob@example.com", 0, 1))
-        self.assertEqual(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0) != \
+            ops.lib._Lib(_dummy_spec, "bar", "bob@example.com", 0, 1)
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1) == \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
 
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 0, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1))
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0) < \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 0, 1) < \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1) < \
+            ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
 
         with self.assertRaises(TypeError):
             42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore  # noqa: B015, SIM300
@@ -369,8 +359,8 @@ class TestLib(TestCase):
         # these two might be surprising in that they don't raise an exception,
         # but they are correct: our __eq__ bailing means Python falls back to
         # its default of checking object identity.
-        self.assertNotEqual(ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1), 42)
-        self.assertNotEqual(42, ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1))
+        assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
+        assert 42 != ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)
 
     def test_lib_order(self):
         a = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 0)
@@ -383,7 +373,7 @@ class TestLib(TestCase):
             with self.subTest(i):
                 libs = [a, b, c, d, e]
                 shuffle(libs)
-                self.assertEqual(sorted(libs), [a, b, c, d, e])
+                assert sorted(libs) == [a, b, c, d, e]
 
     def test_use_bad_args_types(self):
         with self.assertRaises(TypeError):
@@ -427,10 +417,10 @@ class TestLibFunctional(TestCase):
 
         # ops.lib.use done by charm author
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBNAME, 'baz')
-        self.assertEqual(baz.LIBAPI, 2)
-        self.assertEqual(baz.LIBPATCH, 42)
-        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+        assert baz.LIBNAME == 'baz'
+        assert baz.LIBAPI == 2
+        assert baz.LIBPATCH == 42
+        assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_use_finds_best_same_toplevel(self):
         """Test that ops.lib.use("baz") works when there are two baz in the same toplevel."""
@@ -467,10 +457,10 @@ class TestLibFunctional(TestCase):
 
                         # ops.lib.use done by charm author
                         baz = ops.lib.use('baz', 2, 'alice@example.com')
-                        self.assertEqual(baz.LIBNAME, 'baz')
-                        self.assertEqual(baz.LIBAPI, 2)
-                        self.assertEqual(baz.LIBPATCH, max(patch_a, patch_b))
-                        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+                        assert baz.LIBNAME == 'baz'
+                        assert baz.LIBAPI == 2
+                        assert baz.LIBPATCH == max(patch_a, patch_b)
+                        assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_use_finds_best_diff_toplevel(self):
         """Test that ops.lib.use("baz") works when there are two baz in the different toplevels."""
@@ -505,10 +495,10 @@ class TestLibFunctional(TestCase):
 
                         # ops.lib.use done by charm author
                         baz = ops.lib.use('baz', 2, 'alice@example.com')
-                        self.assertEqual(baz.LIBNAME, 'baz')
-                        self.assertEqual(baz.LIBAPI, 2)
-                        self.assertEqual(baz.LIBPATCH, max(patch_a, patch_b))
-                        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+                        assert baz.LIBNAME == 'baz'
+                        assert baz.LIBAPI == 2
+                        assert baz.LIBPATCH == max(patch_a, patch_b)
+                        assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_none_found(self):
         with self.assertRaises(ImportError):
@@ -530,7 +520,7 @@ class TestLibFunctional(TestCase):
 
         # sanity check that ops.lib.use works
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBAPI, 2)
+        assert baz.LIBAPI == 2
 
     def _test_submodule(self, *, relative: bool = False):
         tmpdir = self._mkdtemp()
@@ -554,8 +544,8 @@ class TestLibFunctional(TestCase):
 
         # sanity check that ops.lib.use works
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBAPI, 2)
-        self.assertEqual(baz.quux.this, 42)
+        assert baz.LIBAPI == 2
+        assert baz.quux.this == 42
 
     def test_submodule_absolute(self):
         self._test_submodule(relative=False)
@@ -579,7 +569,7 @@ class TestLibFunctional(TestCase):
 
         # sanity check that ops.lib.use works
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBAPI, 2)
+        assert baz.LIBAPI == 2
 
         with self.assertRaises(ImportError):
             ops.lib.use('baz', 1, 'alice@example.com')
