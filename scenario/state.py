@@ -29,9 +29,8 @@ from typing import (
 )
 from uuid import uuid4
 
-import ops
 import yaml
-from ops import pebble
+from ops import CloudCredential, CloudSpec, pebble
 from ops.charm import CharmBase, CharmEvents
 from ops.model import SecretRotate, StatusBase
 
@@ -158,7 +157,7 @@ class CloudCredential:
     """A list of redacted secrets."""
 
     def _to_ops_cloud_credential(self):
-        return ops.CloudCredential(
+        return CloudCredential(
             auth_type=self.auth_type,
             attributes=self.attributes,
             redacted=self.redacted,
@@ -197,8 +196,8 @@ class CloudSpec:
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
 
-    def _to_ops_cloud_spec(self) -> ops.CloudSpec:
-        return ops.CloudSpec(
+    def _to_ops_cloud_spec(self) -> CloudSpec:
+        return CloudSpec(
             type=self.type,
             name=self.name,
             region=self.region,
