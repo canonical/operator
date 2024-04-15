@@ -950,7 +950,9 @@ assert out.model.uuid == state_in.model.uuid
 
 ## CloudSpec
 
-You can set CloudSpec information in the state.
+You can set CloudSpec information in the state (only `type` and `name` are required).
+
+Example:
 
 ```python
 import scenario
@@ -973,14 +975,17 @@ state = scenario.State(
 )
 ```
 
-The mandatory arguments of CloudSpec are `type` and `name`.
-
-Access CloudSpec by `Model.get_cloud_spec()`:
+Then you can access it by `Model.get_cloud_spec()`:
 
 ```python
-ctx = scenario.Context(MyCharm, meta={"name": "foo"})
-with ctx.manager("start", state=state) as mgr:
-    mgr.charm.model.get_cloud_spec()    
+# charm.py
+class MyVMCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, event: ops.StartEvent):
+        self.cloud_spec = self.model.get_cloud_spec()
 ```
 
 # Actions
