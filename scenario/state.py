@@ -157,7 +157,7 @@ class CloudCredential:
     redacted: List[str] = dataclasses.field(default_factory=list)
     """A list of redacted secrets."""
 
-    def _to_ops_cloud_credential(self):
+    def _to_ops(self):
         return ops.CloudCredential(
             auth_type=self.auth_type,
             attributes=self.attributes,
@@ -197,7 +197,7 @@ class CloudSpec:
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
 
-    def _to_ops_cloud_spec(self) -> ops.CloudSpec:
+    def _to_ops(self) -> ops.CloudSpec:
         return ops.CloudSpec(
             type=self.type,
             name=self.name,
@@ -207,7 +207,7 @@ class CloudSpec:
             storage_endpoint=self.storage_endpoint,
             credential=None
             if not self.credential
-            else self.credential._to_ops_cloud_credential(),
+            else self.credential._to_ops(),
             ca_certificates=self.ca_certificates,
             skip_tls_verify=self.skip_tls_verify,
             is_controller_cloud=self.is_controller_cloud,
