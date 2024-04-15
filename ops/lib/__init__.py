@@ -14,9 +14,10 @@
 
 """Infrastructure for the opslib functionality.
 
-DEPRECATED: The ops.lib functionality is deprecated, and is superseded by
-charm libraries (https://juju.is/docs/sdk/library) and regular Python imports.
-We now prefer to do version selection at build (charmcraft pack) time.
+.. deprecated:: 2.1.0
+    The ops.lib functionality is deprecated, and is superseded by
+    charm libraries (https://juju.is/docs/sdk/library) and regular Python imports.
+    We now prefer to do version selection at build (charmcraft pack) time.
 """
 
 import logging
@@ -48,9 +49,6 @@ _libauthor_re = re.compile(r'''^[A-Za-z0-9_+.-]+@[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.
 def use(name: str, api: int, author: str) -> ModuleType:
     """Use a library from the ops libraries.
 
-    DEPRECATED: This function is deprecated. Prefer charm libraries instead
-    (https://juju.is/docs/sdk/library).
-
     Args:
         name: the name of the library requested.
         api: the API version of the library.
@@ -61,6 +59,10 @@ def use(name: str, api: int, author: str) -> ModuleType:
         ImportError: if the library cannot be found.
         TypeError: if the name, api, or author are the wrong type.
         ValueError: if the name, api, or author are invalid.
+
+    .. deprecated:: 2.1.0
+        This function is deprecated. Prefer charm libraries instead
+        (https://juju.is/docs/sdk/library).
     """
     warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
                   category=DeprecationWarning)
@@ -101,8 +103,9 @@ def autoimport():
     otherwise changed in the current run, and the changes need to be seen.
     Otherwise libraries are found on first call of `use`.
 
-    DEPRECATED: This function is deprecated. Prefer charm libraries instead
-    (https://juju.is/docs/sdk/library).
+    .. deprecated:: 2.1.0
+        This function is deprecated. Prefer charm libraries instead
+        (https://juju.is/docs/sdk/library).
     """
     warnings.warn("ops.lib is deprecated, prefer charm libraries instead",
                   category=DeprecationWarning)
