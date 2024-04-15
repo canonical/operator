@@ -160,12 +160,12 @@ class TestTypes(unittest.TestCase):
         assert isinstance(error, pebble.Error)
         assert error.err == 'Some error'
         assert error.change == change
-        assert str(error) == """Some error \
------ Logs from task 0 ----- \
-LINE1 \
-LINE2 \
------ Logs from task 2 ----- \
-single log \
+        assert str(error) == """Some error
+----- Logs from task 0 -----
+LINE1
+LINE2
+----- Logs from task 2 -----
+single log
 -----"""
 
     def test_warning_state(self):
@@ -206,7 +206,7 @@ single log \
         assert warning.message == 'Beware!'
         assert warning.first_added == datetime_utc(2021, 1, 1, 1, 1, 1)
         assert warning.last_added == datetime_utc(2021, 1, 26, 2, 3, 4)
-        assert warning.last_shown == None
+        assert warning.last_shown is None
         assert warning.expire_after == '1s'
         assert warning.repeat_after == '2s'
 
@@ -222,13 +222,13 @@ single log \
         assert warning.message == 'Look out...'
         assert warning.first_added == datetime_nzdt(2020, 12, 25, 17, 18, 54, 16274)
         assert warning.last_added == datetime_nzdt(2021, 1, 26, 17, 1, 2, 123450)
-        assert warning.last_shown == None
+        assert warning.last_shown is None
         assert warning.expire_after == '1s'
         assert warning.repeat_after == '2s'
 
         d['last-shown'] = None
         warning = pebble.Warning.from_dict(d)
-        assert warning.last_shown == None
+        assert warning.last_shown is None
 
         d['last-shown'] = '2021-08-04T03:02:01.000000000+13:00'
         warning = pebble.Warning.from_dict(d)
@@ -338,7 +338,7 @@ single log \
         assert change.id == '70'
         assert change.kind == 'autostart'
         assert change.err == 'SILLY'
-        assert change.ready == True
+        assert change.ready
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291517)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
         assert change.status == 'Done'
@@ -363,7 +363,7 @@ single log \
         assert change.id == '70'
         assert change.kind == 'autostart'
         assert change.err == 'SILLY'
-        assert change.ready == True
+        assert change.ready
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
         assert change.status == 'Done'
@@ -510,7 +510,7 @@ services:
         assert plan.services['foo'].command == 'echo foo'
 
         # Should be read-only ("can't set attribute")
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             plan.services = {}  # type: ignore
 
     def test_checks(self):
@@ -531,7 +531,7 @@ checks:
         assert plan.checks['bar'].http == {'url': 'https://example.com/'}
 
         # Should be read-only ("can't set attribute")
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             plan.checks = {}  # type: ignore
 
     def test_log_targets(self):
@@ -554,7 +554,7 @@ log-targets:
         assert plan.log_targets['baz'].location == location
 
         # Should be read-only ("can't set attribute")
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             plan.log_targets = {}  # type: ignore
 
     def test_yaml(self):
@@ -847,7 +847,7 @@ summary: Sum Mary
         assert s.services['bar'].summary == 'Bar'
         assert s.services['bar'].command == 'echo bar'
         assert s.services['bar'].environment == \
-                         {'ENV1': 'value1', 'ENV2': 'value2'}
+            {'ENV1': 'value1', 'ENV2': 'value2'}
         assert s.services['bar'].user == 'bob'
         assert s.services['bar'].user_id == 1000
         assert s.services['bar'].group == 'staff'
@@ -940,7 +940,7 @@ class TestService(unittest.TestCase):
         assert service.backoff_delay == ''
         assert service.backoff_factor is None
         assert service.backoff_limit == ''
-        assert service.kill_delay is ''
+        assert service.kill_delay == ''
         assert service.to_dict() == {}
 
     def test_name_only(self):
@@ -1116,7 +1116,7 @@ class TestCheck(unittest.TestCase):
             'http': {'url': 'https://example.com/'},
         }
         check = pebble.Check('chk-http', d)
-        assert check.level == 'foobar!'# remains a string
+        assert check.level == 'foobar!'  # remains a string
 
     def test_equality(self):
         d: pebble.CheckDict = {
@@ -1593,7 +1593,7 @@ class TestClient(unittest.TestCase):
 
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             pebble.Client()  # type: ignore (socket_path arg required)
 
     def test_get_system_info(self):
@@ -1663,11 +1663,11 @@ class TestClient(unittest.TestCase):
         assert change.tasks[0].progress.label == ''
         assert change.tasks[0].progress.total == 1
         assert change.tasks[0].ready_time == \
-                         datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219)
+            datetime_nzdt(2021, 1, 28, 14, 37, 3, 270219)
         assert change.tasks[0].spawn_time == \
-                         datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158)
-        assert change.ready == True
-        assert change.err == None
+            datetime_nzdt(2021, 1, 28, 14, 37, 2, 247158)
+        assert change.ready
+        assert change.err is None
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
 
@@ -1807,13 +1807,13 @@ class TestClient(unittest.TestCase):
             return self.client.start_services(['svc'])
         self._services_action_helper('start', api_func, ['svc'])
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.start_services(1)  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.start_services([1])  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.start_services([['foo']])  # type: ignore
 
     def test_start_services_async(self):
@@ -1826,13 +1826,13 @@ class TestClient(unittest.TestCase):
             return self.client.stop_services(['svc'])
         self._services_action_helper('stop', api_func, ['svc'])
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.stop_services(1)  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.stop_services([1])  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.stop_services([['foo']])  # type: ignore
 
     def test_stop_services_async(self):
@@ -1845,13 +1845,13 @@ class TestClient(unittest.TestCase):
             return self.client.restart_services(['svc'])
         self._services_action_helper('restart', api_func, ['svc'])
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.restart_services(1)  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.restart_services([1])  # type: ignore
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.restart_services([['foo']])  # type: ignore
 
     def test_restart_services_async(self):
@@ -1875,12 +1875,12 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        with self.assertRaises(pebble.ChangeError) as cm:
+        with pytest.raises(pebble.ChangeError) as excinfo:
             self.client.autostart_services()
-        assert isinstance(cm.exception, pebble.Error)
-        assert cm.exception.err == 'Some kind of service error'
-        assert isinstance(cm.exception.change, pebble.Change)
-        assert cm.exception.change.id == '70'
+        assert isinstance(excinfo.value, pebble.Error)
+        assert excinfo.value.err == 'Some kind of service error'
+        assert isinstance(excinfo.value.change, pebble.Change)
+        assert excinfo.value.change.id == '70'
 
         assert self.client.requests == [
             ('POST', '/v1/services', None, {'action': 'autostart', 'services': []}),
@@ -1971,10 +1971,10 @@ class TestClient(unittest.TestCase):
         self.client.responses.append(lambda: timeout_response(4))
         self.client.responses.append(lambda: timeout_response(2))
 
-        with self.assertRaises(pebble.TimeoutError) as cm:
+        with pytest.raises(pebble.TimeoutError) as excinfo:
             self.client.wait_change(pebble.ChangeID('70'), timeout=6)
-        assert isinstance(cm.exception, pebble.Error)
-        assert isinstance(cm.exception, TimeoutError)
+        assert isinstance(excinfo.value, pebble.Error)
+        assert isinstance(excinfo.value, TimeoutError)
 
         assert self.client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
@@ -1997,10 +1997,10 @@ class TestClient(unittest.TestCase):
                 "type": "sync"
             })
 
-        with self.assertRaises(pebble.TimeoutError) as cm:
+        with pytest.raises(pebble.TimeoutError) as excinfo:
             self.client.wait_change(pebble.ChangeID('70'), timeout=3, delay=1)
-        assert isinstance(cm.exception, pebble.Error)
-        assert isinstance(cm.exception, TimeoutError)
+        assert isinstance(excinfo.value, pebble.Error)
+        assert isinstance(excinfo.value, TimeoutError)
 
         assert self.client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
@@ -2036,10 +2036,10 @@ class TestClient(unittest.TestCase):
 
         self.client.responses.append(lambda: timeout_response(3))
 
-        with self.assertRaises(pebble.TimeoutError) as cm:
+        with pytest.raises(pebble.TimeoutError) as excinfo:
             self.client.wait_change(pebble.ChangeID('70'), timeout=3)
-        assert isinstance(cm.exception, pebble.Error)
-        assert isinstance(cm.exception, TimeoutError)
+        assert isinstance(excinfo.value, pebble.Error)
+        assert isinstance(excinfo.value, TimeoutError)
 
     def test_add_layer(self):
         okay_response = {
@@ -2083,13 +2083,13 @@ services:
         ]
 
     def test_add_layer_invalid_type(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.add_layer('foo', 42)  # type: ignore
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.add_layer(42, 'foo')  # type: ignore
 
         # combine is a keyword-only arg (should be combine=True)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.add_layer('foo', {}, True)  # type: ignore
 
     def test_get_plan(self):
@@ -2306,11 +2306,11 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
 
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             self.client.pull('/etc/hosts')
-        assert isinstance(cm.exception, pebble.Error)
-        assert cm.exception.kind == 'not-found'
-        assert cm.exception.message == 'not found'
+        assert isinstance(excinfo.value, pebble.Error)
+        assert excinfo.value.kind == 'not-found'
+        assert excinfo.value.message == 'not found'
 
         assert self.client.requests == [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
@@ -2319,16 +2319,16 @@ Content-Disposition: form-data; name="response"\r
 
     def test_pull_protocol_errors(self):
         self.client.responses.append(({'Content-Type': 'c/t'}, b''))
-        with self.assertRaises(pebble.ProtocolError) as cm:
+        with pytest.raises(pebble.ProtocolError) as excinfo:
             self.client.pull('/etc/hosts')
-        assert isinstance(cm.exception, pebble.Error)
-        assert str(cm.exception) == \
-                         "expected Content-Type 'multipart/form-data', got 'c/t'"
+        assert isinstance(excinfo.value, pebble.Error)
+        assert str(excinfo.value) == \
+            "expected Content-Type 'multipart/form-data', got 'c/t'"
 
         self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
-        with self.assertRaises(pebble.ProtocolError) as cm:
+        with pytest.raises(pebble.ProtocolError) as excinfo:
             self.client.pull('/etc/hosts')
-        assert str(cm.exception) == "invalid boundary ''"
+        assert str(excinfo.value) == "invalid boundary ''"
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
@@ -2349,9 +2349,9 @@ Content-Disposition: form-data; name="response"\r
 --01234567890123456789012345678901--\r
 """,
         ))
-        with self.assertRaises(pebble.ProtocolError) as cm:
+        with pytest.raises(pebble.ProtocolError) as excinfo:
             self.client.pull('/etc/hosts')
-        assert str(cm.exception) == "path not expected: '/bad'"
+        assert str(excinfo.value) == "path not expected: '/bad'"
 
         self.client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
@@ -2363,9 +2363,9 @@ bad path\r
 --01234567890123456789012345678901--\r
 """,
         ))
-        with self.assertRaises(pebble.ProtocolError) as cm:
+        with pytest.raises(pebble.ProtocolError) as excinfo:
             self.client.pull('/etc/hosts')
-        assert str(cm.exception) == 'no "response" field in multipart body'
+        assert str(excinfo.value) == 'no "response" field in multipart body'
 
     def test_push_str(self):
         self._test_push_str('content 😀\nfoo\r\nbar')
@@ -2532,10 +2532,10 @@ bad path\r
 """,
         ))
 
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             self.client.push('/foo/bar', 'content')
-        assert cm.exception.kind == 'not-found'
-        assert cm.exception.message == 'not found'
+        assert excinfo.value.kind == 'not-found'
+        assert excinfo.value.message == 'not found'
 
         assert len(self.client.requests) == 1
         request = self.client.requests[0]
@@ -2626,7 +2626,7 @@ bad path\r
         assert infos[1].path == '/etc/nginx'
         assert infos[1].name == 'nginx'
         assert infos[1].type == pebble.FileType.DIRECTORY
-        assert infos[1].size == None
+        assert infos[1].size is None
         assert infos[1].permissions == 0o755
         assert infos[1].last_modified == datetime_nzdt(2020, 1, 1, 1, 1, 1, 0)
         assert infos[1].user_id is None
@@ -2719,11 +2719,11 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             self.client.make_dir('/foo/bar')
-        assert isinstance(cm.exception, pebble.Error)
-        assert cm.exception.kind == 'permission-denied'
-        assert cm.exception.message == 'permission denied'
+        assert isinstance(excinfo.value, pebble.Error)
+        assert excinfo.value.kind == 'permission-denied'
+        assert excinfo.value.message == 'permission denied'
 
     def test_remove_path_basic(self):
         self.client.responses.append({
@@ -2770,11 +2770,11 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             self.client.remove_path('/boo/far')
-        assert isinstance(cm.exception, pebble.Error)
-        assert cm.exception.kind == 'generic-file-error'
-        assert cm.exception.message == 'some other error'
+        assert isinstance(excinfo.value, pebble.Error)
+        assert excinfo.value.kind == 'generic-file-error'
+        assert excinfo.value.message == 'some other error'
 
     def test_send_signal_name(self):
         self.client.responses.append({
@@ -2806,10 +2806,10 @@ bad path\r
         ]
 
     def test_send_signal_type_error(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.send_signal('SIGHUP', 'should-be-a-list')
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.send_signal('SIGHUP', [1, 2])  # type: ignore
 
     def test_get_checks_all(self):
@@ -2892,7 +2892,7 @@ bad path\r
         checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
-        assert checks[0].level == 'foobar!'# stays a raw string
+        assert checks[0].level == 'foobar!'  # stays a raw string
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
@@ -2976,9 +2976,9 @@ bad path\r
     def test_get_notice_not_found(self):
         self.client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
 
-        with self.assertRaises(pebble.APIError) as cm:
+        with pytest.raises(pebble.APIError) as excinfo:
             self.client.get_notice('1')
-        assert cm.exception.code == 404
+        assert excinfo.value.code == 404
 
         assert self.client.requests == [
             ('GET', '/v1/notices/1', None, None),
@@ -3067,10 +3067,10 @@ bad path\r
 class TestSocketClient(unittest.TestCase):
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
-        with self.assertRaises(pebble.ConnectionError) as cm:
+        with pytest.raises(pebble.ConnectionError) as excinfo:
             client.get_system_info()
-        assert isinstance(cm.exception, pebble.Error)
-        assert "Could not connect to Pebble" in str(cm.exception)
+        assert isinstance(excinfo.value, pebble.Error)
+        assert "Could not connect to Pebble" in str(excinfo.value)
 
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
@@ -3083,12 +3083,12 @@ class TestSocketClient(unittest.TestCase):
             change_id = client.start_services(['foo'], timeout=0)
             assert change_id == '1234'
 
-            with self.assertRaises(pebble.APIError) as cm:
+            with pytest.raises(pebble.APIError) as excinfo:
                 client.start_services(['bar'], timeout=0)
-            assert isinstance(cm.exception, pebble.Error)
-            assert cm.exception.code == 400
-            assert cm.exception.status == 'Bad Request'
-            assert cm.exception.message == 'service "bar" does not exist'
+            assert isinstance(excinfo.value, pebble.Error)
+            assert excinfo.value.code == 400
+            assert excinfo.value.status == 'Bad Request'
+            assert excinfo.value.message == 'service "bar" does not exist'
 
         finally:
             shutdown()
@@ -3114,13 +3114,13 @@ class TestExecError(unittest.TestCase):
 
         e = pebble.ExecError(['a', 'b'], 1, 'out', 'err')
         assert str(e) == "non-zero exit code 1 executing ['a', 'b'], " \
-                                 + "stdout='out', stderr='err'"
+            + "stdout='out', stderr='err'"
 
     def test_str_truncated(self):
         e = pebble.ExecError(['foo'], 2, 'longout', 'longerr')
         e.STR_MAX_OUTPUT = 5  # type: ignore
         assert str(e) == "non-zero exit code 2 executing ['foo'], " \
-                                 + "stdout='longo' [truncated], stderr='longe' [truncated]"
+            + "stdout='longo' [truncated], stderr='longe' [truncated]"
 
 
 class MockWebsocket:
@@ -3202,27 +3202,27 @@ class TestExec(unittest.TestCase):
         }
 
     def test_arg_errors(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.exec('foo')  # type: ignore
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.client.exec([])
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.client.exec(['foo'], stdin='s', encoding=None)  # type: ignore
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.client.exec(['foo'], stdin=b's')
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.client.exec(['foo'], stdin=123)  # type: ignore
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
                              combine_stderr=True)
 
     def test_no_wait_call(self):
         self.add_responses('123', 0)
-        with self.assertWarns(ResourceWarning) as cm:
+        with pytest.warns(ResourceWarning) as record:
             process = self.client.exec(['true'])
             del process
-        assert str(cm.warning) == 'ExecProcess instance garbage collected ' \
-                                          + 'without call to wait() or wait_output()'
+        self.assertEqual(str(record[0].message), 'ExecProcess instance garbage collected '
+                         + 'without call to wait() or wait_output()')
 
     def test_wait_exit_zero(self):
         self.add_responses('123', 0)
@@ -3241,13 +3241,12 @@ class TestExec(unittest.TestCase):
         self.add_responses('456', 1)
 
         process = self.client.exec(['false'])
-        with self.assertRaises(pebble.ExecError) as cm:
+        with pytest.raises(pebble.ExecError) as excinfo:
             process.wait()
-        exc = typing.cast(pebble.ExecError[str], cm.exception)
-        assert exc.command == ['false']
-        assert exc.exit_code == 1
-        assert exc.stdout is None
-        assert exc.stderr is None
+        assert excinfo.value.command == ['false']
+        assert excinfo.value.exit_code == 1
+        assert excinfo.value.stdout is None  # type: ignore
+        assert excinfo.value.stderr is None  # type: ignore
 
         assert self.client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['false'])),
@@ -3296,10 +3295,10 @@ class TestExec(unittest.TestCase):
         self.add_responses('123', 0, change_err='change error!')
 
         process = self.client.exec(['true'])
-        with self.assertRaises(pebble.ChangeError) as cm:
+        with pytest.raises(pebble.ChangeError) as excinfo:
             process.wait()
-        assert cm.exception.err == 'change error!'
-        assert cm.exception.change.id == '123'
+        assert excinfo.value.err == 'change error!'
+        assert excinfo.value.change.id == '123'
 
         assert self.client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['true'])),
@@ -3327,14 +3326,14 @@ class TestExec(unittest.TestCase):
         assert len(control.sends) == num_sends
         assert control.sends[0][0] == 'TXT'
         assert json.loads(control.sends[0][1]) == \
-                         {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
+            {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
         if hasattr(signal, 'SIGHUP'):
             assert control.sends[1][0] == 'TXT'
             assert json.loads(control.sends[1][1]) == \
-                             {'command': 'signal', 'signal': {'name': signal.Signals(1).name}}
+                {'command': 'signal', 'signal': {'name': signal.Signals(1).name}}
             assert control.sends[2][0] == 'TXT'
             assert json.loads(control.sends[2][1]) == \
-                             {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
+                {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
 
     def test_wait_output(self):
         stdio, stderr, _ = self.add_responses('123', 0)
@@ -3469,7 +3468,7 @@ class TestExec(unittest.TestCase):
         stderr.receives.append('{"command":"end"}')
         stdout_buffer = io.BytesIO()
         process = self.client.exec(["echo", "FOOBAR"], stdout=stdout_buffer, encoding=None)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             process.wait_output()
 
     def test_wait_output_bad_command(self):
@@ -3679,15 +3678,15 @@ class TestExec(unittest.TestCase):
 
         self.client = Client()
         self.add_responses('123', 0, change_err='change error!')
-        with self.assertRaises(pebble.ChangeError) as cm:
+        with pytest.raises(pebble.ChangeError) as excinfo:
             self.client.exec(['foo'])
-        assert str(cm.exception) == 'change error!'
+        assert str(excinfo.value) == 'change error!'
 
         self.client = Client()
         self.add_responses('123', 0)
-        with self.assertRaises(pebble.ConnectionError) as cm:
+        with pytest.raises(pebble.ConnectionError) as excinfo:
             self.client.exec(['foo'])
-        assert str(cm.exception) in 'unexpected error connecting to websockets: conn!'
+        assert str(excinfo.value) in 'unexpected error connecting to websockets: conn!'
 
     def test_websocket_send_raises(self):
         stdio, stderr, _ = self.add_responses('123', 0)

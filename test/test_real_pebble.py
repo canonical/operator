@@ -39,6 +39,8 @@ import urllib.error
 import urllib.request
 import uuid
 
+import pytest
+
 from ops import pebble
 
 from .test_testing import PebbleNoticesMixin, PebbleStorageAPIsTestMixin
@@ -125,10 +127,10 @@ class TestRealPebble(unittest.TestCase):
         assert good_check.status == pebble.CheckStatus.UP
 
         # And /v1/health should return "unhealthy" (with status HTTP 502)
-        with self.assertRaises(urllib.error.HTTPError) as cm:
+        with pytest.raises(urllib.error.HTTPError) as excinfo:
             self._get_health()
-        assert cm.exception.code == 502
-        health = json.loads(cm.exception.read())
+        assert excinfo.value.code == 502
+        health = json.loads(excinfo.value.read())
         assert health == {
             'result': {'healthy': False},
             'status': 'Bad Gateway',
@@ -153,10 +155,10 @@ class TestRealPebble(unittest.TestCase):
         process = self.client.exec(['true'])
         process.wait()
 
-        with self.assertRaises(pebble.ExecError) as cm:
+        with pytest.raises(pebble.ExecError) as excinfo:
             process = self.client.exec(['/bin/sh', '-c', 'exit 42'])
             process.wait()
-        assert cm.exception.exit_code == 42
+        assert excinfo.value.exit_code == 42
 
     def test_exec_wait_output(self):
         process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'])
@@ -169,13 +171,12 @@ class TestRealPebble(unittest.TestCase):
         assert out == b'OUT\n'
         assert err == b'ERR\n'
 
-        with self.assertRaises(pebble.ExecError) as cm:
+        with pytest.raises(pebble.ExecError) as excinfo:
             process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
             process.wait_output()
-        exc = typing.cast(pebble.ExecError[str], cm.exception)
-        assert exc.exit_code == 42
-        assert exc.stdout == 'OUT\n'
-        assert exc.stderr == 'ERR\n'
+        assert excinfo.value.exit_code == 42
+        assert excinfo.value.stdout == 'OUT\n'  # type: ignore
+        assert excinfo.value.stderr == 'ERR\n'  # type: ignore
 
     def test_exec_send_stdin(self):
         process = self.client.exec(['awk', '{ print toupper($0) }'], stdin='foo\nBar\n')
@@ -200,9 +201,9 @@ class TestRealPebble(unittest.TestCase):
 
     def test_exec_timeout(self):
         process = self.client.exec(['sleep', '0.2'], timeout=0.1)
-        with self.assertRaises(pebble.ChangeError) as cm:
+        with pytest.raises(pebble.ChangeError) as excinfo:
             process.wait()
-        assert 'timed out' in cm.exception.err
+        assert 'timed out' in excinfo.value.err
 
     def test_exec_working_dir(self):
         with tempfile.TemporaryDirectory() as temp_dir:

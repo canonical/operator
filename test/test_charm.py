@@ -20,6 +20,7 @@ import typing
 import unittest
 from pathlib import Path
 
+import pytest
 import yaml
 
 import ops
@@ -90,9 +91,9 @@ class TestCharm(unittest.TestCase):
         charm = MyCharm(framework)
         charm.on.start.emit()
 
-        assert charm.started == True
+        assert charm.started
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             framework.observe(charm.on.start, charm)  # type: ignore
 
     def test_observe_decorated_method(self):
@@ -127,7 +128,7 @@ class TestCharm(unittest.TestCase):
         charm = MyCharm(framework)
         charm.on.start.emit()
         # check that the event has been seen by the decorator
-        assert 1 == len(events)
+        assert len(events) == 1
         # check that the event has been seen by the observer
         assert isinstance(charm.seen, ops.StartEvent)
 
@@ -239,8 +240,6 @@ peers:
         ]
 
     def test_storage_events(self):
-        this = self
-
         class MyCharm(ops.CharmBase):
             def __init__(self, *args: typing.Any):
                 super().__init__(*args)
@@ -252,7 +251,7 @@ peers:
 
             def _on_stor1_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
-                this.assertEqualevent.storage.location == Path("/var/srv/stor1/0")
+                assert event.storage.location == Path("/var/srv/stor1/0")
 
             def _on_stor2_detach(self, event: ops.StorageDetachingEvent):
                 self.seen.append(type(event).__name__)
@@ -427,11 +426,11 @@ requires:
 
         assert self.meta.requires['metrics'].interface_name == 'prometheus-scraping'
         assert self.meta.requires['metrics'].limit is None
-        assert self.meta.requires['metrics'].scope == 'global'# Default value
+        assert self.meta.requires['metrics'].scope == 'global'  # Default value
         assert self.meta.requires['metrics'].optional
 
     def test_relations_meta_limit_type_validation(self):
-        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
+        with pytest.raises(TypeError, match=r"limit should be an int, not <class 'str'>"):
             # language=YAML
             self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -442,8 +441,10 @@ requires:
 ''')
 
     def test_relations_meta_scope_type_validation(self):
-        with self.assertRaisesRegex(TypeError,
-                                    "scope should be one of 'global', 'container'; not 'foobar'"):
+        with pytest.raises(
+            TypeError,
+            match="scope should be one of 'global', 'container'; not 'foobar'"
+        ):
             # language=YAML
             self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -582,7 +583,7 @@ start:
                 {'aBc': 'd'}):
             charm.res = bad_res
 
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 charm.on.foo_bar_action.emit(id='1')
 
     def _test_action_event_defer_fails(self, cmd_type: str):
@@ -603,7 +604,7 @@ start:
         framework = self.create_framework()
         charm = MyCharm(framework)
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             charm.on.start_action.emit(id='2')
 
     def test_action_event_defer_fails(self):
@@ -669,7 +670,7 @@ containers:
         assert meta.containers['test2'].bases[1].channel == '23.04/stable/fips'
         assert meta.containers['test2'].bases[1].architectures == ['arm']
         # It's an error to specify both the 'resource' and the 'bases' fields.
-        with self.assertRaises(ModelError):
+        with pytest.raises(ModelError):
             ops.CharmMeta.from_yaml("""
 name: invalid-charm
 containers:
@@ -702,7 +703,7 @@ containers:
             '/test/storagemount'
         assert meta.containers['test1'].mounts["data"].locations[1] == '/test/otherdata'
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             meta.containers["test1"].mounts["data"].location
 
     def test_secret_events(self):
@@ -889,7 +890,7 @@ containers:
         fake_script(self, 'is-leader', 'echo true')
 
         charm = MyCharm(self.create_framework())
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.charm._evaluate_status(charm)
 
     def test_collect_status_priority(self):
@@ -965,9 +966,9 @@ issues:
 """)
         assert meta.links.websites == ['https://example.com', 'https://example.org']
         assert meta.links.sources == [
-                'https://git.example.com', 'https://bzr.example.com']
+            'https://git.example.com', 'https://bzr.example.com']
         assert meta.links.issues == [
-                'https://bugs.example.com', 'https://features.example.com']
+            'https://bugs.example.com', 'https://features.example.com']
 
     def test_links_charmcraft_yaml(self):
         meta = ops.CharmMeta.from_yaml("""
@@ -1015,6 +1016,6 @@ assumes:
             ops.JujuAssumes(
                 [ops.JujuAssumes(['juju >= 2.9.44', 'juju < 3']),
                  ops.JujuAssumes(['juju >= 3.1.5', 'juju < 4'])],
-                ops.JujuAssumesCondition.ANY \
+                ops.JujuAssumesCondition.ANY
             ),
         ]

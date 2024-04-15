@@ -28,6 +28,8 @@ import warnings
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import ops
 from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
@@ -158,7 +160,7 @@ class CharmInitTestCase(unittest.TestCase):
                 super().__init__(framework, somekey)  # type: ignore
 
         # Support for "key" has been deprecated since ops 0.7 and was removed in 2.0
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self._check(MyCharm)
 
     def test_init_signature_only_framework(self):
@@ -175,23 +177,23 @@ class CharmInitTestCase(unittest.TestCase):
         # here we patch juju_backend_available so it refuses to set it up
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = False
-            with self.assertRaisesRegex(
+            with pytest.raises(
                     RuntimeError,
-                    'charm set use_juju_for_storage=True, but Juju .* does not support it'):
+                    match='charm set use_juju_for_storage=True, but Juju .* does not support it'):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
     def test_storage_with_storage(self):
         # here we patch juju_backend_available, so it gets set up and falls over when used
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
-            with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+            with pytest.raises(FileNotFoundError, match='state-get'):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
     def test_controller_storage_deprecated(self):
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
             with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
-                with self.assertRaisesRegex(FileNotFoundError, 'state-get'):
+                with pytest.raises(FileNotFoundError, match='state-get'):
                     self._check(ops.CharmBase, use_juju_for_storage=True)
 
 
@@ -661,7 +663,7 @@ class _TestMain(abc.ABC):
 
             if expected_event_data:
                 assert getattr(state, f"{event_spec.event_name}_data") == \
-                                 expected_event_data
+                    expected_event_data
 
     def test_event_not_implemented(self):
         """Make sure events without implementation do not cause non-zero exit."""
@@ -719,7 +721,7 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         # Remove the "[key]>" suffix from the end of the event string
-        assert calls[2][-1].search(re.escape(custom_event_prefix) + '.*')
+        assert re.match(re.escape(custom_event_prefix) + '.*', calls[2][-1])
         calls[2][-1] = custom_event_prefix
         assert calls == expected
 
@@ -750,26 +752,26 @@ class _TestMain(abc.ABC):
         for event_spec, calls in test_cases:
             self._simulate_event(event_spec)
             assert calls in \
-                          fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
+                fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
 
     def test_excepthook(self):
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(ops.InstallEvent, 'install',
                                            set_in_env={'TRY_EXCEPTHOOK': '1'}))
 
         calls = [' '.join(i) for i in fake_script_calls(typing.cast(unittest.TestCase, self))]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
-        assert calls.pop(0).search('Using local storage: not a Kubernetes podspec charm')
-        assert calls.pop(0).search('Initializing SQLite local storage: ')
+        assert re.search('Using local storage: not a Kubernetes podspec charm', calls.pop(0))
+        assert re.search('Initializing SQLite local storage: ', calls.pop(0))
 
         self.maxDiff = None
-        assert calls[0].search(
-            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n' \
-            'Traceback .most recent call last.:\n' \
-            '  .*' \
-            '    raise RuntimeError."failing as requested".\n' \
-            'RuntimeError: failing as requested')
+        assert re.search(
+            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
+            'Traceback .most recent call last.:\n'
+            '  .*'
+            '    raise RuntimeError."failing as requested".\n'
+            'RuntimeError: failing as requested', calls[0])
         assert len(calls) == 1, f"expected 1 call, but got extra: {calls[1:]}"
 
     def test_sets_model_name(self):
@@ -958,7 +960,7 @@ class _TestMainWithDispatch(_TestMain):
             assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
             for event_hook in all_event_hooks:
                 assert not (self.JUJU_CHARM_DIR / event_hook).exists(), \
-                                 f"Spurious hook: {event_hook}"
+                    f"Spurious hook: {event_hook}"
 
         for initial_event in initial_events:
             self._setup_charm_dir()
@@ -993,8 +995,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
-        assert ' '.join(calls.pop(-3)).search(
-                         'Initializing SQLite local storage: ')
+        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
         assert calls == expected
 
     def test_non_executable_hook_and_dispatch(self):
@@ -1015,8 +1016,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
-        assert ' '.join(calls.pop(-3)).search(
-                         'Initializing SQLite local storage: ')
+        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
         assert calls == expected
 
     def test_hook_and_dispatch_with_failing_hook(self):
@@ -1027,7 +1027,7 @@ class _TestMainWithDispatch(_TestMain):
         self.fake_script_path = self.hooks_dir
         fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 42')
         event = EventSpec(ops.InstallEvent, 'install')
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(event)
         self.fake_script_path = old_path
 
@@ -1060,8 +1060,8 @@ class _TestMainWithDispatch(_TestMain):
         }.items():
             with self.subTest(path=path, rel=rel, ind=ind):
                 # sanity check
-                assert path.is_absolute() == not rel
-                assert path.with_suffix('').name == 'dispatch' == ind
+                assert path.is_absolute() == (not rel)
+                assert (path.with_suffix('').name == 'dispatch') == ind
                 try:
                     hook_path.symlink_to(path)
 
@@ -1103,7 +1103,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script_calls(typing.cast(unittest.TestCase, self))
-        assert ' '.join(calls.pop(-3)).search('Initializing SQLite local storage: ')
+        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
 
         assert calls == expected
 
@@ -1169,7 +1169,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         self.stderr = tempfile.TemporaryFile('w+t')
         self.addCleanup(self.stderr.close)
         fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(EventSpec(
                 ops.ActionEvent, 'keyerror_action',
                 env_var='JUJU_ACTION_NAME',

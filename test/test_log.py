@@ -14,6 +14,7 @@
 
 import io
 import logging
+import re
 import typing
 import unittest
 from unittest.mock import patch
@@ -108,11 +109,13 @@ class TestLogging(unittest.TestCase):
              ('WARNING', 'warning message'),
              ('CRITICAL', 'critical message'),
              ]
-        assert buffer.getvalue().search(
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n" \
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n" \
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n" \
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n")
+        assert re.search(
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n",
+            buffer.getvalue()
+        )
 
     def test_reduced_logging(self):
         ops.log.setup_root_logging(self.backend)

@@ -33,6 +33,7 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
+import pytest
 import yaml
 
 import ops
@@ -80,7 +81,7 @@ class TestHarness(unittest.TestCase):
     def test_add_relation_no_meta_fails(self):
         harness = ops.testing.Harness(ops.CharmBase, meta="name: mycharm")
         self.addCleanup(harness.cleanup)
-        with self.assertRaises(ops.RelationNotFoundError):
+        with pytest.raises(ops.RelationNotFoundError):
             harness.add_relation('db', 'postgresql')
 
     def test_add_relation(self):
@@ -145,7 +146,7 @@ class TestHarness(unittest.TestCase):
         c = harness.model.unit.get_container('foo')
 
         assert not c.can_connect()
-        with self.assertRaises(pebble.ConnectionError):
+        with pytest.raises(pebble.ConnectionError):
             c.get_plan()
 
         harness.set_can_connect('foo', True)
@@ -227,7 +228,7 @@ class TestHarness(unittest.TestCase):
         assert isinstance(rel_id, int)
         backend = harness._backend
         assert [rel_id] == backend.relation_ids('db')
-        assert {'app': 'data'} == backend.relation_get(rel_id, remote_app, is_app=True)
+        assert backend.relation_get(rel_id, remote_app, is_app=True) == {'app': 'data'}
 
     def test_add_relation_with_our_initial_data(self):
 
@@ -254,21 +255,21 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v1'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
         backend = harness._backend
-        assert {'k': 'v1'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v1'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
 
         harness.begin()
-        assert {'k': 'v1'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v1'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
         # Make sure no relation-changed events are emitted for our own data bags.
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
         # A remote unit can still update our app relation data bag since our unit is not a leader.
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
         # And we get an event
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
         # We can also update our own relation data, even if it is a bit 'cheaty'
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
         # But no event happens
@@ -277,7 +278,7 @@ class TestHarness(unittest.TestCase):
         harness.set_leader(True)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
     def test_add_peer_relation_with_initial_data_leader(self):
 
@@ -308,27 +309,27 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.1'})
         backend = harness._backend
-        assert {'k': 'v'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
 
         harness.begin()
-        assert {'k': 'v'} == backend.relation_get(rel_id, 'test-app', is_app=True)
-        assert {'ingress-address': '192.0.2.1'} == \
-                         backend.relation_get(rel_id, 'test-app/0', is_app=False)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v'}
+        assert backend.relation_get(rel_id, 'test-app/0', is_app=False) == \
+            {'ingress-address': '192.0.2.1'}
         # Make sure no relation-changed events are emitted for our own data bags.
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
         # Updating our app relation data bag and our unit data bag does not trigger events
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v2'})
         harness.update_relation_data(rel_id, 'test-app/0', {'ingress-address': '192.0.2.2'})
-        assert [] == harness.charm.observed_events
+        assert harness.charm.observed_events == []
 
         # If our unit becomes a minion, updating app relation data indirectly becomes possible
         # and our charm gets notifications.
         harness.set_leader(False)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
-        assert {'k': 'v3'} == backend.relation_get(rel_id, 'test-app', is_app=True)
+        assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v3'}
         assert len(harness.charm.observed_events), 1
         assert isinstance(harness.charm.observed_events[0], ops.RelationEvent)
 
@@ -355,22 +356,22 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id)
         # Check relation no longer exists
         assert backend.relation_ids('db') == []
-        self.assertRaises(ops.RelationNotFoundError, backend.relation_list, rel_id)
+        pytest.raises(ops.RelationNotFoundError, backend.relation_list, rel_id)
         # Check relation broken event is raised with correct data
         changes = harness.charm.get_changes()
         assert changes[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/0',
-                                   'departing_unit': 'postgresql/0',
-                                   'relation_id': 0}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/0',
+                      'departing_unit': 'postgresql/0',
+                      'relation_id': 0}}
         assert changes[1] == \
-                         {'name': 'relation-broken',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': None,
-                                   'relation_id': rel_id}}
+            {'name': 'relation-broken',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': None,
+                      'relation_id': rel_id}}
 
     def test_remove_specific_relation_id(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -408,23 +409,23 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation(rel_id_2)
         # Check second relation no longer exists but first does
         assert backend.relation_ids('db') == [rel_id_1]
-        self.assertRaises(ops.RelationNotFoundError, backend.relation_list, rel_id_2)
+        pytest.raises(ops.RelationNotFoundError, backend.relation_list, rel_id_2)
 
         # Check relation broken event is raised with correct data
         changes = harness.charm.get_changes()
         assert changes[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/1',
-                                   'departing_unit': 'postgresql/1',
-                                   'relation_id': rel_id_2}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/1',
+                      'departing_unit': 'postgresql/1',
+                      'relation_id': rel_id_2}}
         assert changes[1] == \
-                         {'name': 'relation-broken',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': None,
-                                   'relation_id': rel_id_2}}
+            {'name': 'relation-broken',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': None,
+                      'relation_id': rel_id_2}}
 
     def test_removing_invalid_relation_id_raises_exception(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -446,7 +447,7 @@ class TestHarness(unittest.TestCase):
         assert backend.relation_list(rel_id) == ['postgresql/0']
         harness.charm.get_changes(reset=True)  # created event ignored
         # Check exception is raised if relation id is invalid
-        with self.assertRaises(ops.RelationNotFoundError):
+        with pytest.raises(ops.RelationNotFoundError):
             harness.remove_relation(rel_id + 1)
 
     def test_remove_relation_unit(self):
@@ -487,19 +488,19 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db')
         assert rel is not None
         assert len(rel.units) == 0
-        assert not rel_unit in rel.data
+        assert rel_unit not in rel.data
         # Check relation departed was raised with correct data
-        assert {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/0',
-                                   'departing_unit': 'postgresql/0',
-                                   'relation_id': 0,
-                                   'relation_data': {'test-app/0': {},
-                                                     'test-app': {},
-                                                     'postgresql/0': {'foo': 'bar'},
-                                                     'postgresql': {}}}} == \
-                         harness.charm.get_changes()[0]
+        assert harness.charm.get_changes()[0] == \
+            {'name': 'relation-departed',
+                'relation': 'db',
+                'data': {'app': 'postgresql',
+                         'unit': 'postgresql/0',
+                         'departing_unit': 'postgresql/0',
+                         'relation_id': 0,
+                         'relation_data': {'test-app/0': {},
+                                           'test-app': {},
+                                           'postgresql/0': {'foo': 'bar'},
+                                           'postgresql': {}}}}
 
     def test_removing_relation_removes_remote_app_data(self):
         # language=YAML
@@ -520,13 +521,13 @@ class TestHarness(unittest.TestCase):
         # Check relation app data exists
         backend = harness._backend
         assert backend.relation_ids('db') == [rel_id]
-        assert {'app': 'data'} == backend.relation_get(rel_id, remote_app, is_app=True)
+        assert backend.relation_get(rel_id, remote_app, is_app=True) == {'app': 'data'}
         harness.remove_relation(rel_id)
         # Check relation and app data are removed
         assert backend.relation_ids('db') == []
         with harness._event_context('foo'):
-            self.assertRaises(ops.RelationNotFoundError, backend.relation_get,
-                              rel_id, remote_app, is_app=True)
+            pytest.raises(ops.RelationNotFoundError, backend.relation_get,
+                          rel_id, remote_app, is_app=True)
 
     def test_removing_relation_refreshes_charm_model(self):
         # language=YAML
@@ -549,7 +550,7 @@ class TestHarness(unittest.TestCase):
         # Check relation app data exists
         backend = harness._backend
         assert backend.relation_ids('db') == [rel_id]
-        assert {'app': 'data'} == backend.relation_get(rel_id, remote_app, is_app=True)
+        assert backend.relation_get(rel_id, remote_app, is_app=True) == {'app': 'data'}
         harness.remove_relation(rel_id)
         assert self._find_relation_in_model_by_id(harness, rel_id) is None
 
@@ -617,19 +618,19 @@ class TestHarness(unittest.TestCase):
         # Check relation exists but unit and data are removed
         assert backend.relation_ids('db') == [rel_id]
         assert backend.relation_list(rel_id) == []
-        self.assertRaises(KeyError,
-                          backend.relation_get,
-                          rel_id,
-                          'postgresql/0',
-                          is_app=False)
+        pytest.raises(KeyError,
+                      backend.relation_get,
+                      rel_id,
+                      'postgresql/0',
+                      is_app=False)
         # Check relation departed was raised with correct data
         assert harness.charm.get_changes()[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/0',
-                                   'departing_unit': 'postgresql/0',
-                                   'relation_id': rel_id}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/0',
+                      'departing_unit': 'postgresql/0',
+                      'relation_id': rel_id}}
 
     def test_removing_relation_unit_does_not_remove_other_unit_and_data(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -652,7 +653,7 @@ class TestHarness(unittest.TestCase):
         backend = harness._backend
         assert backend.relation_ids('db') == [rel_id]
         assert backend.relation_list(rel_id) == \
-                         ['postgresql/0', 'postgresql/1']
+            ['postgresql/0', 'postgresql/1']
         assert backend.relation_get(rel_id, 'postgresql/0', is_app=False) == \
             {'foo0': 'bar0'}
         assert backend.relation_get(rel_id, 'postgresql/1', is_app=False) == \
@@ -662,17 +663,17 @@ class TestHarness(unittest.TestCase):
         harness.remove_relation_unit(rel_id, 'postgresql/1')
         # Check other unit and data still exists
         assert backend.relation_list(rel_id) == \
-                         ['postgresql/0']
+            ['postgresql/0']
         assert backend.relation_get(rel_id, 'postgresql/0', is_app=False) == \
             {'foo0': 'bar0'}
         # Check relation departed was raised with correct data
         assert harness.charm.get_changes()[0] == \
-                         {'name': 'relation-departed',
-                          'relation': 'db',
-                          'data': {'app': 'postgresql',
-                                   'unit': 'postgresql/1',
-                                   'departing_unit': 'postgresql/1',
-                                   'relation_id': rel_id}}
+            {'name': 'relation-departed',
+             'relation': 'db',
+             'data': {'app': 'postgresql',
+                      'unit': 'postgresql/1',
+                      'departing_unit': 'postgresql/1',
+                      'relation_id': rel_id}}
 
     def test_relation_events(self):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
@@ -735,9 +736,9 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql', {'remote': 'data'})
         assert harness.get_relation_data(rel_id, 'test-app') == {}
         assert harness.get_relation_data(rel_id, 'test-app/0') == {}
-        assert harness.get_relation_data(rel_id, 'test-app/1') == None
+        assert harness.get_relation_data(rel_id, 'test-app/1') is None
         assert harness.get_relation_data(rel_id, 'postgresql') == {'remote': 'data'}
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             # unknown relation id
             harness.get_relation_data(99, 'postgresql')
 
@@ -748,7 +749,7 @@ class TestHarness(unittest.TestCase):
         t_unit1 = ops.Unit('test-app/1', meta, harness._backend, t_cache)
         assert harness.get_relation_data(rel_id, t_app) == {}
         assert harness.get_relation_data(rel_id, t_unit0) == {}
-        assert harness.get_relation_data(rel_id, t_unit1) == None
+        assert harness.get_relation_data(rel_id, t_unit1) is None
         pg_app = ops.Application('postgresql', meta, harness._backend, t_cache)
         assert harness.get_relation_data(rel_id, pg_app) == {'remote': 'data'}
 
@@ -783,7 +784,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.begin()
 
     def test_update_relation_exposes_new_data(self):
@@ -802,7 +803,7 @@ class TestHarness(unittest.TestCase):
         assert viewer.changes == [{'initial': 'data'}]
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'value'})
         assert viewer.changes == [{'initial': 'data'},
-                                          {'initial': 'data', 'new': 'value'}]
+                                  {'initial': 'data', 'new': 'value'}]
 
     def test_update_relation_no_local_unit_change_event(self):
         # language=YAML
@@ -822,13 +823,13 @@ class TestHarness(unittest.TestCase):
         # there should be no event for updating our own data
         harness.update_relation_data(rel_id, 'my-charm/0', {'new': 'other'})
         # but the data will be updated.
-        assert {'key': 'value', 'new': 'other'} == rel.data[harness.charm.model.unit]
+        assert rel.data[harness.charm.model.unit] == {'key': 'value', 'new': 'other'}
 
         rel.data[harness.charm.model.unit]['new'] = 'value'
         # Our unit data bag got updated.
         assert rel.data[harness.charm.model.unit]['new'] == 'value'
         # But there were no changed events registered by our unit.
-        assert [] == helper.changes
+        assert helper.changes == []
 
     def test_update_peer_relation_no_local_unit_change_event(self):
         # language=YAML
@@ -849,25 +850,25 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db')
         assert rel is not None
         harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v1'})
-        assert {'key': 'v1'} == rel.data[harness.charm.model.unit]
+        assert rel.data[harness.charm.model.unit] == {'key': 'v1'}
         # Make sure there was no event
-        assert [] == helper.changes
+        assert helper.changes == []
 
         rel.data[harness.charm.model.unit]['key'] = 'v2'
         # Our unit data bag got updated.
-        assert {'key': 'v2'} == dict(rel.data[harness.charm.model.unit])
+        assert dict(rel.data[harness.charm.model.unit]) == {'key': 'v2'}
         # But there were no changed events registered by our unit.
-        assert [] == helper.changes
+        assert helper.changes == []
 
         # Same for when our unit is a leader.
         harness.set_leader(is_leader=True)
         harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'v3'})
-        assert {'key': 'v3'} == dict(rel.data[harness.charm.model.unit])
-        assert [] == helper.changes
+        assert dict(rel.data[harness.charm.model.unit]) == {'key': 'v3'}
+        assert helper.changes == []
 
         rel.data[harness.charm.model.unit]['key'] = 'v4'
         assert rel.data[harness.charm.model.unit]['key'] == 'v4'
-        assert [] == helper.changes
+        assert helper.changes == []
 
     def test_update_peer_relation_app_data(self):
         # language=YAML
@@ -886,14 +887,14 @@ class TestHarness(unittest.TestCase):
         assert rel is not None
         rel.data[harness.charm.app]['key'] = 'value'
         harness.update_relation_data(rel_id, 'postgresql', {'key': 'v1'})
-        assert {'key': 'v1'} == rel.data[harness.charm.app]
-        assert [] == helper.changes
+        assert rel.data[harness.charm.app] == {'key': 'v1'}
+        assert helper.changes == []
 
         rel.data[harness.charm.app]['key'] = 'v2'
         # Our unit data bag got updated.
         assert rel.data[harness.charm.model.app]['key'] == 'v2'
         # But there were no changed events registered by our unit.
-        assert [] == helper.changes
+        assert helper.changes == []
 
         # If our unit is not a leader unit we get an update about peer app relation data changes.
         harness.set_leader(is_leader=False)
@@ -1009,7 +1010,7 @@ class TestHarness(unittest.TestCase):
         assert viewer.changes == [{'initial': 'data'}]
 
     def test_empty_config_raises(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.testing.Harness(RecordingCharm, config='')
 
     def test_update_config(self):
@@ -1043,7 +1044,7 @@ class TestHarness(unittest.TestCase):
         harness = ops.testing.Harness(RecordingCharm)
         self.addCleanup(harness.cleanup)
         harness.begin()
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             harness.update_config(key_values={'nonexistent': 'foo'})
 
     def test_update_config_bad_type(self):
@@ -1056,15 +1057,15 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             # cannot cast to bool
             harness.update_config(key_values={'a': 'foo'})
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             # cannot cast to float
             harness.update_config(key_values={'a': 42.42})
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             # cannot cast to int
             harness.update_config(key_values={'a': 42})
 
@@ -1072,7 +1073,7 @@ class TestHarness(unittest.TestCase):
         harness.update_config(key_values={'a': False})
 
     def test_bad_config_option_type(self):
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             ops.testing.Harness(RecordingCharm, config='''
                 options:
                     a:
@@ -1093,11 +1094,10 @@ class TestHarness(unittest.TestCase):
         harness.begin()
         secret_id = harness.add_user_secret({'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
-        assert harness.charm.changes == \
-            [{'name': 'config-changed', 'data': {'a': secret_id}}]
+        assert harness.charm.changes == [{'name': 'config-changed', 'data': {'a': secret_id}}]
 
     def test_no_config_option_type(self):
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             ops.testing.Harness(RecordingCharm, config='''
                 options:
                     a:
@@ -1106,7 +1106,7 @@ class TestHarness(unittest.TestCase):
                 ''')
 
     def test_uncastable_config_option_type(self):
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             ops.testing.Harness(RecordingCharm, config='''
                 options:
                     a:
@@ -1172,7 +1172,7 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db')
         assert rel is not None
         with harness._event_context('foo'):
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 rel.data[harness.charm.app]['foo'] = 'bar'
         # The data has not actually been changed
         assert harness.get_relation_data(rel_id, 'test-charm') == {}
@@ -1352,7 +1352,7 @@ class TestHarness(unittest.TestCase):
         assert isinstance(harness.model.config['opt_int'], int)
         assert harness.model.config['opt_float'] == 1.0
         assert isinstance(harness.model.config['opt_float'], float)
-        assert not 'opt_null' in harness.model.config
+        assert 'opt_null' not in harness.model.config
         assert harness._backend._config._defaults['opt_null'] is None
         assert harness._backend._config._defaults['opt_no_default'] is None
 
@@ -1390,7 +1390,7 @@ class TestHarness(unittest.TestCase):
         ''')
         self.addCleanup(harness.cleanup)
         harness.set_model_name('foo')
-        assert 'foo' == harness.model.name
+        assert harness.model.name == 'foo'
 
     def test_set_model_name_after_begin(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -1399,7 +1399,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.set_model_name('bar')
         harness.begin()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_name('foo')
         assert harness.model.name == 'bar'
 
@@ -1411,7 +1411,7 @@ class TestHarness(unittest.TestCase):
         harness.set_model_name('bar')
         harness.set_model_uuid('96957e90-e006-11eb-ba80-0242ac130004')
         harness.begin()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_uuid('af0479ea-e006-11eb-ba80-0242ac130004')
         assert harness.model.uuid == '96957e90-e006-11eb-ba80-0242ac130004'
 
@@ -1422,15 +1422,15 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.set_model_info('foo', '96957e90-e006-11eb-ba80-0242ac130004')
         harness.begin()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_info('bar', 'af0479ea-e006-11eb-ba80-0242ac130004')
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_info('bar')
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_info(uuid='af0479ea-e006-11eb-ba80-0242ac130004')
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_name('bar')
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_model_uuid('af0479ea-e006-11eb-ba80-0242ac130004')
         assert harness.model.name == 'foo'
         assert harness.model.uuid == '96957e90-e006-11eb-ba80-0242ac130004'
@@ -1454,7 +1454,7 @@ class TestHarness(unittest.TestCase):
             # before begin, adding storage does not attach it.
             assert s not in harness._backend.storage_list("test")
 
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             harness._backend.storage_get("test/0", "location")[-6:]
 
     def test_add_storage_then_harness_begin(self):
@@ -1473,7 +1473,7 @@ class TestHarness(unittest.TestCase):
 
         harness.add_storage("test", count=3)
 
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             harness._backend.storage_get("test/0", "location")[-6:]
 
         harness.begin_with_initial_hooks()
@@ -1510,9 +1510,9 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
 
-        with self.assertRaises(RuntimeError) as cm:
+        with pytest.raises(RuntimeError) as excinfo:
             harness.add_storage("test")
-        assert cm.exception.args[0] == \
+        assert excinfo.value.args[0] == \
             "the key 'test' is not specified as a storage key in metadata"
 
     def test_add_storage_after_harness_begin(self):
@@ -1578,11 +1578,11 @@ class TestHarness(unittest.TestCase):
         # Verify backend functions return appropriate values.
         # Real backend would return info only for actively attached storage units.
         assert stor_id not in harness._backend.storage_list("test")
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             harness._backend.storage_get("test/0", "location")
         # Error message modeled after output of
         # "storage-get -s <invalid/inactive id> location" on real deployment
-        assert cm.exception.args[0] == \
+        assert excinfo.value.args[0] == \
             'ERROR invalid value "test/0" for option -s: storage not found'
 
         # Retry detach
@@ -1604,10 +1604,10 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         stor_id = harness.add_storage("test")[0]
-        with self.assertRaises(RuntimeError) as cm:
+        with pytest.raises(RuntimeError) as excinfo:
             harness.detach_storage(f"test/{stor_id}")
-        assert cm.exception.args[0] == \
-                         "cannot detach storage before Harness is initialised"
+        assert excinfo.value.args[0] == \
+            "cannot detach storage before Harness is initialised"
 
     def test_storage_with_hyphens_works(self):
         harness = ops.testing.Harness(StorageTester, meta='''
@@ -1726,9 +1726,9 @@ class TestHarness(unittest.TestCase):
 
         # Doesn't really make sense since we already can't add storage which isn't in the metadata,
         # but included for completeness.
-        with self.assertRaises(RuntimeError) as cm:
+        with pytest.raises(RuntimeError) as excinfo:
             harness.remove_storage("test/0")
-        assert cm.exception.args[0] == \
+        assert excinfo.value.args[0] == \
             "the key 'test' is not specified as a storage key in metadata"
 
     def test_remove_storage_after_harness_begin(self):
@@ -1885,7 +1885,7 @@ class TestHarness(unittest.TestCase):
         event.relation = rel
 
         with harness._event_context('my_relation_joined'):
-            with self.assertRaises(ops.RelationDataError):
+            with pytest.raises(ops.RelationDataError):
                 harness.charm.event_handler(event)
 
     def test_event_context_inverse(self):
@@ -1921,8 +1921,8 @@ class TestHarness(unittest.TestCase):
         harness.add_relation_unit(rel_id, 'remote/0')
         rel = harness.charm.model.get_relation('db', rel_id)
         assert rel is not None
-        assert {'foo': 'bar'} == \
-                         harness.get_relation_data(rel_id, 'test-charm')
+        assert harness.get_relation_data(rel_id, 'test-charm') == \
+            {'foo': 'bar'}
 
         # now we're outside of the hook context:
         assert not harness._backend._hook_is_running
@@ -1944,7 +1944,7 @@ class TestHarness(unittest.TestCase):
         rel = harness.charm.model.get_relation('db', rel_id)
         assert rel is not None
         del rel.data[harness.charm.model.unit]['foo']
-        assert {} == harness.get_relation_data(rel_id, 'test-charm/0')
+        assert harness.get_relation_data(rel_id, 'test-charm/0') == {}
 
     def test_relation_set_nonstring(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -1958,7 +1958,7 @@ class TestHarness(unittest.TestCase):
         harness.set_leader(False)
         rel_id = harness.add_relation('db', 'postgresql')
         for invalid_value in (1, 1.2, {}, [], set(), True, object(), type):  # type: ignore
-            with self.assertRaises(ops.RelationDataError):
+            with pytest.raises(ops.RelationDataError):
                 harness.update_relation_data(rel_id, 'test-charm/0',
                                              {'foo': invalid_value})  # type: ignore
 
@@ -1986,40 +1986,40 @@ class TestHarness(unittest.TestCase):
         rel_id = harness.add_relation('db', 'postgresql')
 
         assert [
-                ('relation_ids', 'db'),
-                ('relation_list', rel_id),
-                ('relation_remote_app_name', 0),
-            ] == \
+            ('relation_ids', 'db'),
+            ('relation_list', rel_id),
+            ('relation_remote_app_name', 0),
+        ] == \
             harness._get_backend_calls()
 
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert [
-                ('relation_get', 0, 'test-charm/0', False),
-                ('update_relation_data', 0, test_charm_unit, 'foo', 'bar') \
-            ] == \
+            ('relation_get', 0, 'test-charm/0', False),
+            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar')
+        ] == \
             harness._get_backend_calls(reset=True)
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
         harness.add_relation_unit(rel_id, 'postgresql/0')
-        assert [] == harness._get_backend_calls(reset=False)
+        assert harness._get_backend_calls(reset=False) == []
         # however, update_relation_data does, because we are preparing relation-changed
         harness.update_relation_data(rel_id, 'postgresql/0', {'foo': 'bar'})
         pgql_unit = harness.model.get_unit('postgresql/0')
 
         assert harness._get_backend_calls(reset=False) == [
-                ('relation_ids', 'db'),
-                ('relation_list', rel_id),
-                ('relation_get', 0, 'postgresql/0', False),
-                ('update_relation_data', 0, pgql_unit, 'foo', 'bar') \
-            ]
+            ('relation_ids', 'db'),
+            ('relation_list', rel_id),
+            ('relation_get', 0, 'postgresql/0', False),
+            ('update_relation_data', 0, pgql_unit, 'foo', 'bar')
+        ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
-                ('relation_ids', 'db'),
-                ('relation_list', rel_id),
-                ('relation_get', 0, 'postgresql/0', False),
-                ('update_relation_data', 0, pgql_unit, 'foo', 'bar') \
-            ]
+            ('relation_ids', 'db'),
+            ('relation_list', rel_id),
+            ('relation_get', 0, 'postgresql/0', False),
+            ('update_relation_data', 0, pgql_unit, 'foo', 'bar')
+        ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
 
@@ -2036,14 +2036,14 @@ class TestHarness(unittest.TestCase):
         # Reset the list, because we don't care what it took to get here
         harness._get_backend_calls(reset=True)
         unit.status = ops.ActiveStatus()
-        assert [('status_set', 'active', '', {'is_app': False})] == harness._get_backend_calls()
+        assert harness._get_backend_calls() == [('status_set', 'active', '', {'is_app': False})]
         harness.set_leader(True)
         app = harness.charm.model.app
         harness._get_backend_calls(reset=True)
         app.status = ops.ActiveStatus('message')
-        assert [('is_leader',),
-             ('status_set', 'active', 'message', {'is_app': True})] == \
-            harness._get_backend_calls()
+        assert harness._get_backend_calls() == \
+            [('is_leader',),
+                ('status_set', 'active', 'message', {'is_app': True})]
 
     def test_unit_status(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
@@ -2168,9 +2168,9 @@ class TestHarness(unittest.TestCase):
                 description: "Image to deploy."
             ''')
         self.addCleanup(harness.cleanup)
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.add_oci_resource("image")
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.add_oci_resource("missing-resource")
         assert len(harness._backend._resources_map) == 0
 
@@ -2183,7 +2183,7 @@ class TestHarness(unittest.TestCase):
                 description: "Image to deploy."
             ''')
         self.addCleanup(harness.cleanup)
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.add_resource('unknown', 'content')
 
     def test_add_resource_but_oci(self):
@@ -2195,7 +2195,7 @@ class TestHarness(unittest.TestCase):
                 description: "Image to deploy."
             ''')
         self.addCleanup(harness.cleanup)
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.add_resource('image', 'content')
 
     def test_add_resource_string(self):
@@ -2213,7 +2213,7 @@ class TestHarness(unittest.TestCase):
         assert path.name == 'foo.txt'
         assert path.parent.name == 'image'
         with path.open('rt') as f:
-            assert 'foo contents\n' == f.read()
+            assert f.read() == 'foo contents\n'
 
     def test_add_resource_bytes(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -2270,7 +2270,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
         harness.set_leader(True)
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             _ = harness.charm
         harness.begin_with_initial_hooks()
         assert harness.charm is not None
@@ -2293,7 +2293,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             _ = harness.charm
         harness.begin_with_initial_hooks()
         assert harness.charm is not None
@@ -2323,7 +2323,7 @@ class TestHarness(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         harness.update_config({'foo': 'bar'})
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             _ = harness.charm
         harness.begin_with_initial_hooks()
         assert harness.charm is not None
@@ -2463,7 +2463,8 @@ class TestHarness(unittest.TestCase):
         harness.update_relation_data(rel_id, 'postgresql/0', {'new': 'data'})
         harness.update_relation_data(rel_id, 'postgresql', {'app': 'data'})
         harness.begin_with_initial_hooks()
-        assert [
+        assert harness.charm.changes == \
+            [
                 {'name': 'install'},
                 {'name': 'relation-created',
                  'relation': 'db',
@@ -2496,8 +2497,7 @@ class TestHarness(unittest.TestCase):
                      'unit': 'postgresql/0',
                      'app': 'postgresql',
                  }},
-            ] == \
-            harness.charm.changes
+            ]
 
     def test_begin_with_initial_hooks_with_multiple_units(self):
         class CharmWithDB(RelationEventCharm):
@@ -2718,14 +2718,14 @@ class TestHarness(unittest.TestCase):
                 command: /bin/echo hello from c
             ''')
         plan = container.pebble.get_plan()
-        assert plan.to_yaml() == textwrap.dedent('''\ \
-            services: \
-              a: \
-                command: /bin/echo hello from a \
-              b: \
-                command: /bin/echo hello from b \
-              c: \
-                command: /bin/echo hello from c \
+        assert plan.to_yaml() == textwrap.dedent('''\
+            services:
+              a:
+                command: /bin/echo hello from a
+              b:
+                command: /bin/echo hello from b
+              c:
+                command: /bin/echo hello from c
             ''')
         harness_plan = harness.get_container_pebble_plan('foo')
         assert harness_plan.to_yaml() == plan.to_yaml()
@@ -2773,7 +2773,7 @@ class TestHarness(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.begin()
         harness.set_can_connect('foo', True)
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             harness.get_container_pebble_plan('unknown')
         plan = harness.get_container_pebble_plan('foo')
         assert plan.to_yaml() == "{}\n"
@@ -2846,15 +2846,15 @@ class TestHarness(unittest.TestCase):
         harness.set_leader(True)
         harness.begin()
 
-        with self.assertRaises(ops.model.ModelError):
+        with pytest.raises(ops.model.ModelError):
             harness.model.app.status = ops.UnknownStatus()
-        with self.assertRaises(ops.model.ModelError):
+        with pytest.raises(ops.model.ModelError):
             harness.model.app.status = ops.ErrorStatus()
         harness.model.app.status = ops.ActiveStatus()
 
-        with self.assertRaises(ops.model.ModelError):
+        with pytest.raises(ops.model.ModelError):
             harness.model.unit.status = ops.UnknownStatus()
-        with self.assertRaises(ops.model.ModelError):
+        with pytest.raises(ops.model.ModelError):
             harness.model.unit.status = ops.ErrorStatus()
         harness.model.unit.status = ops.ActiveStatus()
 
@@ -2907,10 +2907,10 @@ class TestNetwork(unittest.TestCase):
         assert network.bind_address == ipaddress.IPv4Address('10.0.0.10')
         assert network.ingress_address == ipaddress.IPv4Address('10.0.0.1')
         assert network.ingress_addresses == \
-                         [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')]
+            [ipaddress.IPv4Address('10.0.0.1'), ipaddress.IPv4Address('10.0.0.2')]
         assert network.egress_subnets == \
-                         [ipaddress.IPv4Network('10.0.0.0/8'),
-                          ipaddress.IPv4Network('10.10.0.0/16')]
+            [ipaddress.IPv4Network('10.0.0.0/8'),
+             ipaddress.IPv4Network('10.10.0.0/16')]
         assert len(network.interfaces) == 1
         interface = network.interfaces[0]
         assert interface.name == 'eth1'
@@ -2931,7 +2931,7 @@ class TestNetwork(unittest.TestCase):
         foo_binding = self.harness.model.get_binding('foo')
         assert foo_binding is not None
         assert foo_binding.network.bind_address == \
-                         ipaddress.IPv4Address('10.0.0.1')
+            ipaddress.IPv4Address('10.0.0.1')
 
     def test_add_network_specific_relation(self):
         self.harness.add_network('10.0.0.1')
@@ -2951,7 +2951,7 @@ class TestNetwork(unittest.TestCase):
         foo_binding = self.harness.model.get_binding('foo')
         assert foo_binding is not None
         assert foo_binding.network.bind_address == \
-                         ipaddress.IPv4Address('10.0.0.1')
+            ipaddress.IPv4Address('10.0.0.1')
 
     def test_add_network_endpoint_fallback(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
@@ -2992,7 +2992,7 @@ class TestNetwork(unittest.TestCase):
         assert interface.subnet == ipaddress.IPv6Network('2001:0db8::0:0:0:0/64')
 
     def test_network_get_relation_not_found(self):
-        with self.assertRaises(ops.RelationNotFoundError):
+        with pytest.raises(ops.RelationNotFoundError):
             binding = self.harness.model.get_binding('db')
             assert binding is not None
             binding.network
@@ -3004,22 +3004,22 @@ class TestNetwork(unittest.TestCase):
         assert binding.network
 
     def test_add_network_endpoint_not_in_meta(self):
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.harness.add_network('35.0.0.1', endpoint='xyz')
 
     def test_add_network_relation_id_set_endpoint_not_set(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.harness.add_network('35.0.0.1', relation_id=relation_id)
 
     def test_add_network_relation_id_incorrect(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.harness.add_network('35.0.0.1', endpoint='db', relation_id=relation_id + 1)
 
     def test_add_network_endpoint_and_relation_id_do_not_correspond(self):
         relation_id = self.harness.add_relation('db', 'postgresql')
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.harness.add_network('35.0.0.1', endpoint='foo', relation_id=relation_id)
 
 
@@ -3268,7 +3268,7 @@ class TestTestingModelBackend(unittest.TestCase):
         # With no relations added, we just get an empty list for the interface
         assert backend.relation_ids('db') == []
         # But an unknown interface raises a ModelError
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             backend.relation_ids('unknown')
 
     def test_relation_get_unknown_relation_id(self):
@@ -3277,7 +3277,7 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
-        with self.assertRaises(ops.RelationNotFoundError):
+        with pytest.raises(ops.RelationNotFoundError):
             backend.relation_get(1234, 'unit/0', False)
 
     def test_relation_list_unknown_relation_id(self):
@@ -3286,7 +3286,7 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
-        with self.assertRaises(ops.RelationNotFoundError):
+        with pytest.raises(ops.RelationNotFoundError):
             backend.relation_list(1234)
 
     def test_lazy_resource_directory(self):
@@ -3316,10 +3316,10 @@ class TestTestingModelBackend(unittest.TestCase):
             ''')
         self.addCleanup(harness.cleanup)
         backend = harness._backend
-        with self.assertRaises(ops.ModelError) as cm:
+        with pytest.raises(ops.ModelError) as excinfo:
             backend.resource_get('foo')
         assert "units/unit-test-app-0/resources/foo: resource#test-app/foo not found" in \
-            str(cm.exception)
+            str(excinfo.value)
 
     def test_relation_remote_app_name(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -3372,11 +3372,11 @@ class TestTestingModelBackend(unittest.TestCase):
         backend = harness._backend
         backend.reboot()
         assert harness.reboot_count == 1
-        with self.assertRaises(SystemExit):
+        with pytest.raises(SystemExit):
             backend.reboot(now=True)
         assert harness.reboot_count == 2
         harness.begin()
-        with self.assertRaises(SystemExit):
+        with pytest.raises(SystemExit):
             harness.charm.on.install.emit()
         assert harness.reboot_count == 3
         harness.charm.on.remove.emit()
@@ -3412,7 +3412,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         client = self.get_testing_client()
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
-        assert '{}\n' == plan.to_yaml()
+        assert plan.to_yaml() == '{}\n'
         client.add_layer('foo', pebble.Layer('''\
             summary: Foo
             description: |
@@ -3430,25 +3430,25 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             '''))
         plan = client.get_plan()
         # The YAML should be normalized
-        assert textwrap.dedent('''\ \
-            services: \
-              serv: \
-                command: /bin/echo hello \
-                description: 'A description about Serv the amazing service. \
- \
-                  ' \
-                environment: \
-                  KEY: VALUE \
-                override: replace \
-                startup: enabled \
-                summary: Serv \
+        assert textwrap.dedent('''\
+            services:
+              serv:
+                command: /bin/echo hello
+                description: 'A description about Serv the amazing service.
+
+                  '
+                environment:
+                  KEY: VALUE
+                override: replace
+                startup: enabled
+                summary: Serv
             ''') == plan.to_yaml()
 
     def test_add_layer_merge(self):
         client = self.get_testing_client()
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
-        assert '{}\n' == plan.to_yaml()
+        assert plan.to_yaml() == '{}\n'
         client.add_layer('foo', pebble.Layer('''\
             summary: Foo
             description: |
@@ -3484,35 +3484,35 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         plan = client.get_plan()
         # The YAML should be normalized
         self.maxDiff = None
-        assert textwrap.dedent('''\ \
-            services: \
-              serv: \
-                after: \
-                - thing1 \
-                backoff-delay: 1 \
-                backoff-factor: 2 \
-                backoff-limit: 1 \
-                before: \
-                - thing1 \
-                command: /bin/echo hello \
-                description: 'A description about Serv the amazing service. \
- \
-                  ' \
-                environment: \
-                  KEY1: VALUE1 \
-                group: group1 \
-                group-id: groupID1 \
-                on-check-failure: \
-                  KEY1: VALUE1 \
-                on-failure: thing1 \
-                on-success: thing1 \
-                override: replace \
-                requires: \
-                - thing1 \
-                startup: enabled \
-                summary: Serv \
-                user: user1 \
-                user-id: userID1 \
+        assert textwrap.dedent('''\
+            services:
+              serv:
+                after:
+                - thing1
+                backoff-delay: 1
+                backoff-factor: 2
+                backoff-limit: 1
+                before:
+                - thing1
+                command: /bin/echo hello
+                description: 'A description about Serv the amazing service.
+
+                  '
+                environment:
+                  KEY1: VALUE1
+                group: group1
+                group-id: groupID1
+                on-check-failure:
+                  KEY1: VALUE1
+                on-failure: thing1
+                on-success: thing1
+                override: replace
+                requires:
+                - thing1
+                startup: enabled
+                summary: Serv
+                user: user1
+                user-id: userID1
             ''') == plan.to_yaml()
 
         client.add_layer('foo', pebble.Layer('''\
@@ -3553,49 +3553,49 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             '''), combine=True)
         plan = client.get_plan()
         # The YAML should be normalized
-        assert textwrap.dedent('''\ \
-            services: \
-              serv: \
-                after: \
-                - thing1 \
-                - thing2 \
-                backoff-delay: 2 \
-                backoff-factor: 3 \
-                backoff-limit: 2 \
-                before: \
-                - thing1 \
-                - thing2 \
-                command: /bin/echo hello \
-                description: 'A new description of the the amazing Serv service. \
- \
-                  ' \
-                environment: \
-                  KEY1: VALUE4 \
-                  KEY2: VALUE2 \
-                  KEY3: VALUE3 \
-                group: group2 \
-                group-id: groupID2 \
-                on-check-failure: \
-                  KEY1: VALUE4 \
-                  KEY2: VALUE2 \
-                  KEY3: VALUE3 \
-                on-failure: thing2 \
-                on-success: thing2 \
-                override: merge \
-                requires: \
-                - thing1 \
-                - thing2 \
-                startup: enabled \
-                summary: Serv \
-                user: user2 \
-                user-id: userID2 \
+        assert textwrap.dedent('''\
+            services:
+              serv:
+                after:
+                - thing1
+                - thing2
+                backoff-delay: 2
+                backoff-factor: 3
+                backoff-limit: 2
+                before:
+                - thing1
+                - thing2
+                command: /bin/echo hello
+                description: 'A new description of the the amazing Serv service.
+
+                  '
+                environment:
+                  KEY1: VALUE4
+                  KEY2: VALUE2
+                  KEY3: VALUE3
+                group: group2
+                group-id: groupID2
+                on-check-failure:
+                  KEY1: VALUE4
+                  KEY2: VALUE2
+                  KEY3: VALUE3
+                on-failure: thing2
+                on-success: thing2
+                override: merge
+                requires:
+                - thing1
+                - thing2
+                startup: enabled
+                summary: Serv
+                user: user2
+                user-id: userID2
             ''') == plan.to_yaml()
 
     def test_add_layer_not_combined(self):
         client = self.get_testing_client()
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
-        assert '{}\n' == plan.to_yaml()
+        assert plan.to_yaml() == '{}\n'
         service = textwrap.dedent('''\
             summary: Foo
             description: |
@@ -3616,7 +3616,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         #  pebble raises an HTTP exception. See https://github.com/canonical/operator/issues/514
         #  that this should be cleaned up into a clearer error type, however, they should get an
         #  error
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             client.add_layer('foo', pebble.Layer(service))
 
     def test_add_layer_three_services(self):
@@ -3651,23 +3651,23 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         plan = client.get_plan()
         self.maxDiff = 1000
         # Alphabetical services, and the YAML should be normalized
-        assert textwrap.dedent('''\ \
-            services: \
-              bar: \
-                command: /bin/echo bar \
-                override: replace \
-                startup: enabled \
-                summary: The Great Bar \
-              baz: \
-                command: /bin/echo baz \
-                override: replace \
-                startup: enabled \
-                summary: Not Bar, but Baz \
-              foo: \
-                command: /bin/echo foo \
-                override: replace \
-                startup: enabled \
-                summary: Foo \
+        assert textwrap.dedent('''\
+            services:
+              bar:
+                command: /bin/echo bar
+                override: replace
+                startup: enabled
+                summary: The Great Bar
+              baz:
+                command: /bin/echo baz
+                override: replace
+                startup: enabled
+                summary: Not Bar, but Baz
+              foo:
+                command: /bin/echo foo
+                override: replace
+                startup: enabled
+                summary: Foo
             ''') == plan.to_yaml()
 
     def test_add_layer_combine_no_override(self):
@@ -3682,7 +3682,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         # TODO: jam 2021-04-19 Pebble currently raises a HTTP Error 500 Internal Service Error
         #  if you don't supply an override directive. That needs to be fixed and this test
         #  should be updated. https://github.com/canonical/operator/issues/514
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             client.add_layer('foo', '''\
                 summary: foo
                 services:
@@ -3710,14 +3710,14 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
                 command: '/bin/echo foo new'
                 override: replace
             ''', combine=True)
-        assert textwrap.dedent('''\ \
-            services: \
-              bar: \
-                command: /bin/echo bar \
-                summary: Bar \
-              foo: \
-                command: /bin/echo foo new \
-                override: replace \
+        assert textwrap.dedent('''\
+            services:
+              bar:
+                command: /bin/echo bar
+                summary: Bar
+              foo:
+                command: /bin/echo foo new
+                override: replace
             ''') == client.get_plan().to_yaml()
 
     def test_add_layer_combine_override_merge(self):
@@ -3740,15 +3740,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
                 command: '/bin/echo foob'
                 override: merge
             ''', combine=True)
-        assert textwrap.dedent('''\ \
-            services: \
-              bar: \
-                command: /bin/echo bar \
-                summary: Bar \
-              foo: \
-                command: /bin/echo foob \
-                override: merge \
-                summary: Foo \
+        assert textwrap.dedent('''\
+            services:
+              bar:
+                command: /bin/echo bar
+                summary: Bar
+              foo:
+                command: /bin/echo foob
+                override: merge
+                summary: Foo
             ''') == client.get_plan().to_yaml()
 
     def test_add_layer_combine_override_unknown(self):
@@ -3763,7 +3763,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
                 summary: Foo
                 command: '/bin/echo foo'
             ''')
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             client.add_layer('foo', '''\
                 summary: foo
                 services:
@@ -3776,7 +3776,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
     def test_get_services_none(self):
         client = self.get_testing_client()
         service_info = client.get_services()
-        assert [] == service_info
+        assert service_info == []
 
     def test_get_services_not_started(self):
         client = self.get_testing_client()
@@ -3794,15 +3794,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
         assert not bar_info.is_running()
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
         assert not foo_info.is_running()
 
     def test_get_services_autostart(self):
@@ -3822,15 +3822,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
         assert not bar_info.is_running()
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.ACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.ACTIVE
         assert foo_info.is_running()
 
     def test_get_services_start_stop(self):
@@ -3850,21 +3850,21 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Even though bar defaults to DISABLED, we explicitly started it
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.ACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.ACTIVE
         # foo would be started by autostart, but we only called start_services
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
         client.stop_services(['bar'])
         infos = client.get_services()
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.name == 'bar'
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
 
     def test_get_services_bad_request(self):
         client = self.get_testing_client()
@@ -3881,7 +3881,7 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         # It is a common mistake to pass just a name vs a list of names, so catch it with a
         # TypeError
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             client.get_services('foo')
 
     def test_get_services_subset(self):
@@ -3900,9 +3900,9 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services(['foo'])
         assert len(infos) == 1
         foo_info = infos[0]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
 
     def test_get_services_unknown(self):
         client = self.get_testing_client()
@@ -3926,21 +3926,21 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
     def test_invalid_start_service(self):
         client = self.get_testing_client()
         # TODO: jam 2021-04-20 This should become a better error
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             client.start_services(['unknown'])
 
     def test_start_service_str(self):
         # Start service takes a list of names, but it is really easy to accidentally pass just a
         # name
         client = self.get_testing_client()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             client.start_services('unknown')
 
     def test_stop_service_str(self):
         # Start service takes a list of names, but it is really easy to accidentally pass just a
         # name
         client = self.get_testing_client()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             client.stop_services('unknown')
 
     def test_mixed_start_service(self):
@@ -3954,15 +3954,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
                 command: '/bin/echo foo'
             ''')
         # TODO: jam 2021-04-20 better error type
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             client.start_services(['foo', 'unknown'])
         # foo should not be started
         infos = client.get_services()
         assert len(infos) == 1
         foo_info = infos[0]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
 
     def test_stop_services_unknown(self):
         client = self.get_testing_client()
@@ -3976,15 +3976,15 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
             ''')
         client.autostart_services()
         # TODO: jam 2021-04-20 better error type
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             client.stop_services(['foo', 'unknown'])
         # foo should still be running
         infos = client.get_services()
         assert len(infos) == 1
         foo_info = infos[0]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.ACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.ACTIVE
 
     def test_start_started_service(self):
         # Pebble maintains idempotency even if you start a service
@@ -4008,14 +4008,14 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.ACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.ACTIVE
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.ACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.ACTIVE
 
     def test_stop_stopped_service(self):
         # Pebble maintains idempotency even if you stop a service
@@ -4039,14 +4039,14 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
-        assert 'bar' == bar_info.name
+        assert bar_info.name == 'bar'
         # Default when not specified is DISABLED
-        assert pebble.ServiceStartup.DISABLED == bar_info.startup
-        assert pebble.ServiceStatus.INACTIVE == bar_info.current
+        assert bar_info.startup == pebble.ServiceStartup.DISABLED
+        assert bar_info.current == pebble.ServiceStatus.INACTIVE
         foo_info = infos[1]
-        assert 'foo' == foo_info.name
-        assert pebble.ServiceStartup.ENABLED == foo_info.startup
-        assert pebble.ServiceStatus.INACTIVE == foo_info.current
+        assert foo_info.name == 'foo'
+        assert foo_info.startup == pebble.ServiceStartup.ENABLED
+        assert foo_info.current == pebble.ServiceStatus.INACTIVE
 
     @ unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self):
@@ -4069,23 +4069,23 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
         client.send_signal("SIGINT", ("foo",))
 
         # Send a valid signal but omit service name
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             client.send_signal("SIGINT", tuple())
 
         # Send an invalid signal to a running service
-        with self.assertRaises(pebble.APIError):
+        with pytest.raises(pebble.APIError):
             client.send_signal("sigint", ("foo",))
 
         # Send a valid signal to a stopped service
-        with self.assertRaises(pebble.APIError):
+        with pytest.raises(pebble.APIError):
             client.send_signal("SIGINT", ("bar",))
 
         # Send a valid signal to a non-existing service
-        with self.assertRaises(pebble.APIError):
+        with pytest.raises(pebble.APIError):
             client.send_signal("SIGINT", ("baz",))
 
         # Send a valid signal to a multiple services, one of which is not running
-        with self.assertRaises(pebble.APIError):
+        with pytest.raises(pebble.APIError):
             client.send_signal("SIGINT", ("foo", "bar",))
 
 
@@ -4179,9 +4179,9 @@ class PebbleStorageAPIsTestMixin:
         data = 'data'
         client = self.client
 
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=False)
-        assert cm.exception.kind == 'not-found'
+        assert excinfo.value.kind == 'not-found'
 
         client.push(f"{self.prefix}/nonexistent_dir/test", data, make_dirs=True)
 
@@ -4189,9 +4189,9 @@ class PebbleStorageAPIsTestMixin:
         data = 'data'
         client = self.client
         client.push(f"{self.prefix}/file", data)
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.push(f"{self.prefix}/file/file", data)
-        assert cm.exception.kind == 'generic-file-error'
+        assert excinfo.value.kind == 'generic-file-error'
 
     def test_push_with_permission_mask(self):
         data = 'data'
@@ -4204,9 +4204,9 @@ class PebbleStorageAPIsTestMixin:
             0o1000,  # Exceeds 0o777
             -1,      # Less than 0o000
         ):
-            with self.assertRaises(pebble.PathError) as cm:
+            with pytest.raises(pebble.PathError) as excinfo:
                 client.push(f"{self.prefix}/file", data, permissions=bad_permission)
-            assert cm.exception.kind == 'generic-file-error'
+            assert excinfo.value.kind == 'generic-file-error'
 
     def test_push_files_and_list(self):
         data = 'data'
@@ -4223,7 +4223,7 @@ class PebbleStorageAPIsTestMixin:
 
         files = client.list_files(f"{self.prefix}/")
         assert {file.path for file in files} == \
-                         {self.prefix + file for file in ('/file1', '/file2', '/file3')}
+            {self.prefix + file for file in ('/file1', '/file2', '/file3')}
 
         # Let's pull the first file again and check its details
         file = [f for f in files if f.path == f"{self.prefix}/file1"][0]
@@ -4243,31 +4243,31 @@ class PebbleStorageAPIsTestMixin:
 
     def test_push_file_with_relative_path_fails(self):
         client = self.client
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.push('file', '')
-        assert cm.exception.kind == 'generic-file-error'
+        assert excinfo.value.kind == 'generic-file-error'
 
     def test_pull_not_found(self):
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             self.client.pull("/not/found")
-        assert cm.exception.kind == "not-found"
-        assert "/not/found" in cm.exception.message
+        assert excinfo.value.kind == "not-found"
+        assert "/not/found" in excinfo.value.message
 
     def test_pull_directory(self):
         self.client.make_dir(f"{self.prefix}/subdir")
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             self.client.pull(f"{self.prefix}/subdir")
-        assert cm.exception.kind == "generic-file-error"
-        assert f"{self.prefix}/subdir" in cm.exception.message
+        assert excinfo.value.kind == "generic-file-error"
+        assert f"{self.prefix}/subdir" in excinfo.value.message
 
     def test_list_files_not_found_raises(self):
         client = self.client
-        with self.assertRaises(pebble.APIError) as cm:
+        with pytest.raises(pebble.APIError) as excinfo:
             client.list_files("/not/existing/file/")
-        assert cm.exception.code == 404
-        assert cm.exception.status == 'Not Found'
-        assert cm.exception.message == 'stat /not/existing/file/: no ' \
-                                               'such file or directory'
+        assert excinfo.value.code == 404
+        assert excinfo.value.status == 'Not Found'
+        assert excinfo.value.message == 'stat /not/existing/file/: no ' \
+            'such file or directory'
 
     def test_list_directory_object_itself(self):
         client = self.client
@@ -4303,7 +4303,7 @@ class PebbleStorageAPIsTestMixin:
             client.push(self.prefix + filename, data)
         files = client.list_files(f"{self.prefix}/", pattern='file*.gz')
         assert {file.path for file in files} == \
-                         {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')}
+            {self.prefix + file for file in ('/file1.gz', '/file2.tar.gz')}
 
     def test_make_directory(self):
         client = self.client
@@ -4317,9 +4317,9 @@ class PebbleStorageAPIsTestMixin:
     def test_make_directory_recursively(self):
         client = self.client
 
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=False)
-        assert cm.exception.kind == 'not-found'
+        assert excinfo.value.kind == 'not-found'
 
         client.make_dir(f"{self.prefix}/subdir/subdir", make_parents=True)
         assert client.list_files(f"{self.prefix}/subdir", pattern='subdir')[0].path == \
@@ -4327,23 +4327,23 @@ class PebbleStorageAPIsTestMixin:
 
     def test_make_directory_with_relative_path_fails(self):
         client = self.client
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir('dir')
-        assert cm.exception.kind == 'generic-file-error'
+        assert excinfo.value.kind == 'generic-file-error'
 
     def test_make_subdir_of_file_fails(self):
         client = self.client
         client.push(f"{self.prefix}/file", 'data')
 
         # Direct child case
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir(f"{self.prefix}/file/subdir")
-        assert cm.exception.kind == 'generic-file-error'
+        assert excinfo.value.kind == 'generic-file-error'
 
         # Recursive creation case, in case its flow is different
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir(f"{self.prefix}/file/subdir/subdir", make_parents=True)
-        assert cm.exception.kind == 'generic-file-error'
+        assert excinfo.value.kind == 'generic-file-error'
 
     def test_make_dir_with_permission_mask(self):
         client = self.client
@@ -4351,10 +4351,8 @@ class PebbleStorageAPIsTestMixin:
         client.make_dir(f"{self.prefix}/dir2", permissions=0o777)
 
         files = client.list_files(f"{self.prefix}/", pattern='dir*')
-        assert [f for f in files if f.path == f"{self.prefix}/dir1"] \
-                         [0].permissions == 0o700
-        assert [f for f in files if f.path == f"{self.prefix}/dir2"] \
-                         [0].permissions == 0o777
+        assert [f for f in files if f.path == f"{self.prefix}/dir1"][0].permissions == 0o700
+        assert [f for f in files if f.path == f"{self.prefix}/dir2"][0].permissions == 0o777
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -4362,9 +4360,9 @@ class PebbleStorageAPIsTestMixin:
             0o1000,  # Exceeds 0o777
             -1,      # Less than 0o000
         )):
-            with self.assertRaises(pebble.PathError) as cm:
+            with pytest.raises(pebble.PathError) as excinfo:
                 client.make_dir(f"{self.prefix}/dir3_{i}", permissions=bad_permission)
-            assert cm.exception.kind == 'generic-file-error'
+            assert excinfo.value.kind == 'generic-file-error'
 
     def test_remove_path(self):
         client = self.client
@@ -4380,17 +4378,17 @@ class PebbleStorageAPIsTestMixin:
         client.remove_path(f"{self.prefix}/empty_dir")
 
         # Remove non-empty directory, recursive=False: error
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.remove_path(f"{self.prefix}/dir", recursive=False)
-        assert cm.exception.kind == 'generic-file-error'
+        assert excinfo.value.kind == 'generic-file-error'
 
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
         client.remove_path(f"{self.prefix}/dir", recursive=True)
 
         # Remove non-existent path, recursive=False: error
-        with self.assertRaises(pebble.PathError) as cm:
+        with pytest.raises(pebble.PathError) as excinfo:
             client.remove_path(f"{self.prefix}/dir/does/not/exist/asdf", recursive=False)
-        assert cm.exception.kind == 'not-found'
+        assert excinfo.value.kind == 'not-found'
 
         # Remove non-existent path, recursive=True: succeeds
         client.remove_path(f"{self.prefix}/dir/does/not/exist/asdf", recursive=True)
@@ -4461,7 +4459,7 @@ class TestPebbleStorageAPIsUsingMocks(
         assert c1.exists(c1_fpath)
         fpath = os.path.join(str(harness.model.storages['store1'][0].location), 'foo.txt')
         with open(fpath) as f:
-            assert '42' == f.read()
+            assert f.read() == '42'
 
         # check that the file is not visible in c2 which has a different storage mount
         c2 = harness.model.unit.get_container('c2')
@@ -4473,11 +4471,11 @@ class TestPebbleStorageAPIsUsingMocks(
         c3_fpath = os.path.join('/mounts/bar', c1_fname)
         assert c3.exists(c3_fpath)
         with c3.pull(c3_fpath) as f:
-            assert '42' == f.read()
+            assert f.read() == '42'
 
         # test all other container file ops
         with c1.pull(c1_fpath) as f:
-            assert '42' == f.read()
+            assert f.read() == '42'
         files = c1.list_files(c1_fpath)
         assert [c1_fpath] == [fi.path for fi in files]
         c1.remove_path(c1_fpath)
@@ -4774,7 +4772,7 @@ class TestFilesystem(unittest.TestCase, _TestingPebbleClientMixin):
         assert harness.charm.locations[0] != harness.charm.locations[1]
         harness.add_storage('test-storage', 2, attach=True)
         assert harness.charm.attached == [
-                'test-storage/0', 'test-storage/1', 'test-storage/2', 'test-storage/3']
+            'test-storage/0', 'test-storage/1', 'test-storage/2', 'test-storage/3']
         assert len(set(harness.charm.locations)) == 4
 
 
@@ -4862,7 +4860,7 @@ class TestSecrets(unittest.TestCase):
         secret = harness.charm.app.add_secret({'password': 'hunter8'})
         secret.set_content({"password": "hunter9"})
         secret.remove_revision(secret.get_info().revision)
-        with self.assertRaises(ops.SecretNotFoundError):
+        with pytest.raises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret.id)
 
     def test_get_secret_by_label(self):
@@ -4882,7 +4880,7 @@ class TestSecrets(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             harness.add_model_secret('database', {'x': 'y'})  # key too short
 
     def test_set_secret_content(self):
@@ -4914,7 +4912,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret = harness.model.app.add_secret({'foo': 'bar'})
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             assert secret.id is not None
             harness.set_secret_content(secret.id, {'bar': 'foo'})
 
@@ -4922,7 +4920,7 @@ class TestSecrets(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         self.addCleanup(harness.cleanup)
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.set_secret_content('asdf', {'foo': 'bar'})
 
     def test_set_secret_content_invalid_content(self):
@@ -4930,7 +4928,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret_id = harness.add_model_secret('database', {'foo': 'bar'})
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             harness.set_secret_content(secret_id, {'x': 'y'})
 
     def test_grant_secret_and_revoke_secret(self):
@@ -4948,7 +4946,7 @@ class TestSecrets(unittest.TestCase):
         assert secret.get_content() == {'password': 'hunter2'}
 
         harness.revoke_secret(secret_id, 'webapp')
-        with self.assertRaises(ops.SecretNotFoundError):
+        with pytest.raises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret_id)
 
     def test_grant_secret_wrong_app(self):
@@ -4961,7 +4959,7 @@ class TestSecrets(unittest.TestCase):
 
         secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
         harness.grant_secret(secret_id, 'otherapp')
-        with self.assertRaises(ops.SecretNotFoundError):
+        with pytest.raises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret_id)
 
     def test_grant_secret_wrong_unit(self):
@@ -4974,7 +4972,7 @@ class TestSecrets(unittest.TestCase):
 
         secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
         harness.grant_secret(secret_id, 'webapp/1')  # should be webapp/0
-        with self.assertRaises(ops.SecretNotFoundError):
+        with pytest.raises(ops.SecretNotFoundError):
             harness.model.get_secret(id=secret_id)
 
     def test_grant_secret_no_relation(self):
@@ -4982,7 +4980,7 @@ class TestSecrets(unittest.TestCase):
         self.addCleanup(harness.cleanup)
 
         secret_id = harness.add_model_secret('database', {'password': 'hunter2'})
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.grant_secret(secret_id, 'webapp')
 
     def test_get_secret_grants(self):
@@ -5032,7 +5030,7 @@ class TestSecrets(unittest.TestCase):
         assert event.secret.label == 'override'
         assert event.secret.get_content() == {'foo': 'x'}
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.trigger_secret_rotation('nosecret')
 
     def test_trigger_secret_rotation_on_user_secret(self):
@@ -5071,7 +5069,7 @@ class TestSecrets(unittest.TestCase):
         assert event.revision == 42
         assert event.secret.get_content() == {'foo': 'x'}
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
 
     def test_trigger_secret_expiration(self):
@@ -5099,7 +5097,7 @@ class TestSecrets(unittest.TestCase):
         assert event.revision == 42
         assert event.secret.get_content() == {'foo': 'x'}
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.trigger_secret_removal('nosecret', 1)
 
     def test_trigger_secret_expiration_on_user_secret(self):
@@ -5152,11 +5150,11 @@ class TestSecrets(unittest.TestCase):
         secret_id = harness.charm.app.add_secret({"password": "1234"}).id
         secret = harness.charm.model.get_secret(id=secret_id)
         assert secret.get_content() == {"password": "1234"}
-        with self.assertRaises(ops.model.SecretNotFoundError):
+        with pytest.raises(ops.model.SecretNotFoundError):
             secret.get_info()
-        with self.assertRaises(ops.model.SecretNotFoundError):
+        with pytest.raises(ops.model.SecretNotFoundError):
             secret.set_content({"password": "5678"})
-        with self.assertRaises(ops.model.SecretNotFoundError):
+        with pytest.raises(ops.model.SecretNotFoundError):
             secret.remove_all_revisions()
 
     def test_add_user_secret(self):
@@ -5171,8 +5169,8 @@ class TestSecrets(unittest.TestCase):
         harness.grant_secret(secret_id, 'webapp')
 
         secret = harness.model.get_secret(id=secret_id)
-        assert secret.id == secret_id
-        assert secret.get_content() == secret_content
+        self.assertEqual(secret.id, secret_id)
+        self.assertEqual(secret.get_content(), secret_content)
 
     def test_get_user_secret_without_grant(self):
         harness = ops.testing.Harness(ops.CharmBase, meta=yaml.safe_dump(
@@ -5207,10 +5205,10 @@ class TestSecrets(unittest.TestCase):
         secret_id = harness.add_user_secret({'password': 'foo'})
         harness.grant_secret(secret_id, 'webapp')
         secret = harness.model.get_secret(id=secret_id)
-        assert secret.get_content() == {'password': 'foo'}
+        self.assertEqual(secret.get_content(), {'password': 'foo'})
         harness.set_secret_content(secret_id, {'password': 'bar'})
         secret = harness.model.get_secret(id=secret_id)
-        assert secret.get_content(refresh=True) == {'password': 'bar'}
+        self.assertEqual(secret.get_content(refresh=True), {'password': 'bar'})
 
     def test_get_user_secret_info(self):
         harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump(
@@ -5279,17 +5277,17 @@ class TestPorts(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         unit = harness.model.unit
 
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.open_port('icmp', 8080)  # icmp cannot have port
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.open_port('ftp', 8080)  # invalid protocol  # type: ignore
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.open_port('tcp')  # tcp must have port
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.open_port('udp')  # udp must have port
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.open_port('tcp', 0)  # port out of range
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             unit.open_port('tcp', 65536)  # port out of range
 
 
@@ -5340,7 +5338,7 @@ class TestHandleExec(unittest.TestCase):
         stdout, _ = self.container.exec(["foo"]).wait_output()
         assert stdout == "hello2"
 
-        with self.assertRaises(pebble.APIError):
+        with pytest.raises(pebble.APIError):
             self.container.exec(["abc"]).wait()
 
     def test_register_match_all_prefix(self):
@@ -5355,15 +5353,15 @@ class TestHandleExec(unittest.TestCase):
     def test_register_with_result(self):
         self.harness.handle_exec(self.container, ["foo"], result=10)
 
-        with self.assertRaises(pebble.ExecError) as exc:
+        with pytest.raises(pebble.ExecError) as excinfo:
             self.container.exec(["foo"]).wait()
-        assert exc.exception.exit_code == 10
+        assert excinfo.value.exit_code == 10
 
         self.harness.handle_exec(self.container, ["foo"], result="hello")
         stdout, stderr = self.container.exec(["foo"]).wait_output()
         assert stdout == "hello"
         assert stderr == ""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.container.exec(["foo"], encoding=None).wait_output()
 
         self.harness.handle_exec(self.container, ["foo"], result=b"hello2")
@@ -5389,7 +5387,7 @@ class TestHandleExec(unittest.TestCase):
         assert args_history[-1].command == ["foo", "bar"]
 
         return_value = ExecResult(exit_code=1)
-        with self.assertRaises(pebble.ExecError):
+        with pytest.raises(pebble.ExecError):
             self.container.exec(["foo", "bar"]).wait()
 
         return_value = ExecResult(stdout="hello", stderr="error")
@@ -5420,9 +5418,9 @@ class TestHandleExec(unittest.TestCase):
             raise TimeoutError
 
         self.harness.handle_exec(self.container, [], handler=handler)
-        with self.assertRaises(TimeoutError):
+        with pytest.raises(TimeoutError):
             self.container.exec(["ls"], timeout=1).wait()
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.container.exec(["ls"]).wait()
 
     def test_combined_error(self):
@@ -5433,7 +5431,7 @@ class TestHandleExec(unittest.TestCase):
         assert stderr == ""
 
         return_value = ExecResult(stdout="foobar", stderr="error")
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.container.exec(["ls"], combine_stderr=True).wait_output()
 
     def test_exec_stdin(self):
@@ -5521,7 +5519,7 @@ class TestHandleExec(unittest.TestCase):
         self.harness.handle_exec(self.container, ["ls"], handler=handler)
 
         self.container.exec(["ls"], service_context="test").wait()
-        assert args_history[-1].working_dir == "/tmp"# noqa: S108
+        assert args_history[-1].working_dir == "/tmp"  # noqa: S108
         assert args_history[-1].user == "foo"
         assert args_history[-1].user_id == 1
         assert args_history[-1].group == "bar"
@@ -5611,15 +5609,15 @@ class TestActions(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
             name: test
             ''')
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             harness.run_action("fail")
 
     def test_invalid_action(self):
         # This action isn't in the metadata at all.
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.harness.run_action("another-action")
         # Also check that we're not exposing the action with the dash to underscore replacement.
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.harness.run_action("log_and_results")
 
     def test_run_action(self):
@@ -5631,23 +5629,23 @@ class TestActions(unittest.TestCase):
     def test_fail_action(self):
         self._action_results.clear()
         self._action_results["partial"] = "foo"
-        with self.assertRaises(ops.testing.ActionFailed) as cm:
+        with pytest.raises(ops.testing.ActionFailed) as excinfo:
             self.harness.run_action("fail")
-        assert cm.exception.message == "something went wrong"
-        assert cm.exception.output.logs == ["some progress", "more progress"]
-        assert cm.exception.output.results == {"partial": "foo"}
+        assert excinfo.value.message == "something went wrong"
+        assert excinfo.value.output.logs == ["some progress", "more progress"]
+        assert excinfo.value.output.results == {"partial": "foo"}
 
     def test_required_param(self):
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.harness.run_action("unobserved-param-tester")
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             self.harness.run_action("unobserved-param-tester", {"bar": "baz"})
         self.harness.run_action("unobserved-param-tester", {"foo": "baz"})
         self.harness.run_action("unobserved-param-tester", {"foo": "baz", "bar": "qux"})
 
     def test_additional_params(self):
         self.harness.run_action("simple", {"foo": "bar"})
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             self.harness.run_action("unobserved-param-tester", {"foo": "bar", "qux": "baz"})
         self.harness.run_action("simple", {
             "string": "hello",
@@ -5669,19 +5667,19 @@ class TestActions(unittest.TestCase):
         self._action_results.clear()
         self._action_results["a"] = {"b": 1}
         self._action_results["a.b"] = 2
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.harness.run_action("results")
         # There are some result key names we cannot use.
         prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
         for key in prohibited_keys:
             self._action_results.clear()
             self._action_results[key] = "foo"
-            with self.assertRaises(ops.ModelError):
+            with pytest.raises(ops.ModelError):
                 self.harness.run_action("results")
         # There are some additional rules around what result keys are valid.
         self._action_results.clear()
         self._action_results["A"] = "foo"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.harness.run_action("results")
 
 
@@ -5915,5 +5913,5 @@ class TestCloudSpec(unittest.TestCase):
         harness = ops.testing.Harness(ops.CharmBase)
         self.addCleanup(harness.cleanup)
         harness.begin()
-        with self.assertRaises(ops.ModelError):
+        with pytest.raises(ops.ModelError):
             harness.model.get_cloud_spec()
