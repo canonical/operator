@@ -197,7 +197,7 @@ class CloudSpec:
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
 
-    def to_ops_cloud_spec(self) -> ops.CloudSpec:
+    def _to_ops_cloud_spec(self) -> ops.CloudSpec:
         return ops.CloudSpec(
             type=self.type,
             name=self.name,
