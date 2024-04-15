@@ -205,7 +205,7 @@ class CloudSpec:
             endpoint=self.endpoint,
             identity_endpoint=self.identity_endpoint,
             storage_endpoint=self.storage_endpoint,
-            credential=None if not self.credential else self.credential._to_ops(),
+            credential=self.credential._to_ops() if self.credential else None,
             ca_certificates=self.ca_certificates,
             skip_tls_verify=self.skip_tls_verify,
             is_controller_cloud=self.is_controller_cloud,
