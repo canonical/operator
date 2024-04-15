@@ -1233,147 +1233,150 @@ class TestStoredState(BaseTestCase):
             None,
             {},
             lambda a, b: None,
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {},
             {'a': {}},
             {'a': {}},
             lambda a, b: a.update(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {'a': {}},
             {'b': 'c'},
             {'a': {'b': 'c'}},
             lambda a, b: a['a'].update(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {'a': {'b': 'c'}},
             {'d': 'e'},
             {'a': {'b': 'c', 'd': 'e'}},
             lambda a, b: a['a'].update(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {'a': {'b': 'c', 'd': 'e'}},
             'd',
             {'a': {'b': 'c'}},
             lambda a, b: a['a'].pop(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {'s': set()},  # type: ignore
             'a',
             {'s': {'a'}},
             lambda a, b: a['s'].add(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {'s': {'a'}},
             'a',
             {'s': set()},
             lambda a, b: a['s'].discard(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: [],
             None,
             [],
             lambda a, b: None,
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: [],
             'a',
             ['a'],
             lambda a, b: a.append(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: ['a'],
             ['c'],
             ['a', ['c']],
             lambda a, b: a.append(b),
-            lambda res, expected_res: pytest.fail() if (
-                res != expected_res or not isinstance(
-                    res[1], ops.StoredList)) else None
+            lambda res, expected_res: (
+                self.assertEqual(res, expected_res),
+                self.assertIsInstance(res[1], ops.StoredList),
+            )
         ), (
             lambda: ['a', ['c']],
             'b',
             ['b', 'a', ['c']],
             lambda a, b: a.insert(0, b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: ['b', 'a', ['c']],
             ['d'],
             ['b', ['d'], 'a', ['c']],
             lambda a, b: a.insert(1, b),
-            lambda res, expected_res: pytest.fail() if (
-                res != expected_res or not isinstance(
-                    res[1], ops.StoredList)) else None
+            lambda res, expected_res: (
+                self.assertEqual(res, expected_res),
+                self.assertIsInstance(res[1], ops.StoredList)
+            ),
         ), (
             lambda: ['b', 'a', ['c']],
             ['d'],
             ['b', ['d'], ['c']],
             # a[1] = b
             lambda a, b: a.__setitem__(1, b),
-            lambda res, expected_res: pytest.fail() if (
-                res != expected_res or not isinstance(
-                    res[1], ops.StoredList)) else None
+            lambda res, expected_res: (
+                self.assertEqual(res, expected_res),
+                self.assertIsInstance(res[1], ops.StoredList)
+            ),
         ), (
             lambda: ['b', ['d'], 'a', ['c']],
             0,
             [['d'], 'a', ['c']],
             lambda a, b: a.pop(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: [['d'], 'a', ['c']],
             ['d'],
             ['a', ['c']],
             lambda a, b: a.remove(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: ['a', ['c']],
             'd',
             ['a', ['c', 'd']],
             lambda a, b: a[1].append(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: ['a', ['c', 'd']],
             1,
             ['a', ['c']],
             lambda a, b: a[1].pop(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: ['a', ['c']],
             'd',
             ['a', ['c', 'd']],
             lambda a, b: a[1].insert(1, b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: ['a', ['c', 'd']],
             'd',
             ['a', ['c']],
             lambda a, b: a[1].remove(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: set(),
             None,
             set(),
             lambda a, b: None,
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: set(),
             'a',
             {'a'},
             lambda a, b: a.add(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: {'a'},
             'a',
             set(),
             lambda a, b: a.discard(b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         ), (
             lambda: set(),
             {'a'},
             set(),
             # Nested sets are not allowed as sets themselves are not hashable.
             lambda a, b: self.assertRaises(TypeError, a.add, b),
-            lambda res, expected_res: pytest.fail() if res != expected_res else None
+            lambda res, expected_res: self.assertEqual(res, expected_res)
         )]
 
         class SomeObject(ops.Object):
