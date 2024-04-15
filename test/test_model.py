@@ -1557,9 +1557,12 @@ containers:
 
         self.container.restart('foo', 'bar')
         assert self.pebble.requests == [
+            # This is the first request, which in real life fails with APIError on older versions
             ('restart', ('foo', 'bar')),
+            # Next the code should loop over the started services, and stop them
             ('get_services', ('foo', 'bar')),
             ('stop', ('foo',)),
+            # Then start all the specified services
             ('start', ('foo', 'bar')) \
         ]
 
