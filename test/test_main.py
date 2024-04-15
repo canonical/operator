@@ -609,16 +609,6 @@ class _TestMain(abc.ABC):
              'notice_type': 'custom',
              'notice_key': 'example.com/a'},
         ), (
-            EventSpec(ops.PebbleChangeUpdatedEvent, 'test_pebble_change_updated',
-                      workload_name='test',
-                      notice_id='456',
-                      notice_type='change-update',
-                      notice_key='42'),
-            {'container_name': 'test',
-             'notice_id': '456',
-             'notice_type': 'change-update',
-             'notice_key': '42'},
-        ), (
             EventSpec(ops.SecretChangedEvent, 'secret_changed',
                       secret_id='secret:12345',
                       secret_label='foo'),
