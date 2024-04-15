@@ -123,7 +123,7 @@ class StoragePermutations(abc.ABC):
         s.on.event.emit(1)
         assert s.observed_content == 1
         s.on.event.emit(None)
-        assert None is s.observed_content
+        assert s.observed_content is None
 
     def test_save_and_overwrite_snapshot(self):
         store = self.create_storage()
@@ -155,7 +155,7 @@ class StoragePermutations(abc.ABC):
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
         store.save_snapshot('bar', None)
-        assert None is store.load_snapshot('bar')
+        assert store.load_snapshot('bar') is None
         store.drop_snapshot('bar')
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
