@@ -2220,7 +2220,7 @@ Content-Disposition: form-data; name="response"\r
         self.client._chunk_size = 13
         with self.client.pull('/etc/hosts') as infile:
             content = infile.read()
-        self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
+        self.assertEqual(content, '127.0.0.1 localhost  # SPECIAL_CHAR_PLACE_HOLDER')
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
@@ -2250,7 +2250,7 @@ Content-Disposition: form-data; name="response"\r
 
         with self.client.pull('/etc/hosts') as infile:
             content = infile.read()
-        self.assertEqual(content, '127.0.0.1 localhost  # 😀\nfoo\r\nbar')
+        self.assertEqual(content, '127.0.0.1 localhost  # SPECIAL_CHAR_PLACE_HOLDER')
 
         self.assertEqual(self.client.requests, [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
@@ -2368,10 +2368,10 @@ bad path\r
         self.assertEqual(str(cm.exception), 'no "response" field in multipart body')
 
     def test_push_str(self):
-        self._test_push_str('content 😀\nfoo\r\nbar')
+        self._test_push_str('content SPECIAL_CHAR_PLACE_HOLDER')
 
     def test_push_text(self):
-        self._test_push_str(io.StringIO('content 😀\nfoo\r\nbar'))
+        self._test_push_str(io.StringIO('content SPECIAL_CHAR_PLACE_HOLDER'))
 
     def _test_push_str(self, source: typing.Union[str, typing.IO[str]]):
         self.client.responses.append((
@@ -3641,7 +3641,7 @@ class TestExec(unittest.TestCase):
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ])
         self.assertEqual(stdio.sends, [
-            ('BIN', b'Foo Bar\nbazz\n'),  # TextIOWrapper groups the writes together
+            ('BIN', b'Foo Bar\nbazz\n'),
             ('TXT', '{"command":"end"}'),
         ])
 
