@@ -180,10 +180,11 @@ class Model:
     def pod(self) -> 'Pod':
         """Represents the definition of a pod spec in legacy Kubernetes models.
 
-        DEPRECATED: New charms should use the sidecar pattern with Pebble.
-
         Use :meth:`Pod.set_spec` to set the container specification for legacy
         Kubernetes charms.
+
+        .. deprecated:: 2.4.0
+            New charms should use the sidecar pattern with Pebble.
         """
         return self._pod
 
@@ -769,7 +770,12 @@ class Port:
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
 
-OpenedPort = Port  # Alias for backwards compatibility.
+OpenedPort = Port
+"""Alias to Port for backwards compatibility.
+
+.. deprecated:: 2.7.0
+    Use :class:`Port` instead.
+"""
 
 
 _LazyValueType = typing.TypeVar("_LazyValueType")
@@ -1922,10 +1928,12 @@ class Resources:
 class Pod:
     """Represents the definition of a pod spec in legacy Kubernetes models.
 
-    DEPRECATED: New charms should use the sidecar pattern with Pebble.
-
     Currently only supports simple access to setting the Juju pod spec via
     :attr:`.set_spec`.
+
+    .. deprecated:: 2.4.0
+
+        New charms should use the sidecar pattern with Pebble.
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -2016,7 +2024,7 @@ class Storage:
 
     @property
     def id(self) -> int:
-        """DEPRECATED. Use :attr:`Storage.index` instead."""
+        """.. deprecated:: 2.4.0 Use :attr:`Storage.index` instead."""
         logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
         return self.index
 
