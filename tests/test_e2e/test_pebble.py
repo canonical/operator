@@ -383,4 +383,4 @@ def test_pebble_custom_notice(charm_cls):
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
     with ctx.manager(cont.notice_event, state) as mgr:
         container = mgr.charm.unit.get_container("foo")
-        assert container.get_notices() == [n._to_ops_notice() for n in notices]
+        assert container.get_notices() == [n._to_ops() for n in notices]

@@ -668,7 +668,7 @@ class Notice(_DCBase):
     expire_after: Optional[datetime.timedelta] = None
     """How long since one of these last occurred until Pebble will drop the notice."""
 
-    def _to_ops_notice(self) -> pebble.Notice:
+    def _to_ops(self) -> pebble.Notice:
         return pebble.Notice(
             id=self.id,
             user_id=self.user_id,
