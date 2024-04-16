@@ -1,8 +1,9 @@
+import datetime
 import tempfile
 from pathlib import Path
 
 import pytest
-from ops import pebble
+from ops import PebbleCustomNoticeEvent, pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
@@ -373,14 +374,68 @@ def test_pebble_custom_notice(charm_cls):
         Notice(key="example.com/bar", last_data={"a": "b"}),
         Notice(key="example.com/baz", occurrences=42),
     ]
-    cont = Container(
+    container = Container(
         name="foo",
         can_connect=True,
         notices=notices,
     )
 
-    state = State(containers=[cont])
+    state = State(containers=[container])
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(cont.notice_event, state) as mgr:
+    with ctx.manager(container.notice_event, state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         assert container.get_notices() == [n._to_ops() for n in notices]
+
+
+def test_pebble_custom_notice_in_charm():
+    key = "example.com/test/charm"
+    data = {"foo": "bar"}
+    user_id = 100
+    first_occurred = datetime.datetime(1979, 1, 25, 11, 0, 0)
+    last_occured = datetime.datetime(2006, 8, 28, 13, 28, 0)
+    last_repeated = datetime.datetime(2023, 9, 4, 9, 0, 0)
+    occurrences = 42
+    repeat_after = datetime.timedelta(days=7)
+    expire_after = datetime.timedelta(days=365)
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_pebble_custom_notice, self._on_custom_notice)
+
+        def _on_custom_notice(self, event: PebbleCustomNoticeEvent):
+            notice = event.notice
+            assert notice.type == pebble.NoticeType.CUSTOM
+            assert notice.key == key
+            assert notice.last_data == data
+            assert notice.user_id == user_id
+            assert notice.first_occurred == first_occurred
+            assert notice.last_occurred == last_occured
+            assert notice.last_repeated == last_repeated
+            assert notice.occurrences == occurrences
+            assert notice.repeat_after == repeat_after
+            assert notice.expire_after == expire_after
+
+    notices = [
+        Notice("example.com/test/other"),
+        Notice(key, last_data={"foo": "baz"}),
+        Notice(
+            key,
+            last_data=data,
+            user_id=user_id,
+            first_occurred=first_occurred,
+            last_occurred=last_occured,
+            last_repeated=last_repeated,
+            occurrences=occurrences,
+            repeat_after=repeat_after,
+            expire_after=expire_after,
+        ),
+    ]
+    container = Container(
+        name="foo",
+        can_connect=True,
+        notices=notices,
+    )
+    state = State(containers=[container])
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    ctx.run(container.notice_event, state)
