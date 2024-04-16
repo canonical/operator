@@ -50,7 +50,7 @@ class TestYAML(unittest.TestCase):
             yaml.safe_dump(YAMLTest())
 
 
-class TestStrconv(unittest.TestCase):
+class TestStrconv:
     def test_parse_rfc3339(self):
         nzdt = datetime.timezone(datetime.timedelta(hours=13))
         utc = datetime.timezone.utc
@@ -102,84 +102,80 @@ class TestStrconv(unittest.TestCase):
         with pytest.raises(ValueError):
             timeconv.parse_rfc3339('2021-02-10T04:36:22.118970777-99:99')
 
-    def test_parse_duration(self):
+    @pytest.mark.parametrize("input,expected", [
         # Test cases taken from Go's time.ParseDuration tests
-        cases = [
-            # simple
-            ('0', datetime.timedelta(seconds=0)),
-            ('5s', datetime.timedelta(seconds=5)),
-            ('30s', datetime.timedelta(seconds=30)),
-            ('1478s', datetime.timedelta(seconds=1478)),
-            # sign
-            ('-5s', datetime.timedelta(seconds=-5)),
-            ('+5s', datetime.timedelta(seconds=5)),
-            ('-0', datetime.timedelta(seconds=0)),
-            ('+0', datetime.timedelta(seconds=0)),
-            # decimal
-            ('5.0s', datetime.timedelta(seconds=5)),
-            ('5.6s', datetime.timedelta(seconds=5.6)),
-            ('5.s', datetime.timedelta(seconds=5)),
-            ('.5s', datetime.timedelta(seconds=0.5)),
-            ('1.0s', datetime.timedelta(seconds=1)),
-            ('1.00s', datetime.timedelta(seconds=1)),
-            ('1.004s', datetime.timedelta(seconds=1.004)),
-            ('1.0040s', datetime.timedelta(seconds=1.004)),
-            ('100.00100s', datetime.timedelta(seconds=100.001)),
-            # different units
-            ('10ns', datetime.timedelta(seconds=0.000_000_010)),
-            ('11us', datetime.timedelta(seconds=0.000_011)),
-            ('12µs', datetime.timedelta(seconds=0.000_012)),  # U+00B5  # noqa: RUF001
-            ('12μs', datetime.timedelta(seconds=0.000_012)),  # U+03BC
-            ('13ms', datetime.timedelta(seconds=0.013)),
-            ('14s', datetime.timedelta(seconds=14)),
-            ('15m', datetime.timedelta(seconds=15 * 60)),
-            ('16h', datetime.timedelta(seconds=16 * 60 * 60)),
-            # composite durations
-            ('3h30m', datetime.timedelta(seconds=3 * 60 * 60 + 30 * 60)),
-            ('10.5s4m', datetime.timedelta(seconds=4 * 60 + 10.5)),
-            ('-2m3.4s', datetime.timedelta(seconds=-(2 * 60 + 3.4))),
-            ('1h2m3s4ms5us6ns', datetime.timedelta(seconds=1 * 60 * 60 + 2 * 60 + 3.004_005_006)),
-            ('39h9m14.425s', datetime.timedelta(seconds=39 * 60 * 60 + 9 * 60 + 14.425)),
-            # large value
-            ('52763797000ns', datetime.timedelta(seconds=52.763_797_000)),
-            # more than 9 digits after decimal point, see https://golang.org/issue/6617
-            ('0.3333333333333333333h', datetime.timedelta(seconds=20 * 60)),
-            # huge string; issue 15011.
-            ('0.100000000000000000000h', datetime.timedelta(seconds=6 * 60)),
-            # This value tests the first overflow check in leadingFraction.
-            ('0.830103483285477580700h', datetime.timedelta(seconds=49 * 60 + 48.372_539_827)),
+        # simple
+        ('0', datetime.timedelta(seconds=0)),
+        ('5s', datetime.timedelta(seconds=5)),
+        ('30s', datetime.timedelta(seconds=30)),
+        ('1478s', datetime.timedelta(seconds=1478)),
+        # sign
+        ('-5s', datetime.timedelta(seconds=-5)),
+        ('+5s', datetime.timedelta(seconds=5)),
+        ('-0', datetime.timedelta(seconds=0)),
+        ('+0', datetime.timedelta(seconds=0)),
+        # decimal
+        ('5.0s', datetime.timedelta(seconds=5)),
+        ('5.6s', datetime.timedelta(seconds=5.6)),
+        ('5.s', datetime.timedelta(seconds=5)),
+        ('.5s', datetime.timedelta(seconds=0.5)),
+        ('1.0s', datetime.timedelta(seconds=1)),
+        ('1.00s', datetime.timedelta(seconds=1)),
+        ('1.004s', datetime.timedelta(seconds=1.004)),
+        ('1.0040s', datetime.timedelta(seconds=1.004)),
+        ('100.00100s', datetime.timedelta(seconds=100.001)),
+        # different units
+        ('10ns', datetime.timedelta(seconds=0.000_000_010)),
+        ('11us', datetime.timedelta(seconds=0.000_011)),
+        ('12µs', datetime.timedelta(seconds=0.000_012)),  # U+00B5  # noqa: RUF001
+        ('12μs', datetime.timedelta(seconds=0.000_012)),  # U+03BC
+        ('13ms', datetime.timedelta(seconds=0.013)),
+        ('14s', datetime.timedelta(seconds=14)),
+        ('15m', datetime.timedelta(seconds=15 * 60)),
+        ('16h', datetime.timedelta(seconds=16 * 60 * 60)),
+        # composite durations
+        ('3h30m', datetime.timedelta(seconds=3 * 60 * 60 + 30 * 60)),
+        ('10.5s4m', datetime.timedelta(seconds=4 * 60 + 10.5)),
+        ('-2m3.4s', datetime.timedelta(seconds=-(2 * 60 + 3.4))),
+        ('1h2m3s4ms5us6ns', datetime.timedelta(seconds=1 * 60 * 60 + 2 * 60 + 3.004_005_006)),
+        ('39h9m14.425s', datetime.timedelta(seconds=39 * 60 * 60 + 9 * 60 + 14.425)),
+        # large value
+        ('52763797000ns', datetime.timedelta(seconds=52.763_797_000)),
+        # more than 9 digits after decimal point, see https://golang.org/issue/6617
+        ('0.3333333333333333333h', datetime.timedelta(seconds=20 * 60)),
+        # huge string; issue 15011.
+        ('0.100000000000000000000h', datetime.timedelta(seconds=6 * 60)),
+        # This value tests the first overflow check in leadingFraction.
+        ('0.830103483285477580700h', datetime.timedelta(seconds=49 * 60 + 48.372_539_827)),
+        # Test precision handling
+        ('7200000h1us', datetime.timedelta(hours=7_200_000, microseconds=1))
+    ])
+    def test_parse_duration(self, input: str, expected: datetime.timedelta):
+        output = timeconv.parse_duration(input)
+        assert output == expected, \
+            f'parse_duration({input!r}): expected {expected!r}, got {output!r}'
 
-            # Test precision handling
-            ('7200000h1us', datetime.timedelta(hours=7_200_000, microseconds=1))
-        ]
+    @pytest.mark.parametrize("input", [
+        # Test cases taken from Go's time.ParseDuration tests
+        '',
+        '3',
+        '-',
+        's',
+        '.',
+        '-.',
+        '.s',
+        '+.s',
+        '1d',
+        '\x85\x85',
+        '\xffff',
+        'hello \xffff world',
 
-        for input, expected in cases:
-            output = timeconv.parse_duration(input)
-            assert output == expected, \
-                f'parse_duration({input!r}): expected {expected!r}, got {output!r}'
-
-    def test_parse_duration_errors(self):
-        cases = [
-            # Test cases taken from Go's time.ParseDuration tests
-            '',
-            '3',
-            '-',
-            's',
-            '.',
-            '-.',
-            '.s',
-            '+.s',
-            '1d',
-            '\x85\x85',
-            '\xffff',
-            'hello \xffff world',
-
-            # Additional cases
-            'X3h',
-            '3hY',
-            'X3hY',
-            '3.4.5s',
-        ]
-        for input in cases:
-            with pytest.raises(ValueError):
-                timeconv.parse_duration(input)
+        # Additional cases
+        'X3h',
+        '3hY',
+        'X3hY',
+        '3.4.5s',
+    ])
+    def test_parse_duration_errors(self, input: str):
+        with pytest.raises(ValueError):
+            timeconv.parse_duration(input)
