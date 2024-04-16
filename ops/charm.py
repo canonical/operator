@@ -387,11 +387,12 @@ class LeaderElectedEvent(HookEvent):
 
 
 class LeaderSettingsChangedEvent(HookEvent):
-    """DEPRECATED. Event triggered when leader changes any settings.
+    """Event triggered when leader changes any settings.
 
-    This event has been deprecated in favor of using a Peer relation,
-    and having the leader set a value in the Application data bag for
-    that peer relation.  (see :class:`RelationChangedEvent`).
+    .. deprecated:: 2.4.0
+        This event has been deprecated in favor of using a Peer relation,
+        and having the leader set a value in the Application data bag for
+        that peer relation. (See :class:`RelationChangedEvent`.)
     """
 
 
@@ -1085,8 +1086,10 @@ class CharmEvents(ObjectEvents):
     """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
 
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
-    """DEPRECATED. Triggered when leader changes any settings (see
+    """Triggered when leader changes any settings (see
     :class:`LeaderSettingsChangedEvent`).
+
+    .. deprecated: 2.4.0
     """
 
     collect_metrics = EventSource(CollectMetricsEvent)
