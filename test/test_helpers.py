@@ -82,28 +82,28 @@ class FakeScriptTest(unittest.TestCase):
         # subprocess.getoutput goes via the shell, so it needs to be
         # something both sh and CMD understand
         output = subprocess.getoutput('foo a "b c " && bar "d e" f')
-        self.assertEqual(output, 'foo runs\nbar runs')
-        self.assertEqual(fake_script_calls(self), [
+        assert output == 'foo runs\nbar runs'
+        assert fake_script_calls(self) == [
             ['foo', 'a', 'b c '],
             ['bar', 'd e', 'f'],
-        ])
+        ]
 
     def test_fake_script_clear(self):
         fake_script(self, 'foo', 'echo foo runs')
 
         output = subprocess.getoutput('foo a "b c"')
-        self.assertEqual(output, 'foo runs')
+        assert output == 'foo runs'
 
-        self.assertEqual(fake_script_calls(self, clear=True), [['foo', 'a', 'b c']])
+        assert fake_script_calls(self, clear=True) == [['foo', 'a', 'b c']]
 
         fake_script(self, 'bar', 'echo bar runs')
 
         output = subprocess.getoutput('bar "d e" f')
-        self.assertEqual(output, 'bar runs')
+        assert output == 'bar runs'
 
-        self.assertEqual(fake_script_calls(self, clear=True), [['bar', 'd e', 'f']])
+        assert fake_script_calls(self, clear=True) == [['bar', 'd e', 'f']]
 
-        self.assertEqual(fake_script_calls(self, clear=True), [])
+        assert fake_script_calls(self, clear=True) == []
 
 
 class BaseTestCase(unittest.TestCase):

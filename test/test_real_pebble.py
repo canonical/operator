@@ -39,6 +39,8 @@ import urllib.error
 import urllib.request
 import uuid
 
+import pytest
+
 from ops import pebble
 
 from .test_testing import PebbleNoticesMixin, PebbleStorageAPIsTestMixin
@@ -90,25 +92,25 @@ class TestRealPebble(unittest.TestCase):
 
         # Checks should all be "up" initially
         checks = self.client.get_checks()
-        self.assertEqual(len(checks), 3)
-        self.assertEqual(checks[0].name, 'bad')
-        self.assertEqual(checks[0].level, pebble.CheckLevel.READY)
-        self.assertEqual(checks[0].status, pebble.CheckStatus.UP)
-        self.assertEqual(checks[1].name, 'good')
-        self.assertEqual(checks[1].level, pebble.CheckLevel.ALIVE)
-        self.assertEqual(checks[1].status, pebble.CheckStatus.UP)
-        self.assertEqual(checks[2].name, 'other')
-        self.assertEqual(checks[2].level, pebble.CheckLevel.UNSET)
-        self.assertEqual(checks[2].status, pebble.CheckStatus.UP)
+        assert len(checks) == 3
+        assert checks[0].name == 'bad'
+        assert checks[0].level == pebble.CheckLevel.READY
+        assert checks[0].status == pebble.CheckStatus.UP
+        assert checks[1].name == 'good'
+        assert checks[1].level == pebble.CheckLevel.ALIVE
+        assert checks[1].status == pebble.CheckStatus.UP
+        assert checks[2].name == 'other'
+        assert checks[2].level == pebble.CheckLevel.UNSET
+        assert checks[2].status == pebble.CheckStatus.UP
 
         # And /v1/health should return "healthy"
         health = self._get_health()
-        self.assertEqual(health, {
+        assert health == {
             'result': {'healthy': True},
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
-        })
+        }
 
         # After two retries the "bad" check should go down
         for _ in range(5):
@@ -119,31 +121,31 @@ class TestRealPebble(unittest.TestCase):
             time.sleep(0.06)
         else:
             assert False, 'timed out waiting for "bad" check to go down'
-        self.assertEqual(bad_check.failures, 2)
-        self.assertEqual(bad_check.threshold, 2)
+        assert bad_check.failures == 2
+        assert bad_check.threshold == 2
         good_check = [c for c in checks if c.name == 'good'][0]
-        self.assertEqual(good_check.status, pebble.CheckStatus.UP)
+        assert good_check.status == pebble.CheckStatus.UP
 
         # And /v1/health should return "unhealthy" (with status HTTP 502)
-        with self.assertRaises(urllib.error.HTTPError) as cm:
+        with pytest.raises(urllib.error.HTTPError) as excinfo:
             self._get_health()
-        self.assertEqual(cm.exception.code, 502)
-        health = json.loads(cm.exception.read())
-        self.assertEqual(health, {
+        assert excinfo.value.code == 502
+        health = json.loads(excinfo.value.read())
+        assert health == {
             'result': {'healthy': False},
             'status': 'Bad Gateway',
             'status-code': 502,
             'type': 'sync',
-        })
+        }
 
         # Then test filtering by check level and by name
         checks = self.client.get_checks(level=pebble.CheckLevel.ALIVE)
-        self.assertEqual(len(checks), 1)
-        self.assertEqual(checks[0].name, 'good')
+        assert len(checks) == 1
+        assert checks[0].name == 'good'
         checks = self.client.get_checks(names=['good', 'bad'])
-        self.assertEqual(len(checks), 2)
-        self.assertEqual(checks[0].name, 'bad')
-        self.assertEqual(checks[1].name, 'good')
+        assert len(checks) == 2
+        assert checks[0].name == 'bad'
+        assert checks[1].name == 'good'
 
     def _get_health(self):
         f = urllib.request.urlopen('http://localhost:4000/v1/health')
@@ -153,41 +155,41 @@ class TestRealPebble(unittest.TestCase):
         process = self.client.exec(['true'])
         process.wait()
 
-        with self.assertRaises(pebble.ExecError) as cm:
+        with pytest.raises(pebble.ExecError) as excinfo:
             process = self.client.exec(['/bin/sh', '-c', 'exit 42'])
             process.wait()
-        self.assertEqual(cm.exception.exit_code, 42)
+        assert excinfo.value.exit_code == 42
 
     def test_exec_wait_output(self):
         process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'])
         out, err = process.wait_output()
-        self.assertEqual(out, 'OUT\n')
-        self.assertEqual(err, 'ERR\n')
+        assert out == 'OUT\n'
+        assert err == 'ERR\n'
 
         process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2'], encoding=None)
         out, err = process.wait_output()
-        self.assertEqual(out, b'OUT\n')
-        self.assertEqual(err, b'ERR\n')
+        assert out == b'OUT\n'
+        assert err == b'ERR\n'
 
-        with self.assertRaises(pebble.ExecError) as cm:
+        with pytest.raises(pebble.ExecError) as excinfo:
             process = self.client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
             process.wait_output()
-        exc = typing.cast(pebble.ExecError[str], cm.exception)
-        self.assertEqual(exc.exit_code, 42)
-        self.assertEqual(exc.stdout, 'OUT\n')
-        self.assertEqual(exc.stderr, 'ERR\n')
+        exc = typing.cast(pebble.ExecError[str], excinfo.value)
+        assert exc.exit_code == 42
+        assert exc.stdout == 'OUT\n'
+        assert exc.stderr == 'ERR\n'
 
     def test_exec_send_stdin(self):
         process = self.client.exec(['awk', '{ print toupper($0) }'], stdin='foo\nBar\n')
         out, err = process.wait_output()
-        self.assertEqual(out, 'FOO\nBAR\n')
-        self.assertEqual(err, '')
+        assert out == 'FOO\nBAR\n'
+        assert err == ''
 
         process = self.client.exec(['awk', '{ print toupper($0) }'], stdin=b'foo\nBar\n',
                                    encoding=None)
         out, err = process.wait_output()
-        self.assertEqual(out, b'FOO\nBAR\n')
-        self.assertEqual(err, b'')
+        assert out == b'FOO\nBAR\n'
+        assert err == b''
 
     def test_push_pull(self):
         fname = os.path.join(tempfile.gettempdir(), f'pebbletest-{uuid.uuid4()}')
@@ -195,28 +197,28 @@ class TestRealPebble(unittest.TestCase):
         self.client.push(fname, content)
         with self.client.pull(fname) as f:
             data = f.read()
-            self.assertEqual(data, content)
+            assert data == content
         os.remove(fname)
 
     def test_exec_timeout(self):
         process = self.client.exec(['sleep', '0.2'], timeout=0.1)
-        with self.assertRaises(pebble.ChangeError) as cm:
+        with pytest.raises(pebble.ChangeError) as excinfo:
             process.wait()
-        self.assertIn('timed out', cm.exception.err)
+        assert 'timed out' in excinfo.value.err
 
     def test_exec_working_dir(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             process = self.client.exec(['pwd'], working_dir=temp_dir)
             out, err = process.wait_output()
-            self.assertEqual(out, f"{temp_dir}\n")
-            self.assertEqual(err, '')
+            assert out == f"{temp_dir}\n"
+            assert err == ''
 
     def test_exec_environment(self):
         process = self.client.exec(['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'],
                                    environment={'ONE': '1', 'TWO': '2'})
         out, err = process.wait_output()
-        self.assertEqual(out, '1.2.\n')
-        self.assertEqual(err, '')
+        assert out == '1.2.\n'
+        assert err == ''
 
     def test_exec_streaming(self):
         process = self.client.exec(['cat'])
@@ -238,7 +240,7 @@ class TestRealPebble(unittest.TestCase):
 
         process.wait()
 
-        self.assertEqual(reads, ['one\n', '2\n', 'THREE\n'])
+        assert reads == ['one\n', '2\n', 'THREE\n']
 
     def test_exec_streaming_bytes(self):
         process = self.client.exec(['cat'], encoding=None)
@@ -260,7 +262,7 @@ class TestRealPebble(unittest.TestCase):
 
         process.wait()
 
-        self.assertEqual(reads, [b'one\n', b'2\n', b'THREE\n'])
+        assert reads == [b'one\n', b'2\n', b'THREE\n']
 
     def test_log_forwarding(self):
         self.client.add_layer("log-forwarder", {
@@ -281,12 +283,12 @@ class TestRealPebble(unittest.TestCase):
             },
         }, combine=True)
         plan = self.client.get_plan()
-        self.assertEqual(len(plan.log_targets), 1)
-        self.assertEqual(plan.log_targets["pretend-loki"].type, "loki")
-        self.assertEqual(plan.log_targets["pretend-loki"].override, "replace")
-        self.assertEqual(plan.log_targets["pretend-loki"].location, "https://example.com")
-        self.assertEqual(plan.log_targets["pretend-loki"].services, ["all"])
-        self.assertEqual(plan.log_targets["pretend-loki"].labels, {"foo": "bar"})
+        assert len(plan.log_targets) == 1
+        assert plan.log_targets["pretend-loki"].type == "loki"
+        assert plan.log_targets["pretend-loki"].override == "replace"
+        assert plan.log_targets["pretend-loki"].location == "https://example.com"
+        assert plan.log_targets["pretend-loki"].services == ["all"]
+        assert plan.log_targets["pretend-loki"].labels == {"foo": "bar"}
 
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')
