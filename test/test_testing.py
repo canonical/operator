@@ -1985,21 +1985,20 @@ class TestHarness(unittest.TestCase):
         assert harness._get_backend_calls() == []
         rel_id = harness.add_relation('db', 'postgresql')
 
-        assert [
+        assert harness._get_backend_calls() == [
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_remote_app_name', 0),
-        ] == \
-            harness._get_backend_calls()
+        ]
 
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         test_charm_unit = harness.model.get_unit('test-charm/0')
-        assert [
+        assert harness._get_backend_calls(reset=True) == [
             ('relation_get', 0, 'test-charm/0', False),
             ('update_relation_data', 0, test_charm_unit, 'foo', 'bar')
-        ] == \
-            harness._get_backend_calls(reset=True)
+        ]
+
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
         harness.add_relation_unit(rel_id, 'postgresql/0')
         assert harness._get_backend_calls(reset=False) == []
@@ -2041,9 +2040,8 @@ class TestHarness(unittest.TestCase):
         app = harness.charm.model.app
         harness._get_backend_calls(reset=True)
         app.status = ops.ActiveStatus('message')
-        assert harness._get_backend_calls() == \
-            [('is_leader',),
-                ('status_set', 'active', 'message', {'is_app': True})]
+        assert harness._get_backend_calls() == [
+            ('is_leader',), ('status_set', 'active', 'message', {'is_app': True})]
 
     def test_unit_status(self):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
