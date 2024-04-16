@@ -128,7 +128,7 @@ class TestStrconv(unittest.TestCase):
             # different units
             ('10ns', datetime.timedelta(seconds=0.000_000_010)),
             ('11us', datetime.timedelta(seconds=0.000_011)),
-            ('12µs', datetime.timedelta(seconds=0.000_012)),  # U+00B5
+            ('12µs', datetime.timedelta(seconds=0.000_012)),  # U+00B5  # noqa: RUF001
             ('12μs', datetime.timedelta(seconds=0.000_012)),  # U+03BC
             ('13ms', datetime.timedelta(seconds=0.013)),
             ('14s', datetime.timedelta(seconds=14)),
