@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 
 import yaml
+from ops import pebble
 from ops.framework import _event_regex
 from ops.storage import NoSnapshotError, SQLiteStorage
 
@@ -249,10 +250,14 @@ class Runtime:
             env.update({"JUJU_WORKLOAD_NAME": container.name})
 
         if notice := event.notice:
+            if hasattr(notice.type, "value"):
+                notice_type = typing.cast(pebble.NoticeType, notice.type).value
+            else:
+                notice_type = str(notice.type)
             env.update(
                 {
                     "JUJU_NOTICE_ID": notice.id,
-                    "JUJU_NOTICE_TYPE": str(notice.type),
+                    "JUJU_NOTICE_TYPE": notice_type,
                     "JUJU_NOTICE_KEY": notice.key,
                 },
             )

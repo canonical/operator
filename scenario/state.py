@@ -1501,11 +1501,15 @@ class Event(_DCBase):
                 "container_name": container.name,
             }
             if self.notice:
+                if hasattr(self.notice.type, "value"):
+                    notice_type = cast(pebble.NoticeType, self.notice.type).value
+                else:
+                    notice_type = str(self.notice.type)
                 snapshot_data.update(
                     {
                         "notice_id": self.notice.id,
                         "notice_key": self.notice.key,
-                        "notice_type": str(self.notice.type),
+                        "notice_type": notice_type,
                     },
                 )
 

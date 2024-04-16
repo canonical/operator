@@ -667,7 +667,11 @@ class _MockPebbleClient(_TestingPebbleClient):
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         for container in state.containers:
             for notice in container.notices:
-                self._notices[str(notice.type), notice.key] = notice._to_ops()
+                if hasattr(notice.type, "value"):
+                    notice_type = cast(pebble.NoticeType, notice.type).value
+                else:
+                    notice_type = str(notice.type)
+                self._notices[notice_type, notice.key] = notice._to_ops()
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
