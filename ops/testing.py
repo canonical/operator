@@ -497,16 +497,21 @@ class Harness(Generic[CharmType]):
         ``<charm_dir>/metadata.yaml`` if charmcraft.yaml does not include metadata,
         and ``<charm_dir>/actions.yaml`` if charmcraft.yaml does not include actions.
         """
-        filename = inspect.getfile(self._charm_cls)
-        charm_dir = pathlib.Path(filename).parents[1]
+        try:
+            filename = inspect.getfile(self._charm_cls)
+        except OSError:
+            charm_dir = None
+        else:
+            charm_dir = pathlib.Path(filename).parents[1]
 
         charm_metadata: Optional[Dict[str, Any]] = None
         charmcraft_metadata: Optional[Dict[str, Any]] = None
-        # Check charmcraft.yaml and load it if it exists
-        charmcraft_meta = charm_dir / "charmcraft.yaml"
-        if charmcraft_meta.is_file():
-            self._charm_dir = charm_dir
-            charmcraft_metadata = yaml.safe_load(charmcraft_meta.read_text())
+        if charm_dir:
+            # Check charmcraft.yaml and load it if it exists
+            charmcraft_meta = charm_dir / "charmcraft.yaml"
+            if charmcraft_meta.is_file():
+                self._charm_dir = charm_dir
+                charmcraft_metadata = yaml.safe_load(charmcraft_meta.read_text())
 
         # Load metadata from parameters if provided
         if charm_metadata_yaml is not None:
@@ -522,7 +527,7 @@ class Harness(Generic[CharmType]):
                     charm_metadata = charmcraft_metadata
 
             # Still no metadata, check metadata.yaml
-            if charm_metadata is None:
+            if charm_dir and charm_metadata is None:
                 metadata_path = charm_dir / 'metadata.yaml'
                 if metadata_path.is_file():
                     charm_metadata = yaml.safe_load(metadata_path.read_text())
@@ -544,7 +549,7 @@ class Harness(Generic[CharmType]):
                 action_metadata = charmcraft_metadata["actions"]
 
             # Still no actions, check actions.yaml
-            if action_metadata is None:
+            if charm_dir and action_metadata is None:
                 actions_path = charm_dir / 'actions.yaml'
                 if actions_path.is_file():
                     action_metadata = yaml.safe_load(actions_path.read_text())
@@ -558,8 +563,12 @@ class Harness(Generic[CharmType]):
         Otherwise try to load config from ``<charm_dir>/charmcraft.yaml`` first, then
         ``<charm_dir>/config.yaml`` if charmcraft.yaml does not include config.
         """
-        filename = inspect.getfile(self._charm_cls)
-        charm_dir = pathlib.Path(filename).parents[1]
+        try:
+            filename = inspect.getfile(self._charm_cls)
+        except OSError:
+            charm_dir = None
+        else:
+            charm_dir = pathlib.Path(filename).parents[1]
         config: Optional[Dict[str, Any]] = None
 
         # Load config from parameters if provided
@@ -568,18 +577,20 @@ class Harness(Generic[CharmType]):
                 charm_config_yaml = dedent(charm_config_yaml)
             config = yaml.safe_load(charm_config_yaml)
         else:
-            # Check charmcraft.yaml for config if no config is provided
-            charmcraft_meta = charm_dir / "charmcraft.yaml"
-            if charmcraft_meta.is_file():
-                charmcraft_metadata: Dict[str, Any] = yaml.safe_load(charmcraft_meta.read_text())
-                config = charmcraft_metadata.get("config")
+            if charm_dir:
+                # Check charmcraft.yaml for config if no config is provided
+                charmcraft_meta = charm_dir / "charmcraft.yaml"
+                if charmcraft_meta.is_file():
+                    charmcraft_metadata: Dict[str, Any] = yaml.safe_load(
+                        charmcraft_meta.read_text())
+                    config = charmcraft_metadata.get("config")
 
-            # Still no config, check config.yaml
-            if config is None:
-                config_path = charm_dir / 'config.yaml'
-                if config_path.is_file():
-                    config = yaml.safe_load(config_path.read_text())
-                    self._charm_dir = charm_dir
+                # Still no config, check config.yaml
+                if config is None:
+                    config_path = charm_dir / 'config.yaml'
+                    if config_path.is_file():
+                        config = yaml.safe_load(config_path.read_text())
+                        self._charm_dir = charm_dir
 
             # Use default config if config is not found
             if config is None:
