@@ -14,6 +14,7 @@
 
 import io
 import logging
+import re
 import typing
 import unittest
 from unittest.mock import patch
@@ -50,8 +51,8 @@ class TestLogging(unittest.TestCase):
         ops.log.setup_root_logging(self.backend)
 
         logger = logging.getLogger()
-        self.assertEqual(logger.level, logging.DEBUG)
-        self.assertIsInstance(logger.handlers[-1], ops.log.JujuLogHandler)
+        assert logger.level == logging.DEBUG
+        assert isinstance(logger.handlers[-1], ops.log.JujuLogHandler)
 
         test_cases = [
             (logger.critical, 'critical', ('CRITICAL', 'critical')),
@@ -65,16 +66,16 @@ class TestLogging(unittest.TestCase):
             with self.subTest(message):
                 method(message)
                 calls = self.backend.calls(clear=True)
-                self.assertEqual(calls, [result])
+                assert calls == [result]
 
     def test_handler_filtering(self):
         logger = logging.getLogger()
         logger.setLevel(logging.INFO)
         logger.addHandler(ops.log.JujuLogHandler(self.backend, logging.WARNING))
         logger.info('foo')
-        self.assertEqual(self.backend.calls(), [])
+        assert self.backend.calls() == []
         logger.warning('bar')
-        self.assertEqual(self.backend.calls(), [('WARNING', 'bar')])
+        assert self.backend.calls() == [('WARNING', 'bar')]
 
     def test_no_stderr_without_debug(self):
         buffer = io.StringIO()
@@ -85,14 +86,13 @@ class TestLogging(unittest.TestCase):
             logger.info('info message')
             logger.warning('warning message')
             logger.critical('critical message')
-        self.assertEqual(
-            self.backend.calls(),
+        assert self.backend.calls() == \
             [('DEBUG', 'debug message'),
              ('INFO', 'info message'),
                 ('WARNING', 'warning message'),
                 ('CRITICAL', 'critical message'),
-             ])
-        self.assertEqual(buffer.getvalue(), "")
+             ]
+        assert buffer.getvalue() == ""
 
     def test_debug_logging(self):
         buffer = io.StringIO()
@@ -103,19 +103,18 @@ class TestLogging(unittest.TestCase):
             logger.info('info message')
             logger.warning('warning message')
             logger.critical('critical message')
-        self.assertEqual(
-            self.backend.calls(),
+        assert self.backend.calls() == \
             [('DEBUG', 'debug message'),
              ('INFO', 'info message'),
              ('WARNING', 'warning message'),
              ('CRITICAL', 'critical message'),
-             ])
-        self.assertRegex(
-            buffer.getvalue(),
+             ]
+        assert re.search(
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n"
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n"
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n"
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n"
+            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n",
+            buffer.getvalue()
         )
 
     def test_reduced_logging(self):
@@ -125,7 +124,7 @@ class TestLogging(unittest.TestCase):
         logger.debug('debug')
         logger.info('info')
         logger.warning('warning')
-        self.assertEqual(self.backend.calls(), [('WARNING', 'warning')])
+        assert self.backend.calls() == [('WARNING', 'warning')]
 
     def test_long_string_logging(self):
         buffer = io.StringIO()
@@ -135,7 +134,7 @@ class TestLogging(unittest.TestCase):
             logger = logging.getLogger()
             logger.debug('l' * MAX_LOG_LINE_LEN)
 
-        self.assertEqual(len(self.backend.calls()), 1)
+        assert len(self.backend.calls()) == 1
 
         self.backend.calls(clear=True)
 
@@ -143,13 +142,13 @@ class TestLogging(unittest.TestCase):
             logger.debug('l' * (MAX_LOG_LINE_LEN + 9))
 
         calls = self.backend.calls()
-        self.assertEqual(len(calls), 3)
+        assert len(calls) == 3
         # Verify that we note that we are splitting the log message.
-        self.assertTrue("Splitting into multiple chunks" in calls[0][1])
+        assert "Splitting into multiple chunks" in calls[0][1]
 
         # Verify that it got split into the expected chunks.
-        self.assertTrue(len(calls[1][1]) == MAX_LOG_LINE_LEN)
-        self.assertTrue(len(calls[2][1]) == 9)
+        assert len(calls[1][1]) == MAX_LOG_LINE_LEN
+        assert len(calls[2][1]) == 9
 
 
 if __name__ == '__main__':
