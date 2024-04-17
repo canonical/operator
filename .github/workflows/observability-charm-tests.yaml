@@ -10,8 +10,11 @@ jobs:
       fail-fast: false
       matrix:
         charm-repo:
-          - "canonical/alertmanager-k8s-operator"
-          - "canonical/prometheus-k8s-operator"
+# Disabled until the type checking passes (ops#1183)
+# https://github.com/canonical/alertmanager-k8s-operator/pull/241
+# https://github.com/canonical/prometheus-k8s-operator/pull/587
+#          - "canonical/alertmanager-k8s-operator"
+#          - "canonical/prometheus-k8s-operator"
           - "canonical/grafana-k8s-operator"
 
     steps:
