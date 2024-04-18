@@ -1,5 +1,5 @@
 # ruff: noqa
-import datetime 
+import datetime
 import pathlib
 import sys
 
@@ -318,10 +318,11 @@ nitpick_ignore = [
     ('py:class', '_Writeable'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
     ('py:class', 'ops.model._AddressDict'),
-    ('py:class', 'ops.model._ConfigOption'),
+    ('py:class', 'ops.model._GenericLazyMapping'),
     ('py:class', 'ops.model._ModelBackend'),
     ('py:class', 'ops.model._ModelCache'),
     ('py:class', 'ops.model._NetworkDict'),
+    ('py:class', 'ops.model._SupportsKeysAndGetItem'),
     ('py:class', 'ops.pebble._FileLikeIO'),
     ('py:class', 'ops.pebble._IOSource'),
     ('py:class', 'ops.pebble._ServiceInfoDict'),
@@ -329,6 +330,7 @@ nitpick_ignore = [
     ('py:class', 'ops.pebble._WebSocket'),
     ('py:class', 'ops.storage.JujuStorage'),
     ('py:class', 'ops.storage.SQLiteStorage'),
+    ('py:class', 'ops.testing._ConfigOption'),
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
 ]
