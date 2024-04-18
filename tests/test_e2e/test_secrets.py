@@ -45,23 +45,13 @@ def test_get_secret_no_secret(mycharm):
 
 def test_get_secret(mycharm):
     with Context(mycharm, meta={"name": "local"}).manager(
-        state=State(secrets=[Secret(id="foo", contents={0: {"a": "b"}}, granted=True)]),
+        state=State(secrets=[Secret(id="foo", contents={0: {"a": "b"}})]),
         event="update_status",
     ) as mgr:
         assert mgr.charm.model.get_secret(id="foo").get_content()["a"] == "b"
 
 
-def test_get_secret_not_granted(mycharm):
-    with Context(mycharm, meta={"name": "local"}).manager(
-        state=State(secrets=[]),
-        event="update_status",
-    ) as mgr:
-        with pytest.raises(SecretNotFoundError) as e:
-            assert mgr.charm.model.get_secret(id="foo").get_content()["a"] == "b"
-
-
-@pytest.mark.parametrize("owner", ("app", "unit", "application"))
-# "application" is deprecated but still supported
+@pytest.mark.parametrize("owner", ("app", "unit"))
 def test_get_secret_get_refresh(mycharm, owner):
     with Context(mycharm, meta={"name": "local"}).manager(
         "update_status",
@@ -108,8 +98,7 @@ def test_get_secret_nonowner_peek_update(mycharm, app):
         assert charm.model.get_secret(id="foo").get_content()["a"] == "c"
 
 
-@pytest.mark.parametrize("owner", ("app", "unit", "application"))
-# "application" is deprecated but still supported
+@pytest.mark.parametrize("owner", ("app", "unit"))
 def test_get_secret_owner_peek_update(mycharm, owner):
     with Context(mycharm, meta={"name": "local"}).manager(
         "update_status",
@@ -132,8 +121,7 @@ def test_get_secret_owner_peek_update(mycharm, owner):
         assert charm.model.get_secret(id="foo").get_content(refresh=True)["a"] == "c"
 
 
-@pytest.mark.parametrize("owner", ("app", "unit", "application"))
-# "application" is deprecated but still supported
+@pytest.mark.parametrize("owner", ("app", "unit"))
 def test_secret_changed_owner_evt_fails(mycharm, owner):
     with pytest.raises(ValueError):
         _ = Secret(
@@ -310,32 +298,6 @@ def test_meta(mycharm, app):
         assert secret.label is None
         assert info.label == "mylabel"
         assert info.rotation == SecretRotate.HOURLY
-
-
-def test_secret_deprecation_application(mycharm):
-    with warnings.catch_warnings(record=True) as captured:
-        s = Secret("123", {}, owner="application")
-        assert s.owner == "app"
-    msg = captured[0].message
-    assert isinstance(msg, DeprecationWarning)
-    assert msg.args[0] == (
-        "Secret.owner='application' is deprecated in favour of "
-        "'app' and will be removed in Scenario 7+."
-    )
-
-
-@pytest.mark.parametrize("granted", ("app", "unit", False))
-def test_secret_deprecation_granted(mycharm, granted):
-    with warnings.catch_warnings(record=True) as captured:
-        s = Secret("123", {}, granted=granted)
-        assert s.granted == granted
-    msg = captured[0].message
-    assert isinstance(msg, DeprecationWarning)
-    assert msg.args[0] == (
-        "``state.Secret.granted`` is deprecated and will be removed in Scenario 7+. "
-        "If a Secret is not owned by the app/unit you are testing, nor has been granted to "
-        "it by the (remote) owner, then omit it from ``State.secrets`` altogether."
-    )
 
 
 @pytest.mark.parametrize("leader", (True, False))

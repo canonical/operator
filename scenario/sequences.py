@@ -122,12 +122,10 @@ def check_builtin_sequences(
         ),
     ):
         ctx = Context(charm_type=charm_type, meta=meta, actions=actions, config=config)
-        out.append(
-            ctx.run(
-                event,
-                state=state,
-                pre_event=pre_event,
-                post_event=post_event,
-            ),
-        )
+        with ctx.manager(event, state=state) as mgr:
+            if pre_event:
+                pre_event(mgr.charm)
+            out.append(mgr.run())
+            if post_event:
+                post_event(mgr.charm)
     return out

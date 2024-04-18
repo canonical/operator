@@ -44,23 +44,6 @@ def test_action_event(mycharm, baz_value):
     assert evt.params["baz"] is baz_value
 
 
-def test_action_pre_post(mycharm):
-    ctx = Context(
-        mycharm,
-        meta={"name": "foo"},
-        actions={
-            "foo": {"params": {"bar": {"type": "number"}, "baz": {"type": "boolean"}}}
-        },
-    )
-    action = Action("foo", params={"baz": True, "bar": 10})
-    ctx.run_action(
-        action,
-        State(),
-        pre_event=lambda charm: None,
-        post_event=lambda charm: None,
-    )
-
-
 @pytest.mark.parametrize("res_value", ("one", 1, [2], ["bar"], (1,), {1, 2}))
 def test_action_event_results_invalid(mycharm, res_value):
     def handle_evt(charm: CharmBase, evt: ActionEvent):

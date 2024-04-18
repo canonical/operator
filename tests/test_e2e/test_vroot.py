@@ -47,7 +47,7 @@ def test_charm_virtual_root(charm_virtual_root):
         meta=MyCharm.META,
         charm_root=charm_virtual_root,
     )
-    assert out.unit_status == ("active", "hello world")
+    assert out.unit_status == ActiveStatus("hello world")
 
 
 def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):

@@ -177,7 +177,6 @@ def test_relation_set(mycharm):
 
         # this will NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
-        # todo: how do we warn against the user abusing pre/post_event to mess with an unguarded state?
         with pytest.raises(Exception):
             rel.data[rel.app]["a"] = "b"
         with pytest.raises(Exception):
@@ -191,7 +190,6 @@ def test_relation_set(mycharm):
 
         # this would NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
-        # todo: how do we warn against the user abusing pre/post_event to mess with an unguarded state?
         # with pytest.raises(Exception):
         #     rel.data[rel.app]["a"] = "b"
         # with pytest.raises(Exception):

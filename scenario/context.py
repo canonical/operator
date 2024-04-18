@@ -5,7 +5,7 @@ import dataclasses
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
 
 from ops import CharmBase, EventBase
 
@@ -430,20 +430,6 @@ class Context:
             )
         return event
 
-    @staticmethod
-    def _warn_deprecation_if_pre_or_post_event(
-        pre_event: Optional[Callable],
-        post_event: Optional[Callable],
-    ):
-        # warn if pre/post event arguments are passed
-        legacy_mode = pre_event or post_event
-        if legacy_mode:
-            logger.warning(
-                "The [pre/post]_event syntax is deprecated and "
-                "will be removed in a future release. "
-                "Please use the ``Context.[action_]manager`` context manager.",
-            )
-
     def manager(
         self,
         event: Union["Event", str],
@@ -497,8 +483,6 @@ class Context:
         self,
         event: Union["Event", str],
         state: "State",
-        pre_event: Optional[Callable[[CharmBase], None]] = None,
-        post_event: Optional[Callable[[CharmBase], None]] = None,
     ) -> "State":
         """Trigger a charm execution with an Event and a State.
 
@@ -508,32 +492,15 @@ class Context:
         :arg event: the Event that the charm will respond to. Can be a string or an Event instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
             charm will invoke when handling the Event.
-        :arg pre_event: callback to be invoked right before emitting the event on the newly
-            instantiated charm. Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use ``Context.manager`` instead.
-        :arg post_event: callback to be invoked right after emitting the event on the charm.
-            Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use ``Context.manager`` instead.
         """
-        self._warn_deprecation_if_pre_or_post_event(pre_event, post_event)
-
         with self._run_event(event=event, state=state) as ops:
-            if pre_event:
-                pre_event(cast(CharmBase, ops.charm))
-
             ops.emit()
-
-            if post_event:
-                post_event(cast(CharmBase, ops.charm))
-
         return self.output_state
 
     def run_action(
         self,
         action: Union["Action", str],
         state: "State",
-        pre_event: Optional[Callable[[CharmBase], None]] = None,
-        post_event: Optional[Callable[[CharmBase], None]] = None,
     ) -> ActionOutput:
         """Trigger a charm execution with an Action and a State.
 
@@ -543,25 +510,10 @@ class Context:
         :arg action: the Action that the charm will execute. Can be a string or an Action instance.
         :arg state: the State instance to use as data source for the hook tool calls that the
             charm will invoke when handling the Action (event).
-        :arg pre_event: callback to be invoked right before emitting the event on the newly
-            instantiated charm. Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use ``Context.action_manager`` instead.
-        :arg post_event: callback to be invoked right after emitting the event on the charm.
-            Will receive the charm instance as only positional argument.
-            This argument is deprecated. Please use ``Context.action_manager`` instead.
         """
-        self._warn_deprecation_if_pre_or_post_event(pre_event, post_event)
-
         _action = self._coalesce_action(action)
         with self._run_action(action=_action, state=state) as ops:
-            if pre_event:
-                pre_event(cast(CharmBase, ops.charm))
-
             ops.emit()
-
-            if post_event:
-                post_event(cast(CharmBase, ops.charm))
-
         return self._finalize_action(self.output_state)
 
     def _finalize_action(self, state_out: "State"):

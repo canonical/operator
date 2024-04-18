@@ -8,7 +8,6 @@ import dataclasses
 import datetime
 import inspect
 import re
-import warnings
 from collections import namedtuple
 from enum import Enum
 from itertools import chain
@@ -213,10 +212,6 @@ class Secret:
     # if None, the implication is that the secret has been granted to this unit.
     owner: Literal["unit", "app", None] = None
 
-    # deprecated! if a secret is not granted to this unit, omit it from State.secrets altogether.
-    # this attribute will be removed in Scenario 7+
-    granted: Any = "<DEPRECATED>"  # noqa
-
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     revision: int = 0
 
@@ -228,27 +223,6 @@ class Secret:
     description: Optional[str] = None
     expire: Optional[datetime.datetime] = None
     rotate: Optional[SecretRotate] = None
-
-    def __post_init__(self):
-        if self.granted != "<DEPRECATED>":
-            msg = (
-                "``state.Secret.granted`` is deprecated and will be removed in Scenario 7+. "
-                "If a Secret is not owned by the app/unit you are testing, nor has been granted to "
-                "it by the (remote) owner, then omit it from ``State.secrets`` altogether."
-            )
-            logger.warning(msg)
-            warnings.warn(msg, DeprecationWarning, stacklevel=2)
-
-        if self.owner == "application":
-            msg = (
-                "Secret.owner='application' is deprecated in favour of 'app' "
-                "and will be removed in Scenario 7+."
-            )
-            logger.warning(msg)
-            warnings.warn(msg, DeprecationWarning, stacklevel=2)
-
-            # bypass frozen dataclass
-            object.__setattr__(self, "owner", "app")
 
     # consumer-only events
     @property
@@ -973,11 +947,6 @@ class _EntityStatus:
     message: str = ""
 
     def __eq__(self, other):
-        if isinstance(other, Tuple):
-            logger.warning(
-                "Comparing Status with Tuples is deprecated and will be removed soon.",
-            )
-            return (self.name, self.message) == other
         if isinstance(other, (StatusBase, _EntityStatus)):
             return (self.name, self.message) == (other.name, other.message)
         logger.warning(

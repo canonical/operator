@@ -130,11 +130,9 @@ def test_fs_pull(charm_cls, make_dirs):
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
     )
-    out = ctx.run(
-        event="start",
-        state=state,
-        post_event=callback,
-    )
+    with ctx.manager("start", state=state) as mgr:
+        out = mgr.run()
+        callback(mgr.charm)
 
     if make_dirs:
         # file = (out.get_container("foo").mounts["foo"].src + "bar/baz.txt").open("/foo/bar/baz.txt")
@@ -233,37 +231,42 @@ def test_pebble_ready(charm_cls):
 
 @pytest.mark.parametrize("starting_service_status", pebble.ServiceStatus)
 def test_pebble_plan(charm_cls, starting_service_status):
-    def callback(self: CharmBase):
-        foo = self.unit.get_container("foo")
+    class PlanCharm(charm_cls):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        assert foo.get_plan().to_dict() == {
-            "services": {"fooserv": {"startup": "enabled"}}
-        }
-        fooserv = foo.get_services("fooserv")["fooserv"]
-        assert fooserv.startup == ServiceStartup.ENABLED
-        assert fooserv.current == ServiceStatus.ACTIVE
+        def _on_ready(self, event):
+            foo = event.workload
 
-        foo.add_layer(
-            "bar",
-            {
-                "summary": "bla",
-                "description": "deadbeef",
-                "services": {"barserv": {"startup": "disabled"}},
-            },
-        )
-
-        foo.replan()
-        assert foo.get_plan().to_dict() == {
-            "services": {
-                "barserv": {"startup": "disabled"},
-                "fooserv": {"startup": "enabled"},
+            assert foo.get_plan().to_dict() == {
+                "services": {"fooserv": {"startup": "enabled"}}
             }
-        }
+            fooserv = foo.get_services("fooserv")["fooserv"]
+            assert fooserv.startup == ServiceStartup.ENABLED
+            assert fooserv.current == ServiceStatus.ACTIVE
 
-        assert foo.get_service("barserv").current == starting_service_status
-        foo.start("barserv")
-        # whatever the original state, starting a service sets it to active
-        assert foo.get_service("barserv").current == ServiceStatus.ACTIVE
+            foo.add_layer(
+                "bar",
+                {
+                    "summary": "bla",
+                    "description": "deadbeef",
+                    "services": {"barserv": {"startup": "disabled"}},
+                },
+            )
+
+            foo.replan()
+            assert foo.get_plan().to_dict() == {
+                "services": {
+                    "barserv": {"startup": "disabled"},
+                    "fooserv": {"startup": "enabled"},
+                }
+            }
+
+            assert foo.get_service("barserv").current == starting_service_status
+            foo.start("barserv")
+            # whatever the original state, starting a service sets it to active
+            assert foo.get_service("barserv").current == ServiceStatus.ACTIVE
 
     container = Container(
         name="foo",
@@ -286,10 +289,9 @@ def test_pebble_plan(charm_cls, starting_service_status):
 
     out = trigger(
         State(containers=[container]),
-        charm_type=charm_cls,
+        charm_type=PlanCharm,
         meta={"name": "foo", "containers": {"foo": {}}},
         event=container.pebble_ready_event,
-        post_event=callback,
     )
 
     serv = lambda name, obj: pebble.Service(name, raw=obj)

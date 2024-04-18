@@ -45,22 +45,23 @@ def test_initial_status(mycharm):
 
 
 def test_status_history(mycharm):
-    def post_event(charm: CharmBase):
-        for obj in [charm.unit, charm.app]:
-            obj.status = ActiveStatus("1")
-            obj.status = BlockedStatus("2")
-            obj.status = WaitingStatus("3")
+    class StatusCharm(mycharm):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._on_update_status)
+
+        def _on_update_status(self, _):
+            for obj in (self.unit, self.app):
+                obj.status = ActiveStatus("1")
+                obj.status = BlockedStatus("2")
+                obj.status = WaitingStatus("3")
 
     ctx = Context(
-        mycharm,
+        StatusCharm,
         meta={"name": "local"},
     )
 
-    out = ctx.run(
-        "update_status",
-        State(leader=True),
-        post_event=post_event,
-    )
+    out = ctx.run("update_status", State(leader=True))
 
     assert out.unit_status == WaitingStatus("3")
     assert ctx.unit_status_history == [
@@ -78,12 +79,17 @@ def test_status_history(mycharm):
 
 
 def test_status_history_preservation(mycharm):
-    def post_event(charm: CharmBase):
-        for obj in [charm.unit, charm.app]:
-            obj.status = WaitingStatus("3")
+    class StatusCharm(mycharm):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._on_update_status)
+
+        def _on_update_status(self, _):
+            for obj in (self.unit, self.app):
+                obj.status = WaitingStatus("3")
 
     ctx = Context(
-        mycharm,
+        StatusCharm,
         meta={"name": "local"},
     )
 
@@ -94,7 +100,6 @@ def test_status_history_preservation(mycharm):
             unit_status=ActiveStatus("foo"),
             app_status=ActiveStatus("bar"),
         ),
-        post_event=post_event,
     )
 
     assert out.unit_status == WaitingStatus("3")
@@ -105,23 +110,30 @@ def test_status_history_preservation(mycharm):
 
 
 def test_workload_history(mycharm):
-    def post_event(charm: CharmBase):
-        charm.unit.set_workload_version("1")
-        charm.unit.set_workload_version("1.1")
-        charm.unit.set_workload_version("1.2")
+    class WorkloadCharm(mycharm):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.install, self._on_install)
+            framework.observe(self.on.start, self._on_start)
+            framework.observe(self.on.update_status, self._on_update_status)
+
+        def _on_install(self, _):
+            self.unit.set_workload_version("1")
+
+        def _on_start(self, _):
+            self.unit.set_workload_version("1.1")
+
+        def _on_update_status(self, _):
+            self.unit.set_workload_version("1.2")
 
     ctx = Context(
-        mycharm,
+        WorkloadCharm,
         meta={"name": "local"},
     )
 
-    out = ctx.run(
-        "update_status",
-        State(
-            leader=True,
-        ),
-        post_event=post_event,
-    )
+    out = ctx.run("install", State(leader=True))
+    out = ctx.run("start", out)
+    out = ctx.run("update_status", out)
 
     assert ctx.workload_version_history == ["1", "1.1"]
     assert out.workload_version == "1.2"

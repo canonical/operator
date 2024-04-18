@@ -41,19 +41,6 @@ def test_manager(mycharm):
     assert manager.output  # still there!
 
 
-def test_manager_legacy_pre_post_hooks(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
-    post_event = MagicMock()
-    pre_event = MagicMock()
-
-    ctx.run("start", State(), pre_event=pre_event, post_event=post_event)
-
-    assert post_event.called
-    assert isinstance(post_event.call_args.args[0], mycharm)
-    assert pre_event.called
-    assert isinstance(pre_event.call_args.args[0], mycharm)
-
-
 def test_manager_implicit(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     with _EventManager(ctx, "start", State()) as manager:
