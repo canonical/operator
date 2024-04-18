@@ -196,3 +196,8 @@ reportUnnecessaryIsInstance = false
 reportUnnecessaryComparison = false
 disableBytesTypePromotions = false
 stubPath = ""
+
+[tool.pytest.ini_options]
+markers = [
+    "charm_meta",  # Custom fixture to pass charm meta to the framework fixture.
+]
