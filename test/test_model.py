@@ -624,24 +624,34 @@ class TestModel(unittest.TestCase):
 
     def test_config(self):
         self.harness._get_backend_calls(reset=True)
+        self.harness.begin()
         secretfoo_id = self.harness.add_user_secret({"password": "xxxxxxxx"})
+        self.harness.grant_secret(secretfoo_id, self.harness.charm.app)
         secretbar_id = self.harness.add_user_secret({"certificate": "xxxxxxxx"})
+        self.harness.grant_secret(secretbar_id, self.harness.charm.app)
         secretbar = self.model.get_secret(id=secretbar_id)
         self.harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True, 'baz': 3.1,
                                    'secretfoo': secretfoo_id, 'secretbar': secretbar})
-        self.assertEqual(self.model.config, {
-            'foo': 'foo',
-            'bar': 1,
-            'qux': True,
-            'baz': 3.1,
-            'secretfoo': self.model.get_secret(id=secretfoo_id),
-            'secretbar': secretbar,
-        })
+        assert tuple(
+            self.model.config.keys()) == (
+            'foo',
+            'bar',
+            'qux',
+            'baz',
+            'secretfoo',
+            'secretbar')
+        assert self.model.config['foo'] == 'foo'
+        assert self.model.config['bar'] == 1
+        assert self.model.config['qux'] is True
+        assert self.model.config['baz'] == 3.1
+        assert typing.cast(ops.Secret, self.model.config['secretfoo']).id == secretfoo_id
+        assert typing.cast(ops.Secret, self.model.config['secretbar']).id == secretbar.id
         with self.assertRaises(TypeError):
             # Confirm that we cannot modify config values.
             self.model.config['foo'] = 'bar'  # type: ignore
 
-        self.assertBackendCalls([('config_get',)])
+        self.assertBackendCalls(
+            [('secret_get', {'id': secretbar_id, 'label': None}), ('config_get', )])
 
     def test_config_immutable(self):
         with pytest.raises(AttributeError):

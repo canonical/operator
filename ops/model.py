@@ -1740,7 +1740,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return super().__repr__()
 
 
-class ConfigData(_GenericLazyMapping[Union[bool, int, float, str]]):
+_ConfigValueType = Union[bool, int, float, str, Secret]
+
+
+class ConfigData(_GenericLazyMapping[_ConfigValueType]):
     """Configuration data.
 
     This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
@@ -1751,14 +1754,15 @@ class ConfigData(_GenericLazyMapping[Union[bool, int, float, str]]):
         self._backend = backend
         self._config = config
 
-    def _load(self) -> Dict[str, Union[bool, int, float, str], Secret]:
-        data = self._backend.config_get()
+    def _load(self) -> Mapping[str, _ConfigValueType]:
+        data = typing.cast(MutableMapping[str, _ConfigValueType], self._backend.config_get())
         if self._config:
             # Convert any type:secret options to Secret objects.
             # The simple types (bool, int, float, str) are correctly typed in the JSON.
             for option in self._config.values():
-                if option.type == "secret" and option.name in data:
-                    data[option.name] = Secret(self._backend, data[option.name])
+                if option.type == "secret" and data.get(option.name):
+                    data[option.name] = Secret(
+                        self._backend, id=typing.cast(str, data[option.name]))
         return data
 
 

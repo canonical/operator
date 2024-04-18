@@ -60,7 +60,7 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError, Secret, _ConfigOption, _NetworkDict
+from ops.model import Container, RelationNotFoundError, Secret, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -1343,9 +1343,6 @@ class Harness(Generic[CharmType]):
             for key, value in key_values.items():
                 if key in config._defaults:
                     if value is not None:
-                        if self._meta.config[key].type == 'secret' and isinstance(value, str):
-                            # Promote this to an actual Secret object.
-                            value = Secret(self._backend, value)
                         config._config_set(key, value)
                 else:
                     raise ValueError(f"unknown config option: '{key}'")
@@ -2102,19 +2099,20 @@ def _copy_docstrings(source_cls: Any):
 
 
 @_record_calls
-class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
+class _TestingConfig(Dict[str, Union[str, int, float, bool, Secret]]):
     """Represents the Juju Config."""
     _supported_types = {
         'string': str,
         'boolean': bool,
         'int': int,
         'float': float,
-        'secret': str,  # There is some special structure, but they are strings.
+        'secret': Secret,  # There is some special structure, but they are strings.
     }
 
-    def __init__(self, config: '_RawConfig'):
+    def __init__(self, config: '_RawConfig', _backend: '_TestingModelBackend'):
         super().__init__()
         self._spec = config
+        self._backend = _backend
         self._defaults = self._load_defaults(config)
 
         for key, value in self._defaults.items():
@@ -2123,8 +2121,9 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
             self._config_set(key, value)
 
     @staticmethod
-    def _load_defaults(charm_config: '_RawConfig') -> Dict[str, Union[str, int, float, bool]]:
-        """Load default values from config.yaml.
+    def _load_defaults(
+            charm_config: '_RawConfig') -> Dict[str, Union[str, int, float, bool, Secret]]:
+        """Load default values from the metadata.
 
         Handle the case where a user doesn't supply explicit config snippets.
         """
@@ -2133,26 +2132,31 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         cfg: Dict[str, '_ConfigOption'] = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in cfg.items()}
 
-    def _config_set(self, key: str, value: Union[str, int, float, bool]):
+    def _config_set(self, key: str, value: Union[str, int, float, bool, Secret]):
         # this is only called by the harness itself
         # we don't do real serialization/deserialization, but we do check that the value
         # has the expected type.
         option = self._spec.get('options', {}).get(key)
         if not option:
             raise RuntimeError(f'Unknown config option {key}; '
-                               'not declared in `config.yaml`.'
-                               'Check https://juju.is/docs/sdk/config for the '
+                               'not declared in charm metadata.'
+                               'Check https://juju.is/docs/sdk/charmcraft-yaml for the '
                                'spec.')
 
         declared_type = option.get('type')
         if not declared_type:
-            raise RuntimeError(f'Incorrectly formatted `options.yaml`, option {key} '
+            raise RuntimeError(f'Incorrectly formatted metadata, option {key} '
                                'is expected to declare a `type`.')
 
         if declared_type not in self._supported_types:
             raise RuntimeError(
-                'Incorrectly formatted `options.yaml`: `type` needs to be one '
+                'Incorrectly formatted metadata: `type` needs to be one '
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
+
+        # Promote secrets to Secret objects.
+        if declared_type == "secret" and isinstance(value, str) and value:
+            # Promote this to an actual Secret object.
+            value = Secret(self._backend, id=value)
 
         if type(value) is not self._supported_types[declared_type]:
             raise RuntimeError(f'Config option {key} is supposed to be of type '
@@ -2234,7 +2238,7 @@ class _TestingModelBackend:
         self._relation_data_raw: Dict[int, Dict[str, Dict[str, str]]] = {}
         # {relation_id: {"app": app_name, "units": ["app/0",...]}
         self._relation_app_and_units: Dict[int, _RelationEntities] = {}
-        self._config = _TestingConfig(config)
+        self._config = _TestingConfig(config, self)
         self._is_leader: bool = False
         # {resource_name: resource_content}
         # where resource_content is (path, content)

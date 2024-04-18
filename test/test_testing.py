@@ -1088,13 +1088,17 @@ class TestHarness(unittest.TestCase):
                 a:
                     description: a config option
                     type: secret
-                    default: ""
             ''')
         self.addCleanup(harness.cleanup)
         harness.begin()
         secret_id = harness.add_user_secret({'key': 'value'})
         harness.update_config(key_values={'a': secret_id})
-        assert harness.charm.changes == [{'name': 'config-changed', 'data': {'a': secret_id}}]
+        harness.grant_secret(secret_id, harness.charm.app)
+        assert len(harness.charm.changes) == 1
+        change = harness.charm.changes[0]
+        assert change['name'] == 'config-changed'
+        assert tuple(change['data'].keys()) == ('a', )
+        assert change['data']['a'].id == secret_id
 
     def test_no_config_option_type(self):
         with pytest.raises(RuntimeError):
