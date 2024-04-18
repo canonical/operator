@@ -20,7 +20,7 @@ import tempfile
 import typing
 import unittest
 
-from _pytest.monkeypatch import MonkeyPatch
+import pytest
 
 import ops
 from ops.model import _ModelBackend
@@ -78,7 +78,7 @@ def fake_script_calls(test_case: unittest.TestCase,
 
 class FakeScriptFixture:
     def __init__(self,
-                 monkeypatch: MonkeyPatch,
+                 monkeypatch: pytest.MonkeyPatch,
                  tmp_path: pathlib.Path,
                  fake_script_path: typing.Union[pathlib.Path, None] = None):
         self.monkeypatch = monkeypatch
