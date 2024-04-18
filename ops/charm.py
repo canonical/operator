@@ -1457,6 +1457,8 @@ class CharmMeta:
         raw_config = {}
         if config is not None:
             raw_config = cast(Optional[Dict[str, Any]], yaml.safe_load(config))
+            if raw_config:
+                raw_config = raw_config.get("options", {})
         return cls(meta, raw_actions, raw_config)
 
 
