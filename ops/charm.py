@@ -1402,7 +1402,7 @@ class CharmMeta:
         config_path = _charm_root / "config.yaml"
         if config_path.exists():
             with config_path.open() as f:
-                config = yaml.safe_load(f.read())
+                config = yaml.safe_load(f.read()).get("options", {})
 
         return CharmMeta(meta, actions, config)
 
