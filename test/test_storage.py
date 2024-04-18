@@ -26,6 +26,7 @@ import unittest.mock
 from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
 from textwrap import dedent
 
+import pytest
 import yaml
 
 import ops
@@ -78,7 +79,7 @@ class StoragePermutations(abc.ABC):
         del s
         gc.collect()
         res = f.load_snapshot(handle)
-        self.assertEqual(data, res.content)  # type: ignore
+        assert data == res.content  # type: ignore
 
     def test_emit_event(self):
         f = self.create_framework()
@@ -118,63 +119,62 @@ class StoragePermutations(abc.ABC):
         s = Sample(f, 'key')
         f.register_type(Sample, None, Sample.handle_kind)
         s.on.event.emit('foo')
-        self.assertEqual('foo', s.observed_content)
+        assert s.observed_content == 'foo'
         s.on.event.emit(1)
-        self.assertEqual(1, s.observed_content)
+        assert s.observed_content == 1
         s.on.event.emit(None)
-        self.assertEqual(None, s.observed_content)
+        assert s.observed_content is None
 
     def test_save_and_overwrite_snapshot(self):
         store = self.create_storage()
         store.save_snapshot('foo', {1: 2})
-        self.assertEqual({1: 2}, store.load_snapshot('foo'))
+        assert store.load_snapshot('foo') == {1: 2}
         store.save_snapshot('foo', {'three': 4})
-        self.assertEqual({'three': 4}, store.load_snapshot('foo'))
+        assert store.load_snapshot('foo') == {'three': 4}
 
     def test_drop_snapshot(self):
         store = self.create_storage()
         store.save_snapshot('foo', {1: 2})
-        self.assertEqual({1: 2}, store.load_snapshot('foo'))
+        assert store.load_snapshot('foo') == {1: 2}
         store.drop_snapshot('foo')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
     def test_save_snapshot_empty_string(self):
         store = self.create_storage()
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
         store.save_snapshot('foo', '')
-        self.assertEqual('', store.load_snapshot('foo'))
+        assert store.load_snapshot('foo') == ''
         store.drop_snapshot('foo')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
     def test_save_snapshot_none(self):
         store = self.create_storage()
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
         store.save_snapshot('bar', None)
-        self.assertEqual(None, store.load_snapshot('bar'))
+        assert store.load_snapshot('bar') is None
         store.drop_snapshot('bar')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
 
     def test_save_snapshot_zero(self):
         store = self.create_storage()
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
         store.save_snapshot('zero', 0)
-        self.assertEqual(0, store.load_snapshot('zero'))
+        assert store.load_snapshot('zero') == 0
         store.drop_snapshot('zero')
-        with self.assertRaises(ops.storage.NoSnapshotError):
+        with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
 
     def test_save_notice(self):
         store = self.create_storage()
         store.save_notice('event', 'observer', 'method')
-        self.assertEqual(
-            list(store.notices('event')),
-            [('event', 'observer', 'method')])
+        assert list(store.notices('event')) == \
+            [('event', 'observer', 'method')]
 
     def test_all_notices(self):
         notices = [('e1', 'o1', 'm1'), ('e1', 'o2', 'm2'), ('e2', 'o3', 'm3')]
@@ -183,36 +183,35 @@ class StoragePermutations(abc.ABC):
             store.save_notice(*notice)
 
         # passing in the arg, you get the ones that match
-        self.assertEqual(list(store.notices('e1')), notices[:2])
-        self.assertEqual(list(store.notices('e2')), notices[2:])
+        assert list(store.notices('e1')) == notices[:2]
+        assert list(store.notices('e2')) == notices[2:]
         # the match is exact
-        self.assertEqual(list(store.notices('e%')), [])
-        self.assertEqual(list(store.notices('e*')), [])
-        self.assertEqual(list(store.notices('e.')), [])
-        self.assertEqual(list(store.notices('e')), [])
+        assert list(store.notices('e%')) == []
+        assert list(store.notices('e*')) == []
+        assert list(store.notices('e.')) == []
+        assert list(store.notices('e')) == []
         # no arg, or non-arg, means all
-        self.assertEqual(list(store.notices()), notices)
-        self.assertEqual(list(store.notices(None)), notices)
-        self.assertEqual(list(store.notices('')), notices)
+        assert list(store.notices()) == notices
+        assert list(store.notices(None)) == notices
+        assert list(store.notices('')) == notices
 
     def test_load_notices(self):
         store = self.create_storage()
-        self.assertEqual(list(store.notices('path')), [])
+        assert list(store.notices('path')) == []
 
     def test_save_one_load_another_notice(self):
         store = self.create_storage()
         store.save_notice('event', 'observer', 'method')
-        self.assertEqual(list(store.notices('other')), [])
+        assert list(store.notices('other')) == []
 
     def test_save_load_drop_load_notices(self):
         store = self.create_storage()
         store.save_notice('event', 'observer', 'method')
         store.save_notice('event', 'observer', 'method2')
-        self.assertEqual(
-            list(store.notices('event')),
+        assert list(store.notices('event')) == \
             [('event', 'observer', 'method'),
              ('event', 'observer', 'method2'),
-             ])
+             ]
 
 
 class TestSQLiteStorage(StoragePermutations, BaseTestCase):
@@ -224,7 +223,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, ".unit-state.db")
             storage = ops.storage.SQLiteStorage(filename)
-            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            assert stat.S_IMODE(os.stat(filename).st_mode) == stat.S_IRUSR | stat.S_IWUSR
             storage.close()
 
     def test_permissions_existing(self):
@@ -234,7 +233,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             # Set the file to access that will need fixing for user, group, and other.
             os.chmod(filename, 0o744)
             storage = ops.storage.SQLiteStorage(filename)
-            self.assertEqual(stat.S_IMODE(os.stat(filename).st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            assert stat.S_IMODE(os.stat(filename).st_mode) == stat.S_IRUSR | stat.S_IWUSR
             storage.close()
 
     @unittest.mock.patch("os.path.exists")
@@ -245,7 +244,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             # Create an existing file, but the mock will simulate a race condition saying that it
             # does not exist.
             open(filename, "w").close()
-            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
     @unittest.mock.patch("os.chmod")
     def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
@@ -253,7 +252,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, ".unit-state.db")
             open(filename, "w").close()
-            self.assertRaises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
 
 def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
@@ -339,29 +338,29 @@ class TestSimpleLoader(BaseTestCase):
     def test_is_c_loader(self):
         loader = ops.storage._SimpleLoader(io.StringIO(''))
         if getattr(yaml, 'CSafeLoader', None) is not None:
-            self.assertIsInstance(loader, yaml.CSafeLoader)
+            assert isinstance(loader, yaml.CSafeLoader)
         else:
-            self.assertIsInstance(loader, yaml.SafeLoader)
+            assert isinstance(loader, yaml.SafeLoader)
 
     def test_is_c_dumper(self):
         dumper = ops.storage._SimpleDumper(io.StringIO(''))
         if getattr(yaml, 'CSafeDumper', None) is not None:
-            self.assertIsInstance(dumper, yaml.CSafeDumper)
+            assert isinstance(dumper, yaml.CSafeDumper)
         else:
-            self.assertIsInstance(dumper, yaml.SafeDumper)
+            assert isinstance(dumper, yaml.SafeDumper)
 
     def test_handles_tuples(self):
         raw = yaml.dump((1, 'tuple'), Dumper=ops.storage._SimpleDumper)
         parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
-        self.assertEqual(parsed, (1, 'tuple'))
+        assert parsed == (1, 'tuple')
 
     def assertRefused(self, obj: typing.Any):  # noqa: N802
         # We shouldn't allow them to be written
-        with self.assertRaises(yaml.representer.RepresenterError):
+        with pytest.raises(yaml.representer.RepresenterError):
             yaml.dump(obj, Dumper=ops.storage._SimpleDumper)
         # If they did somehow end up written, we shouldn't be able to load them
         raw = yaml.dump(obj, Dumper=yaml.Dumper)
-        with self.assertRaises(yaml.constructor.ConstructorError):
+        with pytest.raises(yaml.constructor.ConstructorError):
             yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
 
     def test_forbids_some_types(self):
@@ -380,12 +379,12 @@ class TestSimpleLoader(BaseTestCase):
 class TestJujuStateBackend(BaseTestCase):
 
     def test_is_not_available(self):
-        self.assertFalse(ops.storage.juju_backend_available())
+        assert not ops.storage.juju_backend_available()
 
     def test_is_available(self):
         fake_script(self, 'state-get', 'echo ""')
-        self.assertTrue(ops.storage.juju_backend_available())
-        self.assertEqual(fake_script_calls(self, clear=True), [])
+        assert ops.storage.juju_backend_available()
+        assert fake_script_calls(self, clear=True) == []
 
     def test_set_encodes_args(self):
         t = tempfile.NamedTemporaryFile()
@@ -395,17 +394,17 @@ class TestJujuStateBackend(BaseTestCase):
                 """).format(pathlib.Path(t.name).as_posix()))
             backend = ops.storage._JujuStorageBackend()
             backend.set('key', {'foo': 2})
-            self.assertEqual(fake_script_calls(self, clear=True), [
+            assert fake_script_calls(self, clear=True) == [
                 ['state-set', '--file', '-'],
-            ])
+            ]
             t.seek(0)
             content = t.read()
         finally:
             t.close()
-        self.assertEqual(content.decode('utf-8'), dedent("""\
+        assert content.decode('utf-8') == dedent("""\
             "key": |
               {foo: 2}
-            """))
+            """)
 
     def test_get(self):
         fake_script(self, 'state-get', dedent("""
@@ -413,10 +412,10 @@ class TestJujuStateBackend(BaseTestCase):
             """))
         backend = ops.storage._JujuStorageBackend()
         value = backend.get('key')
-        self.assertEqual(value, {'foo': 'bar'})
-        self.assertEqual(fake_script_calls(self, clear=True), [
+        assert value == {'foo': 'bar'}
+        assert fake_script_calls(self, clear=True) == [
             ['state-get', 'key'],
-        ])
+        ]
 
     def test_set_and_get_complex_value(self):
         t = tempfile.NamedTemporaryFile()
@@ -434,19 +433,19 @@ class TestJujuStateBackend(BaseTestCase):
                 'seven': b'1234',
             }
             backend.set('Class[foo]/_stored', complex_val)
-            self.assertEqual(fake_script_calls(self, clear=True), [
+            assert fake_script_calls(self, clear=True) == [
                 ['state-set', '--file', '-'],
-            ])
+            ]
             t.seek(0)
             content = t.read()
         finally:
             t.close()
         outer = yaml.safe_load(content)
         key = 'Class[foo]/_stored'
-        self.assertEqual(list(outer.keys()), [key])
+        assert list(outer.keys()) == [key]
         inner = yaml.load(outer[key], Loader=ops.storage._SimpleLoader)  # noqa: S506
-        self.assertEqual(complex_val, inner)
-        self.assertEqual(content.decode('utf-8'), dedent("""\
+        assert complex_val == inner
+        assert content.decode('utf-8') == dedent("""\
             "Class[foo]/_stored": |
               foo: 2
               3: [1, 2, '3']
@@ -455,7 +454,7 @@ class TestJujuStateBackend(BaseTestCase):
               six: !!python/tuple [a, b]
               seven: !!binary |
                 MTIzNA==
-            """))
+            """)
         # Note that the content is yaml in a string, embedded inside YAML to declare the Key:
         # Value of where to store the entry.
         fake_script(self, 'state-get', dedent("""
@@ -469,7 +468,7 @@ class TestJujuStateBackend(BaseTestCase):
             "
         """))
         out = backend.get('Class[foo]/_stored')
-        self.assertEqual(out, complex_val)
+        assert out == complex_val
 
     # TODO: Add tests for things we don't want to support. eg, YAML that has custom types should
     #  be properly forbidden.

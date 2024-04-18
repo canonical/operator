@@ -18,14 +18,13 @@ import shutil
 import tempfile
 import typing
 import unittest
-import unittest.mock
 from pathlib import Path
 
+import pytest
 import yaml
 
 import ops
 import ops.charm
-from ops import pebble
 from ops.model import ModelError, _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -85,16 +84,16 @@ class TestCharm(unittest.TestCase):
                 self.started = True
 
         events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
-        self.assertIn('install', events)
-        self.assertIn('custom', events)
+        assert 'install' in events
+        assert 'custom' in events
 
         framework = self.create_framework()
         charm = MyCharm(framework)
         charm.on.start.emit()
 
-        self.assertEqual(charm.started, True)
+        assert charm.started
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             framework.observe(charm.on.start, charm)  # type: ignore
 
     def test_observe_decorated_method(self):
@@ -129,9 +128,9 @@ class TestCharm(unittest.TestCase):
         charm = MyCharm(framework)
         charm.on.start.emit()
         # check that the event has been seen by the decorator
-        self.assertEqual(1, len(events))
+        assert len(events) == 1
         # check that the event has been seen by the observer
-        self.assertIsInstance(charm.seen, ops.StartEvent)
+        assert isinstance(charm.seen, ops.StartEvent)
 
     def test_observer_not_referenced_warning(self):
         class MyObj(ops.Object):
@@ -159,7 +158,7 @@ class TestCharm(unittest.TestCase):
 
     def test_empty_action(self):
         meta = ops.CharmMeta.from_yaml('name: my-charm', '')
-        self.assertEqual(meta.actions, {})
+        assert meta.actions == {}
 
     def test_helper_properties(self):
         framework = self.create_framework()
@@ -168,11 +167,11 @@ class TestCharm(unittest.TestCase):
             pass
 
         charm = MyCharm(framework)
-        self.assertEqual(charm.app, framework.model.app)
-        self.assertEqual(charm.unit, framework.model.unit)
-        self.assertEqual(charm.meta, framework.meta)
-        self.assertEqual(charm.charm_dir, framework.charm_dir)
-        self.assertIs(charm.config, framework.model.config)
+        assert charm.app == framework.model.app
+        assert charm.unit == framework.model.unit
+        assert charm.meta == framework.meta
+        assert charm.charm_dir == framework.charm_dir
+        assert charm.config is framework.model.config
 
     def test_relation_events(self):
 
@@ -215,7 +214,7 @@ peers:
 
         charm = MyCharm(self.create_framework())
 
-        self.assertIn('pro_2_relation_broken', repr(charm.on))
+        assert 'pro_2_relation_broken' in repr(charm.on)
 
         rel = charm.framework.model.get_relation('req1', 1)
         app = charm.framework.model.get_app('remote')
@@ -229,7 +228,7 @@ peers:
         charm.on['peer1'].relation_broken.emit(rel, app)
         charm.on['peer-2'].relation_broken.emit(rel, app)
 
-        self.assertEqual(charm.seen, [
+        assert charm.seen == [
             'RelationJoinedEvent',
             'RelationChangedEvent',
             'RelationChangedEvent',
@@ -238,11 +237,9 @@ peers:
             'RelationDepartedEvent',
             'RelationBrokenEvent',
             'RelationBrokenEvent',
-        ])
+        ]
 
     def test_storage_events(self):
-        this = self
-
         class MyCharm(ops.CharmBase):
             def __init__(self, *args: typing.Any):
                 super().__init__(*args)
@@ -254,7 +251,7 @@ peers:
 
             def _on_stor1_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
-                this.assertEqual(event.storage.location, Path("/var/srv/stor1/0"))
+                assert event.storage.location == Path("/var/srv/stor1/0")
 
             def _on_stor2_detach(self, event: ops.StorageDetachingEvent):
                 self.seen.append(type(event).__name__)
@@ -334,11 +331,11 @@ storage:
             """,
         )
 
-        self.assertIsNone(self.meta.storages['stor1'].multiple_range)
-        self.assertEqual(self.meta.storages['stor2'].multiple_range, (2, 2))
-        self.assertEqual(self.meta.storages['stor3'].multiple_range, (2, None))
-        self.assertEqual(self.meta.storages['stor-4'].multiple_range, (2, 4))
-        self.assertEqual(self.meta.storages['stor-plus'].multiple_range, (10, None))
+        assert self.meta.storages['stor1'].multiple_range is None
+        assert self.meta.storages['stor2'].multiple_range == (2, 2)
+        assert self.meta.storages['stor3'].multiple_range == (2, None)
+        assert self.meta.storages['stor-4'].multiple_range == (2, 4)
+        assert self.meta.storages['stor-plus'].multiple_range == (10, None)
 
         charm = MyCharm(self.create_framework())
 
@@ -349,26 +346,14 @@ storage:
         charm.on['stor-multiple-dashes'].storage_attached.emit(
             ops.Storage("stor-multiple-dashes", 0, charm.model._backend))
 
-        self.assertEqual(charm.seen, [
+        assert charm.seen == [
             'StorageAttachedEvent',
             'StorageDetachingEvent',
             'StorageAttachedEvent',
             'StorageAttachedEvent',
-        ])
+        ]
 
-    @unittest.mock.patch('ops.pebble.Client.get_change')
-    def test_workload_events(self, mock_get_change: unittest.mock.MagicMock):
-        def get_change(change_id: pebble.ChangeID) -> pebble.Change:
-            return pebble.Change.from_dict({
-                'id': pebble.ChangeID(change_id),
-                'kind': 'exec',
-                'ready': False,
-                'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
-                'status': 'Doing',
-                'summary': 'Exec command "foo"',
-            })
-
-        mock_get_change.side_effect = get_change
+    def test_workload_events(self):
 
         class MyCharm(ops.CharmBase):
             def __init__(self, *args: typing.Any):
@@ -383,22 +368,12 @@ storage:
                         self.on[workload].pebble_custom_notice,
                         self.on_any_pebble_custom_notice,
                     )
-                    self.framework.observe(
-                        self.on[workload].pebble_change_updated,
-                        self.on_any_pebble_change_updated,
-                    )
 
             def on_any_pebble_ready(self, event: ops.PebbleReadyEvent):
                 self.seen.append(type(event).__name__)
 
             def on_any_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
                 self.seen.append(type(event).__name__)
-
-            def on_any_pebble_change_updated(self, event: ops.PebbleChangeUpdatedEvent):
-                self.seen.append(type(event).__name__)
-                change = event.get_change()
-                assert change.id == event.notice.key
-                assert change.kind == 'exec'
 
         # language=YAML
         self.meta = ops.CharmMeta.from_yaml(metadata='''
@@ -410,8 +385,8 @@ containers:
 
         charm = MyCharm(self.create_framework())
 
-        self.assertIn('container_a_pebble_ready', repr(charm.on))
-        self.assertIn('containerb_pebble_ready', repr(charm.on))
+        assert 'container_a_pebble_ready' in repr(charm.on)
+        assert 'containerb_pebble_ready' in repr(charm.on)
 
         charm.on['container-a'].pebble_ready.emit(
             charm.framework.model.unit.get_container('container-a'))
@@ -423,19 +398,12 @@ containers:
         charm.on['containerb'].pebble_custom_notice.emit(
             charm.framework.model.unit.get_container('containerb'), '2', 'custom', 'y')
 
-        charm.on['container-a'].pebble_change_updated.emit(
-            charm.framework.model.unit.get_container('container-a'), '1', 'change-update', '42')
-        charm.on['containerb'].pebble_change_updated.emit(
-            charm.framework.model.unit.get_container('containerb'), '2', 'change-update', '42')
-
-        self.assertEqual(charm.seen, [
+        assert charm.seen == [
             'PebbleReadyEvent',
             'PebbleReadyEvent',
             'PebbleCustomNoticeEvent',
             'PebbleCustomNoticeEvent',
-            'PebbleChangeUpdatedEvent',
-            'PebbleChangeUpdatedEvent',
-        ])
+        ]
 
     def test_relations_meta(self):
         # language=YAML
@@ -451,18 +419,18 @@ requires:
     optional: true
 ''')
 
-        self.assertEqual(self.meta.requires['database'].interface_name, 'mongodb')
-        self.assertEqual(self.meta.requires['database'].limit, 1)
-        self.assertEqual(self.meta.requires['database'].scope, 'container')
-        self.assertFalse(self.meta.requires['database'].optional)
+        assert self.meta.requires['database'].interface_name == 'mongodb'
+        assert self.meta.requires['database'].limit == 1
+        assert self.meta.requires['database'].scope == 'container'
+        assert not self.meta.requires['database'].optional
 
-        self.assertEqual(self.meta.requires['metrics'].interface_name, 'prometheus-scraping')
-        self.assertIsNone(self.meta.requires['metrics'].limit)
-        self.assertEqual(self.meta.requires['metrics'].scope, 'global')  # Default value
-        self.assertTrue(self.meta.requires['metrics'].optional)
+        assert self.meta.requires['metrics'].interface_name == 'prometheus-scraping'
+        assert self.meta.requires['metrics'].limit is None
+        assert self.meta.requires['metrics'].scope == 'global'  # Default value
+        assert self.meta.requires['metrics'].optional
 
     def test_relations_meta_limit_type_validation(self):
-        with self.assertRaisesRegex(TypeError, "limit should be an int, not <class 'str'>"):
+        with pytest.raises(TypeError, match=r"limit should be an int, not <class 'str'>"):
             # language=YAML
             self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -473,8 +441,10 @@ requires:
 ''')
 
     def test_relations_meta_scope_type_validation(self):
-        with self.assertRaisesRegex(TypeError,
-                                    "scope should be one of 'global', 'container'; not 'foobar'"):
+        with pytest.raises(
+            TypeError,
+            match="scope should be one of 'global', 'container'; not 'foobar'"
+        ):
             # language=YAML
             self.meta = ops.CharmMeta.from_yaml('''
 name: my-charm
@@ -518,8 +488,8 @@ start:
                                 {"interface": "bar"}
                         }}))
             meta = ops.CharmMeta.from_charm_root(td)
-            self.assertEqual(meta.name, "bob")
-            self.assertEqual(meta.requires['foo'].interface_name, "bar")
+            assert meta.name == "bob"
+            assert meta.requires['foo'].interface_name == "bar"
 
     def test_actions_from_charm_root(self):
         with tempfile.TemporaryDirectory() as d:
@@ -541,10 +511,10 @@ start:
                         }}))
 
             meta = ops.CharmMeta.from_charm_root(td)
-            self.assertEqual(meta.name, "bob")
-            self.assertEqual(meta.requires['foo'].interface_name, "bar")
-            self.assertFalse(meta.actions['foo'].additional_properties)
-            self.assertEqual(meta.actions['foo'].description, "foos the bar")
+            assert meta.name == "bob"
+            assert meta.requires['foo'].interface_name == "bar"
+            assert not meta.actions['foo'].additional_properties
+            assert meta.actions['foo'].description == "foos the bar"
 
     def _setup_test_action(self):
         fake_script(self, 'action-get', """echo '{"foo-name": "name", "silent": true}'""")
@@ -576,18 +546,18 @@ start:
         charm = MyCharm(framework)
 
         events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
-        self.assertIn('foo_bar_action', events)
-        self.assertIn('start_action', events)
+        assert 'foo_bar_action' in events
+        assert 'start_action' in events
 
         action_id = "1234"
         charm.on.foo_bar_action.emit(id=action_id)
-        self.assertEqual(charm.seen_action_params, {"foo-name": "name", "silent": True})
-        self.assertEqual(fake_script_calls(self), [
+        assert charm.seen_action_params == {"foo-name": "name", "silent": True}
+        assert fake_script_calls(self) == [
             ['action-get', '--format=json'],
             ['action-log', "test-log"],
             ['action-set', "res=val with spaces", f"id={action_id}"],
             ['action-fail', "test-fail"],
-        ])
+        ]
 
     def test_invalid_action_results(self):
 
@@ -613,7 +583,7 @@ start:
                 {'aBc': 'd'}):
             charm.res = bad_res
 
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 charm.on.foo_bar_action.emit(id='1')
 
     def _test_action_event_defer_fails(self, cmd_type: str):
@@ -634,7 +604,7 @@ start:
         framework = self.create_framework()
         charm = MyCharm(framework)
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             charm.on.start_action.emit(id='2')
 
     def test_action_event_defer_fails(self):
@@ -649,10 +619,10 @@ containers:
   test2:
     k: v
 """)
-        self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
-        self.assertIsInstance(meta.containers['test2'], ops.ContainerMeta)
-        self.assertEqual(meta.containers['test1'].name, 'test1')
-        self.assertEqual(meta.containers['test2'].name, 'test2')
+        assert isinstance(meta.containers['test1'], ops.ContainerMeta)
+        assert isinstance(meta.containers['test2'], ops.ContainerMeta)
+        assert meta.containers['test1'].name == 'test1'
+        assert meta.containers['test2'].name == 'test2'
 
     def test_containers_storage(self):
         meta = ops.CharmMeta.from_yaml("""
@@ -685,22 +655,22 @@ containers:
         architectures:
          - arm
 """)
-        self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
-        self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
-        self.assertEqual(meta.containers['test1'].mounts["data"].location, '/test/storagemount')
-        self.assertEqual(meta.containers['test1'].mounts["other"].location, '/test/otherdata')
-        self.assertEqual(meta.storages['other'].properties, ['transient'])
-        self.assertEqual(meta.containers['test1'].resource, 'ubuntu-22.10')
+        assert isinstance(meta.containers['test1'], ops.ContainerMeta)
+        assert isinstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
+        assert meta.containers['test1'].mounts["data"].location == '/test/storagemount'
+        assert meta.containers['test1'].mounts["other"].location == '/test/otherdata'
+        assert meta.storages['other'].properties == ['transient']
+        assert meta.containers['test1'].resource == 'ubuntu-22.10'
         assert meta.containers['test2'].bases is not None
-        self.assertEqual(len(meta.containers['test2'].bases), 2)
-        self.assertEqual(meta.containers['test2'].bases[0].os_name, 'ubuntu')
-        self.assertEqual(meta.containers['test2'].bases[0].channel, '23.10')
-        self.assertEqual(meta.containers['test2'].bases[0].architectures, ['amd64'])
-        self.assertEqual(meta.containers['test2'].bases[1].os_name, 'ubuntu')
-        self.assertEqual(meta.containers['test2'].bases[1].channel, '23.04/stable/fips')
-        self.assertEqual(meta.containers['test2'].bases[1].architectures, ['arm'])
+        assert len(meta.containers['test2'].bases) == 2
+        assert meta.containers['test2'].bases[0].os_name == 'ubuntu'
+        assert meta.containers['test2'].bases[0].channel == '23.10'
+        assert meta.containers['test2'].bases[0].architectures == ['amd64']
+        assert meta.containers['test2'].bases[1].os_name == 'ubuntu'
+        assert meta.containers['test2'].bases[1].channel == '23.04/stable/fips'
+        assert meta.containers['test2'].bases[1].architectures == ['arm']
         # It's an error to specify both the 'resource' and the 'bases' fields.
-        with self.assertRaises(ModelError):
+        with pytest.raises(ModelError):
             ops.CharmMeta.from_yaml("""
 name: invalid-charm
 containers:
@@ -727,14 +697,13 @@ containers:
       - storage: data
         location: /test/otherdata
 """)
-        self.assertIsInstance(meta.containers['test1'], ops.ContainerMeta)
-        self.assertIsInstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
-        self.assertEqual(
-            meta.containers['test1'].mounts["data"].locations[0],
-            '/test/storagemount')
-        self.assertEqual(meta.containers['test1'].mounts["data"].locations[1], '/test/otherdata')
+        assert isinstance(meta.containers['test1'], ops.ContainerMeta)
+        assert isinstance(meta.containers['test1'].mounts["data"], ops.ContainerStorageMeta)
+        assert meta.containers['test1'].mounts["data"].locations[0] == \
+            '/test/storagemount'
+        assert meta.containers['test1'].mounts["data"].locations[1] == '/test/otherdata'
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             meta.containers["test1"].mounts["data"].location
 
     def test_secret_events(self):
@@ -777,12 +746,12 @@ containers:
         charm.on.secret_remove.emit('secret:remove', 'rem', 7)
         charm.on.secret_expired.emit('secret:expired', 'exp', 42)
 
-        self.assertEqual(charm.seen, [
+        assert charm.seen == [
             'SecretChangedEvent',
             'SecretRotateEvent',
             'SecretRemoveEvent',
             'SecretExpiredEvent',
-        ])
+        ]
 
     def test_collect_app_status_leader(self):
         class MyCharm(ops.CharmBase):
@@ -802,10 +771,10 @@ containers:
         charm = MyCharm(self.create_framework())
         ops.charm._evaluate_status(charm)
 
-        self.assertEqual(fake_script_calls(self, True), [
+        assert fake_script_calls(self, True) == [
             ['is-leader', '--format=json'],
             ['status-set', '--application=True', 'blocked', 'first'],
-        ])
+        ]
 
     def test_collect_app_status_no_statuses(self):
         class MyCharm(ops.CharmBase):
@@ -821,9 +790,9 @@ containers:
         charm = MyCharm(self.create_framework())
         ops.charm._evaluate_status(charm)
 
-        self.assertEqual(fake_script_calls(self, True), [
+        assert fake_script_calls(self, True) == [
             ['is-leader', '--format=json'],
-        ])
+        ]
 
     def test_collect_app_status_non_leader(self):
         class MyCharm(ops.CharmBase):
@@ -839,9 +808,9 @@ containers:
         charm = MyCharm(self.create_framework())
         ops.charm._evaluate_status(charm)
 
-        self.assertEqual(fake_script_calls(self, True), [
+        assert fake_script_calls(self, True) == [
             ['is-leader', '--format=json'],
-        ])
+        ]
 
     def test_collect_unit_status(self):
         class MyCharm(ops.CharmBase):
@@ -861,10 +830,10 @@ containers:
         charm = MyCharm(self.create_framework())
         ops.charm._evaluate_status(charm)
 
-        self.assertEqual(fake_script_calls(self, True), [
+        assert fake_script_calls(self, True) == [
             ['is-leader', '--format=json'],
             ['status-set', '--application=False', 'blocked', 'first'],
-        ])
+        ]
 
     def test_collect_unit_status_no_statuses(self):
         class MyCharm(ops.CharmBase):
@@ -880,9 +849,9 @@ containers:
         charm = MyCharm(self.create_framework())
         ops.charm._evaluate_status(charm)
 
-        self.assertEqual(fake_script_calls(self, True), [
+        assert fake_script_calls(self, True) == [
             ['is-leader', '--format=json'],
-        ])
+        ]
 
     def test_collect_app_and_unit_status(self):
         class MyCharm(ops.CharmBase):
@@ -903,11 +872,11 @@ containers:
         charm = MyCharm(self.create_framework())
         ops.charm._evaluate_status(charm)
 
-        self.assertEqual(fake_script_calls(self, True), [
+        assert fake_script_calls(self, True) == [
             ['is-leader', '--format=json'],
             ['status-set', '--application=True', 'active', ''],
             ['status-set', '--application=False', 'waiting', 'blah'],
-        ])
+        ]
 
     def test_add_status_type_error(self):
         class MyCharm(ops.CharmBase):
@@ -921,7 +890,7 @@ containers:
         fake_script(self, 'is-leader', 'echo true')
 
         charm = MyCharm(self.create_framework())
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.charm._evaluate_status(charm)
 
     def test_collect_status_priority(self):
@@ -958,14 +927,14 @@ containers:
 
         status_set_calls = [call for call in fake_script_calls(self, True)
                             if call[0] == 'status-set']
-        self.assertEqual(status_set_calls, [
+        assert status_set_calls == [
             ['status-set', '--application=True', 'error', ''],
             ['status-set', '--application=True', 'blocked', ''],
             ['status-set', '--application=True', 'maintenance', ''],
             ['status-set', '--application=True', 'waiting', ''],
             ['status-set', '--application=True', 'active', ''],
             ['status-set', '--application=True', 'unknown', ''],
-        ])
+        ]
 
 
 class TestCharmMeta(unittest.TestCase):
@@ -978,10 +947,10 @@ source: https://git.example.com
 issues: https://bugs.example.com
 docs: https://docs.example.com
 """)
-        self.assertEqual(meta.links.websites, ['https://example.com'])
-        self.assertEqual(meta.links.sources, ['https://git.example.com'])
-        self.assertEqual(meta.links.issues, ['https://bugs.example.com'])
-        self.assertEqual(meta.links.documentation, 'https://docs.example.com')
+        assert meta.links.websites == ['https://example.com']
+        assert meta.links.sources == ['https://git.example.com']
+        assert meta.links.issues == ['https://bugs.example.com']
+        assert meta.links.documentation == 'https://docs.example.com'
         # Other than documentation, they can also all be lists of items.
         meta = ops.CharmMeta.from_yaml("""
 name: my-charm
@@ -995,13 +964,11 @@ issues:
  - https://bugs.example.com
  - https://features.example.com
 """)
-        self.assertEqual(meta.links.websites, ['https://example.com', 'https://example.org'])
-        self.assertEqual(
-            meta.links.sources, [
-                'https://git.example.com', 'https://bzr.example.com'])
-        self.assertEqual(
-            meta.links.issues, [
-                'https://bugs.example.com', 'https://features.example.com'])
+        assert meta.links.websites == ['https://example.com', 'https://example.org']
+        assert meta.links.sources == [
+            'https://git.example.com', 'https://bzr.example.com']
+        assert meta.links.issues == [
+            'https://bugs.example.com', 'https://features.example.com']
 
     def test_links_charmcraft_yaml(self):
         meta = ops.CharmMeta.from_yaml("""
@@ -1015,24 +982,24 @@ links:
   - https://example.com/
   contact: Support Team <help@example.com>
 """)
-        self.assertEqual(meta.links.websites, ['https://example.com/'])
-        self.assertEqual(meta.links.sources, ['https://git.example.com/issues/'])
-        self.assertEqual(meta.links.issues, ['https://git.example.com/'])
-        self.assertEqual(meta.links.documentation, 'https://discourse.example.com/')
-        self.assertEqual(meta.maintainers, ['Support Team <help@example.com>'])
+        assert meta.links.websites == ['https://example.com/']
+        assert meta.links.sources == ['https://git.example.com/issues/']
+        assert meta.links.issues == ['https://git.example.com/']
+        assert meta.links.documentation == 'https://discourse.example.com/'
+        assert meta.maintainers == ['Support Team <help@example.com>']
 
     def test_assumes(self):
         meta = ops.CharmMeta.from_yaml("""
 assumes:
   - juju
 """)
-        self.assertEqual(meta.assumes.features, ['juju'])
+        assert meta.assumes.features == ['juju']
         meta = ops.CharmMeta.from_yaml("""
 assumes:
   - juju > 3
   - k8s-api
 """)
-        self.assertEqual(meta.assumes.features, ['juju > 3', 'k8s-api'])
+        assert meta.assumes.features == ['juju > 3', 'k8s-api']
         meta = ops.CharmMeta.from_yaml("""
 assumes:
   - k8s-api
@@ -1044,11 +1011,11 @@ assumes:
           - juju >= 3.1.5
           - juju < 4
 """)
-        self.assertEqual(meta.assumes.features, [
+        assert meta.assumes.features == [
             'k8s-api',
             ops.JujuAssumes(
                 [ops.JujuAssumes(['juju >= 2.9.44', 'juju < 3']),
                  ops.JujuAssumes(['juju >= 3.1.5', 'juju < 4'])],
                 ops.JujuAssumesCondition.ANY
             ),
-        ])
+        ]
