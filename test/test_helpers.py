@@ -80,7 +80,7 @@ class FakeScriptFixture:
     def __init__(self,
                  monkeypatch: MonkeyPatch,
                  tmp_path: pathlib.Path,
-                 fake_script_path: typing.Union[pathlib.Path, None]=None):
+                 fake_script_path: typing.Union[pathlib.Path, None] = None):
         self.monkeypatch = monkeypatch
         if fake_script_path is None:
             self.fake_script_path = tmp_path
