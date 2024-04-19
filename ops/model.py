@@ -41,7 +41,6 @@ from typing import (
     Generator,
     Iterable,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -60,12 +59,6 @@ from ops.jujuversion import JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
-
-_ConfigOption = TypedDict('_ConfigOption', {
-    'type': Literal['string', 'int', 'float', 'boolean'],
-    'description': str,
-    'default': Union[str, int, float, bool],
-})
 
 _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
@@ -96,6 +89,16 @@ _NetworkDict = TypedDict('_NetworkDict', {
     'ingress-addresses': List[str],
     'egress-subnets': List[str]
 })
+
+
+# Copied from typeshed.
+_KT = typing.TypeVar("_KT")
+_VT_co = typing.TypeVar("_VT_co", covariant=True)
+
+
+class _SupportsKeysAndGetItem(typing.Protocol[_KT, _VT_co]):
+    def keys(self) -> typing.Iterable[_KT]: ...
+    def __getitem__(self, __key: _KT) -> _VT_co: ...
 
 
 logger = logging.getLogger(__name__)
@@ -775,7 +778,10 @@ OpenedPort = Port
 """
 
 
-class LazyMapping(Mapping[str, str], ABC):
+_LazyValueType = typing.TypeVar("_LazyValueType")
+
+
+class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
     """Represents a dict that isn't populated until it is accessed.
 
     Charm authors should generally never need to use this directly, but it forms
@@ -783,14 +789,14 @@ class LazyMapping(Mapping[str, str], ABC):
     """
 
     # key-value mapping
-    _lazy_data: Optional[Dict[str, str]] = None
+    _lazy_data: Optional[Dict[str, _LazyValueType]] = None
 
     @abstractmethod
-    def _load(self) -> Dict[str, str]:
+    def _load(self) -> Dict[str, _LazyValueType]:
         raise NotImplementedError()
 
     @property
-    def _data(self) -> Dict[str, str]:
+    def _data(self) -> Dict[str, _LazyValueType]:
         data = self._lazy_data
         if data is None:
             data = self._lazy_data = self._load()
@@ -802,17 +808,25 @@ class LazyMapping(Mapping[str, str], ABC):
     def __contains__(self, key: str) -> bool:
         return key in self._data
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: str) -> str:
+    def __getitem__(self, key: str) -> _LazyValueType:
         return self._data[key]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self._data)
+
+
+class LazyMapping(_GenericLazyMapping[str]):
+    """Represents a dict[str, str] that isn't populated until it is accessed.
+
+    Charm authors should generally never need to use this directly, but it forms
+    the basis for many of the dicts that the framework tracks.
+    """
 
 
 class RelationMapping(Mapping[str, List['Relation']]):
@@ -1564,7 +1578,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: Union['Unit', 'Application']):
+    def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
 
     def __repr__(self):
@@ -1708,6 +1722,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
+    def update(self, other: _SupportsKeysAndGetItem[str, str], **kwargs: str):
+        """Update the data from dict/iterable other and the kwargs."""
+        super().update(other, **kwargs)
+
     def __delitem__(self, key: str):
         self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
@@ -1722,7 +1740,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return super().__repr__()
 
 
-class ConfigData(LazyMapping):
+class ConfigData(_GenericLazyMapping[Union[bool, int, float, str]]):
     """Configuration data.
 
     This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
@@ -1731,7 +1749,7 @@ class ConfigData(LazyMapping):
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def _load(self):
+    def _load(self) -> Dict[str, Union[bool, int, float, str]]:
         return self._backend.config_get()
 
 
@@ -3131,9 +3149,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self) -> Dict[str, '_ConfigOption']:
+    def config_get(self) -> Dict[str, Union[bool, int, float, str]]:
         out = self._run('config-get', return_output=True, use_json=True)
-        return typing.cast(Dict[str, '_ConfigOption'], out)
+        return typing.cast(Dict[str, Union[bool, int, float, str]], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
