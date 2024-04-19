@@ -81,8 +81,7 @@ def create_framework(
     monkeypatch: pytest.MonkeyPatch,
     request: pytest.FixtureRequest,
     *,
-    meta: typing.Union[ops.CharmMeta, None] = None
-):
+    meta: typing.Union[ops.CharmMeta, None] = None):
     monkeypatch.setenv("PATH", str(pathlib.Path(__file__).parent / 'bin'), prepend=os.pathsep)
     monkeypatch.setenv("JUJU_UNIT_NAME", "local/0")
 
