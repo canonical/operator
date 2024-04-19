@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import os
 import pathlib
 import shutil
@@ -76,7 +77,44 @@ def fake_script_calls(test_case: unittest.TestCase,
     return calls  # type: ignore
 
 
-class FakeScriptFixture:
+def create_framework(
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+    *,
+    meta: typing.Union[ops.CharmMeta, None] = None
+):
+    monkeypatch.setenv("PATH", str(pathlib.Path(__file__).parent / 'bin'), prepend=os.pathsep)
+    monkeypatch.setenv("JUJU_UNIT_NAME", "local/0")
+
+    tmpdir = pathlib.Path(tempfile.mkdtemp())
+    request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+    class CustomEvent(ops.EventBase):
+        pass
+
+    class TestCharmEvents(ops.CharmEvents):
+        custom = ops.EventSource(CustomEvent)
+
+    # Relations events are defined dynamically and modify the class attributes.
+    # We use a subclass temporarily to prevent these side effects from leaking.
+    ops.CharmBase.on = TestCharmEvents()  # type: ignore
+
+    def cleanup():
+        ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+
+    request.addfinalizer(cleanup)
+
+    if not meta:
+        meta = ops.CharmMeta()
+    model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
+    # we can pass foo_event as event_name because we're not actually testing dispatch
+    framework = ops.Framework(SQLiteStorage(':memory:'), tmpdir, meta, model)  # type: ignore
+    request.addfinalizer(framework.close)
+
+    return framework
+
+
+class FakeScript:
     def __init__(self,
                  monkeypatch: pytest.MonkeyPatch,
                  tmp_path: pathlib.Path,
@@ -91,9 +129,9 @@ class FakeScriptFixture:
         else:
             self.fake_script_path = fake_script_path
 
-    def fake_script(self,
-                    name: str,
-                    content: str):
+    def write(self,
+              name: str,
+              content: str):
         template_args: typing.Dict[str, str] = {
             'name': name,
             'path': self.fake_script_path.as_posix(),  # type: ignore
@@ -115,7 +153,7 @@ class FakeScriptFixture:
         path.with_suffix(".bat").write_text(  # type: ignore
             f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
-    def fake_script_calls(self, clear: bool = False) -> typing.List[typing.List[str]]:
+    def calls(self, clear: bool = False) -> typing.List[typing.List[str]]:
         calls_file: pathlib.Path = self.fake_script_path / 'calls.txt'  # type: ignore
         if not calls_file.exists():  # type: ignore
             return []
