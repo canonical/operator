@@ -409,15 +409,15 @@ requires:
     optional: true
 ''')
 
-        assert meta.requires['database'].interface_name == 'mongodb'  # type: ignore
-        assert meta.requires['database'].limit == 1  # type: ignore
-        assert meta.requires['database'].scope == 'container'  # type: ignore
-        assert not meta.requires['database'].optional  # type: ignore
+        assert meta.requires['database'].interface_name == 'mongodb'
+        assert meta.requires['database'].limit == 1
+        assert meta.requires['database'].scope == 'container'
+        assert not meta.requires['database'].optional
 
-        assert meta.requires['metrics'].interface_name == 'prometheus-scraping'  # type: ignore
-        assert meta.requires['metrics'].limit is None  # type: ignore
-        assert meta.requires['metrics'].scope == 'global'  # Default value  # type: ignore
-        assert meta.requires['metrics'].optional  # type: ignore
+        assert meta.requires['metrics'].interface_name == 'prometheus-scraping'
+        assert meta.requires['metrics'].limit is None
+        assert meta.requires['metrics'].scope == 'global'  # Default value
+        assert meta.requires['metrics'].optional
 
     def test_relations_meta_limit_type_validation(self):
         with pytest.raises(TypeError, match=r"limit should be an int, not <class 'str'>"):
