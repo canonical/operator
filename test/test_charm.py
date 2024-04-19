@@ -165,6 +165,7 @@ class TestCharm:
                 assert event.relation.app.name == 'remote'
                 self.seen.append(type(event).__name__)
 
+        # language=YAML
         meta = ops.CharmMeta.from_yaml(metadata='''
 name: my-charm
 requires:
@@ -237,6 +238,7 @@ peers:
             def _on_stor4_attach(self, event: ops.StorageAttachedEvent):
                 self.seen.append(type(event).__name__)
 
+        # language=YAML
         meta = ops.CharmMeta.from_yaml('''
 name: my-charm
 storage:
@@ -263,12 +265,6 @@ storage:
       range: 10+
     type: filesystem
 ''')
-
-        assert meta.storages['stor1'].multiple_range is None  # type: ignore
-        assert meta.storages['stor2'].multiple_range == (2, 2)  # type: ignore
-        assert meta.storages['stor3'].multiple_range == (2, None)  # type: ignore
-        assert meta.storages['stor-4'].multiple_range == (2, 4)  # type: ignore
-        assert meta.storages['stor-plus'].multiple_range == (10, None)  # type: ignore
 
         fake_script_fixture.write(
             "storage-get",
@@ -308,6 +304,12 @@ storage:
             echo '["disks/0"]'
             """,
         )
+
+        assert meta.storages['stor1'].multiple_range is None
+        assert meta.storages['stor2'].multiple_range == (2, 2)
+        assert meta.storages['stor3'].multiple_range == (2, None)
+        assert meta.storages['stor-4'].multiple_range == (2, 4)
+        assert meta.storages['stor-plus'].multiple_range == (10, None)
 
         framework = create_framework(monkeypatch, request, meta=meta)
         charm = MyCharm(framework)
@@ -350,6 +352,7 @@ storage:
             def on_any_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
                 self.seen.append(type(event).__name__)
 
+        # language=YAML
         meta = ops.CharmMeta.from_yaml(metadata='''
 name: my-charm
 containers:
@@ -379,8 +382,8 @@ containers:
             'PebbleCustomNoticeEvent',
         ]
 
-    @pytest.mark.charm_meta()
     def test_relations_meta(self):
+        # language=YAML
         meta = ops.CharmMeta.from_yaml(metadata='''
 name: my-charm
 requires:
@@ -405,6 +408,7 @@ requires:
 
     def test_relations_meta_limit_type_validation(self):
         with pytest.raises(TypeError, match=r"limit should be an int, not <class 'str'>"):
+            # language=YAML
             ops.CharmMeta.from_yaml('''
 name: my-charm
 requires:
@@ -418,6 +422,7 @@ requires:
             TypeError,
             match="scope should be one of 'global', 'container'; not 'foobar'"
         ):
+            # language=YAML
             ops.CharmMeta.from_yaml('''
 name: my-charm
 requires:
@@ -565,25 +570,6 @@ start:
         with pytest.raises(ValueError):
             charm.on.foo_bar_action.emit(id='1')
 
-    @pytest.mark.charm_meta(ops.CharmMeta.from_yaml(metadata='''
-name: my-charm
-''', actions='''
-foo-bar:
-  description: "Foos the bar."
-  params:
-    foo-name:
-      description: "A foo name to bar"
-      type: string
-    silent:
-      default: false
-      description: ""
-      type: boolean
-  required: foo-bar
-  title: foo-bar
-start:
-  description: "Start the unit."
-  additionalProperties: false
-'''))
     def test_action_event_defer_fails(
             self,
             monkeypatch: pytest.MonkeyPatch,
