@@ -1117,6 +1117,23 @@ class LogTarget:
         dct = {name: value for name, value in fields if value}
         return typing.cast('LogTargetDict', dct)
 
+    def _merge(self, other: 'LogTarget'):
+        """Merges this log target object with another log target definition.
+
+        For attributes present in both objects, the passed in log target
+        attributes take precedence.
+        """
+        if other.type != '':
+            self.type = other.type
+        if other.location != '':
+            self.location = other.location
+        self.services.extend(other.services)
+        if other.labels is not None:
+            if self.labels is None:
+                self.labels = {}
+            for name, value in other.labels.items():
+                self.labels[name] = value
+
     def __repr__(self):
         return f'LogTarget({self.to_dict()!r})'
 

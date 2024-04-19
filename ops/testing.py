@@ -3067,6 +3067,21 @@ class _TestingPebbleClient:
                         s._merge(service)
                     else:
                         layer.services[name] = service
+            for name, log_target in layer_obj.log_targets.items():
+                if not log_target.override:
+                    raise RuntimeError(f'400 Bad Request: layer "{label}" must define'
+                                       f'"override" for log target "{name}"')
+                if log_target.override not in ('merge', 'replace'):
+                    raise RuntimeError(f'400 Bad Request: layer "{label}" has invalid '
+                                       f'"override" value for log target "{name}"')
+                elif log_target.override == 'replace':
+                    layer.log_targets[name] = log_target
+                elif log_target.override == 'merge':
+                    if combine and name in layer.log_targets:
+                        l_t = layer.log_targets[name]
+                        l_t._merge(log_target)
+                    else:
+                        layer.log_targets[name] = log_target
 
         else:
             self._layers[label] = layer_obj

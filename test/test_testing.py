@@ -3792,6 +3792,120 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
                     override: blah
                 ''', combine=True)
 
+    def test_add_layer_combine_log_targets_no_override(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', pebble.Layer('''\
+            log-targets:
+              loki-0:
+                override: replace
+                type: loki
+                location: loki.localhost
+                services:
+                  - serv
+            '''))
+        with pytest.raises(RuntimeError):
+            client.add_layer('foo', '''\
+                log-targets:
+                  loki-0:
+                    type: loki
+                    location: loki.localhost
+                    services:
+                    - serv
+                ''', combine=True)
+
+    def test_add_layer_combine_log_targets_override_replace(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
+        client.add_layer('foo', pebble.Layer('''\
+            log-targets:
+              loki-0:
+                override: replace
+                type: loki
+                location: loki.localhost
+                services:
+                  - serv
+            '''))
+        client.add_layer('foo', pebble.Layer('''\
+            log-targets:
+              loki-0:
+                override: replace
+                type: loki
+                location: loki.localhost
+                services:
+                  - all
+            '''), combine=True)
+        plan = client.get_plan()
+        # The YAML should be normalized
+        assert textwrap.dedent('''\
+            log-targets:
+              loki-0:
+                location: loki.localhost
+                override: replace
+                services:
+                - all
+                type: loki
+            ''') == plan.to_yaml()
+
+    def test_add_layer_combine_log_targets_override_merge(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
+        client.add_layer('foo', pebble.Layer('''\
+            log-targets:
+              loki-0:
+                override: merge
+                type: loki
+                location: loki.localhost
+                services:
+                  - serv
+            '''))
+        client.add_layer('foo', pebble.Layer('''\
+            log-targets:
+              loki-0:
+                override: merge
+                type: loki
+                location: loki.localhost
+                services:
+                  - all
+            '''), combine=True)
+        plan = client.get_plan()
+        # The YAML should be normalized
+        assert textwrap.dedent('''\
+            log-targets:
+              loki-0:
+                location: loki.localhost
+                override: merge
+                services:
+                - serv
+                - all
+                type: loki
+            ''') == plan.to_yaml()
+
+    def test_add_layer_combine_log_targets_override_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', pebble.Layer('''\
+            log-targets:
+              loki-0:
+                location: loki.localhost
+                override: replace
+                services:
+                - foo
+                type: loki
+            '''))
+        with pytest.raises(RuntimeError):
+            client.add_layer('foo', pebble.Layer('''\
+                log-targets:
+                  loki-0:
+                    location: loki.localhost
+                    override: bar
+                    services:
+                    - foo
+                    type: loki
+                '''), combine=True)
+
     def test_get_services_none(self):
         client = self.get_testing_client()
         service_info = client.get_services()
