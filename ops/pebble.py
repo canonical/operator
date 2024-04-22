@@ -1062,6 +1062,74 @@ class Check:
         dct = {name: value for name, value in fields if value}
         return typing.cast('CheckDict', dct)
 
+    def _merge(self, other: 'Check'):
+        """Merges this check object with another check definition.
+
+        For attributes present in both objects, the passed in check
+        attributes take precedence.
+        """
+        if other.level != '':
+            self.level = other.level
+        if other.period != '':
+            self.period = other.period
+        if other.timeout != '':
+            self.timeout = other.timeout
+        if other.threshold is not None:
+            self.threshold = other.threshold
+        if other.http is not None:
+            if other_url := other.http.get('url'):
+                if self.http is None:
+                    self.http = {}
+                self.http['url'] = other_url
+            if other_headers := other.http.get('headers'):
+                if self.http is None:
+                    self.http = {'headers': {}}
+                for header, value in other_headers.items():
+                    self.http['headers'][header] = value
+        if other.tcp is not None:
+            if other_port := other.tcp.get('port'):
+                if self.tcp is None:
+                    self.tcp = {}
+                self.tcp['port'] = other_port
+            if other_host := other.tcp.get('host'):
+                if self.tcp is None:
+                    self.tcp = {}
+                self.tcp['host'] = other_host
+        if other.exec is not None:
+            if other_command := other.exec.get('command'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['command'] = other_command
+            if other_service_context := other.exec.get('service-context'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['service-context'] = other_service_context
+            if other_environment := other.exec.get('environment'):
+                if self.exec is None:
+                    self.exec = {'environment': {}}
+                for environment, value in other_environment.items():
+                    self.exec['environment'][environment] = value
+            if other_user_id := other.exec.get('user-id'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['user-id'] = other_user_id
+            if other_user := other.exec.get('user'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['user'] = other_user
+            if other_group_id := other.exec.get('group-id'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['group-id'] = other_group_id
+            if other_group := other.exec.get('group'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['group'] = other_group
+            if other_working_dir := other.exec.get('working-dir'):
+                if self.exec is None:
+                    self.exec = {}
+                self.exec['working-dir'] = other_working_dir
+
     def __repr__(self) -> str:
         return f'Check({self.to_dict()!r})'
 

@@ -3906,6 +3906,207 @@ class TestTestingPebbleClient(unittest.TestCase, _TestingPebbleClientMixin):
                     type: loki
                 '''), combine=True)
 
+    def test_add_layer_combine_checks_no_override(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', pebble.Layer('''\
+            checks:
+              check-0:
+                override: replace
+                http:
+                  url: svc/check
+            '''))
+        with pytest.raises(RuntimeError):
+            client.add_layer('foo', '''\
+                checks:
+                  check-0:
+                    http:
+                      url: svc/check
+                ''', combine=True)
+
+    def test_add_layer_combine_checks_override_replace(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
+        client.add_layer('foo', pebble.Layer('''\
+            checks:
+              check-0:
+                override: replace
+                http:
+                  url: svc/check
+                  headers:
+                    Connection: keep-alive
+              check-1:
+                override: replace
+                tcp:
+                  port: 9000
+                  host: foo.bar
+              check-2:
+                override: replace
+                exec:
+                  command: ls -l
+                  service-context: foo
+                  environment:
+                    FOO: bar
+                  user: foo
+                  user-id: 42
+                  group: bar
+                  group-id: 24
+                  working-dir: /tmp
+            '''))
+        client.add_layer('foo', pebble.Layer('''\
+            checks:
+              check-0:
+                override: replace
+                http:
+                  url: svc/check
+                  headers:
+                    Connection: close
+              check-1:
+                override: replace
+                tcp:
+                  port: 8080
+                  host: bar.foo
+              check-2:
+                override: replace
+                exec:
+                  command: cat /var/log/syslog
+                  service-context: bar
+                  environment:
+                    FOO: bar
+                    FOO_FOO: bar_bar
+                  user: foobar
+                  user-id: 420
+                  group: barfoo
+                  group-id: 240
+                  working-dir: /var
+            '''), combine=True)
+        plan = client.get_plan()
+        # The YAML should be normalized
+        assert textwrap.dedent('''\
+            checks:
+              check-0:
+                http:
+                  headers:
+                    Connection: close
+                  url: svc/check
+                override: replace
+              check-1:
+                override: replace
+                tcp:
+                  host: bar.foo
+                  port: 8080
+              check-2:
+                exec:
+                  command: cat /var/log/syslog
+                  environment:
+                    FOO: bar
+                    FOO_FOO: bar_bar
+                  group: barfoo
+                  group-id: 240
+                  service-context: bar
+                  user: foobar
+                  user-id: 420
+                  working-dir: /var
+                override: replace
+            ''') == plan.to_yaml()
+
+    def test_add_layer_combine_checks_override_merge(self):
+        client = self.get_testing_client()
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
+        client.add_layer('foo', pebble.Layer('''\
+            checks:
+              check-0:
+                level: alive
+                http:
+                  headers:
+                    Connection: close
+                  url: svc/check
+                override: merge
+              check-1:
+                exec:
+                  command: cat /var/log/syslog
+                  environment:
+                    FOO: bar
+                  group: barfoo
+                  group-id: 240
+                  service-context: bar
+                  user: foobar
+                  user-id: 420
+                  working-dir: /var
+                override: merge
+            '''))
+        client.add_layer('foo', pebble.Layer('''\
+            checks:
+              check-0:
+                level: ready
+                http:
+                  headers:
+                    Connection: keep-alive
+                    Accept: text/html
+                  url: svc/check
+                override: merge
+              check-1:
+                exec:
+                  command: ls -l /tmp/
+                  environment:
+                    FOO: foo
+                    BAR: foo_bar
+                  group: barfoo
+                  group-id: 31
+                  service-context: bar
+                  user: foobar
+                  user-id: 13
+                  working-dir: /var
+                override: merge
+            '''), combine=True)
+        plan = client.get_plan()
+        # The YAML should be normalized
+        assert textwrap.dedent('''\
+            checks:
+              check-0:
+                http:
+                  headers:
+                    Accept: text/html
+                    Connection: keep-alive
+                  url: svc/check
+                level: ready
+                override: merge
+              check-1:
+                exec:
+                  command: ls -l /tmp/
+                  environment:
+                    BAR: foo_bar
+                    FOO: foo
+                  group: barfoo
+                  group-id: 31
+                  service-context: bar
+                  user: foobar
+                  user-id: 13
+                  working-dir: /var
+                override: merge
+            ''') == plan.to_yaml()
+
+    def test_add_layer_combine_checks_override_unknown(self):
+        client = self.get_testing_client()
+        client.add_layer('foo', pebble.Layer('''\
+            checks:
+              check-0:
+                override: replace
+                http:
+                  url: svc/check
+            '''))
+        with pytest.raises(RuntimeError):
+            client.add_layer('foo', pebble.Layer('''\
+                checks:
+                  check-0:
+                    override: foobar
+                    http:
+                    url: svc/check
+                '''), combine=True)
+
     def test_get_services_none(self):
         client = self.get_testing_client()
         service_info = client.get_services()
