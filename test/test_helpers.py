@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import os
 import pathlib
 import shutil
@@ -19,6 +20,8 @@ import subprocess
 import tempfile
 import typing
 import unittest
+
+import pytest
 
 import ops
 from ops.model import _ModelBackend
@@ -72,6 +75,95 @@ def fake_script_calls(test_case: unittest.TestCase,
         if clear:
             f.truncate(0)  # type: ignore
     return calls  # type: ignore
+
+
+def create_framework(
+        monkeypatch: pytest.MonkeyPatch,
+        request: pytest.FixtureRequest,
+        *,
+        meta: typing.Union[ops.CharmMeta, None] = None):
+    monkeypatch.setenv("PATH", str(pathlib.Path(__file__).parent / 'bin'), prepend=os.pathsep)
+    monkeypatch.setenv("JUJU_UNIT_NAME", "local/0")
+
+    tmpdir = pathlib.Path(tempfile.mkdtemp())
+    request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+    class CustomEvent(ops.EventBase):
+        pass
+
+    class TestCharmEvents(ops.CharmEvents):
+        custom = ops.EventSource(CustomEvent)
+
+    # Relations events are defined dynamically and modify the class attributes.
+    # We use a subclass temporarily to prevent these side effects from leaking.
+    ops.CharmBase.on = TestCharmEvents()  # type: ignore
+
+    def cleanup():
+        ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+
+    request.addfinalizer(cleanup)
+
+    if not meta:
+        meta = ops.CharmMeta()
+    model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
+    # we can pass foo_event as event_name because we're not actually testing dispatch
+    framework = ops.Framework(SQLiteStorage(':memory:'), tmpdir, meta, model)  # type: ignore
+    request.addfinalizer(framework.close)
+
+    return framework
+
+
+class FakeScript:
+    def __init__(self,
+                 monkeypatch: pytest.MonkeyPatch,
+                 tmp_path: pathlib.Path,
+                 fake_script_path: typing.Union[pathlib.Path, None] = None):
+        self.monkeypatch = monkeypatch
+        if fake_script_path is None:
+            self.fake_script_path = tmp_path
+            self.monkeypatch.setenv(
+                "PATH",
+                str(self.fake_script_path),
+                prepend=os.pathsep)  # type: ignore
+        else:
+            self.fake_script_path = fake_script_path
+
+    def write(self,
+              name: str,
+              content: str):
+        template_args: typing.Dict[str, str] = {
+            'name': name,
+            'path': self.fake_script_path.as_posix(),  # type: ignore
+            'content': content,
+        }
+
+        path: pathlib.Path = self.fake_script_path / name  # type: ignore
+        with path.open('wt') as f:  # type: ignore
+            # Before executing the provided script, dump the provided arguments in calls.txt.
+            # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which
+            # seem appropriate.
+            f.write(  # type: ignore
+                '''#!/bin/sh
+    {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
+    {content}'''.format_map(template_args))
+        os.chmod(str(path), 0o755)  # type: ignore  # noqa: S103
+        # TODO: this hardcodes the path to bash.exe, which works for now but might
+        #       need to be set via environ or something like that.
+        path.with_suffix(".bat").write_text(  # type: ignore
+            f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
+
+    def calls(self, clear: bool = False) -> typing.List[typing.List[str]]:
+        calls_file: pathlib.Path = self.fake_script_path / 'calls.txt'  # type: ignore
+        if not calls_file.exists():  # type: ignore
+            return []
+
+        # newline and encoding forced to linuxy defaults because on
+        # windows they're written from git-bash
+        with calls_file.open('r+t', newline='\n', encoding='utf8') as f:  # type: ignore
+            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]  # type: ignore
+            if clear:
+                f.truncate(0)  # type: ignore
+        return calls  # type: ignore
 
 
 class FakeScriptTest(unittest.TestCase):

@@ -17,39 +17,75 @@ import functools
 import gc
 import inspect
 import io
+import logging
 import os
+import pathlib
 import re
 import shutil
 import sys
 import tempfile
 import typing
 from pathlib import Path
-from test.test_helpers import BaseTestCase, fake_script
+from test.test_helpers import FakeScript
 from unittest.mock import patch
 
 import pytest
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
+from ops.model import _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 
-class TestFramework(BaseTestCase):
+def create_model():
+    """Create a Model object."""
+    backend = _ModelBackend(unit_name='myapp/0')
+    meta = ops.CharmMeta()
+    model = ops.Model(meta, backend)
+    return model
 
-    def setUp(self):
-        self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, str(self.tmpdir))
 
-        patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
-        patcher.start()
-        self.addCleanup(patcher.stop)
+def create_framework(request: pytest.FixtureRequest,
+                     *,
+                     model: typing.Optional[ops.Model] = None,
+                     tmpdir: typing.Optional[pathlib.Path] = None):
+    """Create a Framework object.
 
-    def test_deprecated_init(self):
+    By default operate in-memory; pass a temporary directory via the 'tmpdir'
+    parameter if you wish to instantiate several frameworks sharing the
+    same dir (e.g. for storing state).
+    """
+    if tmpdir is None:
+        data_fpath = ":memory:"
+        charm_dir = 'non-existant'
+    else:
+        data_fpath = tmpdir / "framework.data"
+        charm_dir = tmpdir
+
+    patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
+    patcher.start()
+    framework = ops.Framework(
+        SQLiteStorage(data_fpath),
+        charm_dir,
+        meta=model._cache._meta if model else ops.CharmMeta(),
+        model=model)  # type: ignore
+    request.addfinalizer(framework.close)
+    request.addfinalizer(patcher.stop)
+    return framework
+
+
+@pytest.fixture
+def fake_script_fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+    return FakeScript(monkeypatch, tmp_path)
+
+
+class TestFramework:
+    def test_deprecated_init(self, caplog: pytest.LogCaptureFixture):
         # For 0.7, this still works, but it is deprecated.
-        with self.assertLogs(level="WARNING") as cm:
+        with caplog.at_level(logging.WARNING):
             framework = ops.Framework(':memory:', None, None, None)  # type: ignore
-        assert "WARNING:ops.framework:deprecated: Framework now takes a Storage not a path" in \
-            cm.output
+        assert "WARNING:ops.framework:deprecated: Framework now takes a Storage not a path" in [
+            f"{record.levelname}:{record.name}:{record.message}" for record in caplog.records]
         assert isinstance(framework._storage, SQLiteStorage)
 
     def test_handle_path(self):
@@ -74,8 +110,8 @@ class TestFramework(BaseTestCase):
         with pytest.raises(AttributeError):
             handle.path = 'foo'  # type: ignore
 
-    def test_restore_unknown(self):
-        framework = self.create_framework()
+    def test_restore_unknown(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class Foo(ops.Object):
             pass
@@ -90,9 +126,9 @@ class TestFramework(BaseTestCase):
             assert e.handle_path == str(handle)
             assert str(e) == "no snapshot data found for a_foo[some_key] object"
         else:
-            self.fail("exception NoSnapshotError not raised")
+            pytest.fail("exception NoSnapshotError not raised")
 
-    def test_snapshot_roundtrip(self):
+    def test_snapshot_roundtrip(self, request: pytest.FixtureRequest):
         class Foo:
             handle_kind = 'foo'
 
@@ -109,13 +145,16 @@ class TestFramework(BaseTestCase):
         handle = ops.Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
-        framework1 = self.create_framework(tmpdir=self.tmpdir)
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        framework1 = create_framework(request, tmpdir=tmpdir)
         framework1.register_type(Foo, None, handle.kind)
         framework1.save_snapshot(event)  # type: ignore
         framework1.commit()
         framework1.close()
 
-        framework2 = self.create_framework(tmpdir=self.tmpdir)
+        framework2 = create_framework(request, tmpdir=tmpdir)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
         event2 = typing.cast(Foo, event2)
@@ -132,13 +171,13 @@ class TestFramework(BaseTestCase):
         framework2.commit()
         framework2.close()
 
-        framework3 = self.create_framework(tmpdir=self.tmpdir)
+        framework3 = create_framework(request, tmpdir=tmpdir)
         framework3.register_type(Foo, None, handle.kind)
 
         pytest.raises(NoSnapshotError, framework3.load_snapshot, handle)
 
-    def test_simple_event_observer(self):
-        framework = self.create_framework()
+    def test_simple_event_observer(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
             pass
@@ -180,8 +219,8 @@ class TestFramework(BaseTestCase):
             "<MyEvent via MyNotifier[1]/bar[2]>",
         ]
 
-    def test_event_observer_more_args(self):
-        framework = self.create_framework()
+    def test_event_observer_more_args(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
             pass
@@ -235,7 +274,7 @@ class TestFramework(BaseTestCase):
             "<MyEvent via MyNotifier[1]/qux[4]>",
         ]
 
-    def test_bad_sig_observer(self):
+    def test_bad_sig_observer(self, request: pytest.FixtureRequest):
 
         class MyEvent(ops.EventBase):
             pass
@@ -263,7 +302,7 @@ class TestFramework(BaseTestCase):
             def _on_qux(self, event: ops.EventBase, extra: typing.Optional[typing.Any] = None):
                 assert False, 'should not be reached'
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         pub = MyNotifier(framework, "pub")
         obs = MyObserver(framework, "obs")
 
@@ -275,8 +314,11 @@ class TestFramework(BaseTestCase):
             framework.observe(pub.baz, obs._on_baz)  # type: ignore
         framework.observe(pub.qux, obs._on_qux)
 
-    def test_on_pre_commit_emitted(self):
-        framework = self.create_framework(tmpdir=self.tmpdir)
+    def test_on_pre_commit_emitted(self, request: pytest.FixtureRequest):
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        framework = create_framework(request, tmpdir=tmpdir)
 
         class PreCommitObserver(ops.Object):
 
@@ -310,7 +352,7 @@ class TestFramework(BaseTestCase):
         assert obs.seen, [ops.PreCommitEvent, ops.CommitEvent]
         framework.close()
 
-        other_framework = self.create_framework(tmpdir=self.tmpdir)
+        other_framework = create_framework(request, tmpdir=tmpdir)
 
         new_obs = PreCommitObserver(other_framework, None)
 
@@ -320,8 +362,8 @@ class TestFramework(BaseTestCase):
         with pytest.raises(AttributeError):
             new_obs._stored.myotherdata  # type: ignore
 
-    def test_defer_and_reemit(self):
-        framework = self.create_framework()
+    def test_defer_and_reemit(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
             pass
@@ -390,8 +432,8 @@ class TestFramework(BaseTestCase):
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
 
-    def test_custom_event_data(self):
-        framework = self.create_framework()
+    def test_custom_event_data(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
             def __init__(self, handle: ops.Handle, n: int):
@@ -436,8 +478,8 @@ class TestFramework(BaseTestCase):
         #
         assert obs.seen == ["on_foo:foo=2", "on_foo:foo=2"]
 
-    def test_weak_observer(self):
-        framework = self.create_framework()
+    def test_weak_observer(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         observed_events: typing.List[str] = []
 
@@ -467,8 +509,8 @@ class TestFramework(BaseTestCase):
         pub.on.foo.emit()
         assert observed_events == ["foo"]
 
-    def test_forget_and_multiple_objects(self):
-        framework = self.create_framework()
+    def test_forget_and_multiple_objects(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyObject(ops.Object):
             def snapshot(self) -> typing.Dict[str, typing.Any]:
@@ -492,12 +534,15 @@ class TestFramework(BaseTestCase):
         assert o1.handle.path == o3.handle.path
         framework.close()
         # Or using a second framework
-        framework_copy = self.create_framework()
+        framework_copy = create_framework(request)
         o_copy = MyObject(framework_copy, "path")
         assert o1.handle.path == o_copy.handle.path
 
-    def test_forget_and_multiple_objects_with_load_snapshot(self):
-        framework = self.create_framework(tmpdir=self.tmpdir)
+    def test_forget_and_multiple_objects_with_load_snapshot(self, request: pytest.FixtureRequest):
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        framework = create_framework(request, tmpdir=tmpdir)
 
         class MyObject(ops.Object):
             def __init__(self, parent: ops.Object, name: str):
@@ -532,18 +577,18 @@ class TestFramework(BaseTestCase):
             MyObject(framework, "path")
         framework.close()
         # But we can create an object, or load a snapshot in a copy of the framework
-        framework_copy1 = self.create_framework(tmpdir=self.tmpdir)
+        framework_copy1 = create_framework(request, tmpdir=tmpdir)
         o_copy1 = MyObject(framework_copy1, "path")
         assert o_copy1.value == "path"
         framework_copy1.close()
-        framework_copy2 = self.create_framework(tmpdir=self.tmpdir)
+        framework_copy2 = create_framework(request, tmpdir=tmpdir)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
         o_copy2 = typing.cast(MyObject, o_copy2)
         assert o_copy2.value == "path"
 
-    def test_events_base(self):
-        framework = self.create_framework()
+    def test_events_base(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
             pass
@@ -614,11 +659,11 @@ class TestFramework(BaseTestCase):
         assert cause == \
             "EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar"
 
-    def test_reemit_ignores_unknown_event_type(self):
+    def test_reemit_ignores_unknown_event_type(self, request: pytest.FixtureRequest):
         # The event type may have been gone for good, and nobody cares,
         # so this shouldn't be an error scenario.
 
-        framework = self.create_framework()
+        framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
             handle_kind = "test"
@@ -647,7 +692,7 @@ class TestFramework(BaseTestCase):
         framework.commit()
         framework.close()
 
-        framework_copy = self.create_framework()
+        framework_copy = create_framework(request)
 
         # No errors on missing event types here.
         framework_copy.reemit()
@@ -656,8 +701,8 @@ class TestFramework(BaseTestCase):
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
         pytest.raises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
 
-    def test_auto_register_event_types(self):
-        framework = self.create_framework()
+    def test_auto_register_event_types(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyFoo(ops.EventBase):
             pass
@@ -699,8 +744,8 @@ class TestFramework(BaseTestCase):
 
         assert obs.seen == ["on_foo:MyFoo:foo", "on_bar:MyBar:bar"]
 
-    def test_dynamic_event_types(self):
-        framework = self.create_framework()
+    def test_dynamic_event_types(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class MyEventsA(ops.ObjectEvents):
             handle_kind = 'on_a'
@@ -767,7 +812,7 @@ class TestFramework(BaseTestCase):
         with pytest.raises(RuntimeError):
             pub.on_a.define_event("foo", MyFoo)
 
-    def test_event_key_roundtrip(self):
+    def test_event_key_roundtrip(self, request: pytest.FixtureRequest):
         class MyEvent(ops.EventBase):
             def __init__(self, handle: ops.Handle, value: typing.Any):
                 super().__init__(handle)
@@ -796,7 +841,10 @@ class TestFramework(BaseTestCase):
                     event.defer()
                     MyObserver.has_deferred = True
 
-        framework1 = self.create_framework(tmpdir=self.tmpdir)
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        framework1 = create_framework(request, tmpdir=tmpdir)
         pub1 = MyNotifier(framework1, "pub")
         obs1 = MyObserver(framework1, "obs")
         framework1.observe(pub1.foo, obs1._on_foo)
@@ -807,7 +855,7 @@ class TestFramework(BaseTestCase):
         framework1.close()
         del framework1
 
-        framework2 = self.create_framework(tmpdir=self.tmpdir)
+        framework2 = create_framework(request, tmpdir=tmpdir)
         pub2 = MyNotifier(framework2, "pub")
         obs2 = MyObserver(framework2, "obs")
         framework2.observe(pub2.foo, obs2._on_foo)
@@ -820,22 +868,25 @@ class TestFramework(BaseTestCase):
         # (The event key goes up by 2 due to the pre-commit and commit events.)
         assert obs2.seen == [('4', 'second'), ('1', 'first')]
 
-    def test_helper_properties(self):
-        framework = self.create_framework()
+    def test_helper_properties(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework.model = 'test-model'  # type: ignore
         framework.meta = 'test-meta'  # type: ignore
 
         my_obj = ops.Object(framework, 'my_obj')
         assert my_obj.model == framework.model
 
-    def test_ban_concurrent_frameworks(self):
-        f = self.create_framework(tmpdir=self.tmpdir)
+    def test_ban_concurrent_frameworks(self, request: pytest.FixtureRequest):
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        f = create_framework(request, tmpdir=tmpdir)
         with pytest.raises(Exception) as excinfo:
-            self.create_framework(tmpdir=self.tmpdir)
+            create_framework(request, tmpdir=tmpdir)
         assert 'database is locked' in str(excinfo.value)
         f.close()
 
-    def test_snapshot_saving_restricted_to_simple_types(self):
+    def test_snapshot_saving_restricted_to_simple_types(self, request: pytest.FixtureRequest):
         # this can not be saved, as it has not simple types!
         to_be_saved = {"bar": TestFramework}
 
@@ -848,7 +899,7 @@ class TestFramework(BaseTestCase):
         handle = ops.Handle(None, "a_foo", "some_key")
         event = FooEvent(handle)
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         framework.register_type(FooEvent, None, handle.kind)
         with pytest.raises(ValueError) as excinfo:
             framework.save_snapshot(event)
@@ -857,7 +908,7 @@ class TestFramework(BaseTestCase):
             "{'bar': <class 'test.test_framework.TestFramework'>}")
         assert str(excinfo.value) == expected
 
-    def test_unobserved_events_dont_leave_cruft(self):
+    def test_unobserved_events_dont_leave_cruft(self, request: pytest.FixtureRequest):
         class FooEvent(ops.EventBase):
             def snapshot(self):
                 return {'content': 1}
@@ -868,7 +919,7 @@ class TestFramework(BaseTestCase):
         class Emitter(ops.Object):
             on = Events()  # type: ignore
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         e = Emitter(framework, 'key')
         e.on.foo.emit()
         ev_1_handle = ops.Handle(e.on, "foo", "1")
@@ -895,8 +946,8 @@ class TestFramework(BaseTestCase):
         for e in non_examples:
             assert regex.match(e) is None
 
-    def test_remove_unreferenced_events(self):
-        framework = self.create_framework()
+    def test_remove_unreferenced_events(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class Evt(ops.EventBase):
             pass
@@ -938,7 +989,7 @@ class TestFramework(BaseTestCase):
                 'ObjectWithStorage[obj]/StoredStateData[_stored]',
                 'ObjectWithStorage[obj]/on/event[1]'])
 
-    def test_wrapped_handler(self):
+    def test_wrapped_handler(self, request: pytest.FixtureRequest):
         # It's fine to wrap the event handler, as long as the framework can
         # still call it with just the `event` argument.
         def add_arg(func: typing.Callable[..., None]) -> typing.Callable[..., None]:
@@ -953,7 +1004,7 @@ class TestFramework(BaseTestCase):
             def _on_event(self, _, another_arg: str):
                 assert another_arg == "extra-arg"
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         charm = MyCharm(framework)
         framework.observe(charm.on.start, charm._on_event)
         charm.on.start.emit()
@@ -973,7 +1024,7 @@ class TestFramework(BaseTestCase):
             def _on_event(self, _: ops.EventBase):
                 assert False, 'should not get to here'
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         charm = BadCharm(framework)
         with pytest.raises(TypeError, match="only 'self' and the 'event'"):
             framework.observe(charm.on.start, charm._on_event)
@@ -1004,12 +1055,7 @@ SetOperationsTestCase = typing.Tuple[
 ]
 
 
-class TestStoredState(BaseTestCase):
-
-    def setUp(self):
-        self.tmpdir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, str(self.tmpdir))
-
+class TestStoredState:
     def test_stored_dict_repr(self):
         assert repr(ops.StoredDict(None, {})) == "ops.framework.StoredDict()"  # type: ignore
         assert repr(ops.StoredDict(None, {"a": 1})  # type: ignore
@@ -1024,22 +1070,22 @@ class TestStoredState(BaseTestCase):
         assert repr(ops.StoredSet(None, set())) == 'ops.framework.StoredSet()'  # type: ignore
         assert repr(ops.StoredSet(None, {1})) == 'ops.framework.StoredSet({1})'  # type: ignore
 
-    def test_basic_state_storage(self):
+    def test_basic_state_storage(self, request: pytest.FixtureRequest):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
-        self._stored_state_tests(SomeObject)
+        self._stored_state_tests(request, SomeObject)
 
-    def test_straight_subclass(self):
+    def test_straight_subclass(self, request: pytest.FixtureRequest):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
         class Sub(SomeObject):
             pass
 
-        self._stored_state_tests(Sub)
+        self._stored_state_tests(request, Sub)
 
-    def test_straight_sub_subclass(self):
+    def test_straight_sub_subclass(self, request: pytest.FixtureRequest):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
@@ -1049,9 +1095,9 @@ class TestStoredState(BaseTestCase):
         class SubSub(Sub):
             pass
 
-        self._stored_state_tests(SubSub)
+        self._stored_state_tests(request, SubSub)
 
-    def test_two_subclasses(self):
+    def test_two_subclasses(self, request: pytest.FixtureRequest):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
@@ -1061,10 +1107,10 @@ class TestStoredState(BaseTestCase):
         class SubB(SomeObject):
             pass
 
-        self._stored_state_tests(SubA)
-        self._stored_state_tests(SubB)
+        self._stored_state_tests(request, SubA)
+        self._stored_state_tests(request, SubB)
 
-    def test_the_crazy_thing(self):
+    def test_the_crazy_thing(self, request: pytest.FixtureRequest):
         class NoState(ops.Object):
             pass
 
@@ -1077,14 +1123,17 @@ class TestStoredState(BaseTestCase):
         class FinalChild(StatedObject, Sibling):
             pass
 
-        self._stored_state_tests(FinalChild)
+        self._stored_state_tests(request, FinalChild)
 
-    def _stored_state_tests(self, cls: typing.Type[ops.Object]):
+    def _stored_state_tests(self, request: pytest.FixtureRequest, cls: typing.Type[ops.Object]):
         @typing.runtime_checkable
         class _StoredProtocol(typing.Protocol):
             _stored: ops.StoredState
 
-        framework = self.create_framework(tmpdir=self.tmpdir)
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        framework = create_framework(request, tmpdir=tmpdir)
         obj = cls(framework, "1")
         assert isinstance(obj, _StoredProtocol)
 
@@ -1093,14 +1142,14 @@ class TestStoredState(BaseTestCase):
         except AttributeError as e:
             assert str(e) == "attribute 'foo' is not stored"
         else:
-            self.fail("AttributeError not raised")
+            pytest.fail("AttributeError not raised")
 
         try:
             obj._stored.on = "nonono"  # type: ignore
         except AttributeError as e:
             assert str(e) == "attribute 'on' is reserved and cannot be set"
         else:
-            self.fail("AttributeError not raised")
+            pytest.fail("AttributeError not raised")
 
         obj._stored.foo = 41
         obj._stored.foo = 42
@@ -1118,7 +1167,7 @@ class TestStoredState(BaseTestCase):
         framework.close()
 
         # Since this has the same absolute object handle, it will get its state back.
-        framework_copy = self.create_framework(tmpdir=self.tmpdir)
+        framework_copy = create_framework(request, tmpdir=tmpdir)
         obj_copy = cls(framework_copy, "1")
         assert isinstance(obj_copy, _StoredProtocol)
         assert obj_copy._stored.foo == 42
@@ -1128,7 +1177,7 @@ class TestStoredState(BaseTestCase):
 
         framework_copy.close()
 
-    def test_two_subclasses_no_conflicts(self):
+    def test_two_subclasses_no_conflicts(self, request: pytest.FixtureRequest):
         class Base(ops.Object):
             _stored = ops.StoredState()
 
@@ -1138,7 +1187,10 @@ class TestStoredState(BaseTestCase):
         class SubB(Base):
             pass
 
-        framework = self.create_framework(tmpdir=self.tmpdir)
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
+        framework = create_framework(request, tmpdir=tmpdir)
         a = SubA(framework, None)
         b = SubB(framework, None)
         z = Base(framework, None)
@@ -1150,7 +1202,7 @@ class TestStoredState(BaseTestCase):
         framework.commit()
         framework.close()
 
-        framework2 = self.create_framework(tmpdir=self.tmpdir)
+        framework2 = create_framework(request, tmpdir=tmpdir)
         a2 = SubA(framework2, None)
         b2 = SubB(framework2, None)
         z2 = Base(framework2, None)
@@ -1159,12 +1211,12 @@ class TestStoredState(BaseTestCase):
         assert b2._stored.foo == "hello"
         assert z2._stored.foo == {1}
 
-    def test_two_names_one_state(self):
+    def test_two_names_one_state(self, request: pytest.FixtureRequest):
         class Mine(ops.Object):
             _stored = ops.StoredState()
             _stored2 = _stored
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         obj = Mine(framework, None)
 
         with pytest.raises(RuntimeError):
@@ -1179,7 +1231,7 @@ class TestStoredState(BaseTestCase):
         assert "_stored" not in obj.__dict__
         assert "_stored2" not in obj.__dict__
 
-    def test_same_name_two_classes(self):
+    def test_same_name_two_classes(self, request: pytest.FixtureRequest):
         class Base(ops.Object):
             pass
 
@@ -1189,7 +1241,7 @@ class TestStoredState(BaseTestCase):
         class B(Base):
             _stored = A._stored
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         a = A(framework, None)
         b = B(framework, None)
 
@@ -1205,8 +1257,8 @@ class TestStoredState(BaseTestCase):
         # make sure we're not changing the object on failure
         assert "_stored" not in b.__dict__
 
-    def test_mutable_types_invalid(self):
-        framework = self.create_framework()
+    def test_mutable_types_invalid(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
@@ -1220,91 +1272,99 @@ class TestStoredState(BaseTestCase):
             assert str(e) == \
                 "attribute 'foo' cannot be a CustomObject: must be int/float/dict/list/etc"
         else:
-            self.fail('AttributeError not raised')
+            pytest.fail('AttributeError not raised')
 
         framework.commit()
 
-    def test_mutable_types(self):
+    def test_mutable_types(self, request: pytest.FixtureRequest):
         # Test and validation functions in a list of tuples.
         # Assignment and keywords like del are not supported in lambdas
         #  so functions are used instead.
+        def _assert_equal(a: typing.Any, b: typing.Any):
+            assert a == b
+
+        def _assert_is_instance(a: typing.Any, b: typing.Any):
+            assert isinstance(a, b)
+
+        def _assert_raises_type_error(a: typing.Any, b: typing.Any):
+            with pytest.raises(TypeError):
+                a.add(b)
+
         test_operations: typing.List[MutableTypesTestCase] = [(
             lambda: {},
             None,
             {},
             lambda a, b: None,
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {},
             {'a': {}},
             {'a': {}},
             lambda a, b: a.update(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {'a': {}},
             {'b': 'c'},
             {'a': {'b': 'c'}},
             lambda a, b: a['a'].update(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {'a': {'b': 'c'}},
             {'d': 'e'},
             {'a': {'b': 'c', 'd': 'e'}},
             lambda a, b: a['a'].update(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {'a': {'b': 'c', 'd': 'e'}},
             'd',
             {'a': {'b': 'c'}},
             lambda a, b: a['a'].pop(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {'s': set()},  # type: ignore
             'a',
             {'s': {'a'}},
             lambda a, b: a['s'].add(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {'s': {'a'}},
             'a',
             {'s': set()},
             lambda a, b: a['s'].discard(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: [],
             None,
             [],
             lambda a, b: None,
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: [],
             'a',
             ['a'],
             lambda a, b: a.append(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: ['a'],
             ['c'],
             ['a', ['c']],
             lambda a, b: a.append(b),
             lambda res, expected_res: (
-                self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], ops.StoredList),
+                _assert_equal(res, expected_res) and _assert_is_instance(res[1], ops.StoredList),
             )
         ), (
             lambda: ['a', ['c']],
             'b',
             ['b', 'a', ['c']],
             lambda a, b: a.insert(0, b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: ['b', 'a', ['c']],
             ['d'],
             ['b', ['d'], 'a', ['c']],
             lambda a, b: a.insert(1, b),
             lambda res, expected_res: (
-                self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], ops.StoredList)
+                _assert_equal(res, expected_res) and _assert_is_instance(res[1], ops.StoredList)
             ),
         ), (
             lambda: ['b', 'a', ['c']],
@@ -1313,70 +1373,69 @@ class TestStoredState(BaseTestCase):
             # a[1] = b
             lambda a, b: a.__setitem__(1, b),
             lambda res, expected_res: (
-                self.assertEqual(res, expected_res),
-                self.assertIsInstance(res[1], ops.StoredList)
+                _assert_equal(res, expected_res) and _assert_is_instance(res[1], ops.StoredList)
             ),
         ), (
             lambda: ['b', ['d'], 'a', ['c']],
             0,
             [['d'], 'a', ['c']],
             lambda a, b: a.pop(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: [['d'], 'a', ['c']],
             ['d'],
             ['a', ['c']],
             lambda a, b: a.remove(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: ['a', ['c']],
             'd',
             ['a', ['c', 'd']],
             lambda a, b: a[1].append(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: ['a', ['c', 'd']],
             1,
             ['a', ['c']],
             lambda a, b: a[1].pop(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: ['a', ['c']],
             'd',
             ['a', ['c', 'd']],
             lambda a, b: a[1].insert(1, b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: ['a', ['c', 'd']],
             'd',
             ['a', ['c']],
             lambda a, b: a[1].remove(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: set(),
             None,
             set(),
             lambda a, b: None,
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: set(),
             'a',
             {'a'},
             lambda a, b: a.add(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: {'a'},
             'a',
             set(),
             lambda a, b: a.discard(b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda res, expected_res: _assert_equal(res, expected_res)
         ), (
             lambda: set(),
             {'a'},
             set(),
             # Nested sets are not allowed as sets themselves are not hashable.
-            lambda a, b: self.assertRaises(TypeError, a.add, b),
-            lambda res, expected_res: self.assertEqual(res, expected_res)
+            lambda a, b: _assert_raises_type_error(a, b),
+            lambda res, expected_res: _assert_equal(res, expected_res)
         )]
 
         class SomeObject(ops.Object):
@@ -1397,10 +1456,13 @@ class TestStoredState(BaseTestCase):
                     self.snapshots.append((type(value), value.snapshot()))
                 return super().save_snapshot(value)
 
+        tmpdir = Path(tempfile.mkdtemp())
+        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            storage = SQLiteStorage(self.tmpdir / "framework.data")
-            framework = WrappedFramework(storage, self.tmpdir, None, None, "foo")  # type: ignore
+            storage = SQLiteStorage(tmpdir / "framework.data")
+            framework = WrappedFramework(storage, tmpdir, None, None, "foo")  # type: ignore
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1425,9 +1487,9 @@ class TestStoredState(BaseTestCase):
             framework.commit()
             framework.close()
 
-            storage_copy = SQLiteStorage(self.tmpdir / "framework.data")
+            storage_copy = SQLiteStorage(tmpdir / "framework.data")
             framework_copy = WrappedFramework(
-                storage_copy, self.tmpdir, None, None, "foo")  # type: ignore
+                storage_copy, tmpdir, None, None, "foo")  # type: ignore
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
@@ -1440,7 +1502,7 @@ class TestStoredState(BaseTestCase):
             assert framework_copy.snapshots == []
             framework_copy.close()
 
-    def test_comparison_operations(self):
+    def test_comparison_operations(self, request: pytest.FixtureRequest):
         test_operations: typing.List[ComparisonOperationsTestCase] = [(
             {"1"},
             {"1", "2"},
@@ -1525,7 +1587,7 @@ class TestStoredState(BaseTestCase):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
-        framework = self.create_framework()
+        framework = create_framework(request)
 
         for i, (a, b, op, op_ab, op_ba) in enumerate(test_operations):
             obj = SomeObject(framework, str(i))
@@ -1533,7 +1595,7 @@ class TestStoredState(BaseTestCase):
             assert op(obj._stored.a, b) == op_ab
             assert op(b, obj._stored.a) == op_ba
 
-    def test_set_operations(self):
+    def test_set_operations(self, request: pytest.FixtureRequest):
         test_operations: typing.List[SetOperationsTestCase] = [(
             {"1"},
             lambda a, b: a | b,
@@ -1564,7 +1626,7 @@ class TestStoredState(BaseTestCase):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
-        framework = self.create_framework()
+        framework = create_framework(request)
 
         # Validate that operations between StoredSet and built-in sets
         # only result in built-in sets being returned.
@@ -1591,8 +1653,8 @@ class TestStoredState(BaseTestCase):
                 assert a == old_a
                 assert b == old_b
 
-    def test_set_default(self):
-        framework = self.create_framework()
+    def test_set_default(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
 
         class StatefulObject(ops.Object):
             _stored = ops.StoredState()
@@ -1628,33 +1690,46 @@ class GenericObserver(ops.Object):
         self.called = True
 
 
-@patch('sys.stderr', new_callable=io.StringIO)
-class BreakpointTests(BaseTestCase):
+@pytest.fixture
+def fake_stderr() -> io.StringIO:
+    return io.StringIO()
 
-    def test_ignored(self, fake_stderr: io.StringIO):
+
+class TestBreakpoint:
+
+    def test_ignored(
+            self,
+            request: pytest.FixtureRequest,
+            caplog: pytest.LogCaptureFixture,
+            fake_stderr: io.StringIO):
         # It doesn't do anything really unless proper environment is there.
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
-            framework = self.create_framework()
+            framework = create_framework(request)
 
         with patch('pdb.Pdb.set_trace') as mock:
             # We want to verify that there are *no* logs at warning level.
             # However, assertNoLogs is Python 3.10+.
-            try:
-                with self.assertLogs(level="WARNING"):
-                    framework.breakpoint()
-            except AssertionError:
-                pass
-            else:
-                self.fail("No warning logs should be generated")
+
+            framework.breakpoint()
+            warning_logs = [
+                record for record in caplog.records if record.levelno == logging.WARNING]
+            assert len(warning_logs) == 0, "No warning level logs were generated."
+            # try:
+            #     with self.assertLogs(level="WARNING"):
+            #         framework.breakpoint()
+            # except AssertionError:
+            #     pass
+            # else:
+            #     pytest.fail("No warning logs should be generated")
         assert mock.call_count == 0
         assert fake_stderr.getvalue() == ""
 
-    def test_pdb_properly_called(self, fake_stderr: io.StringIO):
+    def test_pdb_properly_called(self, request: pytest.FixtureRequest):
         # The debugger needs to leave the user in the frame where the breakpoint is executed,
         # which for the test is the frame we're calling it here in the test :).
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = self.create_framework()
+            framework = create_framework(request)
 
         with patch('pdb.Pdb.set_trace') as mock:
             this_frame = inspect.currentframe()
@@ -1663,31 +1738,39 @@ class BreakpointTests(BaseTestCase):
         assert mock.call_count == 1
         assert mock.call_args == ((this_frame,), {})
 
-    def test_welcome_message(self, fake_stderr: io.StringIO):
+    def test_welcome_message(self, request: pytest.FixtureRequest,
+                             monkeypatch: pytest.MonkeyPatch):
         # Check that an initial message is shown to the user when code is interrupted.
+        fake_stderr = io.StringIO()
+        monkeypatch.setattr(sys, 'stderr', fake_stderr)
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         with patch('pdb.Pdb.set_trace'):
             framework.breakpoint()
-        assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
+        assert _BREAKPOINT_WELCOME_MESSAGE in fake_stderr.getvalue()
 
-    def test_welcome_message_not_multiple(self, fake_stderr: io.StringIO):
+    def test_welcome_message_not_multiple(
+            self,
+            request: pytest.FixtureRequest,
+            monkeypatch: pytest.MonkeyPatch):
         # Check that an initial message is NOT shown twice if the breakpoint is exercised
         # twice in the same run.
+        fake_stderr = io.StringIO()
+        monkeypatch.setattr(sys, 'stderr', fake_stderr)
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         with patch('pdb.Pdb.set_trace'):
             framework.breakpoint()
             assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
             framework.breakpoint()
             assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
 
-    def test_breakpoint_builtin_sanity(self, fake_stderr: io.StringIO):
+    def test_breakpoint_builtin_sanity(self, request: pytest.FixtureRequest):
         # this just checks that calling breakpoint() works as expected
         # nothing really framework-dependent
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
-            self.create_framework()
+            create_framework(request)
 
         with patch('pdb.Pdb.set_trace') as mock:
             this_frame = inspect.currentframe()
@@ -1696,172 +1779,183 @@ class BreakpointTests(BaseTestCase):
         assert mock.call_count == 1
         assert mock.call_args == ((this_frame,), {})
 
-    def test_builtin_breakpoint_hooked(self, fake_stderr: io.StringIO):
+    def test_builtin_breakpoint_hooked(self, request: pytest.FixtureRequest):
         # Verify that the proper hook is set.
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'all'}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         old_breakpointhook = framework.set_breakpointhook()
-        self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
+        request.addfinalizer(lambda: setattr(sys, 'breakpointhook', old_breakpointhook))
         with patch('pdb.Pdb.set_trace') as mock:
             breakpoint()
         assert mock.call_count == 1
 
-    def test_breakpoint_builtin_unset(self, fake_stderr: io.StringIO):
+    def test_breakpoint_builtin_unset(self, request: pytest.FixtureRequest):
         # if no JUJU_DEBUG_AT, no call to pdb is done
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
-            framework = self.create_framework()
+            framework = create_framework(request)
         old_breakpointhook = framework.set_breakpointhook()
-        self.addCleanup(setattr, sys, 'breakpointhook', old_breakpointhook)
+        request.addfinalizer(lambda: setattr(sys, 'breakpointhook', old_breakpointhook))
 
         with patch('pdb.Pdb.set_trace') as mock:
             breakpoint()
 
         assert mock.call_count == 0
 
-    def test_breakpoint_names(self, fake_stderr: io.StringIO):
-        framework = self.create_framework()
-
+    @pytest.mark.parametrize("name", [
+        'foobar',
+        'foo-bar-baz',
+        'foo-------bar',
+        'foo123',
+        '778',
+        '77-xx',
+        'a-b',
+        'ab',
+        'x',
+    ])
+    def test_breakpoint_good_names(self, request: pytest.FixtureRequest, name: str):
+        framework = create_framework(request)
         # Name rules:
         # - must start and end with lowercase alphanumeric characters
         # - only contain lowercase alphanumeric characters, or the hyphen "-"
-        good_names = [
-            'foobar',
-            'foo-bar-baz',
-            'foo-------bar',
-            'foo123',
-            '778',
-            '77-xx',
-            'a-b',
-            'ab',
-            'x',
-        ]
-        for name in good_names:
-            with self.subTest(name=name):
-                framework.breakpoint(name)
+        framework.breakpoint(name)
 
-        bad_names = [
-            '',
-            '.',
-            '-',
-            '...foo',
-            'foo.bar',
-            'bar--'
-            'FOO',
-            'FooBar',
-            'foo bar',
-            'foo_bar',
-            '/foobar',
-            'break-here-☚',
-        ]
+    @pytest.mark.parametrize("name", [
+        '',
+        '.',
+        '-',
+        '...foo',
+        'foo.bar',
+        'bar--'
+        'FOO',
+        'FooBar',
+        'foo bar',
+        'foo_bar',
+        '/foobar',
+        'break-here-☚',
+    ])
+    def test_breakpoint_bad_names(self, request: pytest.FixtureRequest, name: str):
+        framework = create_framework(request)
         msg = 'breakpoint names must look like "foo" or "foo-bar"'
-        for name in bad_names:
-            with self.subTest(name=name):
-                with pytest.raises(ValueError) as excinfo:
-                    framework.breakpoint(name)
-                assert str(excinfo.value) == msg
+        with pytest.raises(ValueError) as excinfo:
+            framework.breakpoint(name)
+        assert str(excinfo.value) == msg
 
-        reserved_names = [
-            'all',
-            'hook',
-        ]
+    @pytest.mark.parametrize("name", [
+        'all',
+        'hook',
+    ])
+    def test_breakpoint_reserved_names(self, request: pytest.FixtureRequest, name: str):
+        framework = create_framework(request)
         msg = 'breakpoint names "all" and "hook" are reserved'
-        for name in reserved_names:
-            with self.subTest(name=name):
-                with pytest.raises(ValueError) as excinfo:
-                    framework.breakpoint(name)
-                assert str(excinfo.value) == msg
+        with pytest.raises(ValueError) as excinfo:
+            framework.breakpoint(name)
+        assert str(excinfo.value) == msg
 
-        not_really_names = [
-            123,
-            1.1,
-            False,
-        ]
-        for name in not_really_names:
-            with self.subTest(name=name):
-                with pytest.raises(TypeError) as excinfo:
-                    framework.breakpoint(name)  # type: ignore
-                assert str(excinfo.value) == 'breakpoint names must be strings'
+    @pytest.mark.parametrize("name", [
+        123,
+        1.1,
+        False,
+    ])
+    def test_breakpoint_not_really_names(self, request: pytest.FixtureRequest, name: typing.Any):
+        framework = create_framework(request)
+        with pytest.raises(TypeError) as excinfo:
+            framework.breakpoint(name)  # type: ignore
+        assert str(excinfo.value) == 'breakpoint names must be strings'
 
     def check_trace_set(
             self,
+            request: pytest.FixtureRequest,
             envvar_value: str,
             breakpoint_name: typing.Optional[str],
             call_count: int):
         """Helper to check the diverse combinations of situations."""
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         with patch('pdb.Pdb.set_trace') as mock:
             framework.breakpoint(breakpoint_name)
         assert mock.call_count == call_count
 
-    def test_unnamed_indicated_all(self, fake_stderr: io.StringIO):
+    def test_unnamed_indicated_all(self, request: pytest.FixtureRequest):
         # If 'all' is indicated, unnamed breakpoints will always activate.
-        self.check_trace_set('all', None, 1)
+        self.check_trace_set(request, 'all', None, 1)
 
-    def test_unnamed_indicated_hook(self, fake_stderr: io.StringIO):
+    def test_unnamed_indicated_hook(self, request: pytest.FixtureRequest):
         # Special value 'hook' was indicated, nothing to do with any call.
-        self.check_trace_set('hook', None, 0)
+        self.check_trace_set(request, 'hook', None, 0)
 
-    def test_named_indicated_specifically(self, fake_stderr: io.StringIO):
+    def test_named_indicated_specifically(self, request: pytest.FixtureRequest):
         # Some breakpoint was indicated, and the framework call used exactly that name.
-        self.check_trace_set('mybreak', 'mybreak', 1)
+        self.check_trace_set(request, 'mybreak', 'mybreak', 1)
 
-    def test_named_indicated_unnamed(self, fake_stderr: io.StringIO):
+    def test_named_indicated_unnamed(
+            self,
+            request: pytest.FixtureRequest,
+            caplog: pytest.LogCaptureFixture):
         # Some breakpoint was indicated, but the framework call was unnamed
-        with self.assertLogs(level="WARNING") as cm:
-            self.check_trace_set('some-breakpoint', None, 0)
-        assert cm.output == [
+        with caplog.at_level(logging.WARNING):
+            self.check_trace_set(request, 'some-breakpoint', None, 0)
+
+        expected_log = [
             "WARNING:ops.framework:Breakpoint None skipped "
             "(not found in the requested breakpoints: {'some-breakpoint'})"
         ]
 
-    def test_named_indicated_somethingelse(self, fake_stderr: io.StringIO):
+        assert expected_log == [
+            f"{record.levelname}:{record.name}:{record.message}" for record in caplog.records]
+
+    def test_named_indicated_somethingelse(
+            self,
+            request: pytest.FixtureRequest,
+            caplog: pytest.LogCaptureFixture):
         # Some breakpoint was indicated, but the framework call was with a different name
-        with self.assertLogs(level="WARNING") as cm:
-            self.check_trace_set('some-breakpoint', 'other-name', 0)
-        assert cm.output == [
+        with caplog.at_level(logging.WARNING):
+            self.check_trace_set(request, 'some-breakpoint', 'other-name', 0)
+        expected_log = [
             "WARNING:ops.framework:Breakpoint 'other-name' skipped "
-            "(not found in the requested breakpoints: {'some-breakpoint'})"]
+            "(not found in the requested breakpoints: {'some-breakpoint'})"
+        ]
+        assert expected_log == [
+            f"{record.levelname}:{record.name}:{record.message}" for record in caplog.records]
 
-    def test_named_indicated_ingroup(self, fake_stderr: io.StringIO):
+    def test_named_indicated_ingroup(self, request: pytest.FixtureRequest):
         # A multiple breakpoint was indicated, and the framework call used a name among those.
-        self.check_trace_set('some,mybreak,foobar', 'mybreak', 1)
+        self.check_trace_set(request, 'some,mybreak,foobar', 'mybreak', 1)
 
-    def test_named_indicated_all(self, fake_stderr: io.StringIO):
+    def test_named_indicated_all(self, request: pytest.FixtureRequest):
         # The framework indicated 'all', which includes any named breakpoint set.
-        self.check_trace_set('all', 'mybreak', 1)
+        self.check_trace_set(request, 'all', 'mybreak', 1)
 
-    def test_named_indicated_hook(self, fake_stderr: io.StringIO):
+    def test_named_indicated_hook(self, request: pytest.FixtureRequest):
         # The framework indicated the special value 'hook', nothing to do with any named call.
-        self.check_trace_set('hook', 'mybreak', 0)
+        self.check_trace_set(request, 'hook', 'mybreak', 0)
 
 
-class DebugHookTests(BaseTestCase):
+class TestDebugHook:
 
-    def test_envvar_parsing_missing(self):
+    def test_envvar_parsing_missing(self, request: pytest.FixtureRequest):
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
-            framework = self.create_framework()
+            framework = create_framework(request)
         assert framework._juju_debug_at == set()
 
-    def test_envvar_parsing_empty(self):
+    def test_envvar_parsing_empty(self, request: pytest.FixtureRequest):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': ''}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         assert framework._juju_debug_at == set()
 
-    def test_envvar_parsing_simple(self):
+    def test_envvar_parsing_simple(self, request: pytest.FixtureRequest):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'hook'}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         assert framework._juju_debug_at == {'hook'}
 
-    def test_envvar_parsing_multiple(self):
+    def test_envvar_parsing_multiple(self, request: pytest.FixtureRequest):
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': 'foo,bar,all'}):
-            framework = self.create_framework()
+            framework = create_framework(request)
         assert framework._juju_debug_at == {'foo', 'bar', 'all'}
 
-    def test_basic_interruption_enabled(self):
-        framework = self.create_framework()
+    def test_basic_interruption_enabled(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework._juju_debug_at = {'hook'}
 
         publisher = ops.CharmEvents(framework, "1")
@@ -1885,9 +1979,12 @@ class DebugHookTests(BaseTestCase):
         # Verify proper message was given to the user.
         assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
 
-    def test_interruption_enabled_with_all(self):
-        test_model = self.create_model()
-        framework = self.create_framework(model=test_model)
+    def test_interruption_enabled_with_all(
+            self,
+            request: pytest.FixtureRequest,
+            fake_script_fixture: FakeScript):
+        test_model = create_model()
+        framework = create_framework(request, model=test_model)
         framework._juju_debug_at = {'all'}
 
         class CustomEvents(ops.ObjectEvents):
@@ -1896,7 +1993,7 @@ class DebugHookTests(BaseTestCase):
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.foobar_action, observer.callback_method)
-        fake_script(self, 'action-get', "echo {}")
+        fake_script_fixture.write('action-get', "echo {}")
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
@@ -1905,9 +2002,12 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 1
         assert not observer.called
 
-    def test_actions_are_interrupted(self):
-        test_model = self.create_model()
-        framework = self.create_framework(model=test_model)
+    def test_actions_are_interrupted(
+            self,
+            request: pytest.FixtureRequest,
+            fake_script_fixture: FakeScript):
+        test_model = create_model()
+        framework = create_framework(request, model=test_model)
         framework._juju_debug_at = {'hook'}
 
         class CustomEvents(ops.ObjectEvents):
@@ -1916,7 +2016,7 @@ class DebugHookTests(BaseTestCase):
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.foobar_action, observer.callback_method)
-        fake_script(self, 'action-get', "echo {}")
+        fake_script_fixture.write('action-get', "echo {}")
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
@@ -1925,12 +2025,12 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 1
         assert not observer.called
 
-    def test_internal_events_not_interrupted(self):
+    def test_internal_events_not_interrupted(self, request: pytest.FixtureRequest):
         class MyNotifier(ops.Object):
             """Generic notifier for the tests."""
             bar = ops.EventSource(ops.EventBase)
 
-        framework = self.create_framework()
+        framework = create_framework(request)
         framework._juju_debug_at = {'hook'}
 
         publisher = MyNotifier(framework, "1")
@@ -1943,8 +2043,8 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 0
         assert observer.called
 
-    def test_envvar_mixed(self):
-        framework = self.create_framework()
+    def test_envvar_mixed(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework._juju_debug_at = {'foo', 'hook', 'all', 'whatever'}
 
         publisher = ops.CharmEvents(framework, "1")
@@ -1958,8 +2058,8 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 1
         assert not observer.called
 
-    def test_no_registered_method(self):
-        framework = self.create_framework()
+    def test_no_registered_method(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework._juju_debug_at = {'hook'}
 
         publisher = ops.CharmEvents(framework, "1")
@@ -1971,8 +2071,8 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 0
         assert not observer.called
 
-    def test_envvar_nohook(self):
-        framework = self.create_framework()
+    def test_envvar_nohook(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework._juju_debug_at = {'something-else'}
 
         publisher = ops.CharmEvents(framework, "1")
@@ -1986,8 +2086,8 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 0
         assert observer.called
 
-    def test_envvar_missing(self):
-        framework = self.create_framework()
+    def test_envvar_missing(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework._juju_debug_at = set()
 
         publisher = ops.CharmEvents(framework, "1")
@@ -2000,8 +2100,8 @@ class DebugHookTests(BaseTestCase):
         assert mock.call_count == 0
         assert observer.called
 
-    def test_welcome_message_not_multiple(self):
-        framework = self.create_framework()
+    def test_welcome_message_not_multiple(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
         framework._juju_debug_at = {'hook'}
 
         publisher = ops.CharmEvents(framework, "1")
