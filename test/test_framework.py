@@ -75,8 +75,8 @@ def create_framework(request: pytest.FixtureRequest,
 
 
 @pytest.fixture
-def fake_script_fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
-    return FakeScript(monkeypatch, tmp_path)
+def fake_script(request: pytest.FixtureRequest) -> FakeScript:
+    return FakeScript(request)
 
 
 class TestFramework:
@@ -146,7 +146,7 @@ class TestFramework:
         event = Foo(handle, 1)
 
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         framework1 = create_framework(request, tmpdir=tmpdir)
         framework1.register_type(Foo, None, handle.kind)
@@ -316,7 +316,7 @@ class TestFramework:
 
     def test_on_pre_commit_emitted(self, request: pytest.FixtureRequest):
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         framework = create_framework(request, tmpdir=tmpdir)
 
@@ -540,7 +540,7 @@ class TestFramework:
 
     def test_forget_and_multiple_objects_with_load_snapshot(self, request: pytest.FixtureRequest):
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         framework = create_framework(request, tmpdir=tmpdir)
 
@@ -842,7 +842,7 @@ class TestFramework:
                     MyObserver.has_deferred = True
 
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         framework1 = create_framework(request, tmpdir=tmpdir)
         pub1 = MyNotifier(framework1, "pub")
@@ -878,7 +878,7 @@ class TestFramework:
 
     def test_ban_concurrent_frameworks(self, request: pytest.FixtureRequest):
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         f = create_framework(request, tmpdir=tmpdir)
         with pytest.raises(Exception) as excinfo:
@@ -1131,7 +1131,7 @@ class TestStoredState:
             _stored: ops.StoredState
 
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         framework = create_framework(request, tmpdir=tmpdir)
         obj = cls(framework, "1")
@@ -1188,7 +1188,7 @@ class TestStoredState:
             pass
 
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         framework = create_framework(request, tmpdir=tmpdir)
         a = SubA(framework, None)
@@ -1457,7 +1457,7 @@ class TestStoredState:
                 return super().save_snapshot(value)
 
         tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
 
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
@@ -1715,13 +1715,6 @@ class TestBreakpoint:
             warning_logs = [
                 record for record in caplog.records if record.levelno == logging.WARNING]
             assert len(warning_logs) == 0, "No warning level logs were generated."
-            # try:
-            #     with self.assertLogs(level="WARNING"):
-            #         framework.breakpoint()
-            # except AssertionError:
-            #     pass
-            # else:
-            #     pytest.fail("No warning logs should be generated")
         assert mock.call_count == 0
         assert fake_stderr.getvalue() == ""
 
@@ -1982,7 +1975,7 @@ class TestDebugHook:
     def test_interruption_enabled_with_all(
             self,
             request: pytest.FixtureRequest,
-            fake_script_fixture: FakeScript):
+            fake_script: FakeScript):
         test_model = create_model()
         framework = create_framework(request, model=test_model)
         framework._juju_debug_at = {'all'}
@@ -1993,7 +1986,7 @@ class TestDebugHook:
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.foobar_action, observer.callback_method)
-        fake_script_fixture.write('action-get', "echo {}")
+        fake_script.write('action-get', "echo {}")
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
@@ -2005,7 +1998,7 @@ class TestDebugHook:
     def test_actions_are_interrupted(
             self,
             request: pytest.FixtureRequest,
-            fake_script_fixture: FakeScript):
+            fake_script: FakeScript):
         test_model = create_model()
         framework = create_framework(request, model=test_model)
         framework._juju_debug_at = {'hook'}
@@ -2016,7 +2009,7 @@ class TestDebugHook:
         publisher = CustomEvents(framework, "1")
         observer = GenericObserver(framework, "1")
         framework.observe(publisher.foobar_action, observer.callback_method)
-        fake_script_fixture.write('action-get', "echo {}")
+        fake_script.write('action-get', "echo {}")
 
         with patch('sys.stderr', new_callable=io.StringIO):
             with patch('pdb.runcall') as mock:
