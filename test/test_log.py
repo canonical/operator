@@ -19,6 +19,8 @@ import typing
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 import ops.log
 from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 
@@ -39,76 +41,78 @@ class FakeModelBackend(_ModelBackend):
             self._calls.append((level, line))
 
 
-class TestLogging(unittest.TestCase):
+@pytest.fixture()
+def backend():
+    return FakeModelBackend()
 
-    def setUp(self):
-        self.backend = FakeModelBackend()
 
-    def tearDown(self):
-        logging.getLogger().handlers.clear()
+@pytest.fixture()
+def logger():
+    logger = logging.getLogger()
+    yield logger
+    logging.getLogger().handlers.clear()
 
-    def test_default_logging(self):
-        ops.log.setup_root_logging(self.backend)
 
-        logger = logging.getLogger()
+class TestLogging:
+    @pytest.mark.parametrize("message,result", [
+        ('critical', ('CRITICAL', 'critical')),
+        ('error', ('ERROR', 'error')),
+        ('warning', ('WARNING', 'warning')),
+        ('info', ('INFO', 'info')),
+        ('debug', ('DEBUG', 'debug')),
+    ])
+    def test_default_logging(self,
+                             backend: FakeModelBackend,
+                             logger: logging.Logger,
+                             message: str,
+                             result: typing.Tuple[str, str]):
+        ops.log.setup_root_logging(backend)
         assert logger.level == logging.DEBUG
         assert isinstance(logger.handlers[-1], ops.log.JujuLogHandler)
 
-        test_cases = [
-            (logger.critical, 'critical', ('CRITICAL', 'critical')),
-            (logger.error, 'error', ('ERROR', 'error')),
-            (logger.warning, 'warning', ('WARNING', 'warning')),
-            (logger.info, 'info', ('INFO', 'info')),
-            (logger.debug, 'debug', ('DEBUG', 'debug')),
-        ]
+        method = getattr(logger, message)
+        method(message)
+        calls = backend.calls(clear=True)
+        assert calls == [result]
 
-        for method, message, result in test_cases:
-            with self.subTest(message):
-                method(message)
-                calls = self.backend.calls(clear=True)
-                assert calls == [result]
-
-    def test_handler_filtering(self):
-        logger = logging.getLogger()
+    def test_handler_filtering(self, backend: FakeModelBackend, logger: logging.Logger):
         logger.setLevel(logging.INFO)
-        logger.addHandler(ops.log.JujuLogHandler(self.backend, logging.WARNING))
+        logger.addHandler(ops.log.JujuLogHandler(backend, logging.WARNING))
         logger.info('foo')
-        assert self.backend.calls() == []
+        assert backend.calls() == []
         logger.warning('bar')
-        assert self.backend.calls() == [('WARNING', 'bar')]
+        assert backend.calls() == [('WARNING', 'bar')]
 
-    def test_no_stderr_without_debug(self):
+    def test_no_stderr_without_debug(self, backend: FakeModelBackend, logger: logging.Logger):
         buffer = io.StringIO()
         with patch('sys.stderr', buffer):
-            ops.log.setup_root_logging(self.backend, debug=False)
-            logger = logging.getLogger()
+            ops.log.setup_root_logging(backend, debug=False)
             logger.debug('debug message')
             logger.info('info message')
             logger.warning('warning message')
             logger.critical('critical message')
-        assert self.backend.calls() == \
-            [('DEBUG', 'debug message'),
-             ('INFO', 'info message'),
-                ('WARNING', 'warning message'),
-                ('CRITICAL', 'critical message'),
-             ]
+        assert backend.calls() == [
+            ('DEBUG', 'debug message'),
+            ('INFO', 'info message'),
+            ('WARNING', 'warning message'),
+            ('CRITICAL', 'critical message'),
+        ]
         assert buffer.getvalue() == ""
 
-    def test_debug_logging(self):
+    def test_debug_logging(self, backend: FakeModelBackend, logger: logging.Logger):
         buffer = io.StringIO()
         with patch('sys.stderr', buffer):
-            ops.log.setup_root_logging(self.backend, debug=True)
-            logger = logging.getLogger()
+            ops.log.setup_root_logging(backend, debug=True)
             logger.debug('debug message')
             logger.info('info message')
             logger.warning('warning message')
             logger.critical('critical message')
-        assert self.backend.calls() == \
-            [('DEBUG', 'debug message'),
-             ('INFO', 'info message'),
-             ('WARNING', 'warning message'),
-             ('CRITICAL', 'critical message'),
-             ]
+        assert backend.calls() == [
+            ('DEBUG', 'debug message'),
+            ('INFO', 'info message'),
+            ('WARNING', 'warning message'),
+            ('CRITICAL', 'critical message'),
+        ]
         assert re.search(
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n"
             r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n"
@@ -117,31 +121,29 @@ class TestLogging(unittest.TestCase):
             buffer.getvalue()
         )
 
-    def test_reduced_logging(self):
-        ops.log.setup_root_logging(self.backend)
-        logger = logging.getLogger()
+    def test_reduced_logging(self, backend: FakeModelBackend, logger: logging.Logger):
+        ops.log.setup_root_logging(backend)
         logger.setLevel(logging.WARNING)
         logger.debug('debug')
         logger.info('info')
         logger.warning('warning')
-        assert self.backend.calls() == [('WARNING', 'warning')]
+        assert backend.calls() == [('WARNING', 'warning')]
 
-    def test_long_string_logging(self):
+    def test_long_string_logging(self, backend: FakeModelBackend, logger: logging.Logger):
         buffer = io.StringIO()
 
         with patch('sys.stderr', buffer):
-            ops.log.setup_root_logging(self.backend, debug=True)
-            logger = logging.getLogger()
+            ops.log.setup_root_logging(backend, debug=True)
             logger.debug('l' * MAX_LOG_LINE_LEN)
 
-        assert len(self.backend.calls()) == 1
+        assert len(backend.calls()) == 1
 
-        self.backend.calls(clear=True)
+        backend.calls(clear=True)
 
         with patch('sys.stderr', buffer):
             logger.debug('l' * (MAX_LOG_LINE_LEN + 9))
 
-        calls = self.backend.calls()
+        calls = backend.calls()
         assert len(calls) == 3
         # Verify that we note that we are splitting the log message.
         assert "Splitting into multiple chunks" in calls[0][1]
