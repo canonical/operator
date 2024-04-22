@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import os
 import pathlib
 import shutil
@@ -78,15 +77,16 @@ def fake_script_calls(test_case: unittest.TestCase,
 
 
 def create_framework(
-        monkeypatch: pytest.MonkeyPatch,
         request: pytest.FixtureRequest,
         *,
-        meta: typing.Union[ops.CharmMeta, None] = None):
-    monkeypatch.setenv("PATH", str(pathlib.Path(__file__).parent / 'bin'), prepend=os.pathsep)
-    monkeypatch.setenv("JUJU_UNIT_NAME", "local/0")
+        meta: typing.Optional[ops.CharmMeta] = None):
+    env_backup = os.environ.copy()
+    os.environ['PATH'] = os.pathsep.join([
+        str(pathlib.Path(__file__).parent / 'bin'),
+        os.environ['PATH']])
+    os.environ['JUJU_UNIT_NAME'] = 'local/0'
 
     tmpdir = pathlib.Path(tempfile.mkdtemp())
-    request.addfinalizer(functools.partial(shutil.rmtree, str(tmpdir)))
 
     class CustomEvent(ops.EventBase):
         pass
@@ -98,51 +98,56 @@ def create_framework(
     # We use a subclass temporarily to prevent these side effects from leaking.
     ops.CharmBase.on = TestCharmEvents()  # type: ignore
 
-    def cleanup():
-        ops.CharmBase.on = ops.CharmEvents()  # type: ignore
-
-    request.addfinalizer(cleanup)
-
-    if not meta:
+    if meta is None:
         meta = ops.CharmMeta()
     model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
-    # we can pass foo_event as event_name because we're not actually testing dispatch
+    # We can pass foo_event as event_name because we're not actually testing dispatch.
     framework = ops.Framework(SQLiteStorage(':memory:'), tmpdir, meta, model)  # type: ignore
-    request.addfinalizer(framework.close)
+
+    def finalizer():
+        os.environ.clear()
+        os.environ.update(env_backup)
+        shutil.rmtree(tmpdir)
+        ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+        framework.close()
+
+    request.addfinalizer(finalizer)
 
     return framework
 
 
 class FakeScript:
     def __init__(self,
-                 monkeypatch: pytest.MonkeyPatch,
-                 tmp_path: pathlib.Path,
-                 fake_script_path: typing.Union[pathlib.Path, None] = None):
-        self.monkeypatch = monkeypatch
-        if fake_script_path is None:
-            self.fake_script_path = tmp_path
-            self.monkeypatch.setenv(
-                "PATH",
-                str(self.fake_script_path),
-                prepend=os.pathsep)  # type: ignore
+                 request: pytest.FixtureRequest,
+                 path: typing.Optional[pathlib.Path] = None):
+        if path is None:
+            fake_script_path = tempfile.mkdtemp('-fake_script')
+            self.path = pathlib.Path(fake_script_path)
+            old_path = os.environ["PATH"]
+            os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ["PATH"]])
+
+            def cleanup():
+                shutil.rmtree(self.path)
+                os.environ['PATH'] = old_path
+
+            request.addfinalizer(cleanup)
         else:
-            self.fake_script_path = fake_script_path
+            self.path = path
 
     def write(self,
               name: str,
               content: str):
         template_args: typing.Dict[str, str] = {
             'name': name,
-            'path': self.fake_script_path.as_posix(),  # type: ignore
+            'path': self.path.as_posix(),
             'content': content,
         }
 
-        path: pathlib.Path = self.fake_script_path / name  # type: ignore
-        with path.open('wt') as f:  # type: ignore
+        path: pathlib.Path = self.path / name
+        with path.open('wt') as f:
             # Before executing the provided script, dump the provided arguments in calls.txt.
-            # ASCII 1E is RS 'record separator', and 1C is FS 'file separator', which
-            # seem appropriate.
-            f.write(  # type: ignore
+            # RS 'record separator' (octal 036 in ASCII), FS 'file separator' (octal 034 in ASCII).
+            f.write(
                 '''#!/bin/sh
     {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
     {content}'''.format_map(template_args))
@@ -153,17 +158,17 @@ class FakeScript:
             f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
 
     def calls(self, clear: bool = False) -> typing.List[typing.List[str]]:
-        calls_file: pathlib.Path = self.fake_script_path / 'calls.txt'  # type: ignore
-        if not calls_file.exists():  # type: ignore
+        calls_file: pathlib.Path = self.path / 'calls.txt'
+        if not calls_file.exists():
             return []
 
-        # newline and encoding forced to linuxy defaults because on
-        # windows they're written from git-bash
-        with calls_file.open('r+t', newline='\n', encoding='utf8') as f:  # type: ignore
-            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]  # type: ignore
+        # Newline and encoding forced to Linux-y defaults because on
+        # windows they're written from git-bash.
+        with calls_file.open('r+t', newline='\n', encoding='utf8') as f:
+            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
             if clear:
-                f.truncate(0)  # type: ignore
-        return calls  # type: ignore
+                f.truncate(0)
+        return calls
 
 
 class FakeScriptTest(unittest.TestCase):
