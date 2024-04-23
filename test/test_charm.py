@@ -97,8 +97,9 @@ def test_observe_decorated_method(request: pytest.FixtureRequest):
 
 
 def test_observer_not_referenced_warning(
-        caplog: pytest.LogCaptureFixture,
-        request: pytest.FixtureRequest):
+        request: pytest.FixtureRequest,
+        caplog: pytest.LogCaptureFixture
+        ):
     class MyObj(ops.Object):
         def __init__(self, charm: ops.CharmBase):
             super().__init__(charm, "obj")
@@ -567,8 +568,8 @@ def test_invalid_action_results(request: pytest.FixtureRequest,
 
 
 def test_action_event_defer_fails(
-        monkeypatch: pytest.MonkeyPatch,
         request: pytest.FixtureRequest,
+        monkeypatch: pytest.MonkeyPatch,
         fake_script: FakeScript):
 
     cmd_type = 'action'
