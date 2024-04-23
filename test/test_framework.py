@@ -45,10 +45,12 @@ def create_model():
     return model
 
 
-def create_framework(request: pytest.FixtureRequest,
-                     *,
-                     model: typing.Optional[ops.Model] = None,
-                     tmpdir: typing.Optional[pathlib.Path] = None):
+def create_framework(
+    request: pytest.FixtureRequest,
+    *,
+    model: typing.Optional[ops.Model] = None,
+    tmpdir: typing.Optional[pathlib.Path] = None
+):
     """Create a Framework object.
 
     By default operate in-memory; pass a temporary directory via the 'tmpdir'
@@ -1731,8 +1733,10 @@ class TestBreakpoint:
         assert mock.call_count == 1
         assert mock.call_args == ((this_frame,), {})
 
-    def test_welcome_message(self, request: pytest.FixtureRequest,
-                             monkeypatch: pytest.MonkeyPatch):
+    def test_welcome_message(
+        self, request: pytest.FixtureRequest,
+        monkeypatch: pytest.MonkeyPatch
+    ):
         # Check that an initial message is shown to the user when code is interrupted.
         fake_stderr = io.StringIO()
         monkeypatch.setattr(sys, 'stderr', fake_stderr)
@@ -1743,9 +1747,10 @@ class TestBreakpoint:
         assert _BREAKPOINT_WELCOME_MESSAGE in fake_stderr.getvalue()
 
     def test_welcome_message_not_multiple(
-            self,
-            request: pytest.FixtureRequest,
-            monkeypatch: pytest.MonkeyPatch):
+        self,
+        request: pytest.FixtureRequest,
+        monkeypatch: pytest.MonkeyPatch
+    ):
         # Check that an initial message is NOT shown twice if the breakpoint is exercised
         # twice in the same run.
         fake_stderr = io.StringIO()
@@ -1882,9 +1887,10 @@ class TestBreakpoint:
         self.check_trace_set(request, 'mybreak', 'mybreak', 1)
 
     def test_named_indicated_unnamed(
-            self,
-            request: pytest.FixtureRequest,
-            caplog: pytest.LogCaptureFixture):
+        self,
+        request: pytest.FixtureRequest,
+        caplog: pytest.LogCaptureFixture
+    ):
         # Some breakpoint was indicated, but the framework call was unnamed
         with caplog.at_level(logging.WARNING):
             self.check_trace_set(request, 'some-breakpoint', None, 0)
@@ -1898,9 +1904,10 @@ class TestBreakpoint:
             f"{record.levelname}:{record.name}:{record.message}" for record in caplog.records]
 
     def test_named_indicated_somethingelse(
-            self,
-            request: pytest.FixtureRequest,
-            caplog: pytest.LogCaptureFixture):
+        self,
+        request: pytest.FixtureRequest,
+        caplog: pytest.LogCaptureFixture
+    ):
         # Some breakpoint was indicated, but the framework call was with a different name
         with caplog.at_level(logging.WARNING):
             self.check_trace_set(request, 'some-breakpoint', 'other-name', 0)
@@ -1973,9 +1980,10 @@ class TestDebugHook:
         assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
 
     def test_interruption_enabled_with_all(
-            self,
-            request: pytest.FixtureRequest,
-            fake_script: FakeScript):
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript
+    ):
         test_model = create_model()
         framework = create_framework(request, model=test_model)
         framework._juju_debug_at = {'all'}
@@ -1996,9 +2004,10 @@ class TestDebugHook:
         assert not observer.called
 
     def test_actions_are_interrupted(
-            self,
-            request: pytest.FixtureRequest,
-            fake_script: FakeScript):
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript
+    ):
         test_model = create_model()
         framework = create_framework(request, model=test_model)
         framework._juju_debug_at = {'hook'}
