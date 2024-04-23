@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import os
-import sys
+import pathlib
 import typing
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from random import shuffle
-from shutil import rmtree
-from tempfile import mkdtemp, mkstemp
+from tempfile import mkstemp
 from textwrap import dedent
-from unittest import TestCase
-from unittest.mock import patch
 
 import pytest
 
@@ -70,15 +68,9 @@ def _flatten(specgen: typing.Iterable[ModuleSpec]) -> typing.List[str]:
                   for spec in specgen])
 
 
-class TestLibFinder(TestCase):
-    def _mkdtemp(self) -> str:
-        tmpdir = mkdtemp()
-        self.addCleanup(rmtree, tmpdir)
-        return tmpdir
-
-    def test_single(self):
-        tmpdir = self._mkdtemp()
-
+class TestLibFinder:
+    def test_single(self, tmp_path: pathlib.Path):
+        tmpdir = str(tmp_path)
         assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar").write_text("")
@@ -86,17 +78,20 @@ class TestLibFinder(TestCase):
         assert _flatten(ops.lib._find_all_specs([tmpdir])) == \
             [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
-    def test_multi(self):
-        tmp_dir_a = self._mkdtemp()
-        tmp_dir_b = self._mkdtemp()
+    def test_multi(self, tmp_path: pathlib.Path):
+        tmp_dir_a = tmp_path / "temp_dir1"
+        tmp_dir_a.mkdir()
+
+        tmp_dir_b = tmp_path / "temp_dir2"
+        tmp_dir_b.mkdir()
 
         if tmp_dir_a > tmp_dir_b:
             # keep sorting happy
             tmp_dir_a, tmp_dir_b = tmp_dir_b, tmp_dir_a
 
-        dirs = [tmp_dir_a, tmp_dir_b]
+        dirs = [str(tmp_dir_a), str(tmp_dir_b)]
 
-        for top in [tmp_dir_a, tmp_dir_b]:
+        for top in dirs:
             for pkg in ["bar", "baz"]:
                 for lib in ["meep", "quux"]:
                     _mklib(top, pkg, lib).write_text("")
@@ -114,11 +109,9 @@ class TestLibFinder(TestCase):
 
         assert _flatten(ops.lib._find_all_specs(dirs)) == expected
 
-    def test_cwd(self):
-        tmpcwd = self._mkdtemp()
-        cwd = os.getcwd()
+    def test_cwd(self, tmp_path: pathlib.Path):
+        tmpcwd = str(tmp_path)
         os.chdir(tmpcwd)
-        self.addCleanup(os.chdir, cwd)
 
         dirs = [""]
 
@@ -130,9 +123,9 @@ class TestLibFinder(TestCase):
         assert [os.path.relpath(p) for p in paths] == \
             [os.path.join('foo', 'opslib', 'bar')]
 
-    def test_bogus_topdir(self):
+    def test_bogus_topdir(self, tmp_path: pathlib.Path):
         """Check that having one bogus dir in sys.path doesn't cause the finder to abort."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
 
         dirs = [tmpdir, "/bogus"]
 
@@ -143,9 +136,9 @@ class TestLibFinder(TestCase):
         assert _flatten(ops.lib._find_all_specs(dirs)) == \
             [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
-    def test_bogus_opsdir(self):
+    def test_bogus_opsdir(self, tmp_path: pathlib.Path):
         """Check that having one bogus opslib doesn't cause the finder to abort."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
 
         assert list(ops.lib._find_all_specs([tmpdir])) == []
 
@@ -158,9 +151,9 @@ class TestLibFinder(TestCase):
         assert _flatten(ops.lib._find_all_specs([tmpdir])) == \
             [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
-    def test_namespace(self):
+    def test_namespace(self, tmp_path: pathlib.Path):
         """Check that namespace packages are ignored."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
 
         assert list(ops.lib._find_all_specs([tmpdir])) == []
 
@@ -169,19 +162,23 @@ class TestLibFinder(TestCase):
         assert list(ops.lib._find_all_specs([tmpdir])) == []
 
 
-class TestLibParser(TestCase):
-    def _mkmod(self, name: str, content: typing.Optional[str] = None) -> ModuleSpec:
+class TestLibParser:
+    def _mkmod(
+        self,
+        request: pytest.FixtureRequest, name: str,
+        content: typing.Optional[str] = None
+    ) -> ModuleSpec:
         fd, fname = mkstemp(text=True)
-        self.addCleanup(os.unlink, fname)
+        request.addfinalizer(functools.partial(os.unlink, fname))
         if content is not None:
             with os.fdopen(fd, mode='wt', closefd=False) as f:
                 f.write(dedent(content))
         os.close(fd)
         return ModuleSpec(name=name, loader=None, origin=fname)
 
-    def test_simple(self):
+    def test_simple(self, request: pytest.FixtureRequest):
         """Check that we can load a reasonably straightforward lib."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = "foo"
         LIBEACH = float('-inf')
         LIBAPI = 2
@@ -194,8 +191,8 @@ class TestLibParser(TestCase):
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_libauthor_has_dashes(self):
-        m = self._mkmod('foo', '''
+    def test_libauthor_has_dashes(self, request: pytest.FixtureRequest):
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
@@ -207,8 +204,8 @@ class TestLibParser(TestCase):
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice-someone@example.com, API 2, patch 42>'
 
-    def test_lib_definitions_without_spaces(self):
-        m = self._mkmod('foo', '''
+    def test_lib_definitions_without_spaces(self, request: pytest.FixtureRequest):
+        m = self._mkmod(request, 'foo', '''
         LIBNAME="foo"
         LIBAPI=2
         LIBPATCH=42
@@ -220,8 +217,8 @@ class TestLibParser(TestCase):
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_lib_definitions_trailing_comments(self):
-        m = self._mkmod('foo', '''
+    def test_lib_definitions_trailing_comments(self, request: pytest.FixtureRequest):
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = "foo" # comment style 1
         LIBAPI = 2 = comment style 2
         LIBPATCH = 42
@@ -233,18 +230,18 @@ class TestLibParser(TestCase):
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_incomplete(self):
+    def test_incomplete(self, request: pytest.FixtureRequest):
         """Check that if anything is missing, nothing is returned."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_too_long(self):
+    def test_too_long(self, request: pytest.FixtureRequest):
         """Check that if the file is too long, nothing is returned."""
-        m = self._mkmod('foo', '\n' * ops.lib._MAX_LIB_LINES + '''
+        m = self._mkmod(request, 'foo', '\n' * ops.lib._MAX_LIB_LINES + '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
@@ -264,10 +261,10 @@ class TestLibParser(TestCase):
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin='/'))
         assert lib is None
 
-    def test_bogus_lib(self):
+    def test_bogus_lib(self, request: pytest.FixtureRequest):
         """Check our behaviour when the lib is messed up."""
         # note the syntax error (that is carefully chosen to pass the initial regexp)
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = "1'
         LIBAPI = 2
         LIBPATCH = 42
@@ -275,9 +272,9 @@ class TestLibParser(TestCase):
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_name_is_number(self):
+    def test_name_is_number(self, request: pytest.FixtureRequest):
         """Check our behaviour when the name in the lib is a number."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = 1
         LIBAPI = 2
         LIBPATCH = 42
@@ -285,9 +282,9 @@ class TestLibParser(TestCase):
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_api_is_string(self):
+    def test_api_is_string(self, request: pytest.FixtureRequest):
         """Check our behaviour when the api in the lib is a string."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = '2'
         LIBPATCH = 42
@@ -295,9 +292,9 @@ class TestLibParser(TestCase):
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_patch_is_string(self):
+    def test_patch_is_string(self, request: pytest.FixtureRequest):
         """Check our behaviour when the patch in the lib is a string."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
         LIBPATCH = '42'
@@ -305,9 +302,9 @@ class TestLibParser(TestCase):
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_author_is_number(self):
+    def test_author_is_number(self, request: pytest.FixtureRequest):
         """Check our behaviour when the author in the lib is a number."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(request, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
         LIBPATCH = 42
@@ -315,9 +312,9 @@ class TestLibParser(TestCase):
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_other_encoding(self):
+    def test_other_encoding(self, request: pytest.FixtureRequest):
         """Check that we don't crash when a library is not UTF-8."""
-        m = self._mkmod('foo')
+        m = self._mkmod(request, 'foo')
         # This should never be the case, but we need to show type checkers
         # that it's not.
         if m.origin is None:
@@ -334,8 +331,7 @@ class TestLibParser(TestCase):
         assert ops.lib._parse_lib(m) is None
 
 
-class TestLib(TestCase):
-
+class TestLib:
     def test_lib_comparison(self):
         assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0) != \
             ops.lib._Lib(_dummy_spec, "bar", "bob@example.com", 0, 1)
@@ -362,18 +358,17 @@ class TestLib(TestCase):
         assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
         assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
 
-    def test_lib_order(self):
+    @pytest.mark.parametrize("execution_number", range(20))
+    def test_lib_order(self, execution_number: range):
         a = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 0)
         b = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)
         c = ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0)
         d = ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
         e = ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1)
 
-        for i in range(20):
-            with self.subTest(i):
-                libs = [a, b, c, d, e]
-                shuffle(libs)
-                assert sorted(libs) == [a, b, c, d, e]
+        libs = [a, b, c, d, e]
+        shuffle(libs)
+        assert sorted(libs) == [a, b, c, d, e]
 
     def test_use_bad_args_types(self):
         with pytest.raises(TypeError):
@@ -392,18 +387,11 @@ class TestLib(TestCase):
             ops.lib.use('foo', 1, 'example.com')
 
 
-@patch('sys.path', new=())
-class TestLibFunctional(TestCase):
-
-    def _mkdtemp(self) -> str:
-        tmpdir = mkdtemp()
-        self.addCleanup(rmtree, tmpdir)
-        return tmpdir
-
-    def test_use_finds_subs(self):
+class TestLibFunctional:
+    def test_use_finds_subs(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
         """Test that ops.lib.use("baz") works when baz is inside a package in the python path."""
-        tmpdir = self._mkdtemp()
-        sys.path = [tmpdir]
+        tmpdir = str(tmp_path)
+        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
         LIBNAME = "baz"
@@ -422,91 +410,108 @@ class TestLibFunctional(TestCase):
         assert baz.LIBPATCH == 42
         assert baz.LIBAUTHOR == 'alice@example.com'
 
-    def test_use_finds_best_same_toplevel(self):
+    @pytest.mark.parametrize("pkg_a", ["foo", "fooA"])
+    @pytest.mark.parametrize("lib_a", ["bar", "barA"])
+    @pytest.mark.parametrize("patch_a", [38, 42])
+    def test_use_finds_best_same_toplevel(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pkg_a: str,
+        lib_a: str,
+        patch_a: int
+    ):
         """Test that ops.lib.use("baz") works when there are two baz in the same toplevel."""
         pkg_b = "foo"
         lib_b = "bar"
         patch_b = 40
-        for pkg_a in ["foo", "fooA"]:
-            for lib_a in ["bar", "barA"]:
-                if (pkg_a, lib_a) == (pkg_b, lib_b):
-                    # everything-is-the-same :-)
-                    continue
-                for patch_a in [38, 42]:
-                    desc = f"A: {pkg_a}/{lib_a}/{patch_a}; B: {pkg_b}/{lib_b}/{patch_b}"
-                    with self.subTest(desc):
-                        tmpdir = self._mkdtemp()
-                        sys.path = [tmpdir]
 
-                        _mklib(tmpdir, pkg_a, lib_a).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_a))
+        if (pkg_a, lib_a) == (pkg_b, lib_b):
+            pytest.skip('Invalid case')
 
-                        _mklib(tmpdir, pkg_b, lib_b).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_b))
+        tmpdir = str(tmp_path)
+        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
 
-                        # autoimport to reset things
-                        ops.lib.autoimport()
+        _mklib(tmpdir, pkg_a, lib_a).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_a))
 
-                        # ops.lib.use done by charm author
-                        baz = ops.lib.use('baz', 2, 'alice@example.com')
-                        assert baz.LIBNAME == 'baz'
-                        assert baz.LIBAPI == 2
-                        assert max(patch_a, patch_b) == baz.LIBPATCH
-                        assert baz.LIBAUTHOR == 'alice@example.com'
+        _mklib(tmpdir, pkg_b, lib_b).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_b))
 
-    def test_use_finds_best_diff_toplevel(self):
+        # autoimport to reset things
+        ops.lib.autoimport()
+
+        # ops.lib.use done by charm author
+        baz = ops.lib.use('baz', 2, 'alice@example.com')
+        assert baz.LIBNAME == 'baz'
+        assert baz.LIBAPI == 2
+        assert max(patch_a, patch_b) == baz.LIBPATCH
+        assert baz.LIBAUTHOR == 'alice@example.com'
+
+    @pytest.mark.parametrize("pkg_a", ["foo", "fooA"])
+    @pytest.mark.parametrize("lib_a", ["bar", "barA"])
+    @pytest.mark.parametrize("patch_a", [38, 42])
+    def test_use_finds_best_diff_toplevel(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pkg_a: str,
+        lib_a: str,
+        patch_a: int
+    ):
         """Test that ops.lib.use("baz") works when there are two baz in the different toplevels."""
         pkg_b = "foo"
         lib_b = "bar"
         patch_b = 40
-        for pkg_a in ["foo", "fooA"]:
-            for lib_a in ["bar", "barA"]:
-                for patch_a in [38, 42]:
-                    desc = f"A: {pkg_a}/{lib_a}/{patch_a}; B: {pkg_b}/{lib_b}/{patch_b}"
-                    with self.subTest(desc):
-                        tmp_dir_a = self._mkdtemp()
-                        tmp_dir_b = self._mkdtemp()
-                        sys.path = [tmp_dir_a, tmp_dir_b]
 
-                        _mklib(tmp_dir_a, pkg_a, lib_a).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_a))
+        tmp_dir_a = tmp_path / "temp_dir1"
+        tmp_dir_a.mkdir()
 
-                        _mklib(tmp_dir_b, pkg_b, lib_b).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_b))
+        tmp_dir_b = tmp_path / "temp_dir2"
+        tmp_dir_b.mkdir()
 
-                        # autoimport to reset things
-                        ops.lib.autoimport()
+        monkeypatch.syspath_prepend(str(tmp_dir_a))  # type: ignore
+        monkeypatch.syspath_prepend(str(tmp_dir_b))  # type: ignore
 
-                        # ops.lib.use done by charm author
-                        baz = ops.lib.use('baz', 2, 'alice@example.com')
-                        assert baz.LIBNAME == 'baz'
-                        assert baz.LIBAPI == 2
-                        assert max(patch_a, patch_b) == baz.LIBPATCH
-                        assert baz.LIBAUTHOR == 'alice@example.com'
+        _mklib(str(tmp_dir_a), pkg_a, lib_a).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_a))
+
+        _mklib(str(tmp_dir_b), pkg_b, lib_b).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_b))
+
+        # autoimport to reset things
+        ops.lib.autoimport()
+
+        # ops.lib.use done by charm author
+        baz = ops.lib.use('baz', 2, 'alice@example.com')
+        assert baz.LIBNAME == 'baz'
+        assert baz.LIBAPI == 2
+        assert max(patch_a, patch_b) == baz.LIBPATCH
+        assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_none_found(self):
         with pytest.raises(ImportError):
             ops.lib.use('foo', 1, 'alice@example.com')
 
-    def test_from_scratch(self):
-        tmpdir = self._mkdtemp()
-        sys.path = [tmpdir]
+    def test_from_scratch(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        tmpdir = str(tmp_path)
+        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
         LIBNAME = "baz"
@@ -522,9 +527,15 @@ class TestLibFunctional(TestCase):
         baz = ops.lib.use('baz', 2, 'alice@example.com')
         assert baz.LIBAPI == 2
 
-    def _test_submodule(self, *, relative: bool = False):
-        tmpdir = self._mkdtemp()
-        sys.path = [tmpdir]
+    def _test_submodule(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        relative: bool = False
+    ):
+        tmpdir = str(tmp_path)
+        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
 
         path = _mklib(tmpdir, "foo", "bar")
         path.write_text(dedent("""
@@ -547,15 +558,15 @@ class TestLibFunctional(TestCase):
         assert baz.LIBAPI == 2
         assert baz.quux.this == 42
 
-    def test_submodule_absolute(self):
-        self._test_submodule(relative=False)
+    def test_submodule_absolute(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        self._test_submodule(tmp_path, monkeypatch, relative=False)
 
-    def test_submodule_relative(self):
-        self._test_submodule(relative=True)
+    def test_submodule_relative(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        self._test_submodule(tmp_path, monkeypatch, relative=True)
 
-    def test_others_found(self):
-        tmpdir = self._mkdtemp()
-        sys.path = [tmpdir]
+    def test_others_found(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        tmpdir = str(tmp_path)
+        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
         LIBNAME = "baz"
@@ -578,12 +589,12 @@ class TestLibFunctional(TestCase):
             ops.lib.use('baz', 2, 'bob@example.com')
 
 
-class TestDeprecationWarning(TestCase):
+class TestDeprecationWarning:
     def test_autoimport_deprecated(self):
-        with self.assertWarns(DeprecationWarning):
+        with pytest.warns(DeprecationWarning):
             ops.lib.autoimport()
 
     def test_use_deprecated(self):
-        with self.assertWarns(DeprecationWarning):
+        with pytest.warns(DeprecationWarning):
             with pytest.raises(ImportError):
                 ops.lib.use('foo', 1, 'bob@example.com')
