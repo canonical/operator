@@ -1692,18 +1692,14 @@ class GenericObserver(ops.Object):
         self.called = True
 
 
-@pytest.fixture
-def fake_stderr() -> io.StringIO:
-    return io.StringIO()
-
-
 class TestBreakpoint:
 
     def test_ignored(
-            self,
-            request: pytest.FixtureRequest,
-            caplog: pytest.LogCaptureFixture,
-            fake_stderr: io.StringIO):
+        self,
+        request: pytest.FixtureRequest,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        fake_stderr = io.StringIO()
         # It doesn't do anything really unless proper environment is there.
         with patch.dict(os.environ):
             os.environ.pop('JUJU_DEBUG_AT', None)
@@ -1734,7 +1730,8 @@ class TestBreakpoint:
         assert mock.call_args == ((this_frame,), {})
 
     def test_welcome_message(
-        self, request: pytest.FixtureRequest,
+        self,
+        request: pytest.FixtureRequest,
         monkeypatch: pytest.MonkeyPatch
     ):
         # Check that an initial message is shown to the user when code is interrupted.
@@ -1862,11 +1859,12 @@ class TestBreakpoint:
         assert str(excinfo.value) == 'breakpoint names must be strings'
 
     def check_trace_set(
-            self,
-            request: pytest.FixtureRequest,
-            envvar_value: str,
-            breakpoint_name: typing.Optional[str],
-            call_count: int):
+        self,
+        request: pytest.FixtureRequest,
+        envvar_value: str,
+        breakpoint_name: typing.Optional[str],
+        call_count: int
+    ):
         """Helper to check the diverse combinations of situations."""
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
             framework = create_framework(request)
