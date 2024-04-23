@@ -97,9 +97,9 @@ def test_observe_decorated_method(request: pytest.FixtureRequest):
 
 
 def test_observer_not_referenced_warning(
-        request: pytest.FixtureRequest,
-        caplog: pytest.LogCaptureFixture
-        ):
+    request: pytest.FixtureRequest,
+    caplog: pytest.LogCaptureFixture
+):
     class MyObj(ops.Object):
         def __init__(self, charm: ops.CharmBase):
             super().__init__(charm, "obj")
@@ -208,8 +208,7 @@ peers:
     ]
 
 
-def test_storage_events(request: pytest.FixtureRequest,
-                        fake_script: FakeScript):
+def test_storage_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -469,11 +468,11 @@ def test_actions_from_charm_root():
         assert meta.actions['foo'].description == "foos the bar"
 
 
-def _setup_test_action(fake_script: typing.Callable[..., None]):
-    fake_script('action-get', """echo '{"foo-name": "name", "silent": true}'""")
-    fake_script('action-set', "")
-    fake_script('action-log', "")
-    fake_script('action-fail', "")
+def _setup_test_action(fake_script: FakeScript):
+    fake_script.write('action-get', """echo '{"foo-name": "name", "silent": true}'""")
+    fake_script.write('action-set', "")
+    fake_script.write('action-log', "")
+    fake_script.write('action-fail', "")
 
 
 def _get_action_test_meta():
@@ -516,7 +515,7 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
         def _on_start_action(self, event: ops.ActionEvent):
             pass
 
-    _setup_test_action(fake_script.write)
+    _setup_test_action(fake_script)
     meta = _get_action_test_meta()
     framework = create_framework(request, meta=meta)
     charm = MyCharm(framework)
@@ -543,9 +542,11 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     {'a': {None: 'c'}},
     {'aBc': 'd'}
 ])
-def test_invalid_action_results(request: pytest.FixtureRequest,
-                                fake_script: FakeScript,
-                                bad_res: typing.Dict[str, typing.Any]):
+def test_invalid_action_results(
+    request: pytest.FixtureRequest,
+    fake_script: FakeScript,
+    bad_res: typing.Dict[str, typing.Any]
+):
 
     class MyCharm(ops.CharmBase):
 
@@ -557,7 +558,7 @@ def test_invalid_action_results(request: pytest.FixtureRequest,
         def _on_foo_bar_action(self, event: ops.ActionEvent):
             event.set_results(self.res)
 
-    _setup_test_action(fake_script.write)
+    _setup_test_action(fake_script)
     meta = _get_action_test_meta()
     framework = create_framework(request, meta=meta)
     charm = MyCharm(framework)
@@ -568,9 +569,10 @@ def test_invalid_action_results(request: pytest.FixtureRequest,
 
 
 def test_action_event_defer_fails(
-        request: pytest.FixtureRequest,
-        monkeypatch: pytest.MonkeyPatch,
-        fake_script: FakeScript):
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_script: FakeScript
+):
 
     cmd_type = 'action'
 
@@ -741,9 +743,7 @@ def test_secret_events(request: pytest.FixtureRequest):
     ]
 
 
-def test_collect_app_status_leader(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -768,9 +768,7 @@ def test_collect_app_status_leader(
     ]
 
 
-def test_collect_app_status_no_statuses(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_collect_app_status_no_statuses(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -790,9 +788,7 @@ def test_collect_app_status_no_statuses(
     ]
 
 
-def test_collect_app_status_non_leader(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_collect_app_status_non_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -812,9 +808,7 @@ def test_collect_app_status_non_leader(
     ]
 
 
-def test_collect_unit_status(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_collect_unit_status(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -840,9 +834,7 @@ def test_collect_unit_status(
     ]
 
 
-def test_collect_unit_status_no_statuses(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_collect_unit_status_no_statuses(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -863,9 +855,7 @@ def test_collect_unit_status_no_statuses(
     ]
 
 
-def test_collect_app_and_unit_status(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_collect_app_and_unit_status(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -892,9 +882,7 @@ def test_collect_app_and_unit_status(
     ]
 
 
-def test_add_status_type_error(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript):
+def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any):
             super().__init__(*args)
@@ -920,10 +908,11 @@ def test_add_status_type_error(
     (['unknown'], 'unknown')
 ])
 def test_collect_status_priority(
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript,
-        statuses: typing.List[str],
-        expected: str):
+    request: pytest.FixtureRequest,
+    fake_script: FakeScript,
+    statuses: typing.List[str],
+    expected: str
+):
     class MyCharm(ops.CharmBase):
         def __init__(self, *args: typing.Any, statuses: typing.List[str]):
             super().__init__(*args)
