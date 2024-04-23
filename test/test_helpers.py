@@ -123,8 +123,8 @@ class FakeScript:
         if path is None:
             fake_script_path = tempfile.mkdtemp('-fake_script')
             self.path = pathlib.Path(fake_script_path)
-            old_path = os.environ["PATH"]
-            os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ["PATH"]])
+            old_path = os.environ['PATH']
+            os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ['PATH']])
 
             def cleanup():
                 shutil.rmtree(self.path)
