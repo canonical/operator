@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import os
 import pathlib
 import typing
@@ -169,7 +168,7 @@ class TestLibParser:
         content: typing.Optional[str] = None
     ) -> ModuleSpec:
         fd, fname = mkstemp(text=True)
-        request.addfinalizer(functools.partial(os.unlink, fname))
+        request.addfinalizer(lambda: os.unlink(fname))
         if content is not None:
             with os.fdopen(fd, mode='wt', closefd=False) as f:
                 f.write(dedent(content))

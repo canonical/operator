@@ -30,9 +30,7 @@ import pytest
 def test_import(mod_name: str, tmp_path: pathlib.Path):
     template = "from ops import {module_name}"
 
-    d = tmp_path
-    testfile = d / "foo.py"
-
+    testfile = tmp_path / "foo.py"
     with open(testfile, 'w', encoding='utf8') as fh:
         fh.write(template.format(module_name=mod_name))
 
@@ -41,5 +39,6 @@ def test_import(mod_name: str, tmp_path: pathlib.Path):
         environ['PYTHONPATH'] = os.getcwd() + os.pathsep + environ['PYTHONPATH']
     else:
         environ['PYTHONPATH'] = os.getcwd()
+
     proc = subprocess.run([sys.executable, testfile], env=environ)
     assert proc.returncode == 0
