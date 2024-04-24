@@ -423,7 +423,7 @@ class TestLibFunctional:
         patch_b = 40
 
         if (pkg_a, lib_a) == (pkg_b, lib_b):
-            pytest.skip('Invalid case')
+            return
 
         tmpdir = str(tmp_path)
         sys.path = [tmpdir]
