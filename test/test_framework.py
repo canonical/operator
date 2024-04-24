@@ -1279,9 +1279,6 @@ class TestStoredState:
         framework.commit()
 
     def test_mutable_types(self, request: pytest.FixtureRequest):
-        # Test and validation functions in a list of tuples.
-        # Assignment and keywords like del are not supported in lambdas
-        #  so functions are used instead.
         def _assert_equal(a: typing.Any, b: typing.Any):
             assert a == b
 
@@ -1712,7 +1709,7 @@ class TestBreakpoint:
             framework.breakpoint()
             warning_logs = [
                 record for record in caplog.records if record.levelno == logging.WARNING]
-            assert len(warning_logs) == 0, "No warning level logs were generated."
+            assert len(warning_logs) == 0
         assert mock.call_count == 0
         assert fake_stderr.getvalue() == ""
 
