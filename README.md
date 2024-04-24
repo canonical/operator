@@ -213,7 +213,7 @@ hook execution:
 ```python
 # ...
 ctx = scenario.Context(HistoryCharm, meta={"name": "foo"})
-ctx.run("start", scenario.State())
+ctx.run(ctx.on.start(), scenario.State())
 assert ctx.workload_version_history == ['1', '1.2', '1.5']
 # ...
 ```
@@ -422,21 +422,16 @@ relation.remote_unit_name  # "zookeeper/42"
 
 ### Triggering Relation Events
 
-If you want to trigger relation events, the easiest way to do so is get a hold of the Relation instance and grab the
-event from one of its aptly-named properties:
+If you want to trigger relation events, use `ctx.on.relation_changed` (and so
+on for the other relation events) and pass the relation object:
 
 ```python
+ctx = scenario.Context(MyCharm, meta=MyCharm.META)
+
 relation = scenario.Relation(endpoint="foo", interface="bar")
-changed_event = relation.changed_event
-joined_event = relation.joined_event
+changed_event = ctx.on.relation_changed(relation=relation)
+joined_event = ctx.on.relation_joined(relation=relation)
 # ...
-```
-
-This is in fact syntactic sugar for:
-
-```python
-relation = scenario.Relation(endpoint="foo", interface="bar")
-changed_event = scenario.Event('foo-relation-changed', relation=relation)
 ```
 
 The reason for this construction is that the event is associated with some relation-specific metadata, that Scenario
@@ -474,20 +469,16 @@ All relation events have some additional metadata that does not belong in the Re
 relation-joined event, the name of the (remote) unit that is joining the relation. That is what determines what
 `ops.model.Unit` you get when you get `RelationJoinedEvent().unit` in an event handler.
 
-In order to supply this parameter, you will have to **call** the event object and pass as `remote_unit_id` the id of the
+In order to supply this parameter, as well as the relation object, pass as `remote_unit` the id of the
 remote unit that the event is about. The reason that this parameter is not supplied to `Relation` but to relation
 events, is that the relation already ties 'this app' to some 'remote app' (cfr. the `Relation.remote_app_name` attr),
 but not to a specific unit. What remote unit this event is about is not a `State` concern but an `Event` one.
 
-The `remote_unit_id` will default to the first ID found in the relation's `remote_units_data`, but if the test you are
-writing is close to that domain, you should probably override it and pass it manually.
-
 ```python
-relation = scenario.Relation(endpoint="foo", interface="bar")
-remote_unit_2_is_joining_event = relation.joined_event(remote_unit_id=2)
+ctx = scenario.Context(MyCharm, meta=MyCharm.META)
 
-# which is syntactic sugar for:
-remote_unit_2_is_joining_event = scenario.Event('foo-relation-changed', relation=relation, relation_remote_unit_id=2)
+relation = scenario.Relation(endpoint="foo", interface="bar")
+remote_unit_2_is_joining_event = ctx.on.relation_joined(relation, remote_unit=2)
 ```
 
 ## Networks
@@ -718,7 +709,7 @@ storage = scenario.Storage("foo")
 # Setup storage with some content:
 (storage.get_filesystem(ctx) / "myfile.txt").write_text("helloworld")
 
-with ctx.manager("update-status", scenario.State(storage=[storage])) as mgr:
+with ctx.manager(ctx.on.update_status(), scenario.State(storage=[storage])) as mgr:
     foo = mgr.charm.model.storages["foo"][0]
     loc = foo.location
     path = loc / "myfile.txt"
@@ -890,7 +881,7 @@ So, the only consistency-level check we enforce in Scenario when it comes to res
 import pathlib
 
 ctx = scenario.Context(MyCharm, meta={'name': 'juliette', "resources": {"foo": {"type": "oci-image"}}})
-with ctx.manager("start", scenario.State(resources={'foo': '/path/to/resource.tar'})) as mgr:
+with ctx.manager(ctx.on.start(), scenario.State(resources={'foo': '/path/to/resource.tar'})) as mgr:
     # If the charm, at runtime, were to call self.model.resources.fetch("foo"), it would get '/path/to/resource.tar' back.
     path = mgr.charm.model.resources.fetch('foo')
     assert path == pathlib.Path('/path/to/resource.tar')
@@ -1031,8 +1022,10 @@ You can also generate the 'deferred' data structure (called a DeferredEvent) fro
 handler):
 
 ```python continuation
-deferred_start = scenario.Event('start').deferred(MyCharm._on_start)
-deferred_install = scenario.Event('install').deferred(MyCharm._on_start)
+ctx = scenario.Context(MyCharm, meta={"name": "deferring"})
+
+deferred_start = ctx.on.start().deferred(MyCharm._on_start)
+deferred_install = ctx.on.install().deferred(MyCharm._on_start)
 ```
 
 On the output side, you can verify that an event that you expect to have been deferred during this trigger, has indeed
@@ -1081,8 +1074,10 @@ def test_start_on_deferred_update_status(MyCharm):
 but you can also use a shortcut from the relation event itself:
 
 ```python continuation
+ctx = scenario.Context(MyCharm, meta={"name": "deferring"})
+
 foo_relation = scenario.Relation('foo')
-foo_relation.changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
+deferred_event = ctx.on.relation_changed(foo_relation).deferred(handler=MyCharm._on_foo_relation_changed)
 ```
 
 # Live charm introspection
@@ -1167,11 +1162,12 @@ class MyCharmType(ops.CharmBase):
 
 
 td = tempfile.TemporaryDirectory()
-state = scenario.Context(
+ctx = scenario.Context(
     charm_type=MyCharmType,
     meta={'name': 'my-charm-name'},
     charm_root=td.name
-).run(ctx.on.start(), scenario.State())
+)
+state = ctx.run(ctx.on.start(), scenario.State())
 ```
 
 Do this, and you will be able to set up said directory as you like before the charm is run, as well as verify its
