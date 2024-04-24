@@ -35,8 +35,8 @@ def fake_script(request: pytest.FixtureRequest) -> FakeScript:
 def test_basic(request: pytest.FixtureRequest):
     class MyCharm(ops.CharmBase):
 
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
 
             self.started = False
             framework.observe(self.on.start, self._on_start)
@@ -60,7 +60,7 @@ def test_basic(request: pytest.FixtureRequest):
 
 
 def test_observe_decorated_method(request: pytest.FixtureRequest):
-    # we test that charm methods decorated with @functools.wraps(wrapper)
+    # We test that charm methods decorated with @functools.wraps(wrapper)
     # can be observed by Framework. Simpler decorators won't work because
     # Framework searches for __self__ and other method things; functools.wraps
     # is more careful and it still works, this test is here to ensure that
@@ -78,8 +78,8 @@ def test_observe_decorated_method(request: pytest.FixtureRequest):
         return wrapper
 
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             framework.observe(self.on.start, self._on_start)
             self.seen = None
 
@@ -109,8 +109,8 @@ def test_observer_not_referenced_warning(
             raise RuntimeError()  # never reached!
 
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             MyObj(self)  # not assigned!
             framework.observe(self.on.start, self._on_start)
 
@@ -144,8 +144,8 @@ def test_helper_properties(request: pytest.FixtureRequest):
 def test_relation_events(request: pytest.FixtureRequest):
 
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.seen: typing.List[str] = []
             for rel in ('req1', 'req-2', 'pro1', 'pro-2', 'peer1', 'peer-2'):
                 # Hook up relation events to generic handler.
@@ -210,8 +210,8 @@ peers:
 
 def test_storage_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.seen: typing.List[str] = []
             self.framework.observe(self.on['stor1'].storage_attached, self._on_stor1_attach)
             self.framework.observe(self.on['stor2'].storage_detaching, self._on_stor2_detach)
@@ -325,8 +325,8 @@ storage:
 def test_workload_events(request: pytest.FixtureRequest):
 
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.seen: typing.List[str] = []
             for workload in ('container-a', 'containerb'):
                 # Hook up relation events to generic handler.
@@ -501,8 +501,8 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
 
     class MyCharm(ops.CharmBase):
 
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
             framework.observe(self.on.start_action, self._on_start_action)
 
@@ -550,8 +550,8 @@ def test_invalid_action_results(
 
     class MyCharm(ops.CharmBase):
 
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.res: typing.Dict[str, typing.Any] = {}
             framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
 
@@ -578,8 +578,8 @@ def test_action_event_defer_fails(
 
     class MyCharm(ops.CharmBase):
 
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             framework.observe(self.on.start_action, self._on_start_action)
 
         def _on_start_action(self, event: ops.ActionEvent):
@@ -697,8 +697,8 @@ containers:
 
 def test_secret_events(request: pytest.FixtureRequest):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.seen: typing.List[str] = []
             self.framework.observe(self.on.secret_changed, self.on_secret_changed)
             self.framework.observe(self.on.secret_rotate, self.on_secret_rotate)
@@ -745,8 +745,8 @@ def test_secret_events(request: pytest.FixtureRequest):
 
 def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -770,8 +770,8 @@ def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: 
 
 def test_collect_app_status_no_statuses(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -790,8 +790,8 @@ def test_collect_app_status_no_statuses(request: pytest.FixtureRequest, fake_scr
 
 def test_collect_app_status_non_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -810,8 +810,8 @@ def test_collect_app_status_non_leader(request: pytest.FixtureRequest, fake_scri
 
 def test_collect_unit_status(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -836,8 +836,8 @@ def test_collect_unit_status(request: pytest.FixtureRequest, fake_script: FakeSc
 
 def test_collect_unit_status_no_statuses(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -857,8 +857,8 @@ def test_collect_unit_status_no_statuses(request: pytest.FixtureRequest, fake_sc
 
 def test_collect_app_and_unit_status(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
             self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
 
@@ -884,8 +884,8 @@ def test_collect_app_and_unit_status(request: pytest.FixtureRequest, fake_script
 
 def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -911,11 +911,11 @@ def test_collect_status_priority(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
     statuses: typing.List[str],
-    expected: str
+    expected: str,
 ):
     class MyCharm(ops.CharmBase):
-        def __init__(self, *args: typing.Any, statuses: typing.List[str]):
-            super().__init__(*args)
+        def __init__(self, framework: ops.Framework, statuses: typing.List[str]):
+            super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
             self.statuses = statuses
 

@@ -117,9 +117,11 @@ def create_framework(
 
 
 class FakeScript:
-    def __init__(self,
-                 request: pytest.FixtureRequest,
-                 path: typing.Optional[pathlib.Path] = None):
+    def __init__(
+        self,
+        request: pytest.FixtureRequest,
+        path: typing.Optional[pathlib.Path] = None,
+    ):
         if path is None:
             fake_script_path = tempfile.mkdtemp('-fake_script')
             self.path = pathlib.Path(fake_script_path)
@@ -134,9 +136,7 @@ class FakeScript:
         else:
             self.path = path
 
-    def write(self,
-              name: str,
-              content: str):
+    def write(self, name: str, content: str):
         template_args: typing.Dict[str, str] = {
             'name': name,
             'path': self.path.as_posix(),
@@ -149,9 +149,9 @@ class FakeScript:
             # RS 'record separator' (octal 036 in ASCII), FS 'file separator' (octal 034 in ASCII).
             f.write(
                 '''#!/bin/sh
-    {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
-    {content}'''.format_map(template_args))
-        os.chmod(str(path), 0o755)  # type: ignore  # noqa: S103
+{{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
+{content}'''.format_map(template_args))
+        path.chmod(0o755)  # noqa: S103
         # TODO: this hardcodes the path to bash.exe, which works for now but might
         #       need to be set via environ or something like that.
         path.with_suffix(".bat").write_text(  # type: ignore
@@ -165,7 +165,7 @@ class FakeScript:
         # Newline and encoding forced to Linux-y defaults because on
         # windows they're written from git-bash.
         with calls_file.open('r+t', newline='\n', encoding='utf8') as f:
-            calls = [line.split('\x1e') for line in f.read().split('\x1c')[:-1]]
+            calls = [line.split('\036') for line in f.read().split('\034')[:-1]]
             if clear:
                 f.truncate(0)
         return calls
