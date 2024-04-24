@@ -316,8 +316,12 @@ class _TestMain(abc.ABC):
 
     def _setup_charm_dir(self, request: pytest.FixtureRequest):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
-        request.addfinalizer(lambda: shutil.rmtree(self._tmpdir)
-                             if self._tmpdir.exists() else None)
+
+        def cleanup():
+            shutil.rmtree(self._tmpdir) if self._tmpdir.exists() else None
+
+        request.addfinalizer(cleanup)
+
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
         self._charm_state_file = self.JUJU_CHARM_DIR / '.unit-state.db'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
