@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import abc
-import functools
 import importlib.util
 import io
 import logging
@@ -54,24 +53,25 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self,
-                 event_type: typing.Type[ops.EventBase],
-                 event_name: str,
-                 env_var: typing.Optional[str] = None,
-                 relation_id: typing.Optional[int] = None,
-                 remote_app: typing.Optional[str] = None,
-                 remote_unit: typing.Optional[str] = None,
-                 model_name: typing.Optional[str] = None,
-                 set_in_env: typing.Optional[typing.Dict[str,
-                                                         str]] = None,
-                 workload_name: typing.Optional[str] = None,
-                 notice_id: typing.Optional[str] = None,
-                 notice_type: typing.Optional[str] = None,
-                 notice_key: typing.Optional[str] = None,
-                 departing_unit_name: typing.Optional[str] = None,
-                 secret_id: typing.Optional[str] = None,
-                 secret_label: typing.Optional[str] = None,
-                 secret_revision: typing.Optional[str] = None):
+    def __init__(
+        self,
+        event_type: typing.Type[ops.EventBase],
+        event_name: str,
+        env_var: typing.Optional[str] = None,
+        relation_id: typing.Optional[int] = None,
+        remote_app: typing.Optional[str] = None,
+        remote_unit: typing.Optional[str] = None,
+        model_name: typing.Optional[str] = None,
+        set_in_env: typing.Optional[typing.Dict[str, str]] = None,
+        workload_name: typing.Optional[str] = None,
+        notice_id: typing.Optional[str] = None,
+        notice_type: typing.Optional[str] = None,
+        notice_key: typing.Optional[str] = None,
+        departing_unit_name: typing.Optional[str] = None,
+        secret_id: typing.Optional[str] = None,
+        secret_label: typing.Optional[str] = None,
+        secret_revision: typing.Optional[str] = None,
+    ):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -122,7 +122,7 @@ class TestCharmInit:
         charm_class: typing.Type[ops.CharmBase],
         *,
         extra_environ: typing.Optional[typing.Dict[str, str]] = None,
-        **kwargs: typing.Any
+        **kwargs: typing.Any,
     ):
         """Helper for below tests."""
         fake_environ = {
@@ -146,8 +146,8 @@ class TestCharmInit:
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):  # type: ignore
-                super().__init__(*args)  # type: ignore
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
 
         with warnings.catch_warnings(record=True) as warn_cm:
             self._check(MyCharm)
@@ -275,8 +275,12 @@ class _TestMain(abc.ABC):
         return NotImplemented
 
     @abc.abstractmethod
-    def _call_event(self, fake_script: FakeScript,
-                    rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         """Set up the environment and call (i.e. run) the given event."""
         return NotImplemented
 
@@ -312,7 +316,8 @@ class _TestMain(abc.ABC):
 
     def _setup_charm_dir(self, request: pytest.FixtureRequest):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
-        request.addfinalizer(functools.partial(shutil.rmtree, str(self._tmpdir)))
+        request.addfinalizer(lambda: shutil.rmtree(self._tmpdir)
+                             if self._tmpdir.exists() else None)
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
         self._charm_state_file = self.JUJU_CHARM_DIR / '.unit-state.db'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
@@ -467,15 +472,17 @@ class _TestMain(abc.ABC):
         assert list(state.observed_event_types) == ['InstallEvent']
 
         state = self._simulate_event(
-            fake_script, EventSpec(
-                ops.ConfigChangedEvent, 'config-changed'))
+            fake_script,
+            EventSpec(ops.ConfigChangedEvent, 'config-changed')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should pick the deferred config-changed.
         state = self._simulate_event(
-            fake_script, EventSpec(
-                ops.UpdateStatusEvent, 'update-status'))
+            fake_script,
+            EventSpec(ops.UpdateStatusEvent, 'update-status')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == \
             ['ConfigChangedEvent', 'UpdateStatusEvent']
@@ -489,16 +496,18 @@ class _TestMain(abc.ABC):
         assert list(state.observed_event_types) == ['InstallEvent']
 
         state = self._simulate_event(
-            fake_script, EventSpec(
-                ops.ConfigChangedEvent, 'config-changed'))
+            fake_script,
+            EventSpec(ops.ConfigChangedEvent, 'config-changed')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should not pick the deferred config-changed because
         # collect-metrics runs in a restricted context.
         state = self._simulate_event(
-            fake_script, EventSpec(
-                ops.CollectMetricsEvent, 'collect-metrics'))
+            fake_script,
+            EventSpec(ops.CollectMetricsEvent, 'collect-metrics')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['CollectMetricsEvent']
 
@@ -680,8 +689,9 @@ class _TestMain(abc.ABC):
 
         try:
             self._simulate_event(
-                fake_script, EventSpec(
-                    ops.HookEvent, 'not-implemented-event'))
+                fake_script,
+                EventSpec(ops.HookEvent, 'not-implemented-event')
+            )
         except subprocess.CalledProcessError:
             pytest.fail('Event simulation for an unsupported event'
                         ' results in a non-zero exit code returned')
@@ -701,9 +711,8 @@ class _TestMain(abc.ABC):
         fake_script.calls(clear=True)
         self._simulate_event(
             fake_script,
-            EventSpec(
-                ops.CollectMetricsEvent,
-                'collect_metrics'))
+            EventSpec(ops.CollectMetricsEvent, 'collect_metrics')
+        )
 
         expected = [
             VERSION_LOGLINE,
@@ -719,8 +728,13 @@ class _TestMain(abc.ABC):
         self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
         fake_script.calls(clear=True)
-        self._simulate_event(fake_script, EventSpec(ops.UpdateStatusEvent, 'update-status',
-                                                    set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
+        self._simulate_event(
+            fake_script,
+            EventSpec(
+                ops.UpdateStatusEvent,
+                'update-status',
+                set_in_env={
+                    'EMIT_CUSTOM_EVENT': "1"}))
 
         calls = fake_script.calls()
 
@@ -762,15 +776,14 @@ class _TestMain(abc.ABC):
 
         for event_spec, calls in test_cases:
             self._simulate_event(fake_script, event_spec)
-            assert calls in \
-                fake_script.calls(clear=True)
+            assert calls in fake_script.calls(clear=True)
 
     def test_excepthook(self, fake_script: FakeScript):
         with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(
-                fake_script, EventSpec(
-                    ops.InstallEvent, 'install', set_in_env={
-                        'TRY_EXCEPTHOOK': '1'}))
+                fake_script,
+                EventSpec(ops.InstallEvent, 'install', set_in_env={'TRY_EXCEPTHOOK': '1'})
+            )
 
         calls = [' '.join(i) for i in fake_script.calls()]
 
@@ -791,11 +804,16 @@ class _TestMain(abc.ABC):
         self._prepare_actions()
 
         fake_script.write('action-get', "echo '{}'")
-        state = self._simulate_event(fake_script, EventSpec(
-            ops.ActionEvent, 'get_model_name_action',
-            env_var='JUJU_ACTION_NAME',
-            model_name='test-model-name',
-            set_in_env={'JUJU_ACTION_UUID': '1'}))
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(
+                ops.ActionEvent,
+                'get_model_name_action',
+                env_var='JUJU_ACTION_NAME',
+                model_name='test-model-name',
+                set_in_env={'JUJU_ACTION_UUID': '1'}
+            )
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert state._on_get_model_name_action == ['test-model-name']
 
@@ -953,7 +971,7 @@ class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
         self,
         fake_script: FakeScript,
         rel_path: Path,
-        env: typing.Dict[str, str]
+        env: typing.Dict[str, str],
     ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         super()._call_event(fake_script, rel_path, env)
@@ -974,7 +992,7 @@ class _TestMainWithDispatch(_TestMain):
     def test_setup_event_links(
         self,
         request: pytest.FixtureRequest,
-        fake_script: FakeScript
+        fake_script: FakeScript,
     ):
         """Test auto-creation of symlinks.
 
@@ -1092,7 +1110,7 @@ class _TestMainWithDispatch(_TestMain):
         fake_script: FakeScript,
         rel: bool,
         ind: bool,
-        path_type: str
+        path_type: str,
     ):
         event = EventSpec(ops.InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'

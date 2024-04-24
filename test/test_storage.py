@@ -76,8 +76,12 @@ class StoragePermutations(abc.ABC):
 
         class Sample(ops.StoredStateData):
 
-            def __init__(self, parent: ops.Object, key: str,
-                         content: typing.Dict[str, typing.Any]):
+            def __init__(
+                self,
+                parent: ops.Object,
+                key: str,
+                content: typing.Dict[str, typing.Any],
+            ):
                 super().__init__(parent, key)
                 self.content = content
 
@@ -213,8 +217,7 @@ class StoragePermutations(abc.ABC):
     def test_save_notice(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         store = self.create_storage(request, fake_script)
         store.save_notice('event', 'observer', 'method')
-        assert list(store.notices('event')) == \
-            [('event', 'observer', 'method')]
+        assert list(store.notices('event')) == [('event', 'observer', 'method')]
 
     def test_all_notices(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         notices = [('e1', 'o1', 'm1'), ('e1', 'o2', 'm2'), ('e2', 'o3', 'm3')]
@@ -256,10 +259,10 @@ class StoragePermutations(abc.ABC):
         store = self.create_storage(request, fake_script)
         store.save_notice('event', 'observer', 'method')
         store.save_notice('event', 'observer', 'method2')
-        assert list(store.notices('event')) == \
-            [('event', 'observer', 'method'),
-             ('event', 'observer', 'method2'),
-             ]
+        assert list(store.notices('event')) == [
+            ('event', 'observer', 'method'),
+            ('event', 'observer', 'method2')
+        ]
 
 
 class TestSQLiteStorage(StoragePermutations):
