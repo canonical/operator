@@ -152,7 +152,6 @@ class FakeScript:
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}'''.format_map(template_args))
         path.chmod(0o755)
-
         # TODO: this hardcodes the path to bash.exe, which works for now but might
         #       need to be set via environ or something like that.
         path.with_suffix(".bat").write_text(  # type: ignore
