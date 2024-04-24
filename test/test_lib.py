@@ -14,11 +14,11 @@
 
 import os
 import pathlib
+import sys
 import typing
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from random import shuffle
-from tempfile import mkstemp
 from textwrap import dedent
 
 import pytest
@@ -164,20 +164,18 @@ class TestLibFinder:
 class TestLibParser:
     def _mkmod(
         self,
-        request: pytest.FixtureRequest, name: str,
+        tmp_path: pathlib.Path,
+        name: str,
         content: typing.Optional[str] = None,
     ) -> ModuleSpec:
-        fd, fname = mkstemp(text=True)
-        request.addfinalizer(lambda: os.unlink(fname))
+        file = tmp_path / name
         if content is not None:
-            with os.fdopen(fd, mode='wt', closefd=False) as f:
-                f.write(dedent(content))
-        os.close(fd)
-        return ModuleSpec(name=name, loader=None, origin=fname)
+            file.write_text(dedent(content))
+        return ModuleSpec(name=name, loader=None, origin=str(file))
 
-    def test_simple(self, request: pytest.FixtureRequest):
+    def test_simple(self, tmp_path: pathlib.Path):
         """Check that we can load a reasonably straightforward lib."""
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo"
         LIBEACH = float('-inf')
         LIBAPI = 2
@@ -190,8 +188,8 @@ class TestLibParser:
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_libauthor_has_dashes(self, request: pytest.FixtureRequest):
-        m = self._mkmod(request, 'foo', '''
+    def test_libauthor_has_dashes(self, tmp_path: pathlib.Path):
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
@@ -203,8 +201,8 @@ class TestLibParser:
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice-someone@example.com, API 2, patch 42>'
 
-    def test_lib_definitions_without_spaces(self, request: pytest.FixtureRequest):
-        m = self._mkmod(request, 'foo', '''
+    def test_lib_definitions_without_spaces(self, tmp_path: pathlib.Path):
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME="foo"
         LIBAPI=2
         LIBPATCH=42
@@ -216,8 +214,8 @@ class TestLibParser:
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_lib_definitions_trailing_comments(self, request: pytest.FixtureRequest):
-        m = self._mkmod(request, 'foo', '''
+    def test_lib_definitions_trailing_comments(self, tmp_path: pathlib.Path):
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo" # comment style 1
         LIBAPI = 2 = comment style 2
         LIBPATCH = 42
@@ -229,18 +227,18 @@ class TestLibParser:
         # also check the repr while we're at it
         assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_incomplete(self, request: pytest.FixtureRequest):
+    def test_incomplete(self, tmp_path: pathlib.Path):
         """Check that if anything is missing, nothing is returned."""
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_too_long(self, request: pytest.FixtureRequest):
+    def test_too_long(self, tmp_path: pathlib.Path):
         """Check that if the file is too long, nothing is returned."""
-        m = self._mkmod(request, 'foo', '\n' * ops.lib._MAX_LIB_LINES + '''
+        m = self._mkmod(tmp_path, 'foo', '\n' * ops.lib._MAX_LIB_LINES + '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
@@ -260,10 +258,10 @@ class TestLibParser:
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin='/'))
         assert lib is None
 
-    def test_bogus_lib(self, request: pytest.FixtureRequest):
+    def test_bogus_lib(self, tmp_path: pathlib.Path):
         """Check our behaviour when the lib is messed up."""
         # note the syntax error (that is carefully chosen to pass the initial regexp)
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "1'
         LIBAPI = 2
         LIBPATCH = 42
@@ -271,9 +269,9 @@ class TestLibParser:
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_name_is_number(self, request: pytest.FixtureRequest):
+    def test_name_is_number(self, tmp_path: pathlib.Path):
         """Check our behaviour when the name in the lib is a number."""
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 1
         LIBAPI = 2
         LIBPATCH = 42
@@ -281,9 +279,9 @@ class TestLibParser:
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_api_is_string(self, request: pytest.FixtureRequest):
+    def test_api_is_string(self, tmp_path: pathlib.Path):
         """Check our behaviour when the api in the lib is a string."""
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = '2'
         LIBPATCH = 42
@@ -291,9 +289,9 @@ class TestLibParser:
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_patch_is_string(self, request: pytest.FixtureRequest):
+    def test_patch_is_string(self, tmp_path: pathlib.Path):
         """Check our behaviour when the patch in the lib is a string."""
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
         LIBPATCH = '42'
@@ -301,9 +299,9 @@ class TestLibParser:
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_author_is_number(self, request: pytest.FixtureRequest):
+    def test_author_is_number(self, tmp_path: pathlib.Path):
         """Check our behaviour when the author in the lib is a number."""
-        m = self._mkmod(request, 'foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
         LIBPATCH = 42
@@ -311,9 +309,9 @@ class TestLibParser:
         ''')
         assert ops.lib._parse_lib(m) is None
 
-    def test_other_encoding(self, request: pytest.FixtureRequest):
+    def test_other_encoding(self, tmp_path: pathlib.Path):
         """Check that we don't crash when a library is not UTF-8."""
-        m = self._mkmod(request, 'foo')
+        m = self._mkmod(tmp_path, 'foo')
         # This should never be the case, but we need to show type checkers
         # that it's not.
         if m.origin is None:
@@ -387,10 +385,10 @@ class TestLib:
 
 
 class TestLibFunctional:
-    def test_use_finds_subs(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    def test_use_finds_subs(self, tmp_path: pathlib.Path):
         """Test that ops.lib.use("baz") works when baz is inside a package in the python path."""
         tmpdir = str(tmp_path)
-        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
+        sys.path = [tmpdir]
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
         LIBNAME = "baz"
@@ -415,7 +413,6 @@ class TestLibFunctional:
     def test_use_finds_best_same_toplevel(
         self,
         tmp_path: pathlib.Path,
-        monkeypatch: pytest.MonkeyPatch,
         pkg_a: str,
         lib_a: str,
         patch_a: int,
@@ -429,7 +426,7 @@ class TestLibFunctional:
             pytest.skip('Invalid case')
 
         tmpdir = str(tmp_path)
-        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
+        sys.path = [tmpdir]
 
         _mklib(tmpdir, pkg_a, lib_a).write_text(dedent("""
         LIBNAME = "baz"
@@ -461,7 +458,6 @@ class TestLibFunctional:
     def test_use_finds_best_diff_toplevel(
         self,
         tmp_path: pathlib.Path,
-        monkeypatch: pytest.MonkeyPatch,
         pkg_a: str,
         lib_a: str,
         patch_a: int,
@@ -477,8 +473,7 @@ class TestLibFunctional:
         tmp_dir_b = tmp_path / "temp_dir2"
         tmp_dir_b.mkdir()
 
-        monkeypatch.syspath_prepend(str(tmp_dir_a))  # type: ignore
-        monkeypatch.syspath_prepend(str(tmp_dir_b))  # type: ignore
+        sys.path = [tmp_dir_a, tmp_dir_b]
 
         _mklib(str(tmp_dir_a), pkg_a, lib_a).write_text(dedent("""
         LIBNAME = "baz"
@@ -508,9 +503,9 @@ class TestLibFunctional:
         with pytest.raises(ImportError):
             ops.lib.use('foo', 1, 'alice@example.com')
 
-    def test_from_scratch(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    def test_from_scratch(self, tmp_path: pathlib.Path):
         tmpdir = str(tmp_path)
-        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
+        sys.path = [tmpdir]
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
         LIBNAME = "baz"
@@ -529,12 +524,11 @@ class TestLibFunctional:
     def _test_submodule(
         self,
         tmp_path: pathlib.Path,
-        monkeypatch: pytest.MonkeyPatch,
         *,
         relative: bool = False,
     ):
         tmpdir = str(tmp_path)
-        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
+        sys.path = [tmpdir]
 
         path = _mklib(tmpdir, "foo", "bar")
         path.write_text(dedent("""
@@ -557,15 +551,15 @@ class TestLibFunctional:
         assert baz.LIBAPI == 2
         assert baz.quux.this == 42
 
-    def test_submodule_absolute(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
-        self._test_submodule(tmp_path, monkeypatch, relative=False)
+    def test_submodule_absolute(self, tmp_path: pathlib.Path):
+        self._test_submodule(tmp_path, relative=False)
 
-    def test_submodule_relative(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
-        self._test_submodule(tmp_path, monkeypatch, relative=True)
+    def test_submodule_relative(self, tmp_path: pathlib.Path):
+        self._test_submodule(tmp_path, relative=True)
 
-    def test_others_found(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    def test_others_found(self, tmp_path: pathlib.Path):
         tmpdir = str(tmp_path)
-        monkeypatch.syspath_prepend(tmpdir)  # type: ignore
+        sys.path = [tmpdir]
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
         LIBNAME = "baz"
