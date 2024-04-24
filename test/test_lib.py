@@ -20,6 +20,7 @@ from importlib.machinery import ModuleSpec
 from pathlib import Path
 from random import shuffle
 from textwrap import dedent
+from unittest.mock import patch
 
 import pytest
 
@@ -384,6 +385,7 @@ class TestLib:
             ops.lib.use('foo', 1, 'example.com')
 
 
+@patch('sys.path', new=())
 class TestLibFunctional:
     def test_use_finds_subs(self, tmp_path: pathlib.Path):
         """Test that ops.lib.use("baz") works when baz is inside a package in the python path."""
