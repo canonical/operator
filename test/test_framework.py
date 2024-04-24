@@ -49,7 +49,7 @@ def create_framework(
     request: pytest.FixtureRequest,
     *,
     model: typing.Optional[ops.Model] = None,
-    tmpdir: typing.Optional[pathlib.Path] = None
+    tmpdir: typing.Optional[pathlib.Path] = None,
 ):
     """Create a Framework object.
 
@@ -1732,7 +1732,7 @@ class TestBreakpoint:
     def test_welcome_message(
         self,
         request: pytest.FixtureRequest,
-        monkeypatch: pytest.MonkeyPatch
+        monkeypatch: pytest.MonkeyPatch,
     ):
         # Check that an initial message is shown to the user when code is interrupted.
         fake_stderr = io.StringIO()
@@ -1746,7 +1746,7 @@ class TestBreakpoint:
     def test_welcome_message_not_multiple(
         self,
         request: pytest.FixtureRequest,
-        monkeypatch: pytest.MonkeyPatch
+        monkeypatch: pytest.MonkeyPatch,
     ):
         # Check that an initial message is NOT shown twice if the breakpoint is exercised
         # twice in the same run.
@@ -1863,7 +1863,7 @@ class TestBreakpoint:
         request: pytest.FixtureRequest,
         envvar_value: str,
         breakpoint_name: typing.Optional[str],
-        call_count: int
+        call_count: int,
     ):
         """Helper to check the diverse combinations of situations."""
         with patch.dict(os.environ, {'JUJU_DEBUG_AT': envvar_value}):
@@ -1887,7 +1887,7 @@ class TestBreakpoint:
     def test_named_indicated_unnamed(
         self,
         request: pytest.FixtureRequest,
-        caplog: pytest.LogCaptureFixture
+        caplog: pytest.LogCaptureFixture,
     ):
         # Some breakpoint was indicated, but the framework call was unnamed
         with caplog.at_level(logging.WARNING):
@@ -1904,7 +1904,7 @@ class TestBreakpoint:
     def test_named_indicated_somethingelse(
         self,
         request: pytest.FixtureRequest,
-        caplog: pytest.LogCaptureFixture
+        caplog: pytest.LogCaptureFixture,
     ):
         # Some breakpoint was indicated, but the framework call was with a different name
         with caplog.at_level(logging.WARNING):
@@ -1980,7 +1980,7 @@ class TestDebugHook:
     def test_interruption_enabled_with_all(
         self,
         request: pytest.FixtureRequest,
-        fake_script: FakeScript
+        fake_script: FakeScript,
     ):
         test_model = create_model()
         framework = create_framework(request, model=test_model)
@@ -2004,7 +2004,7 @@ class TestDebugHook:
     def test_actions_are_interrupted(
         self,
         request: pytest.FixtureRequest,
-        fake_script: FakeScript
+        fake_script: FakeScript,
     ):
         test_model = create_model()
         framework = create_framework(request, model=test_model)
