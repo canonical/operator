@@ -737,8 +737,9 @@ class _TestMain(abc.ABC):
             EventSpec(
                 ops.UpdateStatusEvent,
                 'update-status',
-                set_in_env={
-                    'EMIT_CUSTOM_EVENT': "1"}))
+                set_in_env={'EMIT_CUSTOM_EVENT': "1"}
+            )
+        )
 
         calls = fake_script.calls()
 
