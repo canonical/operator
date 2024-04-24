@@ -3,7 +3,7 @@ import pytest
 from ops import CharmBase, StartEvent, UpdateStatusEvent
 
 from scenario import Context
-from scenario.state import Event, State, _CharmSpec, _EventType
+from scenario.state import State, _CharmSpec, _Event, _EventType
 
 
 @pytest.mark.parametrize(
@@ -29,7 +29,7 @@ from scenario.state import Event, State, _CharmSpec, _EventType
     ),
 )
 def test_event_type(evt, expected_type):
-    event = Event(evt)
+    event = _Event(evt)
     assert event._path.type is expected_type
 
     assert event._is_relation_event is (expected_type is _EventType.relation)
@@ -63,7 +63,7 @@ def test_emitted_framework():
         META = {"name": "joop"}
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
-    ctx.run("update-status", State())
+    ctx.run(ctx.on.update_status(), State())
     assert len(ctx.emitted_events) == 4
     assert list(map(type, ctx.emitted_events)) == [
         ops.UpdateStatusEvent,
@@ -86,7 +86,9 @@ def test_emitted_deferred():
         capture_deferred_events=True,
         capture_framework_events=True,
     )
-    ctx.run("start", State(deferred=[Event("update-status").deferred(MyCharm._foo)]))
+    ctx.run(
+        ctx.on.start(), State(deferred=[_Event("update-status").deferred(MyCharm._foo)])
+    )
 
     assert len(ctx.emitted_events) == 5
     assert [e.handle.kind for e in ctx.emitted_events] == [

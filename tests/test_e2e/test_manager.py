@@ -31,7 +31,7 @@ def mycharm():
 
 def test_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with _EventManager(ctx, "start", State()) as manager:
+    with _EventManager(ctx, ctx.on.start(), State()) as manager:
         assert isinstance(manager.charm, mycharm)
         assert not manager.output
         state_out = manager.run()
@@ -43,7 +43,7 @@ def test_manager(mycharm):
 
 def test_manager_implicit(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with _EventManager(ctx, "start", State()) as manager:
+    with _EventManager(ctx, ctx.on.start(), State()) as manager:
         assert isinstance(manager.charm, mycharm)
         # do not call .run()
 
@@ -55,7 +55,7 @@ def test_manager_implicit(mycharm):
 
 def test_manager_reemit_fails(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with _EventManager(ctx, "start", State()) as manager:
+    with _EventManager(ctx, ctx.on.start(), State()) as manager:
         manager.run()
         with pytest.raises(AlreadyEmittedError):
             manager.run()
@@ -65,7 +65,7 @@ def test_manager_reemit_fails(mycharm):
 
 def test_context_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    with ctx.manager("start", State()) as manager:
+    with ctx.manager(ctx.on.start(), State()) as manager:
         state_out = manager.run()
         assert isinstance(state_out, State)
     assert ctx.emitted_events[0].handle.kind == "start"

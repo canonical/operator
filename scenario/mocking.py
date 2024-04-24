@@ -49,13 +49,13 @@ if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import Container as ContainerSpec
     from scenario.state import (
-        Event,
         ExecOutput,
         Relation,
         Secret,
         State,
         SubordinateRelation,
         _CharmSpec,
+        _Event,
     )
 
 logger = scenario_logger.getChild("mocking")
@@ -102,7 +102,7 @@ class _MockModelBackend(_ModelBackend):
     def __init__(
         self,
         state: "State",
-        event: "Event",
+        event: "_Event",
         charm_spec: "_CharmSpec",
         context: "Context",
     ):
@@ -655,7 +655,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         mounts: Dict[str, Mount],
         *,
         state: "State",
-        event: "Event",
+        event: "_Event",
         charm_spec: "_CharmSpec",
     ):
         self._state = state

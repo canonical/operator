@@ -10,7 +10,6 @@ from scenario.state import (
     CloudSpec,
     Container,
     DeferredEvent,
-    Event,
     ExecOutput,
     Model,
     Mount,
@@ -53,5 +52,4 @@ __all__ = [
     "StoredState",
     "State",
     "DeferredEvent",
-    "Event",
 ]

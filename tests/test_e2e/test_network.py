@@ -41,7 +41,7 @@ def test_ip_get(mycharm):
     )
 
     with ctx.manager(
-        "update_status",
+        ctx.on.update_status(),
         State(
             relations=[
                 Relation(
@@ -78,7 +78,7 @@ def test_no_sub_binding(mycharm):
     )
 
     with ctx.manager(
-        "update_status",
+        ctx.on.update_status(),
         State(
             relations=[
                 SubordinateRelation("bar"),
@@ -103,7 +103,7 @@ def test_no_relation_error(mycharm):
     )
 
     with ctx.manager(
-        "update_status",
+        ctx.on.update_status(),
         State(
             relations=[
                 Relation(

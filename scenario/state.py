@@ -123,10 +123,6 @@ class MetadataNotFoundError(RuntimeError):
     """Raised when Scenario can't find a metadata.yaml file in the provided charm root."""
 
 
-class BindFailedError(RuntimeError):
-    """Raised when Event.bind fails."""
-
-
 @dataclasses.dataclass(frozen=True)
 class CloudCredential:
     auth_type: str
@@ -223,44 +219,6 @@ class Secret:
     description: Optional[str] = None
     expire: Optional[datetime.datetime] = None
     rotate: Optional[SecretRotate] = None
-
-    # consumer-only events
-    @property
-    def changed_event(self):
-        """Sugar to generate a secret-changed event."""
-        if self.owner:
-            raise ValueError(
-                "This unit will never receive secret-changed for a secret it owns.",
-            )
-        return Event("secret_changed", secret=self)
-
-    # owner-only events
-    @property
-    def rotate_event(self):
-        """Sugar to generate a secret-rotate event."""
-        if not self.owner:
-            raise ValueError(
-                "This unit will never receive secret-rotate for a secret it does not own.",
-            )
-        return Event("secret_rotate", secret=self)
-
-    @property
-    def expired_event(self):
-        """Sugar to generate a secret-expired event."""
-        if not self.owner:
-            raise ValueError(
-                "This unit will never receive secret-expired for a secret it does not own.",
-            )
-        return Event("secret_expired", secret=self)
-
-    @property
-    def remove_event(self):
-        """Sugar to generate a secret-remove event."""
-        if not self.owner:
-            raise ValueError(
-                "This unit will never receive secret-remove for a secret it does not own.",
-            )
-        return Event("secret_remove", secret=self)
 
     def _set_revision(self, revision: int):
         """Set a new tracked revision."""
@@ -451,46 +409,6 @@ class _RelationBase:
                     f"all databags should be Dict[str,str]; "
                     f"found a value of type {type(v)}",
                 )
-
-    @property
-    def changed_event(self) -> "Event":
-        """Sugar to generate a <this relation>-relation-changed event."""
-        return Event(
-            path=normalize_name(self.endpoint + "-relation-changed"),
-            relation=cast("AnyRelation", self),
-        )
-
-    @property
-    def joined_event(self) -> "Event":
-        """Sugar to generate a <this relation>-relation-joined event."""
-        return Event(
-            path=normalize_name(self.endpoint + "-relation-joined"),
-            relation=cast("AnyRelation", self),
-        )
-
-    @property
-    def created_event(self) -> "Event":
-        """Sugar to generate a <this relation>-relation-created event."""
-        return Event(
-            path=normalize_name(self.endpoint + "-relation-created"),
-            relation=cast("AnyRelation", self),
-        )
-
-    @property
-    def departed_event(self) -> "Event":
-        """Sugar to generate a <this relation>-relation-departed event."""
-        return Event(
-            path=normalize_name(self.endpoint + "-relation-departed"),
-            relation=cast("AnyRelation", self),
-        )
-
-    @property
-    def broken_event(self) -> "Event":
-        """Sugar to generate a <this relation>-relation-broken event."""
-        return Event(
-            path=normalize_name(self.endpoint + "-relation-broken"),
-            relation=cast("AnyRelation", self),
-        )
 
 
 _DEFAULT_IP = " 192.0.2.0"
@@ -898,16 +816,6 @@ class Container:
         """
         return ctx._get_container_root(self.name)
 
-    @property
-    def pebble_ready_event(self):
-        """Sugar to generate a <this container's name>-pebble-ready event."""
-        if not self.can_connect:
-            logger.warning(
-                "you **can** fire pebble-ready while the container cannot connect, "
-                "but that's most likely not what you want.",
-            )
-        return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
-
     def get_notice(
         self,
         key: str,
@@ -924,7 +832,6 @@ class Container:
         raise KeyError(
             f"{self.name} does not have a notice with key {key} and type {notice_type}",
         )
-
 
 _RawStatusLiteral = Literal[
     "waiting",
@@ -1051,22 +958,6 @@ class Storage:
     def get_filesystem(self, ctx: "Context") -> Path:
         """Simulated filesystem root in this context."""
         return ctx._get_storage_root(self.name, self.index)
-
-    @property
-    def attached_event(self) -> "Event":
-        """Sugar to generate a <this storage>-storage-attached event."""
-        return Event(
-            path=normalize_name(self.name + "-storage-attached"),
-            storage=self,
-        )
-
-    @property
-    def detaching_event(self) -> "Event":
-        """Sugar to generate a <this storage>-storage-detached event."""
-        return Event(
-            path=normalize_name(self.name + "-storage-detaching"),
-            storage=self,
-        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1415,10 +1306,13 @@ class Event:
     relation: Optional["AnyRelation"] = None
     """If this is a relation event, the relation it refers to."""
     relation_remote_unit_id: Optional[int] = None
-    """If this is a relation event, the name of the remote unit the event is about."""
+    relation_departed_unit_id: Optional[int] = None
 
     secret: Optional[Secret] = None
     """If this is a secret event, the secret it refers to."""
+
+    # if this is a secret-removed or secret-expired event, the secret revision it refers to
+    secret_revision: Optional[int] = None
 
     container: Optional[Container] = None
     """If this is a workload (container) event, the container it refers to."""
@@ -1429,20 +1323,7 @@ class Event:
     action: Optional["Action"] = None
     """If this is an action event, the :class:`Action` it refers to."""
 
-    # TODO: add other meta for
-    #  - secret events
-    #  - pebble?
-    #  - action?
-
     _owner_path: List[str] = dataclasses.field(default_factory=list)
-
-    def __call__(self, remote_unit_id: Optional[int] = None) -> "Event":
-        if remote_unit_id and not self._is_relation_event:
-            raise ValueError(
-                "cannot pass param `remote_unit_id` to a "
-                "non-relation event constructor.",
-            )
-        return dataclasses.replace(self, relation_remote_unit_id=remote_unit_id)
 
     def __post_init__(self):
         path = _EventPath(self.path)
@@ -1520,68 +1401,6 @@ class Event:
         # owned by. So the only thing we can do right now is: check whether the event name,
         # assuming it is owned by the charm, LOOKS LIKE that of a builtin event or not.
         return self._path.type is not _EventType.custom
-
-    def bind(self, state: State):
-        """Attach to this event the state component it needs.
-
-        For example, a relation event initialized without a Relation instance will search for
-        a suitable relation in the provided state and return a copy of itself with that
-        relation attached.
-
-        In case of ambiguity (e.g. multiple relations found on 'foo' for event
-        'foo-relation-changed', we pop a warning and bind the first one. Use with care!
-        """
-        entity_name = self._path.prefix
-
-        if self._is_workload_event and not self.container:
-            try:
-                container = state.get_container(entity_name)
-            except ValueError:
-                raise BindFailedError(f"no container found with name {entity_name}")
-            return dataclasses.replace(self, container=container)
-
-        if self._is_secret_event and not self.secret:
-            if len(state.secrets) < 1:
-                raise BindFailedError(f"no secrets found in state: cannot bind {self}")
-            if len(state.secrets) > 1:
-                raise BindFailedError(
-                    f"too many secrets found in state: cannot automatically bind {self}",
-                )
-            return dataclasses.replace(self, secret=state.secrets[0])
-
-        if self._is_storage_event and not self.storage:
-            storages = state.get_storages(entity_name)
-            if len(storages) < 1:
-                raise BindFailedError(
-                    f"no storages called {entity_name} found in state",
-                )
-            if len(storages) > 1:
-                logger.warning(
-                    f"too many storages called {entity_name}: binding to first one",
-                )
-            storage = storages[0]
-            return dataclasses.replace(self, storage=storage)
-
-        if self._is_relation_event and not self.relation:
-            ep_name = entity_name
-            relations = state.get_relations(ep_name)
-            if len(relations) < 1:
-                raise BindFailedError(f"no relations on {ep_name} found in state")
-            if len(relations) > 1:
-                logger.warning(f"too many relations on {ep_name}: binding to first one")
-            return dataclasses.replace(self, relation=relations[0])
-
-        if self._is_action_event and not self.action:
-            raise BindFailedError(
-                "cannot automatically bind action events: if the action has mandatory parameters "
-                "this would probably result in horrible, undebuggable failures downstream.",
-            )
-
-        else:
-            raise BindFailedError(
-                f"cannot bind {self}: only relation, secret, "
-                f"or workload events can be bound.",
-            )
 
     def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
@@ -1682,13 +1501,13 @@ class Action:
     the rare cases where a specific ID is required."""
 
     @property
-    def event(self) -> Event:
+    def event(self) -> _Event:
         """Helper to generate an action event from this action."""
-        return Event(self.name + ACTION_EVENT_SUFFIX, action=self)
+        return _Event(self.name + ACTION_EVENT_SUFFIX, action=self)
 
 
 def deferred(
-    event: Union[str, Event],
+    event: Union[str, _Event],
     handler: Callable,
     event_id: int = 1,
     relation: Optional["Relation"] = None,
@@ -1697,5 +1516,5 @@ def deferred(
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
-        event = Event(event, relation=relation, container=container, notice=notice)
+        event = _Event(event, relation=relation, container=container, notice=notice)
     return event.deferred(handler=handler, event_id=event_id)

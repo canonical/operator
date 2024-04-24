@@ -21,7 +21,7 @@ def test_plugin_ctx_run(pytester):
             return Context(charm_type=MyCharm, meta={"name": "foo"})
         
         def test_sth(context):
-            context.run('start', State())
+            context.run(context.on.start(), State())
     """
     )
 

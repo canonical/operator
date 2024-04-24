@@ -23,13 +23,13 @@ def no_storage_ctx():
 
 
 def test_storage_get_null(no_storage_ctx):
-    with no_storage_ctx.manager("update-status", State()) as mgr:
+    with no_storage_ctx.manager(no_storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         assert not len(storages)
 
 
 def test_storage_get_unknown_name(storage_ctx):
-    with storage_ctx.manager("update-status", State()) as mgr:
+    with storage_ctx.manager(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         # not in metadata
         with pytest.raises(KeyError):
@@ -37,7 +37,7 @@ def test_storage_get_unknown_name(storage_ctx):
 
 
 def test_storage_request_unknown_name(storage_ctx):
-    with storage_ctx.manager("update-status", State()) as mgr:
+    with storage_ctx.manager(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         # not in metadata
         with pytest.raises(ModelError):
@@ -45,7 +45,7 @@ def test_storage_request_unknown_name(storage_ctx):
 
 
 def test_storage_get_some(storage_ctx):
-    with storage_ctx.manager("update-status", State()) as mgr:
+    with storage_ctx.manager(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         # known but none attached
         assert storages["foo"] == []
@@ -53,7 +53,7 @@ def test_storage_get_some(storage_ctx):
 
 @pytest.mark.parametrize("n", (1, 3, 5))
 def test_storage_add(storage_ctx, n):
-    with storage_ctx.manager("update-status", State()) as mgr:
+    with storage_ctx.manager(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         storages.request("foo", n)
 
@@ -65,7 +65,9 @@ def test_storage_usage(storage_ctx):
     # setup storage with some content
     (storage.get_filesystem(storage_ctx) / "myfile.txt").write_text("helloworld")
 
-    with storage_ctx.manager("update-status", State(storage=[storage])) as mgr:
+    with storage_ctx.manager(
+        storage_ctx.on.update_status(), State(storage=[storage])
+    ) as mgr:
         foo = mgr.charm.model.storages["foo"][0]
         loc = foo.location
         path = loc / "myfile.txt"
@@ -83,9 +85,9 @@ def test_storage_usage(storage_ctx):
 
 def test_storage_attached_event(storage_ctx):
     storage = Storage("foo")
-    storage_ctx.run(storage.attached_event, State(storage=[storage]))
+    storage_ctx.run(storage_ctx.on.storage_attached(storage), State(storage=[storage]))
 
 
 def test_storage_detaching_event(storage_ctx):
     storage = Storage("foo")
-    storage_ctx.run(storage.detaching_event, State(storage=[storage]))
+    storage_ctx.run(storage_ctx.on.storage_detaching(storage), State(storage=[storage]))

@@ -5,8 +5,7 @@ from ops.framework import Framework
 
 from scenario import Context
 from scenario.context import InvalidEventError
-from scenario.state import Action, Event, State
-from tests.helpers import trigger
+from scenario.state import Action, State, _Event
 
 
 @pytest.fixture(scope="function")
@@ -63,13 +62,6 @@ def test_cannot_run_action(mycharm):
 
     with pytest.raises(InvalidEventError):
         ctx.run(action, state=State())
-
-
-def test_cannot_run_action_name(mycharm):
-    ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    action = Action("foo")
-    with pytest.raises(InvalidEventError):
-        ctx.run(action.event.name, state=State())
 
 
 def test_cannot_run_action_event(mycharm):

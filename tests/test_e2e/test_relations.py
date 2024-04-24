@@ -5,6 +5,8 @@ from ops.charm import (
     CharmBase,
     CharmEvents,
     CollectStatusEvent,
+    RelationBrokenEvent,
+    RelationCreatedEvent,
     RelationDepartedEvent,
     RelationEvent,
 )
@@ -80,6 +82,7 @@ def test_get_relation(mycharm):
             },
         },
         config={"options": {"foo": {"type": "string"}}},
+        pre_event=pre_event,
     )
 
 
@@ -97,7 +100,7 @@ def test_relation_events(mycharm, evt_name):
                 relation,
             ],
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -141,7 +144,7 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
                 relation,
             ],
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -153,8 +156,14 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
 
 @pytest.mark.parametrize(
-    "evt_name",
-    ("changed", "broken", "departed", "joined", "created"),
+    "evt_name,has_unit",
+    [
+        ("changed", True),
+        ("broken", False),
+        ("departed", True),
+        ("joined", True),
+        ("created", False),
+    ],
 )
 @pytest.mark.parametrize(
     "remote_app_name",
@@ -164,7 +173,9 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
     "remote_unit_id",
     (0, 1),
 )
-def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_id):
+def test_relation_events_attrs(
+    mycharm, evt_name, has_unit, remote_app_name, remote_unit_id
+):
     relation = Relation(
         endpoint="foo", interface="foo", remote_app_name=remote_app_name
     )
@@ -174,20 +185,15 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
             return
 
         assert event.app
-        assert event.unit
+        if not isinstance(event, (RelationCreatedEvent, RelationBrokenEvent)):
+            assert event.unit
         if isinstance(event, RelationDepartedEvent):
             assert event.departing_unit
 
     mycharm._call = callback
 
-    trigger(
-        State(
-            relations=[
-                relation,
-            ],
-        ),
-        getattr(relation, f"{evt_name}_event")(remote_unit_id=remote_unit_id),
-        mycharm,
+    ctx = Context(
+        charm_type=mycharm,
         meta={
             "name": "local",
             "requires": {
@@ -195,6 +201,12 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
             },
         },
     )
+    state = State(relations=[relation])
+    kwargs = {}
+    if has_unit:
+        kwargs["remote_unit"] = remote_unit_id
+    event = getattr(ctx.on, f"relation_{evt_name}")(relation, **kwargs)
+    ctx.run(event, state=state)
 
 
 @pytest.mark.parametrize(
@@ -218,7 +230,11 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
             return
 
         assert event.app  # that's always present
-        assert event.unit
+        # .unit is always None for created and broken.
+        if isinstance(event, (RelationCreatedEvent, RelationBrokenEvent)):
+            assert event.unit is None
+        else:
+            assert event.unit
         assert (evt_name == "departed") is bool(getattr(event, "departing_unit", False))
 
     mycharm._call = callback
@@ -229,7 +245,7 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
                 relation,
             ],
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -239,9 +255,11 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
         },
     )
 
-    assert (
-        "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
-    )
+    if evt_name not in ("created", "broken"):
+        assert (
+            "remote unit ID unset, and multiple remote unit IDs are present"
+            in caplog.text
+        )
 
 
 def test_relation_default_unit_data_regular():
@@ -287,7 +305,7 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
                 relation,
             ],
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -297,7 +315,8 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
         },
     )
 
-    assert "remote unit ID unset; no remote unit data present" in caplog.text
+    if evt_name not in ("created", "broken"):
+        assert "remote unit ID unset; no remote unit data present" in caplog.text
 
 
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
@@ -337,7 +356,7 @@ def test_relation_event_trigger(relation, evt_name, mycharm):
     }
     state = trigger(
         State(relations=[relation]),
-        getattr(relation, evt_name + "_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta=meta,
     )
@@ -370,7 +389,7 @@ def test_trigger_sub_relation(mycharm):
 
     trigger(
         State(relations=[sub1, sub2]),
-        "update-status",
+        "update_status",
         mycharm,
         meta=meta,
         post_event=post_event,
@@ -394,9 +413,10 @@ def test_relation_ids():
 def test_broken_relation_not_in_model_relations(mycharm):
     rel = Relation("foo")
 
-    with Context(
+    ctx = Context(
         mycharm, meta={"name": "local", "requires": {"foo": {"interface": "foo"}}}
-    ).manager(rel.broken_event, state=State(relations=[rel])) as mgr:
+    )
+    with ctx.manager(ctx.on.relation_broken(rel), state=State(relations=[rel])) as mgr:
         charm = mgr.charm
 
         assert charm.model.get_relation("foo") is None

@@ -61,7 +61,7 @@ def test_status_history(mycharm):
         meta={"name": "local"},
     )
 
-    out = ctx.run("update_status", State(leader=True))
+    out = ctx.run(ctx.on.update_status(), State(leader=True))
 
     assert out.unit_status == WaitingStatus("3")
     assert ctx.unit_status_history == [
@@ -94,7 +94,7 @@ def test_status_history_preservation(mycharm):
     )
 
     out = ctx.run(
-        "update_status",
+        ctx.on.update_status(),
         State(
             leader=True,
             unit_status=ActiveStatus("foo"),
@@ -131,9 +131,9 @@ def test_workload_history(mycharm):
         meta={"name": "local"},
     )
 
-    out = ctx.run("install", State(leader=True))
-    out = ctx.run("start", out)
-    out = ctx.run("update_status", out)
+    out = ctx.run(ctx.on.install(), State(leader=True))
+    out = ctx.run(ctx.on.start(), out)
+    out = ctx.run(ctx.on.update_status(), out)
 
     assert ctx.workload_version_history == ["1", "1.1"]
     assert out.workload_version == "1.2"
