@@ -165,7 +165,7 @@ class TestLibParser:
     def _mkmod(
         self,
         request: pytest.FixtureRequest, name: str,
-        content: typing.Optional[str] = None
+        content: typing.Optional[str] = None,
     ) -> ModuleSpec:
         fd, fname = mkstemp(text=True)
         request.addfinalizer(lambda: os.unlink(fname))
@@ -418,7 +418,7 @@ class TestLibFunctional:
         monkeypatch: pytest.MonkeyPatch,
         pkg_a: str,
         lib_a: str,
-        patch_a: int
+        patch_a: int,
     ):
         """Test that ops.lib.use("baz") works when there are two baz in the same toplevel."""
         pkg_b = "foo"
@@ -464,7 +464,7 @@ class TestLibFunctional:
         monkeypatch: pytest.MonkeyPatch,
         pkg_a: str,
         lib_a: str,
-        patch_a: int
+        patch_a: int,
     ):
         """Test that ops.lib.use("baz") works when there are two baz in the different toplevels."""
         pkg_b = "foo"
@@ -531,7 +531,7 @@ class TestLibFunctional:
         tmp_path: pathlib.Path,
         monkeypatch: pytest.MonkeyPatch,
         *,
-        relative: bool = False
+        relative: bool = False,
     ):
         tmpdir = str(tmp_path)
         monkeypatch.syspath_prepend(tmpdir)  # type: ignore
