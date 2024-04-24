@@ -21,9 +21,7 @@ import logging
 import os
 import pathlib
 import re
-import shutil
 import sys
-import tempfile
 import typing
 from pathlib import Path
 from test.test_helpers import FakeScript
@@ -130,7 +128,7 @@ class TestFramework:
         else:
             pytest.fail("exception NoSnapshotError not raised")
 
-    def test_snapshot_roundtrip(self, request: pytest.FixtureRequest):
+    def test_snapshot_roundtrip(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class Foo:
             handle_kind = 'foo'
 
@@ -147,16 +145,13 @@ class TestFramework:
         handle = ops.Handle(None, "a_foo", "some_key")
         event = Foo(handle, 1)
 
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        framework1 = create_framework(request, tmpdir=tmpdir)
+        framework1 = create_framework(request, tmpdir=tmp_path)
         framework1.register_type(Foo, None, handle.kind)
         framework1.save_snapshot(event)  # type: ignore
         framework1.commit()
         framework1.close()
 
-        framework2 = create_framework(request, tmpdir=tmpdir)
+        framework2 = create_framework(request, tmpdir=tmp_path)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
         event2 = typing.cast(Foo, event2)
@@ -173,7 +168,7 @@ class TestFramework:
         framework2.commit()
         framework2.close()
 
-        framework3 = create_framework(request, tmpdir=tmpdir)
+        framework3 = create_framework(request, tmpdir=tmp_path)
         framework3.register_type(Foo, None, handle.kind)
 
         pytest.raises(NoSnapshotError, framework3.load_snapshot, handle)
@@ -316,11 +311,8 @@ class TestFramework:
             framework.observe(pub.baz, obs._on_baz)  # type: ignore
         framework.observe(pub.qux, obs._on_qux)
 
-    def test_on_pre_commit_emitted(self, request: pytest.FixtureRequest):
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        framework = create_framework(request, tmpdir=tmpdir)
+    def test_on_pre_commit_emitted(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
+        framework = create_framework(request, tmpdir=tmp_path)
 
         class PreCommitObserver(ops.Object):
 
@@ -354,7 +346,7 @@ class TestFramework:
         assert obs.seen, [ops.PreCommitEvent, ops.CommitEvent]
         framework.close()
 
-        other_framework = create_framework(request, tmpdir=tmpdir)
+        other_framework = create_framework(request, tmpdir=tmp_path)
 
         new_obs = PreCommitObserver(other_framework, None)
 
@@ -540,11 +532,12 @@ class TestFramework:
         o_copy = MyObject(framework_copy, "path")
         assert o1.handle.path == o_copy.handle.path
 
-    def test_forget_and_multiple_objects_with_load_snapshot(self, request: pytest.FixtureRequest):
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        framework = create_framework(request, tmpdir=tmpdir)
+    def test_forget_and_multiple_objects_with_load_snapshot(
+        self,
+        request: pytest.FixtureRequest,
+        tmp_path: pathlib.Path,
+    ):
+        framework = create_framework(request, tmpdir=tmp_path)
 
         class MyObject(ops.Object):
             def __init__(self, parent: ops.Object, name: str):
@@ -579,11 +572,11 @@ class TestFramework:
             MyObject(framework, "path")
         framework.close()
         # But we can create an object, or load a snapshot in a copy of the framework
-        framework_copy1 = create_framework(request, tmpdir=tmpdir)
+        framework_copy1 = create_framework(request, tmpdir=tmp_path)
         o_copy1 = MyObject(framework_copy1, "path")
         assert o_copy1.value == "path"
         framework_copy1.close()
-        framework_copy2 = create_framework(request, tmpdir=tmpdir)
+        framework_copy2 = create_framework(request, tmpdir=tmp_path)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
         o_copy2 = typing.cast(MyObject, o_copy2)
@@ -814,7 +807,7 @@ class TestFramework:
         with pytest.raises(RuntimeError):
             pub.on_a.define_event("foo", MyFoo)
 
-    def test_event_key_roundtrip(self, request: pytest.FixtureRequest):
+    def test_event_key_roundtrip(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class MyEvent(ops.EventBase):
             def __init__(self, handle: ops.Handle, value: typing.Any):
                 super().__init__(handle)
@@ -843,10 +836,7 @@ class TestFramework:
                     event.defer()
                     MyObserver.has_deferred = True
 
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        framework1 = create_framework(request, tmpdir=tmpdir)
+        framework1 = create_framework(request, tmpdir=tmp_path)
         pub1 = MyNotifier(framework1, "pub")
         obs1 = MyObserver(framework1, "obs")
         framework1.observe(pub1.foo, obs1._on_foo)
@@ -857,7 +847,7 @@ class TestFramework:
         framework1.close()
         del framework1
 
-        framework2 = create_framework(request, tmpdir=tmpdir)
+        framework2 = create_framework(request, tmpdir=tmp_path)
         pub2 = MyNotifier(framework2, "pub")
         obs2 = MyObserver(framework2, "obs")
         framework2.observe(pub2.foo, obs2._on_foo)
@@ -878,13 +868,14 @@ class TestFramework:
         my_obj = ops.Object(framework, 'my_obj')
         assert my_obj.model == framework.model
 
-    def test_ban_concurrent_frameworks(self, request: pytest.FixtureRequest):
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        f = create_framework(request, tmpdir=tmpdir)
+    def test_ban_concurrent_frameworks(
+        self,
+        request: pytest.FixtureRequest,
+        tmp_path: pathlib.Path,
+    ):
+        f = create_framework(request, tmpdir=tmp_path)
         with pytest.raises(Exception) as excinfo:
-            create_framework(request, tmpdir=tmpdir)
+            create_framework(request, tmpdir=tmp_path)
         assert 'database is locked' in str(excinfo.value)
         f.close()
 
@@ -1072,22 +1063,22 @@ class TestStoredState:
         assert repr(ops.StoredSet(None, set())) == 'ops.framework.StoredSet()'  # type: ignore
         assert repr(ops.StoredSet(None, {1})) == 'ops.framework.StoredSet({1})'  # type: ignore
 
-    def test_basic_state_storage(self, request: pytest.FixtureRequest):
+    def test_basic_state_storage(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
-        self._stored_state_tests(request, SomeObject)
+        self._stored_state_tests(request, tmp_path, SomeObject)
 
-    def test_straight_subclass(self, request: pytest.FixtureRequest):
+    def test_straight_subclass(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
         class Sub(SomeObject):
             pass
 
-        self._stored_state_tests(request, Sub)
+        self._stored_state_tests(request, tmp_path, Sub)
 
-    def test_straight_sub_subclass(self, request: pytest.FixtureRequest):
+    def test_straight_sub_subclass(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
@@ -1097,9 +1088,9 @@ class TestStoredState:
         class SubSub(Sub):
             pass
 
-        self._stored_state_tests(request, SubSub)
+        self._stored_state_tests(request, tmp_path, SubSub)
 
-    def test_two_subclasses(self, request: pytest.FixtureRequest):
+    def test_two_subclasses(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class SomeObject(ops.Object):
             _stored = ops.StoredState()
 
@@ -1109,10 +1100,10 @@ class TestStoredState:
         class SubB(SomeObject):
             pass
 
-        self._stored_state_tests(request, SubA)
-        self._stored_state_tests(request, SubB)
+        self._stored_state_tests(request, tmp_path, SubA)
+        self._stored_state_tests(request, tmp_path, SubB)
 
-    def test_the_crazy_thing(self, request: pytest.FixtureRequest):
+    def test_the_crazy_thing(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class NoState(ops.Object):
             pass
 
@@ -1125,17 +1116,19 @@ class TestStoredState:
         class FinalChild(StatedObject, Sibling):
             pass
 
-        self._stored_state_tests(request, FinalChild)
+        self._stored_state_tests(request, tmp_path, FinalChild)
 
-    def _stored_state_tests(self, request: pytest.FixtureRequest, cls: typing.Type[ops.Object]):
+    def _stored_state_tests(
+        self,
+        request: pytest.FixtureRequest,
+        tmp_path: pathlib.Path,
+        cls: typing.Type[ops.Object],
+    ):
         @typing.runtime_checkable
         class _StoredProtocol(typing.Protocol):
             _stored: ops.StoredState
 
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        framework = create_framework(request, tmpdir=tmpdir)
+        framework = create_framework(request, tmpdir=tmp_path)
         obj = cls(framework, "1")
         assert isinstance(obj, _StoredProtocol)
 
@@ -1169,7 +1162,7 @@ class TestStoredState:
         framework.close()
 
         # Since this has the same absolute object handle, it will get its state back.
-        framework_copy = create_framework(request, tmpdir=tmpdir)
+        framework_copy = create_framework(request, tmpdir=tmp_path)
         obj_copy = cls(framework_copy, "1")
         assert isinstance(obj_copy, _StoredProtocol)
         assert obj_copy._stored.foo == 42
@@ -1179,7 +1172,11 @@ class TestStoredState:
 
         framework_copy.close()
 
-    def test_two_subclasses_no_conflicts(self, request: pytest.FixtureRequest):
+    def test_two_subclasses_no_conflicts(
+        self,
+        request: pytest.FixtureRequest,
+        tmp_path: pathlib.Path,
+    ):
         class Base(ops.Object):
             _stored = ops.StoredState()
 
@@ -1189,10 +1186,7 @@ class TestStoredState:
         class SubB(Base):
             pass
 
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
-        framework = create_framework(request, tmpdir=tmpdir)
+        framework = create_framework(request, tmpdir=tmp_path)
         a = SubA(framework, None)
         b = SubB(framework, None)
         z = Base(framework, None)
@@ -1204,7 +1198,7 @@ class TestStoredState:
         framework.commit()
         framework.close()
 
-        framework2 = create_framework(request, tmpdir=tmpdir)
+        framework2 = create_framework(request, tmpdir=tmp_path)
         a2 = SubA(framework2, None)
         b2 = SubB(framework2, None)
         z2 = Base(framework2, None)
@@ -1278,7 +1272,7 @@ class TestStoredState:
 
         framework.commit()
 
-    def test_mutable_types(self, request: pytest.FixtureRequest):
+    def test_mutable_types(self, tmp_path: pathlib.Path):
         def _assert_equal(a: typing.Any, b: typing.Any):
             assert a == b
 
@@ -1455,13 +1449,10 @@ class TestStoredState:
                     self.snapshots.append((type(value), value.snapshot()))
                 return super().save_snapshot(value)
 
-        tmpdir = Path(tempfile.mkdtemp())
-        request.addfinalizer(lambda: shutil.rmtree(tmpdir))
-
         # Validate correctness of modification operations.
         for get_a, b, expected_res, op, validate_op in test_operations:
-            storage = SQLiteStorage(tmpdir / "framework.data")
-            framework = WrappedFramework(storage, tmpdir, None, None, "foo")  # type: ignore
+            storage = SQLiteStorage(tmp_path / "framework.data")
+            framework = WrappedFramework(storage, tmp_path, None, None, "foo")  # type: ignore
             obj = SomeObject(framework, '1')
 
             obj._stored.a = get_a()
@@ -1486,9 +1477,9 @@ class TestStoredState:
             framework.commit()
             framework.close()
 
-            storage_copy = SQLiteStorage(tmpdir / "framework.data")
+            storage_copy = SQLiteStorage(tmp_path / "framework.data")
             framework_copy = WrappedFramework(
-                storage_copy, tmpdir, None, None, "foo")  # type: ignore
+                storage_copy, tmp_path, None, None, "foo")  # type: ignore
 
             obj_copy2 = SomeObject(framework_copy, '1')
 
