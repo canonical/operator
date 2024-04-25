@@ -282,8 +282,11 @@ class TestModel(unittest.TestCase):
             app_data={"app": "data"},
             unit_data={"unit": "data"}
         )
-        self.harness.add_relation_unit(relation_id, 'remoteapp/1', data={"some": "other"})
-        self.harness.add_relation_unit(relation_id, 'remoteapp/2', data={"some": "yams"})
+        self.harness.add_relation_unit(relation_id, 'remoteapp/1')
+        self.harness.add_relation_unit(relation_id, 'remoteapp/2')
+
+        self.harness.update_relation_data(relation_id, "remoteapp/1", {"some": "other"})
+        self.harness.update_relation_data(relation_id, "remoteapp/2", {"some": "yams"})
 
         rel_db1 = self.ensure_relation('db1')
 
