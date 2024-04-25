@@ -33,7 +33,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops._private import yaml
-from ops.model import _ModelBackend
+from ops.model import Unit, _ModelBackend
 
 
 class TestModel(unittest.TestCase):
@@ -276,7 +276,7 @@ class TestModel(unittest.TestCase):
             ('relation_get', relation_id, 'remoteapp1', True),
         ])
 
-    def test_remote_units_get_from_div_app(self):
+    def test_remote_units_data(self):
         relation_id = self.harness.add_relation(
             'db1', 'remoteapp',
             app_data={"app": "data"},
@@ -288,9 +288,11 @@ class TestModel(unittest.TestCase):
         rel_db1 = self.ensure_relation('db1')
 
         remoteapp = rel_db1.app
-        assert rel_db1.data[remoteapp / 0]['unit'] == 'data'
-        assert rel_db1.data[remoteapp / 1]['some'] == 'other'
-        assert rel_db1.data[remoteapp / 2]['some'] == 'yams'
+        u1 = remoteapp._cache.get(Unit, 'remoteapp/1')
+        u2 = remoteapp._cache.get(Unit, 'remoteapp/2')
+        assert rel_db1.data[remoteapp]['unit'] == 'data'
+        assert rel_db1.data[u1]['some'] == 'other'
+        assert rel_db1.data[u2]['some'] == 'yams'
 
     def test_relation_data_modify_remote(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
