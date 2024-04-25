@@ -472,6 +472,10 @@ class Application:
             owner='application')
         return Secret(self._backend, id=id, label=label, content=content)
 
+    def __truediv__(self, other: int) -> "Unit":
+        """Syntactic sugar for generating unit pointers from Application objects."""
+        return self._cache.get(Unit, f"{self.name}/{other}")
+
 
 def _calculate_expiry(expire: Optional[Union[datetime.datetime, datetime.timedelta]],
                       ) -> Optional[datetime.datetime]:

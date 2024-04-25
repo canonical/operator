@@ -971,7 +971,8 @@ class Harness(Generic[CharmType]):
         app = self._model.get_app(remote_app)
         self._charm.on[relation_name].relation_broken.emit(relation, app)
 
-    def add_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
+    def add_relation_unit(self, relation_id: int, remote_unit_name: str,
+                          data: Optional[Mapping[str, str]] = None) -> None:
         """Add a new unit to a relation.
 
         This will trigger a `relation_joined` event. This would naturally be
@@ -992,6 +993,7 @@ class Harness(Generic[CharmType]):
         Args:
             relation_id: The integer relation identifier (as returned by :meth:`add_relation`).
             remote_unit_name: A string representing the remote unit that is being added.
+            data: A str:str mapping to put in the unit's databag.
         """
         self._backend._relation_list_map[relation_id].append(remote_unit_name)
         # we can write remote unit data iff we are not in a hook env
@@ -1024,6 +1026,9 @@ class Harness(Generic[CharmType]):
             return
         self._charm.on[relation_name].relation_joined.emit(
             relation, remote_unit.app, remote_unit)
+
+        if data is not None:
+            self.update_relation_data(relation_id, remote_unit_name, data)
 
     def remove_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Remove a unit from a relation.

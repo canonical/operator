@@ -276,6 +276,22 @@ class TestModel(unittest.TestCase):
             ('relation_get', relation_id, 'remoteapp1', True),
         ])
 
+    def test_remote_units_get_from_div_app(self):
+        relation_id = self.harness.add_relation(
+            'db1', 'remoteapp',
+            app_data={"app": "data"},
+            unit_data={"unit": "data"}
+        )
+        self.harness.add_relation_unit(relation_id, 'remoteapp/1', data={"some": "other"})
+        self.harness.add_relation_unit(relation_id, 'remoteapp/2', data={"some": "yams"})
+
+        rel_db1 = self.ensure_relation('db1')
+
+        remoteapp = rel_db1.app
+        assert rel_db1.data[remoteapp / 0]['unit'] == 'data'
+        assert rel_db1.data[remoteapp / 1]['some'] == 'other'
+        assert rel_db1.data[remoteapp / 2]['some'] == 'yams'
+
     def test_relation_data_modify_remote(self):
         relation_id = self.harness.add_relation('db1', 'remoteapp1')
         with self.harness._event_context('foo_event'):
