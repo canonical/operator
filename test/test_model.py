@@ -186,16 +186,20 @@ class TestModel:
             ('relation_remote_app_name', 2),
         ])
 
-    def test_peer_relation_app(self,
-                               harness: ops.testing.Harness[ops.CharmBase],
-                               model: ops.Model):
+    def test_peer_relation_app(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         harness.add_relation('db2', 'myapp')
         rel_dbpeer = self.ensure_relation(model, 'db2')
         assert rel_dbpeer.app is model.app
 
-    def test_remote_units_is_our(self,
-                                 harness: ops.testing.Harness[ops.CharmBase],
-                                 model: ops.Model):
+    def test_remote_units_is_our(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         harness.add_relation_unit(relation_id, 'remoteapp1/1')
@@ -246,9 +250,11 @@ class TestModel:
                 relation_id, harness.model.app) == harness.get_relation_data(
                 relation_id, local_app) == {'foo': 'bar'}
 
-    def test_unit_relation_data(self,
-                                harness: ops.testing.Harness[ops.CharmBase],
-                                model: ops.Model):
+    def test_unit_relation_data(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         with harness._event_context('foo_event'):
@@ -273,9 +279,11 @@ class TestModel:
             ('relation_get', relation_id, 'remoteapp1/0', False),
         ])
 
-    def test_remote_app_relation_data(self,
-                                      harness: ops.testing.Harness[ops.CharmBase],
-                                      model: ops.Model):
+    def test_remote_app_relation_data(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'remoteapp1',
@@ -302,9 +310,11 @@ class TestModel:
             ('relation_get', relation_id, 'remoteapp1', True),
         ])
 
-    def test_relation_data_modify_remote(self,
-                                         harness: ops.testing.Harness[ops.CharmBase],
-                                         model: ops.Model):
+    def test_relation_data_modify_remote(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'remoteapp1',
@@ -342,9 +352,11 @@ class TestModel:
              "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}, "
              "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}}")
 
-    def test_relation_data_modify_our(self,
-                                      harness: ops.testing.Harness[ops.CharmBase],
-                                      model: ops.Model):
+    def test_relation_data_modify_our(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
 
         harness.update_relation_data(relation_id, 'myapp/0', {'host': 'nothing'})
@@ -365,7 +377,10 @@ class TestModel:
         ])
 
     def test_app_relation_data_modify_local_as_leader(
-            self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'myapp', {'password': 'deadbeefcafe'})
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
@@ -381,14 +396,18 @@ class TestModel:
 
         assert rel_db1.data[local_app]['password'] == 'foo'
 
-        self.assertBackendCalls(harness,
-                                [('relation_ids', 'db1'),
-                                 ('relation_list', 0),
-                                    ('relation_get', 0, 'myapp', True),
-                                    ('update_relation_data', 0, model.app, 'password', 'foo')])
+        self.assertBackendCalls(harness, [
+            ('relation_ids', 'db1'),
+            ('relation_list', 0),
+            ('relation_get', 0, 'myapp', True),
+            ('update_relation_data', 0, model.app, 'password', 'foo')
+        ])
 
     def test_app_relation_data_modify_local_as_minion(
-            self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'myapp', {'password': 'deadbeefcafe'})
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
@@ -405,10 +424,12 @@ class TestModel:
             with pytest.raises(ops.RelationDataError):
                 rel_db1.data[local_app]['password'] = 'foobar'
 
-        self.assertBackendCalls(harness, [('relation_ids', 'db1'),
-                                          ('relation_list', 0),
-                                          ('relation_get', 0, 'myapp', True),
-                                          ('is_leader',)])
+        self.assertBackendCalls(harness, [
+            ('relation_ids', 'db1'),
+            ('relation_list', 0),
+            ('relation_get', 0, 'myapp', True),
+            ('is_leader',)
+        ])
 
     def test_relation_data_access_peer_leader(self, harness: ops.testing.Harness[ops.CharmBase]):
         r_id = harness.add_relation('db2', 'myapp')
@@ -432,9 +453,11 @@ class TestModel:
             assert relation is not None and relation.app is not None
             assert relation.data[relation.app]['foo'] == 'bar'
 
-    def test_relation_data_del_key(self,
-                                   harness: ops.testing.Harness[ops.CharmBase],
-                                   model: ops.Model):
+    def test_relation_data_del_key(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
@@ -456,7 +479,10 @@ class TestModel:
         ])
 
     def test_relation_data_del_missing_key(
-            self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
@@ -480,9 +506,11 @@ class TestModel:
             ('update_relation_data', relation_id, model.unit, 'port', ''),
         ])
 
-    def test_relation_set_fail(self,
-                               harness: ops.testing.Harness[ops.CharmBase],
-                               model: ops.Model):
+    def test_relation_set_fail(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})
@@ -496,12 +524,14 @@ class TestModel:
         #       for us to properly test the side effects of relation-set failing.
 
         def broken_update_relation_data(
-                relation_id: int,
-                entity: typing.Union[ops.Unit, ops.Application],
-                key: str,
-                value: str):
+            relation_id: int,
+            entity: typing.Union[ops.Unit, ops.Application],
+            key: str,
+            value: str,
+        ):
             backend._calls.append(('update_relation_data', relation_id, entity, key, value))
             raise ops.ModelError()
+
         backend.update_relation_data = broken_update_relation_data
 
         rel_db1 = self.ensure_relation(model, 'db1')
@@ -524,9 +554,11 @@ class TestModel:
             ('update_relation_data', relation_id, model.unit, 'host', ''),
         ])
 
-    def test_relation_data_type_check(self,
-                                      harness: ops.testing.Harness[ops.CharmBase],
-                                      model: ops.Model):
+    def test_relation_data_type_check(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
@@ -534,14 +566,14 @@ class TestModel:
 
         rel_db1 = self.ensure_relation(model, 'db1')
         for key, value in (
-                ('foo', 1),
-                ('foo', None),
-                ('foo', {'foo': 'bar'}),
-                (1, 'foo'),
-                (None, 'foo'),
-                (('foo', 'bar'), 'foo'),
-                (1, 1),
-                (None, None)
+            ('foo', 1),
+            ('foo', None),
+            ('foo', {'foo': 'bar'}),
+            (1, 'foo'),
+            (None, 'foo'),
+            (('foo', 'bar'), 'foo'),
+            (1, 1),
+            (None, None)
         ):
             with pytest.raises(ops.RelationDataError):
                 with harness.framework._event_context('foo_event'):
@@ -557,16 +589,16 @@ class TestModel:
         ])
 
     def test_relation_local_app_data_readability_leader(
-            self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
-        harness.update_relation_data(relation_id, 'remoteapp1',
-                                     {'secret': 'cafedeadbeef'})
-        harness.update_relation_data(relation_id, 'myapp',
-                                     {'local': 'data'})
+        harness.update_relation_data(relation_id, 'remoteapp1', {'secret': 'cafedeadbeef'})
+        harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
 
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
-        harness.update_relation_data(relation_id, 'remoteapp1/0',
-                                     {'host': 'remoteapp1/0'})
+        harness.update_relation_data(relation_id, 'remoteapp1/0', {'host': 'remoteapp1/0'})
         model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
 
@@ -588,8 +620,10 @@ class TestModel:
 
             assert rel_db1.data[local_app]['local'] == 'data'
 
-            self.assertBackendCalls(harness, [('is_leader',),
-                                              ('relation_get', 0, 'myapp', True)])
+            self.assertBackendCalls(harness, [
+                ('is_leader',),
+                ('relation_get', 0, 'myapp', True)
+            ])
 
             self.resetBackendCalls(harness)
 
@@ -602,17 +636,17 @@ class TestModel:
             assert isinstance(repr(rel_db1.data), str)
 
     def test_relation_local_app_data_readability_follower(
-            self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
-            harness.update_relation_data(relation_id, 'remoteapp1',
-                                         {'secret': 'cafedeadbeef'})
-            harness.update_relation_data(relation_id, 'myapp',
-                                         {'local': 'data'})
+            harness.update_relation_data(relation_id, 'remoteapp1', {'secret': 'cafedeadbeef'})
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
 
             harness.add_relation_unit(relation_id, 'remoteapp1/0')
-            harness.update_relation_data(relation_id, 'remoteapp1/0',
-                                         {'host': 'remoteapp1/0'})
+            harness.update_relation_data(relation_id, 'remoteapp1/0', {'host': 'remoteapp1/0'})
         model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
 
@@ -650,9 +684,11 @@ class TestModel:
                 ('relation_get', 0, 'remoteapp1', True)]
             self.assertBackendCalls(harness, expected_backend_calls)
 
-    def test_relation_no_units(self,
-                               harness: ops.testing.Harness[ops.CharmBase],
-                               model: ops.Model):
+    def test_relation_no_units(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         harness.add_relation('db1', 'remoteapp1')
         rel = self.ensure_relation(model, 'db1')
         assert rel.units == set()
@@ -665,8 +701,13 @@ class TestModel:
 
     def test_config(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
         harness._get_backend_calls(reset=True)
-        harness.update_config({'foo': 'foo', 'bar': 1, 'qux': True,
-                               'baz': 3.1, 'secretfoo': 'secret:1234'})
+        harness.update_config({
+            'foo': 'foo',
+            'bar': 1,
+            'qux': True,
+            'baz': 3.1,
+            'secretfoo': 'secret:1234'
+        })
         assert model.config == {
             'foo': 'foo',
             'bar': 1,
@@ -719,9 +760,11 @@ class TestModel:
             ('application_version_set', '1.2.3'),
         ])
 
-    def test_workload_version_invalid(self,
-                                      harness: ops.testing.Harness[ops.CharmBase],
-                                      model: ops.Model):
+    def test_workload_version_invalid(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        model: ops.Model,
+    ):
         with pytest.raises(TypeError) as excinfo:
             model.unit.set_workload_version(5)  # type: ignore
         assert str(excinfo.value) == "workload version must be a str, not int: 5"
@@ -740,9 +783,7 @@ class TestModel:
         assert harness.model.resources.fetch('foo').name == 'foo.txt'
         assert harness.model.resources.fetch('bar').name == 'bar.txt'
 
-    def test_resources_immutable(self,
-                                 harness: ops.testing.Harness[ops.CharmBase],
-                                 model: ops.Model):
+    def test_resources_immutable(self, model: ops.Model):
         with pytest.raises(AttributeError):
             model.resources = object()  # type: ignore
 
@@ -759,7 +800,7 @@ class TestModel:
         with pytest.raises(ops.ModelError):
             harness.model.pod.set_spec({'foo': 'bar'})
 
-    def test_pod_immutable(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+    def test_pod_immutable(self, model: ops.Model):
         with pytest.raises(AttributeError):
             model.pod = object()  # type: ignore
 
@@ -900,8 +941,12 @@ class TestModel:
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         harness.add_relation_unit(relation_id, 'remoteapp1/1')
-        remote_unit = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                  self.ensure_relation(model, 'db1').units))
+        remote_unit = next(
+            filter(
+                lambda u: u.name == 'remoteapp1/0',
+                self.ensure_relation(model, 'db1').units
+            )
+        )
         self.resetBackendCalls(harness)
 
         # Remote unit status is always unknown.
@@ -1066,7 +1111,7 @@ class PushPullCase:
         dst: typing.Optional[str] = None,
         errors: typing.Optional[typing.Set[str]] = None,
         dirs: typing.Optional[typing.Set[str]] = None,
-        want_dirs: typing.Optional[typing.Set[str]] = None
+        want_dirs: typing.Optional[typing.Set[str]] = None,
     ):
         self.pattern = None
         self.dst = dst
@@ -1437,10 +1482,12 @@ class TestApplication:
         assert s
         assert 'baz' in c.get_services()
 
-    def test_planned_units(self,
-                           harness: ops.testing.Harness[ops.CharmBase],
-                           app: ops.Application,
-                           peer_rel_id: int):
+    def test_planned_units(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        app: ops.Application,
+        peer_rel_id: int,
+    ):
         # Test that we always count ourself.
         assert app.planned_units() == 1
 
@@ -1458,10 +1505,11 @@ class TestApplication:
 
         assert app.planned_units() == 3
 
-    def test_planned_units_user_set(self,
-                                    harness: ops.testing.Harness[ops.CharmBase],
-                                    app: ops.Application):
-
+    def test_planned_units_user_set(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        app: ops.Application,
+    ):
         harness.set_planned_units(1)
         assert app.planned_units() == 1
 
@@ -1471,9 +1519,11 @@ class TestApplication:
         harness.set_planned_units(100)
         assert app.planned_units() == 100
 
-    def test_planned_units_garbage_values(self,
-                                          harness: ops.testing.Harness[ops.CharmBase],
-                                          app: ops.Application):
+    def test_planned_units_garbage_values(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        app: ops.Application,
+    ):
         # Planned units should be a positive integer, or zero.
         with pytest.raises(TypeError):
             harness.set_planned_units(-1)
@@ -1488,10 +1538,12 @@ class TestApplication:
         with pytest.raises(TypeError):
             harness.set_planned_units(-3423000102312321090)
 
-    def test_planned_units_override(self,
-                                    harness: ops.testing.Harness[ops.CharmBase],
-                                    app: ops.Application,
-                                    peer_rel_id: int):
+    def test_planned_units_override(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        app: ops.Application,
+        peer_rel_id: int,
+    ):
         """Verify that we override the calculated value of planned_units when we set it manually.
 
         When a charm author writes a test that explicitly calls set_planned_units, we assume that
@@ -1761,9 +1813,10 @@ containers:
         ]
 
     def test_restart_fallback_non_400_error(
-            self,
-            container: ops.Container,
-            container_pebble: MockPebbleClient):
+        self,
+        container: ops.Container,
+        container_pebble: MockPebbleClient,
+    ):
         def restart_services(service_names: str):
             raise pebble.APIError({}, 500, "", "")
 
@@ -2037,16 +2090,20 @@ containers:
             ('remove_path', '/path/2', True),
         ]
 
-    def test_can_connect_simple(self, container: ops.Container,
-                                container_pebble: MockPebbleClient):
+    def test_can_connect_simple(
+        self,
+        container: ops.Container,
+        container_pebble: MockPebbleClient,
+    ):
         container_pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))
         assert container.can_connect()
 
     def test_can_connect_connection_error(
-            self,
-            caplog: pytest.LogCaptureFixture,
-            container: ops.Container,
-            container_pebble: MockPebbleClient):
+        self,
+        caplog: pytest.LogCaptureFixture,
+        container: ops.Container,
+        container_pebble: MockPebbleClient,
+    ):
         def raise_error():
             raise pebble.ConnectionError('connection error!')
         container_pebble.get_system_info = raise_error
@@ -2056,10 +2113,11 @@ containers:
         assert re.search(r'connection error!', caplog.text)
 
     def test_can_connect_file_not_found_error(
-            self,
-            caplog: pytest.LogCaptureFixture,
-            container: ops.Container,
-            container_pebble: MockPebbleClient):
+        self,
+        caplog: pytest.LogCaptureFixture,
+        container: ops.Container,
+        container_pebble: MockPebbleClient,
+    ):
         def raise_error():
             raise FileNotFoundError('file not found!')
         container_pebble.get_system_info = raise_error
@@ -2069,10 +2127,11 @@ containers:
         assert re.search(r'file not found!', caplog.text)
 
     def test_can_connect_api_error(
-            self,
-            caplog: pytest.LogCaptureFixture,
-            container: ops.Container,
-            container_pebble: MockPebbleClient):
+        self,
+        caplog: pytest.LogCaptureFixture,
+        container: ops.Container,
+        container_pebble: MockPebbleClient,
+    ):
         def raise_error():
             raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
         container_pebble.get_system_info = raise_error
@@ -2163,8 +2222,11 @@ containers:
             ('get_notice', '123'),
         ]
 
-    def test_get_notice_not_found(self, container: ops.Container,
-                                  container_pebble: MockPebbleClient):
+    def test_get_notice_not_found(
+        self,
+        container: ops.Container,
+        container_pebble: MockPebbleClient,
+    ):
         def raise_error(id: str):
             raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
         container_pebble.get_notice = raise_error
@@ -2277,8 +2339,12 @@ class TestModelBindings:
 }'''
         return model
 
-    def ensure_relation(self, model: ops.Model, name: str = 'db1',
-                        relation_id: typing.Optional[int] = None):
+    def ensure_relation(
+        self,
+        model: ops.Model,
+        name: str = 'db1',
+        relation_id: typing.Optional[int] = None
+    ):
         """Wrapper around self.model.get_relation that enforces that None is not returned."""
         rel_db1 = model.get_relation(name, relation_id)
         assert rel_db1 is not None, rel_db1  # Type checkers don't understand `assertIsNotNone`
@@ -2296,27 +2362,31 @@ class TestModelBindings:
         assert binding.network.bind_address == ipaddress.ip_address('192.0.2.2')
         assert binding.network.ingress_address == ipaddress.ip_address('192.0.2.2')
         # /32 and /128 CIDRs are valid one-address networks for IPv{4,6}Network types respectively.
-        assert binding.network.egress_subnets == [ipaddress.ip_network('192.0.2.2/32'),
-                                                  ipaddress.ip_network('192.0.3.0/24'),
-                                                  ipaddress.ip_network('dead:beef::/64'),
-                                                  ipaddress.ip_network('2001:db8::3/128')]
+        assert binding.network.egress_subnets == [
+            ipaddress.ip_network('192.0.2.2/32'),
+            ipaddress.ip_network('192.0.3.0/24'),
+            ipaddress.ip_network('dead:beef::/64'),
+            ipaddress.ip_network('2001:db8::3/128')
+        ]
 
         for (i, (name, address, subnet)) in enumerate([
-                ('lo', '192.0.2.2', '192.0.2.0/24'),
-                ('lo', 'dead:beef::1', 'dead:beef::/64'),
-                ('tun', '192.0.3.3', '192.0.3.3/32'),
-                ('tun', '2001:db8::3', '2001:db8::3/128'),
-                ('tun', 'fe80::1:1', 'fe80::/64')]):
+            ('lo', '192.0.2.2', '192.0.2.0/24'),
+            ('lo', 'dead:beef::1', 'dead:beef::/64'),
+            ('tun', '192.0.3.3', '192.0.3.3/32'),
+            ('tun', '2001:db8::3', '2001:db8::3/128'),
+            ('tun', 'fe80::1:1', 'fe80::/64')
+        ]):
             assert binding.network.interfaces[i].name == name
             assert binding.network.interfaces[i].address == ipaddress.ip_address(address)
             assert binding.network.interfaces[i].subnet == ipaddress.ip_network(subnet)
 
         for (i, (name, address, subnet)) in enumerate([
-                ('lo', '192.0.2.2', '192.0.2.0/24'),
-                ('lo', 'dead:beef::1', 'dead:beef::/64'),
-                ('tun', '192.0.3.3', '192.0.3.3/32'),
-                ('tun', '2001:db8::3', '2001:db8::3/128'),
-                ('tun', 'fe80::1:1', 'fe80::/64')]):
+            ('lo', '192.0.2.2', '192.0.2.0/24'),
+            ('lo', 'dead:beef::1', 'dead:beef::/64'),
+            ('tun', '192.0.3.3', '192.0.3.3/32'),
+            ('tun', '2001:db8::3', '2001:db8::3/128'),
+            ('tun', 'fe80::1:1', 'fe80::/64')
+        ]):
             assert binding.network.interfaces[i].name == name
             assert binding.network.interfaces[i].address == ipaddress.ip_address(address)
             assert binding.network.interfaces[i].subnet == ipaddress.ip_network(subnet)
@@ -2618,10 +2688,11 @@ class TestModelBackend:
 
     @pytest.mark.parametrize("version", ['2.8.0', '2.7.0'])
     def test_relation_get_juju_version_quirks(
-            self,
-            fake_script: FakeScript,
-            monkeypatch: pytest.MonkeyPatch,
-            version: str):
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        version: str,
+    ):
         fake_script.write('relation-get', '''echo '{"foo": "bar"}' ''')
 
         # on 2.7.0+, things proceed as expected
@@ -2639,10 +2710,11 @@ class TestModelBackend:
 
     @pytest.mark.parametrize("version", ['2.8.0', '2.7.0'])
     def test_relation_set_juju_version_quirks(
-            self,
-            fake_script: FakeScript,
-            monkeypatch: pytest.MonkeyPatch,
-            version: str):
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        version: str,
+    ):
         # on 2.7.0+, things proceed as expected
         t = tempfile.NamedTemporaryFile()
         try:
@@ -3167,8 +3239,9 @@ class TestSecrets:
         assert secret.id == 'secret:123'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-add', '--owner', 'application', 'foo=x']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-add', '--owner', 'application', 'foo=x']
+        ]
 
     def test_app_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:234')
@@ -3193,15 +3266,21 @@ class TestSecrets:
         assert secret.id == 'secret:345'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-add', '--owner', 'unit', 'foo=x']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-add', '--owner', 'unit', 'foo=x']
+        ]
 
     def test_unit_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:456')
 
         expire = datetime.datetime(2022, 12, 9, 16, 22, 0)
-        secret = model.unit.add_secret({'foo': 'w', 'bar': 'z'}, label='l2', description='xyz',
-                                       expire=expire, rotate=ops.SecretRotate.YEARLY)
+        secret = model.unit.add_secret(
+            {'foo': 'w', 'bar': 'z'},
+            label='l2',
+            description='xyz',
+            expire=expire,
+            rotate=ops.SecretRotate.YEARLY
+        )
         assert secret.id == 'secret:456'
         assert secret.label == 'l2'
         assert secret.get_content() == {'foo': 'w', 'bar': 'z'}
@@ -3251,8 +3330,9 @@ class TestSecrets:
         assert secret.label is None
         assert secret.get_content() == {'foo': 'g'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', 'secret:123', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', 'secret:123', '--format=json']
+        ]
 
     def test_get_secret_label(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-get', """echo '{"foo": "g"}'""")
@@ -3262,8 +3342,9 @@ class TestSecrets:
         assert secret.label == 'lbl'
         assert secret.get_content() == {'foo': 'g'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', '--label', 'lbl', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', '--label', 'lbl', '--format=json']
+        ]
 
     def test_get_secret_id_and_label(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-get', """echo '{"foo": "h"}'""")
@@ -3273,8 +3354,9 @@ class TestSecrets:
         assert secret.label == 'l'
         assert secret.get_content() == {'foo': 'h'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', 'secret:123', '--label', 'l', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', 'secret:123', '--label', 'l', '--format=json']
+        ]
 
     def test_get_secret_no_args(self, model: ops.Model):
         with pytest.raises(TypeError):
@@ -3387,7 +3469,7 @@ class TestSecretClass:
         model: ops.Model,
         id: typing.Optional[str] = None,
         label: typing.Optional[str] = None,
-        content: typing.Optional[typing.Dict[str, str]] = None
+        content: typing.Optional[typing.Dict[str, str]] = None,
     ) -> ops.Secret:
         return ops.Secret(model._backend, id=id, label=label, content=content)
 
@@ -3420,8 +3502,9 @@ class TestSecretClass:
         content = secret.get_content(refresh=True)
         assert content == {'foo': 'refreshed'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', 'secret:y', '--refresh', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', 'secret:y', '--refresh', '--format=json']
+        ]
 
     def test_get_content_uncached(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "notcached"}'""")
@@ -3430,8 +3513,9 @@ class TestSecretClass:
         content = secret.get_content()
         assert content == {'foo': 'notcached'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', 'secret:z', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', 'secret:z', '--format=json']
+        ]
 
     def test_get_content_copies_dict(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
@@ -3442,8 +3526,9 @@ class TestSecretClass:
         content['new'] = 'value'
         assert secret.get_content() == {'foo': 'bar'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', 'secret:z', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', 'secret:z', '--format=json']
+        ]
 
     def test_set_content_invalidates_cache(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
@@ -3470,8 +3555,9 @@ class TestSecretClass:
         content = secret.peek_content()
         assert content == {'foo': 'peeked'}
 
-        assert fake_script.calls(clear=True) == \
-            [['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']
+        ]
 
     def test_get_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-info-get', """echo '{"x": {"label": "y", "revision": 7}}'""")
@@ -3497,11 +3583,10 @@ class TestSecretClass:
         assert info.label == 'y'
         assert info.revision == 7
 
-        assert fake_script.calls(clear=True) == \
-            [
-                ['secret-info-get', 'secret:x', '--format=json'],
-                ['secret-info-get', '--label', 'y', '--format=json'],
-                ['secret-info-get', 'secret:x', '--format=json'],
+        assert fake_script.calls(clear=True) == [
+            ['secret-info-get', 'secret:x', '--format=json'],
+            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-info-get', 'secret:x', '--format=json'],
         ]
 
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
