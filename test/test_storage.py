@@ -49,14 +49,8 @@ class StoragePermutations(abc.ABC):
         fake_script: FakeScript,
     ) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
-        return ops.Framework(
-            self.create_storage(
-                request,
-                fake_script
-            ),
-            None,  # type: ignore
-            None,  # type: ignore
-            None)  # type: ignore
+        storage = self.create_storage(request, fake_script)
+        return ops.Framework(storage, None, None, None)  # type: ignore
 
     @abc.abstractmethod
     def create_storage(
