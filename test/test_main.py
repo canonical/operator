@@ -318,7 +318,7 @@ class _TestMain(abc.ABC):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
 
         def cleanup():
-            shutil.rmtree(self._tmpdir) if self._tmpdir.exists() else None
+            shutil.rmtree(self._tmpdir, ignore_errors=True)
 
         request.addfinalizer(cleanup)
 
@@ -1029,13 +1029,13 @@ class _TestMainWithDispatch(_TestMain):
         request: pytest.FixtureRequest,
         fake_script: FakeScript,
     ):
-        fs = FakeScript(request, self.hooks_dir)
-        fs.write('install', 'exit 0')
+        fake_script_hooks = FakeScript(request, self.hooks_dir)
+        fake_script_hooks.write('install', 'exit 0')
         state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
 
         # the script was called, *and*, the .on. was called
-        assert fs.calls() == [['install', '']]
+        assert fake_script_hooks.calls() == [['install', '']]
         assert list(state.observed_event_types) == ['InstallEvent']
 
         hook = Path('hooks/install')
@@ -1084,8 +1084,8 @@ class _TestMainWithDispatch(_TestMain):
         self.stdout = self.stderr = tempfile.TemporaryFile()
         request.addfinalizer(self.stdout.close)
 
-        fs = FakeScript(request, self.hooks_dir)
-        fs.write('install', 'exit 42')
+        fake_script_hooks = FakeScript(request, self.hooks_dir)
+        fake_script_hooks.write('install', 'exit 42')
         event = EventSpec(ops.InstallEvent, 'install')
         with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(fake_script, event)
@@ -1104,46 +1104,33 @@ class _TestMainWithDispatch(_TestMain):
         ]
         assert calls == expected
 
-    @pytest.mark.parametrize("rel,ind,path_type", [
-        (True, True, "indirect"),
-        (True, False, "direct"),
-        (False, False, "absolute_direct"),
-        (False, True, "absolute_indirect")
-    ])
-    def test_hook_and_dispatch_but_hook_is_dispatch(
-        self,
-        fake_script: FakeScript,
-        rel: bool,
-        ind: bool,
-        path_type: str,
-    ):
+    def test_hook_and_dispatch_but_hook_is_dispatch(self, fake_script: FakeScript):
         event = EventSpec(ops.InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'
+        for ((rel, ind), path) in {
+            # relative and indirect
+            (True, True): Path('../dispatch'),
+            # relative and direct
+            (True, False): Path(self.charm_exec_path),
+            # absolute and direct
+            (False, False): (self.hooks_dir / self.charm_exec_path).resolve(),
+            # absolute and indirect
+            (False, True): self.JUJU_CHARM_DIR / 'dispatch',
+        }.items():
+            # Sanity check
+            assert path.is_absolute() == (not rel)
+            assert (path.with_suffix('').name == 'dispatch') == ind
+            try:
+                hook_path.symlink_to(path)
 
-        path_type_dict = {
-            "indirect": Path('../dispatch'),
-            "direct": Path(self.charm_exec_path),
-            "absolute_direct": (self.hooks_dir / self.charm_exec_path).resolve(),
-            "absolute_indirect": self.JUJU_CHARM_DIR / 'dispatch'
-        }
+                state = self._simulate_event(fake_script, event)
+                assert isinstance(state, ops.BoundStoredState)
 
-        path = path_type_dict[path_type]
-
-        # Sanity check
-        assert path.is_absolute() == (not rel)
-        assert (path.with_suffix('').name == 'dispatch') == ind
-
-        try:
-            hook_path.symlink_to(path)
-
-            state = self._simulate_event(fake_script, event)
-            assert isinstance(state, ops.BoundStoredState)
-
-            # The `.on.` method was only called once
-            assert list(state.observed_event_types) == ['InstallEvent']
-            assert list(state.on_install) == ['InstallEvent']
-        finally:
-            hook_path.unlink()
+                # The `.on.` method was only called once
+                assert list(state.observed_event_types) == ['InstallEvent']
+                assert list(state.on_install) == ['InstallEvent']
+            finally:
+                hook_path.unlink()
 
     def test_hook_and_dispatch_but_hook_is_dispatch_copy(self, fake_script: FakeScript):
         hook_path = self.hooks_dir / 'install'
