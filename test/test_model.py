@@ -74,38 +74,28 @@ class TestModel:
         yield harness
         harness.cleanup()
 
-    @pytest.fixture
-    def model(self, harness: ops.testing.Harness[ops.CharmBase]):
-        return harness.model
-
-    @pytest.fixture
-    def relation_id_db0(self, harness: ops.testing.Harness[ops.CharmBase]):
-        rel_id = harness.add_relation('db0', 'db')
-        harness._get_backend_calls(reset=True)
-        return rel_id
-
     def ensure_relation(
             self,
-            model: ops.Model,
+            harness: ops.testing.Harness[ops.CharmBase],
             name: str = 'db1',
             relation_id: typing.Optional[int] = None) -> ops.Relation:
-        """Wrapper around model.get_relation that enforces that None is not returned."""
-        rel_db1 = model.get_relation(name, relation_id)
+        """Wrapper around harness.model.get_relation that enforces that None is not returned."""
+        rel_db1 = harness.model.get_relation(name, relation_id)
         assert rel_db1 is not None
         assert rel_db1 is not None  # Type checkers understand this, but not the previous line.
         return rel_db1
 
-    def test_model_attributes(self, model: ops.Model):
-        assert model.app is model.unit.app
-        assert model.name is None
+    def test_model_attributes(self, harness: ops.testing.Harness[ops.CharmBase]):
+        assert harness.model.app is harness.model.unit.app
+        assert harness.model.name is None
 
-    def test_unit_immutable(self, model: ops.Model):
+    def test_unit_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.unit = object()  # type: ignore
+            harness.model.unit = object()  # type: ignore
 
-    def test_app_immutable(self, model: ops.Model):
+    def test_app_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.app = object()  # type: ignore
+            harness.model.app = object()  # type: ignore
 
     def test_model_name_from_backend(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.set_model_name('default')
@@ -114,7 +104,7 @@ class TestModel:
         with pytest.raises(AttributeError):
             m.name = "changes-disallowed"  # type: ignore
 
-    def test_relations_keys(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+    def test_relations_keys(self, harness: ops.testing.Harness[ops.CharmBase]):
         rel_app1 = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(rel_app1, 'remoteapp1/0')
         harness.add_relation_unit(rel_app1, 'remoteapp1/1')
@@ -122,12 +112,12 @@ class TestModel:
         harness.add_relation_unit(rel_app2, 'remoteapp2/0')
 
         # We invalidate db1 so that it causes us to reload it
-        model.relations._invalidate('db1')
+        harness.model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
-        for relation in model.relations['db1']:
-            assert model.unit in relation.data
+        for relation in harness.model.relations['db1']:
+            assert harness.model.unit in relation.data
             unit_from_rel = next(filter(lambda u: u.name == 'myapp/0', relation.data.keys()))
-            assert model.unit is unit_from_rel
+            assert harness.model.unit is unit_from_rel
 
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
@@ -135,17 +125,17 @@ class TestModel:
             ('relation_list', rel_app2),
         ])
 
-    def test_relations_immutable(self, model: ops.Model):
+    def test_relations_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.relations = {}  # type: ignore
+            harness.model.relations = {}  # type: ignore
 
-    def test_get_relation(self,
-                          harness: ops.testing.Harness[ops.CharmBase],
-                          model: ops.Model,
-                          relation_id_db0: int):
+    def test_get_relation(self, harness: ops.testing.Harness[ops.CharmBase]):
         # one relation on db1
         # two relations on db0
         # no relations on db2
+        relation_id_db0 = harness.add_relation('db0', 'db')
+        harness._get_backend_calls(reset=True)
+
         relation_id_db1 = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id_db1, 'remoteapp1/0')
         relation_id_db0_b = harness.add_relation('db0', 'another')
@@ -153,30 +143,30 @@ class TestModel:
 
         with pytest.raises(ops.ModelError):
             # You have to specify it by just the integer ID
-            model.get_relation('db1', f'db1:{relation_id_db1}')  # type: ignore
-        rel_db1 = model.get_relation('db1', relation_id_db1)
+            harness.model.get_relation('db1', f'db1:{relation_id_db1}')  # type: ignore
+        rel_db1 = harness.model.get_relation('db1', relation_id_db1)
         assert isinstance(rel_db1, ops.Relation)
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
             ('relation_list', relation_id_db1),
         ])
-        dead_rel = self.ensure_relation(model, 'db1', 7)
+        dead_rel = self.ensure_relation(harness, 'db1', 7)
         assert isinstance(dead_rel, ops.Relation)
-        assert set(dead_rel.data.keys()) == {model.unit, model.unit.app}
-        assert dead_rel.data[model.unit] == {}
+        assert set(dead_rel.data.keys()) == {harness.model.unit, harness.model.unit.app}
+        assert dead_rel.data[harness.model.unit] == {}
         self.assertBackendCalls(harness, [
             ('relation_list', 7),
             ('relation_remote_app_name', 7),
             ('relation_get', 7, 'myapp/0', False),
         ])
 
-        assert model.get_relation('db2') is None
+        assert harness.model.get_relation('db2') is None
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db2'),
         ])
-        assert model.get_relation('db1') is rel_db1
+        assert harness.model.get_relation('db1') is rel_db1
         with pytest.raises(ops.TooManyRelatedAppsError):
-            model.get_relation('db0')
+            harness.model.get_relation('db0')
 
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db0'),
@@ -186,26 +176,18 @@ class TestModel:
             ('relation_remote_app_name', 2),
         ])
 
-    def test_peer_relation_app(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_peer_relation_app(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.add_relation('db2', 'myapp')
-        rel_dbpeer = self.ensure_relation(model, 'db2')
-        assert rel_dbpeer.app is model.app
+        rel_dbpeer = self.ensure_relation(harness, 'db2')
+        assert rel_dbpeer.app is harness.model.app
 
-    def test_remote_units_is_our(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_remote_units_is_our(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls(harness)
 
-        for u in self.ensure_relation(model, 'db1').units:
+        for u in self.ensure_relation(harness, 'db1').units:
             assert not u._is_our_unit
             assert not u.app._is_our_app
 
@@ -214,9 +196,9 @@ class TestModel:
             ('relation_list', relation_id)
         ])
 
-    def test_our_unit_is_our(self, model: ops.Model):
-        assert model.unit._is_our_unit
-        assert model.unit.app._is_our_app
+    def test_our_unit_is_our(self, harness: ops.testing.Harness[ops.CharmBase]):
+        assert harness.model.unit._is_our_unit
+        assert harness.model.unit.app._is_our_app
 
     def test_invalid_type_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
@@ -250,11 +232,7 @@ class TestModel:
                 relation_id, harness.model.app) == harness.get_relation_data(
                 relation_id, local_app) == {'foo': 'bar'}
 
-    def test_unit_relation_data(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_unit_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         with harness._event_context('foo_event'):
@@ -262,15 +240,15 @@ class TestModel:
                 relation_id,
                 'remoteapp1/0',
                 {'host': 'remoteapp1-0'})
-        model.relations._invalidate('db1')
+        harness.model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
 
-        random_unit = model.get_unit('randomunit/0')
+        random_unit = harness.model.get_unit('randomunit/0')
         with pytest.raises(KeyError):
-            self.ensure_relation(model, 'db1').data[random_unit]
+            self.ensure_relation(harness, 'db1').data[random_unit]
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                   self.ensure_relation(model, 'db1').units))
-        assert self.ensure_relation(model, 'db1').data[remoteapp1_0] == \
+                                   self.ensure_relation(harness, 'db1').units))
+        assert self.ensure_relation(harness, 'db1').data[remoteapp1_0] == \
             {'host': 'remoteapp1-0'}
 
         self.assertBackendCalls(harness, [
@@ -279,11 +257,7 @@ class TestModel:
             ('relation_get', relation_id, 'remoteapp1/0', False),
         ])
 
-    def test_remote_app_relation_data(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_remote_app_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'remoteapp1',
@@ -292,9 +266,9 @@ class TestModel:
         harness.add_relation_unit(relation_id, 'remoteapp1/1')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         # Try to get relation data for an invalid remote application.
-        random_app = model._cache.get(ops.Application, 'randomapp')
+        random_app = harness.model._cache.get(ops.Application, 'randomapp')
         with pytest.raises(KeyError):
             rel_db1.data[random_app]
 
@@ -310,11 +284,7 @@ class TestModel:
             ('relation_get', relation_id, 'remoteapp1', True),
         ])
 
-    def test_relation_data_modify_remote(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_data_modify_remote(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'remoteapp1',
@@ -322,12 +292,12 @@ class TestModel:
             harness.add_relation_unit(relation_id, 'remoteapp1/0')
             harness.update_relation_data(relation_id, 'remoteapp1/0',
                                          {'host': 'remoteapp1/0'})
-        model.relations._invalidate('db1')
+        harness.model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         remoteapp1_0 = next(filter(lambda u: u.name == 'remoteapp1/0',
-                                   self.ensure_relation(model, 'db1').units))
+                                   self.ensure_relation(harness, 'db1').units))
         # Force memory cache to be loaded.
         assert 'host' in rel_db1.data[remoteapp1_0]
         assert repr(rel_db1.data[remoteapp1_0]) == "{'host': 'remoteapp1/0'}"
@@ -352,34 +322,29 @@ class TestModel:
              "<ops.model.Unit remoteapp1/0>: {'host': 'remoteapp1/0'}, "
              "<ops.model.Application remoteapp1>: {'secret': 'cafedeadbeef'}}")
 
-    def test_relation_data_modify_our(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_data_modify_our(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
 
         harness.update_relation_data(relation_id, 'myapp/0', {'host': 'nothing'})
         self.resetBackendCalls(harness)
         with harness._event_context('foo_event'):
-            rel_db1 = self.ensure_relation(model, 'db1')
+            rel_db1 = self.ensure_relation(harness, 'db1')
             # update_relation_data will also trigger relation-get, so we
             # invalidate the cache to ensure it will be reloaded
-            rel_db1.data[model.unit]._invalidate()
+            rel_db1.data[harness.model.unit]._invalidate()
             # Force memory cache to be loaded.
-            assert 'host' in rel_db1.data[model.unit]
-            rel_db1.data[model.unit]['host'] = 'bar'
-            assert rel_db1.data[model.unit]['host'] == 'bar'
+            assert 'host' in rel_db1.data[harness.model.unit]
+            rel_db1.data[harness.model.unit]['host'] = 'bar'
+            assert rel_db1.data[harness.model.unit]['host'] == 'bar'
 
         self.assertBackendCalls(harness, [
             ('relation_get', relation_id, 'myapp/0', False),
-            ('update_relation_data', relation_id, model.unit, 'host', 'bar'),
+            ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
         ])
 
     def test_app_relation_data_modify_local_as_leader(
         self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
+        harness: ops.testing.Harness[ops.CharmBase]
     ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'myapp', {'password': 'deadbeefcafe'})
@@ -387,9 +352,9 @@ class TestModel:
         harness.set_leader(True)
         self.resetBackendCalls(harness)
 
-        local_app = model.unit.app
+        local_app = harness.model.unit.app
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         assert rel_db1.data[local_app] == {'password': 'deadbeefcafe'}
 
         rel_db1.data[local_app]['password'] = 'foo'
@@ -400,13 +365,12 @@ class TestModel:
             ('relation_ids', 'db1'),
             ('relation_list', 0),
             ('relation_get', 0, 'myapp', True),
-            ('update_relation_data', 0, model.app, 'password', 'foo')
+            ('update_relation_data', 0, harness.model.app, 'password', 'foo')
         ])
 
     def test_app_relation_data_modify_local_as_minion(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
     ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'myapp', {'password': 'deadbeefcafe'})
@@ -414,9 +378,9 @@ class TestModel:
         harness.set_leader(False)
         self.resetBackendCalls(harness)
 
-        local_app = model.unit.app
+        local_app = harness.model.unit.app
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         assert rel_db1.data[local_app] == {'password': 'deadbeefcafe'}
 
         with harness._event_context('foo_event'):
@@ -453,48 +417,40 @@ class TestModel:
             assert relation is not None and relation.app is not None
             assert relation.data[relation.app]['foo'] == 'bar'
 
-    def test_relation_data_del_key(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_data_del_key(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         # Force memory cache to be loaded.
-        assert 'host' in rel_db1.data[model.unit]
-        del rel_db1.data[model.unit]['host']
-        assert 'host' not in rel_db1.data[model.unit]
+        assert 'host' in rel_db1.data[harness.model.unit]
+        del rel_db1.data[harness.model.unit]['host']
+        assert 'host' not in rel_db1.data[harness.model.unit]
         assert harness.get_relation_data(relation_id, 'myapp/0') == {}
 
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
-            ('update_relation_data', relation_id, model.unit, 'host', ''),
+            ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
         ])
 
-    def test_relation_data_del_missing_key(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_data_del_missing_key(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'myapp/0', {'host': 'bar'})
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         # Force memory cache to be loaded.
-        assert 'host' in rel_db1.data[model.unit]
+        assert 'host' in rel_db1.data[harness.model.unit]
         with harness._event_context('foo_event'):
-            rel_db1.data[model.unit]['port'] = ''   # Same as a delete, should not fail.
-        assert 'port' not in rel_db1.data[model.unit]
+            rel_db1.data[harness.model.unit]['port'] = ''   # Same as a delete, should not fail.
+        assert 'port' not in rel_db1.data[harness.model.unit]
         with harness._event_context('foo_event'):
             assert harness.get_relation_data(relation_id, 'myapp/0') == \
                 {'host': 'bar'}
@@ -503,14 +459,10 @@ class TestModel:
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
-            ('update_relation_data', relation_id, model.unit, 'port', ''),
+            ('update_relation_data', relation_id, harness.model.unit, 'port', ''),
         ])
 
-    def test_relation_set_fail(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_set_fail(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
             harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})
@@ -534,37 +486,33 @@ class TestModel:
 
         backend.update_relation_data = broken_update_relation_data
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         # Force memory cache to be loaded.
-        assert 'host' in rel_db1.data[model.unit]
+        assert 'host' in rel_db1.data[harness.model.unit]
 
         with harness._event_context('foo_event'):
             with pytest.raises(ops.ModelError):
-                rel_db1.data[model.unit]['host'] = 'bar'
-            assert rel_db1.data[model.unit]['host'] == 'myapp-0'
+                rel_db1.data[harness.model.unit]['host'] = 'bar'
+            assert rel_db1.data[harness.model.unit]['host'] == 'myapp-0'
             with pytest.raises(ops.ModelError):
-                del rel_db1.data[model.unit]['host']
-            assert 'host' in rel_db1.data[model.unit]
+                del rel_db1.data[harness.model.unit]['host']
+            assert 'host' in rel_db1.data[harness.model.unit]
 
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
             ('relation_list', relation_id),
             ('relation_get', relation_id, 'myapp/0', False),
-            ('update_relation_data', relation_id, model.unit, 'host', 'bar'),
-            ('update_relation_data', relation_id, model.unit, 'host', ''),
+            ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
+            ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
         ])
 
-    def test_relation_data_type_check(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_data_type_check(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'myapp/0', {'host': 'myapp-0'})
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         for key, value in (
             ('foo', 1),
             ('foo', None),
@@ -577,10 +525,10 @@ class TestModel:
         ):
             with pytest.raises(ops.RelationDataError):
                 with harness.framework._event_context('foo_event'):
-                    rel_db1.data[model.unit][key] = value  # type: ignore
+                    rel_db1.data[harness.model.unit][key] = value  # type: ignore
 
         # No data has actually been changed
-        assert dict(rel_db1.data[model.unit]) == {'host': 'myapp-0'}
+        assert dict(rel_db1.data[harness.model.unit]) == {'host': 'myapp-0'}
 
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
@@ -591,7 +539,6 @@ class TestModel:
     def test_relation_local_app_data_readability_leader(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
     ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.update_relation_data(relation_id, 'remoteapp1', {'secret': 'cafedeadbeef'})
@@ -599,10 +546,10 @@ class TestModel:
 
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         harness.update_relation_data(relation_id, 'remoteapp1/0', {'host': 'remoteapp1/0'})
-        model.relations._invalidate('db1')
+        harness.model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         harness.begin()
         harness.set_leader(True)
         self.resetBackendCalls(harness)
@@ -638,7 +585,6 @@ class TestModel:
     def test_relation_local_app_data_readability_follower(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
     ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         with harness._event_context('foo_event'):
@@ -647,10 +593,10 @@ class TestModel:
 
             harness.add_relation_unit(relation_id, 'remoteapp1/0')
             harness.update_relation_data(relation_id, 'remoteapp1/0', {'host': 'remoteapp1/0'})
-        model.relations._invalidate('db1')
+        harness.model.relations._invalidate('db1')
         self.resetBackendCalls(harness)
 
-        rel_db1 = self.ensure_relation(model, 'db1')
+        rel_db1 = self.ensure_relation(harness, 'db1')
         harness.begin()
         harness.set_leader(False)
 
@@ -684,31 +630,27 @@ class TestModel:
                 ('relation_get', 0, 'remoteapp1', True)]
             self.assertBackendCalls(harness, expected_backend_calls)
 
-    def test_relation_no_units(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_relation_no_units(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.add_relation('db1', 'remoteapp1')
-        rel = self.ensure_relation(model, 'db1')
+        rel = self.ensure_relation(harness, 'db1')
         assert rel.units == set()
-        assert rel.app is model.get_app('remoteapp1')
+        assert rel.app is harness.model.get_app('remoteapp1')
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
             ('relation_list', 0),
             ('relation_remote_app_name', 0),
         ])
 
-    def test_config(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+    def test_config(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness._get_backend_calls(reset=True)
         harness.update_config({
             'foo': 'foo',
             'bar': 1,
             'qux': True,
             'baz': 3.1,
-            'secretfoo': 'secret:1234'
+            'secretfoo': 'secret:1234',
         })
-        assert model.config == {
+        assert harness.model.config == {
             'foo': 'foo',
             'bar': 1,
             'qux': True,
@@ -717,15 +659,15 @@ class TestModel:
         }
         with pytest.raises(TypeError):
             # Confirm that we cannot modify config values.
-            model.config['foo'] = 'bar'  # type: ignore
+            harness.model.config['foo'] = 'bar'  # type: ignore
 
         self.assertBackendCalls(harness, [('config_get',)])
 
-    def test_config_immutable(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+    def test_config_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.config = {}  # type: ignore
+            harness.model.config = {}  # type: ignore
 
-    def test_is_leader(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+    def test_is_leader(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         harness.set_leader(True)
@@ -733,17 +675,17 @@ class TestModel:
 
         def check_remote_units():
             # Cannot determine leadership for remote units.
-            for u in self.ensure_relation(model, 'db1').units:
+            for u in self.ensure_relation(harness, 'db1').units:
                 with pytest.raises(RuntimeError):
                     u.is_leader()
 
-        assert model.unit.is_leader()
+        assert harness.model.unit.is_leader()
 
         check_remote_units()
 
         # Create a new model and backend to drop a cached is-leader output.
         harness.set_leader(False)
-        assert not model.unit.is_leader()
+        assert not harness.model.unit.is_leader()
 
         check_remote_units()
 
@@ -754,19 +696,15 @@ class TestModel:
             ('is_leader',),
         ])
 
-    def test_workload_version(self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
-        model.unit.set_workload_version('1.2.3')
+    def test_workload_version(self, harness: ops.testing.Harness[ops.CharmBase]):
+        harness.model.unit.set_workload_version('1.2.3')
         self.assertBackendCalls(harness, [
             ('application_version_set', '1.2.3'),
         ])
 
-    def test_workload_version_invalid(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
-    ):
+    def test_workload_version_invalid(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(TypeError) as excinfo:
-            model.unit.set_workload_version(5)  # type: ignore
+            harness.model.unit.set_workload_version(5)  # type: ignore
         assert str(excinfo.value) == "workload version must be a str, not int: 5"
         self.assertBackendCalls(harness, [])
 
@@ -783,9 +721,9 @@ class TestModel:
         assert harness.model.resources.fetch('foo').name == 'foo.txt'
         assert harness.model.resources.fetch('bar').name == 'bar.txt'
 
-    def test_resources_immutable(self, model: ops.Model):
+    def test_resources_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.resources = object()  # type: ignore
+            harness.model.resources = object()  # type: ignore
 
     def test_pod_spec(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.set_leader(True)
@@ -800,9 +738,9 @@ class TestModel:
         with pytest.raises(ops.ModelError):
             harness.model.pod.set_spec({'foo': 'bar'})
 
-    def test_pod_immutable(self, model: ops.Model):
+    def test_pod_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.pod = object()  # type: ignore
+            harness.model.pod = object()  # type: ignore
 
     def test_base_status_instance_raises(self):
         with pytest.raises(TypeError):
@@ -862,15 +800,14 @@ class TestModel:
     def test_local_set_valid_unit_status(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
         target_status: ops.StatusBase,
         backend_call: typing.Tuple[str, str, str, typing.Dict[str, bool]],
     ):
         harness._get_backend_calls(reset=True)
-        model.unit.status = target_status
-        assert model.unit.status == target_status
-        model.unit._invalidate()
-        assert model.unit.status == target_status
+        harness.model.unit.status = target_status
+        assert harness.model.unit.status == target_status
+        harness.model.unit._invalidate()
+        assert harness.model.unit.status == target_status
         self.assertBackendCalls(harness, [backend_call, ('status_get', {'is_app': False})])
 
     @pytest.mark.parametrize("target_status,backend_call", [(
@@ -889,16 +826,15 @@ class TestModel:
     def test_local_set_valid_app_status(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
         target_status: ops.StatusBase,
         backend_call: typing.Tuple[str, str, str, typing.Dict[str, bool]],
     ):
         harness.set_leader(True)
 
-        model.app.status = target_status
-        assert model.app.status == target_status
-        model.app._invalidate()
-        assert model.app.status == target_status
+        harness.model.app.status = target_status
+        assert harness.model.app.status == target_status
+        harness.model.app._invalidate()
+        assert harness.model.app.status == target_status
         # There is a backend call to check if we can set the value,
         # and then another check each time we assert the status above
         expected_calls = [
@@ -909,21 +845,23 @@ class TestModel:
         self.assertBackendCalls(harness, expected_calls)
 
     def test_set_app_status_non_leader_raises(
-            self, harness: ops.testing.Harness[ops.CharmBase], model: ops.Model):
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
         harness.set_leader(False)
         with pytest.raises(RuntimeError):
-            model.app.status
+            harness.model.app.status
 
         with pytest.raises(RuntimeError):
-            model.app.status = ops.ActiveStatus()
+            harness.model.app.status = ops.ActiveStatus()
 
-    def test_set_unit_status_invalid(self, model: ops.Model):
+    def test_set_unit_status_invalid(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(ops.InvalidStatusError):
-            model.unit.status = 'blocked'  # type: ignore
+            harness.model.unit.status = 'blocked'  # type: ignore
 
-    def test_set_app_status_invalid(self, model: ops.Model):
+    def test_set_app_status_invalid(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(ops.InvalidStatusError):
-            model.app.status = 'blocked'  # type: ignore
+            harness.model.app.status = 'blocked'  # type: ignore
 
     @pytest.mark.parametrize("target_status", [
         ops.UnknownStatus(),
@@ -935,7 +873,6 @@ class TestModel:
     def test_remote_unit_status(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
         target_status: ops.StatusBase,
     ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
@@ -944,7 +881,7 @@ class TestModel:
         remote_unit = next(
             filter(
                 lambda u: u.name == 'remoteapp1/0',
-                self.ensure_relation(model, 'db1').units
+                self.ensure_relation(harness, 'db1').units
             )
         )
         self.resetBackendCalls(harness)
@@ -967,13 +904,12 @@ class TestModel:
     def test_remote_app_status(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        model: ops.Model,
         target_status: ops.StatusBase,
     ):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
         harness.add_relation_unit(relation_id, 'remoteapp1/1')
-        remoteapp1 = self.ensure_relation(model, 'db1').app
+        remoteapp1 = self.ensure_relation(harness, 'db1').app
         self.resetBackendCalls(harness)
 
         # Remote application status is always unknown.
@@ -985,7 +921,7 @@ class TestModel:
 
         self.assertBackendCalls(harness, [])
 
-    def test_storage(self, fake_script: FakeScript, model: ops.Model):
+    def test_storage(self, fake_script: FakeScript):
         meta = ops.CharmMeta()
         raw: 'ops.charm._StorageMetaDict' = {
             'type': 'test',
@@ -1053,9 +989,9 @@ class TestModel:
             with pytest.raises(TypeError):
                 model.storages.request('data', count_v)  # type: ignore
 
-    def test_storages_immutable(self, model: ops.Model):
+    def test_storages_immutable(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(AttributeError):
-            model.storages = {}  # type: ignore
+            harness.model.storages = {}  # type: ignore
 
     def resetBackendCalls(self, harness: ops.testing.Harness[ops.CharmBase]):  # noqa: N802
         harness._get_backend_calls(reset=True)
@@ -1068,7 +1004,7 @@ class TestModel:
             reset: bool = True):
         assert expected == harness._get_backend_calls(reset=reset)
 
-    def test_run_error(self, fake_script: FakeScript, model: ops.Model):
+    def test_run_error(self, fake_script: FakeScript):
         model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
         fake_script.write('status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
         with pytest.raises(ops.ModelError) as excinfo:
@@ -1464,10 +1400,6 @@ class TestApplication:
     def app(self, harness: ops.testing.Harness[ops.CharmBase]):
         return harness.model.app
 
-    @pytest.fixture
-    def peer_rel_id(self, harness: ops.testing.Harness[ops.CharmBase]):
-        return harness.add_relation('db2', 'db2')
-
     # Tests fix for https://github.com/canonical/operator/issues/694.
     def test_mocked_get_services(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.begin()
@@ -1486,8 +1418,9 @@ class TestApplication:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         app: ops.Application,
-        peer_rel_id: int,
     ):
+        peer_rel_id = harness.add_relation('db2', 'db2')
+
         # Test that we always count ourself.
         assert app.planned_units() == 1
 
@@ -1542,7 +1475,6 @@ class TestApplication:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         app: ops.Application,
-        peer_rel_id: int,
     ):
         """Verify that we override the calculated value of planned_units when we set it manually.
 
@@ -1551,6 +1483,8 @@ class TestApplication:
         charm author is composing a charm without peer relations, and the harness's count of
         planned units, which is based on the number of peer relations, will not be accurate.
         """
+        peer_rel_id = harness.add_relation('db2', 'db2')
+
         harness.set_planned_units(10)
         harness.add_relation_unit(peer_rel_id, 'myapp/1')
         harness.add_relation_unit(peer_rel_id, 'myapp/2')
@@ -1609,6 +1543,534 @@ containers:
         with pytest.raises(RuntimeError):
             other_unit = model.get_unit('other')
             other_unit.get_container('foo')
+
+
+class TestContainerPebble:
+    @pytest.fixture
+    def model(self):
+        meta = ops.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+""")
+        backend = MockPebbleBackend('myapp/0')
+        return ops.Model(meta, backend)
+
+    @pytest.fixture
+    def container(self, model: ops.Model):
+        return model.unit.containers['c1']
+
+    def test_socket_path(self, container: ops.Container):
+        assert container.pebble.socket_path == '/charm/containers/c1/pebble.socket'
+
+    def test_autostart(self, container: ops.Container):
+        container.autostart()
+        assert container.pebble.requests == [('autostart',)]  # type: ignore
+
+    def test_replan(self, container: ops.Container):
+        container.replan()
+        assert container.pebble.requests == [('replan',)]  # type: ignore
+
+    def test_can_connect(self, container: ops.Container):
+        container.pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))  # type: ignore
+        assert container.can_connect()
+        assert container.pebble.requests == [('get_system_info',)]  # type: ignore
+
+    def test_start(self, container: ops.Container):
+        container.start('foo')
+        container.start('foo', 'bar')
+        assert container.pebble.requests == [  # type: ignore
+            ('start', ('foo',)),
+            ('start', ('foo', 'bar')),
+        ]
+
+    def test_start_no_arguments(self, container: ops.Container):
+        with pytest.raises(TypeError):
+            container.start()
+
+    def test_stop(self, container: ops.Container):
+        container.stop('foo')
+        container.stop('foo', 'bar')
+        assert container.pebble.requests == [  # type: ignore
+            ('stop', ('foo',)),
+            ('stop', ('foo', 'bar')),
+        ]
+
+    def test_stop_no_arguments(self, container: ops.Container):
+        with pytest.raises(TypeError):
+            container.stop()
+
+    def test_restart(self, container: ops.Container):
+        container.restart('foo')
+        container.restart('foo', 'bar')
+        assert container.pebble.requests == [  # type: ignore
+            ('restart', ('foo',)),
+            ('restart', ('foo', 'bar')),
+        ]
+
+    def test_restart_fallback(self, container: ops.Container):
+        def restart_services(service_names: str):
+            container.pebble.requests.append(('restart', service_names))  # type: ignore
+            raise pebble.APIError({}, 400, "", "")
+
+        container.pebble.restart_services = restart_services  # type: ignore
+        # Setup the Pebble client to respond to a call to get_services()
+        container.pebble.responses.append([  # type: ignore
+            pebble.ServiceInfo.from_dict(
+                {'name': 'foo', 'startup': 'enabled', 'current': 'active'}),
+            pebble.ServiceInfo.from_dict(
+                {'name': 'bar', 'startup': 'enabled', 'current': 'inactive'}),
+        ])
+
+        container.restart('foo', 'bar')
+        assert container.pebble.requests == [  # type: ignore
+            # This is the first request, which in real life fails with APIError on older versions
+            ('restart', ('foo', 'bar')),
+            # Next the code should loop over the started services, and stop them
+            ('get_services', ('foo', 'bar')),
+            ('stop', ('foo',)),
+            # Then start all the specified services
+            ('start', ('foo', 'bar'))
+        ]
+
+    def test_restart_fallback_non_400_error(self, container: ops.Container):
+        def restart_services(service_names: str):
+            raise pebble.APIError({}, 500, "", "")
+
+        container.pebble.restart_services = restart_services  # type: ignore
+        with pytest.raises(pebble.APIError) as excinfo:
+            container.restart('foo')
+        assert excinfo.value.code == 500
+
+    def test_restart_no_arguments(self, container: ops.Container):
+        with pytest.raises(TypeError):
+            container.restart()
+
+    def test_type_errors(self, container: ops.Container):
+        meta = ops.CharmMeta.from_yaml("""
+name: k8s-charm
+containers:
+  c1:
+    k: v
+""")
+        # Only the real pebble Client checks types, so use actual backend class
+        backend = _ModelBackend('myapp/0')
+        model = ops.Model(meta, backend)
+        container = model.unit.containers['c1']
+
+        with pytest.raises(TypeError):
+            container.start(['foo'])  # type: ignore
+
+        with pytest.raises(TypeError):
+            container.stop(['foo'])  # type: ignore
+
+    def test_add_layer(self, container: ops.Container):
+        container.add_layer('a', 'summary: str\n')
+        container.add_layer('b', {'summary': 'dict'})
+        container.add_layer('c', pebble.Layer('summary: Layer'))
+        container.add_layer('d', 'summary: str\n', combine=True)
+        assert container.pebble.requests == [  # type: ignore
+            ('add_layer', 'a', 'summary: str\n', False),
+            ('add_layer', 'b', 'summary: dict\n', False),
+            ('add_layer', 'c', 'summary: Layer\n', False),
+            ('add_layer', 'd', 'summary: str\n', True),
+        ]
+
+        # combine is a keyword-only arg (should be combine=True)
+        with pytest.raises(TypeError):
+            container.add_layer('x', {}, True)  # type: ignore
+
+    def test_get_plan(self, container: ops.Container):
+        plan_yaml = 'services:\n foo:\n  override: replace\n  command: bar'
+        container.pebble.responses.append(pebble.Plan(plan_yaml))  # type: ignore
+        plan = container.get_plan()
+        assert container.pebble.requests == [('get_plan',)]  # type: ignore
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == yaml.safe_dump(yaml.safe_load(plan_yaml))
+
+    @staticmethod
+    def _make_service(name: str, startup: str, current: str):
+        return pebble.ServiceInfo.from_dict(
+            {'name': name, 'startup': startup, 'current': current})
+
+    def test_get_services(self, container: ops.Container):
+        two_services = [
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ]
+        container.pebble.responses.append(two_services)  # type: ignore
+        services = container.get_services()
+        assert len(services) == 2
+        assert set(services) == {'s1', 's2'}
+        assert services['s1'].name == 's1'
+        assert services['s1'].startup == pebble.ServiceStartup.ENABLED
+        assert services['s1'].current == pebble.ServiceStatus.ACTIVE
+        assert services['s2'].name == 's2'
+        assert services['s2'].startup == pebble.ServiceStartup.DISABLED
+        assert services['s2'].current == pebble.ServiceStatus.INACTIVE
+
+        container.pebble.responses.append(two_services)  # type: ignore
+        services = container.get_services('s1', 's2')
+        assert len(services) == 2
+        assert set(services) == {'s1', 's2'}
+        assert services['s1'].name == 's1'
+        assert services['s1'].startup == pebble.ServiceStartup.ENABLED
+        assert services['s1'].current == pebble.ServiceStatus.ACTIVE
+        assert services['s2'].name == 's2'
+        assert services['s2'].startup == pebble.ServiceStartup.DISABLED
+        assert services['s2'].current == pebble.ServiceStatus.INACTIVE
+
+        assert container.pebble.requests == [  # type: ignore
+            ('get_services', None),
+            ('get_services', ('s1', 's2')),
+        ]
+
+    def test_get_service(self, container: ops.Container):
+        # Single service returned successfully
+        container.pebble.responses.append([self._make_service('s1', 'enabled', 'active')])  # type: ignore
+        s = container.get_service('s1')
+        assert container.pebble.requests == [('get_services', ('s1', ))]  # type: ignore
+        assert s.name == 's1'
+        assert s.startup == pebble.ServiceStartup.ENABLED
+        assert s.current == pebble.ServiceStatus.ACTIVE
+
+        # If Pebble returns no services, should be a ops.ModelError
+        container.pebble.responses.append([])  # type: ignore
+        with pytest.raises(ops.ModelError) as excinfo:
+            container.get_service('s2')
+        assert str(excinfo.value) == "service 's2' not found"
+
+        # If Pebble returns more than one service, RuntimeError is raised
+        container.pebble.responses.append([  # type: ignore
+            self._make_service('s1', 'enabled', 'active'),
+            self._make_service('s2', 'disabled', 'inactive'),
+        ])
+        with pytest.raises(RuntimeError):
+            container.get_service('s1')
+
+    def test_get_checks(self, container: ops.Container):
+        response_checks = [
+            pebble.CheckInfo.from_dict({
+                'name': 'c1',
+                'status': 'up',
+                'failures': 0,
+                'threshold': 3,
+            }),  # type: ignore
+            pebble.CheckInfo.from_dict({
+                'name': 'c2',
+                'level': 'alive',
+                'status': 'down',
+                'failures': 2,
+                'threshold': 2,
+            }),
+        ]
+
+        container.pebble.responses.append(response_checks)  # type: ignore
+        checks = container.get_checks()
+        assert len(checks) == 2
+        assert checks['c1'].name == 'c1'
+        assert checks['c1'].level == pebble.CheckLevel.UNSET
+        assert checks['c1'].status == pebble.CheckStatus.UP
+        assert checks['c1'].failures == 0
+        assert checks['c1'].threshold == 3
+        assert checks['c2'].name == 'c2'
+        assert checks['c2'].level == pebble.CheckLevel.ALIVE
+        assert checks['c2'].status == pebble.CheckStatus.DOWN
+        assert checks['c2'].failures == 2
+        assert checks['c2'].threshold == 2
+
+        container.pebble.responses.append(response_checks[1:2])  # type: ignore
+        checks = container.get_checks('c1', 'c2', level=pebble.CheckLevel.ALIVE)
+        assert len(checks) == 1
+        assert checks['c2'].name == 'c2'
+        assert checks['c2'].level == pebble.CheckLevel.ALIVE
+        assert checks['c2'].status == pebble.CheckStatus.DOWN
+        assert checks['c2'].failures == 2
+        assert checks['c2'].threshold == 2
+
+        assert container.pebble.requests == [  # type: ignore
+            ('get_checks', None, None),
+            ('get_checks', pebble.CheckLevel.ALIVE, ('c1', 'c2')),
+        ]
+
+    def test_get_check(self, container: ops.Container):
+        # Single check returned successfully
+        container.pebble.responses.append([  # type: ignore
+            pebble.CheckInfo.from_dict({
+                'name': 'c1',
+                'status': 'up',
+                'failures': 0,
+                'threshold': 3,
+            })  # type: ignore
+        ])
+        c = container.get_check('c1')
+        assert container.pebble.requests == [('get_checks', None, ('c1', ))]  # type: ignore
+        assert c.name == 'c1'
+        assert c.level == pebble.CheckLevel.UNSET
+        assert c.status == pebble.CheckStatus.UP
+        assert c.failures == 0
+        assert c.threshold == 3
+
+        # If Pebble returns no checks, should be a ops.ModelError
+        container.pebble.responses.append([])  # type: ignore
+        with pytest.raises(ops.ModelError) as excinfo:
+            container.get_check('c2')
+        assert str(excinfo.value) == "check 'c2' not found"
+
+        # If Pebble returns more than one check, RuntimeError is raised
+        container.pebble.responses.append([  # type: ignore
+            pebble.CheckInfo.from_dict({
+                'name': 'c1',
+                'status': 'up',
+                'failures': 0,
+                'threshold': 3,
+            }),  # type: ignore
+            pebble.CheckInfo.from_dict({
+                'name': 'c2',
+                'level': 'alive',
+                'status': 'down',
+                'failures': 2,
+                'threshold': 2,
+            }),
+        ])
+        with pytest.raises(RuntimeError):
+            container.get_check('c1')
+
+    def test_pull(self, container: ops.Container):
+        container.pebble.responses.append('dummy1')  # type: ignore
+        got = container.pull('/path/1')
+        assert got == 'dummy1'
+        assert container.pebble.requests == [  # type: ignore
+            ('pull', '/path/1', 'utf-8'),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+        container.pebble.responses.append(b'dummy2')  # type: ignore
+        got = container.pull('/path/2', encoding=None)
+        assert got == b'dummy2'
+        assert container.pebble.requests == [  # type: ignore
+            ('pull', '/path/2', None),
+        ]
+
+    def test_push(self, container: ops.Container):
+        container.push('/path/1', 'content1')
+        assert container.pebble.requests == [  # type: ignore
+            ('push', '/path/1', 'content1', 'utf-8', False, None,
+             None, None, None, None),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+        container.push('/path/2', b'content2', make_dirs=True,
+                       permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
+        assert container.pebble.requests == [  # type: ignore
+            ('push', '/path/2', b'content2', 'utf-8', True, 0o600, 12, 'bob', 34, 'staff'),
+        ]
+
+    def test_list_files(self, container: ops.Container):
+        container.pebble.responses.append('dummy1')  # type: ignore
+        ret = container.list_files('/path/1')
+        assert ret == 'dummy1'
+        assert container.pebble.requests == [  # type: ignore
+            ('list_files', '/path/1', None, False),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+        container.pebble.responses.append('dummy2')  # type: ignore
+        ret = container.list_files('/path/2', pattern='*.txt', itself=True)
+        assert ret == 'dummy2'
+        assert container.pebble.requests == [  # type: ignore
+            ('list_files', '/path/2', '*.txt', True),
+        ]
+
+    def test_make_dir(self, container: ops.Container):
+        container.make_dir('/path/1')
+        assert container.pebble.requests == [  # type: ignore
+            ('make_dir', '/path/1', False, None, None, None, None, None),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+        container.make_dir('/path/2', make_parents=True, permissions=0o700,
+                           user_id=12, user='bob', group_id=34, group='staff')
+        assert container.pebble.requests == [  # type: ignore
+            ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
+        ]
+
+    def test_remove_path(self, container: ops.Container):
+        container.remove_path('/path/1')
+        assert container.pebble.requests == [  # type: ignore
+            ('remove_path', '/path/1', False),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+        container.remove_path('/path/2', recursive=True)
+        assert container.pebble.requests == [  # type: ignore
+            ('remove_path', '/path/2', True),
+        ]
+
+    def test_can_connect_simple(self, container: ops.Container):
+        container.pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))  # type: ignore
+        assert container.can_connect()
+
+    def test_can_connect_connection_error(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        container: ops.Container,
+    ):
+        def raise_error():
+            raise pebble.ConnectionError('connection error!')
+        container.pebble.get_system_info = raise_error
+        with caplog.at_level(level='DEBUG', logger='ops'):
+            assert not container.can_connect()
+        assert len(caplog.records) == 1
+        assert re.search(r'connection error!', caplog.text)
+
+    def test_can_connect_file_not_found_error(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        container: ops.Container,
+    ):
+        def raise_error():
+            raise FileNotFoundError('file not found!')
+        container.pebble.get_system_info = raise_error
+        with caplog.at_level(level='DEBUG', logger='ops'):
+            assert not container.can_connect()
+        assert len(caplog.records) == 1
+        assert re.search(r'file not found!', caplog.text)
+
+    def test_can_connect_api_error(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        container: ops.Container,
+    ):
+        def raise_error():
+            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
+        container.pebble.get_system_info = raise_error
+        with caplog.at_level(level='WARNING', logger='ops'):
+            assert not container.can_connect()
+        assert len(caplog.records) == 1
+        assert re.search(r'api error!', caplog.text)
+
+    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
+    def test_exec(self, container: ops.Container):
+        container.pebble.responses.append('fake_exec_process')  # type: ignore
+        stdout = io.StringIO('STDOUT')
+        stderr = io.StringIO('STDERR')
+        p = container.exec(
+            ['echo', 'foo'],
+            service_context='srv1',
+            environment={'K1': 'V1', 'K2': 'V2'},
+            working_dir='WD',
+            timeout=10.5,
+            user_id=1000,
+            user='bob',
+            group_id=1000,
+            group='staff',
+            stdin='STDIN',
+            stdout=stdout,
+            stderr=stderr,
+            encoding="encoding",
+            combine_stderr=True,
+        )
+        assert container.pebble.requests == [  # type: ignore
+            ('exec', ['echo', 'foo'], dict(
+                service_context='srv1',
+                environment={'K1': 'V1', 'K2': 'V2'},
+                working_dir='WD',
+                timeout=10.5,
+                user_id=1000,
+                user='bob',
+                group_id=1000,
+                group='staff',
+                stdin='STDIN',
+                stdout=stdout,
+                stderr=stderr,
+                encoding="encoding",
+                combine_stderr=True,
+            ))
+        ]
+        assert p == 'fake_exec_process'
+
+    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
+    def test_exec_service_context_not_supported(self, container: ops.Container):
+        with pytest.raises(RuntimeError):
+            container.exec(['foo'], service_context='srv1')
+
+    def test_send_signal(self, container: ops.Container):
+        with pytest.raises(TypeError):
+            container.send_signal('SIGHUP')
+
+        container.send_signal('SIGHUP', 's1')
+        assert container.pebble.requests == [  # type: ignore
+            ('send_signal', 'SIGHUP', ('s1',)),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+        container.send_signal('SIGHUP', 's1', 's2')
+        assert container.pebble.requests == [  # type: ignore
+            ('send_signal', 'SIGHUP', ('s1', 's2')),
+        ]
+        container.pebble.requests = []  # type: ignore
+
+    def test_get_notice(self, container: ops.Container):
+        container.pebble.responses.append(pebble.Notice.from_dict({  # type: ignore
+            'id': '123',
+            'user-id': 1000,
+            'type': 'custom',
+            'key': 'example.com/a',
+            'first-occurred': '2023-12-07T17:01:02.123456789Z',
+            'last-occurred': '2023-12-07T17:01:03.123456789Z',
+            'last-repeated': '2023-12-07T17:01:04.123456789Z',
+            'occurrences': 8,
+        }))
+
+        notice = container.get_notice('123')
+        assert notice.id == '123'
+        assert notice.type == pebble.NoticeType.CUSTOM
+        assert notice.key == 'example.com/a'
+
+        assert container.pebble.requests == [  # type: ignore
+            ('get_notice', '123'),
+        ]
+
+    def test_get_notice_not_found(self, container: ops.Container):
+        def raise_error(id: str):
+            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
+        container.pebble.get_notice = raise_error
+        with pytest.raises(ops.ModelError):
+            container.get_notice('123')
+
+    def test_get_notices(self, container: ops.Container):
+        container.pebble.responses.append([  # type: ignore
+            pebble.Notice.from_dict({
+                'id': '124',
+                'user-id': 1000,
+                'type': 'custom',
+                'key': 'example.com/b',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 8,
+            }),
+        ])
+
+        notices = container.get_notices(
+            user_id=1000,
+            users=pebble.NoticesUsers.ALL,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+        )
+        assert len(notices) == 1
+        assert notices[0].id == '124'
+        assert notices[0].type == pebble.NoticeType.CUSTOM
+        assert notices[0].key == 'example.com/b'
+
+        assert container.pebble.requests == [('get_notices', dict(  # type: ignore
+            user_id=1000,
+            users=pebble.NoticesUsers.ALL,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+        ))]
 
 
 class MockPebbleBackend(_ModelBackend):
@@ -1719,553 +2181,6 @@ class MockPebbleClient:
         return self.responses.pop(0)
 
 
-class TestContainerPebble:
-    @pytest.fixture
-    def model(self):
-        meta = ops.CharmMeta.from_yaml("""
-name: k8s-charm
-containers:
-  c1:
-    k: v
-""")
-        backend = MockPebbleBackend('myapp/0')
-        return ops.Model(meta, backend)
-
-    @pytest.fixture
-    def container(self, model: ops.Model):
-        return model.unit.containers['c1']
-
-    @pytest.fixture
-    def container_pebble(self, container: ops.Container):
-        return container.pebble
-
-    def test_socket_path(self, container_pebble: MockPebbleClient):
-        assert container_pebble.socket_path == '/charm/containers/c1/pebble.socket'
-
-    def test_autostart(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.autostart()
-        assert container_pebble.requests == [('autostart',)]
-
-    def test_replan(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.replan()
-        assert container_pebble.requests == [('replan',)]
-
-    def test_can_connect(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container_pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))
-        assert container.can_connect()
-        assert container_pebble.requests == [('get_system_info',)]
-
-    def test_start(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.start('foo')
-        container.start('foo', 'bar')
-        assert container_pebble.requests == [
-            ('start', ('foo',)),
-            ('start', ('foo', 'bar')),
-        ]
-
-    def test_start_no_arguments(self, container: ops.Container):
-        with pytest.raises(TypeError):
-            container.start()
-
-    def test_stop(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.stop('foo')
-        container.stop('foo', 'bar')
-        assert container_pebble.requests == [
-            ('stop', ('foo',)),
-            ('stop', ('foo', 'bar')),
-        ]
-
-    def test_stop_no_arguments(self, container: ops.Container):
-        with pytest.raises(TypeError):
-            container.stop()
-
-    def test_restart(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.restart('foo')
-        container.restart('foo', 'bar')
-        assert container_pebble.requests == [
-            ('restart', ('foo',)),
-            ('restart', ('foo', 'bar')),
-        ]
-
-    def test_restart_fallback(self, container: ops.Container, container_pebble: MockPebbleClient):
-        def restart_services(service_names: str):
-            container_pebble.requests.append(('restart', service_names))
-            raise pebble.APIError({}, 400, "", "")
-
-        container_pebble.restart_services = restart_services
-        # Setup the Pebble client to respond to a call to get_services()
-        container_pebble.responses.append([
-            pebble.ServiceInfo.from_dict(
-                {'name': 'foo', 'startup': 'enabled', 'current': 'active'}),
-            pebble.ServiceInfo.from_dict(
-                {'name': 'bar', 'startup': 'enabled', 'current': 'inactive'}),
-        ])
-
-        container.restart('foo', 'bar')
-        assert container_pebble.requests == [
-            # This is the first request, which in real life fails with APIError on older versions
-            ('restart', ('foo', 'bar')),
-            # Next the code should loop over the started services, and stop them
-            ('get_services', ('foo', 'bar')),
-            ('stop', ('foo',)),
-            # Then start all the specified services
-            ('start', ('foo', 'bar'))
-        ]
-
-    def test_restart_fallback_non_400_error(
-        self,
-        container: ops.Container,
-        container_pebble: MockPebbleClient,
-    ):
-        def restart_services(service_names: str):
-            raise pebble.APIError({}, 500, "", "")
-
-        container_pebble.restart_services = restart_services
-        with pytest.raises(pebble.APIError) as excinfo:
-            container.restart('foo')
-        assert excinfo.value.code == 500
-
-    def test_restart_no_arguments(self, container: ops.Container):
-        with pytest.raises(TypeError):
-            container.restart()
-
-    def test_type_errors(self, container: ops.Container):
-        meta = ops.CharmMeta.from_yaml("""
-name: k8s-charm
-containers:
-  c1:
-    k: v
-""")
-        # Only the real pebble Client checks types, so use actual backend class
-        backend = _ModelBackend('myapp/0')
-        model = ops.Model(meta, backend)
-        container = model.unit.containers['c1']
-
-        with pytest.raises(TypeError):
-            container.start(['foo'])  # type: ignore
-
-        with pytest.raises(TypeError):
-            container.stop(['foo'])  # type: ignore
-
-    def test_add_layer(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.add_layer('a', 'summary: str\n')
-        container.add_layer('b', {'summary': 'dict'})
-        container.add_layer('c', pebble.Layer('summary: Layer'))
-        container.add_layer('d', 'summary: str\n', combine=True)
-        assert container_pebble.requests == [
-            ('add_layer', 'a', 'summary: str\n', False),
-            ('add_layer', 'b', 'summary: dict\n', False),
-            ('add_layer', 'c', 'summary: Layer\n', False),
-            ('add_layer', 'd', 'summary: str\n', True),
-        ]
-
-        # combine is a keyword-only arg (should be combine=True)
-        with pytest.raises(TypeError):
-            container.add_layer('x', {}, True)  # type: ignore
-
-    def test_get_plan(self, container: ops.Container, container_pebble: MockPebbleClient):
-        plan_yaml = 'services:\n foo:\n  override: replace\n  command: bar'
-        container_pebble.responses.append(pebble.Plan(plan_yaml))
-        plan = container.get_plan()
-        assert container_pebble.requests == [('get_plan',)]
-        assert isinstance(plan, pebble.Plan)
-        assert plan.to_yaml() == yaml.safe_dump(yaml.safe_load(plan_yaml))
-
-    @staticmethod
-    def _make_service(name: str, startup: str, current: str):
-        return pebble.ServiceInfo.from_dict(
-            {'name': name, 'startup': startup, 'current': current})
-
-    def test_get_services(self, container: ops.Container, container_pebble: MockPebbleClient):
-        two_services = [
-            self._make_service('s1', 'enabled', 'active'),
-            self._make_service('s2', 'disabled', 'inactive'),
-        ]
-        container_pebble.responses.append(two_services)
-        services = container.get_services()
-        assert len(services) == 2
-        assert set(services) == {'s1', 's2'}
-        assert services['s1'].name == 's1'
-        assert services['s1'].startup == pebble.ServiceStartup.ENABLED
-        assert services['s1'].current == pebble.ServiceStatus.ACTIVE
-        assert services['s2'].name == 's2'
-        assert services['s2'].startup == pebble.ServiceStartup.DISABLED
-        assert services['s2'].current == pebble.ServiceStatus.INACTIVE
-
-        container_pebble.responses.append(two_services)
-        services = container.get_services('s1', 's2')
-        assert len(services) == 2
-        assert set(services) == {'s1', 's2'}
-        assert services['s1'].name == 's1'
-        assert services['s1'].startup == pebble.ServiceStartup.ENABLED
-        assert services['s1'].current == pebble.ServiceStatus.ACTIVE
-        assert services['s2'].name == 's2'
-        assert services['s2'].startup == pebble.ServiceStartup.DISABLED
-        assert services['s2'].current == pebble.ServiceStatus.INACTIVE
-
-        assert container_pebble.requests == [
-            ('get_services', None),
-            ('get_services', ('s1', 's2')),
-        ]
-
-    def test_get_service(self, container: ops.Container, container_pebble: MockPebbleClient):
-        # Single service returned successfully
-        container_pebble.responses.append([self._make_service('s1', 'enabled', 'active')])
-        s = container.get_service('s1')
-        assert container_pebble.requests == [('get_services', ('s1', ))]
-        assert s.name == 's1'
-        assert s.startup == pebble.ServiceStartup.ENABLED
-        assert s.current == pebble.ServiceStatus.ACTIVE
-
-        # If Pebble returns no services, should be a ops.ModelError
-        container_pebble.responses.append([])
-        with pytest.raises(ops.ModelError) as excinfo:
-            container.get_service('s2')
-        assert str(excinfo.value) == "service 's2' not found"
-
-        # If Pebble returns more than one service, RuntimeError is raised
-        container_pebble.responses.append([
-            self._make_service('s1', 'enabled', 'active'),
-            self._make_service('s2', 'disabled', 'inactive'),
-        ])
-        with pytest.raises(RuntimeError):
-            container.get_service('s1')
-
-    def test_get_checks(self, container: ops.Container, container_pebble: MockPebbleClient):
-        response_checks = [
-            pebble.CheckInfo.from_dict({
-                'name': 'c1',
-                'status': 'up',
-                'failures': 0,
-                'threshold': 3,
-            }),  # type: ignore
-            pebble.CheckInfo.from_dict({
-                'name': 'c2',
-                'level': 'alive',
-                'status': 'down',
-                'failures': 2,
-                'threshold': 2,
-            }),
-        ]
-
-        container_pebble.responses.append(response_checks)
-        checks = container.get_checks()
-        assert len(checks) == 2
-        assert checks['c1'].name == 'c1'
-        assert checks['c1'].level == pebble.CheckLevel.UNSET
-        assert checks['c1'].status == pebble.CheckStatus.UP
-        assert checks['c1'].failures == 0
-        assert checks['c1'].threshold == 3
-        assert checks['c2'].name == 'c2'
-        assert checks['c2'].level == pebble.CheckLevel.ALIVE
-        assert checks['c2'].status == pebble.CheckStatus.DOWN
-        assert checks['c2'].failures == 2
-        assert checks['c2'].threshold == 2
-
-        container_pebble.responses.append(response_checks[1:2])
-        checks = container.get_checks('c1', 'c2', level=pebble.CheckLevel.ALIVE)
-        assert len(checks) == 1
-        assert checks['c2'].name == 'c2'
-        assert checks['c2'].level == pebble.CheckLevel.ALIVE
-        assert checks['c2'].status == pebble.CheckStatus.DOWN
-        assert checks['c2'].failures == 2
-        assert checks['c2'].threshold == 2
-
-        assert container_pebble.requests == [
-            ('get_checks', None, None),
-            ('get_checks', pebble.CheckLevel.ALIVE, ('c1', 'c2')),
-        ]
-
-    def test_get_check(self, container: ops.Container, container_pebble: MockPebbleClient):
-        # Single check returned successfully
-        container_pebble.responses.append([
-            pebble.CheckInfo.from_dict({
-                'name': 'c1',
-                'status': 'up',
-                'failures': 0,
-                'threshold': 3,
-            })  # type: ignore
-        ])
-        c = container.get_check('c1')
-        assert container_pebble.requests == [('get_checks', None, ('c1', ))]
-        assert c.name == 'c1'
-        assert c.level == pebble.CheckLevel.UNSET
-        assert c.status == pebble.CheckStatus.UP
-        assert c.failures == 0
-        assert c.threshold == 3
-
-        # If Pebble returns no checks, should be a ops.ModelError
-        container_pebble.responses.append([])
-        with pytest.raises(ops.ModelError) as excinfo:
-            container.get_check('c2')
-        assert str(excinfo.value) == "check 'c2' not found"
-
-        # If Pebble returns more than one check, RuntimeError is raised
-        container_pebble.responses.append([
-            pebble.CheckInfo.from_dict({
-                'name': 'c1',
-                'status': 'up',
-                'failures': 0,
-                'threshold': 3,
-            }),  # type: ignore
-            pebble.CheckInfo.from_dict({
-                'name': 'c2',
-                'level': 'alive',
-                'status': 'down',
-                'failures': 2,
-                'threshold': 2,
-            }),
-        ])
-        with pytest.raises(RuntimeError):
-            container.get_check('c1')
-
-    def test_pull(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container_pebble.responses.append('dummy1')
-        got = container.pull('/path/1')
-        assert got == 'dummy1'
-        assert container_pebble.requests == [
-            ('pull', '/path/1', 'utf-8'),
-        ]
-        container_pebble.requests = []
-
-        container_pebble.responses.append(b'dummy2')
-        got = container.pull('/path/2', encoding=None)
-        assert got == b'dummy2'
-        assert container_pebble.requests == [
-            ('pull', '/path/2', None),
-        ]
-
-    def test_push(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.push('/path/1', 'content1')
-        assert container_pebble.requests == [
-            ('push', '/path/1', 'content1', 'utf-8', False, None,
-             None, None, None, None),
-        ]
-        container_pebble.requests = []
-
-        container.push('/path/2', b'content2', make_dirs=True,
-                       permissions=0o600, user_id=12, user='bob', group_id=34, group='staff')
-        assert container_pebble.requests == [
-            ('push', '/path/2', b'content2', 'utf-8', True, 0o600, 12, 'bob', 34, 'staff'),
-        ]
-
-    def test_list_files(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container_pebble.responses.append('dummy1')
-        ret = container.list_files('/path/1')
-        assert ret == 'dummy1'
-        assert container_pebble.requests == [
-            ('list_files', '/path/1', None, False),
-        ]
-        container_pebble.requests = []
-
-        container_pebble.responses.append('dummy2')
-        ret = container.list_files('/path/2', pattern='*.txt', itself=True)
-        assert ret == 'dummy2'
-        assert container_pebble.requests == [
-            ('list_files', '/path/2', '*.txt', True),
-        ]
-
-    def test_make_dir(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.make_dir('/path/1')
-        assert container_pebble.requests == [
-            ('make_dir', '/path/1', False, None, None, None, None, None),
-        ]
-        container_pebble.requests = []
-
-        container.make_dir('/path/2', make_parents=True, permissions=0o700,
-                           user_id=12, user='bob', group_id=34, group='staff')
-        assert container_pebble.requests == [
-            ('make_dir', '/path/2', True, 0o700, 12, 'bob', 34, 'staff'),
-        ]
-
-    def test_remove_path(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container.remove_path('/path/1')
-        assert container_pebble.requests == [
-            ('remove_path', '/path/1', False),
-        ]
-        container_pebble.requests = []
-
-        container.remove_path('/path/2', recursive=True)
-        assert container_pebble.requests == [
-            ('remove_path', '/path/2', True),
-        ]
-
-    def test_can_connect_simple(
-        self,
-        container: ops.Container,
-        container_pebble: MockPebbleClient,
-    ):
-        container_pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))
-        assert container.can_connect()
-
-    def test_can_connect_connection_error(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        container: ops.Container,
-        container_pebble: MockPebbleClient,
-    ):
-        def raise_error():
-            raise pebble.ConnectionError('connection error!')
-        container_pebble.get_system_info = raise_error
-        with caplog.at_level(level='DEBUG', logger='ops'):
-            assert not container.can_connect()
-        assert len(caplog.records) == 1
-        assert re.search(r'connection error!', caplog.text)
-
-    def test_can_connect_file_not_found_error(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        container: ops.Container,
-        container_pebble: MockPebbleClient,
-    ):
-        def raise_error():
-            raise FileNotFoundError('file not found!')
-        container_pebble.get_system_info = raise_error
-        with caplog.at_level(level='DEBUG', logger='ops'):
-            assert not container.can_connect()
-        assert len(caplog.records) == 1
-        assert re.search(r'file not found!', caplog.text)
-
-    def test_can_connect_api_error(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        container: ops.Container,
-        container_pebble: MockPebbleClient,
-    ):
-        def raise_error():
-            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
-        container_pebble.get_system_info = raise_error
-        with caplog.at_level(level='WARNING', logger='ops'):
-            assert not container.can_connect()
-        assert len(caplog.records) == 1
-        assert re.search(r'api error!', caplog.text)
-
-    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
-    def test_exec(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container_pebble.responses.append('fake_exec_process')
-        stdout = io.StringIO('STDOUT')
-        stderr = io.StringIO('STDERR')
-        p = container.exec(
-            ['echo', 'foo'],
-            service_context='srv1',
-            environment={'K1': 'V1', 'K2': 'V2'},
-            working_dir='WD',
-            timeout=10.5,
-            user_id=1000,
-            user='bob',
-            group_id=1000,
-            group='staff',
-            stdin='STDIN',
-            stdout=stdout,
-            stderr=stderr,
-            encoding="encoding",
-            combine_stderr=True,
-        )
-        assert container_pebble.requests == [
-            ('exec', ['echo', 'foo'], dict(
-                service_context='srv1',
-                environment={'K1': 'V1', 'K2': 'V2'},
-                working_dir='WD',
-                timeout=10.5,
-                user_id=1000,
-                user='bob',
-                group_id=1000,
-                group='staff',
-                stdin='STDIN',
-                stdout=stdout,
-                stderr=stderr,
-                encoding="encoding",
-                combine_stderr=True,
-            ))
-        ]
-        assert p == 'fake_exec_process'
-
-    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
-    def test_exec_service_context_not_supported(self, container: ops.Container):
-        with pytest.raises(RuntimeError):
-            container.exec(['foo'], service_context='srv1')
-
-    def test_send_signal(self, container: ops.Container, container_pebble: MockPebbleClient):
-        with pytest.raises(TypeError):
-            container.send_signal('SIGHUP')
-
-        container.send_signal('SIGHUP', 's1')
-        assert container_pebble.requests == [
-            ('send_signal', 'SIGHUP', ('s1',)),
-        ]
-        container_pebble.requests = []
-
-        container.send_signal('SIGHUP', 's1', 's2')
-        assert container_pebble.requests == [
-            ('send_signal', 'SIGHUP', ('s1', 's2')),
-        ]
-        container_pebble.requests = []
-
-    def test_get_notice(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container_pebble.responses.append(pebble.Notice.from_dict({
-            'id': '123',
-            'user-id': 1000,
-            'type': 'custom',
-            'key': 'example.com/a',
-            'first-occurred': '2023-12-07T17:01:02.123456789Z',
-            'last-occurred': '2023-12-07T17:01:03.123456789Z',
-            'last-repeated': '2023-12-07T17:01:04.123456789Z',
-            'occurrences': 8,
-        }))
-
-        notice = container.get_notice('123')
-        assert notice.id == '123'
-        assert notice.type == pebble.NoticeType.CUSTOM
-        assert notice.key == 'example.com/a'
-
-        assert container_pebble.requests == [
-            ('get_notice', '123'),
-        ]
-
-    def test_get_notice_not_found(
-        self,
-        container: ops.Container,
-        container_pebble: MockPebbleClient,
-    ):
-        def raise_error(id: str):
-            raise pebble.APIError({'body': ''}, 404, 'status', 'api error!')
-        container_pebble.get_notice = raise_error
-        with pytest.raises(ops.ModelError):
-            container.get_notice('123')
-
-    def test_get_notices(self, container: ops.Container, container_pebble: MockPebbleClient):
-        container_pebble.responses.append([
-            pebble.Notice.from_dict({
-                'id': '124',
-                'user-id': 1000,
-                'type': 'custom',
-                'key': 'example.com/b',
-                'first-occurred': '2023-12-07T17:01:02.123456789Z',
-                'last-occurred': '2023-12-07T17:01:03.123456789Z',
-                'last-repeated': '2023-12-07T17:01:04.123456789Z',
-                'occurrences': 8,
-            }),
-        ])
-
-        notices = container.get_notices(
-            user_id=1000,
-            users=pebble.NoticesUsers.ALL,
-            types=[pebble.NoticeType.CUSTOM],
-            keys=['example.com/a', 'example.com/b'],
-        )
-        assert len(notices) == 1
-        assert notices[0].id == '124'
-        assert notices[0].type == pebble.NoticeType.CUSTOM
-        assert notices[0].key == 'example.com/b'
-
-        assert container_pebble.requests == [('get_notices', dict(
-            user_id=1000,
-            users=pebble.NoticesUsers.ALL,
-            types=[pebble.NoticeType.CUSTOM],
-            keys=['example.com/a', 'example.com/b'],
-        ))]
-
-
 class TestModelBindings:
     @pytest.fixture
     def model(self, fake_script: FakeScript):
@@ -2345,7 +2260,7 @@ class TestModelBindings:
         name: str = 'db1',
         relation_id: typing.Optional[int] = None
     ):
-        """Wrapper around self.model.get_relation that enforces that None is not returned."""
+        """Wrapper around model.get_relation that enforces that None is not returned."""
         rel_db1 = model.get_relation(name, relation_id)
         assert rel_db1 is not None, rel_db1  # Type checkers don't understand `assertIsNotNone`
         return rel_db1
@@ -2366,7 +2281,7 @@ class TestModelBindings:
             ipaddress.ip_network('192.0.2.2/32'),
             ipaddress.ip_network('192.0.3.0/24'),
             ipaddress.ip_network('dead:beef::/64'),
-            ipaddress.ip_network('2001:db8::3/128')
+            ipaddress.ip_network('2001:db8::3/128'),
         ]
 
         for (i, (name, address, subnet)) in enumerate([
@@ -2374,7 +2289,7 @@ class TestModelBindings:
             ('lo', 'dead:beef::1', 'dead:beef::/64'),
             ('tun', '192.0.3.3', '192.0.3.3/32'),
             ('tun', '2001:db8::3', '2001:db8::3/128'),
-            ('tun', 'fe80::1:1', 'fe80::/64')
+            ('tun', 'fe80::1:1', 'fe80::/64'),
         ]):
             assert binding.network.interfaces[i].name == name
             assert binding.network.interfaces[i].address == ipaddress.ip_address(address)
@@ -2385,7 +2300,7 @@ class TestModelBindings:
             ('lo', 'dead:beef::1', 'dead:beef::/64'),
             ('tun', '192.0.3.3', '192.0.3.3/32'),
             ('tun', '2001:db8::3', '2001:db8::3/128'),
-            ('tun', 'fe80::1:1', 'fe80::/64')
+            ('tun', 'fe80::1:1', 'fe80::/64'),
         ]):
             assert binding.network.interfaces[i].name == name
             assert binding.network.interfaces[i].address == ipaddress.ip_address(address)
