@@ -189,8 +189,11 @@ class TestRealPebble:
         assert out == 'FOO\nBAR\n'
         assert err == ''
 
-        process = client.exec(['awk', '{ print toupper($0) }'], stdin=b'foo\nBar\n',
-                              encoding=None)
+        process = client.exec(
+            ['awk', '{ print toupper($0) }'],
+            stdin=b'foo\nBar\n',
+            encoding=None,
+        )
         out, err = process.wait_output()
         assert out == b'FOO\nBAR\n'
         assert err == b''
@@ -218,8 +221,10 @@ class TestRealPebble:
             assert err == ''
 
     def test_exec_environment(self, client: pebble.Client):
-        process = client.exec(['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'],
-                              environment={'ONE': '1', 'TWO': '2'})
+        process = client.exec(
+            ['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'],
+            environment={'ONE': '1', 'TWO': '2'},
+        )
         out, err = process.wait_output()
         assert out == '1.2.\n'
         assert err == ''
