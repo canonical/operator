@@ -1289,6 +1289,7 @@ class TestCheckInfo:
         assert check.status == pebble.CheckStatus.UP
         assert check.failures == 0
         assert check.threshold == 3
+        assert check.change_id is None
 
         check = pebble.CheckInfo(
             name='chk2',
@@ -1296,12 +1297,14 @@ class TestCheckInfo:
             status=pebble.CheckStatus.DOWN,
             failures=5,
             threshold=3,
+            change_id=pebble.ChangeID('10'),
         )
         assert check.name == 'chk2'
         assert check.level == pebble.CheckLevel.ALIVE
         assert check.status == pebble.CheckStatus.DOWN
         assert check.failures == 5
         assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('10')
 
         d: pebble._CheckInfoDict = {
             'name': 'chk3',
@@ -1314,6 +1317,7 @@ class TestCheckInfo:
         assert check.status == pebble.CheckStatus.UP
         assert check.failures == 0
         assert check.threshold == 3
+        assert check.change_id is None
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
@@ -1321,12 +1325,14 @@ class TestCheckInfo:
             'status': pebble.CheckStatus.DOWN,
             'failures': 3,
             'threshold': 3,
+            'change-id': '42',
         })
         assert check.name == 'chk4'
         assert check.level == pebble.CheckLevel.UNSET
         assert check.status == pebble.CheckStatus.DOWN
         assert check.failures == 3
         assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('42')
 
 
 _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]

@@ -20,6 +20,8 @@ import tempfile
 import typing
 import unittest
 
+import pytest
+
 import ops
 from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
@@ -72,6 +74,101 @@ def fake_script_calls(test_case: unittest.TestCase,
         if clear:
             f.truncate(0)  # type: ignore
     return calls  # type: ignore
+
+
+def create_framework(
+        request: pytest.FixtureRequest,
+        *,
+        meta: typing.Optional[ops.CharmMeta] = None):
+    env_backup = os.environ.copy()
+    os.environ['PATH'] = os.pathsep.join([
+        str(pathlib.Path(__file__).parent / 'bin'),
+        os.environ['PATH']])
+    os.environ['JUJU_UNIT_NAME'] = 'local/0'
+
+    tmpdir = pathlib.Path(tempfile.mkdtemp())
+
+    class CustomEvent(ops.EventBase):
+        pass
+
+    class TestCharmEvents(ops.CharmEvents):
+        custom = ops.EventSource(CustomEvent)
+
+    # Relations events are defined dynamically and modify the class attributes.
+    # We use a subclass temporarily to prevent these side effects from leaking.
+    ops.CharmBase.on = TestCharmEvents()  # type: ignore
+
+    if meta is None:
+        meta = ops.CharmMeta()
+    model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
+    # We can pass foo_event as event_name because we're not actually testing dispatch.
+    framework = ops.Framework(SQLiteStorage(':memory:'), tmpdir, meta, model)  # type: ignore
+
+    def finalizer():
+        os.environ.clear()
+        os.environ.update(env_backup)
+        shutil.rmtree(tmpdir)
+        ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+        framework.close()
+
+    request.addfinalizer(finalizer)
+
+    return framework
+
+
+class FakeScript:
+    def __init__(
+        self,
+        request: pytest.FixtureRequest,
+        path: typing.Optional[pathlib.Path] = None,
+    ):
+        if path is None:
+            fake_script_path = tempfile.mkdtemp('-fake_script')
+            self.path = pathlib.Path(fake_script_path)
+            old_path = os.environ['PATH']
+            os.environ['PATH'] = os.pathsep.join([fake_script_path, os.environ['PATH']])
+
+            def cleanup():
+                shutil.rmtree(self.path)
+                os.environ['PATH'] = old_path
+
+            request.addfinalizer(cleanup)
+        else:
+            self.path = path
+
+    def write(self, name: str, content: str):
+        template_args: typing.Dict[str, str] = {
+            'name': name,
+            'path': self.path.as_posix(),
+            'content': content,
+        }
+
+        path: pathlib.Path = self.path / name
+        with path.open('wt') as f:
+            # Before executing the provided script, dump the provided arguments in calls.txt.
+            # RS 'record separator' (octal 036 in ASCII), FS 'file separator' (octal 034 in ASCII).
+            f.write(
+                '''#!/bin/sh
+{{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
+{content}'''.format_map(template_args))
+        path.chmod(0o755)
+        # TODO: this hardcodes the path to bash.exe, which works for now but might
+        #       need to be set via environ or something like that.
+        path.with_suffix(".bat").write_text(  # type: ignore
+            f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n')
+
+    def calls(self, clear: bool = False) -> typing.List[typing.List[str]]:
+        calls_file: pathlib.Path = self.path / 'calls.txt'
+        if not calls_file.exists():
+            return []
+
+        # Newline and encoding forced to Linux-y defaults because on
+        # windows they're written from git-bash.
+        with calls_file.open('r+t', newline='\n', encoding='utf8') as f:
+            calls = [line.split('\036') for line in f.read().split('\034')[:-1]]
+            if clear:
+                f.truncate(0)
+        return calls
 
 
 class FakeScriptTest(unittest.TestCase):

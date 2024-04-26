@@ -208,7 +208,8 @@ if TYPE_CHECKING:
                                 "level": NotRequired[Optional[Union['CheckLevel', str]]],
                                 "status": Union['CheckStatus', str],
                                 "failures": NotRequired[int],
-                                "threshold": int})
+                                "threshold": int,
+                                "change-id": NotRequired[str]})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
@@ -1268,6 +1269,13 @@ class CheckInfo:
     This is how many consecutive failures for the check to be considered "down".
     """
 
+    change_id: Optional[ChangeID]
+    """Change ID of ``perform-check`` or ``recover-check`` change driving this check.
+
+    This will be None on older versions of Pebble, which did not use changes
+    to drive health checks.
+    """
+
     def __init__(
         self,
         name: str,
@@ -1275,12 +1283,14 @@ class CheckInfo:
         status: Union[CheckStatus, str],
         failures: int = 0,
         threshold: int = 0,
+        change_id: Optional[ChangeID] = None,
     ):
         self.name = name
         self.level = level
         self.status = status
         self.failures = failures
         self.threshold = threshold
+        self.change_id = change_id
 
     @classmethod
     def from_dict(cls, d: '_CheckInfoDict') -> 'CheckInfo':
@@ -1299,15 +1309,17 @@ class CheckInfo:
             status=status,
             failures=d.get('failures', 0),
             threshold=d['threshold'],
+            change_id=ChangeID(d['change-id']) if 'change-id' in d else None,
         )
 
     def __repr__(self):
         return ('CheckInfo('
                 f'name={self.name!r}, '
-                f'level={self.level!r}, '
+                f'level={self.level}, '
                 f'status={self.status}, '
                 f'failures={self.failures}, '
-                f'threshold={self.threshold!r})'
+                f'threshold={self.threshold!r}, '
+                f'change_id={self.change_id!r})'
                 )
 
 
