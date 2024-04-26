@@ -1786,18 +1786,19 @@ class TestClient:
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def _services_action_async_helper(self,
-                                      client: MockClient,
-                                      action: str,
-                                      api_func: typing.Callable[...,
-                                                                str],
-                                      services: typing.List[str]):
+    def _services_action_async_helper(
+        self,
+        client: MockClient,
+        action: str,
+        api_func: typing.Callable[..., str],
+        services: typing.List[str],
+    ):
         client.responses.append({
             "change": "70",
             "result": None,
             "status": "Accepted",
             "status-code": 202,
-            "type": "async"
+            "type": "async",
         })
         change_id = api_func(timeout=0)
         assert change_id == '70'
@@ -1949,10 +1950,11 @@ class TestClient:
         assert time.time() == 4
 
     def test_wait_change_success_polled(
-            self,
-            client: MockClient,
-            time: MockTime,
-            timeout: typing.Optional[float] = 30.0):
+        self,
+        client: MockClient,
+        time: MockTime,
+        timeout: typing.Optional[float] = 30.0,
+    ):
         # Trigger polled mode
         client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
