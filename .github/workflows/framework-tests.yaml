@@ -103,6 +103,7 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         exclude:
         - {python-version: "3.8", os: "macos-latest"}  # macos-14 is arm64, and there's no Python 3.8 build for arm64
+        - {python-version: "3.9", os: "macos-latest"}  # macos-14 is arm64, and there's no Python 3.9 build for arm64
 
     steps:
       - uses: actions/checkout@v3
