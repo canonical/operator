@@ -56,7 +56,7 @@ def get_socket_path() -> str:
     return socket_path
 
 
-@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS') == '1', 'RUN_REAL_PEBBLE_TESTS not set')
+@pytest.mark.skipif(os.getenv('RUN_REAL_PEBBLE_TESTS') != '1', reason='RUN_REAL_PEBBLE_TESTS not set')
 class TestRealPebble:
     @pytest.fixture
     def client(self):
@@ -292,7 +292,7 @@ class TestRealPebble:
         assert plan.log_targets["pretend-loki"].labels == {"foo": "bar"}
 
 
-@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS') == '1', 'RUN_REAL_PEBBLE_TESTS not set')
+@pytest.mark.skipif(os.getenv('RUN_REAL_PEBBLE_TESTS') != '1', reason='RUN_REAL_PEBBLE_TESTS not set')
 class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
     def setUp(self):
         pebble_path = os.getenv('PEBBLE')
@@ -310,7 +310,7 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsT
         pass
 
 
-@unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS') == '1', 'RUN_REAL_PEBBLE_TESTS not set')
+@pytest.mark.skipif(os.getenv('RUN_REAL_PEBBLE_TESTS') != '1', reason='RUN_REAL_PEBBLE_TESTS not set')
 class TestNoticesUsingRealPebble(unittest.TestCase, PebbleNoticesMixin):
     def setUp(self):
         self.client = pebble.Client(socket_path=get_socket_path())
