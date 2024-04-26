@@ -193,7 +193,7 @@ class TestModel:
 
         self.assertBackendCalls(harness, [
             ('relation_ids', 'db1'),
-            ('relation_list', relation_id)
+            ('relation_list', relation_id),
         ])
 
     def test_our_unit_is_our(self, harness: ops.testing.Harness[ops.CharmBase]):
@@ -365,7 +365,7 @@ class TestModel:
             ('relation_ids', 'db1'),
             ('relation_list', 0),
             ('relation_get', 0, 'myapp', True),
-            ('update_relation_data', 0, harness.model.app, 'password', 'foo')
+            ('update_relation_data', 0, harness.model.app, 'password', 'foo'),
         ])
 
     def test_app_relation_data_modify_local_as_minion(
@@ -392,7 +392,7 @@ class TestModel:
             ('relation_ids', 'db1'),
             ('relation_list', 0),
             ('relation_get', 0, 'myapp', True),
-            ('is_leader',)
+            ('is_leader',),
         ])
 
     def test_relation_data_access_peer_leader(self, harness: ops.testing.Harness[ops.CharmBase]):
@@ -569,7 +569,7 @@ class TestModel:
 
             self.assertBackendCalls(harness, [
                 ('is_leader',),
-                ('relation_get', 0, 'myapp', True)
+                ('relation_get', 0, 'myapp', True),
             ])
 
             self.resetBackendCalls(harness)
