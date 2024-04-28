@@ -14,7 +14,6 @@
 
 import collections
 import datetime
-import functools
 import grp
 import importlib
 import inspect
@@ -634,7 +633,9 @@ class TestHarness:
                       'relation_id': rel_id}}
 
     def test_removing_relation_unit_does_not_remove_other_unit_and_data(
-            self, request: pytest.FixtureRequest):
+        self,
+        request: pytest.FixtureRequest,
+    ):
         harness = ops.testing.Harness(RelationEventCharm, meta='''
             name: test-app
             requires:
@@ -1278,7 +1279,7 @@ class TestHarness:
 
     def test_metadata_from_directory(self, request: pytest.FixtureRequest):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmp)))
+        request.addfinalizer(lambda: shutil.rmtree(tmp))
         metadata_filename = tmp / 'metadata.yaml'
         with metadata_filename.open('wt') as metadata:
             metadata.write(textwrap.dedent('''
@@ -1295,7 +1296,7 @@ class TestHarness:
 
     def test_metadata_from_directory_charmcraft_yaml(self, request: pytest.FixtureRequest):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, tmp))
+        request.addfinalizer(lambda: shutil.rmtree(tmp))
         charmcraft_filename = tmp / 'charmcraft.yaml'
         charmcraft_filename.write_text(textwrap.dedent('''
             type: charm
@@ -1320,7 +1321,7 @@ class TestHarness:
 
     def test_config_from_directory(self, request: pytest.FixtureRequest):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmp)))
+        request.addfinalizer(lambda: shutil.rmtree(tmp))
         config_filename = tmp / 'config.yaml'
         with config_filename.open('wt') as config:
             config.write(textwrap.dedent('''
@@ -1360,7 +1361,7 @@ class TestHarness:
 
     def test_config_from_directory_charmcraft_yaml(self, request: pytest.FixtureRequest):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, tmp))
+        request.addfinalizer(lambda: shutil.rmtree(tmp))
         charmcraft_filename = tmp / 'charmcraft.yaml'
         charmcraft_filename.write_text(textwrap.dedent('''
             type: charm
@@ -1810,7 +1811,7 @@ class TestHarness:
 
     def test_actions_from_directory(self, request: pytest.FixtureRequest):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, str(tmp)))
+        request.addfinalizer(lambda: shutil.rmtree(tmp))
         actions_filename = tmp / 'actions.yaml'
         with actions_filename.open('wt') as actions:
             actions.write(textwrap.dedent('''
@@ -1825,7 +1826,7 @@ class TestHarness:
 
     def test_actions_from_directory_charmcraft_yaml(self, request: pytest.FixtureRequest):
         tmp = pathlib.Path(tempfile.mkdtemp())
-        request.addfinalizer(functools.partial(shutil.rmtree, tmp))
+        request.addfinalizer(lambda: shutil.rmtree(tmp))
         charmcraft_filename = tmp / 'charmcraft.yaml'
         charmcraft_filename.write_text(textwrap.dedent('''
             type: charm
@@ -2304,7 +2305,9 @@ class TestHarness:
             ]
 
     def test_begin_with_initial_hooks_no_relations_not_leader(
-            self, request: pytest.FixtureRequest):
+        self,
+        request: pytest.FixtureRequest,
+    ):
         harness = ops.testing.Harness(RecordingCharm, meta='''
             name: test-app
             ''', config='''
@@ -2369,7 +2372,9 @@ class TestHarness:
         # With a single unit, no peer-relation-joined is fired
 
     def test_begin_with_initial_hooks_peer_relation_pre_defined(
-            self, request: pytest.FixtureRequest):
+        self,
+        request: pytest.FixtureRequest,
+    ):
         class PeerCharm(RelationEventCharm):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -2401,7 +2406,9 @@ class TestHarness:
             ]
 
     def test_begin_with_initial_hooks_relation_charm_with_no_relation(
-            self, request: pytest.FixtureRequest):
+        self,
+        request: pytest.FixtureRequest,
+    ):
         class CharmWithDB(RelationEventCharm):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -2586,7 +2593,9 @@ class TestHarness:
             ]
 
     def test_begin_with_initial_hooks_multiple_relation_same_endpoint(
-            self, request: pytest.FixtureRequest):
+        self,
+        request: pytest.FixtureRequest,
+    ):
         class CharmWithDB(RelationEventCharm):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -2917,13 +2926,15 @@ class TestNetwork:
 
     def test_add_network_all_args(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db', 'postgresql')
-        harness.add_network('10.0.0.10',
-                            endpoint='db',
-                            relation_id=relation_id,
-                            cidr='10.0.0.0/8',
-                            interface='eth1',
-                            ingress_addresses=['10.0.0.1', '10.0.0.2'],
-                            egress_subnets=['10.0.0.0/8', '10.10.0.0/16'])
+        harness.add_network(
+            '10.0.0.10',
+            endpoint='db',
+            relation_id=relation_id,
+            cidr='10.0.0.0/8',
+            interface='eth1',
+            ingress_addresses=['10.0.0.1', '10.0.0.2'],
+            egress_subnets=['10.0.0.0/8', '10.10.0.0/16'],
+        )
 
         relation = harness.model.get_relation('db', relation_id)
         assert relation is not None
@@ -4096,7 +4107,10 @@ class TestTestingPebbleClient:
 # well as a real pebble server instance.
 class PebbleStorageAPIsTestMixin:
     def test_push_and_pull_bytes(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         self._test_push_and_pull_data(
             prefix,
             client,
@@ -4105,7 +4119,10 @@ class PebbleStorageAPIsTestMixin:
             stream_class=io.BytesIO)
 
     def test_push_and_pull_non_utf8_data(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         self._test_push_and_pull_data(
             prefix,
             client,
@@ -4113,13 +4130,14 @@ class PebbleStorageAPIsTestMixin:
             encoding='sjis',
             stream_class=io.StringIO)
 
-    def _test_push_and_pull_data(self,
-                                 prefix: str,
-                                 client: typing.Union[_TestingPebbleClient, pebble.Client],
-                                 original_data: typing.Union[str, bytes],
-                                 encoding: typing.Optional[str],
-                                 stream_class: typing.Union[typing.Type[io.BytesIO],
-                                                            typing.Type[io.StringIO]]):
+    def _test_push_and_pull_data(
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        original_data: typing.Union[str, bytes],
+        encoding: typing.Optional[str],
+        stream_class: typing.Union[typing.Type[io.BytesIO], typing.Type[io.StringIO]],
+    ):
         # We separate out the calls to make it clearer to type checkers what's happening.
         if encoding is None:
             client.push(f"{prefix}/test", original_data)
@@ -4143,7 +4161,10 @@ class PebbleStorageAPIsTestMixin:
         assert original_data == received_data
 
     def test_push_bytes_ignore_encoding(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         # push() encoding param should be ignored if source is bytes
         client.push(f"{prefix}/test", b'\x00\x01', encoding='utf-8')
         with client.pull(f"{prefix}/test", encoding=None) as infile:
@@ -4151,7 +4172,10 @@ class PebbleStorageAPIsTestMixin:
         assert received_data == b'\x00\x01'
 
     def test_push_bytesio_ignore_encoding(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         # push() encoding param should be ignored if source is binary stream
         client.push(f"{prefix}/test", io.BytesIO(b'\x00\x01'), encoding='utf-8')
         with client.pull(f"{prefix}/test", encoding=None) as infile:
@@ -4159,7 +4183,10 @@ class PebbleStorageAPIsTestMixin:
         assert received_data == b'\x00\x01'
 
     def test_push_and_pull_larger_file(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         # Intent: to ensure things work appropriately with larger files.
         # Larger files may be sent/received in multiple chunks; this should help for
         # checking that such logic is correct.
@@ -4172,7 +4199,10 @@ class PebbleStorageAPIsTestMixin:
         assert original_data == received_data
 
     def test_push_to_non_existent_subdir(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         data = 'data'
 
         with pytest.raises(pebble.PathError) as excinfo:
@@ -4182,7 +4212,10 @@ class PebbleStorageAPIsTestMixin:
         client.push(f"{prefix}/nonexistent_dir/test", data, make_dirs=True)
 
     def test_push_as_child_of_file_raises_error(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         data = 'data'
         client.push(f"{prefix}/file", data)
         with pytest.raises(pebble.PathError) as excinfo:
@@ -4190,7 +4223,10 @@ class PebbleStorageAPIsTestMixin:
         assert excinfo.value.kind == 'generic-file-error'
 
     def test_push_with_permission_mask(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         data = 'data'
         client.push(f"{prefix}/file", data, permissions=0o600)
         client.push(f"{prefix}/file", data, permissions=0o777)
@@ -4205,7 +4241,10 @@ class PebbleStorageAPIsTestMixin:
             assert excinfo.value.kind == 'generic-file-error'
 
     def test_push_files_and_list(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         data = 'data'
 
         # Let's push the first file with a bunch of details.  We'll check on this later.
@@ -4231,31 +4270,37 @@ class PebbleStorageAPIsTestMixin:
         # Skipping ownership checks here; ownership will be checked in purely-mocked tests
 
     def test_push_and_list_file(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         data = 'data'
         client.push(f"{prefix}/file", data)
         files = client.list_files(f"{prefix}/")
         assert {file.path for file in files} == {f"{prefix}/file"}
 
     def test_push_file_with_relative_path_fails(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.push('file', '')
         assert excinfo.value.kind == 'generic-file-error'
 
-    def test_pull_not_found(self,
-                            prefix: str,
-                            client: typing.Union[_TestingPebbleClient,
-                                                 pebble.Client]):
+    def test_pull_not_found(
+        self,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.pull("/not/found")
         assert excinfo.value.kind == "not-found"
         assert "/not/found" in excinfo.value.message
 
-    def test_pull_directory(self,
-                            prefix: str,
-                            client: typing.Union[_TestingPebbleClient,
-                                                 pebble.Client]):
+    def test_pull_directory(
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         client.make_dir(f"{prefix}/subdir")
         with pytest.raises(pebble.PathError) as excinfo:
             client.pull(f"{prefix}/subdir")
@@ -4263,7 +4308,9 @@ class PebbleStorageAPIsTestMixin:
         assert f"{prefix}/subdir" in excinfo.value.message
 
     def test_list_files_not_found_raises(
-            self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         with pytest.raises(pebble.APIError) as excinfo:
             client.list_files("/not/existing/file/")
         assert excinfo.value.code == 404
@@ -4272,7 +4319,10 @@ class PebbleStorageAPIsTestMixin:
             'such file or directory'
 
     def test_list_directory_object_itself(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         # Test with root dir
         # (Special case; we won't prefix this, even when using the real Pebble server.)
         files = client.list_files('/', itself=True)
@@ -4291,7 +4341,10 @@ class PebbleStorageAPIsTestMixin:
         assert dir_.type == pebble.FileType.DIRECTORY
 
     def test_push_files_and_list_by_pattern(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         # Note: glob pattern deltas do exist between golang and Python, but here,
         # we'll just use a simple * pattern.
         data = 'data'
@@ -4306,10 +4359,11 @@ class PebbleStorageAPIsTestMixin:
         assert {file.path for file in files} == \
             {prefix + file for file in ('/file1.gz', '/file2.tar.gz')}
 
-    def test_make_directory(self,
-                            prefix: str,
-                            client: typing.Union[_TestingPebbleClient,
-                                                 pebble.Client]):
+    def test_make_directory(
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         client.make_dir(f"{prefix}/subdir")
         assert client.list_files(f"{prefix}/", pattern='subdir')[0].path == \
             f"{prefix}/subdir"
@@ -4318,7 +4372,10 @@ class PebbleStorageAPIsTestMixin:
             f"{prefix}/subdir/subdir"
 
     def test_make_directory_recursively(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir(f"{prefix}/subdir/subdir", make_parents=False)
         assert excinfo.value.kind == 'not-found'
@@ -4328,13 +4385,18 @@ class PebbleStorageAPIsTestMixin:
             f"{prefix}/subdir/subdir"
 
     def test_make_directory_with_relative_path_fails(
-            self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir('dir')
         assert excinfo.value.kind == 'generic-file-error'
 
     def test_make_subdir_of_file_fails(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         client.push(f"{prefix}/file", 'data')
 
         # Direct child case
@@ -4348,7 +4410,10 @@ class PebbleStorageAPIsTestMixin:
         assert excinfo.value.kind == 'generic-file-error'
 
     def test_make_dir_with_permission_mask(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         client.make_dir(f"{prefix}/dir1", permissions=0o700)
         client.make_dir(f"{prefix}/dir2", permissions=0o777)
 
@@ -4366,10 +4431,11 @@ class PebbleStorageAPIsTestMixin:
                 client.make_dir(f"{prefix}/dir3_{i}", permissions=bad_permission)
             assert excinfo.value.kind == 'generic-file-error'
 
-    def test_remove_path(self,
-                         prefix: str,
-                         client: typing.Union[_TestingPebbleClient,
-                                              pebble.Client]):
+    def test_remove_path(
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         client.push(f"{prefix}/file", '')
         client.make_dir(f"{prefix}/dir/subdir", make_parents=True)
         client.push(f"{prefix}/dir/subdir/file1", '')
@@ -4508,7 +4574,10 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         return user, group
 
     def test_push_with_ownership(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         data = 'data'
         user, group = self._select_testing_user_group()
         cases: typing.List[_MakedirArgs] = [
@@ -4549,7 +4618,10 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
             assert file_.path == f"{prefix}/file{idx}"
 
     def test_make_dir_with_ownership(
-            self, prefix: str, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        self,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         user, group = self._select_testing_user_group()
         cases: typing.List[_MakedirArgs] = [
             {
@@ -4590,12 +4662,13 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
 
     @patch("grp.getgrgid")
     @patch("pwd.getpwuid")
-    def test_list_files_unnamed(self,
-                                getpwuid: MagicMock,
-                                getgrgid: MagicMock,
-                                prefix: str,
-                                client: typing.Union[_TestingPebbleClient,
-                                                     pebble.Client]):
+    def test_list_files_unnamed(
+        self,
+        getpwuid: MagicMock,
+        getgrgid: MagicMock,
+        prefix: str,
+        client: typing.Union[_TestingPebbleClient, pebble.Client],
+    ):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
         data = 'data'
@@ -4701,10 +4774,12 @@ class TestFilesystem:
         assert root_info.path == "/"
         assert root_info.name == "/"
 
-    def test_storage_mount(self,
-                           harness: ops.testing.Harness[ops.CharmBase],
-                           container: ops.Container,
-                           root: pathlib.Path):
+    def test_storage_mount(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+        root: pathlib.Path,
+    ):
         storage_id = harness.add_storage("test-storage", 1, attach=True)[0]
         assert (root / "mounts/foo").exists()
         (root / "mounts/foo/bar").write_text("foobar")
@@ -4715,9 +4790,10 @@ class TestFilesystem:
         assert (root / "mounts/foo/bar").read_text(), "foobar"
 
     def _make_storage_attach_harness(
-            self,
-            request: pytest.FixtureRequest,
-            meta: typing.Optional[str] = None):
+        self,
+        request: pytest.FixtureRequest,
+        meta: typing.Optional[str] = None,
+    ):
         class MyCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -5340,9 +5416,11 @@ class TestHandleExec:
     def container(self, harness: ops.testing.Harness[ops.CharmBase]):
         return harness.charm.unit.get_container("test-container")
 
-    def test_register_handler(self,
-                              harness: ops.testing.Harness[ops.CharmBase],
-                              container: ops.Container):
+    def test_register_handler(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         harness.handle_exec(container, ["foo"], result="foo")
         harness.handle_exec(container, ["foo", "bar", "foobar"], result="foobar2")
         harness.handle_exec(container, ["foo", "bar"], result="foobar")
@@ -5359,9 +5437,11 @@ class TestHandleExec:
         stdout, _ = container.exec(["foo", "--help"]).wait_output()
         assert stdout == "foo"
 
-    def test_re_register_handler(self,
-                                 harness: ops.testing.Harness[ops.CharmBase],
-                                 container: ops.Container):
+    def test_re_register_handler(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         harness.handle_exec(container, ["foo", "bar"], result="foobar")
         harness.handle_exec(container, ["foo"], result="foo")
 
@@ -5379,9 +5459,11 @@ class TestHandleExec:
         with pytest.raises(pebble.APIError):
             container.exec(["abc"]).wait()
 
-    def test_register_match_all_prefix(self,
-                                       harness: ops.testing.Harness[ops.CharmBase],
-                                       container: ops.Container):
+    def test_register_match_all_prefix(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         harness.handle_exec(container, [], result="hello")
 
         stdout, _ = container.exec(["foo", "bar"]).wait_output()
@@ -5390,9 +5472,11 @@ class TestHandleExec:
         stdout, _ = container.exec(["ls"]).wait_output()
         assert stdout == "hello"
 
-    def test_register_with_result(self,
-                                  harness: ops.testing.Harness[ops.CharmBase],
-                                  container: ops.Container):
+    def test_register_with_result(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         harness.handle_exec(container, ["foo"], result=10)
 
         with pytest.raises(pebble.ExecError) as excinfo:
@@ -5414,9 +5498,11 @@ class TestHandleExec:
         assert stdout == "hello2"
         assert stderr == ""
 
-    def test_register_with_handler(self,
-                                   harness: ops.testing.Harness[ops.CharmBase],
-                                   container: ops.Container):
+    def test_register_with_handler(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         args_history: typing.List[ops.testing.ExecArgs] = []
         return_value = None
 
@@ -5457,9 +5543,11 @@ class TestHandleExec:
         assert args_history[-1].group == "bar"
         assert args_history[-1].group_id == 2
 
-    def test_exec_timeout(self,
-                          harness: ops.testing.Harness[ops.CharmBase],
-                          container: ops.Container):
+    def test_exec_timeout(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         def handler(_: ops.testing.ExecArgs):
             raise TimeoutError
 
@@ -5469,9 +5557,11 @@ class TestHandleExec:
         with pytest.raises(RuntimeError):
             container.exec(["ls"]).wait()
 
-    def test_combined_error(self,
-                            harness: ops.testing.Harness[ops.CharmBase],
-                            container: ops.Container):
+    def test_combined_error(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         return_value = ExecResult(stdout="foobar")
         harness.handle_exec(container, [], handler=lambda _: return_value)
         stdout, stderr = container.exec(["ls"], combine_stderr=True).wait_output()
@@ -5482,9 +5572,11 @@ class TestHandleExec:
         with pytest.raises(ValueError):
             container.exec(["ls"], combine_stderr=True).wait_output()
 
-    def test_exec_stdin(self,
-                        harness: ops.testing.Harness[ops.CharmBase],
-                        container: ops.Container):
+    def test_exec_stdin(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         args_history: typing.List[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
@@ -5499,9 +5591,11 @@ class TestHandleExec:
         assert proc.stdin is not None
         assert args_history[-1].stdin is None
 
-    def test_exec_stdout_stderr(self,
-                                harness: ops.testing.Harness[ops.CharmBase],
-                                container: ops.Container):
+    def test_exec_stdout_stderr(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         harness.handle_exec(
             container, [], result=ExecResult(
                 stdout="output", stderr="error"))
@@ -5546,9 +5640,11 @@ class TestHandleExec:
         assert proc.stdout.read() == b"output"
         assert proc.stderr.read() == b"error"
 
-    def test_exec_service_context(self,
-                                  harness: ops.testing.Harness[ops.CharmBase],
-                                  container: ops.Container):
+    def test_exec_service_context(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+    ):
         service: ops.pebble.ServiceDict = {
             "command": "test",
             "working-dir": "/tmp",  # noqa: S108
@@ -5685,10 +5781,11 @@ class TestActions:
         assert out.results == {}
         assert harness.charm.simple_was_called  # type: ignore
 
-    def test_fail_action(self,
-                         action_results: typing.Dict[str,
-                                                     typing.Any],
-                         harness: ops.testing.Harness[ops.CharmBase]):
+    def test_fail_action(
+        self,
+        action_results: typing.Dict[str, typing.Any],
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
         action_results.clear()
         action_results["partial"] = "foo"
         with pytest.raises(ops.testing.ActionFailed) as excinfo:
@@ -5724,10 +5821,11 @@ class TestActions:
         out = harness.run_action("log-and-results", {"foo": "baz", "bar": 28})
         assert out.results == {"result1": "baz", "result2": 28}
 
-    def test_bad_results(self,
-                         action_results: typing.Dict[str,
-                                                     typing.Any],
-                         harness: ops.testing.Harness[ops.CharmBase]):
+    def test_bad_results(
+        self,
+        action_results: typing.Dict[str, typing.Any],
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
         # We can't have results that collide when flattened.
         action_results.clear()
         action_results["a"] = {"b": 1}
