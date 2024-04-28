@@ -1289,6 +1289,7 @@ class TestCheckInfo(unittest.TestCase):
         assert check.status == pebble.CheckStatus.UP
         assert check.failures == 0
         assert check.threshold == 3
+        assert check.change_id is None
 
         check = pebble.CheckInfo(
             name='chk2',
@@ -1296,12 +1297,14 @@ class TestCheckInfo(unittest.TestCase):
             status=pebble.CheckStatus.DOWN,
             failures=5,
             threshold=3,
+            change_id=pebble.ChangeID('10'),
         )
         assert check.name == 'chk2'
         assert check.level == pebble.CheckLevel.ALIVE
         assert check.status == pebble.CheckStatus.DOWN
         assert check.failures == 5
         assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('10')
 
         d: pebble._CheckInfoDict = {
             'name': 'chk3',
@@ -1314,6 +1317,7 @@ class TestCheckInfo(unittest.TestCase):
         assert check.status == pebble.CheckStatus.UP
         assert check.failures == 0
         assert check.threshold == 3
+        assert check.change_id is None
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
@@ -1321,12 +1325,14 @@ class TestCheckInfo(unittest.TestCase):
             'status': pebble.CheckStatus.DOWN,
             'failures': 3,
             'threshold': 3,
+            'change-id': '42',
         })
         assert check.name == 'chk4'
         assert check.level == pebble.CheckLevel.UNSET
         assert check.status == pebble.CheckStatus.DOWN
         assert check.failures == 3
         assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('42')
 
 
 _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]
@@ -1426,159 +1432,158 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     }
 
 
-class TestMultipartParser(unittest.TestCase):
-    class _Case:
-        def __init__(
-                self,
-                name: str,
-                data: bytes,
-                want_headers: typing.List[bytes],
-                want_bodies: typing.List[bytes],
-                want_bodies_done: typing.List[bool],
-                max_boundary: int = 14,
-                max_lookahead: int = 8 * 1024,
-                error: str = ''):
-            self.name = name
-            self.data = data
-            self.want_headers = want_headers
-            self.want_bodies = want_bodies
-            self.want_bodies_done = want_bodies_done
-            self.max_boundary = max_boundary
-            self.max_lookahead = max_lookahead
-            self.error = error
+class MultipartParserTestCase:
+    def __init__(
+            self,
+            name: str,
+            data: bytes,
+            want_headers: typing.List[bytes],
+            want_bodies: typing.List[bytes],
+            want_bodies_done: typing.List[bool],
+            max_boundary: int = 14,
+            max_lookahead: int = 8 * 1024,
+            error: str = ''):
+        self.name = name
+        self.data = data
+        self.want_headers = want_headers
+        self.want_bodies = want_bodies
+        self.want_bodies_done = want_bodies_done
+        self.max_boundary = max_boundary
+        self.max_lookahead = max_lookahead
+        self.error = error
 
-    def test_multipart_parser(self):
-        tests = [
-            TestMultipartParser._Case(
-                'baseline',
-                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\nfoo bar\r\n--qwerty--\r\n',
-                [b'header foo\r\n\r\n'],
-                [b'foo bar\nfoo bar'],
-                want_bodies_done=[True],
-            ),
-            TestMultipartParser._Case(
-                'incomplete header',
-                b'\r\n--qwerty\r\nheader foo\r\n',
-                [],
-                [],
-                want_bodies_done=[],
-            ),
-            TestMultipartParser._Case(
-                'missing header',
-                b'\r\n--qwerty\r\nheader foo\r\n' + 40 * b' ',
-                [],
-                [],
-                want_bodies_done=[],
-                max_lookahead=40,
-                error='header terminator not found',
-            ),
-            TestMultipartParser._Case(
-                'incomplete body terminator',
-                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\rhello my name is joe and I work in a button factory',  # noqa
-                [b'header foo\r\n\r\n'],
-                [b'foo bar\r\n--qwerty\rhello my name is joe and I work in a '],
-                want_bodies_done=[False],
-            ),
-            TestMultipartParser._Case(
-                'empty body',
-                b'\r\n--qwerty\r\nheader foo\r\n\r\n\r\n--qwerty\r\n',
-                [b'header foo\r\n\r\n'],
-                [b''],
-                want_bodies_done=[True],
-            ),
-            TestMultipartParser._Case(
-                'ignore leading garbage',
-                b'hello my name is joe\r\n\n\n\n\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',  # noqa
-                [b'header foo\r\n\r\n'],
-                [b'foo bar'],
-                want_bodies_done=[True],
-            ),
-            TestMultipartParser._Case(
-                'ignore trailing garbage',
-                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nhello my name is joe',
-                [b'header foo\r\n\r\n'],
-                [b'foo bar'],
-                want_bodies_done=[True],
-            ),
-            TestMultipartParser._Case(
-                'boundary allow linear whitespace',
-                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',
-                [b'header foo\r\n\r\n'],
-                [b'foo bar'],
-                want_bodies_done=[True],
-                max_boundary=20,
-            ),
-            TestMultipartParser._Case(
-                'terminal boundary allow linear whitespace',
-                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty-- \t \r\n',
-                [b'header foo\r\n\r\n'],
-                [b'foo bar'],
-                want_bodies_done=[True],
-                max_boundary=20,
-            ),
-            TestMultipartParser._Case(
-                'multiple parts',
-                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
-                [b'header foo\r\n\r\n', b'header bar\r\n\r\n'],
-                [b'foo bar', b'foo baz'],
-                want_bodies_done=[True, True],
-            ),
-            TestMultipartParser._Case(
-                'ignore after terminal boundary',
-                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty--\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
-                [b'header foo\r\n\r\n'],
-                [b'foo bar'],
-                want_bodies_done=[True],
-            ),
-        ]
 
+class TestMultipartParser:
+    @pytest.mark.parametrize("test", [
+        MultipartParserTestCase(
+            'baseline',
+            b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\nfoo bar\r\n--qwerty--\r\n',
+            [b'header foo\r\n\r\n'],
+            [b'foo bar\nfoo bar'],
+            want_bodies_done=[True],
+        ),
+        MultipartParserTestCase(
+            'incomplete header',
+            b'\r\n--qwerty\r\nheader foo\r\n',
+            [],
+            [],
+            want_bodies_done=[],
+        ),
+        MultipartParserTestCase(
+            'missing header',
+            b'\r\n--qwerty\r\nheader foo\r\n' + 40 * b' ',
+            [],
+            [],
+            want_bodies_done=[],
+            max_lookahead=40,
+            error='header terminator not found',
+        ),
+        MultipartParserTestCase(
+            'incomplete body terminator',
+            b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\rhello my name is joe and I work in a button factory',  # noqa
+            [b'header foo\r\n\r\n'],
+            [b'foo bar\r\n--qwerty\rhello my name is joe and I work in a '],
+            want_bodies_done=[False],
+        ),
+        MultipartParserTestCase(
+            'empty body',
+            b'\r\n--qwerty\r\nheader foo\r\n\r\n\r\n--qwerty\r\n',
+            [b'header foo\r\n\r\n'],
+            [b''],
+            want_bodies_done=[True],
+        ),
+        MultipartParserTestCase(
+            'ignore leading garbage',
+            b'hello my name is joe\r\n\n\n\n\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',  # noqa
+            [b'header foo\r\n\r\n'],
+            [b'foo bar'],
+            want_bodies_done=[True],
+        ),
+        MultipartParserTestCase(
+            'ignore trailing garbage',
+            b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nhello my name is joe',
+            [b'header foo\r\n\r\n'],
+            [b'foo bar'],
+            want_bodies_done=[True],
+        ),
+        MultipartParserTestCase(
+            'boundary allow linear whitespace',
+            b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',
+            [b'header foo\r\n\r\n'],
+            [b'foo bar'],
+            want_bodies_done=[True],
+            max_boundary=20,
+        ),
+        MultipartParserTestCase(
+            'terminal boundary allow linear whitespace',
+            b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty-- \t \r\n',
+            [b'header foo\r\n\r\n'],
+            [b'foo bar'],
+            want_bodies_done=[True],
+            max_boundary=20,
+        ),
+        MultipartParserTestCase(
+            'multiple parts',
+            b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+            [b'header foo\r\n\r\n', b'header bar\r\n\r\n'],
+            [b'foo bar', b'foo baz'],
+            want_bodies_done=[True, True],
+        ),
+        MultipartParserTestCase(
+            'ignore after terminal boundary',
+            b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty--\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+            [b'header foo\r\n\r\n'],
+            [b'foo bar'],
+            want_bodies_done=[True],
+        ),
+    ])
+    def test_multipart_parser(self, test: MultipartParserTestCase):
         chunk_sizes = [1, 2, 3, 4, 5, 7, 13, 17, 19, 23, 29, 31, 37, 42, 50, 100, 1000]
         marker = b'qwerty'
-        for i, test in enumerate(tests):
-            for chunk_size in chunk_sizes:
-                headers: typing.List[bytes] = []
-                bodies: typing.List[bytes] = []
-                bodies_done: typing.List[bool] = []
+        for chunk_size in chunk_sizes:
+            headers: typing.List[bytes] = []
+            bodies: typing.List[bytes] = []
+            bodies_done: typing.List[bool] = []
 
-                # All of the "noqa: B023" here are due to a ruff bug:
-                # https://github.com/astral-sh/ruff/issues/7847
-                # ruff should tell us when the 'noqa's are no longer required.
-                def handle_header(data: typing.Any):
-                    headers.append(bytes(data))  # noqa: B023
-                    bodies.append(b'')  # noqa: B023
-                    bodies_done.append(False)  # noqa: B023
+            # All of the "noqa: B023" here are due to a ruff bug:
+            # https://github.com/astral-sh/ruff/issues/7847
+            # ruff should tell us when the 'noqa's are no longer required.
+            def handle_header(data: typing.Any):
+                headers.append(bytes(data))  # noqa: B023
+                bodies.append(b'')  # noqa: B023
+                bodies_done.append(False)  # noqa: B023
 
-                def handle_body(data: bytes, done: bool = False):
-                    bodies[-1] += data  # noqa: B023
-                    bodies_done[-1] = done  # noqa: B023
+            def handle_body(data: bytes, done: bool = False):
+                bodies[-1] += data  # noqa: B023
+                bodies_done[-1] = done  # noqa: B023
 
-                parser = pebble._MultipartParser(
-                    marker,
-                    handle_header,
-                    handle_body,
-                    max_boundary_length=test.max_boundary,
-                    max_lookahead=test.max_lookahead)
-                src = io.BytesIO(test.data)
+            parser = pebble._MultipartParser(
+                marker,
+                handle_header,
+                handle_body,
+                max_boundary_length=test.max_boundary,
+                max_lookahead=test.max_lookahead)
+            src = io.BytesIO(test.data)
 
-                try:
-                    while True:
-                        data = src.read(chunk_size)
-                        if not data:
-                            break
-                        parser.feed(data)
-                except Exception as err:
-                    if not test.error:
-                        self.fail(f'unexpected error: {err}')
+            try:
+                while True:
+                    data = src.read(chunk_size)
+                    if not data:
                         break
-                    assert test.error == str(err)
-                else:
-                    if test.error:
-                        self.fail(f'missing expected error: {test.error!r}')
+                    parser.feed(data)
+            except Exception as err:
+                if not test.error:
+                    pytest.fail(f'unexpected error: {err}')
+                    break
+                assert test.error == str(err)
+            else:
+                if test.error:
+                    pytest.fail(f'missing expected error: {test.error!r}')
 
-                    msg = f'test case {i + 1} ({test.name}), chunk size {chunk_size}'
-                    assert test.want_headers == headers, msg
-                    assert test.want_bodies == bodies, msg
-                    assert test.want_bodies_done == bodies_done, msg
+                msg = f'test case ({test.name}), chunk size {chunk_size}'
+                assert test.want_headers == headers, msg
+                assert test.want_bodies == bodies, msg
+                assert test.want_bodies_done == bodies_done, msg
 
 
 class TestClient(unittest.TestCase):
