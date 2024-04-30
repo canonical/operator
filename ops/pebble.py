@@ -208,7 +208,8 @@ if TYPE_CHECKING:
                                 "level": NotRequired[Optional[Union['CheckLevel', str]]],
                                 "status": Union['CheckStatus', str],
                                 "failures": NotRequired[int],
-                                "threshold": int})
+                                "threshold": int,
+                                "change-id": NotRequired[str]})
     _FileInfoDict = TypedDict('_FileInfoDict',
                               {"path": str,
                                "name": str,
@@ -1268,6 +1269,13 @@ class CheckInfo:
     This is how many consecutive failures for the check to be considered "down".
     """
 
+    change_id: Optional[ChangeID]
+    """Change ID of ``perform-check`` or ``recover-check`` change driving this check.
+
+    This will be None on older versions of Pebble, which did not use changes
+    to drive health checks.
+    """
+
     def __init__(
         self,
         name: str,
@@ -1275,12 +1283,14 @@ class CheckInfo:
         status: Union[CheckStatus, str],
         failures: int = 0,
         threshold: int = 0,
+        change_id: Optional[ChangeID] = None,
     ):
         self.name = name
         self.level = level
         self.status = status
         self.failures = failures
         self.threshold = threshold
+        self.change_id = change_id
 
     @classmethod
     def from_dict(cls, d: '_CheckInfoDict') -> 'CheckInfo':
@@ -1299,32 +1309,24 @@ class CheckInfo:
             status=status,
             failures=d.get('failures', 0),
             threshold=d['threshold'],
+            change_id=ChangeID(d['change-id']) if 'change-id' in d else None,
         )
 
     def __repr__(self):
         return ('CheckInfo('
                 f'name={self.name!r}, '
-                f'level={self.level!r}, '
+                f'level={self.level}, '
                 f'status={self.status}, '
                 f'failures={self.failures}, '
-                f'threshold={self.threshold!r})'
+                f'threshold={self.threshold!r}, '
+                f'change_id={self.change_id!r})'
                 )
 
 
 class NoticeType(enum.Enum):
     """Enum of notice types."""
 
-    CHANGE_UPDATE = 'change-update'
-    """Recorded whenever a change is updated, that is, when it is first
-    spawned or its status was updated. The key for change-update notices is
-    the change ID.
-    """
-
     CUSTOM = 'custom'
-    """A custom notice reported via the Pebble client API or ``pebble notify``.
-    The key and data fields are provided by the user. The key must be in
-    the format ``example.com/path`` to ensure well-namespaced notice keys.
-    """
 
 
 class NoticesUsers(enum.Enum):

@@ -13,15 +13,13 @@
 # limitations under the License.
 
 import os
+import pathlib
 import sys
 import typing
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from random import shuffle
-from shutil import rmtree
-from tempfile import mkdtemp, mkstemp
 from textwrap import dedent
-from unittest import TestCase
 from unittest.mock import patch
 
 import pytest
@@ -70,34 +68,30 @@ def _flatten(specgen: typing.Iterable[ModuleSpec]) -> typing.List[str]:
                   for spec in specgen])
 
 
-class TestLibFinder(TestCase):
-    def _mkdtemp(self) -> str:
-        tmpdir = mkdtemp()
-        self.addCleanup(rmtree, tmpdir)
-        return tmpdir
-
-    def test_single(self):
-        tmpdir = self._mkdtemp()
-
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+class TestLibFinder:
+    def test_single(self, tmp_path: pathlib.Path):
+        tmpdir = str(tmp_path)
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
-        self.assertEqual(
-            _flatten(ops.lib._find_all_specs([tmpdir])),
-            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
+        assert _flatten(ops.lib._find_all_specs([tmpdir])) == \
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
-    def test_multi(self):
-        tmp_dir_a = self._mkdtemp()
-        tmp_dir_b = self._mkdtemp()
+    def test_multi(self, tmp_path: pathlib.Path):
+        tmp_dir_a = tmp_path / "temp_dir1"
+        tmp_dir_a.mkdir()
+
+        tmp_dir_b = tmp_path / "temp_dir2"
+        tmp_dir_b.mkdir()
 
         if tmp_dir_a > tmp_dir_b:
             # keep sorting happy
             tmp_dir_a, tmp_dir_b = tmp_dir_b, tmp_dir_a
 
-        dirs = [tmp_dir_a, tmp_dir_b]
+        dirs = [str(tmp_dir_a), str(tmp_dir_b)]
 
-        for top in [tmp_dir_a, tmp_dir_b]:
+        for top in dirs:
             for pkg in ["bar", "baz"]:
                 for lib in ["meep", "quux"]:
                     _mklib(top, pkg, lib).write_text("")
@@ -113,44 +107,40 @@ class TestLibFinder(TestCase):
             os.path.join(tmp_dir_b, "baz", "opslib", "quux"),
         ]
 
-        self.assertEqual(_flatten(ops.lib._find_all_specs(dirs)), expected)
+        assert _flatten(ops.lib._find_all_specs(dirs)) == expected
 
-    def test_cwd(self):
-        tmpcwd = self._mkdtemp()
-        cwd = os.getcwd()
+    def test_cwd(self, tmp_path: pathlib.Path):
+        tmpcwd = str(tmp_path)
         os.chdir(tmpcwd)
-        self.addCleanup(os.chdir, cwd)
 
         dirs = [""]
 
-        self.assertEqual(list(ops.lib._find_all_specs(dirs)), [])
+        assert list(ops.lib._find_all_specs(dirs)) == []
 
         _mklib(tmpcwd, "foo", "bar").write_text("")
 
         paths = _flatten(ops.lib._find_all_specs(dirs))
-        self.assertEqual(
-            [os.path.relpath(p) for p in paths],
-            [os.path.join('foo', 'opslib', 'bar')])
+        assert [os.path.relpath(p) for p in paths] == \
+            [os.path.join('foo', 'opslib', 'bar')]
 
-    def test_bogus_topdir(self):
+    def test_bogus_topdir(self, tmp_path: pathlib.Path):
         """Check that having one bogus dir in sys.path doesn't cause the finder to abort."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
 
         dirs = [tmpdir, "/bogus"]
 
-        self.assertEqual(list(ops.lib._find_all_specs(dirs)), [])
+        assert list(ops.lib._find_all_specs(dirs)) == []
 
         _mklib(tmpdir, "foo", "bar").write_text("")
 
-        self.assertEqual(
-            _flatten(ops.lib._find_all_specs(dirs)),
-            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
+        assert _flatten(ops.lib._find_all_specs(dirs)) == \
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
-    def test_bogus_opsdir(self):
+    def test_bogus_opsdir(self, tmp_path: pathlib.Path):
         """Check that having one bogus opslib doesn't cause the finder to abort."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar").write_text('')
 
@@ -158,34 +148,35 @@ class TestLibFinder(TestCase):
         path.mkdir()
         (path / 'opslib').write_text('')
 
-        self.assertEqual(
-            _flatten(ops.lib._find_all_specs([tmpdir])),
-            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')])
+        assert _flatten(ops.lib._find_all_specs([tmpdir])) == \
+            [os.path.join(tmpdir, 'foo', 'opslib', 'bar')]
 
-    def test_namespace(self):
+    def test_namespace(self, tmp_path: pathlib.Path):
         """Check that namespace packages are ignored."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
         _mklib(tmpdir, "foo", "bar")  # no __init__.py  =>  a namespace package
 
-        self.assertEqual(list(ops.lib._find_all_specs([tmpdir])), [])
+        assert list(ops.lib._find_all_specs([tmpdir])) == []
 
 
-class TestLibParser(TestCase):
-    def _mkmod(self, name: str, content: typing.Optional[str] = None) -> ModuleSpec:
-        fd, fname = mkstemp(text=True)
-        self.addCleanup(os.unlink, fname)
+class TestLibParser:
+    def _mkmod(
+        self,
+        tmp_path: pathlib.Path,
+        name: str,
+        content: typing.Optional[str] = None,
+    ) -> ModuleSpec:
+        file = tmp_path / name
         if content is not None:
-            with os.fdopen(fd, mode='wt', closefd=False) as f:
-                f.write(dedent(content))
-        os.close(fd)
-        return ModuleSpec(name=name, loader=None, origin=fname)
+            file.write_text(dedent(content))
+        return ModuleSpec(name=name, loader=None, origin=str(file))
 
-    def test_simple(self):
+    def test_simple(self, tmp_path: pathlib.Path):
         """Check that we can load a reasonably straightforward lib."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo"
         LIBEACH = float('-inf')
         LIBAPI = 2
@@ -194,12 +185,12 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_libauthor_has_dashes(self):
-        m = self._mkmod('foo', '''
+    def test_libauthor_has_dashes(self, tmp_path: pathlib.Path):
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
@@ -207,12 +198,12 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice-someone@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice-someone@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice-someone@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice-someone@example.com, API 2, patch 42>'
 
-    def test_lib_definitions_without_spaces(self):
-        m = self._mkmod('foo', '''
+    def test_lib_definitions_without_spaces(self, tmp_path: pathlib.Path):
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME="foo"
         LIBAPI=2
         LIBPATCH=42
@@ -220,12 +211,12 @@ class TestLibParser(TestCase):
         LIBANANA=True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_lib_definitions_trailing_comments(self):
-        m = self._mkmod('foo', '''
+    def test_lib_definitions_trailing_comments(self, tmp_path: pathlib.Path):
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo" # comment style 1
         LIBAPI = 2 = comment style 2
         LIBPATCH = 42
@@ -233,99 +224,99 @@ class TestLibParser(TestCase):
         LIBANANA = True
         ''')
         lib = ops.lib._parse_lib(m)
-        self.assertEqual(lib, ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42))
+        assert lib == ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 2, 42)
         # also check the repr while we're at it
-        self.assertEqual(repr(lib), '<_Lib foo by alice@example.com, API 2, patch 42>')
+        assert repr(lib) == '<_Lib foo by alice@example.com, API 2, patch 42>'
 
-    def test_incomplete(self):
+    def test_incomplete(self, tmp_path: pathlib.Path):
         """Check that if anything is missing, nothing is returned."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
-    def test_too_long(self):
+    def test_too_long(self, tmp_path: pathlib.Path):
         """Check that if the file is too long, nothing is returned."""
-        m = self._mkmod('foo', '\n' * ops.lib._MAX_LIB_LINES + '''
+        m = self._mkmod(tmp_path, 'foo', '\n' * ops.lib._MAX_LIB_LINES + '''
         LIBNAME = "foo"
         LIBAPI = 2
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
     def test_no_origin(self):
         """Check that _parse_lib doesn't choke when given a spec with no origin."""
         # 'just don't crash'
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin=None))
-        self.assertIsNone(lib)
+        assert lib is None
 
     def test_bogus_origin(self):
         """Check that if the origin is messed up, we don't crash."""
         # 'just don't crash'
         lib = ops.lib._parse_lib(ModuleSpec(name='hi', loader=None, origin='/'))
-        self.assertIsNone(lib)
+        assert lib is None
 
-    def test_bogus_lib(self):
+    def test_bogus_lib(self, tmp_path: pathlib.Path):
         """Check our behaviour when the lib is messed up."""
         # note the syntax error (that is carefully chosen to pass the initial regexp)
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = "1'
         LIBAPI = 2
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
-    def test_name_is_number(self):
+    def test_name_is_number(self, tmp_path: pathlib.Path):
         """Check our behaviour when the name in the lib is a number."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 1
         LIBAPI = 2
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
-    def test_api_is_string(self):
+    def test_api_is_string(self, tmp_path: pathlib.Path):
         """Check our behaviour when the api in the lib is a string."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = '2'
         LIBPATCH = 42
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
-    def test_patch_is_string(self):
+    def test_patch_is_string(self, tmp_path: pathlib.Path):
         """Check our behaviour when the patch in the lib is a string."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
         LIBPATCH = '42'
         LIBAUTHOR = "alice@example.com"
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
-    def test_author_is_number(self):
+    def test_author_is_number(self, tmp_path: pathlib.Path):
         """Check our behaviour when the author in the lib is a number."""
-        m = self._mkmod('foo', '''
+        m = self._mkmod(tmp_path, 'foo', '''
         LIBNAME = 'foo'
         LIBAPI = 2
         LIBPATCH = 42
         LIBAUTHOR = 43
         ''')
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
-    def test_other_encoding(self):
+    def test_other_encoding(self, tmp_path: pathlib.Path):
         """Check that we don't crash when a library is not UTF-8."""
-        m = self._mkmod('foo')
+        m = self._mkmod(tmp_path, 'foo')
         # This should never be the case, but we need to show type checkers
         # that it's not.
         if m.origin is None:
-            self.assertIsNotNone(m.origin)
+            assert m.origin is not None
             return
         with open(m.origin, 'w', encoding='latin-1') as f:
             f.write(dedent('''
@@ -335,84 +326,70 @@ class TestLibParser(TestCase):
             LIBAUTHOR = "alice@example.com"
             LIBANANA = "Ñoño"
             '''))
-        self.assertIsNone(ops.lib._parse_lib(m))
+        assert ops.lib._parse_lib(m) is None
 
 
-class TestLib(TestCase):
-
+class TestLib:
     def test_lib_comparison(self):
-        self.assertNotEqual(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0),
-            ops.lib._Lib(_dummy_spec, "bar", "bob@example.com", 0, 1))
-        self.assertEqual(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0) != \
+            ops.lib._Lib(_dummy_spec, "bar", "bob@example.com", 0, 1)
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1) == \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
 
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 0, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1))
-        self.assertLess(
-            ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1),
-            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1))
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0) < \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 0, 1) < \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1) < \
+            ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1)
+        assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < \
+            ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             42 < ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)  # type:ignore  # noqa: B015, SIM300
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) < 42  # type: ignore  # noqa: B015
 
         # these two might be surprising in that they don't raise an exception,
         # but they are correct: our __eq__ bailing means Python falls back to
         # its default of checking object identity.
-        self.assertNotEqual(ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1), 42)
-        self.assertNotEqual(42, ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1))
+        assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
+        assert ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1) != 42
 
-    def test_lib_order(self):
+    @pytest.mark.parametrize("execution_number", range(20))
+    def test_lib_order(self, execution_number: range):
         a = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 0)
         b = ops.lib._Lib(_dummy_spec, "bar", "alice@example.com", 1, 1)
         c = ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 0)
         d = ops.lib._Lib(_dummy_spec, "foo", "alice@example.com", 1, 1)
         e = ops.lib._Lib(_dummy_spec, "foo", "bob@example.com", 1, 1)
 
-        for i in range(20):
-            with self.subTest(i):
-                libs = [a, b, c, d, e]
-                shuffle(libs)
-                self.assertEqual(sorted(libs), [a, b, c, d, e])
+        libs = [a, b, c, d, e]
+        shuffle(libs)
+        assert sorted(libs) == [a, b, c, d, e]
 
     def test_use_bad_args_types(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib.use(1, 2, 'bob@example.com')  # type: ignore
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib.use('foo', '2', 'bob@example.com')  # type: ignore
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ops.lib.use('foo', 2, ops.lib.use)  # type: ignore
 
     def test_use_bad_args_values(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ops.lib.use('--help', 2, 'alice@example.com')
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ops.lib.use('foo', -2, 'alice@example.com')
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ops.lib.use('foo', 1, 'example.com')
 
 
 @patch('sys.path', new=())
-class TestLibFunctional(TestCase):
-
-    def _mkdtemp(self) -> str:
-        tmpdir = mkdtemp()
-        self.addCleanup(rmtree, tmpdir)
-        return tmpdir
-
-    def test_use_finds_subs(self):
+class TestLibFunctional:
+    def test_use_finds_subs(self, tmp_path: pathlib.Path):
         """Test that ops.lib.use("baz") works when baz is inside a package in the python path."""
-        tmpdir = self._mkdtemp()
+        tmpdir = str(tmp_path)
         sys.path = [tmpdir]
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
@@ -427,95 +404,109 @@ class TestLibFunctional(TestCase):
 
         # ops.lib.use done by charm author
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBNAME, 'baz')
-        self.assertEqual(baz.LIBAPI, 2)
-        self.assertEqual(baz.LIBPATCH, 42)
-        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+        assert baz.LIBNAME == 'baz'
+        assert baz.LIBAPI == 2
+        assert baz.LIBPATCH == 42
+        assert baz.LIBAUTHOR == 'alice@example.com'
 
-    def test_use_finds_best_same_toplevel(self):
+    @pytest.mark.parametrize("pkg_a", ["foo", "fooA"])
+    @pytest.mark.parametrize("lib_a", ["bar", "barA"])
+    @pytest.mark.parametrize("patch_a", [38, 42])
+    def test_use_finds_best_same_toplevel(
+        self,
+        tmp_path: pathlib.Path,
+        pkg_a: str,
+        lib_a: str,
+        patch_a: int,
+    ):
         """Test that ops.lib.use("baz") works when there are two baz in the same toplevel."""
         pkg_b = "foo"
         lib_b = "bar"
         patch_b = 40
-        for pkg_a in ["foo", "fooA"]:
-            for lib_a in ["bar", "barA"]:
-                if (pkg_a, lib_a) == (pkg_b, lib_b):
-                    # everything-is-the-same :-)
-                    continue
-                for patch_a in [38, 42]:
-                    desc = f"A: {pkg_a}/{lib_a}/{patch_a}; B: {pkg_b}/{lib_b}/{patch_b}"
-                    with self.subTest(desc):
-                        tmpdir = self._mkdtemp()
-                        sys.path = [tmpdir]
 
-                        _mklib(tmpdir, pkg_a, lib_a).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_a))
+        if (pkg_a, lib_a) == (pkg_b, lib_b):
+            return
 
-                        _mklib(tmpdir, pkg_b, lib_b).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_b))
+        tmpdir = str(tmp_path)
+        sys.path = [tmpdir]
 
-                        # autoimport to reset things
-                        ops.lib.autoimport()
+        _mklib(tmpdir, pkg_a, lib_a).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_a))
 
-                        # ops.lib.use done by charm author
-                        baz = ops.lib.use('baz', 2, 'alice@example.com')
-                        self.assertEqual(baz.LIBNAME, 'baz')
-                        self.assertEqual(baz.LIBAPI, 2)
-                        self.assertEqual(baz.LIBPATCH, max(patch_a, patch_b))
-                        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+        _mklib(tmpdir, pkg_b, lib_b).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_b))
 
-    def test_use_finds_best_diff_toplevel(self):
+        # autoimport to reset things
+        ops.lib.autoimport()
+
+        # ops.lib.use done by charm author
+        baz = ops.lib.use('baz', 2, 'alice@example.com')
+        assert baz.LIBNAME == 'baz'
+        assert baz.LIBAPI == 2
+        assert max(patch_a, patch_b) == baz.LIBPATCH
+        assert baz.LIBAUTHOR == 'alice@example.com'
+
+    @pytest.mark.parametrize("pkg_a", ["foo", "fooA"])
+    @pytest.mark.parametrize("lib_a", ["bar", "barA"])
+    @pytest.mark.parametrize("patch_a", [38, 42])
+    def test_use_finds_best_diff_toplevel(
+        self,
+        tmp_path: pathlib.Path,
+        pkg_a: str,
+        lib_a: str,
+        patch_a: int,
+    ):
         """Test that ops.lib.use("baz") works when there are two baz in the different toplevels."""
         pkg_b = "foo"
         lib_b = "bar"
         patch_b = 40
-        for pkg_a in ["foo", "fooA"]:
-            for lib_a in ["bar", "barA"]:
-                for patch_a in [38, 42]:
-                    desc = f"A: {pkg_a}/{lib_a}/{patch_a}; B: {pkg_b}/{lib_b}/{patch_b}"
-                    with self.subTest(desc):
-                        tmp_dir_a = self._mkdtemp()
-                        tmp_dir_b = self._mkdtemp()
-                        sys.path = [tmp_dir_a, tmp_dir_b]
 
-                        _mklib(tmp_dir_a, pkg_a, lib_a).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_a))
+        tmp_dir_a = tmp_path / "temp_dir1"
+        tmp_dir_a.mkdir()
 
-                        _mklib(tmp_dir_b, pkg_b, lib_b).write_text(dedent("""
-                        LIBNAME = "baz"
-                        LIBAPI = 2
-                        LIBPATCH = {}
-                        LIBAUTHOR = "alice@example.com"
-                        """).format(patch_b))
+        tmp_dir_b = tmp_path / "temp_dir2"
+        tmp_dir_b.mkdir()
 
-                        # autoimport to reset things
-                        ops.lib.autoimport()
+        sys.path = [tmp_dir_a, tmp_dir_b]
 
-                        # ops.lib.use done by charm author
-                        baz = ops.lib.use('baz', 2, 'alice@example.com')
-                        self.assertEqual(baz.LIBNAME, 'baz')
-                        self.assertEqual(baz.LIBAPI, 2)
-                        self.assertEqual(baz.LIBPATCH, max(patch_a, patch_b))
-                        self.assertEqual(baz.LIBAUTHOR, 'alice@example.com')
+        _mklib(str(tmp_dir_a), pkg_a, lib_a).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_a))
+
+        _mklib(str(tmp_dir_b), pkg_b, lib_b).write_text(dedent("""
+        LIBNAME = "baz"
+        LIBAPI = 2
+        LIBPATCH = {}
+        LIBAUTHOR = "alice@example.com"
+        """).format(patch_b))
+
+        # autoimport to reset things
+        ops.lib.autoimport()
+
+        # ops.lib.use done by charm author
+        baz = ops.lib.use('baz', 2, 'alice@example.com')
+        assert baz.LIBNAME == 'baz'
+        assert baz.LIBAPI == 2
+        assert max(patch_a, patch_b) == baz.LIBPATCH
+        assert baz.LIBAUTHOR == 'alice@example.com'
 
     def test_none_found(self):
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             ops.lib.use('foo', 1, 'alice@example.com')
 
-    def test_from_scratch(self):
-        tmpdir = self._mkdtemp()
+    def test_from_scratch(self, tmp_path: pathlib.Path):
+        tmpdir = str(tmp_path)
         sys.path = [tmpdir]
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
@@ -530,10 +521,15 @@ class TestLibFunctional(TestCase):
 
         # sanity check that ops.lib.use works
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBAPI, 2)
+        assert baz.LIBAPI == 2
 
-    def _test_submodule(self, *, relative: bool = False):
-        tmpdir = self._mkdtemp()
+    def _test_submodule(
+        self,
+        tmp_path: pathlib.Path,
+        *,
+        relative: bool = False,
+    ):
+        tmpdir = str(tmp_path)
         sys.path = [tmpdir]
 
         path = _mklib(tmpdir, "foo", "bar")
@@ -554,17 +550,17 @@ class TestLibFunctional(TestCase):
 
         # sanity check that ops.lib.use works
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBAPI, 2)
-        self.assertEqual(baz.quux.this, 42)
+        assert baz.LIBAPI == 2
+        assert baz.quux.this == 42
 
-    def test_submodule_absolute(self):
-        self._test_submodule(relative=False)
+    def test_submodule_absolute(self, tmp_path: pathlib.Path):
+        self._test_submodule(tmp_path, relative=False)
 
-    def test_submodule_relative(self):
-        self._test_submodule(relative=True)
+    def test_submodule_relative(self, tmp_path: pathlib.Path):
+        self._test_submodule(tmp_path, relative=True)
 
-    def test_others_found(self):
-        tmpdir = self._mkdtemp()
+    def test_others_found(self, tmp_path: pathlib.Path):
+        tmpdir = str(tmp_path)
         sys.path = [tmpdir]
 
         _mklib(tmpdir, "foo", "bar").write_text(dedent("""
@@ -579,21 +575,21 @@ class TestLibFunctional(TestCase):
 
         # sanity check that ops.lib.use works
         baz = ops.lib.use('baz', 2, 'alice@example.com')
-        self.assertEqual(baz.LIBAPI, 2)
+        assert baz.LIBAPI == 2
 
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             ops.lib.use('baz', 1, 'alice@example.com')
 
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             ops.lib.use('baz', 2, 'bob@example.com')
 
 
-class TestDeprecationWarning(TestCase):
+class TestDeprecationWarning:
     def test_autoimport_deprecated(self):
-        with self.assertWarns(DeprecationWarning):
+        with pytest.warns(DeprecationWarning):
             ops.lib.autoimport()
 
     def test_use_deprecated(self):
-        with self.assertWarns(DeprecationWarning):
-            with self.assertRaises(ImportError):
+        with pytest.warns(DeprecationWarning):
+            with pytest.raises(ImportError):
                 ops.lib.use('foo', 1, 'bob@example.com')

@@ -41,7 +41,6 @@ from typing import (
     Generator,
     Iterable,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -60,12 +59,6 @@ from ops.jujuversion import JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
-
-_ConfigOption = TypedDict('_ConfigOption', {
-    'type': Literal['string', 'int', 'float', 'boolean'],
-    'description': str,
-    'default': Union[str, int, float, bool],
-})
 
 _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
@@ -96,6 +89,16 @@ _NetworkDict = TypedDict('_NetworkDict', {
     'ingress-addresses': List[str],
     'egress-subnets': List[str]
 })
+
+
+# Copied from typeshed.
+_KT = typing.TypeVar("_KT")
+_VT_co = typing.TypeVar("_VT_co", covariant=True)
+
+
+class _SupportsKeysAndGetItem(typing.Protocol[_KT, _VT_co]):
+    def keys(self) -> typing.Iterable[_KT]: ...
+    def __getitem__(self, __key: _KT) -> _VT_co: ...
 
 
 logger = logging.getLogger(__name__)
@@ -177,10 +180,11 @@ class Model:
     def pod(self) -> 'Pod':
         """Represents the definition of a pod spec in legacy Kubernetes models.
 
-        DEPRECATED: New charms should use the sidecar pattern with Pebble.
-
         Use :meth:`Pod.set_spec` to set the container specification for legacy
         Kubernetes charms.
+
+        .. deprecated:: 2.4.0
+            New charms should use the sidecar pattern with Pebble.
         """
         return self._pod
 
@@ -588,8 +592,8 @@ class Unit:
         shown in the output of 'juju status'.
         """
         if not isinstance(version, str):
-            raise TypeError("workload version must be a str, not {}: {!r}".format(
-                type(version).__name__, version))
+            raise TypeError(
+                f'workload version must be a str, not {type(version).__name__}: {version!r}')
         self._backend.application_version_set(version)
 
     @property
@@ -766,10 +770,18 @@ class Port:
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
 
-OpenedPort = Port  # Alias for backwards compatibility.
+OpenedPort = Port
+"""Alias to Port for backwards compatibility.
+
+.. deprecated:: 2.7.0
+    Use :class:`Port` instead.
+"""
 
 
-class LazyMapping(Mapping[str, str], ABC):
+_LazyValueType = typing.TypeVar("_LazyValueType")
+
+
+class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
     """Represents a dict that isn't populated until it is accessed.
 
     Charm authors should generally never need to use this directly, but it forms
@@ -777,14 +789,14 @@ class LazyMapping(Mapping[str, str], ABC):
     """
 
     # key-value mapping
-    _lazy_data: Optional[Dict[str, str]] = None
+    _lazy_data: Optional[Dict[str, _LazyValueType]] = None
 
     @abstractmethod
-    def _load(self) -> Dict[str, str]:
+    def _load(self) -> Dict[str, _LazyValueType]:
         raise NotImplementedError()
 
     @property
-    def _data(self) -> Dict[str, str]:
+    def _data(self) -> Dict[str, _LazyValueType]:
         data = self._lazy_data
         if data is None:
             data = self._lazy_data = self._load()
@@ -796,17 +808,25 @@ class LazyMapping(Mapping[str, str], ABC):
     def __contains__(self, key: str) -> bool:
         return key in self._data
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: str) -> str:
+    def __getitem__(self, key: str) -> _LazyValueType:
         return self._data[key]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self._data)
+
+
+class LazyMapping(_GenericLazyMapping[str]):
+    """Represents a dict[str, str] that isn't populated until it is accessed.
+
+    Charm authors should generally never need to use this directly, but it forms
+    the basis for many of the dicts that the framework tracks.
+    """
 
 
 class RelationMapping(Mapping[str, List['Relation']]):
@@ -862,9 +882,9 @@ class RelationMapping(Mapping[str, List['Relation']]):
     def _get_unique(self, relation_name: str, relation_id: Optional[int] = None):
         if relation_id is not None:
             if not isinstance(relation_id, int):
-                raise ModelError('relation id {} must be int or None not {}'.format(
-                    relation_id,
-                    type(relation_id).__name__))
+                raise ModelError(
+                    f'relation id {relation_id} must be int or None, '
+                    f'not {type(relation_id).__name__}')
             for relation in self[relation_name]:
                 if relation.id == relation_id:
                     return relation
@@ -908,8 +928,9 @@ class BindingMapping(Mapping[str, 'Binding']):
             binding_name = binding_key
             relation_id = None
         else:
-            raise ModelError('binding key must be str or relation instance, not {}'
-                             ''.format(type(binding_key).__name__))
+            raise ModelError(
+                f'binding key must be str or relation instance, not {type(binding_key).__name__}'
+            )
         binding = self._data.get(binding_key)
         if binding is None:
             binding = Binding(binding_name, relation_id, self._backend)
@@ -1557,7 +1578,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __iter__(self):
         return iter(self._data)
 
-    def __getitem__(self, key: Union['Unit', 'Application']):
+    def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
 
     def __repr__(self):
@@ -1629,9 +1650,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
-                "{} is not leader and cannot read its own application databag".format(
-                    self._backend.unit_name
-                )
+                f'{self._backend.unit_name} is not leader and cannot read its own '
+                f'application databag'
             )
 
         return True
@@ -1660,9 +1680,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             is_our_app: bool = self._backend.app_name == self._entity.name
             if not is_our_app:
                 raise RelationDataAccessError(
-                    "{} cannot write the data of remote application {}".format(
-                        self._backend.app_name, self._entity.name
-                    ))
+                    f'{self._backend.app_name} cannot write the data of remote application '
+                    f'{self._entity.name}')
             # Whether the application data bag is mutable or not depends on
             # whether this unit is a leader or not, but this is not guaranteed
             # to be always true during the same hook execution.
@@ -1676,9 +1695,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # is it OUR UNIT's?
             if self._backend.unit_name != self._entity.name:
                 raise RelationDataAccessError(
-                    "{} cannot write databag of {}: not the same unit.".format(
-                        self._backend.unit_name, self._entity.name
-                    )
+                    f'{self._backend.unit_name} cannot write databag of {self._entity.name}: '
+                    f'not the same unit.'
                 )
 
     def __setitem__(self, key: str, value: str):
@@ -1704,6 +1722,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
+    def update(self, other: _SupportsKeysAndGetItem[str, str], **kwargs: str):
+        """Update the data from dict/iterable other and the kwargs."""
+        super().update(other, **kwargs)
+
     def __delitem__(self, key: str):
         self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
@@ -1718,7 +1740,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return super().__repr__()
 
 
-class ConfigData(LazyMapping):
+class ConfigData(_GenericLazyMapping[Union[bool, int, float, str]]):
     """Configuration data.
 
     This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
@@ -1727,7 +1749,7 @@ class ConfigData(LazyMapping):
     def __init__(self, backend: '_ModelBackend'):
         self._backend = backend
 
-    def _load(self):
+    def _load(self) -> Dict[str, Union[bool, int, float, str]]:
         return self._backend.config_get()
 
 
@@ -1906,10 +1928,12 @@ class Resources:
 class Pod:
     """Represents the definition of a pod spec in legacy Kubernetes models.
 
-    DEPRECATED: New charms should use the sidecar pattern with Pebble.
-
     Currently only supports simple access to setting the Juju pod spec via
     :attr:`.set_spec`.
+
+    .. deprecated:: 2.4.0
+
+        New charms should use the sidecar pattern with Pebble.
     """
 
     def __init__(self, backend: '_ModelBackend'):
@@ -2000,7 +2024,7 @@ class Storage:
 
     @property
     def id(self) -> int:
-        """DEPRECATED. Use :attr:`Storage.index` instead."""
+        """.. deprecated:: 2.4.0 Use :attr:`Storage.index` instead."""
         logger.warning("model.Storage.id is being replaced - please use model.Storage.index")
         return self.index
 
@@ -2867,8 +2891,9 @@ class TooManyRelatedAppsError(ModelError):
     """Raised by :meth:`Model.get_relation` if there is more than one integrated application."""
 
     def __init__(self, relation_name: str, num_related: int, max_supported: int):
-        super().__init__('Too many remote applications on {} ({} > {})'.format(
-            relation_name, num_related, max_supported))
+        super().__init__(
+            f'Too many remote applications on {relation_name} ({num_related} > {max_supported})'
+        )
         self.relation_name = relation_name
         self.num_related = num_related
         self.max_supported = max_supported
@@ -2950,8 +2975,9 @@ def _format_action_result_dict(input: Dict[str, Any],
             # other exceptions raised on key validation...
             raise ValueError(f'invalid key {key!r}; must be a string')
         if not _ACTION_RESULT_KEY_REGEX.match(key):
-            raise ValueError("key '{!r}' is invalid: must be similar to 'key', 'some-key2', or "
-                             "'some.key'".format(key))
+            raise ValueError(
+                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', "
+                f"or 'some.key'")
 
         if parent_key:
             key = f"{parent_key}.{key}"
@@ -2960,8 +2986,9 @@ def _format_action_result_dict(input: Dict[str, Any],
             value = typing.cast(Dict[str, Any], value)
             output_ = _format_action_result_dict(value, key, output_)
         elif key in output_:
-            raise ValueError("duplicate key detected in dictionary passed to 'action-set': {!r}"
-                             .format(key))
+            raise ValueError(
+                f"duplicate key detected in dictionary passed to 'action-set': {key!r}"
+            )
         else:
             output_[key] = value  # type: ignore
 
@@ -3122,9 +3149,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def config_get(self) -> Dict[str, '_ConfigOption']:
+    def config_get(self) -> Dict[str, Union[bool, int, float, str]]:
         out = self._run('config-get', return_output=True, use_json=True)
-        return typing.cast(Dict[str, '_ConfigOption'], out)
+        return typing.cast(Dict[str, Union[bool, int, float, str]], out)
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -3531,8 +3558,9 @@ class _ModelBackendValidator:
     def validate_metric_label(cls, label_name: str):
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
             raise ModelError(
-                'invalid metric label name {!r}: must match {}'.format(
-                    label_name, cls.METRIC_KEY_REGEX.pattern))
+                f'invalid metric label name {label_name!r}: '
+                f'must match {cls.METRIC_KEY_REGEX.pattern}'
+            )
 
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):

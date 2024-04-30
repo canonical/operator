@@ -13,56 +13,32 @@
 # limitations under the License.
 
 import os
+import pathlib
 import subprocess
 import sys
-import tempfile
-import typing
-import unittest
+
+import pytest
 
 
-def get_python_filepaths(include_tests: bool = True):
-    """Helper to retrieve paths of Python files."""
-    python_paths: typing.List[str] = []
-    roots = ['ops']
-    if include_tests:
-        roots.append('test')
-    for root in roots:
-        for dirpath, _, filenames in os.walk(root):
-            for filename in filenames:
-                if filename.endswith(".py"):
-                    python_paths.append(os.path.join(dirpath, filename))
-    return python_paths
-
-
-class ImportersTestCase(unittest.TestCase):
-
+@pytest.mark.parametrize("mod_name", [
+    'charm',
+    'framework',
+    'main',
+    'model',
+    'testing',
+])
+def test_import(mod_name: str, tmp_path: pathlib.Path):
     template = "from ops import {module_name}"
 
-    def test_imports(self):
-        mod_names = [
-            'charm',
-            'framework',
-            'main',
-            'model',
-            'testing',
-        ]
+    testfile = tmp_path / "foo.py"
+    with open(testfile, 'w', encoding='utf8') as fh:
+        fh.write(template.format(module_name=mod_name))
 
-        for name in mod_names:
-            with self.subTest(name=name):
-                self.check(name)
+    environ = os.environ.copy()
+    if 'PYTHONPATH' in environ:
+        environ['PYTHONPATH'] = os.getcwd() + os.pathsep + environ['PYTHONPATH']
+    else:
+        environ['PYTHONPATH'] = os.getcwd()
 
-    def check(self, name: str):
-        """Helper function to run the test."""
-        fd, testfile = tempfile.mkstemp()
-        self.addCleanup(os.unlink, testfile)
-
-        with open(fd, 'w', encoding='utf8') as fh:
-            fh.write(self.template.format(module_name=name))
-
-        environ = os.environ.copy()
-        if 'PYTHONPATH' in environ:
-            environ['PYTHONPATH'] = os.getcwd() + os.pathsep + environ['PYTHONPATH']
-        else:
-            environ['PYTHONPATH'] = os.getcwd()
-        proc = subprocess.run([sys.executable, testfile], env=environ)
-        self.assertEqual(proc.returncode, 0)
+    proc = subprocess.run([sys.executable, testfile], env=environ)
+    assert proc.returncode == 0
