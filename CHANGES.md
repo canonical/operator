@@ -1,3 +1,25 @@
+# 2.13.0 - 30 Apr 2024
+
+## Features
+
+* Added support for user secrets in Harness (#1176)
+
+## Fixes
+
+* Corrected the model config types (#1183)
+* In Harness, only inspect the source file if it will be used - this fixed using Harness in a Python REPL (#1181)
+
+## Documentation
+
+* Updated publishing a release in HACKING.md (#1173)
+* Added `tox -e docs-deps` to compile requirements.txt (#1172)
+* Updated doc to note deprecated functionality in (#1178)
+
+## Tests
+
+* First stage of converting tests from unittest to pytest (#1191, #1192, #1196, #1193, #1195)
+* Added `pebble.CheckInfo.change_id` field (#1197)
+
 # 2.12.0 - 28 Mar 2024
 
 ## Features
