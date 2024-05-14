@@ -288,13 +288,16 @@ To make a release of the ops library, do the following:
    link to the full changelog.
 8. Change [version.py][ops/version.py]'s `version` to the
    [appropriate string](https://semver.org/).
-9. Add, commit, and push, and open a PR to get the changelog and version bump
+9. Update the pinned charm versions in `.github/workflows/*-charm-tests.yaml` to
+   the latest version of the charm's `main`. If they fail in the PR, bump them back
+   to the previous pin (and push on the charm team to get it fixed).
+10. Add, commit, and push, and open a PR to get the changelog and version bump
    into main (and get it merged).
-10. Back in the GitHub releases page, tweak the release notes - for example,
+11. Back in the GitHub releases page, tweak the release notes - for example,
    you might want to have a short paragraph at the intro on particularly
    noteworthy changes.
-11. Have someone else in the Charm-Tech team proofread the release notes.
-12. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+12. Have someone else in the Charm-Tech team proofread the release notes.
+13. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
 
 This will trigger an automatic build for the Python package and publish it to
 [PyPI](https://pypi.org/project/ops/)) (authorisation is handled via a
