@@ -8,20 +8,22 @@ jobs:
 
     strategy:
       matrix:
-        charm-repo:
-          - "jnsgruk/hello-kubecon"
-          - "juju/hello-juju-charm"
-
+        include:
+          - charm-repo: jnsgruk/hello-kubecon
+            commit: dbd133466dde59ee64f20a732a8f3d2e560ec3b8  # 2023-07-03T14:09:38Z
+          - charm-repo: juju/hello-juju-charm
+            commit: 046b8ce758660d5aa9cf05207e2370fcbab688d0  # 2021-12-16T10:10:24Z
     steps:
       - name: Set up Python 3.8
         uses: actions/setup-python@v5
         with:
-          python-version: "3.8"
+          python-version: '3.8'
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
         with:
           repository: ${{ matrix.charm-repo }}
+          ref: ${{ matrix.commit }}
 
       - name: Remove 'ops' from charm requirements.txt
         run: |
