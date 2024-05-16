@@ -5718,7 +5718,10 @@ class TestActions:
             def _on_fail_action(self, event: ops.ActionEvent):
                 event.fail("this will be ignored")
                 event.log("some progress")
-                event.fail("something went wrong")
+                if event.params.get('empty-failure-message'):
+                    event.fail()
+                else:
+                    event.fail("something went wrong")
                 event.log("more progress")
                 event.set_results(action_results)
 
@@ -5781,6 +5784,12 @@ class TestActions:
         assert out.results == {}
         assert harness.charm.simple_was_called  # type: ignore
 
+    def test_fail_action_no_message(self, harness: ops.testing.Harness[ops.CharmBase]):
+        with pytest.raises(ops.testing.ActionFailed) as excinfo:
+            harness.run_action('fail', {'empty-failure-message': True})
+            assert 'called `fail()`' in str(excinfo.value)
+        assert excinfo.value.message == ''
+
     def test_fail_action(
         self,
         action_results: typing.Dict[str, typing.Any],
@@ -5790,6 +5799,7 @@ class TestActions:
         action_results["partial"] = "foo"
         with pytest.raises(ops.testing.ActionFailed) as excinfo:
             harness.run_action("fail")
+
         assert excinfo.value.message == "something went wrong"
         assert excinfo.value.output.logs == ["some progress", "more progress"]
         assert excinfo.value.output.results == {"partial": "foo"}
