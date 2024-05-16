@@ -166,6 +166,11 @@ class ActionFailed(Exception):  # noqa
         self.message = message
         self.output = output
 
+    def __str__(self):
+        if self.message:
+            return self.message
+        return "Event handler called `fail()` with no additional details."
+
 
 @dataclasses.dataclass()
 class _RunningAction:
