@@ -18,12 +18,12 @@ jobs:
 
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ matrix.charm-repo }}
 
       - name: Checkout the operator repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: myops
 
