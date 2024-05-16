@@ -15,7 +15,7 @@ jobs:
       id-token: write
     needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

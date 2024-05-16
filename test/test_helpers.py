@@ -201,38 +201,3 @@ class FakeScriptTest(unittest.TestCase):
         assert fake_script_calls(self, clear=True) == [['bar', 'd e', 'f']]
 
         assert fake_script_calls(self, clear=True) == []
-
-
-class BaseTestCase(unittest.TestCase):
-
-    def create_framework(self,
-                         *,
-                         model: typing.Optional[ops.Model] = None,
-                         tmpdir: typing.Optional[pathlib.Path] = None):
-        """Create a Framework object.
-
-        By default operate in-memory; pass a temporary directory via the 'tmpdir'
-        parameter if you wish to instantiate several frameworks sharing the
-        same dir (e.g. for storing state).
-        """
-        if tmpdir is None:
-            data_fpath = ":memory:"
-            charm_dir = 'non-existant'
-        else:
-            data_fpath = tmpdir / "framework.data"
-            charm_dir = tmpdir
-
-        framework = ops.Framework(
-            SQLiteStorage(data_fpath),
-            charm_dir,
-            meta=model._cache._meta if model else ops.CharmMeta(),
-            model=model)  # type: ignore
-        self.addCleanup(framework.close)
-        return framework
-
-    def create_model(self):
-        """Create a Model object."""
-        backend = _ModelBackend(unit_name='myapp/0')
-        meta = ops.CharmMeta()
-        model = ops.Model(meta, backend)
-        return model
