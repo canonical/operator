@@ -288,7 +288,7 @@ To make a release of the ops library, do the following:
    link to the full changelog.
 8. Change [version.py][ops/version.py]'s `version` to the
    [appropriate string](https://semver.org/).
-9. Update the pinned charm versions in `.github/workflows/*-charm-tests.yaml` to
+9. Update the pinned charm versions in [*-charm-tests.yaml](.github/workflows/) to
    the latest version of the charm's default branch. If they fail in the PR, bump them back
    to the previous pin (and push on the charm team to get it fixed).
 10. Add, commit, and push, and open a PR to get the changelog and version bump
