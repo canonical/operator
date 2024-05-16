@@ -1396,10 +1396,6 @@ class TestApplication:
         yield harness
         harness.cleanup()
 
-    @pytest.fixture
-    def app(self, harness: ops.testing.Harness[ops.CharmBase]):
-        return harness.model.app
-
     # Tests fix for https://github.com/canonical/operator/issues/694.
     def test_mocked_get_services(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.begin()
@@ -1414,11 +1410,8 @@ class TestApplication:
         assert s
         assert 'baz' in c.get_services()
 
-    def test_planned_units(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        app: ops.Application,
-    ):
+    def test_planned_units(self, harness: ops.testing.Harness[ops.CharmBase]):
+        app = harness.model.app
         peer_rel_id = harness.add_relation('db2', 'db2')
 
         # Test that we always count ourself.
@@ -1438,12 +1431,9 @@ class TestApplication:
 
         assert app.planned_units() == 3
 
-    def test_planned_units_user_set(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        app: ops.Application,
-    ):
+    def test_planned_units_user_set(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.set_planned_units(1)
+        app = harness.model.app
         assert app.planned_units() == 1
 
         harness.set_planned_units(2)
@@ -1452,17 +1442,14 @@ class TestApplication:
         harness.set_planned_units(100)
         assert app.planned_units() == 100
 
-    def test_planned_units_garbage_values(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        app: ops.Application,
-    ):
+    def test_planned_units_garbage_values(self, harness: ops.testing.Harness[ops.CharmBase]):
         # Planned units should be a positive integer, or zero.
         with pytest.raises(TypeError):
             harness.set_planned_units(-1)
         # Verify that we didn't set our value before raising the error.
         assert harness._backend._planned_units is None
         # Verify that we still get the default value back from .planned_units.
+        app = harness.model.app
         assert app.planned_units() == 1
 
         with pytest.raises(TypeError):
@@ -1471,11 +1458,7 @@ class TestApplication:
         with pytest.raises(TypeError):
             harness.set_planned_units(-3423000102312321090)
 
-    def test_planned_units_override(
-        self,
-        harness: ops.testing.Harness[ops.CharmBase],
-        app: ops.Application,
-    ):
+    def test_planned_units_override(self, harness: ops.testing.Harness[ops.CharmBase]):
         """Verify that we override the calculated value of planned_units when we set it manually.
 
         When a charm author writes a test that explicitly calls set_planned_units, we assume that
@@ -1490,6 +1473,7 @@ class TestApplication:
         harness.add_relation_unit(peer_rel_id, 'myapp/2')
         harness.add_relation_unit(peer_rel_id, 'myapp/3')
 
+        app = harness.model.app
         assert app.planned_units() == 10
 
         # Verify that we can clear the override.
@@ -1547,7 +1531,7 @@ containers:
 
 class TestContainerPebble:
     @pytest.fixture
-    def model(self):
+    def container(self):
         meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 containers:
@@ -1555,11 +1539,7 @@ containers:
     k: v
 """)
         backend = MockPebbleBackend('myapp/0')
-        return ops.Model(meta, backend)
-
-    @pytest.fixture
-    def container(self, model: ops.Model):
-        return model.unit.containers['c1']
+        return ops.Model(meta, backend).unit.containers['c1']
 
     def test_socket_path(self, container: ops.Container):
         assert container.pebble.socket_path == '/charm/containers/c1/pebble.socket'
