@@ -23,7 +23,7 @@ import tempfile
 import typing
 import unittest
 import unittest.mock
-from test.test_helpers import BaseTestCase, fake_script, fake_script_calls
+from test.test_helpers import FakeScript
 from textwrap import dedent
 
 import pytest
@@ -33,27 +33,49 @@ import ops
 import ops.storage
 
 
+@pytest.fixture
+def fake_script(request: pytest.FixtureRequest):
+    return FakeScript(request)
+
+
 class StoragePermutations(abc.ABC):
 
     assertEqual = unittest.TestCase.assertEqual  # noqa
     assertRaises = unittest.TestCase.assertRaises  # noqa
 
-    def create_framework(self) -> ops.Framework:
+    def create_framework(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
-        return ops.Framework(self.create_storage(), None, None, None)  # type: ignore
+        storage = self.create_storage(request, fake_script)
+        return ops.Framework(storage, None, None, None)  # type: ignore
 
     @abc.abstractmethod
-    def create_storage(self) -> ops.storage.SQLiteStorage:
+    def create_storage(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ) -> ops.storage.SQLiteStorage:
         """Create a Storage backend that we can interact with."""
         return NotImplemented
 
-    def test_save_and_load_snapshot(self):
-        f = self.create_framework()
+    def test_save_and_load_snapshot(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        f = self.create_framework(request, fake_script)
 
         class Sample(ops.StoredStateData):
 
-            def __init__(self, parent: ops.Object, key: str,
-                         content: typing.Dict[str, typing.Any]):
+            def __init__(
+                self,
+                parent: ops.Object,
+                key: str,
+                content: typing.Dict[str, typing.Any],
+            ):
                 super().__init__(parent, key)
                 self.content = content
 
@@ -81,8 +103,8 @@ class StoragePermutations(abc.ABC):
         res = f.load_snapshot(handle)
         assert data == res.content  # type: ignore
 
-    def test_emit_event(self):
-        f = self.create_framework()
+    def test_emit_event(self, request: pytest.FixtureRequest, fake_script: FakeScript):
+        f = self.create_framework(request, fake_script)
 
         class Evt(ops.EventBase):
             def __init__(self, handle: ops.Handle, content: typing.Any):
@@ -125,23 +147,31 @@ class StoragePermutations(abc.ABC):
         s.on.event.emit(None)
         assert s.observed_content is None
 
-    def test_save_and_overwrite_snapshot(self):
-        store = self.create_storage()
+    def test_save_and_overwrite_snapshot(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        store = self.create_storage(request, fake_script)
         store.save_snapshot('foo', {1: 2})
         assert store.load_snapshot('foo') == {1: 2}
         store.save_snapshot('foo', {'three': 4})
         assert store.load_snapshot('foo') == {'three': 4}
 
-    def test_drop_snapshot(self):
-        store = self.create_storage()
+    def test_drop_snapshot(self, request: pytest.FixtureRequest, fake_script: FakeScript):
+        store = self.create_storage(request, fake_script)
         store.save_snapshot('foo', {1: 2})
         assert store.load_snapshot('foo') == {1: 2}
         store.drop_snapshot('foo')
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
-    def test_save_snapshot_empty_string(self):
-        store = self.create_storage()
+    def test_save_snapshot_empty_string(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        store = self.create_storage(request, fake_script)
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
         store.save_snapshot('foo', '')
@@ -150,8 +180,12 @@ class StoragePermutations(abc.ABC):
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('foo')
 
-    def test_save_snapshot_none(self):
-        store = self.create_storage()
+    def test_save_snapshot_none(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        store = self.create_storage(request, fake_script)
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
         store.save_snapshot('bar', None)
@@ -160,8 +194,12 @@ class StoragePermutations(abc.ABC):
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('bar')
 
-    def test_save_snapshot_zero(self):
-        store = self.create_storage()
+    def test_save_snapshot_zero(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        store = self.create_storage(request, fake_script)
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
         store.save_snapshot('zero', 0)
@@ -170,15 +208,14 @@ class StoragePermutations(abc.ABC):
         with pytest.raises(ops.storage.NoSnapshotError):
             store.load_snapshot('zero')
 
-    def test_save_notice(self):
-        store = self.create_storage()
+    def test_save_notice(self, request: pytest.FixtureRequest, fake_script: FakeScript):
+        store = self.create_storage(request, fake_script)
         store.save_notice('event', 'observer', 'method')
-        assert list(store.notices('event')) == \
-            [('event', 'observer', 'method')]
+        assert list(store.notices('event')) == [('event', 'observer', 'method')]
 
-    def test_all_notices(self):
+    def test_all_notices(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         notices = [('e1', 'o1', 'm1'), ('e1', 'o2', 'm2'), ('e2', 'o3', 'm3')]
-        store = self.create_storage()
+        store = self.create_storage(request, fake_script)
         for notice in notices:
             store.save_notice(*notice)
 
@@ -195,28 +232,36 @@ class StoragePermutations(abc.ABC):
         assert list(store.notices(None)) == notices
         assert list(store.notices('')) == notices
 
-    def test_load_notices(self):
-        store = self.create_storage()
+    def test_load_notices(self, request: pytest.FixtureRequest, fake_script: FakeScript):
+        store = self.create_storage(request, fake_script)
         assert list(store.notices('path')) == []
 
-    def test_save_one_load_another_notice(self):
-        store = self.create_storage()
+    def test_save_one_load_another_notice(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        store = self.create_storage(request, fake_script)
         store.save_notice('event', 'observer', 'method')
         assert list(store.notices('other')) == []
 
-    def test_save_load_drop_load_notices(self):
-        store = self.create_storage()
+    def test_save_load_drop_load_notices(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        store = self.create_storage(request, fake_script)
         store.save_notice('event', 'observer', 'method')
         store.save_notice('event', 'observer', 'method2')
-        assert list(store.notices('event')) == \
-            [('event', 'observer', 'method'),
-             ('event', 'observer', 'method2'),
-             ]
+        assert list(store.notices('event')) == [
+            ('event', 'observer', 'method'),
+            ('event', 'observer', 'method2')
+        ]
 
 
-class TestSQLiteStorage(StoragePermutations, BaseTestCase):
+class TestSQLiteStorage(StoragePermutations):
 
-    def create_storage(self):
+    def create_storage(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         return ops.storage.SQLiteStorage(':memory:')
 
     def test_permissions_new(self):
@@ -255,7 +300,7 @@ class TestSQLiteStorage(StoragePermutations, BaseTestCase):
             pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
 
-def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
+def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):
     """Create fake scripts for pretending to be state-set and state-get."""
     template_args = {
         'executable': str(pathlib.Path(sys.executable).as_posix()),
@@ -263,7 +308,7 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         'state_file': str(state_file.as_posix()),
     }
 
-    fake_script(test_case, 'state-set', dedent('''\
+    fake_script.write('state-set', dedent('''\
         {executable} -c '
         import sys
         if "{pthpth}" not in sys.path:
@@ -284,7 +329,7 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         ' "$@"
         ''').format(**template_args))
 
-    fake_script(test_case, 'state-get', dedent('''\
+    fake_script.write('state-get', dedent('''\
         {executable} -Sc '
         import sys
         if "{pthpth}" not in sys.path:
@@ -302,7 +347,7 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         ' "$@"
         ''').format(**template_args))
 
-    fake_script(test_case, 'state-delete', dedent('''\
+    fake_script.write('state-delete', dedent('''\
         {executable} -Sc '
         import sys
         if "{pthpth}" not in sys.path:
@@ -322,18 +367,18 @@ def setup_juju_backend(test_case: unittest.TestCase, state_file: pathlib.Path):
         ''').format(**template_args))
 
 
-class TestJujuStorage(StoragePermutations, BaseTestCase):
+class TestJujuStorage(StoragePermutations):
 
-    def create_storage(self):
+    def create_storage(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         fd, fn = tempfile.mkstemp(prefix='tmp-ops-test-state-')
         os.close(fd)
         state_file = pathlib.Path(fn)
-        self.addCleanup(state_file.unlink)
-        setup_juju_backend(self, state_file)
+        request.addfinalizer(state_file.unlink)
+        setup_juju_backend(fake_script, state_file)
         return ops.storage.JujuStorage()
 
 
-class TestSimpleLoader(BaseTestCase):
+class TestSimpleLoader:
 
     def test_is_c_loader(self):
         loader = ops.storage._SimpleLoader(io.StringIO(''))
@@ -376,25 +421,25 @@ class TestSimpleLoader(BaseTestCase):
         self.assertRefused(f)
 
 
-class TestJujuStateBackend(BaseTestCase):
+class TestJujuStateBackend:
 
     def test_is_not_available(self):
         assert not ops.storage.juju_backend_available()
 
-    def test_is_available(self):
-        fake_script(self, 'state-get', 'echo ""')
+    def test_is_available(self, fake_script: FakeScript):
+        fake_script.write('state-get', 'echo ""')
         assert ops.storage.juju_backend_available()
-        assert fake_script_calls(self, clear=True) == []
+        assert fake_script.calls(clear=True) == []
 
-    def test_set_encodes_args(self):
+    def test_set_encodes_args(self, fake_script: FakeScript):
         t = tempfile.NamedTemporaryFile()
         try:
-            fake_script(self, 'state-set', dedent("""
+            fake_script.write('state-set', dedent("""
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()))
             backend = ops.storage._JujuStorageBackend()
             backend.set('key', {'foo': 2})
-            assert fake_script_calls(self, clear=True) == [
+            assert fake_script.calls(clear=True) == [
                 ['state-set', '--file', '-'],
             ]
             t.seek(0)
@@ -406,21 +451,21 @@ class TestJujuStateBackend(BaseTestCase):
               {foo: 2}
             """)
 
-    def test_get(self):
-        fake_script(self, 'state-get', dedent("""
+    def test_get(self, fake_script: FakeScript):
+        fake_script.write('state-get', dedent("""
             echo 'foo: "bar"'
             """))
         backend = ops.storage._JujuStorageBackend()
         value = backend.get('key')
         assert value == {'foo': 'bar'}
-        assert fake_script_calls(self, clear=True) == [
+        assert fake_script.calls(clear=True) == [
             ['state-get', 'key'],
         ]
 
-    def test_set_and_get_complex_value(self):
+    def test_set_and_get_complex_value(self, fake_script: FakeScript):
         t = tempfile.NamedTemporaryFile()
         try:
-            fake_script(self, 'state-set', dedent("""
+            fake_script.write('state-set', dedent("""
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()))
             backend = ops.storage._JujuStorageBackend()
@@ -433,7 +478,7 @@ class TestJujuStateBackend(BaseTestCase):
                 'seven': b'1234',
             }
             backend.set('Class[foo]/_stored', complex_val)
-            assert fake_script_calls(self, clear=True) == [
+            assert fake_script.calls(clear=True) == [
                 ['state-set', '--file', '-'],
             ]
             t.seek(0)
@@ -457,7 +502,7 @@ class TestJujuStateBackend(BaseTestCase):
             """)
         # Note that the content is yaml in a string, embedded inside YAML to declare the Key:
         # Value of where to store the entry.
-        fake_script(self, 'state-get', dedent("""
+        fake_script.write('state-get', dedent("""
             echo "foo: 2
             3: [1, 2, '3']
             four: !!set {2: null, 3: null}

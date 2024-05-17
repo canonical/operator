@@ -23,7 +23,6 @@ import subprocess
 import sys
 import tempfile
 import typing
-import unittest
 import warnings
 from pathlib import Path
 from unittest.mock import patch
@@ -35,7 +34,7 @@ from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
-from .test_helpers import fake_script, fake_script_calls
+from .test_helpers import FakeScript
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
@@ -54,24 +53,25 @@ class SymlinkTargetError(Exception):
 
 
 class EventSpec:
-    def __init__(self,
-                 event_type: typing.Type[ops.EventBase],
-                 event_name: str,
-                 env_var: typing.Optional[str] = None,
-                 relation_id: typing.Optional[int] = None,
-                 remote_app: typing.Optional[str] = None,
-                 remote_unit: typing.Optional[str] = None,
-                 model_name: typing.Optional[str] = None,
-                 set_in_env: typing.Optional[typing.Dict[str,
-                                                         str]] = None,
-                 workload_name: typing.Optional[str] = None,
-                 notice_id: typing.Optional[str] = None,
-                 notice_type: typing.Optional[str] = None,
-                 notice_key: typing.Optional[str] = None,
-                 departing_unit_name: typing.Optional[str] = None,
-                 secret_id: typing.Optional[str] = None,
-                 secret_label: typing.Optional[str] = None,
-                 secret_revision: typing.Optional[str] = None):
+    def __init__(
+        self,
+        event_type: typing.Type[ops.EventBase],
+        event_name: str,
+        env_var: typing.Optional[str] = None,
+        relation_id: typing.Optional[int] = None,
+        remote_app: typing.Optional[str] = None,
+        remote_unit: typing.Optional[str] = None,
+        model_name: typing.Optional[str] = None,
+        set_in_env: typing.Optional[typing.Dict[str, str]] = None,
+        workload_name: typing.Optional[str] = None,
+        notice_id: typing.Optional[str] = None,
+        notice_type: typing.Optional[str] = None,
+        notice_key: typing.Optional[str] = None,
+        departing_unit_name: typing.Optional[str] = None,
+        secret_id: typing.Optional[str] = None,
+        secret_label: typing.Optional[str] = None,
+        secret_revision: typing.Optional[str] = None,
+    ):
         self.event_type = event_type
         self.event_name = event_name
         self.env_var = env_var
@@ -93,7 +93,7 @@ class EventSpec:
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
-class CharmInitTestCase(unittest.TestCase):
+class TestCharmInit:
 
     @patch('sys.stderr', new_callable=io.StringIO)
     def test_breakpoint(self, fake_stderr: io.StringIO):
@@ -118,11 +118,11 @@ class CharmInitTestCase(unittest.TestCase):
         assert mock.call_count == 0
 
     def _check(
-            self,
-            charm_class: typing.Type[ops.CharmBase],
-            *,
-            extra_environ: typing.Optional[typing.Dict[str, str]] = None,
-            **kwargs: typing.Any
+        self,
+        charm_class: typing.Type[ops.CharmBase],
+        *,
+        extra_environ: typing.Optional[typing.Dict[str, str]] = None,
+        **kwargs: typing.Any,
     ):
         """Helper for below tests."""
         fake_environ = {
@@ -146,8 +146,8 @@ class CharmInitTestCase(unittest.TestCase):
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
 
-            def __init__(self, *args):  # type: ignore
-                super().__init__(*args)  # type: ignore
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
 
         with warnings.catch_warnings(record=True) as warn_cm:
             self._check(MyCharm)
@@ -192,7 +192,7 @@ class CharmInitTestCase(unittest.TestCase):
     def test_controller_storage_deprecated(self):
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
-            with self.assertWarnsRegex(DeprecationWarning, 'Controller storage'):
+            with pytest.warns(DeprecationWarning, match='Controller storage'):
                 with pytest.raises(FileNotFoundError, match='state-get'):
                     self._check(ops.CharmBase, use_juju_for_storage=True)
 
@@ -200,7 +200,7 @@ class CharmInitTestCase(unittest.TestCase):
 @patch('sys.argv', new=("hooks/config-changed",))
 @patch('ops.main._Manager._setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
-class TestDispatch(unittest.TestCase):
+class TestDispatch:
     def _check(self, *, with_dispatch: bool = False, dispatch_path: str = ''):
         """Helper for below tests."""
         class MyCharm(ops.CharmBase):
@@ -257,6 +257,11 @@ _event_test = typing.List[typing.Tuple[
     typing.Dict[str, typing.Union[str, int, None]]]]
 
 
+@pytest.fixture
+def fake_script(request: pytest.FixtureRequest):
+    return FakeScript(request)
+
+
 class _TestMain(abc.ABC):
 
     @abc.abstractmethod
@@ -270,11 +275,17 @@ class _TestMain(abc.ABC):
         return NotImplemented
 
     @abc.abstractmethod
-    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         """Set up the environment and call (i.e. run) the given event."""
         return NotImplemented
 
     @abc.abstractmethod
+    @pytest.mark.usefixtures("setup_charm")
     def test_setup_event_links(self):
         """Test auto-creation of symlinks caused by initial events.
 
@@ -283,19 +294,9 @@ class _TestMain(abc.ABC):
         """
         return NotImplemented
 
-    addCleanup = unittest.TestCase.addCleanup  # noqa
-    assertEqual = unittest.TestCase.assertEqual  # noqa
-    assertFalse = unittest.TestCase.assertFalse  # noqa
-    assertIn = unittest.TestCase.assertIn  # noqa
-    assertIsNotNone = unittest.TestCase.assertIsNotNone  # noqa
-    assertRaises = unittest.TestCase.assertRaises  # noqa
-    assertRegex = unittest.TestCase.assertRegex  # noqa
-    assertNotIn = unittest.TestCase.assertNotIn  # noqa
-    fail = unittest.TestCase.fail
-    subTest = unittest.TestCase.subTest  # noqa
-
-    def setUp(self):
-        self._setup_charm_dir()
+    @pytest.fixture
+    def setup_charm(self, request: pytest.FixtureRequest, fake_script: FakeScript):
+        self._setup_charm_dir(request)
 
         # Relations events are defined dynamically and modify the class attributes.
         # We use a subclass temporarily to prevent these side effects from leaking.
@@ -305,18 +306,23 @@ class _TestMain(abc.ABC):
 
         def cleanup():
             ops.CharmBase.on = ops.CharmEvents()  # type: ignore
-        self.addCleanup(cleanup)
+        request.addfinalizer(cleanup)
 
-        fake_script(typing.cast(unittest.TestCase, self), 'is-leader', 'echo true')
-        fake_script(typing.cast(unittest.TestCase, self), 'juju-log', 'exit 0')
+        fake_script.write('is-leader', 'echo true')
+        fake_script.write('juju-log', 'exit 0')
 
         # set to something other than None for tests that care
         self.stdout = None
         self.stderr = None
 
-    def _setup_charm_dir(self):
+    def _setup_charm_dir(self, request: pytest.FixtureRequest):
         self._tmpdir = Path(tempfile.mkdtemp(prefix='tmp-ops-test-')).resolve()
-        self.addCleanup(shutil.rmtree, str(self._tmpdir))
+
+        def cleanup():
+            shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+        request.addfinalizer(cleanup)
+
         self.JUJU_CHARM_DIR = self._tmpdir / 'test_main'
         self._charm_state_file = self.JUJU_CHARM_DIR / '.unit-state.db'
         self.hooks_dir = self.JUJU_CHARM_DIR / 'hooks'
@@ -347,9 +353,10 @@ class _TestMain(abc.ABC):
         for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status', 'keyerror'):
             self._setup_entry_point(actions_dir, action_name)
 
-    def _read_and_clear_state(self,
-                              event_name: str) -> typing.Union[ops.BoundStoredState,
-                                                               ops.StoredStateData]:
+    def _read_and_clear_state(
+        self,
+        event_name: str,
+    ) -> typing.Union[ops.BoundStoredState, ops.StoredStateData]:
         if self._charm_state_file.stat().st_size:
             storage = SQLiteStorage(self._charm_state_file)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -381,7 +388,7 @@ class _TestMain(abc.ABC):
             stored = ops.StoredStateData(None, None)  # type: ignore
         return stored
 
-    def _simulate_event(self, event_spec: EventSpec):
+    def _simulate_event(self, fake_script: FakeScript, event_spec: EventSpec):
         ppath = Path(__file__).parent
         pypath = str(ppath.parent)
         if 'PYTHONPATH' in os.environ:
@@ -460,47 +467,62 @@ class _TestMain(abc.ABC):
         if event_spec.model_name is not None:
             env['JUJU_MODEL_NAME'] = event_spec.model_name
 
-        self._call_event(Path(event_dir, event_filename), env)
+        self._call_event(fake_script, Path(event_dir, event_filename), env)
         return self._read_and_clear_state(event_spec.event_name)
 
-    def test_event_reemitted(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_event_reemitted(self, fake_script: FakeScript):
         # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['InstallEvent']
 
-        state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(ops.ConfigChangedEvent, 'config-changed')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should pick the deferred config-changed.
-        state = self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status'))
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(ops.UpdateStatusEvent, 'update-status')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == \
             ['ConfigChangedEvent', 'UpdateStatusEvent']
 
-    def test_no_reemission_on_collect_metrics(self):
-        fake_script(typing.cast(unittest.TestCase, self), 'add-metric', 'exit 0')
+    @pytest.mark.usefixtures("setup_charm")
+    def test_no_reemission_on_collect_metrics(self, fake_script: FakeScript):
+        fake_script.write('add-metric', 'exit 0')
 
         # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['InstallEvent']
 
-        state = self._simulate_event(EventSpec(ops.ConfigChangedEvent, 'config-changed'))
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(ops.ConfigChangedEvent, 'config-changed')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should not pick the deferred config-changed because
         # collect-metrics runs in a restricted context.
-        state = self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect-metrics'))
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(ops.CollectMetricsEvent, 'collect-metrics')
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['CollectMetricsEvent']
 
-    def test_multiple_events_handled(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_multiple_events_handled(self, fake_script: FakeScript):
         self._prepare_actions()
 
-        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
+        fake_script.write('action-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
         # and with endpoints from different sections of metadata.yaml
@@ -643,11 +665,11 @@ class _TestMain(abc.ABC):
         logger.debug('Expected events %s', events_under_test)
 
         # First run "install" to make sure all hooks are set up.
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
 
         # Simulate hook executions for every event.
         for event_spec, expected_event_data in events_under_test:
-            state = self._simulate_event(event_spec)
+            state = self._simulate_event(fake_script, event_spec)
             assert isinstance(state, ops.BoundStoredState)
 
             state_key = f"on_{event_spec.event_name}"
@@ -665,7 +687,8 @@ class _TestMain(abc.ABC):
                 assert getattr(state, f"{event_spec.event_name}_data") == \
                     expected_event_data
 
-    def test_event_not_implemented(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_event_not_implemented(self, fake_script: FakeScript):
         """Make sure events without implementation do not cause non-zero exit."""
         # Simulate a scenario where there is a symlink for an event that
         # a charm does not know how to handle.
@@ -674,25 +697,34 @@ class _TestMain(abc.ABC):
         hook_path.symlink_to('install')
 
         try:
-            self._simulate_event(EventSpec(ops.HookEvent, 'not-implemented-event'))
+            self._simulate_event(
+                fake_script,
+                EventSpec(ops.HookEvent, 'not-implemented-event')
+            )
         except subprocess.CalledProcessError:
-            self.fail('Event simulation for an unsupported event'
-                      ' results in a non-zero exit code returned')
+            pytest.fail('Event simulation for an unsupported event'
+                        ' results in a non-zero exit code returned')
 
-    def test_no_actions(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_no_actions(self, fake_script: FakeScript):
         (self.JUJU_CHARM_DIR / 'actions.yaml').unlink()
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
 
-    def test_empty_actions(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_empty_actions(self, fake_script: FakeScript):
         (self.JUJU_CHARM_DIR / 'actions.yaml').write_text('')
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
 
-    def test_collect_metrics(self):
-        fake_script(typing.cast(unittest.TestCase, self), 'add-metric', 'exit 0')
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+    @pytest.mark.usefixtures("setup_charm")
+    def test_collect_metrics(self, fake_script: FakeScript):
+        fake_script.write('add-metric', 'exit 0')
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
-        fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
-        self._simulate_event(EventSpec(ops.CollectMetricsEvent, 'collect_metrics'))
+        fake_script.calls(clear=True)
+        self._simulate_event(
+            fake_script,
+            EventSpec(ops.CollectMetricsEvent, 'collect_metrics')
+        )
 
         expected = [
             VERSION_LOGLINE,
@@ -700,18 +732,25 @@ class _TestMain(abc.ABC):
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
+        calls = fake_script.calls()
 
         assert calls == expected
 
-    def test_custom_event(self):
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+    @pytest.mark.usefixtures("setup_charm")
+    def test_custom_event(self, fake_script: FakeScript):
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         # Clear the calls during 'install'
-        fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
-        self._simulate_event(EventSpec(ops.UpdateStatusEvent, 'update-status',
-                                       set_in_env={'EMIT_CUSTOM_EVENT': "1"}))
+        fake_script.calls(clear=True)
+        self._simulate_event(
+            fake_script,
+            EventSpec(
+                ops.UpdateStatusEvent,
+                'update-status',
+                set_in_env={'EMIT_CUSTOM_EVENT': "1"}
+            )
+        )
 
-        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
+        calls = fake_script.calls()
 
         custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
@@ -725,8 +764,9 @@ class _TestMain(abc.ABC):
         calls[2][-1] = custom_event_prefix
         assert calls == expected
 
-    def test_logger(self):
-        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
+    @pytest.mark.usefixtures("setup_charm")
+    def test_logger(self, fake_script: FakeScript):
+        fake_script.write('action-get', "echo '{}'")
 
         test_cases = [(
             EventSpec(ops.ActionEvent, 'log_critical_action', env_var='JUJU_ACTION_NAME',
@@ -747,19 +787,21 @@ class _TestMain(abc.ABC):
         )]
 
         # Set up action symlinks.
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
 
         for event_spec, calls in test_cases:
-            self._simulate_event(event_spec)
-            assert calls in \
-                fake_script_calls(typing.cast(unittest.TestCase, self), clear=True)
+            self._simulate_event(fake_script, event_spec)
+            assert calls in fake_script.calls(clear=True)
 
-    def test_excepthook(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_excepthook(self, fake_script: FakeScript):
         with pytest.raises(subprocess.CalledProcessError):
-            self._simulate_event(EventSpec(ops.InstallEvent, 'install',
-                                           set_in_env={'TRY_EXCEPTHOOK': '1'}))
+            self._simulate_event(
+                fake_script,
+                EventSpec(ops.InstallEvent, 'install', set_in_env={'TRY_EXCEPTHOOK': '1'})
+            )
 
-        calls = [' '.join(i) for i in fake_script_calls(typing.cast(unittest.TestCase, self))]
+        calls = [' '.join(i) for i in fake_script.calls()]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
         assert re.search('Using local storage: not a Kubernetes podspec charm', calls.pop(0))
@@ -774,36 +816,42 @@ class _TestMain(abc.ABC):
             'RuntimeError: failing as requested', calls[0])
         assert len(calls) == 1, f"expected 1 call, but got extra: {calls[1:]}"
 
-    def test_sets_model_name(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_sets_model_name(self, fake_script: FakeScript):
         self._prepare_actions()
 
-        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
-        state = self._simulate_event(EventSpec(
-            ops.ActionEvent, 'get_model_name_action',
-            env_var='JUJU_ACTION_NAME',
-            model_name='test-model-name',
-            set_in_env={'JUJU_ACTION_UUID': '1'}))
+        fake_script.write('action-get', "echo '{}'")
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(
+                ops.ActionEvent,
+                'get_model_name_action',
+                env_var='JUJU_ACTION_NAME',
+                model_name='test-model-name',
+                set_in_env={'JUJU_ACTION_UUID': '1'}
+            )
+        )
         assert isinstance(state, ops.BoundStoredState)
         assert state._on_get_model_name_action == ['test-model-name']
 
-    def test_has_valid_status(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_has_valid_status(self, fake_script: FakeScript):
         self._prepare_actions()
 
-        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
-        fake_script(typing.cast(unittest.TestCase, self), 'status-get',
-                    """echo '{"status": "unknown", "message": ""}'""")
-        state = self._simulate_event(EventSpec(
+        fake_script.write('action-get', "echo '{}'")
+        fake_script.write('status-get',
+                          """echo '{"status": "unknown", "message": ""}'""")
+        state = self._simulate_event(fake_script, EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME',
             set_in_env={'JUJU_ACTION_UUID': '1'}))
         assert isinstance(state, ops.BoundStoredState)
         assert state.status_name == 'unknown'
         assert state.status_message == ''
-        fake_script(
-            typing.cast(unittest.TestCase, self),
+        fake_script.write(
             'status-get',
             """echo '{"status": "blocked", "message": "help meeee"}'""")
-        state = self._simulate_event(EventSpec(
+        state = self._simulate_event(fake_script, EventSpec(
             ops.ActionEvent, 'get_status_action',
             env_var='JUJU_ACTION_NAME',
             set_in_env={'JUJU_ACTION_UUID': '1'}))
@@ -812,7 +860,7 @@ class _TestMain(abc.ABC):
         assert state.status_message == 'help meeee'
 
 
-class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
+class TestMainWithNoDispatch(_TestMain):
     has_dispatch = False
     hooks_are_symlinks = True
 
@@ -820,13 +868,17 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
         path = directory / entry_point
         path.symlink_to(self.charm_exec_path)
 
-    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         env['JUJU_VERSION'] = '2.7.0'
         event_file = self.JUJU_CHARM_DIR / rel_path
         # Note that sys.executable is used to make sure we are using the same
         # interpreter for the child process to support virtual environments.
-        fake_script(
-            self,
+        fake_script.write(
             "storage-get",
             """
             if [ "$1" = "-s" ]; then
@@ -858,8 +910,7 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             fi
             """,
         )
-        fake_script(
-            self,
+        fake_script.write(
             "storage-list",
             """
             echo '["disks/0"]'
@@ -869,7 +920,12 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
             [sys.executable, str(event_file)],
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
 
-    def test_setup_event_links(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_setup_event_links(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
         """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = [
             f"hooks/{name.replace('_', '-')}"
@@ -902,32 +958,43 @@ class TestMainWithNoDispatch(_TestMain, unittest.TestCase):
                     assert os.readlink(str(hook_path)) == event_spec.event_name
 
         for initial_event in initial_events:
-            self._setup_charm_dir()
+            self._setup_charm_dir(request)
 
-            self._simulate_event(initial_event)
+            self._simulate_event(fake_script, initial_event)
             _assess_event_links(initial_event)
             # Make sure it is idempotent.
-            self._simulate_event(initial_event)
+            self._simulate_event(fake_script, initial_event)
             _assess_event_links(initial_event)
 
-    def test_setup_action_links(self):
-        self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+    @pytest.mark.usefixtures("setup_charm")
+    def test_setup_action_links(self, fake_script: FakeScript):
+        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         # foo-bar is one of the actions defined in actions.yaml
         action_hook = self.JUJU_CHARM_DIR / 'actions' / 'foo-bar'
         assert action_hook.exists()
 
 
 class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
-    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
-        super()._call_event(rel_path, env)
+        super()._call_event(fake_script, rel_path, env)
 
 
 class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
-    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        super()._call_event(rel_path, env)
+        super()._call_event(fake_script, rel_path, env)
 
 
 class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
@@ -942,7 +1009,12 @@ class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
 class _TestMainWithDispatch(_TestMain):
     has_dispatch = True
 
-    def test_setup_event_links(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_setup_event_links(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
         """Test auto-creation of symlinks.
 
         Symlink creation caused by initial events should _not_ happen when using dispatch.
@@ -963,24 +1035,26 @@ class _TestMainWithDispatch(_TestMain):
                     f"Spurious hook: {event_hook}"
 
         for initial_event in initial_events:
-            self._setup_charm_dir()
+            self._setup_charm_dir(request)
 
-            self._simulate_event(initial_event)
+            self._simulate_event(fake_script, initial_event)
             _assess_event_links(initial_event)
 
-    def test_hook_and_dispatch(self):
-        old_path = self.fake_script_path
-        self.fake_script_path = self.hooks_dir
-        fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 0')
-        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+    @pytest.mark.usefixtures("setup_charm")
+    def test_hook_and_dispatch(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
+        fake_script_hooks = FakeScript(request, self.hooks_dir)
+        fake_script_hooks.write('install', 'exit 0')
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
 
         # the script was called, *and*, the .on. was called
-        assert fake_script_calls(typing.cast(
-            unittest.TestCase, self)) == [['install', '']]
+        assert fake_script_hooks.calls() == [['install', '']]
         assert list(state.observed_event_types) == ['InstallEvent']
 
-        self.fake_script_path = old_path
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
@@ -994,13 +1068,14 @@ class _TestMainWithDispatch(_TestMain):
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
+        calls = fake_script.calls()
         assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
         assert calls == expected
 
-    def test_non_executable_hook_and_dispatch(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_non_executable_hook_and_dispatch(self, fake_script: FakeScript):
         (self.hooks_dir / "install").write_text("")
-        state = self._simulate_event(EventSpec(ops.InstallEvent, 'install'))
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
 
         assert list(state.observed_event_types) == ['InstallEvent']
@@ -1015,27 +1090,30 @@ class _TestMainWithDispatch(_TestMain):
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
+        calls = fake_script.calls()
         assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
         assert calls == expected
 
-    def test_hook_and_dispatch_with_failing_hook(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_hook_and_dispatch_with_failing_hook(
+        self,
+        request: pytest.FixtureRequest,
+        fake_script: FakeScript,
+    ):
         self.stdout = self.stderr = tempfile.TemporaryFile()
-        self.addCleanup(self.stdout.close)
+        request.addfinalizer(self.stdout.close)
 
-        old_path = self.fake_script_path
-        self.fake_script_path = self.hooks_dir
-        fake_script(typing.cast(unittest.TestCase, self), 'install', 'exit 42')
+        fake_script_hooks = FakeScript(request, self.hooks_dir)
+        fake_script_hooks.write('install', 'exit 42')
         event = EventSpec(ops.InstallEvent, 'install')
         with pytest.raises(subprocess.CalledProcessError):
-            self._simulate_event(event)
-        self.fake_script_path = old_path
+            self._simulate_event(fake_script, event)
 
         self.stdout.seek(0)
         assert self.stdout.read() == b''
         self.stderr.seek(0)
         assert self.stderr.read() == b''
-        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
+        calls = fake_script.calls()
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
@@ -1045,42 +1123,43 @@ class _TestMainWithDispatch(_TestMain):
         ]
         assert calls == expected
 
-    def test_hook_and_dispatch_but_hook_is_dispatch(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_hook_and_dispatch_but_hook_is_dispatch(self, fake_script: FakeScript):
         event = EventSpec(ops.InstallEvent, 'install')
         hook_path = self.hooks_dir / 'install'
         for ((rel, ind), path) in {
-                # relative and indirect
-                (True, True): Path('../dispatch'),
-                # relative and direct
-                (True, False): Path(self.charm_exec_path),
-                # absolute and direct
-                (False, False): (self.hooks_dir / self.charm_exec_path).resolve(),
-                # absolute and indirect
-                (False, True): self.JUJU_CHARM_DIR / 'dispatch',
+            # relative and indirect
+            (True, True): Path('../dispatch'),
+            # relative and direct
+            (True, False): Path(self.charm_exec_path),
+            # absolute and direct
+            (False, False): (self.hooks_dir / self.charm_exec_path).resolve(),
+            # absolute and indirect
+            (False, True): self.JUJU_CHARM_DIR / 'dispatch',
         }.items():
-            with self.subTest(path=path, rel=rel, ind=ind):
-                # sanity check
-                assert path.is_absolute() == (not rel)
-                assert (path.with_suffix('').name == 'dispatch') == ind
-                try:
-                    hook_path.symlink_to(path)
+            # Sanity check
+            assert path.is_absolute() == (not rel)
+            assert (path.with_suffix('').name == 'dispatch') == ind
+            try:
+                hook_path.symlink_to(path)
 
-                    state = self._simulate_event(event)
-                    assert isinstance(state, ops.BoundStoredState)
+                state = self._simulate_event(fake_script, event)
+                assert isinstance(state, ops.BoundStoredState)
 
-                    # the .on. was only called once
-                    assert list(state.observed_event_types) == ['InstallEvent']
-                    assert list(state.on_install) == ['InstallEvent']
-                finally:
-                    hook_path.unlink()
+                # The `.on.` method was only called once
+                assert list(state.observed_event_types) == ['InstallEvent']
+                assert list(state.on_install) == ['InstallEvent']
+            finally:
+                hook_path.unlink()
 
-    def test_hook_and_dispatch_but_hook_is_dispatch_copy(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_hook_and_dispatch_but_hook_is_dispatch_copy(self, fake_script: FakeScript):
         hook_path = self.hooks_dir / 'install'
         path = (self.hooks_dir / self.charm_exec_path).resolve()
         shutil.copy(str(path), str(hook_path))
 
         event = EventSpec(ops.InstallEvent, 'install')
-        state = self._simulate_event(event)
+        state = self._simulate_event(fake_script, event)
         assert isinstance(state, ops.BoundStoredState)
 
         # the .on. was only called once
@@ -1102,24 +1181,28 @@ class _TestMainWithDispatch(_TestMain):
              'Emitting Juju event install.'],
             ['is-leader', '--format=json'],
         ]
-        calls = fake_script_calls(typing.cast(unittest.TestCase, self))
+        calls = fake_script.calls()
         assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
 
         assert calls == expected
 
 
-class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
+class TestMainWithDispatch(_TestMainWithDispatch):
     def _setup_entry_point(self, directory: Path, entry_point: str):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
             path.symlink_to(os.path.join('src', 'charm.py'))
 
-    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
         dispatch = self.JUJU_CHARM_DIR / 'dispatch'
-        fake_script(
-            self,
+        fake_script.write(
             "storage-get",
             """
             if [ "$1" = "-s" ]; then
@@ -1151,8 +1234,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
             fi
             """,
         )
-        fake_script(
-            self,
+        fake_script.write(
             "storage-list",
             """
             echo '["disks/0"]'
@@ -1164,13 +1246,14 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
             stderr=self.stderr,
             check=True, env=env, cwd=str(self.JUJU_CHARM_DIR))
 
-    def test_crash_action(self):
+    @pytest.mark.usefixtures("setup_charm")
+    def test_crash_action(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         self._prepare_actions()
         self.stderr = tempfile.TemporaryFile('w+t')
-        self.addCleanup(self.stderr.close)
-        fake_script(typing.cast(unittest.TestCase, self), 'action-get', "echo '{}'")
+        request.addfinalizer(self.stderr.close)
+        fake_script.write('action-get', "echo '{}'")
         with pytest.raises(subprocess.CalledProcessError):
-            self._simulate_event(EventSpec(
+            self._simulate_event(fake_script, EventSpec(
                 ops.ActionEvent, 'keyerror_action',
                 env_var='JUJU_ACTION_NAME',
                 set_in_env={'JUJU_ACTION_UUID': '1'}))
@@ -1180,7 +1263,7 @@ class TestMainWithDispatch(_TestMainWithDispatch, unittest.TestCase):
         assert "'foo' not found in 'bar'" in stderr
 
 
-class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
+class TestMainWithDispatchAsScript(_TestMainWithDispatch):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
     has_dispatch = True
@@ -1193,11 +1276,15 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
                 self.JUJU_CHARM_DIR / 'src/charm.py'))
             path.chmod(0o755)
 
-    def _call_event(self, rel_path: Path, env: typing.Dict[str, str]):
+    def _call_event(
+        self,
+        fake_script: FakeScript,
+        rel_path: Path,
+        env: typing.Dict[str, str],
+    ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
-        fake_script(
-            self,
+        fake_script.write(
             "storage-get",
             """
             if [ "$1" = "-s" ]; then
@@ -1229,8 +1316,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
             fi
             """,
         )
-        fake_script(
-            self,
+        fake_script.write(
             "storage-list",
             """
             echo '["disks/0"]'
@@ -1240,7 +1326,7 @@ class TestMainWithDispatchAsScript(_TestMainWithDispatch, unittest.TestCase):
         subprocess.check_call([str(dispatch)], env=env, cwd=str(self.JUJU_CHARM_DIR))
 
 
-class TestStorageHeuristics(unittest.TestCase):
+class TestStorageHeuristics:
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml("series: [kubernetes]")
         with patch.dict(os.environ, {"JUJU_VERSION": "1.0"}):
