@@ -1587,9 +1587,13 @@ class TestMultipartParser:
 
 
 @pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch):
+def time():
+    return MockTime()
+
+
+@pytest.fixture
+def client(monkeypatch: pytest.MonkeyPatch, time: MockTime):
     client = MockClient()
-    time = MockTime()
     monkeypatch.setattr('ops.pebble.time', time)
     return client
 
@@ -1919,9 +1923,9 @@ class TestClient:
     def test_wait_change_success_timeout_none(self, client: MockClient):
         self.test_wait_change_success(client, timeout=None)
 
-    def test_wait_change_success_multiple_calls(self, client: MockClient):
+    def test_wait_change_success_multiple_calls(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
-            pebble.time.sleep(n)  # simulate passing of time due to wait_change call
+            time.sleep(n)  # simulate passing of time due to wait_change call
             raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
         client.responses.append(lambda: timeout_response(4))
@@ -1943,11 +1947,12 @@ class TestClient:
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-        assert pebble.time.time() == 4
+        assert time.time() == 4
 
     def test_wait_change_success_polled(
         self,
         client: MockClient,
+        time: MockTime,
         timeout: typing.Optional[float] = 30.0,
     ):
         # Trigger polled mode
@@ -1974,14 +1979,14 @@ class TestClient:
             ('GET', '/v1/changes/70', None, None),
         ]
 
-        assert pebble.time.time() == 2
+        assert time.time() == 2
 
-    def test_wait_change_success_polled_timeout_none(self, client: MockClient):
-        self.test_wait_change_success_polled(client, timeout=None)
+    def test_wait_change_success_polled_timeout_none(self, client: MockClient, time: MockTime):
+        self.test_wait_change_success_polled(client, time, timeout=None)
 
-    def test_wait_change_timeout(self, client: MockClient):
+    def test_wait_change_timeout(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
-            pebble.time.sleep(n)  # simulate passing of time due to wait_change call
+            time.sleep(n)  # simulate passing of time due to wait_change call
             raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
         client.responses.append(lambda: timeout_response(4))
@@ -1997,9 +2002,9 @@ class TestClient:
             ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
         ]
 
-        assert pebble.time.time() == 6
+        assert time.time() == 6
 
-    def test_wait_change_timeout_polled(self, client: MockClient):
+    def test_wait_change_timeout_polled(self, client: MockClient, time: MockTime):
         # Trigger polled mode
         client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
@@ -2025,7 +2030,7 @@ class TestClient:
             ('GET', '/v1/changes/70', None, None),
         ]
 
-        assert pebble.time.time() == 3
+        assert time.time() == 3
 
     def test_wait_change_error(self, client: MockClient):
         change = build_mock_change_dict()
@@ -2045,9 +2050,9 @@ class TestClient:
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_change_socket_timeout(self, client: MockClient):
+    def test_wait_change_socket_timeout(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
-            pebble.time.sleep(n)
+            time.sleep(n)
             raise socket.timeout("socket.timeout: timed out")
 
         client.responses.append(lambda: timeout_response(3))
