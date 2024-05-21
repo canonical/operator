@@ -34,7 +34,6 @@ import tempfile
 import threading
 import time
 import typing
-import unittest
 import urllib.error
 import urllib.request
 import uuid
@@ -304,14 +303,14 @@ class TestRealPebble:
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
-class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
+class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
     @pytest.fixture
-    def prefix(self):
+    def pebble_dir(self):
         pebble_path = os.getenv('PEBBLE')
         assert pebble_path is not None
-        prefix = tempfile.mkdtemp(dir=pebble_path)
-        yield prefix
-        shutil.rmtree(prefix)
+        pebble_dir = tempfile.mkdtemp(dir=pebble_path)
+        yield pebble_dir
+        shutil.rmtree(pebble_dir)
 
     @pytest.fixture
     def client(self):
@@ -319,7 +318,7 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsT
 
     # Remove this entirely once the associated bug is fixed; it overrides the original test in the
     # test mixin class.
-    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
+    @pytest.mark.skip(reason='pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
 
