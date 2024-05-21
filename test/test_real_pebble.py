@@ -305,14 +305,17 @@ class TestRealPebble:
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
 class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
-    def setUp(self):
+    @pytest.fixture
+    def prefix(self):
         pebble_path = os.getenv('PEBBLE')
         assert pebble_path is not None
-        self.prefix = tempfile.mkdtemp(dir=pebble_path)
-        self.client = pebble.Client(socket_path=get_socket_path())
+        prefix = tempfile.mkdtemp(dir=pebble_path)
+        yield prefix
+        shutil.rmtree(prefix)
 
-    def tearDown(self):
-        shutil.rmtree(self.prefix)
+    @pytest.fixture
+    def client(self):
+        pebble.Client(socket_path=get_socket_path())
 
     # Remove this entirely once the associated bug is fixed; it overrides the original test in the
     # test mixin class.
@@ -325,6 +328,7 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsT
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
-class TestNoticesUsingRealPebble(unittest.TestCase, PebbleNoticesMixin):
-    def setUp(self):
-        self.client = pebble.Client(socket_path=get_socket_path())
+class TestNoticesUsingRealPebble(PebbleNoticesMixin):
+    @pytest.fixture
+    def client(self):
+        return pebble.Client(socket_path=get_socket_path())
