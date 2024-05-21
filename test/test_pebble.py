@@ -47,8 +47,6 @@ def datetime_nzdt(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: 
 
 
 class TestTypes:
-    maxDiff = None
-
     def test_error(self):
         error = pebble.Error('error')
         assert isinstance(error, Exception)
@@ -1599,8 +1597,6 @@ def client(monkeypatch: pytest.MonkeyPatch, time: MockTime):
 
 
 class TestClient:
-    maxDiff = None
-
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
         with pytest.raises(TypeError):
