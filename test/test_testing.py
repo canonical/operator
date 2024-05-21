@@ -3517,7 +3517,6 @@ class TestTestingPebbleClient:
             '''))
         plan = client.get_plan()
         # The YAML should be normalized
-        self.maxDiff = None
         assert textwrap.dedent('''\
             services:
               serv:
@@ -3681,7 +3680,6 @@ class TestTestingPebbleClient:
                 command: '/bin/echo baz'
             ''')
         plan = client.get_plan()
-        self.maxDiff = 1000
         # Alphabetical services, and the YAML should be normalized
         assert textwrap.dedent('''\
             services:
@@ -4108,11 +4106,11 @@ class TestTestingPebbleClient:
 class PebbleStorageAPIsTestMixin:
     def test_push_and_pull_bytes(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         self._test_push_and_pull_data(
-            prefix,
+            pebble_dir,
             client,
             original_data=b"\x00\x01\x02\x03\x04",
             encoding=None,
@@ -4120,11 +4118,11 @@ class PebbleStorageAPIsTestMixin:
 
     def test_push_and_pull_non_utf8_data(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         self._test_push_and_pull_data(
-            prefix,
+            pebble_dir,
             client,
             original_data='日本語',  # "Japanese" in Japanese
             encoding='sjis',
@@ -4132,7 +4130,7 @@ class PebbleStorageAPIsTestMixin:
 
     def _test_push_and_pull_data(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
         original_data: typing.Union[str, bytes],
         encoding: typing.Optional[str],
@@ -4140,10 +4138,10 @@ class PebbleStorageAPIsTestMixin:
     ):
         # We separate out the calls to make it clearer to type checkers what's happening.
         if encoding is None:
-            client.push(f"{prefix}/test", original_data)
+            client.push(f"{pebble_dir}/test", original_data)
         else:
-            client.push(f"{prefix}/test", original_data, encoding=encoding)
-        with client.pull(f"{prefix}/test", encoding=encoding) as infile:
+            client.push(f"{pebble_dir}/test", original_data, encoding=encoding)
+        with client.pull(f"{pebble_dir}/test", encoding=encoding) as infile:
             received_data = infile.read()
         assert original_data == received_data
 
@@ -4151,40 +4149,40 @@ class PebbleStorageAPIsTestMixin:
         if encoding is None:
             stream_class = typing.cast(typing.Type[io.BytesIO], stream_class)
             small_file = stream_class(typing.cast(bytes, original_data))
-            client.push(f"{prefix}/test", small_file)
+            client.push(f"{pebble_dir}/test", small_file)
         else:
             stream_class = typing.cast(typing.Type[io.StringIO], stream_class)
             small_file = stream_class(typing.cast(str, original_data))
-            client.push(f"{prefix}/test", small_file, encoding=encoding)
-        with client.pull(f"{prefix}/test", encoding=encoding) as infile:
+            client.push(f"{pebble_dir}/test", small_file, encoding=encoding)
+        with client.pull(f"{pebble_dir}/test", encoding=encoding) as infile:
             received_data = infile.read()
         assert original_data == received_data
 
     def test_push_bytes_ignore_encoding(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         # push() encoding param should be ignored if source is bytes
-        client.push(f"{prefix}/test", b'\x00\x01', encoding='utf-8')
-        with client.pull(f"{prefix}/test", encoding=None) as infile:
+        client.push(f"{pebble_dir}/test", b'\x00\x01', encoding='utf-8')
+        with client.pull(f"{pebble_dir}/test", encoding=None) as infile:
             received_data = infile.read()
         assert received_data == b'\x00\x01'
 
     def test_push_bytesio_ignore_encoding(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         # push() encoding param should be ignored if source is binary stream
-        client.push(f"{prefix}/test", io.BytesIO(b'\x00\x01'), encoding='utf-8')
-        with client.pull(f"{prefix}/test", encoding=None) as infile:
+        client.push(f"{pebble_dir}/test", io.BytesIO(b'\x00\x01'), encoding='utf-8')
+        with client.pull(f"{pebble_dir}/test", encoding=None) as infile:
             received_data = infile.read()
         assert received_data == b'\x00\x01'
 
     def test_push_and_pull_larger_file(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         # Intent: to ensure things work appropriately with larger files.
@@ -4193,43 +4191,43 @@ class PebbleStorageAPIsTestMixin:
         data_size = 1024 * 1024
         original_data = os.urandom(data_size)
 
-        client.push(f"{prefix}/test", original_data)
-        with client.pull(f"{prefix}/test", encoding=None) as infile:
+        client.push(f"{pebble_dir}/test", original_data)
+        with client.pull(f"{pebble_dir}/test", encoding=None) as infile:
             received_data = infile.read()
         assert original_data == received_data
 
     def test_push_to_non_existent_subdir(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         data = 'data'
 
         with pytest.raises(pebble.PathError) as excinfo:
-            client.push(f"{prefix}/nonexistent_dir/test", data, make_dirs=False)
+            client.push(f"{pebble_dir}/nonexistent_dir/test", data, make_dirs=False)
         assert excinfo.value.kind == 'not-found'
 
-        client.push(f"{prefix}/nonexistent_dir/test", data, make_dirs=True)
+        client.push(f"{pebble_dir}/nonexistent_dir/test", data, make_dirs=True)
 
     def test_push_as_child_of_file_raises_error(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         data = 'data'
-        client.push(f"{prefix}/file", data)
+        client.push(f"{pebble_dir}/file", data)
         with pytest.raises(pebble.PathError) as excinfo:
-            client.push(f"{prefix}/file/file", data)
+            client.push(f"{pebble_dir}/file/file", data)
         assert excinfo.value.kind == 'generic-file-error'
 
     def test_push_with_permission_mask(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         data = 'data'
-        client.push(f"{prefix}/file", data, permissions=0o600)
-        client.push(f"{prefix}/file", data, permissions=0o777)
+        client.push(f"{pebble_dir}/file", data, permissions=0o600)
+        client.push(f"{pebble_dir}/file", data, permissions=0o777)
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
         for bad_permission in (
@@ -4237,31 +4235,31 @@ class PebbleStorageAPIsTestMixin:
             -1,      # Less than 0o000
         ):
             with pytest.raises(pebble.PathError) as excinfo:
-                client.push(f"{prefix}/file", data, permissions=bad_permission)
+                client.push(f"{pebble_dir}/file", data, permissions=bad_permission)
             assert excinfo.value.kind == 'generic-file-error'
 
     def test_push_files_and_list(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         data = 'data'
 
         # Let's push the first file with a bunch of details.  We'll check on this later.
         client.push(
-            f"{prefix}/file1", data,
+            f"{pebble_dir}/file1", data,
             permissions=0o620)
 
         # Do a quick push with defaults for the other files.
-        client.push(f"{prefix}/file2", data)
-        client.push(f"{prefix}/file3", data)
+        client.push(f"{pebble_dir}/file2", data)
+        client.push(f"{pebble_dir}/file3", data)
 
-        files = client.list_files(f"{prefix}/")
+        files = client.list_files(f"{pebble_dir}/")
         assert {file.path for file in files} == \
-            {prefix + file for file in ('/file1', '/file2', '/file3')}
+            {pebble_dir + file for file in ('/file1', '/file2', '/file3')}
 
         # Let's pull the first file again and check its details
-        file = [f for f in files if f.path == f"{prefix}/file1"][0]
+        file = [f for f in files if f.path == f"{pebble_dir}/file1"][0]
         assert file.name == 'file1'
         assert file.type == pebble.FileType.FILE
         assert file.size == 4
@@ -4271,13 +4269,13 @@ class PebbleStorageAPIsTestMixin:
 
     def test_push_and_list_file(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         data = 'data'
-        client.push(f"{prefix}/file", data)
-        files = client.list_files(f"{prefix}/")
-        assert {file.path for file in files} == {f"{prefix}/file"}
+        client.push(f"{pebble_dir}/file", data)
+        files = client.list_files(f"{pebble_dir}/")
+        assert {file.path for file in files} == {f"{pebble_dir}/file"}
 
     def test_push_file_with_relative_path_fails(
         self,
@@ -4298,14 +4296,14 @@ class PebbleStorageAPIsTestMixin:
 
     def test_pull_directory(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
-        client.make_dir(f"{prefix}/subdir")
+        client.make_dir(f"{pebble_dir}/subdir")
         with pytest.raises(pebble.PathError) as excinfo:
-            client.pull(f"{prefix}/subdir")
+            client.pull(f"{pebble_dir}/subdir")
         assert excinfo.value.kind == "generic-file-error"
-        assert f"{prefix}/subdir" in excinfo.value.message
+        assert f"{pebble_dir}/subdir" in excinfo.value.message
 
     def test_list_files_not_found_raises(
         self,
@@ -4320,7 +4318,7 @@ class PebbleStorageAPIsTestMixin:
 
     def test_list_directory_object_itself(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         # Test with root dir
@@ -4333,8 +4331,8 @@ class PebbleStorageAPIsTestMixin:
         assert dir_.type == pebble.FileType.DIRECTORY
 
         # Test with subdirs
-        client.make_dir(f"{prefix}/subdir")
-        files = client.list_files(f"{prefix}/subdir", itself=True)
+        client.make_dir(f"{pebble_dir}/subdir")
+        files = client.list_files(f"{pebble_dir}/subdir", itself=True)
         assert len(files) == 1
         dir_ = files[0]
         assert dir_.name == 'subdir'
@@ -4342,7 +4340,7 @@ class PebbleStorageAPIsTestMixin:
 
     def test_push_files_and_list_by_pattern(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         # Note: glob pattern deltas do exist between golang and Python, but here,
@@ -4354,35 +4352,35 @@ class PebbleStorageAPIsTestMixin:
             '/file3.tar.bz2',
             '/backup_file.gz',
         ):
-            client.push(prefix + filename, data)
-        files = client.list_files(f"{prefix}/", pattern='file*.gz')
+            client.push(pebble_dir + filename, data)
+        files = client.list_files(f"{pebble_dir}/", pattern='file*.gz')
         assert {file.path for file in files} == \
-            {prefix + file for file in ('/file1.gz', '/file2.tar.gz')}
+            {pebble_dir + file for file in ('/file1.gz', '/file2.tar.gz')}
 
     def test_make_directory(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
-        client.make_dir(f"{prefix}/subdir")
-        assert client.list_files(f"{prefix}/", pattern='subdir')[0].path == \
-            f"{prefix}/subdir"
-        client.make_dir(f"{prefix}/subdir/subdir")
-        assert client.list_files(f"{prefix}/subdir", pattern='subdir')[0].path == \
-            f"{prefix}/subdir/subdir"
+        client.make_dir(f"{pebble_dir}/subdir")
+        assert client.list_files(f"{pebble_dir}/", pattern='subdir')[0].path == \
+            f"{pebble_dir}/subdir"
+        client.make_dir(f"{pebble_dir}/subdir/subdir")
+        assert client.list_files(f"{pebble_dir}/subdir", pattern='subdir')[0].path == \
+            f"{pebble_dir}/subdir/subdir"
 
     def test_make_directory_recursively(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         with pytest.raises(pebble.PathError) as excinfo:
-            client.make_dir(f"{prefix}/subdir/subdir", make_parents=False)
+            client.make_dir(f"{pebble_dir}/subdir/subdir", make_parents=False)
         assert excinfo.value.kind == 'not-found'
 
-        client.make_dir(f"{prefix}/subdir/subdir", make_parents=True)
-        assert client.list_files(f"{prefix}/subdir", pattern='subdir')[0].path == \
-            f"{prefix}/subdir/subdir"
+        client.make_dir(f"{pebble_dir}/subdir/subdir", make_parents=True)
+        assert client.list_files(f"{pebble_dir}/subdir", pattern='subdir')[0].path == \
+            f"{pebble_dir}/subdir/subdir"
 
     def test_make_directory_with_relative_path_fails(
         self,
@@ -4394,32 +4392,32 @@ class PebbleStorageAPIsTestMixin:
 
     def test_make_subdir_of_file_fails(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
-        client.push(f"{prefix}/file", 'data')
+        client.push(f"{pebble_dir}/file", 'data')
 
         # Direct child case
         with pytest.raises(pebble.PathError) as excinfo:
-            client.make_dir(f"{prefix}/file/subdir")
+            client.make_dir(f"{pebble_dir}/file/subdir")
         assert excinfo.value.kind == 'generic-file-error'
 
         # Recursive creation case, in case its flow is different
         with pytest.raises(pebble.PathError) as excinfo:
-            client.make_dir(f"{prefix}/file/subdir/subdir", make_parents=True)
+            client.make_dir(f"{pebble_dir}/file/subdir/subdir", make_parents=True)
         assert excinfo.value.kind == 'generic-file-error'
 
     def test_make_dir_with_permission_mask(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
-        client.make_dir(f"{prefix}/dir1", permissions=0o700)
-        client.make_dir(f"{prefix}/dir2", permissions=0o777)
+        client.make_dir(f"{pebble_dir}/dir1", permissions=0o700)
+        client.make_dir(f"{pebble_dir}/dir2", permissions=0o777)
 
-        files = client.list_files(f"{prefix}/", pattern='dir*')
-        assert [f for f in files if f.path == f"{prefix}/dir1"][0].permissions == 0o700
-        assert [f for f in files if f.path == f"{prefix}/dir2"][0].permissions == 0o777
+        files = client.list_files(f"{pebble_dir}/", pattern='dir*')
+        assert [f for f in files if f.path == f"{pebble_dir}/dir1"][0].permissions == 0o700
+        assert [f for f in files if f.path == f"{pebble_dir}/dir2"][0].permissions == 0o777
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -4428,40 +4426,40 @@ class PebbleStorageAPIsTestMixin:
             -1,      # Less than 0o000
         )):
             with pytest.raises(pebble.PathError) as excinfo:
-                client.make_dir(f"{prefix}/dir3_{i}", permissions=bad_permission)
+                client.make_dir(f"{pebble_dir}/dir3_{i}", permissions=bad_permission)
             assert excinfo.value.kind == 'generic-file-error'
 
     def test_remove_path(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
-        client.push(f"{prefix}/file", '')
-        client.make_dir(f"{prefix}/dir/subdir", make_parents=True)
-        client.push(f"{prefix}/dir/subdir/file1", '')
-        client.push(f"{prefix}/dir/subdir/file2", '')
-        client.push(f"{prefix}/dir/subdir/file3", '')
-        client.make_dir(f"{prefix}/empty_dir")
+        client.push(f"{pebble_dir}/file", '')
+        client.make_dir(f"{pebble_dir}/dir/subdir", make_parents=True)
+        client.push(f"{pebble_dir}/dir/subdir/file1", '')
+        client.push(f"{pebble_dir}/dir/subdir/file2", '')
+        client.push(f"{pebble_dir}/dir/subdir/file3", '')
+        client.make_dir(f"{pebble_dir}/empty_dir")
 
-        client.remove_path(f"{prefix}/file")
+        client.remove_path(f"{pebble_dir}/file")
 
-        client.remove_path(f"{prefix}/empty_dir")
+        client.remove_path(f"{pebble_dir}/empty_dir")
 
         # Remove non-empty directory, recursive=False: error
         with pytest.raises(pebble.PathError) as excinfo:
-            client.remove_path(f"{prefix}/dir", recursive=False)
+            client.remove_path(f"{pebble_dir}/dir", recursive=False)
         assert excinfo.value.kind == 'generic-file-error'
 
         # Remove non-empty directory, recursive=True: succeeds (and removes child objects)
-        client.remove_path(f"{prefix}/dir", recursive=True)
+        client.remove_path(f"{pebble_dir}/dir", recursive=True)
 
         # Remove non-existent path, recursive=False: error
         with pytest.raises(pebble.PathError) as excinfo:
-            client.remove_path(f"{prefix}/dir/does/not/exist/asdf", recursive=False)
+            client.remove_path(f"{pebble_dir}/dir/does/not/exist/asdf", recursive=False)
         assert excinfo.value.kind == 'not-found'
 
         # Remove non-existent path, recursive=True: succeeds
-        client.remove_path(f"{prefix}/dir/does/not/exist/asdf", recursive=True)
+        client.remove_path(f"{pebble_dir}/dir/does/not/exist/asdf", recursive=True)
 
     # Other notes:
     # * Parent directories created via push(make_dirs=True) default to root:root ownership
@@ -4494,10 +4492,10 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         harness.cleanup()
 
     @pytest.fixture
-    def prefix(self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
-        prefix = '/prefix'
-        client.make_dir(prefix, make_parents=True)
-        return prefix
+    def pebble_dir(self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+        pebble_dir = '/prefix'
+        client.make_dir(pebble_dir, make_parents=True)
+        return pebble_dir
 
     def test_container_storage_mounts(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(ops.CharmBase, meta='''
@@ -4575,7 +4573,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
 
     def test_push_with_ownership(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         data = 'data'
@@ -4613,13 +4611,13 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
             }
         ]
         for idx, case in enumerate(cases):
-            client.push(f"{prefix}/file{idx}", data, **case)
-            file_ = client.list_files(f"{prefix}/file{idx}")[0]
-            assert file_.path == f"{prefix}/file{idx}"
+            client.push(f"{pebble_dir}/file{idx}", data, **case)
+            file_ = client.list_files(f"{pebble_dir}/file{idx}")[0]
+            assert file_.path == f"{pebble_dir}/file{idx}"
 
     def test_make_dir_with_ownership(
         self,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         user, group = self._select_testing_user_group()
@@ -4656,9 +4654,9 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
             }
         ]
         for idx, case in enumerate(cases):
-            client.make_dir(f"{prefix}/dir{idx}", **case)
-            dir_ = client.list_files(f"{prefix}/dir{idx}", itself=True)[0]
-            assert dir_.path == f"{prefix}/dir{idx}"
+            client.make_dir(f"{pebble_dir}/dir{idx}", **case)
+            dir_ = client.list_files(f"{pebble_dir}/dir{idx}", itself=True)[0]
+            assert dir_.path == f"{pebble_dir}/dir{idx}"
 
     @patch("grp.getgrgid")
     @patch("pwd.getpwuid")
@@ -4666,14 +4664,14 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         self,
         getpwuid: MagicMock,
         getgrgid: MagicMock,
-        prefix: str,
+        pebble_dir: str,
         client: typing.Union[_TestingPebbleClient, pebble.Client],
     ):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
         data = 'data'
-        client.push(f"{prefix}/file", data)
-        files = client.list_files(f"{prefix}/")
+        client.push(f"{pebble_dir}/file", data)
+        files = client.list_files(f"{pebble_dir}/")
         assert len(files) == 1
         assert files[0].user is None
         assert files[0].group is None
@@ -5408,7 +5406,6 @@ class TestHandleExec:
             ''')
         harness.begin()
         harness.set_can_connect("test-container", True)
-        # self.root = self.harness.get_filesystem_root("test-container")
         yield harness
         harness.cleanup()
 
@@ -5700,6 +5697,7 @@ class TestActions:
 
     @pytest.fixture
     def harness(self, action_results: typing.Dict[str, typing.Any]):
+
         class ActionCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
