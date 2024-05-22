@@ -1972,7 +1972,6 @@ class TestClient:
     ):
         # Trigger polled mode
         client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
-
         for i in range(3):
             change = build_mock_change_dict()
             change['ready'] = i == 2
