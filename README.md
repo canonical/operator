@@ -471,7 +471,7 @@ needs to set up the process that will run `ops.main` with the right environment 
 
 ### Working with relation IDs
 
-Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `id`.
+Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `relation_id`.
 To inspect the ID the next relation instance will have, you can call `scenario.state.next_relation_id`.
 
 ```python
@@ -479,7 +479,7 @@ import scenario.state
 
 next_id = scenario.state.next_relation_id(update=False)
 rel = scenario.Relation('foo')
-assert rel.id == next_id
+assert rel.relation_id == next_id
 ``` 
 
 This can be handy when using `replace` to create new relations, to avoid relation ID conflicts:
@@ -488,8 +488,8 @@ This can be handy when using `replace` to create new relations, to avoid relatio
 import scenario.state
 
 rel = scenario.Relation('foo')
-rel2 = rel.replace(local_app_data={"foo": "bar"}, id=scenario.state.next_relation_id())
-assert rel2.id == rel.id + 1 
+rel2 = rel.replace(local_app_data={"foo": "bar"}, relation_id=scenario.state.next_relation_id())
+assert rel2.relation_id == rel.relation_id + 1 
 ``` 
 
 If you don't do this, and pass both relations into a `State`, you will trigger a consistency checker error.
