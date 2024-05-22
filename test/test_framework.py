@@ -68,8 +68,8 @@ def create_framework(
         SQLiteStorage(data_fpath),
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
-        model=model,
-    )  # type: ignore
+        model=model,  # type: ignore
+    )
     request.addfinalizer(framework.close)
     request.addfinalizer(patcher.stop)
     return framework

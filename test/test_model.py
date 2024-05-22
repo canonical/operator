@@ -2121,8 +2121,8 @@ containers:
         container.pebble.requests = []  # type: ignore
 
     def test_get_notice(self, container: ops.Container):
-        container.pebble.responses.append(
-            pebble.Notice.from_dict({  # type: ignore
+        container.pebble.responses.append(  # type: ignore
+            pebble.Notice.from_dict({
                 'id': '123',
                 'user-id': 1000,
                 'type': 'custom',
@@ -2176,10 +2176,10 @@ containers:
         assert notices[0].type == pebble.NoticeType.CUSTOM
         assert notices[0].key == 'example.com/b'
 
-        assert container.pebble.requests == [
+        assert container.pebble.requests == [  # type: ignore
             (
                 'get_notices',
-                dict(  # type: ignore
+                dict(
                     user_id=1000,
                     users=pebble.NoticesUsers.ALL,
                     types=[pebble.NoticeType.CUSTOM],

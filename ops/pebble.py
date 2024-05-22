@@ -371,8 +371,8 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
     def http_open(self, req: urllib.request.Request):
         """Override http_open to use a Unix socket connection (instead of TCP)."""
         return self.do_open(
-            _UnixSocketConnection,
-            req,  # type:ignore
+            _UnixSocketConnection,  # type:ignore
+            req,
             socket_path=self.socket_path,
         )
 
@@ -2802,8 +2802,8 @@ class Client:
                 process_stderr = _WebsocketReader(ws)
                 if encoding is not None:
                     process_stderr = io.TextIOWrapper(
-                        process_stderr, encoding=encoding, newline=''
-                    )  # type: ignore
+                        process_stderr, encoding=encoding, newline=''  # type: ignore
+                    )
 
         process: ExecProcess[Any] = ExecProcess(
             stdin=process_stdin,  # type: ignore
