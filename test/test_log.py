@@ -26,7 +26,6 @@ from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 
 
 class FakeModelBackend(_ModelBackend):
-
     def __init__(self):
         self._calls: typing.List[typing.Tuple[str, str]] = []
 
@@ -54,18 +53,23 @@ def logger():
 
 
 class TestLogging:
-    @pytest.mark.parametrize("message,result", [
-        ('critical', ('CRITICAL', 'critical')),
-        ('error', ('ERROR', 'error')),
-        ('warning', ('WARNING', 'warning')),
-        ('info', ('INFO', 'info')),
-        ('debug', ('DEBUG', 'debug')),
-    ])
-    def test_default_logging(self,
-                             backend: FakeModelBackend,
-                             logger: logging.Logger,
-                             message: str,
-                             result: typing.Tuple[str, str]):
+    @pytest.mark.parametrize(
+        'message,result',
+        [
+            ('critical', ('CRITICAL', 'critical')),
+            ('error', ('ERROR', 'error')),
+            ('warning', ('WARNING', 'warning')),
+            ('info', ('INFO', 'info')),
+            ('debug', ('DEBUG', 'debug')),
+        ],
+    )
+    def test_default_logging(
+        self,
+        backend: FakeModelBackend,
+        logger: logging.Logger,
+        message: str,
+        result: typing.Tuple[str, str],
+    ):
         ops.log.setup_root_logging(backend)
         assert logger.level == logging.DEBUG
         assert isinstance(logger.handlers[-1], ops.log.JujuLogHandler)
@@ -97,7 +101,7 @@ class TestLogging:
             ('WARNING', 'warning message'),
             ('CRITICAL', 'critical message'),
         ]
-        assert buffer.getvalue() == ""
+        assert buffer.getvalue() == ''
 
     def test_debug_logging(self, backend: FakeModelBackend, logger: logging.Logger):
         buffer = io.StringIO()
@@ -114,11 +118,11 @@ class TestLogging:
             ('CRITICAL', 'critical message'),
         ]
         assert re.search(
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n"
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n"
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n"
-            r"\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n",
-            buffer.getvalue()
+            r'\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d DEBUG    debug message\n'
+            r'\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d INFO     info message\n'
+            r'\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d WARNING  warning message\n'
+            r'\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d,\d\d\d CRITICAL critical message\n',
+            buffer.getvalue(),
         )
 
     def test_reduced_logging(self, backend: FakeModelBackend, logger: logging.Logger):
@@ -146,7 +150,7 @@ class TestLogging:
         calls = backend.calls()
         assert len(calls) == 3
         # Verify that we note that we are splitting the log message.
-        assert "Splitting into multiple chunks" in calls[0][1]
+        assert 'Splitting into multiple chunks' in calls[0][1]
 
         # Verify that it got split into the expected chunks.
         assert len(calls[1][1]) == MAX_LOG_LINE_LEN

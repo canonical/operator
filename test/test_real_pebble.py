@@ -62,33 +62,37 @@ class TestRealPebble(unittest.TestCase):
         self.client = pebble.Client(socket_path=get_socket_path())
 
     def test_checks_and_health(self):
-        self.client.add_layer('layer', {
-            'checks': {
-                'bad': {
-                    'override': 'replace',
-                    'level': 'ready',
-                    'period': '50ms',
-                    'threshold': 2,
-                    'exec': {
-                        'command': 'sleep x',
+        self.client.add_layer(
+            'layer',
+            {
+                'checks': {
+                    'bad': {
+                        'override': 'replace',
+                        'level': 'ready',
+                        'period': '50ms',
+                        'threshold': 2,
+                        'exec': {
+                            'command': 'sleep x',
+                        },
                     },
-                },
-                'good': {
-                    'override': 'replace',
-                    'level': 'alive',
-                    'period': '50ms',
-                    'exec': {
-                        'command': 'echo foo',
+                    'good': {
+                        'override': 'replace',
+                        'level': 'alive',
+                        'period': '50ms',
+                        'exec': {
+                            'command': 'echo foo',
+                        },
                     },
-                },
-                'other': {
-                    'override': 'replace',
-                    'exec': {
-                        'command': 'echo bar',
+                    'other': {
+                        'override': 'replace',
+                        'exec': {
+                            'command': 'echo bar',
+                        },
                     },
                 },
             },
-        }, combine=True)
+            combine=True,
+        )
 
         # Checks should all be "up" initially
         checks = self.client.get_checks()
@@ -185,8 +189,9 @@ class TestRealPebble(unittest.TestCase):
         assert out == 'FOO\nBAR\n'
         assert err == ''
 
-        process = self.client.exec(['awk', '{ print toupper($0) }'], stdin=b'foo\nBar\n',
-                                   encoding=None)
+        process = self.client.exec(
+            ['awk', '{ print toupper($0) }'], stdin=b'foo\nBar\n', encoding=None
+        )
         out, err = process.wait_output()
         assert out == b'FOO\nBAR\n'
         assert err == b''
@@ -210,12 +215,13 @@ class TestRealPebble(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             process = self.client.exec(['pwd'], working_dir=temp_dir)
             out, err = process.wait_output()
-            assert out == f"{temp_dir}\n"
+            assert out == f'{temp_dir}\n'
             assert err == ''
 
     def test_exec_environment(self):
-        process = self.client.exec(['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'],
-                                   environment={'ONE': '1', 'TWO': '2'})
+        process = self.client.exec(
+            ['/bin/sh', '-c', 'echo $ONE.$TWO.$THREE'], environment={'ONE': '1', 'TWO': '2'}
+        )
         out, err = process.wait_output()
         assert out == '1.2.\n'
         assert err == ''
@@ -265,30 +271,34 @@ class TestRealPebble(unittest.TestCase):
         assert reads == [b'one\n', b'2\n', b'THREE\n']
 
     def test_log_forwarding(self):
-        self.client.add_layer("log-forwarder", {
-            "services": {
-                "tired": {
-                    "override": "replace",
-                    "command": "sleep 1",
+        self.client.add_layer(
+            'log-forwarder',
+            {
+                'services': {
+                    'tired': {
+                        'override': 'replace',
+                        'command': 'sleep 1',
+                    },
+                },
+                'log-targets': {
+                    'pretend-loki': {
+                        'type': 'loki',
+                        'override': 'replace',
+                        'location': 'https://example.com',
+                        'services': ['all'],
+                        'labels': {'foo': 'bar'},
+                    },
                 },
             },
-            "log-targets": {
-                "pretend-loki": {
-                    "type": "loki",
-                    "override": "replace",
-                    "location": "https://example.com",
-                    "services": ["all"],
-                    "labels": {"foo": "bar"},
-                },
-            },
-        }, combine=True)
+            combine=True,
+        )
         plan = self.client.get_plan()
         assert len(plan.log_targets) == 1
-        assert plan.log_targets["pretend-loki"].type == "loki"
-        assert plan.log_targets["pretend-loki"].override == "replace"
-        assert plan.log_targets["pretend-loki"].location == "https://example.com"
-        assert plan.log_targets["pretend-loki"].services == ["all"]
-        assert plan.log_targets["pretend-loki"].labels == {"foo": "bar"}
+        assert plan.log_targets['pretend-loki'].type == 'loki'
+        assert plan.log_targets['pretend-loki'].override == 'replace'
+        assert plan.log_targets['pretend-loki'].location == 'https://example.com'
+        assert plan.log_targets['pretend-loki'].services == ['all']
+        assert plan.log_targets['pretend-loki'].labels == {'foo': 'bar'}
 
 
 @unittest.skipUnless(os.getenv('RUN_REAL_PEBBLE_TESTS'), 'RUN_REAL_PEBBLE_TESTS not set')

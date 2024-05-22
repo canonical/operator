@@ -39,7 +39,6 @@ def fake_script(request: pytest.FixtureRequest):
 
 
 class StoragePermutations(abc.ABC):
-
     assertEqual = unittest.TestCase.assertEqual  # noqa
     assertRaises = unittest.TestCase.assertRaises  # noqa
 
@@ -69,7 +68,6 @@ class StoragePermutations(abc.ABC):
         f = self.create_framework(request, fake_script)
 
         class Sample(ops.StoredStateData):
-
             def __init__(
                 self,
                 parent: ops.Object,
@@ -121,7 +119,6 @@ class StoragePermutations(abc.ABC):
             event = ops.EventSource(Evt)
 
         class Sample(ops.Object):
-
             on = Events()  # type: ignore
 
             def __init__(self, parent: ops.Object, key: str):
@@ -255,25 +252,24 @@ class StoragePermutations(abc.ABC):
         store.save_notice('event', 'observer', 'method2')
         assert list(store.notices('event')) == [
             ('event', 'observer', 'method'),
-            ('event', 'observer', 'method2')
+            ('event', 'observer', 'method2'),
         ]
 
 
 class TestSQLiteStorage(StoragePermutations):
-
     def create_storage(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         return ops.storage.SQLiteStorage(':memory:')
 
     def test_permissions_new(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
+            filename = os.path.join(temp_dir, '.unit-state.db')
             storage = ops.storage.SQLiteStorage(filename)
             assert stat.S_IMODE(os.stat(filename).st_mode) == stat.S_IRUSR | stat.S_IWUSR
             storage.close()
 
     def test_permissions_existing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
+            filename = os.path.join(temp_dir, '.unit-state.db')
             ops.storage.SQLiteStorage(filename).close()
             # Set the file to access that will need fixing for user, group, and other.
             os.chmod(filename, 0o744)
@@ -281,22 +277,22 @@ class TestSQLiteStorage(StoragePermutations):
             assert stat.S_IMODE(os.stat(filename).st_mode) == stat.S_IRUSR | stat.S_IWUSR
             storage.close()
 
-    @unittest.mock.patch("os.path.exists")
+    @unittest.mock.patch('os.path.exists')
     def test_permissions_race(self, exists: unittest.mock.MagicMock):
         exists.return_value = False
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
+            filename = os.path.join(temp_dir, '.unit-state.db')
             # Create an existing file, but the mock will simulate a race condition saying that it
             # does not exist.
-            open(filename, "w").close()
+            open(filename, 'w').close()
             pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
-    @unittest.mock.patch("os.chmod")
+    @unittest.mock.patch('os.chmod')
     def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
         chmod.side_effect = OSError
         with tempfile.TemporaryDirectory() as temp_dir:
-            filename = os.path.join(temp_dir, ".unit-state.db")
-            open(filename, "w").close()
+            filename = os.path.join(temp_dir, '.unit-state.db')
+            open(filename, 'w').close()
             pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
 
 
@@ -308,7 +304,9 @@ def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):
         'state_file': str(state_file.as_posix()),
     }
 
-    fake_script.write('state-set', dedent('''\
+    fake_script.write(
+        'state-set',
+        dedent("""\
         {executable} -c '
         import sys
         if "{pthpth}" not in sys.path:
@@ -327,9 +325,12 @@ def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):
         with state_file.open("wb") as f:
             pickle.dump(state, f)
         ' "$@"
-        ''').format(**template_args))
+        """).format(**template_args),
+    )
 
-    fake_script.write('state-get', dedent('''\
+    fake_script.write(
+        'state-get',
+        dedent("""\
         {executable} -Sc '
         import sys
         if "{pthpth}" not in sys.path:
@@ -345,9 +346,12 @@ def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):
         result = state.get(sys.argv[1], "\\n")
         sys.stdout.write(result)
         ' "$@"
-        ''').format(**template_args))
+        """).format(**template_args),
+    )
 
-    fake_script.write('state-delete', dedent('''\
+    fake_script.write(
+        'state-delete',
+        dedent("""\
         {executable} -Sc '
         import sys
         if "{pthpth}" not in sys.path:
@@ -364,11 +368,11 @@ def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):
         with state_file.open("wb") as f:
             pickle.dump(state, f)
         ' "$@"
-        ''').format(**template_args))
+        """).format(**template_args),
+    )
 
 
 class TestJujuStorage(StoragePermutations):
-
     def create_storage(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         fd, fn = tempfile.mkstemp(prefix='tmp-ops-test-state-')
         os.close(fd)
@@ -379,7 +383,6 @@ class TestJujuStorage(StoragePermutations):
 
 
 class TestSimpleLoader:
-
     def test_is_c_loader(self):
         loader = ops.storage._SimpleLoader(io.StringIO(''))
         if getattr(yaml, 'CSafeLoader', None) is not None:
@@ -417,12 +420,12 @@ class TestSimpleLoader:
 
         class Foo:
             pass
+
         f = Foo()
         self.assertRefused(f)
 
 
 class TestJujuStateBackend:
-
     def test_is_not_available(self):
         assert not ops.storage.juju_backend_available()
 
@@ -434,9 +437,12 @@ class TestJujuStateBackend:
     def test_set_encodes_args(self, fake_script: FakeScript):
         t = tempfile.NamedTemporaryFile()
         try:
-            fake_script.write('state-set', dedent("""
+            fake_script.write(
+                'state-set',
+                dedent("""
                 cat >> {}
-                """).format(pathlib.Path(t.name).as_posix()))
+                """).format(pathlib.Path(t.name).as_posix()),
+            )
             backend = ops.storage._JujuStorageBackend()
             backend.set('key', {'foo': 2})
             assert fake_script.calls(clear=True) == [
@@ -452,9 +458,12 @@ class TestJujuStateBackend:
             """)
 
     def test_get(self, fake_script: FakeScript):
-        fake_script.write('state-get', dedent("""
+        fake_script.write(
+            'state-get',
+            dedent("""
             echo 'foo: "bar"'
-            """))
+            """),
+        )
         backend = ops.storage._JujuStorageBackend()
         value = backend.get('key')
         assert value == {'foo': 'bar'}
@@ -465,9 +474,12 @@ class TestJujuStateBackend:
     def test_set_and_get_complex_value(self, fake_script: FakeScript):
         t = tempfile.NamedTemporaryFile()
         try:
-            fake_script.write('state-set', dedent("""
+            fake_script.write(
+                'state-set',
+                dedent("""
                 cat >> {}
-                """).format(pathlib.Path(t.name).as_posix()))
+                """).format(pathlib.Path(t.name).as_posix()),
+            )
             backend = ops.storage._JujuStorageBackend()
             complex_val = {
                 'foo': 2,
@@ -502,7 +514,9 @@ class TestJujuStateBackend:
             """)
         # Note that the content is yaml in a string, embedded inside YAML to declare the Key:
         # Value of where to store the entry.
-        fake_script.write('state-get', dedent("""
+        fake_script.write(
+            'state-get',
+            dedent("""
             echo "foo: 2
             3: [1, 2, '3']
             four: !!set {2: null, 3: null}
@@ -511,7 +525,8 @@ class TestJujuStateBackend:
             seven: !!binary |
               MTIzNA==
             "
-        """))
+        """),
+        )
         out = backend.get('Class[foo]/_stored')
         assert out == complex_val
 
