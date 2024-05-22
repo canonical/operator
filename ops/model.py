@@ -1722,8 +1722,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
-    def update(self, other: _SupportsKeysAndGetItem[str, str], **kwargs: str):
+    def update(self, other: Optional[_SupportsKeysAndGetItem[str, str]] = None, *_, **kwargs: str):
         """Update the data from dict/iterable other and the kwargs."""
+        if other is None:
+            other = {}
         super().update(other, **kwargs)
 
     def __delitem__(self, key: str):
