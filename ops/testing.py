@@ -2475,7 +2475,8 @@ class _TestingModelBackend:
             include_detached: True to include unattached storage mounts as well.
         """
         return [
-            index for index in self._storage_list[name]
+            index
+            for index in self._storage_list[name]
             if include_detached or self._storage_is_attached(name, index)
         ]
 
