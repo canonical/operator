@@ -163,7 +163,7 @@ class _MockModelBackend(_ModelBackend):
     ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
             return next(
-                filter(lambda r: r.relation_id == rel_id, self._state.relations),
+                filter(lambda r: r.id == rel_id, self._state.relations),
             )
         except StopIteration:
             raise RelationNotFoundError()
@@ -245,9 +245,7 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_ids(self, relation_name):
         return [
-            rel.relation_id
-            for rel in self._state.relations
-            if rel.endpoint == relation_name
+            rel.id for rel in self._state.relations if rel.endpoint == relation_name
         ]
 
     def relation_list(self, relation_id: int) -> Tuple[str, ...]:

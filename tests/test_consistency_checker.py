@@ -401,9 +401,7 @@ def test_action_params_type(ptype, good, bad):
 
 def test_duplicate_relation_ids():
     assert_inconsistent(
-        State(
-            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
-        ),
+        State(relations=[Relation("foo", id=1), Relation("bar", id=1)]),
         Event("start"),
         _CharmSpec(
             MyCharm,
@@ -416,17 +414,13 @@ def test_duplicate_relation_ids():
 
 def test_relation_without_endpoint():
     assert_inconsistent(
-        State(
-            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
-        ),
+        State(relations=[Relation("foo", id=1), Relation("bar", id=1)]),
         Event("start"),
         _CharmSpec(MyCharm, meta={"name": "charlemagne"}),
     )
 
     assert_consistent(
-        State(
-            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=2)]
-        ),
+        State(relations=[Relation("foo", id=1), Relation("bar", id=2)]),
         Event("start"),
         _CharmSpec(
             MyCharm,
