@@ -343,8 +343,8 @@ class _SimpleLoader(_BaseLoader):  # type: ignore
 
 
 _SimpleLoader.add_constructor(  # type: ignore
-    'tag:yaml.org,2002:python/tuple', _SimpleLoader.construct_python_tuple
-)  # type: ignore
+    'tag:yaml.org,2002:python/tuple', _SimpleLoader.construct_python_tuple  # type: ignore
+)
 
 
 class _SimpleDumper(_BaseDumper):  # type: ignore

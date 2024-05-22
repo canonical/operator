@@ -344,7 +344,7 @@ class Harness(Generic[CharmType]):
         """
         if self._charm is None:
             raise RuntimeError(
-                'The charm instance is not available yet. ' 'Call Harness.begin() first.'
+                'The charm instance is not available yet. Call Harness.begin() first.'
             )
         return self._charm
 
@@ -1525,7 +1525,7 @@ class Harness(Generic[CharmType]):
             if endpoint != relation_name:
                 raise model.ModelError(
                     f'endpoint {endpoint!r} does not correspond to relation_id '
-                    + f'{relation_id} ({relation_name!r})'
+                    f'{relation_id} ({relation_name!r})'
                 )
 
         parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
@@ -1695,7 +1695,7 @@ class Harness(Generic[CharmType]):
         # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(
-                f'Secret {secret_id!r} owned by the charm under test, "' f"can't call grant_secret"
+                f"Secret {secret_id!r} owned by the charm under test, can't call grant_secret"
             )
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
@@ -2475,8 +2475,7 @@ class _TestingModelBackend:
             include_detached: True to include unattached storage mounts as well.
         """
         return [
-            index
-            for index in self._storage_list[name]
+            index for index in self._storage_list[name]
             if include_detached or self._storage_is_attached(name, index)
         ]
 

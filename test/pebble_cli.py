@@ -42,8 +42,7 @@ def main():
     p = subparsers.add_parser('ack', help='acknowledge warnings up to given time')
     p.add_argument(
         '--timestamp',
-        help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zz'
-        'format), default current time',
+        help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zzformat), default current time',
         type=timeconv.parse_rfc3339,
     )
 

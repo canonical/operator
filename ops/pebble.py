@@ -605,8 +605,7 @@ class Warning:
             last_added=timeconv.parse_rfc3339(d['last-added']),
             last_shown=(
                 timeconv.parse_rfc3339(d['last-shown'])  # type: ignore
-                if d.get('last-shown')
-                else None
+                if d.get('last-shown') else None
             ),
             expire_after=d['expire-after'],
             repeat_after=d['repeat-after'],
@@ -700,8 +699,7 @@ class Task:
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
             ready_time=(
                 timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
-                if d.get('ready-time')
-                else None
+                if d.get('ready-time') else None
             ),
             data=d.get('data') or {},
         )
@@ -769,8 +767,7 @@ class Change:
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
             ready_time=(
                 timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
-                if d.get('ready-time')
-                else None
+                if d.get('ready-time') else None
             ),
             data=d.get('data') or {},
         )
@@ -1463,11 +1460,9 @@ class Notice:
             occurrences=d['occurrences'],
             last_data=d.get('last-data') or {},
             repeat_after=timeconv.parse_duration(d['repeat-after'])
-            if 'repeat-after' in d
-            else None,
+            if 'repeat-after' in d else None,
             expire_after=timeconv.parse_duration(d['expire-after'])
-            if 'expire-after' in d
-            else None,
+            if 'expire-after' in d else None,
         )
 
 
@@ -2855,7 +2850,7 @@ class Client:
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError(
-                'services must be of type Iterable[str], ' f'not {type(services).__name__}'
+                f'services must be of type Iterable[str], not {type(services).__name__}'
             )
         for s in services:
             if not isinstance(s, str):
