@@ -4697,24 +4697,24 @@ class TestFilesystem:
         harness.cleanup()
 
     @pytest.fixture
-    def root(self, harness: ops.testing.Harness[ops.CharmBase]):
+    def container_fs_root(self, harness: ops.testing.Harness[ops.CharmBase]):
         return harness.get_filesystem_root("test-container")
 
     @pytest.fixture
     def container(self, harness: ops.testing.Harness[ops.CharmBase]):
         return harness.charm.unit.get_container("test-container")
 
-    def test_push(self, container: ops.Container, root: pathlib.Path):
+    def test_push(self, container: ops.Container, container_fs_root: pathlib.Path):
         container.push("/foo", source="foo")
-        assert (root / "foo").is_file()
-        assert (root / "foo").read_text() == "foo"
+        assert (container_fs_root / "foo").is_file()
+        assert (container_fs_root / "foo").read_text() == "foo"
 
-    def test_push_create_parent(self, container: ops.Container, root: pathlib.Path):
+    def test_push_create_parent(self, container: ops.Container, container_fs_root: pathlib.Path):
         container.push("/foo/bar", source="bar", make_dirs=True)
-        assert (root / "foo").is_dir()
-        assert (root / "foo" / "bar").read_text() == "bar"
+        assert (container_fs_root / "foo").is_dir()
+        assert (container_fs_root / "foo" / "bar").read_text() == "bar"
 
-    def test_push_path(self, container: ops.Container, root: pathlib.Path):
+    def test_push_path(self, container: ops.Container, container_fs_root: pathlib.Path):
         with tempfile.TemporaryDirectory() as temp:
             tempdir = pathlib.Path(temp)
             (tempdir / "foo/bar").mkdir(parents=True)
@@ -4723,28 +4723,28 @@ class TestFilesystem:
             (tempdir / "foo/baz").mkdir(parents=True)
             container.push_path(tempdir / "foo", "/tmp")  # noqa: S108
 
-            assert (root / "tmp").is_dir()
-            assert (root / "tmp/foo").is_dir()
-            assert (root / "tmp/foo/bar").is_dir()
-            assert (root / "tmp/foo/baz").is_dir()
-            assert (root / "tmp/foo/test").read_text() == "test"
-            assert (root / "tmp/foo/bar/foobar").read_text() == "foobar"
+            assert (container_fs_root / "tmp").is_dir()
+            assert (container_fs_root / "tmp/foo").is_dir()
+            assert (container_fs_root / "tmp/foo/bar").is_dir()
+            assert (container_fs_root / "tmp/foo/baz").is_dir()
+            assert (container_fs_root / "tmp/foo/test").read_text() == "test"
+            assert (container_fs_root / "tmp/foo/bar/foobar").read_text() == "foobar"
 
-    def test_make_dir(self, container: ops.Container, root: pathlib.Path):
+    def test_make_dir(self, container: ops.Container, container_fs_root: pathlib.Path):
         container.make_dir("/tmp")  # noqa: S108
-        assert (root / "tmp").is_dir()
+        assert (container_fs_root / "tmp").is_dir()
         container.make_dir("/foo/bar/foobar", make_parents=True)
-        assert (root / "foo/bar/foobar").is_dir()
+        assert (container_fs_root / "foo/bar/foobar").is_dir()
 
-    def test_pull(self, container: ops.Container, root: pathlib.Path):
-        (root / "foo").write_text("foo")
+    def test_pull(self, container: ops.Container, container_fs_root: pathlib.Path):
+        (container_fs_root / "foo").write_text("foo")
         assert container.pull("/foo").read() == "foo"
 
-    def test_pull_path(self, container: ops.Container, root: pathlib.Path):
-        (root / "foo").mkdir()
-        (root / "foo/bar").write_text("bar")
-        (root / "foobar").mkdir()
-        (root / "test").write_text("test")
+    def test_pull_path(self, container: ops.Container, container_fs_root: pathlib.Path):
+        (container_fs_root / "foo").mkdir()
+        (container_fs_root / "foo/bar").write_text("bar")
+        (container_fs_root / "foobar").mkdir()
+        (container_fs_root / "test").write_text("test")
         with tempfile.TemporaryDirectory() as temp:
             tempdir = pathlib.Path(temp)
             container.pull_path("/", tempdir)
@@ -4753,15 +4753,15 @@ class TestFilesystem:
             assert (tempdir / "foobar").is_dir()
             assert (tempdir / "test").read_text() == "test"
 
-    def test_list_files(self, container: ops.Container, root: pathlib.Path):
-        (root / "foo").mkdir()
+    def test_list_files(self, container: ops.Container, container_fs_root: pathlib.Path):
+        (container_fs_root / "foo").mkdir()
         assert container.list_files("/foo") == []
         assert len(container.list_files("/")) == 1
         file_info = container.list_files("/")[0]
         assert file_info.path == "/foo"
         assert file_info.type == FileType.DIRECTORY
         assert container.list_files("/foo", itself=True)[0].path == "/foo"
-        (root / "foo/bar").write_text("foobar")
+        (container_fs_root / "foo/bar").write_text("foobar")
         assert len(container.list_files("/foo")) == 1
         assert len(container.list_files("/foo", pattern="*ar")) == 1
         assert len(container.list_files("/foo", pattern="*oo")) == 0
@@ -4776,16 +4776,16 @@ class TestFilesystem:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         container: ops.Container,
-        root: pathlib.Path,
+        container_fs_root: pathlib.Path,
     ):
         storage_id = harness.add_storage("test-storage", 1, attach=True)[0]
-        assert (root / "mounts/foo").exists()
-        (root / "mounts/foo/bar").write_text("foobar")
+        assert (container_fs_root / "mounts/foo").exists()
+        (container_fs_root / "mounts/foo/bar").write_text("foobar")
         assert container.pull("/mounts/foo/bar").read() == "foobar"
         harness.detach_storage(storage_id)
-        assert not (root / "mounts/foo/bar").is_file()
+        assert not (container_fs_root / "mounts/foo/bar").is_file()
         harness.attach_storage(storage_id)
-        assert (root / "mounts/foo/bar").read_text(), "foobar"
+        assert (container_fs_root / "mounts/foo/bar").read_text(), "foobar"
 
     def _make_storage_attach_harness(
         self,

@@ -55,15 +55,16 @@ def get_socket_path() -> str:
     return socket_path
 
 
+@pytest.fixture
+def client():
+    return pebble.Client(socket_path=get_socket_path())
+
+
 @pytest.mark.skipif(
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
 class TestRealPebble:
-    @pytest.fixture
-    def client(self):
-        return pebble.Client(socket_path=get_socket_path())
-
     def test_checks_and_health(self, client: pebble.Client):
         client.add_layer('layer', {
             'checks': {
@@ -312,10 +313,6 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         yield pebble_dir
         shutil.rmtree(pebble_dir)
 
-    @pytest.fixture
-    def client(self):
-        return pebble.Client(socket_path=get_socket_path())
-
     # Remove this entirely once the associated bug is fixed; it overrides the original test in the
     # test mixin class.
     @pytest.mark.skip(reason='pending resolution of https://github.com/canonical/pebble/issues/80')
@@ -328,6 +325,4 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
 class TestNoticesUsingRealPebble(PebbleNoticesMixin):
-    @pytest.fixture
-    def client(self):
-        return pebble.Client(socket_path=get_socket_path())
+    pass
