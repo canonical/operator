@@ -314,7 +314,7 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
 
     @pytest.fixture
     def client(self):
-        pebble.Client(socket_path=get_socket_path())
+        return pebble.Client(socket_path=get_socket_path())
 
     # Remove this entirely once the associated bug is fixed; it overrides the original test in the
     # test mixin class.
