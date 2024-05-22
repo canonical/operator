@@ -46,7 +46,7 @@ def datetime_nzdt(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: 
     return datetime.datetime(y, m, d, hour, min, sec, micro, tzinfo=tz)
 
 
-class TestTypes(unittest.TestCase):
+class TestTypes:
     maxDiff = None
 
     def test_error(self):
@@ -492,7 +492,7 @@ single log
         )
 
 
-class TestPlan(unittest.TestCase):
+class TestPlan:
     def test_services(self):
         plan = pebble.Plan('')
         assert plan.services == {}
@@ -747,7 +747,7 @@ checks:
         assert plan4 == plan7
 
 
-class TestLayer(unittest.TestCase):
+class TestLayer:
     def _assert_empty(self, layer: pebble.Layer):
         assert layer.summary == ''
         assert layer.description == ''
@@ -917,7 +917,7 @@ summary: Sum Mary
         assert s != 5
 
 
-class TestService(unittest.TestCase):
+class TestService:
     def _assert_empty(self, service: pebble.Service, name: str):
         assert service.name == name
         assert service.summary == ''
@@ -1055,7 +1055,7 @@ class TestService(unittest.TestCase):
         assert one != 5
 
 
-class TestCheck(unittest.TestCase):
+class TestCheck:
     def _assert_empty(self, check: pebble.Check, name: str):
         assert check.name == name
         assert check.override == ''
@@ -1140,7 +1140,7 @@ class TestCheck(unittest.TestCase):
         assert one != 5
 
 
-class TestLogTarget(unittest.TestCase):
+class TestLogTarget:
     def _assert_empty(self, target: pebble.LogTarget, name: str):
         assert target.name == name
         assert target.override == ''
@@ -1199,7 +1199,7 @@ class TestLogTarget(unittest.TestCase):
         assert one != 5
 
 
-class TestServiceInfo(unittest.TestCase):
+class TestServiceInfo:
     def test_service_startup(self):
         assert list(pebble.ServiceStartup) == [
             pebble.ServiceStartup.ENABLED,
@@ -1258,7 +1258,7 @@ class TestServiceInfo(unittest.TestCase):
             assert not s.is_running()
 
 
-class TestCheckInfo(unittest.TestCase):
+class TestCheckInfo:
     def test_check_level(self):
         assert list(pebble.CheckLevel) == [
             pebble.CheckLevel.UNSET,
@@ -1586,23 +1586,28 @@ class TestMultipartParser:
                 assert test.want_bodies_done == bodies_done, msg
 
 
-class TestClient(unittest.TestCase):
-    maxDiff = None
+@pytest.fixture
+def time():
+    return MockTime()
 
-    def setUp(self):
-        self.client = MockClient()
-        self.time = MockTime()
-        time_patcher = unittest.mock.patch('ops.pebble.time', self.time)
-        time_patcher.start()
-        self.addCleanup(time_patcher.stop)
+
+@pytest.fixture
+def client(monkeypatch: pytest.MonkeyPatch, time: MockTime):
+    client = MockClient()
+    monkeypatch.setattr('ops.pebble.time', time)
+    return client
+
+
+class TestClient:
+    maxDiff = None
 
     def test_client_init(self):
         pebble.Client(socket_path='foo')  # test that constructor runs
         with pytest.raises(TypeError):
             pebble.Client()  # type: ignore (socket_path arg required)
 
-    def test_get_system_info(self):
-        self.client.responses.append({
+    def test_get_system_info(self, client: MockClient):
+        client.responses.append({
             "result": {
                 "version": "1.2.3",
                 "extra-field": "foo",
@@ -1611,42 +1616,42 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        info = self.client.get_system_info()
+        info = client.get_system_info()
         assert info.version == '1.2.3'
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/system-info', None, None),
         ]
 
-    def test_get_warnings(self):
+    def test_get_warnings(self, client: MockClient):
         empty: typing.Dict[str, typing.Any] = {
             "result": [],
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         }
-        self.client.responses.append(empty)
-        warnings = self.client.get_warnings()
+        client.responses.append(empty)
+        warnings = client.get_warnings()
         assert warnings == []
 
-        self.client.responses.append(empty)
-        warnings = self.client.get_warnings(select=pebble.WarningState.ALL)
+        client.responses.append(empty)
+        warnings = client.get_warnings(select=pebble.WarningState.ALL)
         assert warnings == []
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/warnings', {'select': 'pending'}, None),
             ('GET', '/v1/warnings', {'select': 'all'}, None),
         ]
 
-    def test_ack_warnings(self):
-        self.client.responses.append({
+    def test_ack_warnings(self, client: MockClient):
+        client.responses.append({
             "result": 0,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        num = self.client.ack_warnings(datetime_nzdt(2021, 1, 28, 15, 11, 0))
+        num = client.ack_warnings(datetime_nzdt(2021, 1, 28, 15, 11, 0))
         assert num == 0
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/warnings', None, {
                 'action': 'okay',
                 'timestamp': '2021-01-28T15:11:00+13:00',
@@ -1676,26 +1681,26 @@ class TestClient(unittest.TestCase):
         assert change.ready_time == datetime_nzdt(2021, 1, 28, 14, 37, 4, 291518)
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
 
-    def test_get_changes(self):
+    def test_get_changes(self, client: MockClient):
         empty: typing.Dict[str, typing.Any] = {
             "result": [],
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         }
-        self.client.responses.append(empty)
-        changes = self.client.get_changes()
+        client.responses.append(empty)
+        changes = client.get_changes()
         assert changes == []
 
-        self.client.responses.append(empty)
-        changes = self.client.get_changes(select=pebble.ChangeState.ALL)
+        client.responses.append(empty)
+        changes = client.get_changes(select=pebble.ChangeState.ALL)
         assert changes == []
 
-        self.client.responses.append(empty)
-        changes = self.client.get_changes(select=pebble.ChangeState.ALL, service='foo')
+        client.responses.append(empty)
+        changes = client.get_changes(select=pebble.ChangeState.ALL, service='foo')
         assert changes == []
 
-        self.client.responses.append({
+        client.responses.append({
             "result": [
                 build_mock_change_dict(),
             ],
@@ -1703,62 +1708,63 @@ class TestClient(unittest.TestCase):
             "status-code": 200,
             "type": "sync"
         })
-        changes = self.client.get_changes()
+        changes = client.get_changes()
         assert len(changes) == 1
         self.assert_mock_change(changes[0])
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes', {'select': 'in-progress'}, None),
             ('GET', '/v1/changes', {'select': 'all'}, None),
             ('GET', '/v1/changes', {'select': 'all', 'for': 'foo'}, None),
             ('GET', '/v1/changes', {'select': 'in-progress'}, None),
         ]
 
-    def test_get_change(self):
-        self.client.responses.append({
+    def test_get_change(self, client: MockClient):
+        client.responses.append({
             "result": build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.get_change(pebble.ChangeID('70'))
+        change = client.get_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70', None, None),
         ]
 
-    def test_get_change_str(self):
-        self.client.responses.append({
+    def test_get_change_str(self, client: MockClient):
+        client.responses.append({
             "result": build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.get_change('70')  # type: ignore
+        change = client.get_change('70')  # type: ignore
         self.assert_mock_change(change)
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70', None, None),
         ]
 
-    def test_abort_change(self):
-        self.client.responses.append({
+    def test_abort_change(self, client: MockClient):
+        client.responses.append({
             "result": build_mock_change_dict(),
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        change = self.client.abort_change(pebble.ChangeID('70'))
+        change = client.abort_change(pebble.ChangeID('70'))
         self.assert_mock_change(change)
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/changes/70', None, {'action': 'abort'}),
         ]
 
     def _services_action_helper(
             self,
+            client: MockClient,
             action: str,
             api_func: typing.Callable[[], str],
             services: typing.List[str]):
-        self.client.responses.append({
+        client.responses.append({
             "change": "70",
             "result": None,
             "status": "Accepted",
@@ -1767,7 +1773,7 @@ class TestClient(unittest.TestCase):
         })
         change = build_mock_change_dict()
         change['ready'] = True
-        self.client.responses.append({
+        client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
@@ -1775,97 +1781,102 @@ class TestClient(unittest.TestCase):
         })
         change_id = api_func()
         assert change_id == '70'
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/services', None, {'action': action, 'services': services}),
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
     def _services_action_async_helper(
-            self, action: str, api_func: typing.Callable[..., str], services: typing.List[str]):
-        self.client.responses.append({
+        self,
+        client: MockClient,
+        action: str,
+        api_func: typing.Callable[..., str],
+        services: typing.List[str],
+    ):
+        client.responses.append({
             "change": "70",
             "result": None,
             "status": "Accepted",
             "status-code": 202,
-            "type": "async"
+            "type": "async",
         })
         change_id = api_func(timeout=0)
         assert change_id == '70'
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/services', None, {'action': action, 'services': services}),
         ]
 
-    def test_autostart_services(self):
-        self._services_action_helper('autostart', self.client.autostart_services, [])
+    def test_autostart_services(self, client: MockClient):
+        self._services_action_helper(client, 'autostart', client.autostart_services, [])
 
-    def test_autostart_services_async(self):
-        self._services_action_async_helper('autostart', self.client.autostart_services, [])
+    def test_autostart_services_async(self, client: MockClient):
+        self._services_action_async_helper(client, 'autostart', client.autostart_services, [])
 
-    def test_replan_services(self):
-        self._services_action_helper('replan', self.client.replan_services, [])
+    def test_replan_services(self, client: MockClient):
+        self._services_action_helper(client, 'replan', client.replan_services, [])
 
-    def test_replan_services_async(self):
-        self._services_action_async_helper('replan', self.client.replan_services, [])
+    def test_replan_services_async(self, client: MockClient):
+        self._services_action_async_helper(client, 'replan', client.replan_services, [])
 
-    def test_start_services(self):
+    def test_start_services(self, client: MockClient):
         def api_func():
-            return self.client.start_services(['svc'])
-        self._services_action_helper('start', api_func, ['svc'])
+            return client.start_services(['svc'])
+        self._services_action_helper(client, 'start', api_func, ['svc'])
 
         with pytest.raises(TypeError):
-            self.client.start_services(1)  # type: ignore
+            client.start_services(1)  # type: ignore
 
         with pytest.raises(TypeError):
-            self.client.start_services([1])  # type: ignore
+            client.start_services([1])  # type: ignore
 
         with pytest.raises(TypeError):
-            self.client.start_services([['foo']])  # type: ignore
+            client.start_services([['foo']])  # type: ignore
 
-    def test_start_services_async(self):
+    def test_start_services_async(self, client: MockClient):
         def api_func(timeout: float = 30):
-            return self.client.start_services(['svc'], timeout=timeout)
-        self._services_action_async_helper('start', api_func, ['svc'])
+            return client.start_services(['svc'], timeout=timeout)
+        self._services_action_async_helper(client, 'start', api_func, ['svc'])
 
-    def test_stop_services(self):
+    def test_stop_services(self, client: MockClient):
         def api_func():
-            return self.client.stop_services(['svc'])
-        self._services_action_helper('stop', api_func, ['svc'])
+            return client.stop_services(['svc'])
+        self._services_action_helper(client, 'stop', api_func, ['svc'])
 
         with pytest.raises(TypeError):
-            self.client.stop_services(1)  # type: ignore
+            client.stop_services(1)  # type: ignore
 
         with pytest.raises(TypeError):
-            self.client.stop_services([1])  # type: ignore
+            client.stop_services([1])  # type: ignore
 
         with pytest.raises(TypeError):
-            self.client.stop_services([['foo']])  # type: ignore
+            client.stop_services([['foo']])  # type: ignore
 
-    def test_stop_services_async(self):
+    def test_stop_services_async(self, client: MockClient):
         def api_func(timeout: float = 30):
-            return self.client.stop_services(['svc'], timeout=timeout)
-        self._services_action_async_helper('stop', api_func, ['svc'])
+            return client.stop_services(['svc'], timeout=timeout)
+        self._services_action_async_helper(client, 'stop', api_func, ['svc'])
 
-    def test_restart_services(self):
+    def test_restart_services(self, client: MockClient):
         def api_func():
-            return self.client.restart_services(['svc'])
-        self._services_action_helper('restart', api_func, ['svc'])
+            return client.restart_services(['svc'])
+        self._services_action_helper(client, 'restart', api_func, ['svc'])
 
         with pytest.raises(TypeError):
-            self.client.restart_services(1)  # type: ignore
+            client.restart_services(1)  # type: ignore
 
         with pytest.raises(TypeError):
-            self.client.restart_services([1])  # type: ignore
+            client.restart_services([1])  # type: ignore
 
         with pytest.raises(TypeError):
-            self.client.restart_services([['foo']])  # type: ignore
+            client.restart_services([['foo']])  # type: ignore
 
-    def test_restart_services_async(self):
+    def test_restart_services_async(self, client: MockClient):
         def api_func(timeout: float = 30):
-            return self.client.restart_services(['svc'], timeout=timeout)
-        self._services_action_async_helper('restart', api_func, ['svc'])
+            return client.restart_services(['svc'], timeout=timeout)
+        self._services_action_async_helper(client, 'restart', api_func, ['svc'])
 
-    def test_change_error(self):
-        self.client.responses.append({
+    def test_change_error(self, client: MockClient):
+        client.responses.append({
             "change": "70",
             "result": None,
             "status": "Accepted",
@@ -1874,128 +1885,133 @@ class TestClient(unittest.TestCase):
         })
         change = build_mock_change_dict()
         change['err'] = 'Some kind of service error'
-        self.client.responses.append({
+        client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
         with pytest.raises(pebble.ChangeError) as excinfo:
-            self.client.autostart_services()
+            client.autostart_services()
         assert isinstance(excinfo.value, pebble.Error)
         assert excinfo.value.err == 'Some kind of service error'
         assert isinstance(excinfo.value.change, pebble.Change)
         assert excinfo.value.change.id == '70'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/services', None, {'action': 'autostart', 'services': []}),
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_change_success(self, timeout: typing.Optional[float] = 30.0):
+    def test_wait_change_success(self, client: MockClient, timeout: typing.Optional[float] = 30.0):
         change = build_mock_change_dict()
-        self.client.responses.append({
+        client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
 
-        response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout)
+        response = client.wait_change(pebble.ChangeID('70'), timeout=timeout)
         assert response.id == '70'
         assert response.ready
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_change_success_timeout_none(self):
-        self.test_wait_change_success(timeout=None)
+    def test_wait_change_success_timeout_none(self, client: MockClient):
+        self.test_wait_change_success(client, timeout=None)
 
-    def test_wait_change_success_multiple_calls(self):
+    def test_wait_change_success_multiple_calls(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
-            self.time.sleep(n)  # simulate passing of time due to wait_change call
+            time.sleep(n)  # simulate passing of time due to wait_change call
             raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
-        self.client.responses.append(lambda: timeout_response(4))
+        client.responses.append(lambda: timeout_response(4))
 
         change = build_mock_change_dict()
-        self.client.responses.append({
+        client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
 
-        response = self.client.wait_change(pebble.ChangeID('70'))
+        response = client.wait_change(pebble.ChangeID('70'))
         assert response.id == '70'
         assert response.ready
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-        assert self.time.time() == 4
+        assert time.time() == 4
 
-    def test_wait_change_success_polled(self, timeout: typing.Optional[float] = 30.0):
+    def test_wait_change_success_polled(
+        self,
+        client: MockClient,
+        time: MockTime,
+        timeout: typing.Optional[float] = 30.0,
+    ):
         # Trigger polled mode
-        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+        client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
         for i in range(3):
             change = build_mock_change_dict()
             change['ready'] = i == 2
-            self.client.responses.append({
+            client.responses.append({
                 "result": change,
                 "status": "OK",
                 "status-code": 200,
                 "type": "sync"
             })
 
-        response = self.client.wait_change(pebble.ChangeID('70'), timeout=timeout, delay=1)
+        response = client.wait_change(pebble.ChangeID('70'), timeout=timeout, delay=1)
         assert response.id == '70'
         assert response.ready
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
             ('GET', '/v1/changes/70', None, None),
             ('GET', '/v1/changes/70', None, None),
             ('GET', '/v1/changes/70', None, None),
         ]
 
-        assert self.time.time() == 2
+        assert time.time() == 2
 
-    def test_wait_change_success_polled_timeout_none(self):
-        self.test_wait_change_success_polled(timeout=None)
+    def test_wait_change_success_polled_timeout_none(self, client: MockClient, time: MockTime):
+        self.test_wait_change_success_polled(client, time, timeout=None)
 
-    def test_wait_change_timeout(self):
+    def test_wait_change_timeout(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
-            self.time.sleep(n)  # simulate passing of time due to wait_change call
+            time.sleep(n)  # simulate passing of time due to wait_change call
             raise pebble.APIError({}, 504, "Gateway Timeout", "timed out")
 
-        self.client.responses.append(lambda: timeout_response(4))
-        self.client.responses.append(lambda: timeout_response(2))
+        client.responses.append(lambda: timeout_response(4))
+        client.responses.append(lambda: timeout_response(2))
 
         with pytest.raises(pebble.TimeoutError) as excinfo:
-            self.client.wait_change(pebble.ChangeID('70'), timeout=6)
+            client.wait_change(pebble.ChangeID('70'), timeout=6)
         assert isinstance(excinfo.value, pebble.Error)
         assert isinstance(excinfo.value, TimeoutError)
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
             ('GET', '/v1/changes/70/wait', {'timeout': '2.000s'}, None),
         ]
 
-        assert self.time.time() == 6
+        assert time.time() == 6
 
-    def test_wait_change_timeout_polled(self):
+    def test_wait_change_timeout_polled(self, client: MockClient, time: MockTime):
         # Trigger polled mode
-        self.client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
+        client.responses.append(pebble.APIError({}, 404, "Not Found", "not found"))
 
         change = build_mock_change_dict()
         change['ready'] = False
         for _ in range(3):
-            self.client.responses.append({
+            client.responses.append({
                 "result": change,
                 "status": "OK",
                 "status-code": 200,
@@ -2003,60 +2019,60 @@ class TestClient(unittest.TestCase):
             })
 
         with pytest.raises(pebble.TimeoutError) as excinfo:
-            self.client.wait_change(pebble.ChangeID('70'), timeout=3, delay=1)
+            client.wait_change(pebble.ChangeID('70'), timeout=3, delay=1)
         assert isinstance(excinfo.value, pebble.Error)
         assert isinstance(excinfo.value, TimeoutError)
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '3.000s'}, None),
             ('GET', '/v1/changes/70', None, None),
             ('GET', '/v1/changes/70', None, None),
             ('GET', '/v1/changes/70', None, None),
         ]
 
-        assert self.time.time() == 3
+        assert time.time() == 3
 
-    def test_wait_change_error(self):
+    def test_wait_change_error(self, client: MockClient):
         change = build_mock_change_dict()
         change['err'] = 'Some kind of service error'
-        self.client.responses.append({
+        client.responses.append({
             "result": change,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
         # wait_change() itself shouldn't raise an error
-        response = self.client.wait_change(pebble.ChangeID('70'))
+        response = client.wait_change(pebble.ChangeID('70'))
         assert response.id == '70'
         assert response.err == 'Some kind of service error'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_change_socket_timeout(self):
+    def test_wait_change_socket_timeout(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
-            self.time.sleep(n)
+            time.sleep(n)
             raise socket.timeout("socket.timeout: timed out")
 
-        self.client.responses.append(lambda: timeout_response(3))
+        client.responses.append(lambda: timeout_response(3))
 
         with pytest.raises(pebble.TimeoutError) as excinfo:
-            self.client.wait_change(pebble.ChangeID('70'), timeout=3)
+            client.wait_change(pebble.ChangeID('70'), timeout=3)
         assert isinstance(excinfo.value, pebble.Error)
         assert isinstance(excinfo.value, TimeoutError)
 
-    def test_add_layer(self):
+    def test_add_layer(self, client: MockClient):
         okay_response = {
             "result": True,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         }
-        self.client.responses.append(okay_response)
-        self.client.responses.append(okay_response)
-        self.client.responses.append(okay_response)
-        self.client.responses.append(okay_response)
+        client.responses.append(okay_response)
+        client.responses.append(okay_response)
+        client.responses.append(okay_response)
+        client.responses.append(okay_response)
 
         layer_yaml = """
 services:
@@ -2066,10 +2082,10 @@ services:
 """[1:]
         layer = pebble.Layer(layer_yaml)
 
-        self.client.add_layer('a', layer)
-        self.client.add_layer('b', layer.to_yaml())
-        self.client.add_layer('c', layer.to_dict())
-        self.client.add_layer('d', layer, combine=True)
+        client.add_layer('a', layer)
+        client.add_layer('b', layer.to_yaml())
+        client.add_layer('c', layer.to_dict())
+        client.add_layer('d', layer, combine=True)
 
         def build_expected(label: str, combine: bool):
             return {
@@ -2080,48 +2096,48 @@ services:
                 'layer': layer_yaml,
             }
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/layers', None, build_expected('a', False)),
             ('POST', '/v1/layers', None, build_expected('b', False)),
             ('POST', '/v1/layers', None, build_expected('c', False)),
             ('POST', '/v1/layers', None, build_expected('d', True)),
         ]
 
-    def test_add_layer_invalid_type(self):
+    def test_add_layer_invalid_type(self, client: MockClient):
         with pytest.raises(TypeError):
-            self.client.add_layer('foo', 42)  # type: ignore
+            client.add_layer('foo', 42)  # type: ignore
         with pytest.raises(TypeError):
-            self.client.add_layer(42, 'foo')  # type: ignore
+            client.add_layer(42, 'foo')  # type: ignore
 
         # combine is a keyword-only arg (should be combine=True)
         with pytest.raises(TypeError):
-            self.client.add_layer('foo', {}, True)  # type: ignore
+            client.add_layer('foo', {}, True)  # type: ignore
 
-    def test_get_plan(self):
+    def test_get_plan(self, client: MockClient):
         plan_yaml = """
 services:
   foo:
     command: echo bar
     override: replace
 """[1:]
-        self.client.responses.append({
+        client.responses.append({
             "result": plan_yaml,
             "status": "OK",
             "status-code": 200,
             "type": "sync"
         })
-        plan = self.client.get_plan()
+        plan = client.get_plan()
         assert plan.to_yaml() == plan_yaml
         assert len(plan.services) == 1
         assert plan.services['foo'].command == 'echo bar'
         assert plan.services['foo'].override == 'replace'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/plan', {'format': 'yaml'}, None),
         ]
 
-    def test_get_services_all(self):
-        self.client.responses.append({
+    def test_get_services_all(self, client: MockClient):
+        client.responses.append({
             "result": [
                 {
                     "current": "inactive",
@@ -2138,7 +2154,7 @@ services:
             "status-code": 200,
             "type": "sync"
         })
-        services = self.client.get_services()
+        services = client.get_services()
         assert len(services) == 2
         assert services[0].name == 'svc1'
         assert services[0].startup == pebble.ServiceStartup.DISABLED
@@ -2147,12 +2163,12 @@ services:
         assert services[1].startup == pebble.ServiceStartup.ENABLED
         assert services[1].current == pebble.ServiceStatus.ACTIVE
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/services', None, None),
         ]
 
-    def test_get_services_names(self):
-        self.client.responses.append({
+    def test_get_services_names(self, client: MockClient):
+        client.responses.append({
             "result": [
                 {
                     "current": "inactive",
@@ -2169,7 +2185,7 @@ services:
             "status-code": 200,
             "type": "sync"
         })
-        services = self.client.get_services(['svc1', 'svc2'])
+        services = client.get_services(['svc1', 'svc2'])
         assert len(services) == 2
         assert services[0].name == 'svc1'
         assert services[0].startup == pebble.ServiceStartup.DISABLED
@@ -2178,7 +2194,7 @@ services:
         assert services[1].startup == pebble.ServiceStartup.ENABLED
         assert services[1].current == pebble.ServiceStatus.ACTIVE
 
-        self.client.responses.append({
+        client.responses.append({
             "result": [
                 {
                     "current": "active",
@@ -2190,19 +2206,19 @@ services:
             "status-code": 200,
             "type": "sync"
         })
-        services = self.client.get_services(['svc2'])
+        services = client.get_services(['svc2'])
         assert len(services) == 1
         assert services[0].name == 'svc2'
         assert services[0].startup == pebble.ServiceStartup.ENABLED
         assert services[0].current == pebble.ServiceStatus.ACTIVE
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/services', {'names': 'svc1,svc2'}, None),
             ('GET', '/v1/services', {'names': 'svc2'}, None),
         ]
 
-    def test_pull_boundary_spanning_chunk(self):
-        self.client.responses.append((
+    def test_pull_boundary_spanning_chunk(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""\
 --01234567890123456789012345678901\r
@@ -2222,18 +2238,18 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
 
-        self.client._chunk_size = 13
-        with self.client.pull('/etc/hosts') as infile:
+        client._chunk_size = 13
+        with client.pull('/etc/hosts') as infile:
             content = infile.read()
         assert content == '127.0.0.1 localhost  # 😀\nfoo\r\nbar'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
                 {'Accept': 'multipart/form-data'}, None),
         ]
 
-    def test_pull_text(self):
-        self.client.responses.append((
+    def test_pull_text(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""\
 --01234567890123456789012345678901\r
@@ -2253,17 +2269,17 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
 
-        with self.client.pull('/etc/hosts') as infile:
+        with client.pull('/etc/hosts') as infile:
             content = infile.read()
         assert content == '127.0.0.1 localhost  # 😀\nfoo\r\nbar'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
                 {'Accept': 'multipart/form-data'}, None),
         ]
 
-    def test_pull_binary(self):
-        self.client.responses.append((
+    def test_pull_binary(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""\
 --01234567890123456789012345678901\r
@@ -2283,17 +2299,17 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
 
-        with self.client.pull('/etc/hosts', encoding=None) as infile:
+        with client.pull('/etc/hosts', encoding=None) as infile:
             content = infile.read()
         assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
                 {'Accept': 'multipart/form-data'}, None),
         ]
 
-    def test_pull_path_error(self):
-        self.client.responses.append((
+    def test_pull_path_error(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""\
 --01234567890123456789012345678901\r
@@ -2312,30 +2328,30 @@ Content-Disposition: form-data; name="response"\r
         ))
 
         with pytest.raises(pebble.PathError) as excinfo:
-            self.client.pull('/etc/hosts')
+            client.pull('/etc/hosts')
         assert isinstance(excinfo.value, pebble.Error)
         assert excinfo.value.kind == 'not-found'
         assert excinfo.value.message == 'not found'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'read', 'path': '/etc/hosts'},
                 {'Accept': 'multipart/form-data'}, None),
         ]
 
-    def test_pull_protocol_errors(self):
-        self.client.responses.append(({'Content-Type': 'c/t'}, b''))
+    def test_pull_protocol_errors(self, client: MockClient):
+        client.responses.append(({'Content-Type': 'c/t'}, b''))
         with pytest.raises(pebble.ProtocolError) as excinfo:
-            self.client.pull('/etc/hosts')
+            client.pull('/etc/hosts')
         assert isinstance(excinfo.value, pebble.Error)
         assert str(excinfo.value) == \
             "expected Content-Type 'multipart/form-data', got 'c/t'"
 
-        self.client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
+        client.responses.append(({'Content-Type': 'multipart/form-data'}, b''))
         with pytest.raises(pebble.ProtocolError) as excinfo:
-            self.client.pull('/etc/hosts')
+            client.pull('/etc/hosts')
         assert str(excinfo.value) == "invalid boundary ''"
 
-        self.client.responses.append((
+        client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""\
 --01234567890123456789012345678901\r
@@ -2355,10 +2371,10 @@ Content-Disposition: form-data; name="response"\r
 """,
         ))
         with pytest.raises(pebble.ProtocolError) as excinfo:
-            self.client.pull('/etc/hosts')
+            client.pull('/etc/hosts')
         assert str(excinfo.value) == "path not expected: '/bad'"
 
-        self.client.responses.append((
+        client.responses.append((
             {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
             b"""\
 --01234567890123456789012345678901\r
@@ -2369,17 +2385,17 @@ bad path\r
 """,
         ))
         with pytest.raises(pebble.ProtocolError) as excinfo:
-            self.client.pull('/etc/hosts')
+            client.pull('/etc/hosts')
         assert str(excinfo.value) == 'no "response" field in multipart body'
 
-    def test_push_str(self):
-        self._test_push_str('content 😀\nfoo\r\nbar')
+    def test_push_str(self, client: MockClient):
+        self._test_push_str(client, 'content 😀\nfoo\r\nbar')
 
-    def test_push_text(self):
-        self._test_push_str(io.StringIO('content 😀\nfoo\r\nbar'))
+    def test_push_text(self, client: MockClient):
+        self._test_push_str(client, io.StringIO('content 😀\nfoo\r\nbar'))
 
-    def _test_push_str(self, source: typing.Union[str, typing.IO[str]]):
-        self.client.responses.append((
+    def _test_push_str(self, client: MockClient, source: typing.Union[str, typing.IO[str]]):
+        client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
 {
@@ -2393,10 +2409,10 @@ bad path\r
 """,
         ))
 
-        self.client.push('/foo/bar', source)
+        client.push('/foo/bar', source)
 
-        assert len(self.client.requests) == 1
-        request = self.client.requests[0]
+        assert len(client.requests) == 1
+        request = client.requests[0]
         assert request[:3] == ('POST', '/v1/files', None)
 
         headers, body = request[3:]
@@ -2410,14 +2426,14 @@ bad path\r
             'files': [{'path': '/foo/bar'}],
         }
 
-    def test_push_bytes(self):
-        self._test_push_bytes(b'content \xf0\x9f\x98\x80\nfoo\r\nbar')
+    def test_push_bytes(self, client: MockClient):
+        self._test_push_bytes(client, b'content \xf0\x9f\x98\x80\nfoo\r\nbar')
 
-    def test_push_binary(self):
-        self._test_push_bytes(io.BytesIO(b'content \xf0\x9f\x98\x80\nfoo\r\nbar'))
+    def test_push_binary(self, client: MockClient):
+        self._test_push_bytes(client, io.BytesIO(b'content \xf0\x9f\x98\x80\nfoo\r\nbar'))
 
-    def _test_push_bytes(self, source: typing.Union[bytes, typing.IO[bytes]]):
-        self.client.responses.append((
+    def _test_push_bytes(self, client: MockClient, source: typing.Union[bytes, typing.IO[bytes]]):
+        client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
 {
@@ -2431,10 +2447,10 @@ bad path\r
 """,
         ))
 
-        self.client.push('/foo/bar', source)
+        client.push('/foo/bar', source)
 
-        assert len(self.client.requests) == 1
-        request = self.client.requests[0]
+        assert len(client.requests) == 1
+        request = client.requests[0]
         assert request[:3] == ('POST', '/v1/files', None)
 
         headers, body = request[3:]
@@ -2447,8 +2463,8 @@ bad path\r
             'files': [{'path': '/foo/bar'}],
         }
 
-    def test_push_all_options(self):
-        self.client.responses.append((
+    def test_push_all_options(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
 {
@@ -2462,11 +2478,11 @@ bad path\r
 """,
         ))
 
-        self.client.push('/foo/bar', 'content', make_dirs=True, permissions=0o600,
-                         user_id=12, user='bob', group_id=34, group='staff')
+        client.push('/foo/bar', 'content', make_dirs=True, permissions=0o600,
+                    user_id=12, user='bob', group_id=34, group='staff')
 
-        assert len(self.client.requests) == 1
-        request = self.client.requests[0]
+        assert len(client.requests) == 1
+        request = client.requests[0]
         assert request[:3] == ('POST', '/v1/files', None)
 
         headers, body = request[3:]
@@ -2487,8 +2503,8 @@ bad path\r
             }],
         }
 
-    def test_push_uid_gid(self):
-        self.client.responses.append((
+    def test_push_uid_gid(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
 {
@@ -2502,10 +2518,10 @@ bad path\r
 """,
         ))
 
-        self.client.push('/foo/bar', 'content', user_id=12, group_id=34)
+        client.push('/foo/bar', 'content', user_id=12, group_id=34)
 
-        assert len(self.client.requests) == 1
-        request = self.client.requests[0]
+        assert len(client.requests) == 1
+        request = client.requests[0]
         assert request[:3] == ('POST', '/v1/files', None)
 
         headers, body = request[3:]
@@ -2522,8 +2538,8 @@ bad path\r
             }],
         }
 
-    def test_push_path_error(self):
-        self.client.responses.append((
+    def test_push_path_error(self, client: MockClient):
+        client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
 {
@@ -2538,12 +2554,12 @@ bad path\r
         ))
 
         with pytest.raises(pebble.PathError) as excinfo:
-            self.client.push('/foo/bar', 'content')
+            client.push('/foo/bar', 'content')
         assert excinfo.value.kind == 'not-found'
         assert excinfo.value.message == 'not found'
 
-        assert len(self.client.requests) == 1
-        request = self.client.requests[0]
+        assert len(client.requests) == 1
+        request = client.requests[0]
         assert request[:3] == ('POST', '/v1/files', None)
 
         headers, body = request[3:]
@@ -2588,8 +2604,8 @@ bad path\r
                 filename = part.get_filename()
         return (req, filename, content)
 
-    def test_list_files_path(self):
-        self.client.responses.append({
+    def test_list_files_path(self, client: MockClient):
+        client.responses.append({
             "result": [
                 {
                     'path': '/etc/hosts',
@@ -2615,7 +2631,7 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        infos = self.client.list_files('/etc')
+        infos = client.list_files('/etc')
 
         assert len(infos) == 2
         assert infos[0].path == '/etc/hosts'
@@ -2639,64 +2655,64 @@ bad path\r
         assert infos[1].group_id is None
         assert infos[1].group is None
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'list', 'path': '/etc'}, None),
         ]
 
-    def test_list_files_pattern(self):
-        self.client.responses.append({
+    def test_list_files_pattern(self, client: MockClient):
+        client.responses.append({
             "result": [],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
 
-        infos = self.client.list_files('/etc', pattern='*.conf')
+        infos = client.list_files('/etc', pattern='*.conf')
 
         assert len(infos) == 0
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'pattern': '*.conf'}, None),
         ]
 
-    def test_list_files_itself(self):
-        self.client.responses.append({
+    def test_list_files_itself(self, client: MockClient):
+        client.responses.append({
             "result": [],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
 
-        infos = self.client.list_files('/etc', itself=True)
+        infos = client.list_files('/etc', itself=True)
 
         assert len(infos) == 0
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/files', {'action': 'list', 'path': '/etc', 'itself': 'true'}, None),
         ]
 
-    def test_make_dir_basic(self):
-        self.client.responses.append({
+    def test_make_dir_basic(self, client: MockClient):
+        client.responses.append({
             "result": [{'path': '/foo/bar'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
-        self.client.make_dir('/foo/bar')
+        client.make_dir('/foo/bar')
         req = {'action': 'make-dirs', 'dirs': [{
             'path': '/foo/bar',
         }]}
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/files', None, req),
         ]
 
-    def test_make_dir_all_options(self):
-        self.client.responses.append({
+    def test_make_dir_all_options(self, client: MockClient):
+        client.responses.append({
             "result": [{'path': '/foo/bar'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
-        self.client.make_dir('/foo/bar', make_parents=True, permissions=0o600,
-                             user_id=12, user='bob', group_id=34, group='staff')
+        client.make_dir('/foo/bar', make_parents=True, permissions=0o600,
+                        user_id=12, user='bob', group_id=34, group='staff')
 
         req = {'action': 'make-dirs', 'dirs': [{
             'path': '/foo/bar',
@@ -2707,12 +2723,12 @@ bad path\r
             'group-id': 34,
             'group': 'staff',
         }]}
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/files', None, req),
         ]
 
-    def test_make_dir_error(self):
-        self.client.responses.append({
+    def test_make_dir_error(self, client: MockClient):
+        client.responses.append({
             "result": [{
                 'path': '/foo/bar',
                 'error': {
@@ -2725,45 +2741,45 @@ bad path\r
             'type': 'sync',
         })
         with pytest.raises(pebble.PathError) as excinfo:
-            self.client.make_dir('/foo/bar')
+            client.make_dir('/foo/bar')
         assert isinstance(excinfo.value, pebble.Error)
         assert excinfo.value.kind == 'permission-denied'
         assert excinfo.value.message == 'permission denied'
 
-    def test_remove_path_basic(self):
-        self.client.responses.append({
+    def test_remove_path_basic(self, client: MockClient):
+        client.responses.append({
             "result": [{'path': '/boo/far'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
-        self.client.remove_path('/boo/far')
+        client.remove_path('/boo/far')
         req = {'action': 'remove', 'paths': [{
             'path': '/boo/far',
         }]}
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/files', None, req),
         ]
 
-    def test_remove_path_recursive(self):
-        self.client.responses.append({
+    def test_remove_path_recursive(self, client: MockClient):
+        client.responses.append({
             "result": [{'path': '/boo/far'}],
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
-        self.client.remove_path('/boo/far', recursive=True)
+        client.remove_path('/boo/far', recursive=True)
 
         req = {'action': 'remove', 'paths': [{
             'path': '/boo/far',
             'recursive': True,
         }]}
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/files', None, req),
         ]
 
-    def test_remove_path_error(self):
-        self.client.responses.append({
+    def test_remove_path_error(self, client: MockClient):
+        client.responses.append({
             "result": [{
                 'path': '/boo/far',
                 'error': {
@@ -2776,49 +2792,49 @@ bad path\r
             'type': 'sync',
         })
         with pytest.raises(pebble.PathError) as excinfo:
-            self.client.remove_path('/boo/far')
+            client.remove_path('/boo/far')
         assert isinstance(excinfo.value, pebble.Error)
         assert excinfo.value.kind == 'generic-file-error'
         assert excinfo.value.message == 'some other error'
 
-    def test_send_signal_name(self):
-        self.client.responses.append({
+    def test_send_signal_name(self, client: MockClient):
+        client.responses.append({
             'result': True,
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
 
-        self.client.send_signal('SIGHUP', ['s1', 's2'])
+        client.send_signal('SIGHUP', ['s1', 's2'])
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/signals', None, {'signal': 'SIGHUP', 'services': ['s1', 's2']}),
         ]
 
     @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'signal constants not present')
-    def test_send_signal_number(self):
-        self.client.responses.append({
+    def test_send_signal_number(self, client: MockClient):
+        client.responses.append({
             'result': True,
             'status': 'OK',
             'status-code': 200,
             'type': 'sync',
         })
 
-        self.client.send_signal(signal.SIGHUP, ['s1', 's2'])
+        client.send_signal(signal.SIGHUP, ['s1', 's2'])
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/signals', None, {'signal': 'SIGHUP', 'services': ['s1', 's2']}),
         ]
 
-    def test_send_signal_type_error(self):
+    def test_send_signal_type_error(self, client: MockClient):
         with pytest.raises(TypeError):
-            self.client.send_signal('SIGHUP', 'should-be-a-list')
+            client.send_signal('SIGHUP', 'should-be-a-list')
 
         with pytest.raises(TypeError):
-            self.client.send_signal('SIGHUP', [1, 2])  # type: ignore
+            client.send_signal('SIGHUP', [1, 2])  # type: ignore
 
-    def test_get_checks_all(self):
-        self.client.responses.append({
+    def test_get_checks_all(self, client: MockClient):
+        client.responses.append({
             "result": [
                 {
                     "name": "chk1",
@@ -2837,7 +2853,7 @@ bad path\r
             "status-code": 200,
             "type": "sync"
         })
-        checks = self.client.get_checks()
+        checks = client.get_checks()
         assert len(checks) == 2
         assert checks[0].name == 'chk1'
         assert checks[0].level == pebble.CheckLevel.UNSET
@@ -2850,12 +2866,12 @@ bad path\r
         assert checks[1].failures == 5
         assert checks[1].threshold == 3
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/checks', {}, None),
         ]
 
-    def test_get_checks_filters(self):
-        self.client.responses.append({
+    def test_get_checks_filters(self, client: MockClient):
+        client.responses.append({
             "result": [
                 {
                     "name": "chk2",
@@ -2868,7 +2884,7 @@ bad path\r
             "status-code": 200,
             "type": "sync"
         })
-        checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
         assert checks[0].level == pebble.CheckLevel.READY
@@ -2876,12 +2892,12 @@ bad path\r
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
         ]
 
-    def test_checklevel_conversion(self):
-        self.client.responses.append({
+    def test_checklevel_conversion(self, client: MockClient):
+        client.responses.append({
             "result": [
                 {
                     "name": "chk2",
@@ -2894,7 +2910,7 @@ bad path\r
             "status-code": 200,
             "type": "sync"
         })
-        checks = self.client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
         assert checks[0].level == 'foobar!'  # stays a raw string
@@ -2902,12 +2918,12 @@ bad path\r
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
         ]
 
-    def test_notify_basic(self):
-        self.client.responses.append({
+    def test_notify_basic(self, client: MockClient):
+        client.responses.append({
             'result': {
                 'id': '123',
             },
@@ -2916,10 +2932,10 @@ bad path\r
             'type': 'sync',
         })
 
-        notice_id = self.client.notify(pebble.NoticeType.CUSTOM, 'example.com/a')
+        notice_id = client.notify(pebble.NoticeType.CUSTOM, 'example.com/a')
         assert notice_id == '123'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/notices', None, {
                 'action': 'add',
                 'key': 'example.com/a',
@@ -2927,8 +2943,8 @@ bad path\r
             }),
         ]
 
-    def test_notify_other_args(self):
-        self.client.responses.append({
+    def test_notify_other_args(self, client: MockClient):
+        client.responses.append({
             'result': {
                 'id': '321',
             },
@@ -2937,12 +2953,12 @@ bad path\r
             'type': 'sync',
         })
 
-        notice_id = self.client.notify(pebble.NoticeType.CUSTOM, 'example.com/a',
-                                       data={'k': 'v'},
-                                       repeat_after=datetime.timedelta(hours=3))
+        notice_id = client.notify(pebble.NoticeType.CUSTOM, 'example.com/a',
+                                  data={'k': 'v'},
+                                  repeat_after=datetime.timedelta(hours=3))
         assert notice_id == '321'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/notices', None, {
                 'action': 'add',
                 'key': 'example.com/a',
@@ -2952,8 +2968,8 @@ bad path\r
             }),
         ]
 
-    def test_get_notice(self):
-        self.client.responses.append({
+    def test_get_notice(self, client: MockClient):
+        client.responses.append({
             'result': {
                 'id': '123',
                 'user-id': 1000,
@@ -2969,28 +2985,28 @@ bad path\r
             'type': 'sync',
         })
 
-        notice = self.client.get_notice('123')
+        notice = client.get_notice('123')
 
         # No need to re-test full Notice.from_dict behaviour.
         assert notice.id == '123'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/notices/123', None, None),
         ]
 
-    def test_get_notice_not_found(self):
-        self.client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
+    def test_get_notice_not_found(self, client: MockClient):
+        client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
 
         with pytest.raises(pebble.APIError) as excinfo:
-            self.client.get_notice('1')
+            client.get_notice('1')
         assert excinfo.value.code == 404
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/notices/1', None, None),
         ]
 
-    def test_get_notices_all(self):
-        self.client.responses.append({
+    def test_get_notices_all(self, client: MockClient):
+        client.responses.append({
             'result': [{
                 'id': '123',
                 'user-id': 1000,
@@ -3014,17 +3030,17 @@ bad path\r
             'type': 'sync',
         })
 
-        checks = self.client.get_notices()
+        checks = client.get_notices()
         assert len(checks) == 2
         assert checks[0].id == '123'
         assert checks[1].id == '124'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/notices', {}, None),
         ]
 
-    def test_get_notices_filters(self):
-        self.client.responses.append({
+    def test_get_notices_filters(self, client: MockClient):
+        client.responses.append({
             'result': [{
                 'id': '123',
                 'user-id': 1000,
@@ -3048,7 +3064,7 @@ bad path\r
             'type': 'sync',
         })
 
-        notices = self.client.get_notices(
+        notices = client.get_notices(
             user_id=1000,
             users=pebble.NoticesUsers.ALL,
             types=[pebble.NoticeType.CUSTOM],
@@ -3064,12 +3080,12 @@ bad path\r
             'types': ['custom'],
             'keys': ['example.com/a', 'example.com/b'],
         }
-        assert self.client.requests == [
+        assert client.requests == [
             ('GET', '/v1/notices', query, None),
         ]
 
 
-class TestSocketClient(unittest.TestCase):
+class TestSocketClient:
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
         with pytest.raises(pebble.ConnectionError) as excinfo:
@@ -3099,7 +3115,7 @@ class TestSocketClient(unittest.TestCase):
             shutdown()
 
 
-class TestExecError(unittest.TestCase):
+class TestExecError:
     def test_init(self):
         e = pebble.ExecError(['foo'], 42, 'out', 'err')
         assert e.command == ['foo']
@@ -3146,18 +3162,11 @@ class MockWebsocket:
         pass
 
 
-class TestExec(unittest.TestCase):
-    def setUp(self):
-        self.client = MockClient()
-        self.time = MockTime()
-        time_patcher = unittest.mock.patch('ops.pebble.time', self.time)
-        time_patcher.start()
-        self.addCleanup(time_patcher.stop)
-
-    def add_responses(self, change_id: str, exit_code: int,
+class TestExec:
+    def add_responses(self, client: MockClient, change_id: str, exit_code: int,
                       change_err: typing.Optional[str] = None):
         task_id = f"T{change_id}"  # create a task_id based on change_id
-        self.client.responses.append({
+        client.responses.append({
             'change': change_id,
             'result': {'task-id': task_id},
         })
@@ -3168,14 +3177,14 @@ class TestExec(unittest.TestCase):
         change['tasks'][0]['data'] = {'exit-code': exit_code}
         if change_err is not None:
             change['err'] = change_err
-        self.client.responses.append({
+        client.responses.append({
             'result': change,
         })
 
         stdio = MockWebsocket()
         stderr = MockWebsocket()
         control = MockWebsocket()
-        self.client.websockets = {
+        client.websockets = {
             (task_id, 'stdio'): stdio,
             (task_id, 'stderr'): stderr,
             (task_id, 'control'): control,
@@ -3206,46 +3215,46 @@ class TestExec(unittest.TestCase):
             'split-stderr': not combine_stderr,
         }
 
-    def test_arg_errors(self):
+    def test_arg_errors(self, client: MockClient):
         with pytest.raises(TypeError):
-            self.client.exec('foo')  # type: ignore
+            client.exec('foo')  # type: ignore
         with pytest.raises(ValueError):
-            self.client.exec([])
+            client.exec([])
         with pytest.raises(ValueError):
-            self.client.exec(['foo'], stdin='s', encoding=None)  # type: ignore
+            client.exec(['foo'], stdin='s', encoding=None)  # type: ignore
         with pytest.raises(ValueError):
-            self.client.exec(['foo'], stdin=b's')
+            client.exec(['foo'], stdin=b's')
         with pytest.raises(TypeError):
-            self.client.exec(['foo'], stdin=123)  # type: ignore
+            client.exec(['foo'], stdin=123)  # type: ignore
         with pytest.raises(ValueError):
-            self.client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
-                             combine_stderr=True)
+            client.exec(['foo'], stdout=io.StringIO(), stderr=io.StringIO(),
+                        combine_stderr=True)
 
-    def test_no_wait_call(self):
-        self.add_responses('123', 0)
+    def test_no_wait_call(self, client: MockClient):
+        self.add_responses(client, '123', 0)
         with pytest.warns(ResourceWarning) as record:
-            process = self.client.exec(['true'])
+            process = client.exec(['true'])
             del process
-        self.assertEqual(str(record[0].message), 'ExecProcess instance garbage collected '
-                         + 'without call to wait() or wait_output()')
+        assert str(record[0].message) == \
+            'ExecProcess instance garbage collected without call to wait() or wait_output()'
 
-    def test_wait_exit_zero(self):
-        self.add_responses('123', 0)
+    def test_wait_exit_zero(self, client: MockClient):
+        self.add_responses(client, '123', 0)
 
-        process = self.client.exec(['true'])
+        process = client.exec(['true'])
         assert process.stdout is not None
         assert process.stderr is not None
         process.wait()
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['true'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_exit_nonzero(self):
-        self.add_responses('456', 1)
+    def test_wait_exit_nonzero(self, client: MockClient):
+        self.add_responses(client, '456', 1)
 
-        process = self.client.exec(['false'])
+        process = client.exec(['false'])
         with pytest.raises(pebble.ExecError) as excinfo:
             process.wait()
         assert excinfo.value.command == ['false']
@@ -3253,26 +3262,26 @@ class TestExec(unittest.TestCase):
         assert excinfo.value.stdout is None  # type: ignore
         assert excinfo.value.stderr is None  # type: ignore
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['false'])),
             ('GET', '/v1/changes/456/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_timeout(self):
-        self.add_responses('123', 0)
+    def test_wait_timeout(self, client: MockClient):
+        self.add_responses(client, '123', 0)
 
-        process = self.client.exec(['true'], timeout=2)
+        process = client.exec(['true'], timeout=2)
         process.wait()
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['true'], timeout=2)),
             ('GET', '/v1/changes/123/wait', {'timeout': '3.000s'}, None),
         ]
 
-    def test_wait_other_args(self):
-        self.add_responses('123', 0)
+    def test_wait_other_args(self, client: MockClient):
+        self.add_responses(client, '123', 0)
 
-        process = self.client.exec(
+        process = client.exec(
             ['true'],
             environment={'K1': 'V1', 'K2': 'V2'},
             working_dir='WD',
@@ -3283,7 +3292,7 @@ class TestExec(unittest.TestCase):
         )
         process.wait()
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(
                 command=['true'],
                 environment={'K1': 'V1', 'K2': 'V2'},
@@ -3296,24 +3305,24 @@ class TestExec(unittest.TestCase):
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_change_error(self):
-        self.add_responses('123', 0, change_err='change error!')
+    def test_wait_change_error(self, client: MockClient):
+        self.add_responses(client, '123', 0, change_err='change error!')
 
-        process = self.client.exec(['true'])
+        process = client.exec(['true'])
         with pytest.raises(pebble.ChangeError) as excinfo:
             process.wait()
         assert excinfo.value.err == 'change error!'
         assert excinfo.value.change.id == '123'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['true'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_send_signal(self):
-        _, _, control = self.add_responses('123', 0)
+    def test_send_signal(self, client: MockClient):
+        _, _, control = self.add_responses(client, '123', 0)
 
-        process = self.client.exec(['server'])
+        process = client.exec(['server'])
         process.send_signal('SIGHUP')
         num_sends = 1
         if hasattr(signal, 'SIGHUP'):
@@ -3323,7 +3332,7 @@ class TestExec(unittest.TestCase):
 
         process.wait()
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['server'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
@@ -3340,104 +3349,104 @@ class TestExec(unittest.TestCase):
             assert json.loads(control.sends[2][1]) == \
                 {'command': 'signal', 'signal': {'name': 'SIGHUP'}}
 
-    def test_wait_output(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'Python 3.8.10\n')
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['python3', '--version'])
+        process = client.exec(['python3', '--version'])
         out, err = process.wait_output()
         assert out == 'Python 3.8.10\n'
         assert err == ''
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
 
-    def test_wait_output_combine_stderr(self):
-        stdio, _, _ = self.add_responses('123', 0)
+    def test_wait_output_combine_stderr(self, client: MockClient):
+        stdio, _, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'invalid time interval\n')
         stdio.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['sleep', 'x'], combine_stderr=True)
+        process = client.exec(['sleep', 'x'], combine_stderr=True)
         out, err = process.wait_output()
         assert out == 'invalid time interval\n'
         assert err is None
         assert process.stderr is None
 
         exec_data = self.build_exec_data(['sleep', 'x'], combine_stderr=True)
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
 
-    def test_wait_output_bytes(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output_bytes(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'Python 3.8.10\n')
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['python3', '--version'], encoding=None)
+        process = client.exec(['python3', '--version'], encoding=None)
         out, err = process.wait_output()
         assert out == b'Python 3.8.10\n'
         assert err == b''
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
 
-    def test_wait_output_exit_nonzero(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output_exit_nonzero(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append(b'file not found: x\n')
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['ls', 'x'])
+        process = client.exec(['ls', 'x'])
         out, err = process.wait_output()
         assert out == ''
         assert err == 'file not found: x\n'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['ls', 'x'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
 
-    def test_wait_output_exit_nonzero_combine_stderr(self):
-        stdio, _, _ = self.add_responses('123', 0)
+    def test_wait_output_exit_nonzero_combine_stderr(self, client: MockClient):
+        stdio, _, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'file not found: x\n')
         stdio.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['ls', 'x'], combine_stderr=True)
+        process = client.exec(['ls', 'x'], combine_stderr=True)
         out, err = process.wait_output()
         assert out == 'file not found: x\n'
         assert err is None
 
         exec_data = self.build_exec_data(['ls', 'x'], combine_stderr=True)
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
 
-    def test_wait_output_send_stdin(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output_send_stdin(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'FOO\nBAR\n')
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['awk', '{ print toupper($) }'], stdin='foo\nbar\n')
+        process = client.exec(['awk', '{ print toupper($) }'], stdin='foo\nbar\n')
         out, err = process.wait_output()
         assert out == 'FOO\nBAR\n'
         assert err == ''
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
@@ -3446,19 +3455,19 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ]
 
-    def test_wait_output_send_stdin_bytes(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output_send_stdin_bytes(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'FOO\nBAR\n')
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['awk', '{ print toupper($) }'], stdin=b'foo\nbar\n',
-                                   encoding=None)
+        process = client.exec(['awk', '{ print toupper($) }'], stdin=b'foo\nbar\n',
+                              encoding=None)
         out, err = process.wait_output()
         assert out == b'FOO\nBAR\n'
         assert err == b''
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
@@ -3467,42 +3476,43 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ]
 
-    def test_wait_output_no_stdout(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output_no_stdout(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
         stdout_buffer = io.BytesIO()
-        process = self.client.exec(["echo", "FOOBAR"], stdout=stdout_buffer, encoding=None)
+        process = client.exec(["echo", "FOOBAR"], stdout=stdout_buffer, encoding=None)
         with pytest.raises(TypeError):
             process.wait_output()
 
-    def test_wait_output_bad_command(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_wait_output_bad_command(self, caplog: pytest.LogCaptureFixture, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'Python 3.8.10\n')
         stdio.receives.append('not json')  # bad JSON should be ignored
         stdio.receives.append('{"command":"foo"}')  # unknown command should be ignored
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
 
-        with self.assertLogs('ops.pebble', level='WARNING') as cm:
-            process = self.client.exec(['python3', '--version'])
+        with caplog.at_level(level='WARNING', logger='ops.pebble'):
+            process = client.exec(['python3', '--version'])
             out, err = process.wait_output()
-        assert cm.output == [
-            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
-            "WARNING:ops.pebble:Invalid I/O command 'foo'",
+        expected = [
+            "Cannot decode I/O command (invalid JSON)",
+            "Invalid I/O command 'foo'",
         ]
+        assert expected == [record.message for record in caplog.records]
 
         assert out == 'Python 3.8.10\n'
         assert err == ''
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['python3', '--version'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
 
-    def test_wait_passed_output(self):
-        io_ws, stderr, _ = self.add_responses('123', 0)
+    def test_wait_passed_output(self, client: MockClient):
+        io_ws, stderr, _ = self.add_responses(client, '123', 0)
         io_ws.receives.append(b'foo\n')
         io_ws.receives.append('{"command":"end"}')
         stderr.receives.append(b'some error\n')
@@ -3510,38 +3520,38 @@ class TestExec(unittest.TestCase):
 
         out = io.StringIO()
         err = io.StringIO()
-        process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err)
+        process = client.exec(['echo', 'foo'], stdout=out, stderr=err)
         process.wait()
         assert out.getvalue() == 'foo\n'
         assert err.getvalue() == 'some error\n'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert io_ws.sends == []
 
-    def test_wait_passed_output_combine_stderr(self):
-        io_ws, _, _ = self.add_responses('123', 0)
+    def test_wait_passed_output_combine_stderr(self, client: MockClient):
+        io_ws, _, _ = self.add_responses(client, '123', 0)
         io_ws.receives.append(b'foo\n')
         io_ws.receives.append(b'some error\n')
         io_ws.receives.append('{"command":"end"}')
 
         out = io.StringIO()
-        process = self.client.exec(['echo', 'foo'], stdout=out, combine_stderr=True)
+        process = client.exec(['echo', 'foo'], stdout=out, combine_stderr=True)
         process.wait()
         assert out.getvalue() == 'foo\nsome error\n'
         assert process.stderr is None
 
         exec_data = self.build_exec_data(['echo', 'foo'], combine_stderr=True)
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, exec_data),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert io_ws.sends == []
 
-    def test_wait_passed_output_bytes(self):
-        io_ws, stderr, _ = self.add_responses('123', 0)
+    def test_wait_passed_output_bytes(self, client: MockClient):
+        io_ws, stderr, _ = self.add_responses(client, '123', 0)
         io_ws.receives.append(b'foo\n')
         io_ws.receives.append('{"command":"end"}')
         stderr.receives.append(b'some error\n')
@@ -3549,19 +3559,22 @@ class TestExec(unittest.TestCase):
 
         out = io.BytesIO()
         err = io.BytesIO()
-        process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err, encoding=None)
+        process = client.exec(['echo', 'foo'], stdout=out, stderr=err, encoding=None)
         process.wait()
         assert out.getvalue() == b'foo\n'
         assert err.getvalue() == b'some error\n'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert io_ws.sends == []
 
-    def test_wait_passed_output_bad_command(self):
-        io_ws, stderr, _ = self.add_responses('123', 0)
+    def test_wait_passed_output_bad_command(
+            self,
+            caplog: pytest.LogCaptureFixture,
+            client: MockClient):
+        io_ws, stderr, _ = self.add_responses(client, '123', 0)
         io_ws.receives.append(b'foo\n')
         io_ws.receives.append('not json')  # bad JSON should be ignored
         io_ws.receives.append('{"command":"foo"}')  # unknown command should be ignored
@@ -3572,24 +3585,25 @@ class TestExec(unittest.TestCase):
         out = io.StringIO()
         err = io.StringIO()
 
-        with self.assertLogs('ops.pebble', level='WARNING') as cm:
-            process = self.client.exec(['echo', 'foo'], stdout=out, stderr=err)
+        with caplog.at_level(level='WARNING', logger='ops.pebble'):
+            process = client.exec(['echo', 'foo'], stdout=out, stderr=err)
             process.wait()
-        assert cm.output == [
-            "WARNING:ops.pebble:Cannot decode I/O command (invalid JSON)",
-            "WARNING:ops.pebble:Invalid I/O command 'foo'",
+        expected = [
+            "Cannot decode I/O command (invalid JSON)",
+            "Invalid I/O command 'foo'",
         ]
+        assert expected == [record.message for record in caplog.records]
 
         assert out.getvalue() == 'foo\n'
         assert err.getvalue() == 'some error\n'
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert io_ws.sends == []
 
-    def test_wait_file_io(self):
+    def test_wait_file_io(self, client: MockClient):
         fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
         out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
         err = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
@@ -3597,13 +3611,13 @@ class TestExec(unittest.TestCase):
             fin.write('foo\n')
             fin.seek(0)
 
-            io_ws, stderr, _ = self.add_responses('123', 0)
+            io_ws, stderr, _ = self.add_responses(client, '123', 0)
             io_ws.receives.append(b'foo\n')
             io_ws.receives.append('{"command":"end"}')
             stderr.receives.append(b'some error\n')
             stderr.receives.append('{"command":"end"}')
 
-            process = self.client.exec(['echo', 'foo'], stdin=fin, stdout=out, stderr=err)
+            process = client.exec(['echo', 'foo'], stdin=fin, stdout=out, stderr=err)
             process.wait()
 
             out.seek(0)
@@ -3611,7 +3625,7 @@ class TestExec(unittest.TestCase):
             err.seek(0)
             assert err.read() == 'some error\n'
 
-            assert self.client.requests == [
+            assert client.requests == [
                 ('POST', '/v1/exec', None, self.build_exec_data(['echo', 'foo'])),
                 ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
             ]
@@ -3624,13 +3638,13 @@ class TestExec(unittest.TestCase):
             out.close()
             err.close()
 
-    def test_wait_returned_io(self):
-        stdio = self.add_responses('123', 0)[0]
+    def test_wait_returned_io(self, client: MockClient):
+        stdio = self.add_responses(client, '123', 0)[0]
         stdio.receives.append(b'FOO BAR\n')
         stdio.receives.append(b'BAZZ\n')
         stdio.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['awk', '{ print toupper($) }'])
+        process = client.exec(['awk', '{ print toupper($) }'])
         assert process.stdout is not None and process.stdin is not None
         process.stdin.write('Foo Bar\n')
         assert process.stdout.read(4) == 'FOO '
@@ -3640,7 +3654,7 @@ class TestExec(unittest.TestCase):
         assert process.stdout.read() == ''
         process.wait()
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
@@ -3649,13 +3663,13 @@ class TestExec(unittest.TestCase):
             ('TXT', '{"command":"end"}'),
         ]
 
-    def test_wait_returned_io_bytes(self):
-        stdio = self.add_responses('123', 0)[0]
+    def test_wait_returned_io_bytes(self, client: MockClient):
+        stdio = self.add_responses(client, '123', 0)[0]
         stdio.receives.append(b'FOO BAR\n')
         stdio.receives.append(b'BAZZ\n')
         stdio.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['awk', '{ print toupper($) }'], encoding=None)
+        process = client.exec(['awk', '{ print toupper($) }'], encoding=None)
         assert process.stdout is not None and process.stdin is not None
         process.stdin.write(b'Foo Bar\n')
         assert process.stdout.read(4) == b'FOO '
@@ -3666,7 +3680,7 @@ class TestExec(unittest.TestCase):
         assert process.stdout.read() == b''
         process.wait()
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['awk', '{ print toupper($) }'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
@@ -3681,20 +3695,20 @@ class TestExec(unittest.TestCase):
             def _connect_websocket(self, change_id: str, websocket_id: str):
                 raise websocket.WebSocketException('conn!')
 
-        self.client = Client()
-        self.add_responses('123', 0, change_err='change error!')
+        client = Client()
+        self.add_responses(client, '123', 0, change_err='change error!')
         with pytest.raises(pebble.ChangeError) as excinfo:
-            self.client.exec(['foo'])
+            client.exec(['foo'])
         assert str(excinfo.value) == 'change error!'
 
-        self.client = Client()
-        self.add_responses('123', 0)
+        client = Client()
+        self.add_responses(client, '123', 0)
         with pytest.raises(pebble.ConnectionError) as excinfo:
-            self.client.exec(['foo'])
+            client.exec(['foo'])
         assert str(excinfo.value) in 'unexpected error connecting to websockets: conn!'
 
-    def test_websocket_send_raises(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_websocket_send_raises(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         raised = False
 
         def send_binary(b: bytes):
@@ -3706,13 +3720,13 @@ class TestExec(unittest.TestCase):
         stdio.receives.append('{"command":"end"}')
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['cat'], stdin='foo\nbar\n')
+        process = client.exec(['cat'], stdin='foo\nbar\n')
         out, err = process.wait_output()
         assert out == ''
         assert err == ''
         assert raised
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['cat'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
@@ -3724,8 +3738,8 @@ class TestExec(unittest.TestCase):
         test_websocket_send_raises = pytest.mark.filterwarnings(
             'ignore::pytest.PytestUnhandledThreadExceptionWarning')(test_websocket_send_raises)
 
-    def test_websocket_recv_raises(self):
-        stdio, stderr, _ = self.add_responses('123', 0)
+    def test_websocket_recv_raises(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
         raised = False
 
         def recv():
@@ -3736,13 +3750,13 @@ class TestExec(unittest.TestCase):
         stdio.recv = recv
         stderr.receives.append('{"command":"end"}')
 
-        process = self.client.exec(['cat'], stdin='foo\nbar\n')
+        process = client.exec(['cat'], stdin='foo\nbar\n')
         out, err = process.wait_output()
         assert out == ''
         assert err == ''
         assert raised
 
-        assert self.client.requests == [
+        assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['cat'])),
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
