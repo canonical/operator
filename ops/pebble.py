@@ -3076,9 +3076,9 @@ class _FilesParser:
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
         newline = '' if encoding else None
-        file_io = open(
+        file_io = open(  # noqa: SIM115
             self._files[path].name,
-            mode,  # noqa: SIM115
+            mode,
             encoding=encoding,
             newline=newline,
         )
