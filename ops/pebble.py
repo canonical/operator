@@ -2807,9 +2807,9 @@ class Client:
                 process_stderr = _WebsocketReader(ws)
                 if encoding is not None:
                     process_stderr = io.TextIOWrapper(
-                        process_stderr,
+                        process_stderr,  # type: ignore
                         encoding=encoding,
-                        newline='',  # type: ignore
+                        newline='',
                     )
 
         process: ExecProcess[Any] = ExecProcess(
