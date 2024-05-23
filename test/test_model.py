@@ -1605,8 +1605,7 @@ containers:
         assert container.pebble.requests == [('replan',)]  # type: ignore
 
     def test_can_connect(self, container: ops.Container):
-        container.pebble.responses.append(
-            pebble.SystemInfo.from_dict({'version': '1.0.0'}))  # type: ignore
+        container.pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))  # type: ignore
         assert container.can_connect()
         assert container.pebble.requests == [('get_system_info',)]  # type: ignore
 
@@ -1761,8 +1760,7 @@ containers:
 
     def test_get_service(self, container: ops.Container):
         # Single service returned successfully
-        container.pebble.responses.append(
-            [self._make_service('s1', 'enabled', 'active')])  # type: ignore
+        container.pebble.responses.append([self._make_service('s1', 'enabled', 'active')])  # type: ignore
         s = container.get_service('s1')
         assert container.pebble.requests == [('get_services', ('s1', ))]  # type: ignore
         assert s.name == 's1'
@@ -1943,8 +1941,7 @@ containers:
         ]
 
     def test_can_connect_simple(self, container: ops.Container):
-        container.pebble.responses.append(
-            pebble.SystemInfo.from_dict({'version': '1.0.0'}))  # type: ignore
+        container.pebble.responses.append(pebble.SystemInfo.from_dict({'version': '1.0.0'}))  # type: ignore
         assert container.can_connect()
 
     def test_can_connect_connection_error(
