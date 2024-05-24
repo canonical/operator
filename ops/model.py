@@ -1012,7 +1012,7 @@ def _cast_network_address(raw: str) -> Union[ipaddress.IPv4Address, ipaddress.IP
     try:
         return ipaddress.ip_address(raw)
     except ValueError:
-        logger.debug("could not cast %s to IPv4/v6 address", raw)
+        logger.debug('could not cast %s to IPv4/v6 address', raw)
         return raw
 
 
