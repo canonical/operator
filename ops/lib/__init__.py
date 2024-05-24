@@ -142,7 +142,7 @@ def _find_all_specs(path: typing.Iterable[str]) -> typing.Iterator[ModuleSpec]:
             except (FileNotFoundError, NotADirectoryError):
                 continue
             except OSError as e:
-                logger.debug("  Tried '%s': %s", opslib, e) # *lots* of things checked here
+                logger.debug("  Tried '%s': %s", opslib, e)  # *lots* of things checked here
                 continue
             else:
                 logger.debug("  Trying '%s'", opslib)
