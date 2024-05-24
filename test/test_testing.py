@@ -4100,6 +4100,9 @@ class TestTestingPebbleClient:
             client.send_signal("SIGINT", ("foo", "bar",))
 
 
+PebbleClientType = typing.Union[_TestingPebbleClient, pebble.Client]
+
+
 # For testing file-ops of the pebble client.  This is refactored into a
 # separate mixin so we can run these tests against both the mock client as
 # well as a real pebble server instance.
@@ -4107,7 +4110,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_and_pull_bytes(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         self._test_push_and_pull_data(
             pebble_dir,
@@ -4119,7 +4122,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_and_pull_non_utf8_data(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         self._test_push_and_pull_data(
             pebble_dir,
@@ -4131,7 +4134,7 @@ class PebbleStorageAPIsTestMixin:
     def _test_push_and_pull_data(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
         original_data: typing.Union[str, bytes],
         encoding: typing.Optional[str],
         stream_class: typing.Union[typing.Type[io.BytesIO], typing.Type[io.StringIO]],
@@ -4161,7 +4164,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_bytes_ignore_encoding(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         # push() encoding param should be ignored if source is bytes
         client.push(f"{pebble_dir}/test", b'\x00\x01', encoding='utf-8')
@@ -4172,7 +4175,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_bytesio_ignore_encoding(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         # push() encoding param should be ignored if source is binary stream
         client.push(f"{pebble_dir}/test", io.BytesIO(b'\x00\x01'), encoding='utf-8')
@@ -4183,7 +4186,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_and_pull_larger_file(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         # Intent: to ensure things work appropriately with larger files.
         # Larger files may be sent/received in multiple chunks; this should help for
@@ -4199,7 +4202,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_to_non_existent_subdir(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         data = 'data'
 
@@ -4212,7 +4215,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_as_child_of_file_raises_error(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         data = 'data'
         client.push(f"{pebble_dir}/file", data)
@@ -4223,7 +4226,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_with_permission_mask(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         data = 'data'
         client.push(f"{pebble_dir}/file", data, permissions=0o600)
@@ -4241,7 +4244,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_files_and_list(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         data = 'data'
 
@@ -4270,7 +4273,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_and_list_file(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         data = 'data'
         client.push(f"{pebble_dir}/file", data)
@@ -4279,7 +4282,7 @@ class PebbleStorageAPIsTestMixin:
 
     def test_push_file_with_relative_path_fails(
         self,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.push('file', '')
@@ -4287,7 +4290,7 @@ class PebbleStorageAPIsTestMixin:
 
     def test_pull_not_found(
         self,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.pull("/not/found")
@@ -4297,7 +4300,7 @@ class PebbleStorageAPIsTestMixin:
     def test_pull_directory(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         client.make_dir(f"{pebble_dir}/subdir")
         with pytest.raises(pebble.PathError) as excinfo:
@@ -4307,7 +4310,7 @@ class PebbleStorageAPIsTestMixin:
 
     def test_list_files_not_found_raises(
         self,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         with pytest.raises(pebble.APIError) as excinfo:
             client.list_files("/not/existing/file/")
@@ -4319,7 +4322,7 @@ class PebbleStorageAPIsTestMixin:
     def test_list_directory_object_itself(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         # Test with root dir
         # (Special case; we won't prefix this, even when using the real Pebble server.)
@@ -4341,7 +4344,7 @@ class PebbleStorageAPIsTestMixin:
     def test_push_files_and_list_by_pattern(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         # Note: glob pattern deltas do exist between golang and Python, but here,
         # we'll just use a simple * pattern.
@@ -4360,7 +4363,7 @@ class PebbleStorageAPIsTestMixin:
     def test_make_directory(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         client.make_dir(f"{pebble_dir}/subdir")
         assert client.list_files(f"{pebble_dir}/", pattern='subdir')[0].path == \
@@ -4372,7 +4375,7 @@ class PebbleStorageAPIsTestMixin:
     def test_make_directory_recursively(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir(f"{pebble_dir}/subdir/subdir", make_parents=False)
@@ -4384,7 +4387,7 @@ class PebbleStorageAPIsTestMixin:
 
     def test_make_directory_with_relative_path_fails(
         self,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         with pytest.raises(pebble.PathError) as excinfo:
             client.make_dir('dir')
@@ -4393,7 +4396,7 @@ class PebbleStorageAPIsTestMixin:
     def test_make_subdir_of_file_fails(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         client.push(f"{pebble_dir}/file", 'data')
 
@@ -4410,7 +4413,7 @@ class PebbleStorageAPIsTestMixin:
     def test_make_dir_with_permission_mask(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         client.make_dir(f"{pebble_dir}/dir1", permissions=0o700)
         client.make_dir(f"{pebble_dir}/dir2", permissions=0o777)
@@ -4432,7 +4435,7 @@ class PebbleStorageAPIsTestMixin:
     def test_remove_path(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         client.push(f"{pebble_dir}/file", '')
         client.make_dir(f"{pebble_dir}/dir/subdir", make_parents=True)
@@ -4492,7 +4495,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         harness.cleanup()
 
     @pytest.fixture
-    def pebble_dir(self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+    def pebble_dir(self, client: PebbleClientType):
         pebble_dir = '/prefix'
         client.make_dir(pebble_dir, make_parents=True)
         return pebble_dir
@@ -4574,7 +4577,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
     def test_push_with_ownership(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         data = 'data'
         user, group = self._select_testing_user_group()
@@ -4618,7 +4621,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
     def test_make_dir_with_ownership(
         self,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         user, group = self._select_testing_user_group()
         cases: typing.List[_MakedirArgs] = [
@@ -4665,7 +4668,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         getpwuid: MagicMock,
         getgrgid: MagicMock,
         pebble_dir: str,
-        client: typing.Union[_TestingPebbleClient, pebble.Client],
+        client: PebbleClientType,
     ):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
@@ -5793,7 +5796,6 @@ class TestActions:
         action_results: typing.Dict[str, typing.Any],
         harness: ops.testing.Harness[ops.CharmBase],
     ):
-        action_results.clear()
         action_results["partial"] = "foo"
         with pytest.raises(ops.testing.ActionFailed) as excinfo:
             harness.run_action("fail")
@@ -5829,24 +5831,26 @@ class TestActions:
         out = harness.run_action("log-and-results", {"foo": "baz", "bar": 28})
         assert out.results == {"result1": "baz", "result2": 28}
 
+    @pytest.mark.parametrize('prohibited_key', [
+        "stdout", "stdout-encoding", "stderr", "stderr-encoding"
+    ])
     def test_bad_results(
         self,
         action_results: typing.Dict[str, typing.Any],
         harness: ops.testing.Harness[ops.CharmBase],
+        prohibited_key: str,
     ):
-        # We can't have results that collide when flattened.
-        action_results.clear()
         action_results["a"] = {"b": 1}
         action_results["a.b"] = 2
         with pytest.raises(ValueError):
             harness.run_action("results")
+
         # There are some result key names we cannot use.
-        prohibited_keys = "stdout", "stdout-encoding", "stderr", "stderr-encoding"
-        for key in prohibited_keys:
-            action_results.clear()
-            action_results[key] = "foo"
-            with pytest.raises(ops.ModelError):
-                harness.run_action("results")
+        action_results.clear()
+        action_results[prohibited_key] = "foo"
+        with pytest.raises(ops.ModelError):
+            harness.run_action("results")
+
         # There are some additional rules around what result keys are valid.
         action_results.clear()
         action_results["A"] = "foo"
@@ -5970,7 +5974,7 @@ class TestNotify:
 
 
 class PebbleNoticesMixin:
-    def test_get_notice_by_id(self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+    def test_get_notice_by_id(self, client: PebbleClientType):
         key1 = 'example.com/' + os.urandom(16).hex()
         key2 = 'example.com/' + os.urandom(16).hex()
         id1 = client.notify(pebble.NoticeType.CUSTOM, key1)
@@ -6001,7 +6005,7 @@ class PebbleNoticesMixin:
         assert notice.repeat_after is None
         assert notice.expire_after == datetime.timedelta(days=7)
 
-    def test_get_notices(self, client: typing.Union[_TestingPebbleClient, pebble.Client]):
+    def test_get_notices(self, client: PebbleClientType):
         key1 = 'example.com/' + os.urandom(16).hex()
         key2 = 'example.com/' + os.urandom(16).hex()
         key3 = 'example.com/' + os.urandom(16).hex()
