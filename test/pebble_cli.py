@@ -40,9 +40,11 @@ def main():
     p.add_argument('change_id', help='ID of change to abort')
 
     p = subparsers.add_parser('ack', help='acknowledge warnings up to given time')
-    p.add_argument('--timestamp', help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zz'
-                                       'format), default current time',
-                   type=timeconv.parse_rfc3339)
+    p.add_argument(
+        '--timestamp',
+        help='time to acknowledge up to (YYYY-mm-ddTHH:MM:SS.f+ZZ:zzformat), default current time',
+        type=timeconv.parse_rfc3339,
+    )
 
     p = subparsers.add_parser('add', help='add a configuration layer dynamically')
     p.add_argument('--combine', action='store_true', help='combine layer instead of appending')
@@ -55,39 +57,58 @@ def main():
     p.add_argument('change_id', help='ID of change to fetch')
 
     p = subparsers.add_parser('changes', help='show (filtered) changes')
-    p.add_argument('--select', help='change state to filter on, default %(default)s',
-                   choices=[s.value for s in pebble.ChangeState], default='all')
+    p.add_argument(
+        '--select',
+        help='change state to filter on, default %(default)s',
+        choices=[s.value for s in pebble.ChangeState],
+        default='all',
+    )
     p.add_argument('--service', help='optional service name to filter on')
 
     p = subparsers.add_parser('checks', help='show (filtered) checks')
-    p.add_argument('--level', help='check level to filter on, default all levels',
-                   choices=[c.value for c in pebble.CheckLevel], default='')
+    p.add_argument(
+        '--level',
+        help='check level to filter on, default all levels',
+        choices=[c.value for c in pebble.CheckLevel],
+        default='',
+    )
     p.add_argument('name', help='check name(s) to filter on', nargs='*')
 
     p = subparsers.add_parser('exec', help='execute a command')
     p.add_argument('--context', help='service context')
-    p.add_argument('--env', help='environment variables to set', action='append',
-                   metavar='KEY=VALUE')
+    p.add_argument(
+        '--env', help='environment variables to set', action='append', metavar='KEY=VALUE'
+    )
     p.add_argument('--working-dir', help='working directory to run command in')
-    p.add_argument('--io-mode', help='input/output mode, default %(default)r',
-                   choices=['passthrough', 'string'], default='passthrough')
+    p.add_argument(
+        '--io-mode',
+        help='input/output mode, default %(default)r',
+        choices=['passthrough', 'string'],
+        default='passthrough',
+    )
     p.add_argument('-t', '--timeout', type=float, help='timeout in seconds')
     p.add_argument('-u', '--user', help='user to run as')
     p.add_argument('-g', '--group', help='group to run as')
-    p.add_argument('--encoding', help="input/output encoding or 'none', default %(default)r",
-                   default='utf-8')
+    p.add_argument(
+        '--encoding', help="input/output encoding or 'none', default %(default)r", default='utf-8'
+    )
     p.add_argument('--combine-stderr', help='combine stderr into stdout', action='store_true')
     p.add_argument('exec_command', help='command and arguments', nargs='+', metavar='command')
 
     p = subparsers.add_parser('ls', help='list files')
-    p.add_argument('-d', '--directory', action='store_true',
-                   help='list directories themselves, not their contents')
+    p.add_argument(
+        '-d',
+        '--directory',
+        action='store_true',
+        help='list directories themselves, not their contents',
+    )
     p.add_argument('-p', '--pattern', help='glob pattern to filter results')
     p.add_argument('path', help='name of directory or file')
 
     p = subparsers.add_parser('mkdir', help='create directory')
-    p.add_argument('-p', '--parents', action='store_true',
-                   help='create parent directories if needed')
+    p.add_argument(
+        '-p', '--parents', action='store_true', help='create parent directories if needed'
+    )
     p.add_argument('path', help='path to create')
 
     p = subparsers.add_parser('plan', help='show configuration plan (combined layers)')
@@ -105,8 +126,9 @@ def main():
     p.add_argument('remote_path', help='path of remote file to copy to')
 
     p = subparsers.add_parser('rm', help='remove path')
-    p.add_argument('-r', '--recursive', action='store_true',
-                   help='recursively delete directory contents')
+    p.add_argument(
+        '-r', '--recursive', action='store_true', help='recursively delete directory contents'
+    )
     p.add_argument('path', help='path to remove')
 
     p = subparsers.add_parser('services', help='show service status')
@@ -125,8 +147,12 @@ def main():
     p.add_argument('change_id', help='ID of change to wait for')
 
     p = subparsers.add_parser('warnings', help='show (filtered) warnings')
-    p.add_argument('--select', help='warning state to filter on, default %(default)s',
-                   choices=[s.value for s in pebble.WarningState], default='all')
+    p.add_argument(
+        '--select',
+        help='warning state to filter on, default %(default)s',
+        choices=[s.value for s in pebble.WarningState],
+        default='all',
+    )
 
     args = parser.parse_args()
 
@@ -162,8 +188,9 @@ def main():
         elif args.command == 'change':
             result = client.get_change(pebble.ChangeID(args.change_id))
         elif args.command == 'changes':
-            result = client.get_changes(select=pebble.ChangeState(args.select),
-                                        service=args.service)
+            result = client.get_changes(
+                select=pebble.ChangeState(args.select), service=args.service
+            )
         elif args.command == 'checks':
             result = client.get_checks(level=pebble.CheckLevel(args.level), names=args.name)
         elif args.command == 'exec':
@@ -243,9 +270,13 @@ def main():
         elif args.command == 'push':
             with open(args.local_path, 'rb') as f:
                 client.push(
-                    args.remote_path, f, make_dirs=args.dirs,
+                    args.remote_path,
+                    f,
+                    make_dirs=args.dirs,
                     permissions=int(args.mode, 8) if args.mode is not None else None,
-                    user=args.user, group=args.group)
+                    user=args.user,
+                    group=args.group,
+                )
             result = f'wrote {args.local_path} to remote file {args.remote_path}'
         elif args.command == 'rm':
             client.remove_path(args.path, recursive=bool(args.recursive))
@@ -268,8 +299,7 @@ def main():
         print(f'APIError: {e.code} {e.status}: {e.message}', file=sys.stderr)
         sys.exit(1)
     except pebble.ConnectionError as e:
-        print(f'ConnectionError: cannot connect to socket {socket_path!r}: {e}',
-              file=sys.stderr)
+        print(f'ConnectionError: cannot connect to socket {socket_path!r}: {e}', file=sys.stderr)
         sys.exit(1)
     except pebble.ChangeError as e:
         print('ChangeError:', e, file=sys.stderr)

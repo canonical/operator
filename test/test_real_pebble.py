@@ -66,33 +66,37 @@ def client():
 )
 class TestRealPebble:
     def test_checks_and_health(self, client: pebble.Client):
-        client.add_layer('layer', {
-            'checks': {
-                'bad': {
-                    'override': 'replace',
-                    'level': 'ready',
-                    'period': '50ms',
-                    'threshold': 2,
-                    'exec': {
-                        'command': 'sleep x',
+        client.add_layer(
+            'layer',
+            {
+                'checks': {
+                    'bad': {
+                        'override': 'replace',
+                        'level': 'ready',
+                        'period': '50ms',
+                        'threshold': 2,
+                        'exec': {
+                            'command': 'sleep x',
+                        },
                     },
-                },
-                'good': {
-                    'override': 'replace',
-                    'level': 'alive',
-                    'period': '50ms',
-                    'exec': {
-                        'command': 'echo foo',
+                    'good': {
+                        'override': 'replace',
+                        'level': 'alive',
+                        'period': '50ms',
+                        'exec': {
+                            'command': 'echo foo',
+                        },
                     },
-                },
-                'other': {
-                    'override': 'replace',
-                    'exec': {
-                        'command': 'echo bar',
+                    'other': {
+                        'override': 'replace',
+                        'exec': {
+                            'command': 'echo bar',
+                        },
                     },
                 },
             },
-        }, combine=True)
+            combine=True,
+        )
 
         # Checks should all be "up" initially
         checks = client.get_checks()
@@ -217,7 +221,7 @@ class TestRealPebble:
         with tempfile.TemporaryDirectory() as temp_dir:
             process = client.exec(['pwd'], working_dir=temp_dir)
             out, err = process.wait_output()
-            assert out == f"{temp_dir}\n"
+            assert out == f'{temp_dir}\n'
             assert err == ''
 
     def test_exec_environment(self, client: pebble.Client):
@@ -274,30 +278,34 @@ class TestRealPebble:
         assert reads == [b'one\n', b'2\n', b'THREE\n']
 
     def test_log_forwarding(self, client: pebble.Client):
-        client.add_layer("log-forwarder", {
-            "services": {
-                "tired": {
-                    "override": "replace",
-                    "command": "sleep 1",
+        client.add_layer(
+            'log-forwarder',
+            {
+                'services': {
+                    'tired': {
+                        'override': 'replace',
+                        'command': 'sleep 1',
+                    },
+                },
+                'log-targets': {
+                    'pretend-loki': {
+                        'type': 'loki',
+                        'override': 'replace',
+                        'location': 'https://example.com',
+                        'services': ['all'],
+                        'labels': {'foo': 'bar'},
+                    },
                 },
             },
-            "log-targets": {
-                "pretend-loki": {
-                    "type": "loki",
-                    "override": "replace",
-                    "location": "https://example.com",
-                    "services": ["all"],
-                    "labels": {"foo": "bar"},
-                },
-            },
-        }, combine=True)
+            combine=True,
+        )
         plan = client.get_plan()
         assert len(plan.log_targets) == 1
-        assert plan.log_targets["pretend-loki"].type == "loki"
-        assert plan.log_targets["pretend-loki"].override == "replace"
-        assert plan.log_targets["pretend-loki"].location == "https://example.com"
-        assert plan.log_targets["pretend-loki"].services == ["all"]
-        assert plan.log_targets["pretend-loki"].labels == {"foo": "bar"}
+        assert plan.log_targets['pretend-loki'].type == 'loki'
+        assert plan.log_targets['pretend-loki'].override == 'replace'
+        assert plan.log_targets['pretend-loki'].location == 'https://example.com'
+        assert plan.log_targets['pretend-loki'].services == ['all']
+        assert plan.log_targets['pretend-loki'].labels == {'foo': 'bar'}
 
 
 @pytest.mark.skipif(

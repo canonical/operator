@@ -43,5 +43,5 @@ class SmokeCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main(SmokeCharm)
