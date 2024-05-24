@@ -422,9 +422,7 @@ class ObjectEvents(Object):
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = (
-            weakref.WeakKeyDictionary()
-        )
+        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter: Object, emitter_type: 'Type[Object]'):
         if emitter is None:
