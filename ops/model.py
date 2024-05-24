@@ -96,16 +96,6 @@ _NetworkDict = TypedDict(
 )
 
 
-# Copied from typeshed.
-_KT = typing.TypeVar('_KT')
-_VT_co = typing.TypeVar('_VT_co', covariant=True)
-
-
-class _SupportsKeysAndGetItem(typing.Protocol[_KT, _VT_co]):
-    def keys(self) -> typing.Iterable[_KT]: ...
-    def __getitem__(self, __key: _KT) -> _VT_co: ...
-
-
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -1022,7 +1012,7 @@ def _cast_network_address(raw: str) -> Union[ipaddress.IPv4Address, ipaddress.IP
     try:
         return ipaddress.ip_address(raw)
     except ValueError:
-        logger.debug(f'could not cast {raw} to IPv4/v6 address')
+        logger.debug("could not cast %s to IPv4/v6 address", raw)
         return raw
 
 
@@ -1779,7 +1769,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
-    def update(self, other: _SupportsKeysAndGetItem[str, str], **kwargs: str):
+    def update(self, other: typing.Any = (), /, **kwargs: str):
         """Update the data from dict/iterable other and the kwargs."""
         super().update(other, **kwargs)
 

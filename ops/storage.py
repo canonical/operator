@@ -59,7 +59,7 @@ class SQLiteStorage:
 
         if not os.path.exists(str(filename)):
             # sqlite3.connect creates the file silently if it does not exist
-            logger.debug(f'Initializing SQLite local storage: {filename}.')
+            logger.debug("Initializing SQLite local storage: %s.", filename)
 
         if filename != ':memory:':
             self._ensure_db_permissions(str(filename))

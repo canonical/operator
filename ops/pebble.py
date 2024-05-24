@@ -1704,7 +1704,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter', encoding:
             command = payload.get('command')
             if command != 'end':
                 # A command we don't recognize, keep going
-                logger.warning(f'Invalid I/O command {command!r}')
+                logger.warning('Invalid I/O command %r', command)
                 continue
             # Received "end" command (EOF signal), stop thread
             break
@@ -1767,7 +1767,7 @@ class _WebsocketReader(io.BufferedIOBase):
                 command = payload.get('command')
                 if command != 'end':
                     # A command we don't recognize, keep going
-                    logger.warning(f'Invalid I/O command {command!r}')
+                    logger.warning('Invalid I/O command %r', command)
                     continue
                 # Received "end" command, return EOF designator
                 self.eof = True
