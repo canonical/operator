@@ -107,14 +107,22 @@ def test_supports_exec_service_context():
         'foo.bar',
         'foo.bar.baz',
         'dead.beef.ca.fe',
-        '1234567890.2.1',  # The major version is too long.
-        '0.2..1',  # Two periods next to each other.
-        '1.21.alpha1',  # Tag comes after period.
-        '1.21-alpha',  # No patch number but a tag is present.
-        '1.21-alpha1beta',  # Non-numeric string after the patch number.
-        '1.21-alpha-dev',  # Tag duplication.
-        '1.21-alpha_dev3',  # Underscore in a tag.
-        '1.21-alpha123dev3',  # Non-numeric string after the patch number.
+        # The major version is too long.
+        '1234567890.2.1',
+        # Two periods next to each other.
+        '0.2..1',
+        # Tag comes after period.
+        '1.21.alpha1',
+        # No patch number but a tag is present.
+        '1.21-alpha',
+        # Non-numeric string after the patch number.
+        '1.21-alpha1beta',
+        # Tag duplication.
+        '1.21-alpha-dev',
+        # Underscore in a tag.
+        '1.21-alpha_dev3',
+        # Non-numeric string after the patch number.
+        '1.21-alpha123dev3',
     ],
 )
 def test_parsing_errors(invalid_version: str):
