@@ -73,7 +73,7 @@ aggressive = 3
 [tool.ruff]
 line-length = 99
 target-version = "py38"
-exclude = ["docs"]
+extend-exclude = ["docs"]
 
 # Ruff formatter configuration
 [tool.ruff.format]
