@@ -34,7 +34,6 @@ import tempfile
 import threading
 import time
 import typing
-import unittest
 import urllib.error
 import urllib.request
 import uuid
@@ -56,15 +55,16 @@ def get_socket_path() -> str:
     return socket_path
 
 
+@pytest.fixture
+def client():
+    return pebble.Client(socket_path=get_socket_path())
+
+
 @pytest.mark.skipif(
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
 class TestRealPebble:
-    @pytest.fixture
-    def client(self):
-        return pebble.Client(socket_path=get_socket_path())
-
     def test_checks_and_health(self, client: pebble.Client):
         client.add_layer(
             'layer',
@@ -312,19 +312,18 @@ class TestRealPebble:
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
-class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsTestMixin):
-    def setUp(self):
+class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
+    @pytest.fixture
+    def pebble_dir(self):
         pebble_path = os.getenv('PEBBLE')
         assert pebble_path is not None
-        self.prefix = tempfile.mkdtemp(dir=pebble_path)
-        self.client = pebble.Client(socket_path=get_socket_path())
-
-    def tearDown(self):
-        shutil.rmtree(self.prefix)
+        pebble_dir = tempfile.mkdtemp(dir=pebble_path)
+        yield pebble_dir
+        shutil.rmtree(pebble_dir)
 
     # Remove this entirely once the associated bug is fixed; it overrides the original test in the
     # test mixin class.
-    @unittest.skip('pending resolution of https://github.com/canonical/pebble/issues/80')
+    @pytest.mark.skip(reason='pending resolution of https://github.com/canonical/pebble/issues/80')
     def test_make_dir_with_permission_mask(self):
         pass
 
@@ -333,6 +332,5 @@ class TestPebbleStorageAPIsUsingRealPebble(unittest.TestCase, PebbleStorageAPIsT
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
-class TestNoticesUsingRealPebble(unittest.TestCase, PebbleNoticesMixin):
-    def setUp(self):
-        self.client = pebble.Client(socket_path=get_socket_path())
+class TestNoticesUsingRealPebble(PebbleNoticesMixin):
+    pass
