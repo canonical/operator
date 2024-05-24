@@ -2749,7 +2749,7 @@ class Client:
         change_id = resp['change']
         task_id = resp['result']['task-id']
 
-        stderr_ws: Optional['_WebSocket'] = None
+        stderr_ws: Optional[_WebSocket] = None
         try:
             control_ws = self._connect_websocket(task_id, 'control')
             stdio_ws = self._connect_websocket(task_id, 'stdio')
@@ -2834,7 +2834,7 @@ class Client:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self.socket_path)
         url = self._websocket_url(task_id, websocket_id)
-        ws: '_WebSocket' = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
+        ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
         ws.connect(url, socket=sock)
         return ws
 

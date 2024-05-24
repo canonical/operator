@@ -24,7 +24,6 @@ import re
 import sys
 import typing
 from pathlib import Path
-from test.test_helpers import FakeScript
 from unittest.mock import patch
 
 import pytest
@@ -33,6 +32,7 @@ import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
 from ops.model import _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
+from test.test_helpers import FakeScript
 
 
 def create_model():

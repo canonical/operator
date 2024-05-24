@@ -1696,7 +1696,7 @@ class JujuAssumes:
         condition: JujuAssumesCondition = JujuAssumesCondition.ALL,
     ) -> 'JujuAssumes':
         """Create new JujuAssumes object from list parsed from YAML."""
-        features: List[Union[str, 'JujuAssumes']] = []
+        features: List[Union[str, JujuAssumes]] = []
         for feature in raw:
             if isinstance(feature, str):
                 features.append(feature)

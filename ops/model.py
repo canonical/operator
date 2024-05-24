@@ -117,7 +117,7 @@ class Model:
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        relations: Dict[str, 'ops.RelationMeta'] = meta.relations
+        relations: Dict[str, ops.RelationMeta] = meta.relations
         self._relations = RelationMapping(
             relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
         )
@@ -352,7 +352,7 @@ class Application:
         self._cache = cache
         self._is_our_app = self.name == self._backend.app_name
         self._status = None
-        self._collected_statuses: 'List[StatusBase]' = []
+        self._collected_statuses: List[StatusBase] = []
 
     def _invalidate(self):
         self._status = None
@@ -523,7 +523,7 @@ class Unit:
         self._cache = cache
         self._is_our_unit = self.name == self._backend.unit_name
         self._status = None
-        self._collected_statuses: 'List[StatusBase]' = []
+        self._collected_statuses: List[StatusBase] = []
 
         if self._is_our_unit and hasattr(meta, 'containers'):
             containers: _ContainerMeta_Raw = meta.containers
@@ -1603,7 +1603,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
 
     def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
-        self._data: Dict[Union['Unit', 'Application'], RelationDataContent] = {
+        self._data: Dict[Union[Unit, Application], RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
         }

@@ -2189,7 +2189,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         """
         if not charm_config:
             return {}
-        cfg: Dict[str, '_ConfigOption'] = charm_config.get('options', {})
+        cfg: Dict[str, _ConfigOption] = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in cfg.items()}
 
     def _config_set(self, key: str, value: Union[str, int, float, bool]):

@@ -20,7 +20,6 @@ import json
 import signal
 import socket
 import tempfile
-import test.fake_pebble as fake_pebble
 import typing
 import unittest
 import unittest.mock
@@ -29,6 +28,7 @@ import unittest.util
 import pytest
 import websocket  # type: ignore
 
+import test.fake_pebble as fake_pebble
 from ops import pebble
 from ops._private import yaml
 
@@ -348,7 +348,7 @@ single log
         assert change.data == {}
 
     def test_change_from_dict(self):
-        d: 'pebble._ChangeDict' = {
+        d: pebble._ChangeDict = {
             'id': '70',
             'kind': 'autostart',
             'err': 'SILLY',

@@ -422,7 +422,7 @@ class ObjectEvents(Object):
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] = (
+        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = (
             weakref.WeakKeyDictionary()
         )
 
@@ -639,7 +639,7 @@ class Framework(Object):
             logger.warning('deprecated: Framework now takes a Storage not a path')
             storage = SQLiteStorage(storage)
         # TODO(benhoyt): should probably have a Storage protocol
-        self._storage: 'SQLiteStorage' = storage  # type: ignore
+        self._storage: SQLiteStorage = storage  # type: ignore
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)

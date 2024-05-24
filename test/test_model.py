@@ -23,7 +23,6 @@ import tempfile
 import typing
 import unittest
 from collections import OrderedDict
-from test.test_helpers import FakeScript
 from textwrap import dedent
 from unittest.mock import MagicMock, patch
 
@@ -34,6 +33,7 @@ import ops.testing
 from ops import pebble
 from ops._private import yaml
 from ops.model import _ModelBackend
+from test.test_helpers import FakeScript
 
 
 @pytest.fixture
@@ -1016,7 +1016,7 @@ class TestModel:
 
     def test_storage(self, fake_script: FakeScript):
         meta = ops.CharmMeta()
-        raw: 'ops.charm._StorageMetaDict' = {
+        raw: ops.charm._StorageMetaDict = {
             'type': 'test',
         }
         meta.storages = {

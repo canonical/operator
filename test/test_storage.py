@@ -23,7 +23,6 @@ import tempfile
 import typing
 import unittest
 import unittest.mock
-from test.test_helpers import FakeScript
 from textwrap import dedent
 
 import pytest
@@ -31,6 +30,7 @@ import yaml
 
 import ops
 import ops.storage
+from test.test_helpers import FakeScript
 
 
 @pytest.fixture
