@@ -3379,8 +3379,6 @@ class TestSecretInfo:
 
 
 class TestSecretClass:
-    maxDiff = 64 * 1024
-
     @pytest.fixture
     def model(self):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
