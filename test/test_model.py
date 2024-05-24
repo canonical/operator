@@ -232,7 +232,17 @@ class TestModel:
                 relation_id, harness.model.app) == harness.get_relation_data(
                 relation_id, local_app) == {'foo': 'bar'}
 
-    def test_update_app_relation_data_other_map(self, harness: ops.testing.Harness[ops.CharmBase]):
+    @pytest.mark.parametrize('args,kwargs', [
+        (({'foo': 'baz'}, ), {}),
+        (([('foo', 'baz')], ), {}),
+        ((), {'foo': 'baz'})
+    ])
+    def test_update_app_relation_data(
+        self,
+        args: typing.Tuple[typing.Any, ...],
+        kwargs: typing.Dict[str, str],
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
         harness.set_leader(True)
         harness.begin()
         relation_id = harness.add_relation('db1', 'remote')
@@ -244,45 +254,9 @@ class TestModel:
                 {'foo': 'bar'})
             rel = harness.model.get_relation('db1', relation_id)
             assert rel is not None
-            rel.data[harness.model.app].update({'foo': 'baz'})
+            rel.data[harness.model.app].update(*args, **kwargs)
             assert harness.get_relation_data(
-                relation_id, harness.model.app) == harness.get_relation_data(
-                relation_id, harness.model.app.name) == {'foo': 'baz'}
-
-    def test_update_app_relation_data_other_iter(
-            self, harness: ops.testing.Harness[ops.CharmBase]):
-        harness.set_leader(True)
-        harness.begin()
-        relation_id = harness.add_relation('db1', 'remote')
-        harness.add_relation_unit(relation_id, 'remote/0')
-        with harness._event_context('foo_event'):
-            harness.update_relation_data(
-                relation_id,
-                harness.model.app.name,
-                {'foo': 'bar'})
-            rel = harness.model.get_relation('db1', relation_id)
-            assert rel is not None
-            rel.data[harness.model.app].update((('foo', 'baz'), ))
-            assert harness.get_relation_data(
-                relation_id, harness.model.app) == harness.get_relation_data(
-                relation_id, harness.model.app.name) == {'foo': 'baz'}
-
-    def test_update_app_relation_data_kwarg(self, harness: ops.testing.Harness[ops.CharmBase]):
-        harness.set_leader(True)
-        harness.begin()
-        relation_id = harness.add_relation('db1', 'remote')
-        harness.add_relation_unit(relation_id, 'remote/0')
-        with harness._event_context('foo_event'):
-            harness.update_relation_data(
-                relation_id,
-                harness.model.app.name,
-                {'foo': 'bar'})
-            rel = harness.model.get_relation('db1', relation_id)
-            assert rel is not None
-            rel.data[harness.model.app].update(foo='baz')
-            assert harness.get_relation_data(
-                relation_id, harness.model.app) == harness.get_relation_data(
-                relation_id, harness.model.app.name) == {'foo': 'baz'}
+                relation_id, harness.model.app) == {'foo': 'baz'}
 
     def test_unit_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
