@@ -382,7 +382,7 @@ def test_pebble_custom_notice(charm_cls):
 
     state = State(containers=[container])
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(container.notice_event, state) as mgr:
+    with ctx.manager(container.get_notice("example.com/baz").event, state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         assert container.get_notices() == [n._to_ops() for n in notices]
 
@@ -418,7 +418,7 @@ def test_pebble_custom_notice_in_charm():
 
     notices = [
         Notice("example.com/test/other"),
-        Notice(key, last_data={"foo": "baz"}),
+        Notice("example.org/test/charm", last_data={"foo": "baz"}),
         Notice(
             key,
             last_data=data,
@@ -438,4 +438,4 @@ def test_pebble_custom_notice_in_charm():
     )
     state = State(containers=[container])
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    ctx.run(container.notice_event, state)
+    ctx.run(container.get_notice(key).event, state)

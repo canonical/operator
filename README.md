@@ -745,24 +745,7 @@ notices = [
     scenario.Notice(key="example.com/c"),
 ]
 cont = scenario.Container(notices=notices)
-ctx.run(cont.notice_event, scenario.State(containers=[cont]))
-```
-
-Note that the `custom_event` is accessed via the container, not the notice,
-and is always for the last notice in the list. An `ops.pebble.Notice` does not
-know which container it is in, but an `ops.PebbleCustomNoticeEvent` does know
-which container did the notifying. If you need to generate an event for a different
-notice, you can override the notice:
-
-```python
-ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": "cont": {}})
-notices = [
-    scenario.Notice(key="example.com/a", occurences=10),
-    scenario.Notice(key="example.com/b", last_data={"bar": "baz"}),
-    scenario.Notice(key="example.com/c"),
-]
-cont = scenario.Container(notices=notices)
-ctx.run(cont.notice_event(notice=notices[0]), scenario.State(containers=[cont]))
+ctx.run(container.get_notice("example.com/c").event, scenario.State(containers=[cont]))
 ```
 
 ## Storage

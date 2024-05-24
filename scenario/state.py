@@ -685,6 +685,22 @@ class Notice(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
+class BoundNotice(_DCBase):
+    notice: Notice
+    container: "Container"
+
+    @property
+    def event(self):
+        """Sugar to generate a <container's name>-pebble-custom-notice event for this notice."""
+        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX.replace("_", "-")
+        return Event(
+            path=normalize_name(self.container.name + suffix),
+            container=self.container,
+            notice=self.notice,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
 class Container(_DCBase):
     name: str
     can_connect: bool = False
@@ -790,25 +806,21 @@ class Container(_DCBase):
             )
         return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
 
-    @property
-    def notice_event(self):
-        """Sugar to generate a <this container's name>-pebble-custom-notice event for the latest notice."""
-        if not self.notices:
-            raise RuntimeError("This container does not have any notices.")
-        # We assume this event is about the most recent notice.
-        notice = self.notices[-1]
-        if notice.type != pebble.NoticeType.CUSTOM:
-            raise RuntimeError("Scenario only knows about custom notices at this time.")
-        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX.replace("_", "-")
-        if not self.can_connect:
-            logger.warning(
-                "you **can** fire pebble-custom-notice while the container cannot connect, "
-                "but that's most likely not what you want.",
-            )
-        return Event(
-            path=normalize_name(self.name + suffix),
-            container=self,
-            notice=notice,
+    def get_notice(
+        self,
+        key: str,
+        notice_type: pebble.NoticeType = pebble.NoticeType.CUSTOM,
+    ) -> BoundNotice:
+        """Get a Pebble notice by key and type.
+
+        Raises:
+            KeyError: if the notice is not found.
+        """
+        for notice in self.notices:
+            if notice.key == key and notice.type == notice_type:
+                return BoundNotice(notice, self)
+        raise KeyError(
+            f"{self.name} does not have a notice with key {key} and type {notice_type}",
         )
 
 
