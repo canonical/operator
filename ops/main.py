@@ -98,7 +98,9 @@ def _create_event_link(
 
         # Ignore the non-symlink files or directories
         # assuming the charm author knows what they are doing.
-        logger.debug(f'Creating a new relative symlink at {event_path} pointing to {target_path}')
+        logger.debug(
+            'Creating a new relative symlink at %s pointing to %s', event_path, target_path
+        )
         event_path.symlink_to(target_path)
 
 
@@ -135,13 +137,13 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str):
     try:
         event_to_emit = getattr(charm.on, event_name)
     except AttributeError:
-        logger.debug(f'Event {event_name} not defined for {charm}.')
+        logger.debug('Event %s not defined for %s.', event_name, charm)
 
     # If the event is not supported by the charm implementation, do
     # not error out or try to emit it. This is to support rollbacks.
     if event_to_emit is not None:
         args, kwargs = _get_event_args(charm, event_to_emit)
-        logger.debug(f'Emitting Juju event {event_name}.')
+        logger.debug('Emitting Juju event %s.', event_name)
         event_to_emit.emit(*args, **kwargs)
 
 
@@ -283,26 +285,26 @@ class _Dispatcher:
 
         # super strange that there isn't an is_executable
         if not os.access(str(dispatch_path), os.X_OK):
-            logger.warning(f'Legacy {self._dispatch_path} exists but is not executable.')
+            logger.warning('Legacy %s exists but is not executable.', self._dispatch_path)
             return
 
         if dispatch_path.resolve() == Path(sys.argv[0]).resolve():
-            logger.debug(f'Legacy {self._dispatch_path} is just a link to ourselves.')
+            logger.debug('Legacy %s is just a link to ourselves.', self._dispatch_path)
             return
 
         argv = sys.argv.copy()
         argv[0] = str(dispatch_path)
-        logger.info(f'Running legacy {self._dispatch_path}.')
+        logger.info('Running legacy %s.', self._dispatch_path)
         try:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
-            logger.warning(f'Legacy {self._dispatch_path} exited with status {e.returncode}.')
+            logger.warning('Legacy %s exited with status %d.', self._dispatch_path, e.returncode)
             raise _Abort(e.returncode) from e
         except OSError as e:
-            logger.warning(f'Unable to run legacy {self._dispatch_path}: {e}')
+            logger.warning('Unable to run legacy %s: %s', self._dispatch_path, e)
             raise _Abort(1) from e
         else:
-            logger.debug(f'Legacy {self._dispatch_path} exited with status 0.')
+            logger.debug('Legacy %s exited with status 0.', self._dispatch_path)
 
     def _set_name_from_path(self, path: Path):
         """Sets the name attribute to that which can be inferred from the given path."""
@@ -332,7 +334,7 @@ class _Dispatcher:
         self._dispatch_path = Path(os.environ['JUJU_DISPATCH_PATH'])
 
         if 'OPERATOR_DISPATCH' in os.environ:
-            logger.debug(f'Charm called itself via {self._dispatch_path}.')
+            logger.debug('Charm called itself via %s.', self._dispatch_path)
             raise _Abort(0)
         os.environ['OPERATOR_DISPATCH'] = '1'
 
@@ -365,10 +367,10 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
     cur_version = JujuVersion.from_environ()
 
     if cur_version.has_controller_storage():
-        logger.debug(f'Using controller storage: JUJU_VERSION={cur_version}')
+        logger.debug('Using controller storage: JUJU_VERSION=%s', cur_version)
         return True
     else:
-        logger.debug(f'Using local storage: JUJU_VERSION={cur_version}')
+        logger.debug('Using local storage: JUJU_VERSION=%s', cur_version)
         return False
 
 
@@ -439,7 +441,7 @@ class _Manager:
         handling_action = 'JUJU_ACTION_NAME' in os.environ
         setup_root_logging(self._model_backend, debug=debug, exc_stderr=handling_action)
 
-        logger.debug(f'ops {ops.__version__} up and running.')
+        logger.debug('ops %s up and running.', ops.__version__) # type:ignore
 
     def _make_storage(self, dispatcher: _Dispatcher):
         charm_state_path = self._charm_root / self._charm_state_path
@@ -467,8 +469,9 @@ class _Manager:
             #  non-restricted context. Once we can determine that we are running
             #  collect-metrics in a non-restricted context, we should fire the event as normal.
             logger.debug(
-                f'"{dispatcher.event_name}" is not supported when using Juju for storage\n'
-                'see: https://github.com/canonical/operator/issues/348'
+                '"%s" is not supported when using Juju for storage\n'
+                'see: https://github.com/canonical/operator/issues/348',
+                dispatcher.event_name,
             )
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
             raise _Abort(0)

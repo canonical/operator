@@ -2197,17 +2197,17 @@ class Container:
         try:
             self._pebble.get_system_info()
         except pebble.ConnectionError as e:
-            logger.debug(f'Pebble API is not ready; ConnectionError: {e}')
+            logger.debug('Pebble API is not ready; ConnectionError: %s', e)
             return False
         except FileNotFoundError as e:
             # In some cases, charm authors can attempt to hit the Pebble API before it has had the
             # chance to create the UNIX socket in the shared volume.
-            logger.debug(f'Pebble API is not ready; UNIX socket not found: {e}')
+            logger.debug('Pebble API is not ready; UNIX socket not found: %s', e)
             return False
         except pebble.APIError as e:
             # An API error is only raised when the Pebble API returns invalid JSON, or the response
             # cannot be read. Both of these are a likely indicator that something is wrong.
-            logger.warning(f'Pebble API is not ready; APIError: {e}')
+            logger.warning('Pebble API is not ready; APIError: %s', e)
             return False
         return True
 
@@ -2609,12 +2609,12 @@ class Container:
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
         except KeyError:
-            logger.warning(f'Could not get name for user {info.st_uid}')
+            logger.warning('Could not get name for user %s', info.st_uid)
             pw_name = None
         try:
             gr_name = grp.getgrgid(info.st_gid).gr_name
         except KeyError:
-            logger.warning(f'Could not get name for group {info.st_gid}')
+            logger.warning('Could not get name for group %s', info.st_gid)
             gr_name = None
         return pebble.FileInfo(
             path=str(path),
@@ -2655,7 +2655,7 @@ class Container:
                 yield info
             else:
                 logger.debug(
-                    f'skipped unsupported file in Container.[push/pull]_path: {info.path}'
+                    'skipped unsupported file in Container.[push/pull]_path: %s', info.path
                 )
 
     @staticmethod
@@ -3641,11 +3641,11 @@ class _ModelBackend:
             return Port('icmp', None)
         port_range, slash, protocol = port_str.partition('/')
         if not slash or protocol not in ['tcp', 'udp']:
-            logger.warning(f'Unexpected opened-ports protocol: {port_str}')
+            logger.warning('Unexpected opened-ports protocol: %s', port_str)
             return None
         port, hyphen, _ = port_range.partition('-')
         if hyphen:
-            logger.warning(f'Ignoring opened-ports port range: {port_str}')
+            logger.warning('Ignoring opened-ports port range: %s', port_str)
         protocol_lit = typing.cast(typing.Literal['tcp', 'udp'], protocol)
         return Port(protocol_lit, int(port))
 

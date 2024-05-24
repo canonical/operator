@@ -241,7 +241,7 @@ class EventBase:
         3. At some future time, event C happens, which also checks if A can
            proceed.
         """
-        logger.debug(f'Deferring {self}.')
+        logger.debug('Deferring %s.', self)
         self.deferred = True
 
     def snapshot(self) -> Dict[str, Any]:
@@ -925,7 +925,7 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug(f'Re-emitting deferred event {event}.')
+                    logger.debug('Re-emitting deferred event %s.', event)
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
                     pass
@@ -934,7 +934,7 @@ class Framework(Object):
                     # dispatched, and it also is not an event we have deferred,
                     # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
-                    logger.debug(f'Emitting custom event {event}.')
+                    logger.debug('Emitting custom event %s.', event)
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
@@ -1012,8 +1012,9 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
         else:
             logger.warning(
-                f'Breakpoint {name!r} skipped (not found in the requested breakpoints: '
-                f'{indicated_breakpoints})'
+                'Breakpoint %r skipped (not found in the requested breakpoints: %s)',
+                name,
+                indicated_breakpoints,
             )
 
     def remove_unreferenced_events(self) -> None:
