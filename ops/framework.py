@@ -951,9 +951,9 @@ class Framework(Object):
 
             else:
                 logger.warning(
-                    f'Reference to ops.Object at path {observer_path} has been garbage collected '
+                    'Reference to ops.Object at path %s has been garbage collected '
                     'between when the charm was initialised and when the event was emitted. '
-                    'Make sure sure you store a reference to the observer.'
+                    'Make sure sure you store a reference to the observer.', observer_path
                 )
 
             if event.deferred:
