@@ -274,7 +274,8 @@ class Model:
             label: Secret label if fetching by label (or updating it).
 
         Raises:
-            SecretNotFoundError: If a secret with this ID or label doesn't exist.
+            SecretNotFoundError: If a secret with this ID or label doesn't exist,
+                or the caller does not have permission to view it.
         """
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
