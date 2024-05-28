@@ -73,6 +73,11 @@ aggressive = 3
 [tool.ruff]
 line-length = 99
 target-version = "py38"
+extend-exclude = ["docs"]
+
+# Ruff formatter configuration
+[tool.ruff.format]
+quote-style = "single"
 
 [tool.ruff.lint]
 select = [

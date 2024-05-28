@@ -51,36 +51,34 @@ if TYPE_CHECKING:
 
     _Scopes = Literal['global', 'container']
     _RelationMetaDict = TypedDict(
-        '_RelationMetaDict', {
-            'interface': Required[str],
-            'limit': int,
-            'optional': bool,
-            'scope': _Scopes},
-        total=False)
+        '_RelationMetaDict',
+        {'interface': Required[str], 'limit': int, 'optional': bool, 'scope': _Scopes},
+        total=False,
+    )
 
     _MultipleRange = TypedDict('_MultipleRange', {'range': str})
-    _StorageMetaDict = TypedDict('_StorageMetaDict', {
-        'type': Required[str],
-        'description': str,
-        'shared': bool,
-        'read-only': bool,
-        'minimum-size': str,
-        'location': str,
-        'multiple-range': str,
-        'multiple': _MultipleRange
-    }, total=False)
+    _StorageMetaDict = TypedDict(
+        '_StorageMetaDict',
+        {
+            'type': Required[str],
+            'description': str,
+            'shared': bool,
+            'read-only': bool,
+            'minimum-size': str,
+            'location': str,
+            'multiple-range': str,
+            'multiple': _MultipleRange,
+        },
+        total=False,
+    )
 
     _ResourceMetaDict = TypedDict(
-        '_ResourceMetaDict', {
-            'type': Required[str],
-            'filename': str,
-            'description': str},
-        total=False)
+        '_ResourceMetaDict',
+        {'type': Required[str], 'filename': str, 'description': str},
+        total=False,
+    )
 
-    _MountDict = TypedDict(
-        '_MountDict', {'storage': Required[str],
-                       'location': str},
-        total=False)
+    _MountDict = TypedDict('_MountDict', {'storage': Required[str], 'location': str}, total=False)
 
 
 class _ContainerBaseDict(TypedDict):
@@ -125,7 +123,7 @@ class ActionEvent(EventBase):
     :meth:`log`.
     """
 
-    id: str = ""
+    id: str = ''
     """The Juju ID of the action invocation."""
 
     params: Dict[str, Any]
@@ -407,8 +405,9 @@ class CollectMetricsEvent(HookEvent):
     how they can interact with Juju.
     """
 
-    def add_metrics(self, metrics: Mapping[str, Union[int, float]],
-                    labels: Optional[Mapping[str, str]] = None):
+    def add_metrics(
+        self, metrics: Mapping[str, Union[int, float]], labels: Optional[Mapping[str, str]] = None
+    ):
         """Record metrics that have been gathered by the charm for this unit.
 
         Args:
@@ -445,14 +444,19 @@ class RelationEvent(HookEvent):
     :class:`Application <model.Application>`-level event.
     """
 
-    def __init__(self, handle: 'Handle', relation: 'model.Relation',
-                 app: Optional[model.Application] = None,
-                 unit: Optional[model.Unit] = None):
+    def __init__(
+        self,
+        handle: 'Handle',
+        relation: 'model.Relation',
+        app: Optional[model.Application] = None,
+        unit: Optional[model.Unit] = None,
+    ):
         super().__init__(handle)
 
         if unit is not None and unit.app != app:
             raise RuntimeError(
-                f'cannot create RelationEvent with application {app} and unit {unit}')
+                f'cannot create RelationEvent with application {app} and unit {unit}'
+            )
 
         self.relation = relation
         if app is None:
@@ -484,11 +488,14 @@ class RelationEvent(HookEvent):
         Not meant to be called by charm code.
         """
         relation = self.framework.model.get_relation(
-            snapshot['relation_name'], snapshot['relation_id'])
+            snapshot['relation_name'], snapshot['relation_id']
+        )
         if relation is None:
             raise ValueError(
                 'Unable to restore {}: relation {} (id={}) not found.'.format(
-                    self, snapshot['relation_name'], snapshot['relation_id']))
+                    self, snapshot['relation_name'], snapshot['relation_id']
+                )
+            )
         self.relation = relation
 
         app_name = snapshot.get('app_name')
@@ -513,6 +520,7 @@ class RelationCreatedEvent(RelationEvent):
     relations will trigger `RelationCreatedEvent` before :class:`StartEvent` is
     emitted.
     """
+
     unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
     """Always ``None``."""
 
@@ -528,6 +536,7 @@ class RelationJoinedEvent(RelationEvent):
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
     """
+
     unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
     """The remote unit that has triggered this event."""
 
@@ -570,13 +579,18 @@ class RelationDepartedEvent(RelationEvent):
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`RelationBrokenEvent`.
     """
+
     unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
     """The remote unit that has triggered this event."""
 
-    def __init__(self, handle: 'Handle', relation: 'model.Relation',
-                 app: Optional[model.Application] = None,
-                 unit: Optional[model.Unit] = None,
-                 departing_unit_name: Optional[str] = None):
+    def __init__(
+        self,
+        handle: 'Handle',
+        relation: 'model.Relation',
+        app: Optional[model.Application] = None,
+        unit: Optional[model.Unit] = None,
+        departing_unit_name: Optional[str] = None,
+    ):
         super().__init__(handle, relation, app=app, unit=unit)
 
         self._departing_unit_name = departing_unit_name
@@ -627,6 +641,7 @@ class RelationBrokenEvent(RelationEvent):
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
+
     unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
     """Always ``None``."""
 
@@ -654,9 +669,9 @@ class StorageEvent(HookEvent):
         """
         snapshot: Dict[str, Any] = {}
         if isinstance(self.storage, model.Storage):
-            snapshot["storage_name"] = self.storage.name
-            snapshot["storage_index"] = self.storage.index
-            snapshot["storage_location"] = str(self.storage.location)
+            snapshot['storage_name'] = self.storage.name
+            snapshot['storage_index'] = self.storage.index
+            snapshot['storage_location'] = str(self.storage.location)
         return snapshot
 
     def restore(self, snapshot: Dict[str, Any]):
@@ -664,15 +679,13 @@ class StorageEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        storage_name = snapshot.get("storage_name")
-        storage_index = snapshot.get("storage_index")
-        storage_location = snapshot.get("storage_location")
+        storage_name = snapshot.get('storage_name')
+        storage_index = snapshot.get('storage_index')
+        storage_location = snapshot.get('storage_location')
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next(
-                (s for s in storages if s.index == storage_index),
-                None)  # type: ignore
+            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore
             if self.storage is None:
                 raise RuntimeError(
                     f'failed loading storage (name={storage_name!r}, '
@@ -681,7 +694,8 @@ class StorageEvent(HookEvent):
             if storage_location is None:
                 raise RuntimeError(
                     'failed loading storage location from snapshot.'
-                    f'(name={storage_name!r}, index={storage_index!r}, storage_location=None)')
+                    f'(name={storage_name!r}, index={storage_index!r}, storage_location=None)'
+                )
 
             self.storage.location = storage_location
 
@@ -777,8 +791,14 @@ class PebbleNoticeEvent(WorkloadEvent):
     notice: model.LazyNotice
     """Provide access to the event notice's details."""
 
-    def __init__(self, handle: 'Handle', workload: 'model.Container',
-                 notice_id: str, notice_type: str, notice_key: str):
+    def __init__(
+        self,
+        handle: 'Handle',
+        workload: 'model.Container',
+        notice_id: str,
+        notice_type: str,
+        notice_key: str,
+    ):
         super().__init__(handle, workload)
         self.notice = model.LazyNotice(workload, notice_id, notice_type, notice_key)
 
@@ -789,8 +809,9 @@ class PebbleNoticeEvent(WorkloadEvent):
         """
         d = super().snapshot()
         d['notice_id'] = self.notice.id
-        d['notice_type'] = (self.notice.type if isinstance(self.notice.type, str)
-                            else self.notice.type.value)
+        d['notice_type'] = (
+            self.notice.type if isinstance(self.notice.type, str) else self.notice.type.value
+        )
         d['notice_key'] = self.notice.key
         return d
 
@@ -869,7 +890,8 @@ class SecretRotateEvent(SecretEvent):
         """
         raise RuntimeError(
             'Cannot defer secret rotation events. Juju will keep firing this '
-            'event until you create a new revision.')
+            'event until you create a new revision.'
+        )
 
 
 class SecretRemoveEvent(SecretEvent):
@@ -953,7 +975,8 @@ class SecretExpiredEvent(SecretEvent):
         """
         raise RuntimeError(
             'Cannot defer secret expiration events. Juju will keep firing '
-            'this event until you create a new revision.')
+            'this event until you create a new revision.'
+        )
 
 
 class CollectStatusEvent(LifecycleEvent):
@@ -1172,25 +1195,25 @@ class CharmBase(Object):
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
-            self.on.define_event(f"{relation_name}_relation_created", RelationCreatedEvent)
-            self.on.define_event(f"{relation_name}_relation_joined", RelationJoinedEvent)
-            self.on.define_event(f"{relation_name}_relation_changed", RelationChangedEvent)
-            self.on.define_event(f"{relation_name}_relation_departed", RelationDepartedEvent)
-            self.on.define_event(f"{relation_name}_relation_broken", RelationBrokenEvent)
+            self.on.define_event(f'{relation_name}_relation_created', RelationCreatedEvent)
+            self.on.define_event(f'{relation_name}_relation_joined', RelationJoinedEvent)
+            self.on.define_event(f'{relation_name}_relation_changed', RelationChangedEvent)
+            self.on.define_event(f'{relation_name}_relation_departed', RelationDepartedEvent)
+            self.on.define_event(f'{relation_name}_relation_broken', RelationBrokenEvent)
 
         for storage_name in self.framework.meta.storages:
             storage_name = storage_name.replace('-', '_')
-            self.on.define_event(f"{storage_name}_storage_attached", StorageAttachedEvent)
-            self.on.define_event(f"{storage_name}_storage_detaching", StorageDetachingEvent)
+            self.on.define_event(f'{storage_name}_storage_attached', StorageAttachedEvent)
+            self.on.define_event(f'{storage_name}_storage_detaching', StorageDetachingEvent)
 
         for action_name in self.framework.meta.actions:
             action_name = action_name.replace('-', '_')
-            self.on.define_event(f"{action_name}_action", ActionEvent)
+            self.on.define_event(f'{action_name}_action', ActionEvent)
 
         for container_name in self.framework.meta.containers:
             container_name = container_name.replace('-', '_')
-            self.on.define_event(f"{container_name}_pebble_ready", PebbleReadyEvent)
-            self.on.define_event(f"{container_name}_pebble_custom_notice", PebbleCustomNoticeEvent)
+            self.on.define_event(f'{container_name}_pebble_ready', PebbleReadyEvent)
+            self.on.define_event(f'{container_name}_pebble_custom_notice', PebbleCustomNoticeEvent)
 
     @property
     def app(self) -> model.Application:
@@ -1319,8 +1342,9 @@ class CharmMeta:
     actions: Dict[str, 'ActionMeta']
     """Actions the charm has defined."""
 
-    def __init__(self, raw: Optional[Dict[str, Any]] = None,
-                 actions_raw: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, raw: Optional[Dict[str, Any]] = None, actions_raw: Optional[Dict[str, Any]] = None
+    ):
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
 
@@ -1356,39 +1380,50 @@ class CharmMeta:
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
-        self.requires = {name: RelationMeta(RelationRole.requires, name, rel)
-                         for name, rel in raw_.get('requires', {}).items()}
-        self.provides = {name: RelationMeta(RelationRole.provides, name, rel)
-                         for name, rel in raw_.get('provides', {}).items()}
-        self.peers = {name: RelationMeta(RelationRole.peer, name, rel)
-                      for name, rel in raw_.get('peers', {}).items()}
+        self.requires = {
+            name: RelationMeta(RelationRole.requires, name, rel)
+            for name, rel in raw_.get('requires', {}).items()
+        }
+        self.provides = {
+            name: RelationMeta(RelationRole.provides, name, rel)
+            for name, rel in raw_.get('provides', {}).items()
+        }
+        self.peers = {
+            name: RelationMeta(RelationRole.peer, name, rel)
+            for name, rel in raw_.get('peers', {}).items()
+        }
         self.relations: Dict[str, RelationMeta] = {}
         self.relations.update(self.requires)
         self.relations.update(self.provides)
         self.relations.update(self.peers)
-        self.storages = {name: StorageMeta(name, storage)
-                         for name, storage in raw_.get('storage', {}).items()}
-        self.resources = {name: ResourceMeta(name, res)
-                          for name, res in raw_.get('resources', {}).items()}
-        self.payloads = {name: PayloadMeta(name, payload)
-                         for name, payload in raw_.get('payloads', {}).items()}
+        self.storages = {
+            name: StorageMeta(name, storage) for name, storage in raw_.get('storage', {}).items()
+        }
+        self.resources = {
+            name: ResourceMeta(name, res) for name, res in raw_.get('resources', {}).items()
+        }
+        self.payloads = {
+            name: PayloadMeta(name, payload) for name, payload in raw_.get('payloads', {}).items()
+        }
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
-        self.containers = {name: ContainerMeta(name, container)
-                           for name, container in raw_.get('containers', {}).items()}
+        self.containers = {
+            name: ContainerMeta(name, container)
+            for name, container in raw_.get('containers', {}).items()
+        }
 
     @staticmethod
     def from_charm_root(charm_root: Union[pathlib.Path, str]):
         """Initialise CharmMeta from the path to a charm repository root folder."""
         _charm_root = pathlib.Path(charm_root)
-        metadata_path = _charm_root / "metadata.yaml"
+        metadata_path = _charm_root / 'metadata.yaml'
 
         with metadata_path.open() as f:
             meta = yaml.safe_load(f.read())
 
         actions = None
 
-        actions_path = _charm_root / "actions.yaml"
+        actions_path = _charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
                 actions = yaml.safe_load(f.read())
@@ -1426,8 +1461,8 @@ class CharmMeta:
 
     @classmethod
     def from_yaml(
-            cls, metadata: Union[str, TextIO],
-            actions: Optional[Union[str, TextIO]] = None) -> 'CharmMeta':
+        cls, metadata: Union[str, TextIO], actions: Optional[Union[str, TextIO]] = None
+    ) -> 'CharmMeta':
         """Instantiate a :class:`CharmMeta` from a YAML description of ``metadata.yaml``.
 
         Args:
@@ -1453,6 +1488,7 @@ class RelationRole(enum.Enum):
     - A service consumer in the relation ('requires')
     - A service provider in the relation ('provides')
     """
+
     peer = 'peer'
     requires = 'requires'
     provides = 'provides'
@@ -1502,8 +1538,9 @@ class RelationMeta:
     VALID_SCOPES = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(role, RelationRole), \
-            f"role should be one of {list(RelationRole)!r}, not {role!r}"
+        assert isinstance(
+            role, RelationRole
+        ), f'role should be one of {list(RelationRole)!r}, not {role!r}'
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
@@ -1511,12 +1548,15 @@ class RelationMeta:
 
         self.limit = limit = raw.get('limit', None)
         if limit is not None and not isinstance(limit, int):  # type: ignore
-            raise TypeError(f"limit should be an int, not {type(limit)}")
+            raise TypeError(f'limit should be an int, not {type(limit)}')
 
         self.scope = raw.get('scope') or self._default_scope
         if self.scope not in self.VALID_SCOPES:
-            raise TypeError("scope should be one of {}; not '{}'".format(
-                ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope))
+            raise TypeError(
+                "scope should be one of {}; not '{}'".format(
+                    ', '.join(f"'{s}'" for s in self.VALID_SCOPES), self.scope
+                )
+            )
 
         self.optional = raw.get('optional', False)
 
@@ -1650,18 +1690,23 @@ class JujuAssumes:
     condition: JujuAssumesCondition = JujuAssumesCondition.ALL
 
     @classmethod
-    def from_list(cls, raw: List[Any],
-                  condition: JujuAssumesCondition = JujuAssumesCondition.ALL,
-                  ) -> 'JujuAssumes':
+    def from_list(
+        cls,
+        raw: List[Any],
+        condition: JujuAssumesCondition = JujuAssumesCondition.ALL,
+    ) -> 'JujuAssumes':
         """Create new JujuAssumes object from list parsed from YAML."""
-        features: List[Union[str, 'JujuAssumes']] = []
+        features: List[Union[str, JujuAssumes]] = []
         for feature in raw:
             if isinstance(feature, str):
                 features.append(feature)
             else:
                 for nested_condition, nested_features in feature.items():
-                    features.append(JujuAssumes.from_list(
-                        nested_features, JujuAssumesCondition(nested_condition)))
+                    features.append(
+                        JujuAssumes.from_list(
+                            nested_features, JujuAssumesCondition(nested_condition)
+                        )
+                    )
         return cls(features=features, condition=condition)
 
 
@@ -1770,8 +1815,8 @@ class ContainerMeta:
         under each key.
         """
         for mount in mounts:
-            storage = mount.get("storage", "")
-            mount = mount.get("location", "")
+            storage = mount.get('storage', '')
+            mount = mount.get('location', '')
 
             if not mount:
                 continue
@@ -1819,6 +1864,6 @@ class ContainerStorageMeta:
         if len(self._locations) == 1:
             return self._locations[0]
         raise RuntimeError(
-            "container has more than one mount point with the same backing storage. "
-            "Request .locations to see a list"
+            'container has more than one mount point with the same backing storage. '
+            'Request .locations to see a list'
         )

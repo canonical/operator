@@ -20,17 +20,20 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize("mod_name", [
-    'charm',
-    'framework',
-    'main',
-    'model',
-    'testing',
-])
+@pytest.mark.parametrize(
+    'mod_name',
+    [
+        'charm',
+        'framework',
+        'main',
+        'model',
+        'testing',
+    ],
+)
 def test_import(mod_name: str, tmp_path: pathlib.Path):
-    template = "from ops import {module_name}"
+    template = 'from ops import {module_name}'
 
-    testfile = tmp_path / "foo.py"
+    testfile = tmp_path / 'foo.py'
     with open(testfile, 'w', encoding='utf8') as fh:
         fh.write(template.format(module_name=mod_name))
 

@@ -38,8 +38,9 @@ class JujuLogHandler(logging.Handler):
         self.model_backend.juju_log(record.levelname, self.format(record))
 
 
-def setup_root_logging(model_backend: _ModelBackend, debug: bool = False,
-                       exc_stderr: bool = False):
+def setup_root_logging(
+    model_backend: _ModelBackend, debug: bool = False, exc_stderr: bool = False
+):
     """Setup python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
@@ -61,15 +62,12 @@ def setup_root_logging(model_backend: _ModelBackend, debug: bool = False,
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    def except_hook(etype: typing.Type[BaseException],
-                    value: BaseException,
-                    tb: types.TracebackType):
-        logger.error(
-            "Uncaught exception while in charm code:",
-            exc_info=(etype, value, tb))
+    def except_hook(
+        etype: typing.Type[BaseException], value: BaseException, tb: types.TracebackType
+    ):
+        logger.error('Uncaught exception while in charm code:', exc_info=(etype, value, tb))
         if exc_stderr:
-            print(f"Uncaught {etype.__name__} in charm code: {value}",
-                  file=sys.stderr)
-            print("Use `juju debug-log` to see the full traceback.", file=sys.stderr)
+            print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
+            print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
 
     sys.excepthook = except_hook

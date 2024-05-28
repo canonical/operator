@@ -45,7 +45,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     '__version__',
     'main',
     'pebble',
-
     # From charm.py
     'ActionEvent',
     'ActionMeta',
@@ -95,7 +94,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'UpdateStatusEvent',
     'UpgradeCharmEvent',
     'WorkloadEvent',
-
     # From framework.py
     'BoundEvent',
     'BoundStoredState',
@@ -118,10 +116,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'StoredSet',
     'StoredState',
     'StoredStateData',
-
     # From jujuversion.py
     'JujuVersion',
-
     # From model.py
     'ActiveStatus',
     'Application',

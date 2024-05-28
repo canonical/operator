@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Structures to offer storage to the charm (through Juju or locally)."""
+
 import logging
 import os
 import pickle
@@ -58,13 +59,13 @@ class SQLiteStorage:
 
         if not os.path.exists(str(filename)):
             # sqlite3.connect creates the file silently if it does not exist
-            logger.debug(f"Initializing SQLite local storage: {filename}.")
+            logger.debug('Initializing SQLite local storage: %s.', filename)
 
-        if filename != ":memory:":
+        if filename != ':memory:':
             self._ensure_db_permissions(str(filename))
-        self._db = sqlite3.connect(str(filename),
-                                   isolation_level=None,
-                                   timeout=self.DB_LOCK_TIMEOUT.total_seconds())
+        self._db = sqlite3.connect(
+            str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT.total_seconds()
+        )
         self._setup()
 
     def _ensure_db_permissions(self, filename: str):
@@ -74,33 +75,33 @@ class SQLiteStorage:
             try:
                 os.chmod(filename, mode)
             except OSError as e:
-                raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
+                raise RuntimeError(f'Unable to adjust access permission of {filename!r}') from e
             return
 
         try:
             fd = os.open(filename, os.O_CREAT | os.O_EXCL, mode=mode)
         except OSError as e:
-            raise RuntimeError(f"Unable to adjust access permission of {filename!r}") from e
+            raise RuntimeError(f'Unable to adjust access permission of {filename!r}') from e
         os.close(fd)
 
     def _setup(self):
         """Make the database ready to be used as storage."""
         # Make sure that the database is locked until the connection is closed,
         # not until the transaction ends.
-        self._db.execute("PRAGMA locking_mode=EXCLUSIVE")
-        c = self._db.execute("BEGIN")
+        self._db.execute('PRAGMA locking_mode=EXCLUSIVE')
+        c = self._db.execute('BEGIN')
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
             # The system must not be rendered permanently broken by that.
-            self._db.execute("CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)")
-            self._db.execute('''
+            self._db.execute('CREATE TABLE snapshot (handle TEXT PRIMARY KEY, data BLOB)')
+            self._db.execute("""
                 CREATE TABLE notice (
                   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                   event_path TEXT,
                   observer_path TEXT,
                   method_name TEXT)
-                ''')
+                """)
             self._db.commit()
 
     def close(self) -> None:
@@ -127,7 +128,7 @@ class SQLiteStorage:
         """
         # Use pickle for serialization, so the value remains portable.
         raw_data = pickle.dumps(snapshot_data)
-        self._db.execute("REPLACE INTO snapshot VALUES (?, ?)", (handle_path, raw_data))
+        self._db.execute('REPLACE INTO snapshot VALUES (?, ?)', (handle_path, raw_data))
 
     def load_snapshot(self, handle_path: str) -> Any:
         """Part of the Storage API, retrieve a snapshot that was previously saved.
@@ -139,7 +140,7 @@ class SQLiteStorage:
             NoSnapshotError: if there is no snapshot for the given handle_path.
         """
         c = self._db.cursor()
-        c.execute("SELECT data FROM snapshot WHERE handle=?", (handle_path,))
+        c.execute('SELECT data FROM snapshot WHERE handle=?', (handle_path,))
         row = c.fetchone()
         if row:
             return pickle.loads(row[0])  # noqa: S301
@@ -150,12 +151,12 @@ class SQLiteStorage:
 
         Dropping a snapshot that doesn't exist is treated as a no-op.
         """
-        self._db.execute("DELETE FROM snapshot WHERE handle=?", (handle_path,))
+        self._db.execute('DELETE FROM snapshot WHERE handle=?', (handle_path,))
 
     def list_snapshots(self) -> Generator[str, None, None]:
         """Return the name of all snapshots that are currently saved."""
         c = self._db.cursor()
-        c.execute("SELECT handle FROM snapshot")
+        c.execute('SELECT handle FROM snapshot')
         while True:
             rows = c.fetchmany()
             if not rows:
@@ -165,17 +166,21 @@ class SQLiteStorage:
 
     def save_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
         """Part of the Storage API, record an notice (event and observer)."""
-        self._db.execute('INSERT INTO notice VALUES (NULL, ?, ?, ?)',
-                         (event_path, observer_path, method_name))
+        self._db.execute(
+            'INSERT INTO notice VALUES (NULL, ?, ?, ?)', (event_path, observer_path, method_name)
+        )
 
     def drop_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
         """Part of the Storage API, remove a notice that was previously recorded."""
-        self._db.execute('''
+        self._db.execute(
+            """
             DELETE FROM notice
              WHERE event_path=?
                AND observer_path=?
                AND method_name=?
-            ''', (event_path, observer_path, method_name))
+            """,
+            (event_path, observer_path, method_name),
+        )
 
     def notices(self, event_path: Optional[str] = None) -> '_NoticeGenerator':
         """Part of the Storage API, return all notices that begin with event_path.
@@ -188,18 +193,21 @@ class SQLiteStorage:
             Iterable of (event_path, observer_path, method_name) tuples
         """
         if event_path:
-            c = self._db.execute('''
+            c = self._db.execute(
+                """
                 SELECT event_path, observer_path, method_name
                   FROM notice
                  WHERE event_path=?
                  ORDER BY sequence
-                ''', (event_path,))
+                """,
+                (event_path,),
+            )
         else:
-            c = self._db.execute('''
+            c = self._db.execute("""
                 SELECT event_path, observer_path, method_name
                   FROM notice
                  ORDER BY sequence
-                ''')
+                """)
         while True:
             rows = c.fetchmany()
             if not rows:
@@ -215,7 +223,7 @@ class JujuStorage:
     as the way to store state for the framework and for components.
     """
 
-    NOTICE_KEY = "#notices#"
+    NOTICE_KEY = '#notices#'
 
     def __init__(self, backend: Optional['_JujuStorageBackend'] = None):
         self._backend: _JujuStorageBackend = backend or _JujuStorageBackend()
@@ -327,6 +335,7 @@ class _SimpleLoader(_BaseLoader):  # type: ignore
     that it *doesn't* handle is tuples. We don't want to support arbitrary types, so we just
     subclass SafeLoader and add tuples back in.
     """
+
     # Taken from the example at:
     # https://stackoverflow.com/questions/9169025/how-can-i-add-a-python-tuple-to-a-yaml-file-using-pyyaml
 
@@ -335,7 +344,8 @@ class _SimpleLoader(_BaseLoader):  # type: ignore
 
 _SimpleLoader.add_constructor(  # type: ignore
     'tag:yaml.org,2002:python/tuple',
-    _SimpleLoader.construct_python_tuple)  # type: ignore
+    _SimpleLoader.construct_python_tuple,  # type: ignore
+)
 
 
 class _SimpleDumper(_BaseDumper):  # type: ignore
@@ -344,6 +354,7 @@ class _SimpleDumper(_BaseDumper):  # type: ignore
     YAML can support arbitrary types, but that is generally considered unsafe (like pickle). So
     we want to only support dumping out types that are safe to load.
     """
+
     represent_tuple: '_TupleRepresenterType' = yaml.Dumper.represent_tuple
 
 
@@ -375,11 +386,9 @@ class _JujuStorageBackend:
         # have the same default style.
         encoded_value = yaml.dump(value, Dumper=_SimpleDumper, default_flow_style=None)
         content = yaml.dump(
-            {key: encoded_value},
-            default_style='|',
-            default_flow_style=False,
-            Dumper=_SimpleDumper)
-        _run(["state-set", "--file", "-"], input=content, check=True)
+            {key: encoded_value}, default_style='|', default_flow_style=False, Dumper=_SimpleDumper
+        )
+        _run(['state-set', '--file', '-'], input=content, check=True)
 
     def get(self, key: str) -> Any:
         """Get the bytes value associated with a given key.
@@ -390,7 +399,7 @@ class _JujuStorageBackend:
             CalledProcessError: if 'state-get' returns an error code.
         """
         # We don't capture stderr here so it can end up in debug logs.
-        p = _run(["state-get", key], stdout=subprocess.PIPE, check=True)
+        p = _run(['state-get', key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
         return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore  # noqa: S506
@@ -403,7 +412,7 @@ class _JujuStorageBackend:
         Raises:
             CalledProcessError: if 'state-delete' returns an error code.
         """
-        _run(["state-delete", key], check=True)
+        _run(['state-delete', key], check=True)
 
 
 class NoSnapshotError(Exception):
