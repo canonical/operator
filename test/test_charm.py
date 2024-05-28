@@ -560,27 +560,42 @@ def test_invalid_action_results(
         charm.on.foo_bar_action.emit(id='1')
 
 
-def test_action_event_defer_fails(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, fake_script: FakeScript
+@pytest.mark.parametrize(
+    'event,kwargs',
+    [
+        ('start_action', {'id': 2}),
+        ('stop', {}),
+        ('remove', {}),
+        ('secret_expired', {'id': 'secret:123', 'label': None, 'revision': 0}),
+        ('secret_rotate', {'id': 'secret:234', 'label': 'my-secret'}),
+    ],
+)
+def test_inappropriate_event_defer_fails(
+    event: str,
+    kwargs: typing.Dict[str, typing.Any],
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_script: FakeScript,
 ):
-    cmd_type = 'action'
-
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            framework.observe(self.on.start_action, self._on_start_action)
+            framework.observe(getattr(self.on, event), self._call_defer)
 
-        def _on_start_action(self, event: ops.ActionEvent):
+        def _call_defer(self, event: ops.EventBase):
             event.defer()
 
+    # This is only necessary for the action event, but is ignored by the others.
+    cmd_type = 'action'
     fake_script.write(f'{cmd_type}-get', """echo '{"foo-name": "name", "silent": true}'""")
     monkeypatch.setenv(f'JUJU_{cmd_type.upper()}_NAME', 'start')
     meta = _get_action_test_meta()
+
     framework = create_framework(request, meta=meta)
     charm = MyCharm(framework)
 
     with pytest.raises(RuntimeError):
-        charm.on.start_action.emit(id='2')
+        getattr(charm.on, event).emit(**kwargs)
 
 
 def test_containers():
