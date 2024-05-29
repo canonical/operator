@@ -288,9 +288,9 @@ To make a release of the ops library, do the following:
    link to the full changelog.
 8. Change [version.py][ops/version.py]'s `version` to the
    [appropriate string](https://semver.org/).
-9. Check if there's an `chore: update charm pins` auto-generated PR in the queue. If it looks
-   good, merge it and check that tests still pass. If needed, you can trigger a new run of the
-   `Update Charm Pins` manually to ensure that the latest `ops` code is tested in the PR context.
+9. Check if there's a `chore: update charm pins` auto-generated PR in the queue. If it looks
+   good, merge it and check that tests still pass. If needed, you can re-trigger the
+   `Update Charm Pins` workflow manually to ensure latest charms and ops get tested.
 10. Add, commit, and push, and open a PR to get the changelog and version bump
    into main (and get it merged).
 11. Back in the GitHub releases page, tweak the release notes - for example,
