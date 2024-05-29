@@ -521,7 +521,9 @@ def test_add_grant_revoke_remove():
     state = State(
         leader=True,
         relations=[
-            Relation("bar", remote_app_name=relation_remote_app, id=relation_id)
+            Relation(
+                "bar", remote_app_name=relation_remote_app, relation_id=relation_id
+            )
         ],
     )
 

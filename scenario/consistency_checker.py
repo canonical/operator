@@ -487,13 +487,13 @@ def check_relation_consistency(
         expected_sub = relation_meta.get("scope", "") == "container"
         relations = _get_relations(endpoint)
         for relation in relations:
-            if relation.id in seen_ids:
+            if relation.relation_id in seen_ids:
                 errors.append(
-                    f"duplicate relation ID: {relation.id} is claimed "
+                    f"duplicate relation ID: {relation.relation_id} is claimed "
                     f"by multiple Relation instances",
                 )
 
-            seen_ids.add(relation.id)
+            seen_ids.add(relation.relation_id)
             is_sub = isinstance(relation, SubordinateRelation)
             if is_sub and not expected_sub:
                 errors.append(
