@@ -6,33 +6,39 @@ jobs:
   charmcraft-pack:
     runs-on: ubuntu-22.04
 
+    strategy:
+      matrix:
+        include:
+          - charm-repo: jnsgruk/hello-kubecon
+            commit: dbd133466dde59ee64f20a732a8f3d2e560ec3b8  # 2023-07-03T14:09:38Z
     steps:
-    - name: Checkout test charm repository
-      uses: actions/checkout@v4
-      with:
-        repository: jnsgruk/hello-kubecon
+      - name: Checkout test charm repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.charm-repo }}
+          ref: ${{ matrix.commit }}
 
-    - name: Update 'ops' dependency in test charm to latest
-      run: |
-        sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-        if [ -z "${{ github.event.pull_request.head.sha }}" ]
-        then
-          echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-        else
-          # If on a PR, we need to reference the PR branch's repo and commit (not the GITHUB_SHA
-          # temporary merge commit), because charmcraft pack does a git checkout which
-          # can't see the temporary merge commit.
-          echo -e "\ngit+${{ github.event.pull_request.head.repo.clone_url }}@${{ github.event.pull_request.head.sha }}#egg=ops" >> requirements.txt
-        fi
-        cat requirements.txt
+      - name: Update 'ops' dependency in test charm to latest
+        run: |
+          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+          if [ -z "${{ github.event.pull_request.head.sha }}" ]
+          then
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+          else
+            # If on a PR, we need to reference the PR branch's repo and commit (not the GITHUB_SHA
+            # temporary merge commit), because charmcraft pack does a git checkout which
+            # can't see the temporary merge commit.
+            echo -e "\ngit+${{ github.event.pull_request.head.repo.clone_url }}@${{ github.event.pull_request.head.sha }}#egg=ops" >> requirements.txt
+          fi
+          cat requirements.txt
 
-    - name: Set up LXD
-      uses: canonical/setup-lxd@7be523c4c2724a31218a627809044c6a2f0870ad
-      with:
-        channel: 5.0/stable
+      - name: Set up LXD
+        uses: canonical/setup-lxd@7be523c4c2724a31218a627809044c6a2f0870ad
+        with:
+          channel: 5.0/stable
 
-    - name: Install charmcraft
-      run: sudo snap install charmcraft --classic
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
 
-    - name: Pack the charm
-      run: sudo charmcraft pack --verbose
+      - name: Pack the charm
+        run: sudo charmcraft pack --verbose

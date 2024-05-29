@@ -155,6 +155,11 @@ your charm to a controller using that version of Juju. For example, with microk8
 3. Run `GOBIN=/path/to/your/juju/_build/linux_amd64/bin:$GOBIN /path/to/your/juju bootstrap`
 4. Add a model and deploy your charm as normal
 
+### Regression testing against existing charms
+
+We rely on automation to [update charm pins](.github/actions/update-charm-pins/) of
+a bunch of charms that use the operator framework. The script can be run locally too.
+
 # Documentation
 
 In general, new functionality
