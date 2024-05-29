@@ -948,6 +948,46 @@ assert out.model.name == "my-model"
 assert out.model.uuid == state_in.model.uuid
 ```
 
+## CloudSpec
+
+You can set CloudSpec information in the state (only `type` and `name` are required).
+
+Example:
+
+```python
+import scenario
+
+state = scenario.State(
+    cloud_spec=scenario.CloudSpec(
+        type="lxd",
+        name="localhost",
+        endpoint="https://127.0.0.1:8443",
+        credential=scenario.CloudCredential(
+            auth_type="clientcertificate",
+            attributes={
+                "client-cert": "foo",
+                "client-key": "bar",
+                "server-cert": "baz",
+            },
+        ),
+    ),
+    model=scenario.Model(name="my-vm-model", type="lxd"),
+)
+```
+
+Then you can access it by `Model.get_cloud_spec()`:
+
+```python
+# charm.py
+class MyVMCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, event: ops.StartEvent):
+        self.cloud_spec = self.model.get_cloud_spec()
+```
+
 # Actions
 
 An action is a special sort of event, even though `ops` handles them almost identically.

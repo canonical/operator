@@ -70,6 +70,7 @@ def check_consistency(
         check_storages_consistency,
         check_relation_consistency,
         check_network_consistency,
+        check_cloudspec_consistency,
     ):
         results = check(
             state=state,
@@ -565,3 +566,23 @@ def check_containers_consistency(
         errors.append(f"Duplicate container name(s): {dupes}.")
 
     return Results(errors, [])
+
+
+def check_cloudspec_consistency(
+    *,
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    **_kwargs,  # noqa: U101
+) -> Results:
+    """Check that Kubernetes charms/models don't have `state.cloud_spec`."""
+
+    errors = []
+    warnings = []
+
+    if state.model.type == "kubernetes" and state.cloud_spec:
+        errors.append(
+            "CloudSpec is only available for machine charms, not Kubernetes charms. Tell Scenario to simulate a machine substrate with: `scenario.State(..., model=scenario.Model(type='lxd'))`.",
+        )
+
+    return Results(errors, warnings)

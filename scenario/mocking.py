@@ -20,7 +20,7 @@ from typing import (
     cast,
 )
 
-from ops import JujuVersion, pebble
+from ops import CloudSpec, JujuVersion, pebble
 from ops.model import ModelError, RelationNotFoundError
 from ops.model import Secret as Secret_Ops  # lol
 from ops.model import (
@@ -628,6 +628,13 @@ class _MockModelBackend(_ModelBackend):
                 f"Inconsistent state: "
                 f"resource {resource_name} not found in State. please pass it.",
             )
+
+    def credential_get(self) -> CloudSpec:
+        if not self._state.cloud_spec:
+            raise ModelError(
+                "ERROR cloud spec is empty, initialise it with `scenario.State(cloud_spec=scenario.CloudSpec(...))`",
+            )
+        return self._state.cloud_spec._to_ops()
 
 
 class _MockPebbleClient(_TestingPebbleClient):
