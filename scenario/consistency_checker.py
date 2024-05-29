@@ -582,7 +582,7 @@ def check_cloudspec_consistency(
 
     if state.model.type == "kubernetes" and state.cloud_spec:
         errors.append(
-            "CloudSpec is only available for machine charms, not Kubernetes charms.",
+            "CloudSpec is only available for machine charms, not Kubernetes charms. Tell Scenario to simulate a machine substrate with: `scenario.State(..., model=scenario.Model(type='lxd'))`.",
         )
 
     return Results(errors, warnings)
