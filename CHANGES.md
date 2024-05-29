@@ -1,3 +1,26 @@
+# 2.14.0 - 29 May 2024
+
+This release fixes the `RelationDataContent.update` method to follow `dict.update` semantics, that is allow both updating with another dict, an iterable, keyword arguments or a mixture thereof.
+
+## Features
+
+* feat: add a `__str__` to ActionFailed, for better unexpected failure output in https://github.com/canonical/operator/pull/1209
+
+## Fixes
+
+* The `other` argument to `RelatationDataContent.update(...)` should be optional by @addyess in https://github.com/canonical/operator/pull/1226
+
+## Documentation
+
+* Use the actual emoji character rather than GitHub markup, to show properly on PyPI in https://github.com/canonical/operator/pull/1221
+* Clarify that SecretNotFound may be raised for permission errors in https://github.com/canonical/operator/pull/1231
+
+## Refactoring
+
+* Refactor tests to pytest style in https://github.com/canonical/operator/pull/1199 https://github.com/canonical/operator/pull/1200 https://github.com/canonical/operator/pull/1203 https://github.com/canonical/operator/pull/1206
+* Use `ruff` formatter and reformat all code in https://github.com/canonical/operator/pull/1224
+* Don't use f-strings in logging calls in https://github.com/canonical/operator/pull/1227 https://github.com/canonical/operator/pull/1234
+
 # 2.13.0 - 30 Apr 2024
 
 ## Features
