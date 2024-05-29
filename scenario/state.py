@@ -155,7 +155,7 @@ class CloudCredential:
     """
 
     redacted: List[str] = dataclasses.field(default_factory=list)
-    """A list of redacted secrets."""
+    """A list of redacted generic cloud API secrets."""
 
     def _to_ops(self) -> ops.CloudCredential:
         return ops.CloudCredential(
