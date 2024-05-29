@@ -164,7 +164,7 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and:
 - Join our chat: [Mattermost](https://chat.charmhub.io/charmhub/channels/ops)
 - Join our forum: [Discourse](https://discourse.charmhub.io/)
- 
+
 ### File an issue
 
 - Report an `ops` bug using [GitHub issues](https://github.com/canonical/operator/issues)
@@ -175,4 +175,3 @@ Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and:
 - Read our [documentation contributor guidelines](https://discourse.charmhub.io/t/documentation-guidelines-for-contributors/1245) and help improve a doc
 - Read our [codebase contributor guidelines](HACKING.md) and help improve the codebase
 - Write a charm and publish it on [Charmhub](https://charmhub.io/)
-
