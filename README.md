@@ -20,7 +20,7 @@ union of an `Event` (why am I, charm, being executed), a `State` (am I leader? w
 config?...) and the charm's execution `Context` (what relations can I have? what containers can I have?...). The output is another `State`: the state after the charm has had a chance to interact with the
 mocked Juju model and affect the initial state back.
 
-![state transition model depiction](resources/state-transition-model.png)
+![state transition model depiction](https://raw.githubusercontent.com/canonical/ops-scenario/main/resources/state-transition-model.png)
 
 For example: a charm currently in `unknown` status is executed with a `start` event, and based on whether it has leadership or not (according to its input state), it will decide to set `active` or `blocked` status (which will be reflected in the output state).
 
