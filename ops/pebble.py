@@ -70,100 +70,121 @@ import websocket  # type: ignore
 from ops._private import timeconv, yaml
 
 # Public as these are used in the Container.add_layer signature
-ServiceDict = typing.TypedDict('ServiceDict',
-                               {'summary': str,
-                                'description': str,
-                                'startup': str,
-                                'override': str,
-                                'command': str,
-                                'after': Sequence[str],
-                                'before': Sequence[str],
-                                'requires': Sequence[str],
-                                'environment': Dict[str, str],
-                                'user': str,
-                                'user-id': Optional[int],
-                                'group': str,
-                                'group-id': Optional[int],
-                                'working-dir': str,
-                                'on-success': str,
-                                'on-failure': str,
-                                'on-check-failure': Dict[str, Any],
-                                'backoff-delay': str,
-                                'backoff-factor': Optional[int],
-                                'backoff-limit': str,
-                                'kill-delay': Optional[str],
-                                },
-                               total=False)
+ServiceDict = typing.TypedDict(
+    'ServiceDict',
+    {
+        'summary': str,
+        'description': str,
+        'startup': str,
+        'override': str,
+        'command': str,
+        'after': Sequence[str],
+        'before': Sequence[str],
+        'requires': Sequence[str],
+        'environment': Dict[str, str],
+        'user': str,
+        'user-id': Optional[int],
+        'group': str,
+        'group-id': Optional[int],
+        'working-dir': str,
+        'on-success': str,
+        'on-failure': str,
+        'on-check-failure': Dict[str, Any],
+        'backoff-delay': str,
+        'backoff-factor': Optional[int],
+        'backoff-limit': str,
+        'kill-delay': Optional[str],
+    },
+    total=False,
+)
 
-HttpDict = typing.TypedDict('HttpDict',
-                            {'url': str,
-                             'headers': Dict[str, str]},
-                            total=False)
-TcpDict = typing.TypedDict('TcpDict',
-                           {'port': int,
-                            'host': str},
-                           total=False)
-ExecDict = typing.TypedDict('ExecDict',
-                            {'command': str,
-                             # see JujuVersion.supports_exec_service_context
-                             'service-context': str,
-                             'environment': Dict[str, str],
-                             'user-id': Optional[int],
-                             'user': str,
-                             'group-id': Optional[int],
-                             'group': str,
-                             'working-dir': str},
-                            total=False)
+HttpDict = typing.TypedDict('HttpDict', {'url': str, 'headers': Dict[str, str]}, total=False)
+TcpDict = typing.TypedDict('TcpDict', {'port': int, 'host': str}, total=False)
+ExecDict = typing.TypedDict(
+    'ExecDict',
+    {
+        'command': str,
+        # see JujuVersion.supports_exec_service_context
+        'service-context': str,
+        'environment': Dict[str, str],
+        'user-id': Optional[int],
+        'user': str,
+        'group-id': Optional[int],
+        'group': str,
+        'working-dir': str,
+    },
+    total=False,
+)
 
-CheckDict = typing.TypedDict('CheckDict',
-                             {'override': str,
-                              'level': Union['CheckLevel', str],
-                              'period': Optional[str],
-                              'timeout': Optional[str],
-                              'http': Optional[HttpDict],
-                              'tcp': Optional[TcpDict],
-                              'exec': Optional[ExecDict],
-                              'threshold': Optional[int]},
-                             total=False)
+CheckDict = typing.TypedDict(
+    'CheckDict',
+    {
+        'override': str,
+        'level': Union['CheckLevel', str],
+        'period': Optional[str],
+        'timeout': Optional[str],
+        'http': Optional[HttpDict],
+        'tcp': Optional[TcpDict],
+        'exec': Optional[ExecDict],
+        'threshold': Optional[int],
+    },
+    total=False,
+)
 
 # In Python 3.11+ 'services' and 'labels' should be NotRequired, and total=True.
-LogTargetDict = typing.TypedDict('LogTargetDict',
-                                 {'override': Union[Literal['merge'], Literal['replace']],
-                                  'type': Literal['loki'],
-                                  'location': str,
-                                  'services': List[str],
-                                  'labels': Dict[str, str]},
-                                 total=False)
+LogTargetDict = typing.TypedDict(
+    'LogTargetDict',
+    {
+        'override': Union[Literal['merge'], Literal['replace']],
+        'type': Literal['loki'],
+        'location': str,
+        'services': List[str],
+        'labels': Dict[str, str],
+    },
+    total=False,
+)
 
-LayerDict = typing.TypedDict('LayerDict',
-                             {'summary': str,
-                              'description': str,
-                              'services': Dict[str, ServiceDict],
-                              'checks': Dict[str, CheckDict],
-                              'log-targets': Dict[str, LogTargetDict]},
-                             total=False)
+LayerDict = typing.TypedDict(
+    'LayerDict',
+    {
+        'summary': str,
+        'description': str,
+        'services': Dict[str, ServiceDict],
+        'checks': Dict[str, CheckDict],
+        'log-targets': Dict[str, LogTargetDict],
+    },
+    total=False,
+)
 
-PlanDict = typing.TypedDict('PlanDict',
-                            {'services': Dict[str, ServiceDict],
-                             'checks': Dict[str, CheckDict],
-                             'log-targets': Dict[str, LogTargetDict]},
-                            total=False)
+PlanDict = typing.TypedDict(
+    'PlanDict',
+    {
+        'services': Dict[str, ServiceDict],
+        'checks': Dict[str, CheckDict],
+        'log-targets': Dict[str, LogTargetDict],
+    },
+    total=False,
+)
 
-_AuthDict = TypedDict('_AuthDict',
-                      {'permissions': Optional[str],
-                       'user-id': Optional[int],
-                       'user': Optional[str],
-                       'group-id': Optional[int],
-                       'group': Optional[str],
-                       'path': Optional[str],
-                       'make-dirs': Optional[bool],
-                       'make-parents': Optional[bool],
-                       }, total=False)
+_AuthDict = TypedDict(
+    '_AuthDict',
+    {
+        'permissions': Optional[str],
+        'user-id': Optional[int],
+        'user': Optional[str],
+        'group-id': Optional[int],
+        'group': Optional[str],
+        'path': Optional[str],
+        'make-dirs': Optional[bool],
+        'make-parents': Optional[bool],
+    },
+    total=False,
+)
 
-_ServiceInfoDict = TypedDict('_ServiceInfoDict',
-                             {'startup': Union['ServiceStartup', str],
-                                 'current': Union['ServiceStatus', str],
-                                 'name': str})
+_ServiceInfoDict = TypedDict(
+    '_ServiceInfoDict',
+    {'startup': Union['ServiceStartup', str], 'current': Union['ServiceStatus', str], 'name': str},
+)
 
 # Callback types for _MultiParser header and body handlers
 
@@ -203,81 +224,96 @@ _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
-    _CheckInfoDict = TypedDict('_CheckInfoDict',
-                               {"name": str,
-                                "level": NotRequired[Optional[Union['CheckLevel', str]]],
-                                "status": Union['CheckStatus', str],
-                                "failures": NotRequired[int],
-                                "threshold": int,
-                                "change-id": NotRequired[str]})
-    _FileInfoDict = TypedDict('_FileInfoDict',
-                              {"path": str,
-                               "name": str,
-                               "size": NotRequired[Optional[int]],
-                               "permissions": str,
-                               "last-modified": str,
-                               "user-id": NotRequired[Optional[int]],
-                               "user": NotRequired[Optional[str]],
-                               "group-id": NotRequired[Optional[int]],
-                               "group": NotRequired[Optional[str]],
-                               "type": Union['FileType', str]})
+    _CheckInfoDict = TypedDict(
+        '_CheckInfoDict',
+        {
+            'name': str,
+            'level': NotRequired[Optional[Union['CheckLevel', str]]],
+            'status': Union['CheckStatus', str],
+            'failures': NotRequired[int],
+            'threshold': int,
+            'change-id': NotRequired[str],
+        },
+    )
+    _FileInfoDict = TypedDict(
+        '_FileInfoDict',
+        {
+            'path': str,
+            'name': str,
+            'size': NotRequired[Optional[int]],
+            'permissions': str,
+            'last-modified': str,
+            'user-id': NotRequired[Optional[int]],
+            'user': NotRequired[Optional[str]],
+            'group-id': NotRequired[Optional[int]],
+            'group': NotRequired[Optional[str]],
+            'type': Union['FileType', str],
+        },
+    )
 
-    _ProgressDict = TypedDict('_ProgressDict',
-                              {'label': str,
-                               'done': int,
-                               'total': int})
-    _TaskDict = TypedDict('_TaskDict',
-                          {'id': str,
-                           'kind': str,
-                           'summary': str,
-                           'status': str,
-                           'log': NotRequired[Optional[List[str]]],
-                           'progress': _ProgressDict,
-                           'spawn-time': str,
-                           'ready-time': NotRequired[Optional[str]],
-                           'data': NotRequired[Optional[Dict[str, Any]]]})
-    _ChangeDict = TypedDict('_ChangeDict',
-                            {'id': str,
-                             'kind': str,
-                             'summary': str,
-                             'status': str,
-                             'ready': bool,
-                             'spawn-time': str,
-                             'tasks': NotRequired[Optional[List[_TaskDict]]],
-                             'err': NotRequired[Optional[str]],
-                             'ready-time': NotRequired[Optional[str]],
-                             'data': NotRequired[Optional[Dict[str, Any]]]})
+    _ProgressDict = TypedDict('_ProgressDict', {'label': str, 'done': int, 'total': int})
+    _TaskDict = TypedDict(
+        '_TaskDict',
+        {
+            'id': str,
+            'kind': str,
+            'summary': str,
+            'status': str,
+            'log': NotRequired[Optional[List[str]]],
+            'progress': _ProgressDict,
+            'spawn-time': str,
+            'ready-time': NotRequired[Optional[str]],
+            'data': NotRequired[Optional[Dict[str, Any]]],
+        },
+    )
+    _ChangeDict = TypedDict(
+        '_ChangeDict',
+        {
+            'id': str,
+            'kind': str,
+            'summary': str,
+            'status': str,
+            'ready': bool,
+            'spawn-time': str,
+            'tasks': NotRequired[Optional[List[_TaskDict]]],
+            'err': NotRequired[Optional[str]],
+            'ready-time': NotRequired[Optional[str]],
+            'data': NotRequired[Optional[Dict[str, Any]]],
+        },
+    )
 
-    _Error = TypedDict('_Error',
-                       {'kind': str,
-                        'message': str})
-    _Item = TypedDict('_Item',
-                      {'path': str,
-                       'error': NotRequired[_Error]})
-    _FilesResponse = TypedDict('_FilesResponse',
-                               {'result': List[_Item]})
+    _Error = TypedDict('_Error', {'kind': str, 'message': str})
+    _Item = TypedDict('_Item', {'path': str, 'error': NotRequired[_Error]})
+    _FilesResponse = TypedDict('_FilesResponse', {'result': List[_Item]})
 
-    _WarningDict = TypedDict('_WarningDict',
-                             {'message': str,
-                              'first-added': str,
-                              'last-added': str,
-                              'last-shown': NotRequired[Optional[str]],
-                              'expire-after': str,
-                              'repeat-after': str})
+    _WarningDict = TypedDict(
+        '_WarningDict',
+        {
+            'message': str,
+            'first-added': str,
+            'last-added': str,
+            'last-shown': NotRequired[Optional[str]],
+            'expire-after': str,
+            'repeat-after': str,
+        },
+    )
 
-    _NoticeDict = TypedDict('_NoticeDict', {
-        'id': str,
-        'user-id': NotRequired[Optional[int]],
-        'type': str,
-        'key': str,
-        'first-occurred': str,
-        'last-occurred': str,
-        'last-repeated': str,
-        'occurrences': int,
-        'last-data': NotRequired[Optional[Dict[str, str]]],
-        'repeat-after': NotRequired[str],
-        'expire-after': NotRequired[str],
-    })
+    _NoticeDict = TypedDict(
+        '_NoticeDict',
+        {
+            'id': str,
+            'user-id': NotRequired[Optional[int]],
+            'type': str,
+            'key': str,
+            'first-occurred': str,
+            'last-occurred': str,
+            'last-repeated': str,
+            'occurrences': int,
+            'last-data': NotRequired[Optional[Dict[str, str]]],
+            'repeat-after': NotRequired[str],
+            'expire-after': NotRequired[str],
+        },
+    )
 
 
 class _WebSocket(Protocol):
@@ -305,8 +341,9 @@ _not_provided = _NotProvidedFlag()
 class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
-    def __init__(self, host: str, socket_path: str,
-                 timeout: Union[_NotProvidedFlag, float] = _not_provided):
+    def __init__(
+        self, host: str, socket_path: str, timeout: Union[_NotProvidedFlag, float] = _not_provided
+    ):
         if timeout is _not_provided:
             super().__init__(host)
         else:
@@ -333,8 +370,11 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
 
     def http_open(self, req: urllib.request.Request):
         """Override http_open to use a Unix socket connection (instead of TCP)."""
-        return self.do_open(_UnixSocketConnection, req,  # type:ignore
-                            socket_path=self.socket_path)
+        return self.do_open(
+            _UnixSocketConnection,  # type:ignore
+            req,
+            socket_path=self.socket_path,
+        )
 
 
 def _format_timeout(timeout: float) -> str:
@@ -375,7 +415,7 @@ class ProtocolError(Error):
 class PathError(Error):
     """Raised when there's an error with a specific path."""
 
-    kind: typing.Literal["not-found", "permission-denied", "generic-file-error"]
+    kind: typing.Literal['not-found', 'permission-denied', 'generic-file-error']
     """Short string representing the kind of error."""
 
     message: str
@@ -501,7 +541,7 @@ class ExecError(Error, Generic[AnyStr]):
             if out is None:
                 continue
             truncated = ' [truncated]' if len(out) > self.STR_MAX_OUTPUT else ''
-            out = out[:self.STR_MAX_OUTPUT]
+            out = out[: self.STR_MAX_OUTPUT]
             message = f'{message}, {name}={out!r}{truncated}'
 
         return message
@@ -563,21 +603,25 @@ class Warning:
             message=d['message'],
             first_added=timeconv.parse_rfc3339(d['first-added']),
             last_added=timeconv.parse_rfc3339(d['last-added']),
-            last_shown=(timeconv.parse_rfc3339(d['last-shown'])  # type: ignore
-                        if d.get('last-shown') else None),
+            last_shown=(
+                timeconv.parse_rfc3339(d['last-shown'])  # type: ignore
+                if d.get('last-shown')
+                else None
+            ),
             expire_after=d['expire-after'],
             repeat_after=d['repeat-after'],
         )
 
     def __repr__(self):
-        return ('Warning('
-                f'message={self.message!r}, '
-                f'first_added={self.first_added!r}, '
-                f'last_added={self.last_added!r}, '
-                f'last_shown={self.last_shown!r}, '
-                f'expire_after={self.expire_after!r}, '
-                f'repeat_after={self.repeat_after!r})'
-                )
+        return (
+            'Warning('
+            f'message={self.message!r}, '
+            f'first_added={self.first_added!r}, '
+            f'last_added={self.last_added!r}, '
+            f'last_shown={self.last_shown!r}, '
+            f'expire_after={self.expire_after!r}, '
+            f'repeat_after={self.repeat_after!r})'
+        )
 
 
 class TaskProgress:
@@ -603,11 +647,12 @@ class TaskProgress:
         )
 
     def __repr__(self):
-        return ('TaskProgress('
-                f'label={self.label!r}, '
-                f'done={self.done!r}, '
-                f'total={self.total!r})'
-                )
+        return (
+            'TaskProgress('
+            f'label={self.label!r}, '
+            f'done={self.done!r}, '
+            f'total={self.total!r})'
+        )
 
 
 class TaskID(str):
@@ -653,23 +698,27 @@ class Task:
             log=d.get('log') or [],
             progress=TaskProgress.from_dict(d['progress']),
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
-            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
-                        if d.get('ready-time') else None),
+            ready_time=(
+                timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
+                if d.get('ready-time')
+                else None
+            ),
             data=d.get('data') or {},
         )
 
     def __repr__(self):
-        return ('Task('
-                f'id={self.id!r}, '
-                f'kind={self.kind!r}, '
-                f'summary={self.summary!r}, '
-                f'status={self.status!r}, '
-                f'log={self.log!r}, '
-                f'progress={self.progress!r}, '
-                f'spawn_time={self.spawn_time!r}, '
-                f'ready_time={self.ready_time!r}, '
-                f'data={self.data!r})'
-                )
+        return (
+            'Task('
+            f'id={self.id!r}, '
+            f'kind={self.kind!r}, '
+            f'summary={self.summary!r}, '
+            f'status={self.status!r}, '
+            f'log={self.log!r}, '
+            f'progress={self.progress!r}, '
+            f'spawn_time={self.spawn_time!r}, '
+            f'ready_time={self.ready_time!r}, '
+            f'data={self.data!r})'
+        )
 
 
 class ChangeID(str):
@@ -718,24 +767,28 @@ class Change:
             ready=d['ready'],
             err=d.get('err'),
             spawn_time=timeconv.parse_rfc3339(d['spawn-time']),
-            ready_time=(timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
-                        if d.get('ready-time') else None),
+            ready_time=(
+                timeconv.parse_rfc3339(d['ready-time'])  # type: ignore
+                if d.get('ready-time')
+                else None
+            ),
             data=d.get('data') or {},
         )
 
     def __repr__(self):
-        return ('Change('
-                f'id={self.id!r}, '
-                f'kind={self.kind!r}, '
-                f'summary={self.summary!r}, '
-                f'status={self.status!r}, '
-                f'tasks={self.tasks!r}, '
-                f'ready={self.ready!r}, '
-                f'err={self.err!r}, '
-                f'spawn_time={self.spawn_time!r}, '
-                f'ready_time={self.ready_time!r}, '
-                f'data={self.data!r})'
-                )
+        return (
+            'Change('
+            f'id={self.id!r}, '
+            f'kind={self.kind!r}, '
+            f'summary={self.summary!r}, '
+            f'status={self.status!r}, '
+            f'tasks={self.tasks!r}, '
+            f'ready={self.ready!r}, '
+            f'err={self.err!r}, '
+            f'spawn_time={self.spawn_time!r}, '
+            f'ready_time={self.ready_time!r}, '
+            f'data={self.data!r})'
+        )
 
 
 class Plan:
@@ -753,13 +806,15 @@ class Plan:
         d = typing.cast('PlanDict', d)
 
         self._raw = raw
-        self._services: Dict[str, Service] = {name: Service(name, service)
-                                              for name, service in d.get('services', {}).items()}
-        self._checks: Dict[str, Check] = {name: Check(name, check)
-                                          for name, check in d.get('checks', {}).items()}
+        self._services: Dict[str, Service] = {
+            name: Service(name, service) for name, service in d.get('services', {}).items()
+        }
+        self._checks: Dict[str, Check] = {
+            name: Check(name, check) for name, check in d.get('checks', {}).items()
+        }
         self._log_targets: Dict[str, LogTarget] = {
-            name: LogTarget(name, target)
-            for name, target in d.get('log-targets', {}).items()}
+            name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
+        }
 
     @property
     def services(self) -> Dict[str, 'Service']:
@@ -790,7 +845,10 @@ class Plan:
         fields = [
             ('services', {name: service.to_dict() for name, service in self._services.items()}),
             ('checks', {name: check.to_dict() for name, check in self._checks.items()}),
-            ('log-targets', {name: target.to_dict() for name, target in self._log_targets.items()})
+            (
+                'log-targets',
+                {name: target.to_dict() for name, target in self._log_targets.items()},
+            ),
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('PlanDict', dct)
@@ -836,12 +894,13 @@ class Layer:
 
         self.summary = d.get('summary', '')
         self.description = d.get('description', '')
-        self.services = {name: Service(name, service)
-                         for name, service in d.get('services', {}).items()}
-        self.checks = {name: Check(name, check)
-                       for name, check in d.get('checks', {}).items()}
-        self.log_targets = {name: LogTarget(name, target)
-                            for name, target in d.get('log-targets', {}).items()}
+        self.services = {
+            name: Service(name, service) for name, service in d.get('services', {}).items()
+        }
+        self.checks = {name: Check(name, check) for name, check in d.get('checks', {}).items()}
+        self.log_targets = {
+            name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
+        }
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -854,7 +913,7 @@ class Layer:
             ('description', self.description),
             ('services', {name: service.to_dict() for name, service in self.services.items()}),
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
-            ('log-targets', {name: target.to_dict() for name, target in self.log_targets.items()})
+            ('log-targets', {name: target.to_dict() for name, target in self.log_targets.items()}),
         ]
         dct = {name: value for name, value in fields if value}
         return typing.cast('LayerDict', dct)
@@ -1009,11 +1068,12 @@ class ServiceInfo:
         )
 
     def __repr__(self):
-        return ('ServiceInfo('
-                f'name={self.name!r}, '
-                f'startup={self.startup}, '
-                f'current={self.current})'
-                )
+        return (
+            'ServiceInfo('
+            f'name={self.name!r}, '
+            f'startup={self.startup}, '
+            f'current={self.current})'
+        )
 
 
 class Check:
@@ -1220,18 +1280,19 @@ class FileInfo:
         )
 
     def __repr__(self):
-        return ('FileInfo('
-                f'path={self.path!r}, '
-                f'name={self.name!r}, '
-                f'type={self.type}, '
-                f'size={self.size}, '
-                f'permissions=0o{self.permissions:o}, '
-                f'last_modified={self.last_modified!r}, '
-                f'user_id={self.user_id}, '
-                f'user={self.user!r}, '
-                f'group_id={self.group_id}, '
-                f'group={self.group!r})'
-                )
+        return (
+            'FileInfo('
+            f'path={self.path!r}, '
+            f'name={self.name!r}, '
+            f'type={self.type}, '
+            f'size={self.size}, '
+            f'permissions=0o{self.permissions:o}, '
+            f'last_modified={self.last_modified!r}, '
+            f'user_id={self.user_id}, '
+            f'user={self.user!r}, '
+            f'group_id={self.group_id}, '
+            f'group={self.group!r})'
+        )
 
 
 class CheckInfo:
@@ -1313,14 +1374,15 @@ class CheckInfo:
         )
 
     def __repr__(self):
-        return ('CheckInfo('
-                f'name={self.name!r}, '
-                f'level={self.level}, '
-                f'status={self.status}, '
-                f'failures={self.failures}, '
-                f'threshold={self.threshold!r}, '
-                f'change_id={self.change_id!r})'
-                )
+        return (
+            'CheckInfo('
+            f'name={self.name!r}, '
+            f'level={self.level}, '
+            f'status={self.status}, '
+            f'failures={self.failures}, '
+            f'threshold={self.threshold!r}, '
+            f'change_id={self.change_id!r})'
+        )
 
 
 class NoticeType(enum.Enum):
@@ -1401,9 +1463,11 @@ class Notice:
             occurrences=d['occurrences'],
             last_data=d.get('last-data') or {},
             repeat_after=timeconv.parse_duration(d['repeat-after'])
-            if 'repeat-after' in d else None,
+            if 'repeat-after' in d
+            else None,
             expire_after=timeconv.parse_duration(d['expire-after'])
-            if 'expire-after' in d else None,
+            if 'expire-after' in d
+            else None,
         )
 
 
@@ -1546,7 +1610,7 @@ class ExecProcess(Generic[AnyStr]):
         if self.stdout is None:
             raise TypeError(
                 "can't use wait_output() when exec was called with the stdout argument; "
-                "use wait() instead"
+                'use wait() instead'
             )
 
         if self._encoding is not None:
@@ -1600,11 +1664,13 @@ def _has_fileno(f: Any) -> bool:
         return False
 
 
-def _reader_to_websocket(reader: '_WebsocketReader',
-                         ws: '_WebSocket',
-                         encoding: str,
-                         cancel_reader: Optional[int] = None,
-                         bufsize: int = 16 * 1024):
+def _reader_to_websocket(
+    reader: '_WebsocketReader',
+    ws: '_WebSocket',
+    encoding: str,
+    cancel_reader: Optional[int] = None,
+    bufsize: int = 16 * 1024,
+):
     """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         if cancel_reader is not None:
@@ -1623,8 +1689,7 @@ def _reader_to_websocket(reader: '_WebsocketReader',
     ws.send('{"command":"end"}')  # type: ignore # Send "end" command as TEXT frame to signal EOF
 
 
-def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
-                         encoding: Optional[str]):
+def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter', encoding: Optional[str]):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
         chunk = ws.recv()
@@ -1639,7 +1704,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter',
             command = payload.get('command')
             if command != 'end':
                 # A command we don't recognize, keep going
-                logger.warning(f'Invalid I/O command {command!r}')
+                logger.warning('Invalid I/O command %r', command)
                 continue
             # Received "end" command (EOF signal), stop thread
             break
@@ -1702,7 +1767,7 @@ class _WebsocketReader(io.BufferedIOBase):
                 command = payload.get('command')
                 if command != 'end':
                     # A command we don't recognize, keep going
-                    logger.warning(f'Invalid I/O command {command!r}')
+                    logger.warning('Invalid I/O command %r', command)
                     continue
                 # Received "end" command, return EOF designator
                 self.eof = True
@@ -1744,10 +1809,13 @@ class Client:
 
     _chunk_size = 8192
 
-    def __init__(self, socket_path: str,
-                 opener: Optional[urllib.request.OpenerDirector] = None,
-                 base_url: str = 'http://localhost',
-                 timeout: float = 5.0):
+    def __init__(
+        self,
+        socket_path: str,
+        opener: Optional[urllib.request.OpenerDirector] = None,
+        base_url: str = 'http://localhost',
+        timeout: float = 5.0,
+    ):
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
         if opener is None:
@@ -1768,12 +1836,13 @@ class Client:
         return opener
 
     # we need to cast the return type depending on the request params
-    def _request(self,
-                 method: str,
-                 path: str,
-                 query: Optional[Dict[str, Any]] = None,
-                 body: Optional[Dict[str, Any]] = None
-                 ) -> Dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        query: Optional[Dict[str, Any]] = None,
+        body: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Make a JSON request to the Pebble server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -1793,8 +1862,10 @@ class Client:
         return raw_resp
 
     @staticmethod
-    def _ensure_content_type(headers: email.message.Message,
-                             expected: 'Literal["multipart/form-data", "application/json"]'):
+    def _ensure_content_type(
+        headers: email.message.Message,
+        expected: 'Literal["multipart/form-data", "application/json"]',
+    ):
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
         Return a dict of any options in the header, e.g., {'boundary': ...}.
@@ -1807,7 +1878,9 @@ class Client:
         return options
 
     def _request_raw(
-        self, method: str, path: str,
+        self,
+        method: str,
+        path: str,
         query: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, Any]] = None,
         data: Optional[Union[bytes, Generator[bytes, Any, Any]]] = None,
@@ -1815,7 +1888,7 @@ class Client:
         """Make a request to the Pebble server; return the raw HTTPResponse object."""
         url = self.base_url + path
         if query:
-            url = f"{url}?{urllib.parse.urlencode(query, doseq=True)}"
+            url = f'{url}?{urllib.parse.urlencode(query, doseq=True)}'
 
         if headers is None:
             headers = {}
@@ -1837,8 +1910,9 @@ class Client:
         except urllib.error.URLError as e:
             if e.args and isinstance(e.args[0], FileNotFoundError):
                 raise ConnectionError(
-                    f"Could not connect to Pebble: socket not found at {self.socket_path!r} "
-                    "(container restarted?)") from None
+                    f'Could not connect to Pebble: socket not found at {self.socket_path!r} '
+                    '(container restarted?)'
+                ) from None
             raise ConnectionError(e.reason) from e
 
         return response
@@ -1861,7 +1935,9 @@ class Client:
         return resp['result']
 
     def get_changes(
-        self, select: ChangeState = ChangeState.IN_PROGRESS, service: Optional[str] = None,
+        self,
+        select: ChangeState = ChangeState.IN_PROGRESS,
+        service: Optional[str] = None,
     ) -> List[Change]:
         """Get list of changes in given state, filter by service name if given."""
         query: Dict[str, Union[str, int]] = {'select': select.value}
@@ -1917,7 +1993,10 @@ class Client:
         return self._services_action('replan', [], timeout, delay)
 
     def start_services(
-        self, services: Iterable[str], timeout: float = 30.0, delay: float = 0.1,
+        self,
+        services: Iterable[str],
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ) -> ChangeID:
         """Start services by name and wait (poll) for them to be started.
 
@@ -1938,7 +2017,10 @@ class Client:
         return self._services_action('start', services, timeout, delay)
 
     def stop_services(
-        self, services: Iterable[str], timeout: float = 30.0, delay: float = 0.1,
+        self,
+        services: Iterable[str],
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ) -> ChangeID:
         """Stop services by name and wait (poll) for them to be started.
 
@@ -1959,7 +2041,10 @@ class Client:
         return self._services_action('stop', services, timeout, delay)
 
     def restart_services(
-        self, services: Iterable[str], timeout: float = 30.0, delay: float = 0.1,
+        self,
+        services: Iterable[str],
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ) -> ChangeID:
         """Restart services by name and wait (poll) for them to be started.
 
@@ -1980,12 +2065,16 @@ class Client:
         return self._services_action('restart', services, timeout, delay)
 
     def _services_action(
-        self, action: str, services: Iterable[str], timeout: Optional[float],
-            delay: float,
+        self,
+        action: str,
+        services: Iterable[str],
+        timeout: Optional[float],
+        delay: float,
     ) -> ChangeID:
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
             raise TypeError(
-                f'services must be of type Iterable[str], not {type(services).__name__}')
+                f'services must be of type Iterable[str], not {type(services).__name__}'
+            )
 
         services = list(services)
         for s in services:
@@ -2002,7 +2091,8 @@ class Client:
         return change_id
 
     def wait_change(
-        self, change_id: ChangeID,
+        self,
+        change_id: ChangeID,
         timeout: Optional[float] = 30.0,
         delay: float = 0.1,
     ) -> Change:
@@ -2066,16 +2156,19 @@ class Client:
         except APIError as e:
             if e.code == 404:
                 raise NotImplementedError(
-                    'server does not implement wait-change endpoint') from None
+                    'server does not implement wait-change endpoint'
+                ) from None
             if e.code == 504:
                 raise TimeoutError(
-                    f'timed out waiting for change {change_id} ({timeout} seconds)') from None
+                    f'timed out waiting for change {change_id} ({timeout} seconds)'
+                ) from None
             raise
 
         return Change.from_dict(resp['result'])
 
-    def _wait_change_using_polling(self, change_id: ChangeID, timeout: Optional[float],
-                                   delay: float):
+    def _wait_change_using_polling(
+        self, change_id: ChangeID, timeout: Optional[float], delay: float
+    ):
         """Wait for a change to be ready by polling the get-change API."""
         deadline = time.time() + timeout if timeout is not None else 0
 
@@ -2089,8 +2182,8 @@ class Client:
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def add_layer(
-            self, label: str, layer: Union[str, 'LayerDict', Layer], *,
-            combine: bool = False):
+        self, label: str, layer: Union[str, 'LayerDict', Layer], *, combine: bool = False
+    ):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
@@ -2109,7 +2202,8 @@ class Client:
             layer_yaml = layer.to_yaml()
         else:
             raise TypeError(
-                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}'
+            )
 
         body = {
             'action': 'add',
@@ -2138,17 +2232,12 @@ class Client:
         return [ServiceInfo.from_dict(info) for info in resp['result']]
 
     @typing.overload
-    def pull(self, path: str, *, encoding: None) -> BinaryIO:
-        ...
+    def pull(self, path: str, *, encoding: None) -> BinaryIO: ...
 
     @typing.overload
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO:
-        ...
+    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO: ...
 
-    def pull(self,
-             path: str,
-             *,
-             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(self, path: str, *, encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
         Args:
@@ -2216,13 +2305,18 @@ class Client:
             raise PathError(error['kind'], error['message'])
 
     def push(
-            self, path: str, source: '_IOSource', *,
-            encoding: str = 'utf-8', make_dirs: bool = False,
-            permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None):
+        self,
+        path: str,
+        source: '_IOSource',
+        *,
+        encoding: str = 'utf-8',
+        make_dirs: bool = False,
+        permissions: Optional[int] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+    ):
         """Write content to a given file path on the remote system.
 
         Args:
@@ -2268,11 +2362,13 @@ class Client:
         self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
     @staticmethod
-    def _make_auth_dict(permissions: Optional[int],
-                        user_id: Optional[int],
-                        user: Optional[str],
-                        group_id: Optional[int],
-                        group: Optional[str]) -> '_AuthDict':
+    def _make_auth_dict(
+        permissions: Optional[int],
+        user_id: Optional[int],
+        user: Optional[str],
+        group_id: Optional[int],
+        group: Optional[str],
+    ) -> '_AuthDict':
         d: _AuthDict = {}
         if permissions is not None:
             d['permissions'] = format(permissions, '03o')
@@ -2286,8 +2382,9 @@ class Client:
             d['group'] = group
         return d
 
-    def _encode_multipart(self, metadata: Dict[str, Any], path: str,
-                          source: '_IOSource', encoding: str):
+    def _encode_multipart(
+        self, metadata: Dict[str, Any], path: str, source: '_IOSource', encoding: str
+    ):
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
         if isinstance(source, str):
@@ -2302,15 +2399,21 @@ class Client:
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([
-                b'--', boundary, b'\r\n',
+                b'--',
+                boundary,
+                b'\r\n',
                 b'Content-Type: application/json\r\n',
                 b'Content-Disposition: form-data; name="request"\r\n',
                 b'\r\n',
-                json.dumps(metadata).encode('utf-8'), b'\r\n',
-                b'--', boundary, b'\r\n',
+                json.dumps(metadata).encode('utf-8'),
+                b'\r\n',
+                b'--',
+                boundary,
+                b'\r\n',
                 b'Content-Type: application/octet-stream\r\n',
                 b'Content-Disposition: form-data; name="files"; filename="',
-                path_escaped, b'"\r\n',
+                path_escaped,
+                b'"\r\n',
                 b'\r\n',
             ])
 
@@ -2323,13 +2426,16 @@ class Client:
 
             yield b''.join([
                 b'\r\n',
-                b'--', boundary, b'--\r\n',
+                b'--',
+                boundary,
+                b'--\r\n',
             ])
 
         return generator(), content_type
 
-    def list_files(self, path: str, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List[FileInfo]:
+    def list_files(
+        self, path: str, *, pattern: Optional[str] = None, itself: bool = False
+    ) -> List[FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2360,12 +2466,16 @@ class Client:
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
-            self, path: str, *, make_parents: bool = False,
-            permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None):
+        self,
+        path: str,
+        *,
+        make_parents: bool = False,
+        permissions: Optional[int] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
+    ):
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -2437,9 +2547,8 @@ class Client:
         stdout: Optional[TextIO] = None,
         stderr: Optional[TextIO] = None,
         encoding: str = 'utf-8',
-        combine_stderr: bool = False
-    ) -> ExecProcess[str]:
-        ...
+        combine_stderr: bool = False,
+    ) -> ExecProcess[str]: ...
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
@@ -2459,9 +2568,8 @@ class Client:
         stdout: Optional[BinaryIO] = None,
         stderr: Optional[BinaryIO] = None,
         encoding: None = None,
-        combine_stderr: bool = False
-    ) -> ExecProcess[bytes]:
-        ...
+        combine_stderr: bool = False,
+    ) -> ExecProcess[bytes]: ...
 
     def exec(
         self,
@@ -2479,7 +2587,7 @@ class Client:
         stdout: Optional[Union[TextIO, BinaryIO]] = None,
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: Optional[str] = 'utf-8',
-        combine_stderr: bool = False
+        combine_stderr: bool = False,
     ) -> ExecProcess[Any]:
         r"""Execute the given command on the remote system.
 
@@ -2641,7 +2749,7 @@ class Client:
         change_id = resp['change']
         task_id = resp['result']['task-id']
 
-        stderr_ws: Optional['_WebSocket'] = None
+        stderr_ws: Optional[_WebSocket] = None
         try:
             control_ws = self._connect_websocket(task_id, 'control')
             stdio_ws = self._connect_websocket(task_id, 'stdio')
@@ -2669,6 +2777,7 @@ class Client:
                 def _cancel_stdin():
                     os.write(cancel_writer, b'x')  # doesn't matter what we write
                     os.close(cancel_writer)
+
                 cancel_stdin = _cancel_stdin
 
             t = _start_thread(_reader_to_websocket, stdin, stdio_ws, encoding, cancel_reader)
@@ -2677,8 +2786,7 @@ class Client:
         else:
             process_stdin = _WebsocketWriter(stdio_ws)
             if encoding is not None:
-                process_stdin = io.TextIOWrapper(
-                    process_stdin, encoding=encoding, newline='')  # type: ignore
+                process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding, newline='')  # type: ignore
 
         if stdout is not None:
             t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
@@ -2687,8 +2795,7 @@ class Client:
         else:
             process_stdout = _WebsocketReader(stdio_ws)
             if encoding is not None:
-                process_stdout = io.TextIOWrapper(
-                    process_stdout, encoding=encoding, newline='')  # type: ignore
+                process_stdout = io.TextIOWrapper(process_stdout, encoding=encoding, newline='')  # type: ignore
 
         process_stderr = None
         if not combine_stderr:
@@ -2700,7 +2807,10 @@ class Client:
                 process_stderr = _WebsocketReader(ws)
                 if encoding is not None:
                     process_stderr = io.TextIOWrapper(
-                        process_stderr, encoding=encoding, newline='')  # type: ignore
+                        process_stderr,  # type: ignore
+                        encoding=encoding,
+                        newline='',
+                    )
 
         process: ExecProcess[Any] = ExecProcess(
             stdin=process_stdin,  # type: ignore
@@ -2724,7 +2834,7 @@ class Client:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self.socket_path)
         url = self._websocket_url(task_id, websocket_id)
-        ws: '_WebSocket' = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
+        ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
         ws.connect(url, socket=sock)
         return ws
 
@@ -2746,8 +2856,9 @@ class Client:
                 currently running.
         """
         if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
-            raise TypeError('services must be of type Iterable[str], '
-                            f'not {type(services).__name__}')
+            raise TypeError(
+                f'services must be of type Iterable[str], not {type(services).__name__}'
+            )
         for s in services:
             if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
@@ -2761,9 +2872,7 @@ class Client:
         self._request('POST', '/v1/signals', body=body)
 
     def get_checks(
-        self,
-        level: Optional[CheckLevel] = None,
-        names: Optional[Iterable[str]] = None
+        self, level: Optional[CheckLevel] = None, names: Optional[Iterable[str]] = None
     ) -> List[CheckInfo]:
         """Get the check status for the configured checks.
 
@@ -2784,9 +2893,14 @@ class Client:
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
 
-    def notify(self, type: NoticeType, key: str, *,
-               data: Optional[Dict[str, str]] = None,
-               repeat_after: Optional[datetime.timedelta] = None) -> str:
+    def notify(
+        self,
+        type: NoticeType,
+        key: str,
+        *,
+        data: Optional[Dict[str, str]] = None,
+        repeat_after: Optional[datetime.timedelta] = None,
+    ) -> str:
         """Record an occurrence of a notice with the specified options.
 
         Args:
@@ -2869,7 +2983,7 @@ class _FilesParser:
 
     def __init__(self, boundary: Union[bytes, str]):
         self._response: Optional[_FilesResponse] = None  # externally managed
-        self._part_type: Optional[Literal["response", "files"]] = None  # externally managed
+        self._part_type: Optional[Literal['response', 'files']] = None  # externally managed
         self._headers: Optional[email.message.Message] = None  # externally managed
         self._files: Dict[str, _Tempfile] = {}
 
@@ -2883,10 +2997,8 @@ class _FilesParser:
         self._max_lookahead = 8 * 1024 * 1024
 
         self._parser = _MultipartParser(
-            boundary,
-            self._process_header,
-            self._process_body,
-            max_lookahead=self._max_lookahead)
+            boundary, self._process_header, self._process_body, max_lookahead=self._max_lookahead
+        )
 
         # RFC 2046 says that the boundary string needs to be preceded by a CRLF.
         # Unfortunately, the request library's header parsing logic strips off one of
@@ -2900,8 +3012,7 @@ class _FilesParser:
 
         content_disposition = self._headers.get_content_disposition()
         if content_disposition != 'form-data':
-            raise ProtocolError(
-                f'unexpected content disposition: {content_disposition!r}')
+            raise ProtocolError(f'unexpected content disposition: {content_disposition!r}')
 
         name = self._headers.get_param('name', header='content-disposition')
         if name == 'files':
@@ -2910,8 +3021,7 @@ class _FilesParser:
                 raise ProtocolError('multipart "files" part missing filename')
             self._prepare_tempfile(filename)
         elif name != 'response':
-            raise ProtocolError(
-                f'unexpected name in content-disposition header: {name!r}')
+            raise ProtocolError(f'unexpected name in content-disposition header: {name!r}')
 
         self._part_type = typing.cast('Literal["response", "files"]', name)
 
@@ -2968,20 +3078,25 @@ class _FilesParser:
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
         newline = '' if encoding else None
-        file_io = open(self._files[path].name, mode,  # noqa: SIM115
-                       encoding=encoding, newline=newline)
+        file_io = open(  # noqa: SIM115
+            self._files[path].name,
+            mode,
+            encoding=encoding,
+            newline=newline,
+        )
         # open() returns IO[Any]
         return typing.cast('_TextOrBinaryIO', file_io)
 
 
 class _MultipartParser:
     def __init__(
-            self,
-            marker: bytes,
-            handle_header: '_HeaderHandler',
-            handle_body: '_BodyHandler',
-            max_lookahead: int = 0,
-            max_boundary_length: int = 0):
+        self,
+        marker: bytes,
+        handle_header: '_HeaderHandler',
+        handle_body: '_BodyHandler',
+        max_lookahead: int = 0,
+        max_boundary_length: int = 0,
+    ):
         r"""Configures a parser for mime multipart messages.
 
         Args:
@@ -3054,14 +3169,14 @@ class _MultipartParser:
                 safe_bound = max(0, len(self._buf) - self._max_boundary_length)
                 if ii != -1:
                     # part body is finished
-                    self._handle_body(self._buf[self._pos:ii], done=True)
+                    self._handle_body(self._buf[self._pos : ii], done=True)
                     self._buf = self._buf[ii:]
                     self._pos = 0
                     if self._done:
                         return  # terminal boundary reached
                 elif safe_bound > self._pos:
                     # write partial body data
-                    data = self._buf[self._pos:safe_bound]
+                    data = self._buf[self._pos : safe_bound]
                     self._pos = safe_bound
                     self._handle_body(data)
                     return  # waiting for more data
@@ -3069,8 +3184,7 @@ class _MultipartParser:
                     return  # waiting for more data
 
 
-def _next_part_boundary(buf: bytes, marker: bytes, start: int = 0
-                        ) -> Tuple[int, int, bool]:
+def _next_part_boundary(buf: bytes, marker: bytes, start: int = 0) -> Tuple[int, int, bool]:
     """Returns the index of the next boundary marker in buf beginning at start.
 
     Returns:

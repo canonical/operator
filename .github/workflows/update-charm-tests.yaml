@@ -1,0 +1,53 @@
+---
+name: Update Charm Pins
+
+on:
+  # NOTE: to avoid infinite loop, exclude the branch created by this workflow if triggering on push or pull_request
+  workflow_dispatch:
+  schedule:
+    - cron: '0 18 * * SUN' # Sunday 6pm UTC, before international day starts
+
+jobs:
+  update-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
+
+      - uses: ./.github/actions/update-charm-pins
+        with:
+          # Whitespace (null) separated string, as workflow inputs are always plain values
+          workflows: |-
+            .github/workflows/db-charm-tests.yaml
+            .github/workflows/hello-charm-tests.yaml
+            .github/workflows/charmcraft-pack.yaml
+            .github/workflows/observability-charm-tests.yaml
+          gh-pat: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
+
+      - run: |
+          # Force-push pin changes to the branch
+          echo "New changes in charm pins"
+          git --no-pager diff
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git switch -C auto-update-external-charm-pins
+          git commit --allow-empty -am "chore: update charm pins"
+          echo "Total changes in charm pins"
+          git --no-pager diff main HEAD
+          git push -f --set-upstream origin auto-update-external-charm-pins
+      - run: |
+          # Ensure a PR if there are changes, no PR otherwise
+          PR=$(gh pr list --state open --head auto-update-external-charm-pins --json number -q '.[0].number')
+          CHANGES=$(git --no-pager diff --stat main HEAD)
+          echo "Existing PR? $PR"
+          echo "Changes? $CHANGES"
+          if [[ -n "$PR" && -z "$CHANGES" ]]; then
+            echo "Closing #$PR as stale"
+            gh pr close -c stale "$PR";
+          elif [[ -z "$PR" && -n "$CHANGES" ]]; then
+            echo "Opening new PR"
+            gh pr create --base main --head auto-update-external-charm-pins --title "chore: update charm pins" --body "This is an automated PR to update pins of the external repositories that the operator framework is tested against";
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}

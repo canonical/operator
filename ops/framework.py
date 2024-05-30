@@ -79,9 +79,9 @@ _ObjectPath = Tuple[Optional[_Path], _Kind]
 _PathToObjectMapping = Dict[_Path, 'Object']
 _PathToSerializableMapping = Dict[_Path, Serializable]
 
-_T = TypeVar("_T")
+_T = TypeVar('_T')
 _EventType = TypeVar('_EventType', bound='EventBase')
-_ObjectType = TypeVar("_ObjectType", bound="Object")
+_ObjectType = TypeVar('_ObjectType', bound='Object')
 
 logger = logging.getLogger(__name__)
 
@@ -109,14 +109,14 @@ class Handle:
         self._key = key
         if parent:
             if key:
-                self._path = f"{parent}/{kind}[{key}]"
+                self._path = f'{parent}/{kind}[{key}]'
             else:
-                self._path = f"{parent}/{kind}"
+                self._path = f'{parent}/{kind}'
         else:
             if key:
-                self._path = f"{kind}[{key}]"
+                self._path = f'{kind}[{key}]'
             else:
-                self._path = f"{kind}"  # don't need f-string, but consistent with above
+                self._path = f'{kind}'  # don't need f-string, but consistent with above
 
     def nest(self, kind: str, key: Optional[str]) -> 'Handle':
         """Create a new handle as child of the current one."""
@@ -155,8 +155,8 @@ class Handle:
     def from_path(cls, path: str) -> 'Handle':
         """Build a handle from the indicated path."""
         handle = None
-        for pair in path.split("/"):
-            pair = pair.split("[")
+        for pair in path.split('/'):
+            pair = pair.split('[')
             good = False
             if len(pair) == 1:
                 kind, key = pair[0], None
@@ -167,7 +167,7 @@ class Handle:
                     key = key[:-1]
                     good = True
             if not good:
-                raise RuntimeError(f"attempted to restore invalid handle path {path}")
+                raise RuntimeError(f'attempted to restore invalid handle path {path}')
             handle = Handle(handle, kind, key)  # type: ignore
         return typing.cast(Handle, handle)
 
@@ -191,7 +191,7 @@ class EventBase:
         self.deferred: bool = False
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} via {self.handle}>"
+        return f'<{self.__class__.__name__} via {self.handle}>'
 
     def defer(self) -> None:
         """Defer the event to the future.
@@ -241,7 +241,7 @@ class EventBase:
         3. At some future time, event C happens, which also checks if A can
            proceed.
         """
-        logger.debug("Deferring %s.", self)
+        logger.debug('Deferring %s.', self)
         self.deferred = True
 
     def snapshot(self) -> Dict[str, Any]:
@@ -278,7 +278,8 @@ class EventSource:
     def __init__(self, event_type: 'Type[EventBase]'):
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(
-                f'Event requires a subclass of EventBase as an argument, got {event_type}')
+                f'Event requires a subclass of EventBase as an argument, got {event_type}'
+            )
         self.event_type: Type[EventBase] = event_type
         self.event_kind: Optional[str] = None
         self.emitter_type: Optional[Type[Object]] = None
@@ -293,13 +294,12 @@ class EventSource:
                     self.event_kind,
                     emitter_type.__name__,
                     event_kind,
-                ))
+                )
+            )
         self.event_kind = event_kind
         self.emitter_type = emitter_type
 
-    def __get__(self, emitter: Optional['Object'],
-                emitter_type: 'Type[Object]'
-                ) -> 'BoundEvent':
+    def __get__(self, emitter: Optional['Object'], emitter_type: 'Type[Object]') -> 'BoundEvent':
         if emitter is None:
             return self  # type: ignore
         # Framework might not be available if accessed as CharmClass.on.event
@@ -320,9 +320,7 @@ class BoundEvent:
             f'{type(self.emitter).__name__}.{self.event_kind} at {hex(id(self))}>'
         )
 
-    def __init__(self, emitter: 'Object',
-                 event_type: 'Type[EventBase]',
-                 event_kind: str):
+    def __init__(self, emitter: 'Object', event_type: 'Type[EventBase]', event_kind: str):
         self.emitter = emitter
         self.event_type = event_type
         self.event_kind = event_kind
@@ -358,7 +356,7 @@ class HandleKind:
     """
 
     def __get__(self, obj: 'Object', obj_type: 'Type[Object]') -> str:
-        kind = typing.cast(str, obj_type.__dict__.get("handle_kind"))
+        kind = typing.cast(str, obj_type.__dict__.get('handle_kind'))
         if kind:
             return kind
         return obj_type.__name__
@@ -383,6 +381,7 @@ class Object:
     been created.
 
     """
+
     handle_kind: str = HandleKind()  # type: ignore
 
     if TYPE_CHECKING:
@@ -418,13 +417,12 @@ class Object:
 class ObjectEvents(Object):
     """Convenience type to allow defining ``.on`` attributes at class level."""
 
-    handle_kind = "on"
+    handle_kind = 'on'
 
     def __init__(self, parent: Optional[Object] = None, key: Optional[str] = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, 'ObjectEvents'] = \
-            weakref.WeakKeyDictionary()
+        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter: Object, emitter_type: 'Type[Object]'):
         if emitter is None:
@@ -462,13 +460,14 @@ class ObjectEvents(Object):
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
-            raise RuntimeError(f"{prefix}is not a valid python identifier: {event_kind}")
+            raise RuntimeError(f'{prefix}is not a valid python identifier: {event_kind}')
         elif keyword.iskeyword(event_kind):
-            raise RuntimeError(f"{prefix}is a python keyword: {event_kind}")
+            raise RuntimeError(f'{prefix}is a python keyword: {event_kind}')
         try:
             getattr(cls, event_kind)
             raise RuntimeError(
-                f"{prefix}overlaps with an existing type {cls} attribute: {event_kind}")
+                f'{prefix}overlaps with an existing type {cls} attribute: {event_kind}'
+            )
         except AttributeError:
             pass
 
@@ -559,7 +558,7 @@ class NoTypeError(Exception):
         self.handle_path = handle_path
 
     def __str__(self):
-        return f"cannot restore {self.handle_path} since no class was registered for it"
+        return f'cannot restore {self.handle_path} since no class was registered for it'
 
 
 # the message to show to the user when a pdb breakpoint goes active
@@ -594,13 +593,18 @@ class Framework(Object):
 
     # to help the type checker and IDEs:
     if TYPE_CHECKING:
+
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
-    def __init__(self, storage: Union[SQLiteStorage, JujuStorage],
-                 charm_dir: Union[str, pathlib.Path],
-                 meta: 'charm.CharmMeta', model: 'Model',
-                 event_name: Optional[str] = None):
+    def __init__(
+        self,
+        storage: Union[SQLiteStorage, JujuStorage],
+        charm_dir: Union[str, pathlib.Path],
+        meta: 'charm.CharmMeta',
+        model: 'Model',
+        event_name: Optional[str] = None,
+    ):
         super().__init__(self, None)
 
         # an old, deprecated __init__ interface accepted an Optional charm_dir,
@@ -630,11 +634,10 @@ class Framework(Object):
         self._type_known: Set[Type[Serializable]] = set()
 
         if isinstance(storage, (str, pathlib.Path)):
-            logger.warning(
-                "deprecated: Framework now takes a Storage not a path")
+            logger.warning('deprecated: Framework now takes a Storage not a path')
             storage = SQLiteStorage(storage)
         # TODO(benhoyt): should probably have a Storage protocol
-        self._storage: 'SQLiteStorage' = storage  # type: ignore
+        self._storage: SQLiteStorage = storage  # type: ignore
 
         # We can't use the higher-level StoredState because it relies on events.
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
@@ -684,8 +687,7 @@ class Framework(Object):
             # Framework objects don't track themselves
             return
         if obj.handle.path in self.framework._objects:
-            raise RuntimeError(
-                f'two objects claiming to be {obj.handle.path} have been created')
+            raise RuntimeError(f'two objects claiming to be {obj.handle.path} have been created')
         self._objects[obj.handle.path] = obj
 
     def _forget(self, obj: 'Serializable'):
@@ -703,8 +705,12 @@ class Framework(Object):
         self.save_snapshot(self._stored)
         self._storage.commit()
 
-    def register_type(self, cls: Type[Serializable], parent: Optional[Union['Handle', 'Object']],
-                      kind: Optional[str] = None):
+    def register_type(
+        self,
+        cls: Type[Serializable],
+        parent: Optional[Union['Handle', 'Object']],
+        kind: Optional[str] = None,
+    ):
         """Register a type to a handle."""
         parent_path: Optional[str] = None
         if isinstance(parent, Object):
@@ -716,11 +722,12 @@ class Framework(Object):
         self._type_registry[(parent_path, kind_)] = cls
         self._type_known.add(cls)
 
-    def save_snapshot(self, value: Union["StoredStateData", "EventBase"]):
+    def save_snapshot(self, value: Union['StoredStateData', 'EventBase']):
         """Save a persistent snapshot of the provided value."""
         if type(value) not in self._type_known:
             raise RuntimeError(
-                f'cannot save {type(value).__name__} values before registering that type')
+                f'cannot save {type(value).__name__} values before registering that type'
+            )
         data = value.snapshot()
 
         # Use marshal as a validator, enforcing the use of simple types, as we later the
@@ -731,7 +738,7 @@ class Framework(Object):
         try:
             marshal.dumps(data)
         except ValueError:
-            msg = "unable to save the data for {}, it must contain only simple types: {!r}"
+            msg = 'unable to save the data for {}, it must contain only simple types: {!r}'
             raise ValueError(msg.format(value.__class__.__name__, data)) from None
 
         self._storage.save_snapshot(value.handle.path, data)
@@ -778,10 +785,12 @@ class Framework(Object):
         """
         if not isinstance(bound_event, BoundEvent):
             raise TypeError(
-                f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}')
+                f'Framework.observe requires a BoundEvent as second parameter, got {bound_event}'
+            )
         if not isinstance(observer, types.MethodType):
             raise TypeError(
-                f"Framework.observe requires a method as the 'observer' parameter, got {observer}")
+                f"Framework.observe requires a method as the 'observer' parameter, got {observer}"
+            )
 
         event_type = bound_event.event_type
         event_kind = bound_event.event_kind
@@ -789,16 +798,18 @@ class Framework(Object):
 
         self.register_type(event_type, emitter, event_kind)  # type: ignore
 
-        if hasattr(emitter, "handle"):
+        if hasattr(emitter, 'handle'):
             emitter_path = emitter.handle.path
         else:
             raise TypeError(
-                f'event emitter {type(emitter).__name__} must have a "handle" attribute')
+                f'event emitter {type(emitter).__name__} must have a "handle" attribute'
+            )
 
         method_name = observer.__name__
 
-        assert isinstance(observer.__self__, Object), "can't register observers " \
-                                                      "that aren't `Object`s"
+        assert isinstance(observer.__self__, Object), (
+            "can't register observers " "that aren't `Object`s"
+        )
         observer_obj = observer.__self__
 
         # Validate that the method has an acceptable call signature.
@@ -808,13 +819,13 @@ class Framework(Object):
         except TypeError as e:
             raise TypeError(
                 f'{type(observer_obj).__name__}.{method_name} must be callable with '
-                "only 'self' and the 'event'") from e
+                "only 'self' and the 'event'"
+            ) from e
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
         self._observer[observer_obj.handle.path] = observer_obj
-        self._observers.append((observer_obj.handle.path,
-                                method_name, emitter_path, event_kind))
+        self._observers.append((observer_obj.handle.path, method_name, emitter_path, event_kind))
 
     def _next_event_key(self) -> str:
         """Return the next event key that should be used, incrementing the internal counter."""
@@ -829,7 +840,7 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         parent = event.handle.parent
-        assert isinstance(parent, Handle), "event handle must have a parent"
+        assert isinstance(parent, Handle), 'event handle must have a parent'
         parent_path = parent.path
         # TODO Track observers by (parent_path, event_kind) rather than as a list of
         #  all observers. Avoiding linear search through all observers for every event
@@ -912,7 +923,7 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug("Re-emitting deferred event %s.", event)
+                    logger.debug('Re-emitting deferred event %s.', event)
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
                     pass
@@ -921,7 +932,7 @@ class Framework(Object):
                     # dispatched, and it also is not an event we have deferred,
                     # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
-                    logger.debug("Emitting custom event %s.", event)
+                    logger.debug('Emitting custom event %s.', event)
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
@@ -940,9 +951,9 @@ class Framework(Object):
 
             else:
                 logger.warning(
-                    f"Reference to ops.Object at path {observer_path} has been garbage collected "
-                    "between when the charm was initialised and when the event was emitted. "
-                    "Make sure sure you store a reference to the observer."
+                    'Reference to ops.Object at path %s has been garbage collected '
+                    'between when the charm was initialised and when the event was emitted. '
+                    'Make sure sure you store a reference to the observer.', observer_path
                 )
 
             if event.deferred:
@@ -999,8 +1010,10 @@ class Framework(Object):
             pdb.Pdb().set_trace(code_frame)
         else:
             logger.warning(
-                "Breakpoint %r skipped (not found in the requested breakpoints: %s)",
-                name, indicated_breakpoints)
+                'Breakpoint %r skipped (not found in the requested breakpoints: %s)',
+                name,
+                indicated_breakpoints,
+            )
 
     def remove_unreferenced_events(self) -> None:
         """Remove events from storage that are not referenced.
@@ -1057,6 +1070,7 @@ class StoredStateData(Object):
 
 class BoundStoredState:
     """Stored state data bound to a specific Object."""
+
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
@@ -1075,8 +1089,8 @@ class BoundStoredState:
             data = StoredStateData(parent, attr_name)
 
         # __dict__ is used to avoid infinite recursion.
-        self.__dict__["_data"] = data
-        self.__dict__["_attr_name"] = attr_name
+        self.__dict__['_data'] = data
+        self.__dict__['_attr_name'] = attr_name
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
 
@@ -1090,14 +1104,14 @@ class BoundStoredState:
 
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
-        if key == "on":
+        if key == 'on':
             return self._data.on
         if key not in self._data:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
 
     def __setattr__(self, key: str, value: Any):
-        if key == "on":
+        if key == 'on':
             raise AttributeError("attribute 'on' is reserved and cannot be set")
 
         unwrapped = _unwrap_stored(self._data, value)
@@ -1105,7 +1119,8 @@ class BoundStoredState:
         if not isinstance(unwrapped, (type(None), int, float, str, bytes, list, dict, set)):
             raise AttributeError(
                 f'attribute {key!r} cannot be a {type(unwrapped).__name__}: '
-                'must be int/float/dict/list/etc')
+                'must be int/float/dict/list/etc'
+            )
 
         self._data[key] = unwrapped
 
@@ -1146,28 +1161,22 @@ class StoredState:
         self.attr_name: Optional[str] = None
 
     @typing.overload
-    def __get__(
-            self,
-            parent: Literal[None],
-            parent_type: 'Type[_ObjectType]') -> 'StoredState':
+    def __get__(self, parent: Literal[None], parent_type: 'Type[_ObjectType]') -> 'StoredState':
         pass
 
     @typing.overload
-    def __get__(
-            self,
-            parent: '_ObjectType',
-            parent_type: 'Type[_ObjectType]') -> BoundStoredState:
+    def __get__(self, parent: '_ObjectType', parent_type: 'Type[_ObjectType]') -> BoundStoredState:
         pass
 
-    def __get__(self,
-                parent: Optional['_ObjectType'],
-                parent_type: 'Type[_ObjectType]') -> Union['StoredState',
-                                                           BoundStoredState]:
+    def __get__(
+        self, parent: Optional['_ObjectType'], parent_type: 'Type[_ObjectType]'
+    ) -> Union['StoredState', BoundStoredState]:
         if self.parent_type is not None and self.parent_type not in parent_type.mro():
             # the StoredState instance is being shared between two unrelated classes
             # -> unclear what is expected of us -> bail out
             raise RuntimeError(
-                f'StoredState shared by {self.parent_type.__name__} and {parent_type.__name__}')
+                f'StoredState shared by {self.parent_type.__name__} and {parent_type.__name__}'
+            )
 
         if parent is None:
             # accessing via the class directly (e.g. MyClass.stored)
@@ -1191,7 +1200,8 @@ class StoredState:
                     # attributes -> unclear what is expected of us -> bail out
                     raise RuntimeError(
                         f'StoredState shared by {cls.__name__}.{self.attr_name} and '
-                        f'{cls.__name__}.{attr_name}')
+                        f'{cls.__name__}.{attr_name}'
+                    )
                 # we've found ourselves for the first time; save where, and bind the object
                 self.attr_name = attr_name
                 self.parent_type = cls
@@ -1208,7 +1218,8 @@ class StoredState:
             return bound
 
         raise AttributeError(
-            f'cannot find {self.__class__.__name__} attribute in type {parent_type.__name__}')
+            f'cannot find {self.__class__.__name__} attribute in type {parent_type.__name__}'
+        )
 
 
 def _wrap_stored(parent_data: StoredStateData, value: Any) -> Any:
@@ -1230,9 +1241,9 @@ def _unwrap_stored(parent_data: StoredStateData, value: Any) -> Any:
 def _wrapped_repr(obj: '_StoredObject') -> str:
     t = type(obj)
     if obj._under:
-        return f"{t.__module__}.{t.__name__}({obj._under!r})"  # type: ignore
+        return f'{t.__module__}.{t.__name__}({obj._under!r})'  # type: ignore
     else:
-        return f"{t.__module__}.{t.__name__}()"
+        return f'{t.__module__}.{t.__name__}()'
 
 
 class StoredDict(typing.MutableMapping[Hashable, Any]):

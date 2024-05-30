@@ -19,8 +19,7 @@ import re
 from typing import Union
 
 # Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
-_TIMESTAMP_RE = re.compile(
-    r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
+_TIMESTAMP_RE = re.compile(r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
 
 # Matches [-+]HH:MM
 _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
@@ -59,8 +58,9 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     # standard library behaviour.
     microsecond = min(microsecond, 999999)
 
-    return datetime.datetime(int(y), int(m), int(d), int(hh), int(mm), int(ss),
-                             microsecond=microsecond, tzinfo=tz)
+    return datetime.datetime(
+        int(y), int(m), int(d), int(hh), int(mm), int(ss), microsecond=microsecond, tzinfo=tz
+    )
 
 
 def parse_duration(s: str) -> datetime.timedelta:

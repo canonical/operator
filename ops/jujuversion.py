@@ -30,11 +30,14 @@ class JujuVersion:
     operators.
     """
 
-    _pattern_re = re.compile(r'''^
+    _pattern_re = re.compile(
+        r"""^
     (?P<major>\d{1,9})\.(?P<minor>\d{1,9})       # <major> and <minor> numbers are always there
     ((?:\.|-(?P<tag>[a-z]+))(?P<patch>\d{1,9}))? # sometimes with .<patch> or -<tag><patch>
     (\.(?P<build>\d{1,9}))?$                     # and sometimes with a <build> number.
-    ''', re.VERBOSE)
+    """,
+        re.VERBOSE,
+    )
 
     def __init__(self, version: str):
         m = self._pattern_re.match(version)
@@ -69,7 +72,8 @@ class JujuVersion:
             and self.minor == other.minor
             and self.tag == other.tag
             and self.build == other.build
-            and self.patch == other.patch)
+            and self.patch == other.patch
+        )
 
     def __lt__(self, other: Union[str, 'JujuVersion']) -> bool:
         if self is other:

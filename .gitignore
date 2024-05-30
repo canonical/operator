@@ -9,6 +9,12 @@ venv
 .vscode
 .coverage
 /.tox
+.*.swp
+
+# Tokens and settings for `act` to run GHA locally
+.env
+.envrc
+.secrets
 
 # Build artifacts
 /dist

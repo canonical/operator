@@ -14,7 +14,6 @@
 
 """Infrastructure to build unit tests for charms using the ops library."""
 
-
 import dataclasses
 import datetime
 import fnmatch
@@ -65,31 +64,37 @@ from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
 _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
-_FileKwargs = TypedDict('_FileKwargs', {
-    'permissions': Optional[int],
-    'last_modified': datetime.datetime,
-    'user_id': Optional[int],
-    'user': Optional[str],
-    'group_id': Optional[int],
-    'group': Optional[str],
-})
+_FileKwargs = TypedDict(
+    '_FileKwargs',
+    {
+        'permissions': Optional[int],
+        'last_modified': datetime.datetime,
+        'user_id': Optional[int],
+        'user': Optional[str],
+        'group_id': Optional[int],
+        'group': Optional[str],
+    },
+)
 
-_RelationEntities = TypedDict('_RelationEntities', {
-    'app': str,
-    'units': List[str]
-})
+_RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[str]})
 
 _StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
-_RawStatus = TypedDict('_RawStatus', {
-    'status': _StatusName,
-    'message': str,
-})
-_ConfigOption = TypedDict('_ConfigOption', {
-    'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
-    'description': str,
-    'default': Union[str, int, float, bool],
-})
-_RawConfig = TypedDict("_RawConfig", {'options': Dict[str, _ConfigOption]})
+_RawStatus = TypedDict(
+    '_RawStatus',
+    {
+        'status': _StatusName,
+        'message': str,
+    },
+)
+_ConfigOption = TypedDict(
+    '_ConfigOption',
+    {
+        'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
+        'description': str,
+        'default': Union[str, int, float, bool],
+    },
+)
+_RawConfig = TypedDict('_RawConfig', {'options': Dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
@@ -114,6 +119,7 @@ class ExecArgs:
     These arguments will be passed to the :meth:`Harness.handle_exec` handler function.
     See :meth:`ops.pebble.Client.exec` for documentation of properties.
     """
+
     command: List[str]
     environment: Dict[str, str]
     working_dir: Optional[str]
@@ -134,9 +140,10 @@ class ExecResult:
     This class is typically used to return the output and exit code from the
     :meth:`Harness.handle_exec` result or handler function.
     """
+
     exit_code: int = 0
-    stdout: Union[str, bytes] = b""
-    stderr: Union[str, bytes] = b""
+    stdout: Union[str, bytes] = b''
+    stderr: Union[str, bytes] = b''
 
 
 ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
@@ -165,6 +172,11 @@ class ActionFailed(Exception):  # noqa
     def __init__(self, message: str, output: ActionOutput):
         self.message = message
         self.output = output
+
+    def __str__(self):
+        if self.message:
+            return self.message
+        return 'Event handler called `fail()` with no additional details.'
 
 
 @dataclasses.dataclass()
@@ -240,17 +252,18 @@ class Harness(Generic[CharmType]):
     """
 
     def __init__(
-            self,
-            charm_cls: Type[CharmType],
-            *,
-            meta: Optional[YAMLStringOrFile] = None,
-            actions: Optional[YAMLStringOrFile] = None,
-            config: Optional[YAMLStringOrFile] = None):
+        self,
+        charm_cls: Type[CharmType],
+        *,
+        meta: Optional[YAMLStringOrFile] = None,
+        actions: Optional[YAMLStringOrFile] = None,
+        config: Optional[YAMLStringOrFile] = None,
+    ):
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
         self._meta = self._create_meta(meta, actions)
-        self._unit_name: str = f"{self._meta.name}/0"
+        self._unit_name: str = f'{self._meta.name}/0'
         self._hooks_enabled: bool = True
         self._relation_id_counter: int = 0
         self._action_id_counter: int = 0
@@ -259,7 +272,8 @@ class Harness(Generic[CharmType]):
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
-            self._storage, self._charm_dir, self._meta, self._model)
+            self._storage, self._charm_dir, self._meta, self._model
+        )
 
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
@@ -329,8 +343,9 @@ class Harness(Generic[CharmType]):
         Until then, attempting to access this property will raise an exception.
         """
         if self._charm is None:
-            raise RuntimeError('The charm instance is not available yet. '
-                               'Call Harness.begin() first.')
+            raise RuntimeError(
+                'The charm instance is not available yet. Call Harness.begin() first.'
+            )
         return self._charm
 
     @property
@@ -441,7 +456,7 @@ class Harness(Generic[CharmType]):
                 rel_ids = self._backend._relation_ids_map.get(relname, [])
                 random.shuffle(rel_ids)
                 for rel_id in rel_ids:
-                    app_name = self._backend._relation_app_and_units[rel_id]["app"]
+                    app_name = self._backend._relation_app_and_units[rel_id]['app']
                     self._emit_relation_created(relname, rel_id, app_name)
         if self._backend._is_leader:
             charm.on.leader_elected.emit()
@@ -459,13 +474,13 @@ class Harness(Generic[CharmType]):
         # If the initial hooks do not set a unit status, the Juju controller will switch
         # the unit status from "Maintenance" to "Unknown". See gh#726
         post_setup_sts = self._backend.status_get()
-        if post_setup_sts.get("status") == "maintenance" and not post_setup_sts.get("message"):
+        if post_setup_sts.get('status') == 'maintenance' and not post_setup_sts.get('message'):
             self._backend._unit_status = {'status': 'unknown', 'message': ''}
         all_ids = list(self._backend._relation_names.items())
         random.shuffle(all_ids)
         for rel_id, rel_name in all_ids:
             rel_app_and_units = self._backend._relation_app_and_units[rel_id]
-            app_name = rel_app_and_units["app"]
+            app_name = rel_app_and_units['app']
             # Note: Juju *does* fire relation events for a given relation in the sorted order of
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
@@ -474,12 +489,10 @@ class Harness(Generic[CharmType]):
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
                 charm.on[rel_name].relation_changed.emit(relation, app, None)
-            for unit_name in sorted(rel_app_and_units["units"]):
+            for unit_name in sorted(rel_app_and_units['units']):
                 remote_unit = self._model.get_unit(unit_name)
-                charm.on[rel_name].relation_joined.emit(
-                    relation, remote_unit.app, remote_unit)
-                charm.on[rel_name].relation_changed.emit(
-                    relation, remote_unit.app, remote_unit)
+                charm.on[rel_name].relation_joined.emit(relation, remote_unit.app, remote_unit)
+                charm.on[rel_name].relation_changed.emit(relation, remote_unit.app, remote_unit)
 
     def cleanup(self) -> None:
         """Called by the test infrastructure to clean up any temporary directories/files/etc.
@@ -488,8 +501,11 @@ class Harness(Generic[CharmType]):
         """
         self._backend._cleanup()
 
-    def _create_meta(self, charm_metadata_yaml: Optional[YAMLStringOrFile],
-                     action_metadata_yaml: Optional[YAMLStringOrFile]) -> CharmMeta:
+    def _create_meta(
+        self,
+        charm_metadata_yaml: Optional[YAMLStringOrFile],
+        action_metadata_yaml: Optional[YAMLStringOrFile],
+    ) -> CharmMeta:
         """Create a CharmMeta object.
 
         Handle the cases where a user doesn't supply explicit metadata snippets.
@@ -508,7 +524,7 @@ class Harness(Generic[CharmType]):
         charmcraft_metadata: Optional[Dict[str, Any]] = None
         if charm_dir:
             # Check charmcraft.yaml and load it if it exists
-            charmcraft_meta = charm_dir / "charmcraft.yaml"
+            charmcraft_meta = charm_dir / 'charmcraft.yaml'
             if charmcraft_meta.is_file():
                 self._charm_dir = charm_dir
                 charmcraft_metadata = yaml.safe_load(charmcraft_meta.read_text())
@@ -521,7 +537,7 @@ class Harness(Generic[CharmType]):
         else:
             # Check charmcraft.yaml for metadata if no metadata is provided
             if charmcraft_metadata is not None:
-                meta_keys = ["name", "summary", "description"]
+                meta_keys = ['name', 'summary', 'description']
                 if any(key in charmcraft_metadata for key in meta_keys):
                     # Unrelated keys in the charmcraft.yaml file will be ignored.
                     charm_metadata = charmcraft_metadata
@@ -535,7 +551,7 @@ class Harness(Generic[CharmType]):
 
         # Use default metadata if metadata is not found
         if charm_metadata is None:
-            charm_metadata = {"name": "test-charm"}
+            charm_metadata = {'name': 'test-charm'}
 
         action_metadata: Optional[Dict[str, Any]] = None
         # Load actions from parameters if provided
@@ -545,8 +561,8 @@ class Harness(Generic[CharmType]):
             action_metadata = yaml.safe_load(action_metadata_yaml)
         else:
             # Check charmcraft.yaml for actions if no actions are provided
-            if charmcraft_metadata is not None and "actions" in charmcraft_metadata:
-                action_metadata = charmcraft_metadata["actions"]
+            if charmcraft_metadata is not None and 'actions' in charmcraft_metadata:
+                action_metadata = charmcraft_metadata['actions']
 
             # Still no actions, check actions.yaml
             if charm_dir and action_metadata is None:
@@ -579,11 +595,12 @@ class Harness(Generic[CharmType]):
         else:
             if charm_dir:
                 # Check charmcraft.yaml for config if no config is provided
-                charmcraft_meta = charm_dir / "charmcraft.yaml"
+                charmcraft_meta = charm_dir / 'charmcraft.yaml'
                 if charmcraft_meta.is_file():
                     charmcraft_metadata: Dict[str, Any] = yaml.safe_load(
-                        charmcraft_meta.read_text())
-                    config = charmcraft_metadata.get("config")
+                        charmcraft_meta.read_text()
+                    )
+                    config = charmcraft_metadata.get('config')
 
                 # Still no config, check config.yaml
                 if config is None:
@@ -600,8 +617,9 @@ class Harness(Generic[CharmType]):
             raise TypeError(config)
         return cast('_RawConfig', config)
 
-    def add_oci_resource(self, resource_name: str,
-                         contents: Optional[Mapping[str, str]] = None) -> None:
+    def add_oci_resource(
+        self, resource_name: str, contents: Optional[Mapping[str, str]] = None
+    ) -> None:
         """Add OCI resources to the backend.
 
         This will register an OCI resource and create a temporary file for processing metadata
@@ -613,13 +631,14 @@ class Harness(Generic[CharmType]):
             contents: Optional custom dict to write for the named resource.
         """
         if not contents:
-            contents = {'registrypath': 'registrypath',
-                        'username': 'username',
-                        'password': 'password',
-                        }
+            contents = {
+                'registrypath': 'registrypath',
+                'username': 'username',
+                'password': 'password',
+            }
         if resource_name not in self._meta.resources:
             raise RuntimeError(f'Resource {resource_name} is not a defined resources')
-        if self._meta.resources[resource_name].type != "oci-image":
+        if self._meta.resources[resource_name].type != 'oci-image':
             raise RuntimeError(f'Resource {resource_name} is not an OCI Image')
 
         as_yaml = yaml.safe_dump(contents)
@@ -639,9 +658,10 @@ class Harness(Generic[CharmType]):
         if resource_name not in self._meta.resources:
             raise RuntimeError(f'Resource {resource_name} is not a defined resource')
         record = self._meta.resources[resource_name]
-        if record.type != "file":
+        if record.type != 'file':
             raise RuntimeError(
-                f'Resource {resource_name} is not a file, but actually {record.type}')
+                f'Resource {resource_name} is not a file, but actually {record.type}'
+            )
         filename = record.filename
         if filename is None:
             filename = resource_name
@@ -651,7 +671,7 @@ class Harness(Generic[CharmType]):
     def populate_oci_resources(self) -> None:
         """Populate all OCI resources."""
         for name, data in self._meta.resources.items():
-            if data.type == "oci-image":
+            if data.type == 'oci-image':
                 self.add_oci_resource(name)
 
     def disable_hooks(self) -> None:
@@ -698,8 +718,7 @@ class Harness(Generic[CharmType]):
         self._relation_id_counter += 1
         return rel_id
 
-    def add_storage(self, storage_name: str, count: int = 1,
-                    *, attach: bool = False) -> List[str]:
+    def add_storage(self, storage_name: str, count: int = 1, *, attach: bool = False) -> List[str]:
         """Create a new storage device and attach it to this unit.
 
         To have repeatable tests, each device will be initialized with
@@ -720,7 +739,8 @@ class Harness(Generic[CharmType]):
         """
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                f"the key '{storage_name}' is not specified as a storage key in metadata")
+                f"the key '{storage_name}' is not specified as a storage key in metadata"
+            )
 
         storage_indices = self._backend.storage_add(storage_name, count)
 
@@ -750,11 +770,11 @@ class Harness(Generic[CharmType]):
             raise RuntimeError('cannot detach storage before Harness is initialised')
         storage_name, storage_index = storage_id.split('/', 1)
         storage_index = int(storage_index)
-        storage_attached = self._backend._storage_is_attached(
-            storage_name, storage_index)
+        storage_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if storage_attached and self._hooks_enabled:
             self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend))
+                model.Storage(storage_name, storage_index, self._backend)
+            )
         self._backend._storage_detach(storage_id)
 
     def attach_storage(self, storage_id: str) -> None:
@@ -785,7 +805,8 @@ class Harness(Generic[CharmType]):
 
         storage_index = int(storage_index)
         self.charm.on[storage_name].storage_attached.emit(
-            model.Storage(storage_name, storage_index, self._backend))
+            model.Storage(storage_name, storage_index, self._backend)
+        )
 
     def remove_storage(self, storage_id: str) -> None:
         """Detach a storage device.
@@ -806,17 +827,23 @@ class Harness(Generic[CharmType]):
         storage_index = int(storage_index)
         if storage_name not in self._meta.storages:
             raise RuntimeError(
-                f"the key '{storage_name}' is not specified as a storage key in metadata")
-        is_attached = self._backend._storage_is_attached(
-            storage_name, storage_index)
+                f"the key '{storage_name}' is not specified as a storage key in metadata"
+            )
+        is_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if self._charm is not None and self._hooks_enabled and is_attached:
             self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend))
+                model.Storage(storage_name, storage_index, self._backend)
+            )
         self._backend._storage_remove(storage_id)
 
-    def add_relation(self, relation_name: str, remote_app: str, *,
-                     app_data: Optional[Mapping[str, str]] = None,
-                     unit_data: Optional[Mapping[str, str]] = None) -> int:
+    def add_relation(
+        self,
+        relation_name: str,
+        remote_app: str,
+        *,
+        app_data: Optional[Mapping[str, str]] = None,
+        unit_data: Optional[Mapping[str, str]] = None,
+    ) -> int:
         """Declare that there is a new relation between this application and `remote_app`.
 
         This function creates a relation with an application and triggers a
@@ -863,24 +890,26 @@ class Harness(Generic[CharmType]):
         Return:
             The ID of the relation created.
         """
-        if not (relation_name in self._meta.provides
-                or relation_name in self._meta.requires
-                or relation_name in self._meta.peers):
+        if not (
+            relation_name in self._meta.provides
+            or relation_name in self._meta.requires
+            or relation_name in self._meta.peers
+        ):
             raise RelationNotFoundError(f'relation {relation_name!r} not declared in metadata')
 
         relation_id = self._next_relation_id()
-        self._backend._relation_ids_map.setdefault(
-            relation_name, []).append(relation_id)
+        self._backend._relation_ids_map.setdefault(relation_name, []).append(relation_id)
         self._backend._relation_names[relation_id] = relation_name
         self._backend._relation_list_map[relation_id] = []
         self._backend._relation_data_raw[relation_id] = {
             remote_app: {},
             self._backend.unit_name: {},
-            self._backend.app_name: {}}
+            self._backend.app_name: {},
+        }
 
         self._backend._relation_app_and_units[relation_id] = {
-            "app": remote_app,
-            "units": [],
+            'app': remote_app,
+            'units': [],
         }
         # Reload the relation_ids list
         if self._model is not None:
@@ -899,10 +928,10 @@ class Harness(Generic[CharmType]):
         if not self._backend._networks.get((None, None)):
             # If we don't already have a network binding for this relation id, create one.
             if not self._backend._networks.get((relation_name, relation_id)):
-                self.add_network("10.0.0.10", endpoint=relation_name, relation_id=relation_id)
+                self.add_network('10.0.0.10', endpoint=relation_name, relation_id=relation_id)
             # If we don't already have a default network binding for this endpoint, create one.
             if not self._backend._networks.get((relation_name, None)):
-                self.add_network("192.0.2.0", endpoint=relation_name)
+                self.add_network('192.0.2.0', endpoint=relation_name)
 
         return relation_id
 
@@ -949,21 +978,21 @@ class Harness(Generic[CharmType]):
 
         # Remove secret grants that give access via this relation
         for secret in self._backend._secrets:
-            secret.grants = {rid: names for rid, names in secret.grants.items()
-                             if rid != relation_id}
+            secret.grants = {
+                rid: names for rid, names in secret.grants.items() if rid != relation_id
+            }
 
-    def _emit_relation_created(self, relation_name: str, relation_id: int,
-                               remote_app: str) -> None:
+    def _emit_relation_created(
+        self, relation_name: str, relation_id: int, remote_app: str
+    ) -> None:
         """Trigger relation-created for a given relation with a given remote application."""
         if self._charm is None or not self._hooks_enabled:
             return
         relation = self._model.get_relation(relation_name, relation_id)
         app = self._model.get_app(remote_app)
-        self._charm.on[relation_name].relation_created.emit(
-            relation, app)
+        self._charm.on[relation_name].relation_created.emit(relation, app)
 
-    def _emit_relation_broken(self, relation_name: str, relation_id: int,
-                              remote_app: str) -> None:
+    def _emit_relation_broken(self, relation_name: str, relation_id: int, remote_app: str) -> None:
         """Trigger relation-broken for a given relation with a given remote application."""
         if self._charm is None or not self._hooks_enabled:
             return
@@ -999,8 +1028,10 @@ class Harness(Generic[CharmType]):
         relation = self._model.get_relation(relation_name, relation_id)
 
         if not relation:
-            raise RuntimeError('Relation id {} is mapped to relation name {},'
-                               'but no relation matching that name was found.')
+            raise RuntimeError(
+                'Relation id {} is mapped to relation name {},'
+                'but no relation matching that name was found.'
+            )
 
         self._backend._relation_data_raw[relation_id][remote_unit_name] = {}
         app = relation.app
@@ -1012,7 +1043,7 @@ class Harness(Generic[CharmType]):
                 f'not {remote_unit_name!r}.'
             )
         app_and_units = self._backend._relation_app_and_units
-        app_and_units[relation_id]["units"].append(remote_unit_name)
+        app_and_units[relation_id]['units'].append(remote_unit_name)
         # Make sure that the Model reloads the relation_list for this relation_id, as well as
         # reloading the relation data for this unit.
         remote_unit = self._model.get_unit(remote_unit_name)
@@ -1022,8 +1053,7 @@ class Harness(Generic[CharmType]):
         self._model.relations._invalidate(relation_name)
         if self._charm is None or not self._hooks_enabled:
             return
-        self._charm.on[relation_name].relation_joined.emit(
-            relation, remote_unit.app, remote_unit)
+        self._charm.on[relation_name].relation_joined.emit(relation, remote_unit.app, remote_unit)
 
     def remove_relation_unit(self, relation_id: int, remote_unit_name: str) -> None:
         """Remove a unit from a relation.
@@ -1057,8 +1087,10 @@ class Harness(Generic[CharmType]):
             # This should not really happen, since there being a relation name mapped
             # to this ID in _relation_names should guarantee that you created the relation
             # following the proper path, but still...
-            raise RuntimeError('Relation id {} is mapped to relation name {},'
-                               'but no relation matching that name was found.')
+            raise RuntimeError(
+                'Relation id {} is mapped to relation name {},'
+                'but no relation matching that name was found.'
+            )
 
         unit_cache = relation.data.get(remote_unit, None)
 
@@ -1068,7 +1100,7 @@ class Harness(Generic[CharmType]):
         self._emit_relation_departed(relation_id, remote_unit_name)
         # remove the relation data for the departed unit now that the event has happened
         self._backend._relation_list_map[relation_id].remove(remote_unit_name)
-        self._backend._relation_app_and_units[relation_id]["units"].remove(remote_unit_name)
+        self._backend._relation_app_and_units[relation_id]['units'].remove(remote_unit_name)
         self._backend._relation_data_raw[relation_id].pop(remote_unit_name)
         self.model._relations._invalidate(relation_name=relation.name)
 
@@ -1087,8 +1119,7 @@ class Harness(Generic[CharmType]):
             unit = self.model.get_unit(unit_name)
         else:
             raise ValueError('Invalid Unit Name')
-        self._charm.on[rel_name].relation_departed.emit(
-            relation, app, unit, unit_name)
+        self._charm.on[rel_name].relation_departed.emit(relation, app, unit, unit_name)
 
     def get_relation_data(self, relation_id: int, app_or_unit: AppUnitOrName) -> Mapping[str, str]:
         """Get the relation data bucket for a single app or unit in a given relation.
@@ -1122,9 +1153,7 @@ class Harness(Generic[CharmType]):
         """
         return self._backend._pod_spec
 
-    def get_container_pebble_plan(
-            self, container_name: str
-    ) -> pebble.Plan:
+    def get_container_pebble_plan(self, container_name: str) -> pebble.Plan:
         """Return the current plan that Pebble is executing for the given container.
 
         Args:
@@ -1158,10 +1187,15 @@ class Harness(Generic[CharmType]):
         self.set_can_connect(container, True)
         self.charm.on[container_name].pebble_ready.emit(container)
 
-    def pebble_notify(self, container_name: str, key: str, *,
-                      data: Optional[Dict[str, str]] = None,
-                      repeat_after: Optional[datetime.timedelta] = None,
-                      type: pebble.NoticeType = pebble.NoticeType.CUSTOM) -> str:
+    def pebble_notify(
+        self,
+        container_name: str,
+        key: str,
+        *,
+        data: Optional[Dict[str, str]] = None,
+        repeat_after: Optional[datetime.timedelta] = None,
+        type: pebble.NoticeType = pebble.NoticeType.CUSTOM,
+    ) -> str:
         """Record a Pebble notice with the specified key and data.
 
         If :meth:`begin` has been called and the notice is new or was repeated,
@@ -1229,10 +1263,10 @@ class Harness(Generic[CharmType]):
         self._backend.model_uuid = uuid
 
     def update_relation_data(
-            self,
-            relation_id: int,
-            app_or_unit: str,
-            key_values: Mapping[str, str],
+        self,
+        relation_id: int,
+        app_or_unit: str,
+        key_values: Mapping[str, str],
     ) -> None:
         """Update the relation data for a given unit or application in a given relation.
 
@@ -1256,8 +1290,10 @@ class Harness(Generic[CharmType]):
             entity = self._model.get_app(app_or_unit)
 
         if not relation:
-            raise RuntimeError('Relation id {} is mapped to relation name {},'
-                               'but no relation matching that name was found.')
+            raise RuntimeError(
+                'Relation id {} is mapped to relation name {},'
+                'but no relation matching that name was found.'
+            )
 
         rel_data = relation.data.get(entity, None)
         if rel_data is not None:
@@ -1319,9 +1355,9 @@ class Harness(Generic[CharmType]):
         self._charm.on[rel_name].relation_changed.emit(*args)
 
     def _update_config(
-            self,
-            key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
-            unset: Iterable[str] = (),
+        self,
+        key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
+        unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -1356,9 +1392,9 @@ class Harness(Generic[CharmType]):
                 config.pop(key, None)
 
     def update_config(
-            self,
-            key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
-            unset: Iterable[str] = (),
+        self,
+        key_values: Optional[Mapping[str, Union[str, int, float, bool]]] = None,
+        unset: Iterable[str] = (),
     ) -> None:
         """Update the config as seen by the charm.
 
@@ -1415,7 +1451,7 @@ class Harness(Generic[CharmType]):
         event.
         """
         if num_units < 0:
-            raise TypeError("num_units must be 0 or a positive integer.")
+            raise TypeError('num_units must be 0 or a positive integer.')
         self._backend._planned_units = num_units
 
     def reset_planned_units(self) -> None:
@@ -1427,13 +1463,17 @@ class Harness(Generic[CharmType]):
         """
         self._backend._planned_units = None
 
-    def add_network(self, address: str, *,
-                    endpoint: Optional[str] = None,
-                    relation_id: Optional[int] = None,
-                    cidr: Optional[str] = None,
-                    interface: str = 'eth0',
-                    ingress_addresses: Optional[Iterable[str]] = None,
-                    egress_subnets: Optional[Iterable[str]] = None):
+    def add_network(
+        self,
+        address: str,
+        *,
+        endpoint: Optional[str] = None,
+        relation_id: Optional[int] = None,
+        cidr: Optional[str] = None,
+        interface: str = 'eth0',
+        ingress_addresses: Optional[Iterable[str]] = None,
+        egress_subnets: Optional[Iterable[str]] = None,
+    ):
         """Add simulated network data for the given relation endpoint (binding).
 
         Calling this multiple times with the same (binding, relation_id)
@@ -1480,11 +1520,13 @@ class Harness(Generic[CharmType]):
             relation_name = self._backend._relation_names.get(relation_id)
             if relation_name is None:
                 raise model.ModelError(
-                    f'relation_id {relation_id} has not been added; use add_relation')
+                    f'relation_id {relation_id} has not been added; use add_relation'
+                )
             if endpoint != relation_name:
                 raise model.ModelError(
-                    f"endpoint {endpoint!r} does not correspond to relation_id "
-                    + f"{relation_id} ({relation_name!r})")
+                    f'endpoint {endpoint!r} does not correspond to relation_id '
+                    f'{relation_id} ({relation_name!r})'
+                )
 
         parsed_address = ipaddress.ip_address(address)  # raises ValueError if not an IP
         if cidr is None:
@@ -1498,12 +1540,14 @@ class Harness(Generic[CharmType]):
             egress_subnets = [cidr]
 
         data = {
-            'bind-addresses': [{
-                'interface-name': interface,
-                'addresses': [
-                    {'cidr': cidr, 'value': address},
-                ],
-            }],
+            'bind-addresses': [
+                {
+                    'interface-name': interface,
+                    'addresses': [
+                        {'cidr': cidr, 'value': address},
+                    ],
+                }
+            ],
             'egress-subnets': list(egress_subnets),
             'ingress-addresses': list(ingress_addresses),
         }
@@ -1613,8 +1657,10 @@ class Harness(Generic[CharmType]):
         model.Secret._validate_content(content)
         secret = self._ensure_secret(secret_id)
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
-            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, '
-                               f"can't call set_secret_content")
+            raise RuntimeError(
+                f'Secret {secret_id!r} owned by the charm under test, '
+                f"can't call set_secret_content"
+            )
         new_revision = _SecretRevision(
             revision=secret.revisions[-1].revision + 1,
             content=content,
@@ -1648,8 +1694,9 @@ class Harness(Generic[CharmType]):
 
         # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
-            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
-                               f"can't call grant_secret")
+            raise RuntimeError(
+                f"Secret {secret_id!r} owned by the charm under test, can't call grant_secret"
+            )
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
             secret.grants[relation_id] = set()
@@ -1678,8 +1725,10 @@ class Harness(Generic[CharmType]):
 
         # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
-            raise RuntimeError(f'Secret {secret_id!r} owned by the charm under test, "'
-                               f"can't call revoke_secret")
+            raise RuntimeError(
+                f'Secret {secret_id!r} owned by the charm under test, "'
+                f"can't call revoke_secret"
+            )
 
         relation_id = self._secret_relation_id_to(secret)
         if relation_id not in secret.grants:
@@ -1691,8 +1740,10 @@ class Harness(Generic[CharmType]):
         owner_app = secret.owner_name.split('/')[0]
         relation_id = self._backend._relation_id_to(owner_app)
         if relation_id is None:
-            raise RuntimeError(f'No relation between this charm ({self.model.app.name}) '
-                               f'and secret owner ({owner_app})')
+            raise RuntimeError(
+                f'No relation between this charm ({self.model.app.name}) '
+                f'and secret owner ({owner_app})'
+            )
         return relation_id
 
     def get_secret_grants(self, secret_id: str, relation_id: int) -> Set[str]:
@@ -1728,13 +1779,14 @@ class Harness(Generic[CharmType]):
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name == self.model.uuid:
-            raise RuntimeError("Cannot trigger the secret-rotate event for a user secret.")
+            raise RuntimeError('Cannot trigger the secret-rotate event for a user secret.')
         if label is None:
             label = secret.label
         self.charm.on.secret_rotate.emit(secret_id, label)
 
-    def trigger_secret_removal(self, secret_id: str, revision: int, *,
-                               label: Optional[str] = None):
+    def trigger_secret_removal(
+        self, secret_id: str, revision: int, *, label: Optional[str] = None
+    ):
         """Trigger a secret-remove event for the given secret and revision.
 
         This event is fired by Juju for a specific revision when all the
@@ -1753,8 +1805,9 @@ class Harness(Generic[CharmType]):
             label = secret.label
         self.charm.on.secret_remove.emit(secret_id, label, revision)
 
-    def trigger_secret_expiration(self, secret_id: str, revision: int, *,
-                                  label: Optional[str] = None):
+    def trigger_secret_expiration(
+        self, secret_id: str, revision: int, *, label: Optional[str] = None
+    ):
         """Trigger a secret-expired event for the given secret.
 
         This event is fired by Juju when a secret's expiration time elapses,
@@ -1770,7 +1823,7 @@ class Harness(Generic[CharmType]):
         """
         secret = self._ensure_secret(secret_id)
         if secret.owner_name == self.model.uuid:
-            raise RuntimeError("Cannot trigger the secret-expired event for a user secret.")
+            raise RuntimeError('Cannot trigger the secret-expired event for a user secret.')
         if label is None:
             label = secret.label
         self.charm.on.secret_expired.emit(secret_id, label, revision)
@@ -1846,12 +1899,14 @@ class Harness(Generic[CharmType]):
         self.charm.unit._collected_statuses = []
         charm._evaluate_status(self.charm)
 
-    def handle_exec(self,
-                    container: Union[str, Container],
-                    command_prefix: Sequence[str],
-                    *,
-                    handler: Optional[ExecHandler] = None,
-                    result: Optional[Union[int, str, bytes, ExecResult]] = None):
+    def handle_exec(
+        self,
+        container: Union[str, Container],
+        command_prefix: Sequence[str],
+        *,
+        handler: Optional[ExecHandler] = None,
+        result: Optional[Union[int, str, bytes, ExecResult]] = None,
+    ):
         r"""Register a handler to simulate the Pebble command execution.
 
         This allows a test harness to simulate the behavior of running commands in a container.
@@ -1921,7 +1976,7 @@ class Harness(Generic[CharmType]):
             harness.handle_exec('database', ['foo'], handler=handle_timeout)
         """
         if (handler is None and result is None) or (handler is not None and result is not None):
-            raise TypeError("Either handler or result must be provided, but not both.")
+            raise TypeError('Either handler or result must be provided, but not both.')
         container_name = container if isinstance(container, str) else container.name
         if result is not None:
             if isinstance(result, int) and not isinstance(result, bool):
@@ -1930,11 +1985,12 @@ class Harness(Generic[CharmType]):
                 result = ExecResult(stdout=result)
             elif not isinstance(result, ExecResult):
                 raise TypeError(
-                    f"result must be int, str, bytes, or ExecResult, "
-                    f"not {result.__class__.__name__}")
+                    f'result must be int, str, bytes, or ExecResult, '
+                    f'not {result.__class__.__name__}'
+                )
         self._backend._pebble_clients[container_name]._handle_exec(
             command_prefix=command_prefix,
-            handler=(lambda _: result) if handler is None else handler  # type: ignore
+            handler=(lambda _: result) if handler is None else handler,  # type: ignore
         )
 
     @property
@@ -1942,8 +1998,9 @@ class Harness(Generic[CharmType]):
         """Number of times the charm has called :meth:`ops.Unit.reboot`."""
         return self._backend._reboot_count
 
-    def run_action(self, action_name: str,
-                   params: Optional[Dict[str, Any]] = None) -> ActionOutput:
+    def run_action(
+        self, action_name: str, params: Optional[Dict[str, Any]] = None
+    ) -> ActionOutput:
         """Simulates running a charm action, as with ``juju run``.
 
         Use this only after calling :meth:`begin`.
@@ -1976,21 +2033,22 @@ class Harness(Generic[CharmType]):
         try:
             action_meta = self.charm.meta.actions[action_name]
         except KeyError:
-            raise RuntimeError(f"Charm does not have a {action_name!r} action.") from None
+            raise RuntimeError(f'Charm does not have a {action_name!r} action.') from None
         if params is None:
             params = {}
         for key in action_meta.required:
             # Juju requires that the key is in the passed parameters, even if there is a default
             # value in actions.yaml.
             if key not in params:
-                raise RuntimeError(f"{key!r} parameter is required, but missing.")
+                raise RuntimeError(f'{key!r} parameter is required, but missing.')
         if not action_meta.additional_properties:
             for key in params:
                 if key not in action_meta.parameters:
                     # Match Juju's error message.
                     raise model.ModelError(
                         f'additional property "{key}" is not allowed, '
-                        f'given {{"{key}":{params[key]!r}}}')
+                        f'given {{"{key}":{params[key]!r}}}'
+                    )
         action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
         handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
         self._backend._running_action = action_under_test
@@ -1999,8 +2057,8 @@ class Harness(Generic[CharmType]):
         self._backend._running_action = None
         if action_under_test.failure_message is not None:
             raise ActionFailed(
-                message=action_under_test.failure_message,
-                output=action_under_test.output)
+                message=action_under_test.failure_message, output=action_under_test.output
+            )
         return action_under_test.output
 
     def set_cloud_spec(self, spec: 'model.CloudSpec'):
@@ -2071,6 +2129,7 @@ def _record_calls(cls: Any):
                     full_args = (*full_args, kwargs)
                 self._calls.append(full_args)
                 return orig_method(self, *args, **kwargs)
+
             return wrapped
 
         setattr(cls, meth_name, decorator(orig_method))
@@ -2087,6 +2146,7 @@ def _copy_docstrings(source_cls: Any):
     And for any public method that exists on both classes, it will copy the
     __doc__ for that method.
     """
+
     def decorator(target_cls: Any):
         for meth_name in target_cls.__dict__:
             if meth_name.startswith('_'):
@@ -2095,12 +2155,14 @@ def _copy_docstrings(source_cls: Any):
             if source_method is not None and source_method.__doc__:
                 target_cls.__dict__[meth_name].__doc__ = source_method.__doc__
         return target_cls
+
     return decorator
 
 
 @_record_calls
 class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
     """Represents the Juju Config."""
+
     _supported_types = {
         'string': str,
         'boolean': bool,
@@ -2127,7 +2189,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         """
         if not charm_config:
             return {}
-        cfg: Dict[str, '_ConfigOption'] = charm_config.get('options', {})
+        cfg: Dict[str, _ConfigOption] = charm_config.get('options', {})
         return {key: value.get('default', None) for key, value in cfg.items()}
 
     def _config_set(self, key: str, value: Union[str, int, float, bool]):
@@ -2136,24 +2198,31 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         # has the expected type.
         option = self._spec.get('options', {}).get(key)
         if not option:
-            raise RuntimeError(f'Unknown config option {key}; '
-                               'not declared in `config.yaml`.'
-                               'Check https://juju.is/docs/sdk/config for the '
-                               'spec.')
+            raise RuntimeError(
+                f'Unknown config option {key}; '
+                'not declared in `config.yaml`.'
+                'Check https://juju.is/docs/sdk/config for the '
+                'spec.'
+            )
 
         declared_type = option.get('type')
         if not declared_type:
-            raise RuntimeError(f'Incorrectly formatted `options.yaml`, option {key} '
-                               'is expected to declare a `type`.')
+            raise RuntimeError(
+                f'Incorrectly formatted `options.yaml`, option {key} '
+                'is expected to declare a `type`.'
+            )
 
         if declared_type not in self._supported_types:
             raise RuntimeError(
                 'Incorrectly formatted `options.yaml`: `type` needs to be one '
-                'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type))
+                'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type)
+            )
 
         if type(value) is not self._supported_types[declared_type]:
-            raise RuntimeError(f'Config option {key} is supposed to be of type '
-                               f'{declared_type}, not `{type(value).__name__}`.')
+            raise RuntimeError(
+                f'Config option {key} is supposed to be of type '
+                f'{declared_type}, not `{type(value).__name__}`.'
+            )
 
         # call 'normal' setattr.
         dict.__setitem__(self, key, value)  # type: ignore
@@ -2166,11 +2235,11 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
 class _TestingRelationDataContents(Dict[str, str]):
     def __setitem__(self, key: str, value: str):
         if not isinstance(key, str):
-            raise model.RelationDataError(
-                f'relation data keys must be strings, not {type(key)}')
+            raise model.RelationDataError(f'relation data keys must be strings, not {type(key)}')
         if not isinstance(value, str):
             raise model.RelationDataError(
-                f'relation data values must be strings, not {type(value)}')
+                f'relation data values must be strings, not {type(value)}'
+            )
         super().__setitem__(key, value)
 
     def copy(self):
@@ -2214,8 +2283,8 @@ class _TestingModelBackend:
         self.model_uuid = str(uuid.uuid4())
 
         self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
-        self._harness_storage_path = pathlib.Path(self._harness_tmp_dir.name) / "storages"
-        self._harness_container_path = pathlib.Path(self._harness_tmp_dir.name) / "containers"
+        self._harness_storage_path = pathlib.Path(self._harness_tmp_dir.name) / 'storages'
+        self._harness_container_path = pathlib.Path(self._harness_tmp_dir.name) / 'containers'
         self._harness_storage_path.mkdir()
         self._harness_container_path.mkdir()
         # this is used by the _record_calls decorator
@@ -2247,7 +2316,8 @@ class _TestingModelBackend:
         # <ID1>: device id that is key for given storage_name
         # Initialize the _storage_list with values present on metadata.yaml
         self._storage_list: Dict[str, Dict[int, Dict[str, Any]]] = {
-            k: {} for k in self._meta.storages}
+            k: {} for k in self._meta.storages
+        }
         self._storage_attached: Dict[str, Set[int]] = {k: set() for k in self._meta.storages}
         self._storage_index_counter = 0
         # {container_name : _TestingPebbleClient}
@@ -2316,8 +2386,9 @@ class _TestingModelBackend:
             raise model.RelationNotFoundError()
         return self._relation_data_raw[relation_id][member_name]
 
-    def update_relation_data(self, relation_id: int, _entity: Union[model.Unit, model.Application],
-                             key: str, value: str):
+    def update_relation_data(
+        self, relation_id: int, _entity: Union[model.Unit, model.Application], key: str, value: str
+    ):
         # this is where the 'real' backend would call relation-set.
         raw_data = self._relation_data_raw[relation_id][_entity.name]
         if value == '':
@@ -2330,9 +2401,11 @@ class _TestingModelBackend:
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
         if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
-                relation_id):
+            relation_id
+        ):
             raise RuntimeError(
-                'remote-side relation data cannot be accessed during a relation-broken event')
+                'remote-side relation data cannot be accessed during a relation-broken event'
+            )
 
         if relation_id not in self._relation_data_raw:
             raise RelationNotFoundError(relation_id)
@@ -2359,10 +2432,11 @@ class _TestingModelBackend:
     def resource_get(self, resource_name: str):
         if resource_name not in self._resources_map:
             raise model.ModelError(
-                "ERROR could not download resource: HTTP request failed: "
-                "Get https://.../units/unit-{}/resources/{}: resource#{}/{} not found".format(
+                'ERROR could not download resource: HTTP request failed: '
+                'Get https://.../units/unit-{}/resources/{}: resource#{}/{} not found'.format(
                     self.unit_name.replace('/', '-'), resource_name, self.app_name, resource_name
-                ))
+                )
+            )
         filename, contents = self._resources_map[resource_name]
         resource_dir = self._get_resource_dir()
         resource_filename = resource_dir / resource_name / filename
@@ -2384,8 +2458,10 @@ class _TestingModelBackend:
 
     def status_set(self, status: '_StatusName', message: str = '', *, is_app: bool = False):
         if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
-            raise model.ModelError(f'ERROR invalid status "{status}", expected one of'
-                                   ' [maintenance blocked waiting active]')
+            raise model.ModelError(
+                f'ERROR invalid status "{status}", expected one of'
+                ' [maintenance blocked waiting active]'
+            )
         if is_app:
             self._app_status = {'status': status, 'message': message}
         else:
@@ -2398,11 +2474,14 @@ class _TestingModelBackend:
             name: name (i.e. from metadata.yaml).
             include_detached: True to include unattached storage mounts as well.
         """
-        return [index for index in self._storage_list[name]
-                if include_detached or self._storage_is_attached(name, index)]
+        return [
+            index
+            for index in self._storage_list[name]
+            if include_detached or self._storage_is_attached(name, index)
+        ]
 
     def storage_get(self, storage_name_id: str, attribute: str) -> Any:
-        name, index = storage_name_id.split("/", 1)
+        name, index = storage_name_id.split('/', 1)
         index = int(index)
         try:
             if index not in self._storage_attached[name]:
@@ -2411,7 +2490,8 @@ class _TestingModelBackend:
                 return self._storage_list[name][index][attribute]
         except KeyError:
             raise model.ModelError(
-                f'ERROR invalid value "{name}/{index}" for option -s: storage not found') from None
+                f'ERROR invalid value "{name}/{index}" for option -s: storage not found'
+            ) from None
 
     def storage_add(self, name: str, count: int = 1) -> List[int]:
         if '/' in name:
@@ -2460,7 +2540,7 @@ class _TestingModelBackend:
                     root = client._root
                     mounting_dir = root / mount.location[1:]
                     mounting_dir.parent.mkdir(parents=True, exist_ok=True)
-                    target_dir = pathlib.Path(store["location"])
+                    target_dir = pathlib.Path(store['location'])
                     target_dir.mkdir(parents=True, exist_ok=True)
                     try:
                         mounting_dir.symlink_to(target_dir, target_is_directory=True)
@@ -2468,9 +2548,8 @@ class _TestingModelBackend:
                         # If the symlink is already the one we want, then we
                         # don't need to do anything here.
                         # NOTE: In Python 3.9, this can use `mounting_dir.readlink()`
-                        if (
-                            not mounting_dir.is_symlink()
-                            or os.readlink(mounting_dir) != str(target_dir)
+                        if not mounting_dir.is_symlink() or os.readlink(mounting_dir) != str(
+                            target_dir
                         ):
                             raise
 
@@ -2497,14 +2576,14 @@ class _TestingModelBackend:
         assert self._running_action is not None
         action_meta = self._meta.actions[self._running_action.name]
         for name, meta in action_meta.parameters.items():
-            if "default" in meta:
-                params[name] = meta["default"]
+            if 'default' in meta:
+                params[name] = meta['default']
         params.update(self._running_action.parameters)
         return params
 
     def action_set(self, results: Dict[str, Any]):
         assert self._running_action is not None
-        for key in ("stdout", "stderr", "stdout-encoding", "stderr-encoding"):
+        for key in ('stdout', 'stderr', 'stdout-encoding', 'stderr-encoding'):
             if key in results:
                 # Match Juju's error message.
                 raise model.ModelError(f'ERROR cannot set reserved action key "{key}"')
@@ -2607,21 +2686,26 @@ class _TestingModelBackend:
             secret = next((s for s in self._secrets if s.label == label), None)
         if secret is None:
             raise model.SecretNotFoundError(
-                f'Secret not found by ID ({id!r}) or label ({label!r})')
+                f'Secret not found by ID ({id!r}) or label ({label!r})'
+            )
         return secret
 
-    def secret_get(self, *,
-                   id: Optional[str] = None,
-                   label: Optional[str] = None,
-                   refresh: bool = False,
-                   peek: bool = False) -> Dict[str, str]:
+    def secret_get(
+        self,
+        *,
+        id: Optional[str] = None,
+        label: Optional[str] = None,
+        refresh: bool = False,
+        peek: bool = False,
+    ) -> Dict[str, str]:
         secret = self._ensure_secret_id_or_label(id, label)
 
         if secret.owner_name == self.model_uuid:
             # This is a user secret - charms only ever have view access.
             if self.app_name not in secret.user_secrets_grants:
                 raise model.SecretNotFoundError(
-                    f'Secret {id!r} not granted access to {self.app_name!r}')
+                    f'Secret {id!r} not granted access to {self.app_name!r}'
+                )
         elif secret.owner_name not in [self.app_name, self.unit_name]:
             # This is a model secret - the model might have admin or view access.
             # Check that caller has permission to get this secret
@@ -2631,11 +2715,13 @@ class _TestingModelBackend:
             relation_id = self._relation_id_to(owner_app)
             if relation_id is None:
                 raise model.SecretNotFoundError(
-                    f'Secret {id!r} does not have relation to {owner_app!r}')
+                    f'Secret {id!r} does not have relation to {owner_app!r}'
+                )
             grants = secret.grants.get(relation_id, set())
             if self.app_name not in grants and self.unit_name not in grants:
                 raise model.SecretNotFoundError(
-                    f'Secret {id!r} not granted access to {self.app_name!r} or {self.unit_name!r}')
+                    f'Secret {id!r} not granted access to {self.app_name!r} or {self.unit_name!r}'
+                )
 
         if peek or refresh:
             revision = secret.revisions[-1]
@@ -2670,11 +2756,12 @@ class _TestingModelBackend:
         if unit_secret or (app_secret and self.is_leader()):
             return
         raise model.SecretNotFoundError(
-            f'You must own secret {secret.id!r} to perform this operation')
+            f'You must own secret {secret.id!r} to perform this operation'
+        )
 
-    def secret_info_get(self, *,
-                        id: Optional[str] = None,
-                        label: Optional[str] = None) -> model.SecretInfo:
+    def secret_info_get(
+        self, *, id: Optional[str] = None, label: Optional[str] = None
+    ) -> model.SecretInfo:
         secret = self._ensure_secret_id_or_label(id, label)
         self._ensure_secret_owner(secret)
 
@@ -2695,21 +2782,22 @@ class _TestingModelBackend:
             rotates=rotates,
         )
 
-    def secret_set(self, id: str, *,
-                   content: Optional[Dict[str, str]] = None,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional[model.SecretRotate] = None) -> None:
+    def secret_set(
+        self,
+        id: str,
+        *,
+        content: Optional[Dict[str, str]] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[model.SecretRotate] = None,
+    ) -> None:
         secret = self._ensure_secret(id)
         self._ensure_secret_owner(secret)
 
         if content is None:
             content = secret.revisions[-1].content
-        revision = _SecretRevision(
-            revision=secret.revisions[-1].revision + 1,
-            content=content
-        )
+        revision = _SecretRevision(revision=secret.revisions[-1].revision + 1, content=content)
         secret.revisions.append(revision)
         if label is not None:
             if label:
@@ -2732,26 +2820,33 @@ class _TestingModelBackend:
     @classmethod
     def _generate_secret_id(cls) -> str:
         # Not a proper Juju secrets-style xid, but that's okay
-        return f"secret:{uuid.uuid4()}"
+        return f'secret:{uuid.uuid4()}'
 
-    def secret_add(self, content: Dict[str, str], *,
-                   label: Optional[str] = None,
-                   description: Optional[str] = None,
-                   expire: Optional[datetime.datetime] = None,
-                   rotate: Optional[model.SecretRotate] = None,
-                   owner: Optional[str] = None) -> str:
+    def secret_add(
+        self,
+        content: Dict[str, str],
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[model.SecretRotate] = None,
+        owner: Optional[str] = None,
+    ) -> str:
         owner_name = self.unit_name if owner == 'unit' else self.app_name
-        return self._secret_add(content, owner_name,
-                                label=label,
-                                description=description,
-                                expire=expire,
-                                rotate=rotate)
+        return self._secret_add(
+            content, owner_name, label=label, description=description, expire=expire, rotate=rotate
+        )
 
-    def _secret_add(self, content: Dict[str, str], owner_name: str, *,
-                    label: Optional[str] = None,
-                    description: Optional[str] = None,
-                    expire: Optional[datetime.datetime] = None,
-                    rotate: Optional[model.SecretRotate] = None) -> str:
+    def _secret_add(
+        self,
+        content: Dict[str, str],
+        owner_name: str,
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        expire: Optional[datetime.datetime] = None,
+        rotate: Optional[model.SecretRotate] = None,
+    ) -> str:
         id = self._generate_secret_id()
         revision = _SecretRevision(
             revision=1,
@@ -2821,14 +2916,23 @@ class _TestingModelBackend:
         # should be testing details of error messages).
         if protocol == 'icmp':
             if port is not None:
-                raise model.ModelError(f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n')  # noqa: E501
+                raise model.ModelError(
+                    f'ERROR protocol "{protocol}" doesn\'t support any ports; got "{port}"\n'
+                )
         elif protocol in ['tcp', 'udp']:
             if port is None:
-                raise model.ModelError(f'ERROR invalid port "{protocol}": strconv.Atoi: parsing "{protocol}": invalid syntax\n')  # noqa: E501
+                raise model.ModelError(
+                    f'ERROR invalid port "{protocol}": '
+                    f'strconv.Atoi: parsing "{protocol}": invalid syntax\n'
+                )
             if not (1 <= port <= 65535):
-                raise model.ModelError(f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n')  # noqa: E501
+                raise model.ModelError(
+                    f'ERROR port range bounds must be between 1 and 65535, got {port}-{port}\n'
+                )
         else:
-            raise model.ModelError(f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n')  # noqa: E501
+            raise model.ModelError(
+                f'ERROR invalid protocol "{protocol}", expected "tcp", "udp", or "icmp"\n'
+            )
 
     def reboot(self, now: bool = False):
         self._reboot_count += 1
@@ -2841,25 +2945,28 @@ class _TestingModelBackend:
     def credential_get(self) -> model.CloudSpec:
         if not self._cloud_spec:
             raise model.ModelError(
-                'ERROR cloud spec is empty, set it with `Harness.set_cloud_spec()` first')
+                'ERROR cloud spec is empty, set it with `Harness.set_cloud_spec()` first'
+            )
         return self._cloud_spec
 
 
 @_copy_docstrings(pebble.ExecProcess)
 class _TestingExecProcess:
-    def __init__(self,
-                 command: List[str],
-                 timeout: Optional[float],
-                 exit_code: Optional[int],
-                 stdin: Union[TextIO, BinaryIO, None],
-                 stdout: Union[TextIO, BinaryIO, None],
-                 stderr: Union[TextIO, BinaryIO, None],
-                 is_timeout: bool):
+    def __init__(
+        self,
+        command: List[str],
+        timeout: Optional[float],
+        exit_code: Optional[int],
+        stdin: Union[TextIO, BinaryIO, None],
+        stdout: Union[TextIO, BinaryIO, None],
+        stderr: Union[TextIO, BinaryIO, None],
+        is_timeout: bool,
+    ):
         self._command = command
         self._timeout = timeout
         self._is_timeout = is_timeout
         if exit_code is None and not is_timeout:
-            raise ValueError("when is_timeout is False, exit_code must not be None")
+            raise ValueError('when is_timeout is False, exit_code must not be None')
         self._exit_code = exit_code
         self.stdin = stdin
         self.stdout = stdout
@@ -2867,29 +2974,27 @@ class _TestingExecProcess:
 
     def wait(self):
         if self._is_timeout:
-            raise pebble.TimeoutError(
-                f'timed out waiting for change ({self._timeout} seconds)'
-            )
+            raise pebble.TimeoutError(f'timed out waiting for change ({self._timeout} seconds)')
         if self._exit_code != 0:
             raise pebble.ExecError(self._command, cast(int, self._exit_code), None, None)
 
     def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
         if self._is_timeout:
-            raise pebble.TimeoutError(
-                f'timed out waiting for change ({self._timeout} seconds)'
-            )
+            raise pebble.TimeoutError(f'timed out waiting for change ({self._timeout} seconds)')
         out_value = self.stdout.read() if self.stdout is not None else None
         err_value = self.stderr.read() if self.stderr is not None else None
         if self._exit_code != 0:
-            raise pebble.ExecError[AnyStr](self._command,
-                                           cast(int, self._exit_code),
-                                           cast(Union[AnyStr, None], out_value),
-                                           cast(Union[AnyStr, None], err_value))
+            raise pebble.ExecError[AnyStr](
+                self._command,
+                cast(int, self._exit_code),
+                cast(Union[AnyStr, None], out_value),
+                cast(Union[AnyStr, None], err_value),
+            )
         return cast(AnyStr, out_value), cast(Union[AnyStr, None], err_value)
 
     def send_signal(self, sig: Union[int, str]):
         # the process is always terminated when ExecProcess is return in the simulation.
-        raise BrokenPipeError("[Errno 32] Broken pipe")
+        raise BrokenPipeError('[Errno 32] Broken pipe')
 
 
 @_copy_docstrings(pebble.Client)
@@ -2918,8 +3023,10 @@ class _TestingPebbleClient:
 
     def _check_connection(self):
         if not self._backend._can_connect(self):
-            msg = ('Cannot connect to Pebble; did you forget to call '
-                   'begin_with_initial_hooks() or set_can_connect()?')
+            msg = (
+                'Cannot connect to Pebble; did you forget to call '
+                'begin_with_initial_hooks() or set_can_connect()?'
+            )
             raise pebble.ConnectionError(msg)
 
     def get_system_info(self) -> pebble.SystemInfo:
@@ -2927,7 +3034,8 @@ class _TestingPebbleClient:
         return pebble.SystemInfo(version='1.0.0')
 
     def get_warnings(
-            self, select: pebble.WarningState = pebble.WarningState.PENDING,
+        self,
+        select: pebble.WarningState = pebble.WarningState.PENDING,
     ) -> List['pebble.Warning']:
         raise NotImplementedError(self.get_warnings)
 
@@ -2935,8 +3043,9 @@ class _TestingPebbleClient:
         raise NotImplementedError(self.ack_warnings)
 
     def get_changes(
-            self, select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS,
-            service: Optional[str] = None,
+        self,
+        select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS,
+        service: Optional[str] = None,
     ) -> List[pebble.Change]:
         raise NotImplementedError(self.get_changes)
 
@@ -2963,7 +3072,10 @@ class _TestingPebbleClient:
         return self.autostart_services(timeout, delay)
 
     def start_services(
-            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+        self,
+        services: List[str],
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ):
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
@@ -2984,7 +3096,10 @@ class _TestingPebbleClient:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def stop_services(
-            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+        self,
+        services: List[str],
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
@@ -3004,7 +3119,10 @@ class _TestingPebbleClient:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
 
     def restart_services(
-            self, services: List[str], timeout: float = 30.0, delay: float = 0.1,
+        self,
+        services: List[str],
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ):
         # handle a common mistake of passing just a name rather than a list of names
         if isinstance(services, str):
@@ -3024,13 +3142,20 @@ class _TestingPebbleClient:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def wait_change(
-            self, change_id: pebble.ChangeID, timeout: float = 30.0, delay: float = 0.1,
+        self,
+        change_id: pebble.ChangeID,
+        timeout: float = 30.0,
+        delay: float = 0.1,
     ) -> pebble.Change:
         raise NotImplementedError(self.wait_change)
 
     def add_layer(
-            self, label: str, layer: Union[str, 'pebble.LayerDict', pebble.Layer], *,
-            combine: bool = False):
+        self,
+        label: str,
+        layer: Union[str, 'pebble.LayerDict', pebble.Layer],
+        *,
+        combine: bool = False,
+    ):
         # I wish we could combine some of this helpful object corralling with the actual backend,
         # rather than having to re-implement it. Maybe we could subclass
         if not isinstance(label, str):
@@ -3042,7 +3167,8 @@ class _TestingPebbleClient:
             layer_obj = layer
         else:
             raise TypeError(
-                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}')
+                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}'
+            )
 
         self._check_connection()
 
@@ -3054,11 +3180,15 @@ class _TestingPebbleClient:
                 # 'override' is actually single quoted in the real error, but
                 # it shouldn't be, hopefully that gets cleaned up.
                 if not service.override:
-                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" must define'
-                                       f'"override" for service "{name}"')
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" must define'
+                        f'"override" for service "{name}"'
+                    )
                 if service.override not in ('merge', 'replace'):
-                    raise RuntimeError(f'500 Internal Server Error: layer "{label}" has invalid '
-                                       f'"override" value on service "{name}"')
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" has invalid '
+                        f'"override" value on service "{name}"'
+                    )
                 elif service.override == 'replace':
                     layer.services[name] = service
                 elif service.override == 'merge':
@@ -3125,49 +3255,51 @@ class _TestingPebbleClient:
                 startup = pebble.ServiceStartup.DISABLED
             else:
                 startup = pebble.ServiceStartup(service.startup)
-            info = pebble.ServiceInfo(name,
-                                      startup=startup,
-                                      current=pebble.ServiceStatus(status))
+            info = pebble.ServiceInfo(name, startup=startup, current=pebble.ServiceStatus(status))
             infos.append(info)
         return infos
 
     @staticmethod
     def _check_absolute_path(path: str):
-        if not path.startswith("/"):
-            raise pebble.PathError(
-                'generic-file-error',
-                f'paths must be absolute, got {path!r}'
-            )
+        if not path.startswith('/'):
+            raise pebble.PathError('generic-file-error', f'paths must be absolute, got {path!r}')
 
-    def pull(self, path: str, *,
-             encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(self, path: str, *, encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         try:
             return cast(
                 Union[BinaryIO, TextIO],
-                file_path.open("rb" if encoding is None else "r", encoding=encoding))
+                file_path.open('rb' if encoding is None else 'r', encoding=encoding),
+            )
         except FileNotFoundError:
-            raise pebble.PathError('not-found',
-                                   f'stat {path}: no such file or directory') from None
+            raise pebble.PathError(
+                'not-found', f'stat {path}: no such file or directory'
+            ) from None
         except IsADirectoryError:
-            raise pebble.PathError('generic-file-error',
-                                   f'can only read a regular file: "{path}"') from None
+            raise pebble.PathError(
+                'generic-file-error', f'can only read a regular file: "{path}"'
+            ) from None
 
     def push(
-            self, path: str, source: 'ReadableBuffer', *,
-            encoding: str = 'utf-8', make_dirs: bool = False, permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None
+        self,
+        path: str,
+        source: 'ReadableBuffer',
+        *,
+        encoding: str = 'utf-8',
+        make_dirs: bool = False,
+        permissions: Optional[int] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
     ) -> None:
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
-                'generic-file-error',
-                f'permissions not within 0o000 to 0o777: {permissions:#o}')
+                'generic-file-error', f'permissions not within 0o000 to 0o777: {permissions:#o}'
+            )
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if make_dirs and not file_path.parent.exists():
@@ -3178,7 +3310,8 @@ class _TestingPebbleClient:
                 user_id=user_id,
                 user=user,
                 group_id=group_id,
-                group=group)
+                group=group,
+            )
         permissions = permissions if permissions is not None else 0o644
         try:
             if isinstance(source, str):
@@ -3195,18 +3328,21 @@ class _TestingPebbleClient:
             os.chmod(file_path, permissions)
         except FileNotFoundError as e:
             raise pebble.PathError(
-                'not-found', f'parent directory not found: {e.args[0]}') from None
+                'not-found', f'parent directory not found: {e.args[0]}'
+            ) from None
         except NotADirectoryError:
-            raise pebble.PathError('generic-file-error',
-                                   f'open {path}.~: not a directory') from None
+            raise pebble.PathError(
+                'generic-file-error', f'open {path}.~: not a directory'
+            ) from None
 
-    def list_files(self, path: str, *, pattern: Optional[str] = None,
-                   itself: bool = False) -> List[pebble.FileInfo]:
+    def list_files(
+        self, path: str, *, pattern: Optional[str] = None, itself: bool = False
+    ) -> List[pebble.FileInfo]:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if not file_path.exists():
-            raise self._api_error(404, f"stat {path}: no such file or directory")
+            raise self._api_error(404, f'stat {path}: no such file or directory')
         files = [file_path]
         if not itself:
             try:
@@ -3217,37 +3353,35 @@ class _TestingPebbleClient:
         if pattern is not None:
             files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
 
-        file_infos = [
-            Container._build_fileinfo(file)
-            for file in files
-        ]
+        file_infos = [Container._build_fileinfo(file) for file in files]
         for file_info in file_infos:
             rel_path = os.path.relpath(file_info.path, start=self._root)
             rel_path = '/' if rel_path == '.' else '/' + rel_path
             file_info.path = rel_path
-            if rel_path == "/":
-                file_info.name = "/"
+            if rel_path == '/':
+                file_info.name = '/'
         return file_infos
 
     def make_dir(
-            self, path: str, *,
-            make_parents: bool = False,
-            permissions: Optional[int] = None,
-            user_id: Optional[int] = None,
-            user: Optional[str] = None,
-            group_id: Optional[int] = None,
-            group: Optional[str] = None
+        self,
+        path: str,
+        *,
+        make_parents: bool = False,
+        permissions: Optional[int] = None,
+        user_id: Optional[int] = None,
+        user: Optional[str] = None,
+        group_id: Optional[int] = None,
+        group: Optional[str] = None,
     ) -> None:
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
-                'generic-file-error',
-                f'permissions not within 0o000 to 0o777: {permissions:#o}')
+                'generic-file-error', f'permissions not within 0o000 to 0o777: {permissions:#o}'
+            )
         self._check_absolute_path(path)
         dir_path = self._root / path[1:]
         if not dir_path.parent.exists() and not make_parents:
-            raise pebble.PathError(
-                'not-found', f'parent directory not found: {path}')
+            raise pebble.PathError('not-found', f'parent directory not found: {path}')
         if not dir_path.parent.exists() and make_parents:
             self.make_dir(
                 os.path.dirname(path),
@@ -3256,7 +3390,8 @@ class _TestingPebbleClient:
                 user_id=user_id,
                 user=user,
                 group_id=group_id,
-                group=group)
+                group=group,
+            )
         try:
             permissions = permissions if permissions else 0o755
             dir_path.mkdir()
@@ -3264,8 +3399,8 @@ class _TestingPebbleClient:
         except FileExistsError:
             if not make_parents:
                 raise pebble.PathError(
-                    'generic-file-error',
-                    f'mkdir {path}: file exists') from None
+                    'generic-file-error', f'mkdir {path}: file exists'
+                ) from None
         except NotADirectoryError as e:
             # Attempted to create a subdirectory of a file
             raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
@@ -3277,8 +3412,7 @@ class _TestingPebbleClient:
         if not file_path.exists():
             if recursive:
                 return
-            raise pebble.PathError(
-                'not-found', f'remove {path}: no such file or directory')
+            raise pebble.PathError('not-found', f'remove {path}: no such file or directory')
         if file_path.is_dir():
             if recursive:
                 shutil.rmtree(file_path)
@@ -3288,7 +3422,8 @@ class _TestingPebbleClient:
                 except OSError as e:
                     raise pebble.PathError(
                         'generic-file-error',
-                        'cannot remove non-empty directory without recursive=True') from e
+                        'cannot remove non-empty directory without recursive=True',
+                    ) from e
         else:
             file_path.unlink()
 
@@ -3299,9 +3434,9 @@ class _TestingPebbleClient:
                 return self._exec_handlers[command_prefix]
         return None
 
-    def _transform_exec_handler_output(self,
-                                       data: Union[str, bytes],
-                                       encoding: Optional[str]) -> Union[io.BytesIO, io.StringIO]:
+    def _transform_exec_handler_output(
+        self, data: Union[str, bytes], encoding: Optional[str]
+    ) -> Union[io.BytesIO, io.StringIO]:
         if isinstance(data, bytes):
             if encoding is None:
                 return io.BytesIO(data)
@@ -3310,8 +3445,9 @@ class _TestingPebbleClient:
         else:
             if encoding is None:
                 raise ValueError(
-                    f"exec handler must return bytes if encoding is None,"
-                    f"not {data.__class__.__name__}")
+                    f'exec handler must return bytes if encoding is None,'
+                    f'not {data.__class__.__name__}'
+                )
             else:
                 return io.StringIO(typing.cast(str, data))
 
@@ -3331,12 +3467,12 @@ class _TestingPebbleClient:
         stdout: Optional[Union[TextIO, BinaryIO]] = None,
         stderr: Optional[Union[TextIO, BinaryIO]] = None,
         encoding: Optional[str] = 'utf-8',
-        combine_stderr: bool = False
+        combine_stderr: bool = False,
     ) -> ExecProcess[Any]:
         self._check_connection()
         handler = self._find_exec_handler(command)
         if handler is None:
-            message = "execution handler not found, please register one using Harness.handle_exec"
+            message = 'execution handler not found, please register one using Harness.handle_exec'
             raise self._api_error(500, message)
         environment = {} if environment is None else environment
         if service_context is not None:
@@ -3352,7 +3488,7 @@ class _TestingPebbleClient:
             group = service.group if group is None else group
             group_id = service.group_id if group_id is None else group_id
 
-        if hasattr(stdin, "read"):
+        if hasattr(stdin, 'read'):
             stdin = stdin.read()  # type: ignore
 
         exec_args = ExecArgs(
@@ -3366,29 +3502,31 @@ class _TestingPebbleClient:
             group=group,
             stdin=cast(Union[str, bytes, None], stdin),
             encoding=encoding,
-            combine_stderr=combine_stderr
+            combine_stderr=combine_stderr,
         )
-        proc_stdin = self._transform_exec_handler_output(b"", encoding)
+        proc_stdin = self._transform_exec_handler_output(b'', encoding)
         if stdin is not None:
             proc_stdin = None
-        proc_stdout = self._transform_exec_handler_output(b"", encoding)
-        proc_stderr = self._transform_exec_handler_output(b"", encoding)
+        proc_stdout = self._transform_exec_handler_output(b'', encoding)
+        proc_stderr = self._transform_exec_handler_output(b'', encoding)
         try:
             result = handler(exec_args)
         except TimeoutError:
             if timeout is not None:
-                exec_process = _TestingExecProcess(command=command,
-                                                   timeout=timeout,
-                                                   exit_code=None,
-                                                   stdin=proc_stdin,
-                                                   stdout=proc_stdout,
-                                                   stderr=proc_stderr,
-                                                   is_timeout=True)
+                exec_process = _TestingExecProcess(
+                    command=command,
+                    timeout=timeout,
+                    exit_code=None,
+                    stdin=proc_stdin,
+                    stdout=proc_stdout,
+                    stderr=proc_stderr,
+                    is_timeout=True,
+                )
                 return cast(pebble.ExecProcess[Any], exec_process)
             else:
                 raise RuntimeError(
-                    "a TimeoutError occurred in the execution handler, "
-                    "but no timeout value was provided in the execution arguments."
+                    'a TimeoutError occurred in the execution handler, '
+                    'but no timeout value was provided in the execution arguments.'
                 ) from None
         if result is None:
             exit_code = 0
@@ -3399,23 +3537,27 @@ class _TestingPebbleClient:
             proc_stdout = self._transform_exec_handler_output(result.stdout, encoding)
             proc_stderr = self._transform_exec_handler_output(result.stderr, encoding)
         else:
-            raise TypeError(f"execution handler returned an unexpected type: {type(result)!r}.")
+            raise TypeError(f'execution handler returned an unexpected type: {type(result)!r}.')
         if combine_stderr and proc_stderr.getvalue():
-            raise ValueError("execution handler returned a non-empty stderr "
-                             "even though combine_stderr is enabled.")
+            raise ValueError(
+                'execution handler returned a non-empty stderr '
+                'even though combine_stderr is enabled.'
+            )
         if stdout is not None:
             shutil.copyfileobj(cast(io.IOBase, proc_stdout), cast(io.IOBase, stdout))
             proc_stdout = None
         if stderr is not None:
             shutil.copyfileobj(cast(io.IOBase, proc_stderr), cast(io.IOBase, stderr))
             proc_stderr = None
-        exec_process = _TestingExecProcess(command=command,
-                                           timeout=timeout,
-                                           exit_code=exit_code,
-                                           stdin=proc_stdin,
-                                           stdout=proc_stdout,
-                                           stderr=proc_stderr,
-                                           is_timeout=False)
+        exec_process = _TestingExecProcess(
+            command=command,
+            timeout=timeout,
+            exit_code=exit_code,
+            stdin=proc_stdin,
+            stdout=proc_stdout,
+            stderr=proc_stderr,
+            is_timeout=False,
+        )
         return cast(pebble.ExecProcess[Any], exec_process)
 
     def send_signal(self, sig: Union[int, str], service_names: Iterable[str]):
@@ -3448,15 +3590,25 @@ class _TestingPebbleClient:
     def get_checks(self, level=None, names=None):  # type:ignore
         raise NotImplementedError(self.get_checks)  # type:ignore
 
-    def notify(self, type: pebble.NoticeType, key: str, *,
-               data: Optional[Dict[str, str]] = None,
-               repeat_after: Optional[datetime.timedelta] = None) -> str:
+    def notify(
+        self,
+        type: pebble.NoticeType,
+        key: str,
+        *,
+        data: Optional[Dict[str, str]] = None,
+        repeat_after: Optional[datetime.timedelta] = None,
+    ) -> str:
         notice_id, _ = self._notify(type, key, data=data, repeat_after=repeat_after)
         return notice_id
 
-    def _notify(self, type: pebble.NoticeType, key: str, *,
-                data: Optional[Dict[str, str]] = None,
-                repeat_after: Optional[datetime.timedelta] = None) -> Tuple[str, bool]:
+    def _notify(
+        self,
+        type: pebble.NoticeType,
+        key: str,
+        *,
+        data: Optional[Dict[str, str]] = None,
+        repeat_after: Optional[datetime.timedelta] = None,
+    ) -> Tuple[str, bool]:
         """Record an occurrence of a notice with the specified details.
 
         Return a tuple of (notice_id, new_or_repeated).
@@ -3547,16 +3699,21 @@ class _TestingPebbleClient:
         if keys is not None:
             keys = set(keys)
 
-        notices = [notice for notice in self._notices.values() if
-                   self._notice_matches(notice, filter_user_id, types, keys)]
+        notices = [
+            notice
+            for notice in self._notices.values()
+            if self._notice_matches(notice, filter_user_id, types, keys)
+        ]
         notices.sort(key=lambda notice: notice.last_repeated)
         return notices
 
     @staticmethod
-    def _notice_matches(notice: pebble.Notice,
-                        user_id: Optional[int] = None,
-                        types: Optional[Set[str]] = None,
-                        keys: Optional[Set[str]] = None) -> bool:
+    def _notice_matches(
+        notice: pebble.Notice,
+        user_id: Optional[int] = None,
+        types: Optional[Set[str]] = None,
+        keys: Optional[Set[str]] = None,
+    ) -> bool:
         # Same logic as NoticeFilter.matches in Pebble.
         # For example: if user_id filter is set and it doesn't match, return False.
         if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):

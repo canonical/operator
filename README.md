@@ -14,7 +14,7 @@ The `ops` library is a Python framework for developing and testing Kubernetes an
 ||||
 || [Charmhub](https://charmhub.io/) | Sample our existing charms on Charmhub. <br> _A charm can be a cluster ([OpenStack](https://charmhub.io/openstack-base), [Kubernetes](https://charmhub.io/charmed-kubernetes)), a data platform ([PostgreSQL](https://charmhub.io/postgresql-k8s), [MongoDB](https://charmhub.io/mongodb), etc.), an observability stack ([Canonical Observability Stack](https://charmhub.io/cos-lite)), an MLOps solution ([Kubeflow](https://charmhub.io/kubeflow)), and so much more._ |
 ||||
-|:point_right:| [Charm&nbsp;SDK](https://juju.is/docs/sdk)  | Write your own charm! <br> _Juju is written in Go, but our SDK supports easy charm development in Python._  |
+|👉| [Charm&nbsp;SDK](https://juju.is/docs/sdk)  | Write your own charm! <br> _Juju is written in Go, but our SDK supports easy charm development in Python._  |
 
 ## Give it a try
 
@@ -164,7 +164,7 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and:
 - Join our chat: [Mattermost](https://chat.charmhub.io/charmhub/channels/ops)
 - Join our forum: [Discourse](https://discourse.charmhub.io/)
- 
+
 ### File an issue
 
 - Report an `ops` bug using [GitHub issues](https://github.com/canonical/operator/issues)
@@ -175,4 +175,3 @@ Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and:
 - Read our [documentation contributor guidelines](https://discourse.charmhub.io/t/documentation-guidelines-for-contributors/1245) and help improve a doc
 - Read our [codebase contributor guidelines](HACKING.md) and help improve the codebase
 - Write a charm and publish it on [Charmhub](https://charmhub.io/)
-
