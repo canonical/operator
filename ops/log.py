@@ -15,9 +15,11 @@
 """Interface to emit messages to the Juju logging system."""
 
 import logging
+import os
 import sys
 import types
 import typing
+import warnings
 
 from ops.model import _ModelBackend
 
@@ -53,6 +55,21 @@ def setup_root_logging(
         debug: if True, write logs to stderr as well as to juju-log.
         exc_stderr: if True, write uncaught exceptions to stderr as well as to juju-log.
     """
+    logging.captureWarnings(True)
+
+    def custom_warning_formatter(
+        message: typing.Union[str, Warning],
+        category: typing.Type[Warning],
+        filename: str,
+        lineno: int,
+        line: typing.Optional[str] = None,
+    ) -> str:
+        module_name = os.path.basename(filename)
+        warning_msg = f'{message}'.replace('\n', ' ')
+        return f'{module_name}:{lineno}: {category.__name__}: {warning_msg}'
+
+    warnings.formatwarning = custom_warning_formatter
+
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
