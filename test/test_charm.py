@@ -571,11 +571,11 @@ def test_invalid_action_results(
     ],
 )
 def test_inappropriate_event_defer_fails(
-    event: str,
-    kwargs: typing.Dict[str, typing.Any],
     request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,
     fake_script: FakeScript,
+    event: str,
+    kwargs: typing.Dict[str, typing.Any],
 ):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
