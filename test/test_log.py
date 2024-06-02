@@ -157,14 +157,16 @@ class TestLogging:
         assert len(calls[1][1]) == MAX_LOG_LINE_LEN
         assert len(calls[2][1]) == 9
 
+    @pytest.mark.filterwarnings("error")
     def test_warning(self, backend: FakeModelBackend):
         ops.log.setup_root_logging(backend)
-        warnings.warn('warning')
-        calls = backend.calls()
-        assert len(calls) == 1
-        assert calls[0][0] == 'WARNING'
-        # Match any lineno, in case this file changes in the future.
-        assert re.search(r'test_log\.py:\d+: UserWarning: warning', calls[0][1])
+        with pytest.raises(UserWarning):
+            warnings.warn('this is a test warning')
+            calls = backend.calls()
+            assert len(calls) == 1
+            assert calls[0][0] == 'WARNING'
+            # Match any lineno, in case this file changes in the future.
+            assert re.search(r'test_log\.py:\d+: UserWarning: warning', calls[0][1])
 
 
 if __name__ == '__main__':

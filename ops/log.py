@@ -65,8 +65,7 @@ def setup_root_logging(
         line: typing.Optional[str] = None,
     ) -> str:
         module_name = os.path.basename(filename)
-        warning_msg = f'{message}'.replace('\n', ' ')
-        return f'{module_name}:{lineno}: {category.__name__}: {warning_msg}'
+        return f'{module_name}:{lineno}: {category.__name__}: {message}'
 
     warnings.formatwarning = custom_warning_formatter
 
