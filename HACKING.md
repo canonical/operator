@@ -291,7 +291,7 @@ To make a release of the ops library, do the following:
 7. Create a new branch, and copy this text to the [CHANGES.md](CHANGES.md) file,
    stripping out links, who did each commit, the new contributor list, and the
    link to the full changelog.
-8. Change [version.py][ops/version.py]'s `version` to the
+8. Change [version.py](ops/version.py)'s `version` to the
    [appropriate string](https://semver.org/).
 9. Check if there's a `chore: update charm pins` auto-generated PR in the queue. If it looks
    good, merge it and check that tests still pass. If needed, you can re-trigger the
@@ -315,6 +315,6 @@ You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/op
 
 13. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
 
-14. Open a PR to change [version.py][ops/version.py]'s `version` to the expected
-   next version, with "+dev" appended (for example, if 3.14.1 is the next expected version, use
+14. Open a PR to change [version.py](ops/version.py)'s `version` to the expected
+   next version, with ".dev0" appended (for example, if 3.14.1 is the next expected version, use
    `'3.14.1.dev0'`).
