@@ -1382,6 +1382,7 @@ class Secret:
             refresh: If true, fetch the latest revision's content and tell
                 Juju to update to tracking that revision. The default is to
                 get the content of the currently-tracked revision.
+
         Raises:
             SecretNotFoundError: if the secret no longer exists.
             ModelError: if the charm does not have permission to access the

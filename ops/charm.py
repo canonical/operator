@@ -842,9 +842,10 @@ class SecretEvent(HookEvent):
     @property
     def secret(self) -> model.Secret:
         """The secret instance this event refers to.
-        
+
         Note that the secret content is not retrieved from the secret storage
-        until :meth:`Secret.get_content()` is called."""
+        until :meth:`Secret.get_content()` is called.
+        """
         backend = self.framework.model._backend
         return model.Secret(backend=backend, id=self._id, label=self._label)
 
