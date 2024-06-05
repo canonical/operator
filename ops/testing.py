@@ -59,7 +59,7 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError, _NetworkDict
+from ops.model import Container, RelationNotFoundError, SecretNotFoundError, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -2741,29 +2741,30 @@ class _TestingModelBackend:
                 return relation_id
         return None
 
-    def _ensure_secret_owner(self, secret: _Secret):
+    def _has_secret_owner_permission(self, secret: _Secret) -> bool:
         # For unit secrets, the owner unit has manage permissions. For app
         # secrets, the leader has manage permissions and other units only have
         # view permissions.
         # https://discourse.charmhub.io/t/secret-access-permissions/12627
         # For user secrets the secret owner is the model, that is,
-        # `secret.owner_name == self.model.uuid`, only model admins have
+        # when `secret.owner_name == self.model.uuid`, only model admins have
         # manage permissions: https://juju.is/docs/juju/secret.
 
         unit_secret = secret.owner_name == self.unit_name
         app_secret = secret.owner_name == self.app_name
 
         if unit_secret or (app_secret and self.is_leader()):
-            return
-        raise model.SecretNotFoundError(
-            f'You must own secret {secret.id!r} to perform this operation'
-        )
+            return True
+        return False
 
     def secret_info_get(
         self, *, id: Optional[str] = None, label: Optional[str] = None
     ) -> model.SecretInfo:
         secret = self._ensure_secret_id_or_label(id, label)
-        self._ensure_secret_owner(secret)
+        if not self._has_secret_owner_permission(secret):
+            raise model.SecretNotFoundError(
+                f'You must own secret {secret.id!r} to perform this operation'
+            )
 
         rotates = None
         rotation = None
@@ -2793,7 +2794,8 @@ class _TestingModelBackend:
         rotate: Optional[model.SecretRotate] = None,
     ) -> None:
         secret = self._ensure_secret(id)
-        self._ensure_secret_owner(secret)
+        if not self._has_secret_owner_permission(secret):
+            raise RuntimeError(f'You must own secret {secret.id!r} to perform this operation')
 
         if content is None:
             content = secret.revisions[-1].content
@@ -2866,7 +2868,10 @@ class _TestingModelBackend:
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
         secret = self._ensure_secret(id)
-        self._ensure_secret_owner(secret)
+        if not self._has_secret_owner_permission(secret):
+            raise SecretNotFoundError(
+                f'You must own secret {secret.id!r} to perform this operation'
+            )
 
         if relation_id not in secret.grants:
             secret.grants[relation_id] = set()
@@ -2875,7 +2880,8 @@ class _TestingModelBackend:
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
         secret = self._ensure_secret(id)
-        self._ensure_secret_owner(secret)
+        if not self._has_secret_owner_permission(secret):
+            raise RuntimeError(f'You must own secret {secret.id!r} to perform this operation')
 
         if relation_id not in secret.grants:
             return
@@ -2884,7 +2890,8 @@ class _TestingModelBackend:
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None) -> None:
         secret = self._ensure_secret(id)
-        self._ensure_secret_owner(secret)
+        if not self._has_secret_owner_permission(secret):
+            raise RuntimeError(f'You must own secret {secret.id!r} to perform this operation')
 
         if revision is not None:
             revisions = [r for r in secret.revisions if r.revision != revision]
