@@ -269,6 +269,11 @@ class Model:
         owners set a label using ``add_secret``, whereas secret observers set
         a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
+        The content of the secret is retrieved, so calls to
+        :meth:`Secret.get_content` do not require querying the secret storage
+        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
+        has been called.
+
         Args:
             id: Secret ID if fetching by ID.
             label: Secret label if fetching by label (or updating it).
@@ -1365,6 +1370,10 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> Dict[str, str]:
         """Get the secret's content.
 
+        The content of the secret is cached on the :class:`Secret` object, so
+        subsequent calls do not require querying the secret storage again,
+        unless ``refresh=True`` is used, or :meth:`set_content` is called.
+
         Returns:
             A copy of the secret's content dictionary.
 
@@ -1381,7 +1390,8 @@ class Secret:
         """Get the content of the latest revision of this secret.
 
         This returns the content of the latest revision without updating the
-        tracking.
+        tracking. The content is not cached locally, so multiple calls will
+        result in multiple queries to the secret storage.
         """
         return self._backend.secret_get(id=self.id, label=self.label, peek=True)
 
@@ -1407,6 +1417,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_set(typing.cast(str, self.id), content=content)
+        # TODO: won't this just get the same content anyway? Unless we refresh
+        # (which ignores the cache) then the tracked revision won't be different.
         self._content = None  # invalidate cache so it's refetched next get_content()
 
     def set_info(
