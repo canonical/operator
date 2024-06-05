@@ -1436,9 +1436,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_set(typing.cast(str, self.id), content=content)
-        # TODO: won't this just get the same content anyway? Unless we refresh
-        # (which ignores the cache) then the tracked revision won't be different.
-        self._content = None  # invalidate cache so it's refetched next get_content()
+        # We do not need to invalidate the cache here, as the content is the
+        # same until `refresh` is used, at which point the cache is invalidated.
 
     def set_info(
         self,
