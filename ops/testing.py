@@ -59,7 +59,7 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.model import Container, RelationNotFoundError, SecretNotFoundError, _NetworkDict
+from ops.model import Container, RelationNotFoundError, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -2869,7 +2869,7 @@ class _TestingModelBackend:
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
         secret = self._ensure_secret(id)
         if not self._has_secret_owner_permission(secret):
-            raise SecretNotFoundError(
+            raise model.SecretNotFoundError(
                 f'You must own secret {secret.id!r} to perform this operation'
             )
 
