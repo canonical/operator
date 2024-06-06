@@ -948,30 +948,30 @@ assert out.model.name == "my-model"
 assert out.model.uuid == state_in.model.uuid
 ```
 
-## CloudSpec
+### CloudSpec
 
-You can set CloudSpec information in the state (only `type` and `name` are required).
+You can set CloudSpec information in the model (only `type` and `name` are required).
 
 Example:
 
 ```python
 import scenario
 
-state = scenario.State(
-    cloud_spec=scenario.CloudSpec(
-        type="lxd",
-        name="localhost",
-        endpoint="https://127.0.0.1:8443",
-        credential=scenario.CloudCredential(
-            auth_type="clientcertificate",
-            attributes={
-                "client-cert": "foo",
-                "client-key": "bar",
-                "server-cert": "baz",
-            },
-        ),
+cloud_spec=ops.CloudSpec(
+    type="lxd",
+    name="localhost",
+    endpoint="https://127.0.0.1:8443",
+    credential=scenario.CloudCredential(
+        auth_type="clientcertificate",
+        attributes={
+            "client-cert": "foo",
+            "client-key": "bar",
+            "server-cert": "baz",
+        },
     ),
-    model=scenario.Model(name="my-vm-model", type="lxd"),
+)
+state = scenario.State(
+    model=scenario.Model(name="my-vm-model", type="lxd", cloud_spec=cloud_spec),
 )
 ```
 
