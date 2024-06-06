@@ -20,7 +20,7 @@ union of an `Event` (why am I, charm, being executed), a `State` (am I leader? w
 config?...) and the charm's execution `Context` (what relations can I have? what containers can I have?...). The output is another `State`: the state after the charm has had a chance to interact with the
 mocked Juju model and affect the initial state back.
 
-![state transition model depiction](resources/state-transition-model.png)
+![state transition model depiction](https://raw.githubusercontent.com/canonical/ops-scenario/main/resources/state-transition-model.png)
 
 For example: a charm currently in `unknown` status is executed with a `start` event, and based on whether it has leadership or not (according to its input state), it will decide to set `active` or `blocked` status (which will be reflected in the output state).
 
@@ -471,7 +471,7 @@ needs to set up the process that will run `ops.main` with the right environment 
 
 ### Working with relation IDs
 
-Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `id`.
+Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `relation_id`.
 To inspect the ID the next relation instance will have, you can call `scenario.state.next_relation_id`.
 
 ```python
@@ -479,7 +479,7 @@ import scenario.state
 
 next_id = scenario.state.next_relation_id(update=False)
 rel = scenario.Relation('foo')
-assert rel.id == next_id
+assert rel.relation_id == next_id
 ``` 
 
 This can be handy when using `replace` to create new relations, to avoid relation ID conflicts:
@@ -488,8 +488,8 @@ This can be handy when using `replace` to create new relations, to avoid relatio
 import scenario.state
 
 rel = scenario.Relation('foo')
-rel2 = rel.replace(local_app_data={"foo": "bar"}, id=scenario.state.next_relation_id())
-assert rel2.id == rel.id + 1 
+rel2 = rel.replace(local_app_data={"foo": "bar"}, relation_id=scenario.state.next_relation_id())
+assert rel2.relation_id == rel.relation_id + 1 
 ``` 
 
 If you don't do this, and pass both relations into a `State`, you will trigger a consistency checker error.
@@ -946,6 +946,46 @@ state_in = scenario.State(model=scenario.Model(name="my-model"))
 out = ctx.run("start", state_in)
 assert out.model.name == "my-model"
 assert out.model.uuid == state_in.model.uuid
+```
+
+## CloudSpec
+
+You can set CloudSpec information in the state (only `type` and `name` are required).
+
+Example:
+
+```python
+import scenario
+
+state = scenario.State(
+    cloud_spec=scenario.CloudSpec(
+        type="lxd",
+        name="localhost",
+        endpoint="https://127.0.0.1:8443",
+        credential=scenario.CloudCredential(
+            auth_type="clientcertificate",
+            attributes={
+                "client-cert": "foo",
+                "client-key": "bar",
+                "server-cert": "baz",
+            },
+        ),
+    ),
+    model=scenario.Model(name="my-vm-model", type="lxd"),
+)
+```
+
+Then you can access it by `Model.get_cloud_spec()`:
+
+```python
+# charm.py
+class MyVMCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, event: ops.StartEvent):
+        self.cloud_spec = self.model.get_cloud_spec()
 ```
 
 # Actions

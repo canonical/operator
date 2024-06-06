@@ -20,7 +20,7 @@ from typing import (
     cast,
 )
 
-from ops import JujuVersion, pebble
+from ops import CloudSpec, JujuVersion, pebble
 from ops.model import ModelError, RelationNotFoundError
 from ops.model import Secret as Secret_Ops  # lol
 from ops.model import (
@@ -163,7 +163,7 @@ class _MockModelBackend(_ModelBackend):
     ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
             return next(
-                filter(lambda r: r.id == rel_id, self._state.relations),
+                filter(lambda r: r.relation_id == rel_id, self._state.relations),
             )
         except StopIteration:
             raise RelationNotFoundError()
@@ -245,7 +245,9 @@ class _MockModelBackend(_ModelBackend):
 
     def relation_ids(self, relation_name):
         return [
-            rel.id for rel in self._state.relations if rel.endpoint == relation_name
+            rel.relation_id
+            for rel in self._state.relations
+            if rel.endpoint == relation_name
         ]
 
     def relation_list(self, relation_id: int) -> Tuple[str, ...]:
@@ -628,6 +630,13 @@ class _MockModelBackend(_ModelBackend):
                 f"Inconsistent state: "
                 f"resource {resource_name} not found in State. please pass it.",
             )
+
+    def credential_get(self) -> CloudSpec:
+        if not self._state.cloud_spec:
+            raise ModelError(
+                "ERROR cloud spec is empty, initialise it with `scenario.State(cloud_spec=scenario.CloudSpec(...))`",
+            )
+        return self._state.cloud_spec._to_ops()
 
 
 class _MockPebbleClient(_TestingPebbleClient):

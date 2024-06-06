@@ -29,6 +29,7 @@ from typing import (
 )
 from uuid import uuid4
 
+import ops
 import yaml
 from ops import pebble
 from ops.charm import CharmBase, CharmEvents
@@ -138,6 +139,77 @@ class _DCBase:
     def copy(self) -> "Self":
         """Produce a deep copy of this object."""
         return copy.deepcopy(self)
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudCredential:
+    auth_type: str
+    """Authentication type."""
+
+    attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """A dictionary containing cloud credentials.
+
+    For example, for AWS, it contains `access-key` and `secret-key`;
+    for Azure, `application-id`, `application-password` and `subscription-id`
+    can be found here.
+    """
+
+    redacted: List[str] = dataclasses.field(default_factory=list)
+    """A list of redacted generic cloud API secrets."""
+
+    def _to_ops(self) -> ops.CloudCredential:
+        return ops.CloudCredential(
+            auth_type=self.auth_type,
+            attributes=self.attributes,
+            redacted=self.redacted,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class CloudSpec:
+    type: str
+    """Type of the cloud."""
+
+    name: str = "localhost"
+    """Juju cloud name."""
+
+    region: Optional[str] = None
+    """Region of the cloud."""
+
+    endpoint: Optional[str] = None
+    """Endpoint of the cloud."""
+
+    identity_endpoint: Optional[str] = None
+    """Identity endpoint of the cloud."""
+
+    storage_endpoint: Optional[str] = None
+    """Storage endpoint of the cloud."""
+
+    credential: Optional[CloudCredential] = None
+    """Cloud credentials with key-value attributes."""
+
+    ca_certificates: List[str] = dataclasses.field(default_factory=list)
+    """A list of CA certificates."""
+
+    skip_tls_verify: bool = False
+    """Whether to skip TLS verfication."""
+
+    is_controller_cloud: bool = False
+    """If this is the cloud used by the controller."""
+
+    def _to_ops(self) -> ops.CloudSpec:
+        return ops.CloudSpec(
+            type=self.type,
+            name=self.name,
+            region=self.region,
+            endpoint=self.endpoint,
+            identity_endpoint=self.identity_endpoint,
+            storage_endpoint=self.storage_endpoint,
+            credential=self.credential._to_ops() if self.credential else None,
+            ca_certificates=self.ca_certificates,
+            skip_tls_verify=self.skip_tls_verify,
+            is_controller_cloud=self.is_controller_cloud,
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -353,7 +425,7 @@ class RelationBase(_DCBase):
     """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
     If left empty, it will be automatically derived from metadata.yaml."""
 
-    id: int = dataclasses.field(default_factory=next_relation_id)
+    relation_id: int = dataclasses.field(default_factory=next_relation_id)
     """Juju relation ID. Every new Relation instance gets a unique one,
     if there's trouble, override."""
 
@@ -919,6 +991,8 @@ class State(_DCBase):
     """Status of the unit."""
     workload_version: str = ""
     """Workload version."""
+    cloud_spec: Optional[CloudSpec] = None
+    """Cloud specification information (metadata) including credentials."""
 
     def __post_init__(self):
         for name in ["app_status", "unit_status"]:
@@ -1410,7 +1484,7 @@ class Event(_DCBase):
 
             snapshot_data = {
                 "relation_name": relation.endpoint,
-                "relation_id": relation.id,
+                "relation_id": relation.relation_id,
                 "app_name": remote_app,
                 "unit_name": f"{remote_app}/{self.relation_remote_unit_id}",
             }

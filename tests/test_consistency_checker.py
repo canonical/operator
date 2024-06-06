@@ -1,11 +1,14 @@
 import pytest
 from ops.charm import CharmBase
 
+from scenario import Model
 from scenario.consistency_checker import check_consistency
 from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Action,
+    CloudCredential,
+    CloudSpec,
     Container,
     Event,
     Network,
@@ -401,7 +404,9 @@ def test_action_params_type(ptype, good, bad):
 
 def test_duplicate_relation_ids():
     assert_inconsistent(
-        State(relations=[Relation("foo", id=1), Relation("bar", id=1)]),
+        State(
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
+        ),
         Event("start"),
         _CharmSpec(
             MyCharm,
@@ -414,13 +419,17 @@ def test_duplicate_relation_ids():
 
 def test_relation_without_endpoint():
     assert_inconsistent(
-        State(relations=[Relation("foo", id=1), Relation("bar", id=1)]),
+        State(
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=1)]
+        ),
         Event("start"),
         _CharmSpec(MyCharm, meta={"name": "charlemagne"}),
     )
 
     assert_consistent(
-        State(relations=[Relation("foo", id=1), Relation("bar", id=2)]),
+        State(
+            relations=[Relation("foo", relation_id=1), Relation("bar", relation_id=2)]
+        ),
         Event("start"),
         _CharmSpec(
             MyCharm,
@@ -560,5 +569,38 @@ def test_networks_consistency():
                 "extra-bindings": {"foo": {}},
                 "requires": {"bar": {"interface": "bar"}},
             },
+        ),
+    )
+
+
+def test_cloudspec_consistency():
+    cloud_spec = CloudSpec(
+        type="lxd",
+        endpoint="https://127.0.0.1:8443",
+        credential=CloudCredential(
+            auth_type="clientcertificate",
+            attributes={
+                "client-cert": "foo",
+                "client-key": "bar",
+                "server-cert": "baz",
+            },
+        ),
+    )
+
+    assert_consistent(
+        State(cloud_spec=cloud_spec, model=Model(name="lxd-model", type="lxd")),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "MyVMCharm"},
+        ),
+    )
+
+    assert_inconsistent(
+        State(cloud_spec=cloud_spec, model=Model(name="k8s-model", type="kubernetes")),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "MyK8sCharm"},
         ),
     )
