@@ -197,6 +197,7 @@ class MyCharm(ops.CharmBase):
         self.model.unit.status = ops.ActiveStatus("foo")
 
 # ...
+ctx = scenario.Context(MyCharm, meta={"name": "foo"})
 ctx.run(ctx.on.start(), scenario.State(unit_status=ops.ActiveStatus('foo')))
 assert ctx.unit_status_history == [
     ops.ActiveStatus('foo'),  # now the first status is active: 'foo'!
@@ -274,7 +275,7 @@ with scenario.capture_events.capture_events() as emitted:
     ctx = scenario.Context(SimpleCharm, meta={"name": "capture"})
     state_out = ctx.run(
         ctx.on.update_status(),
-        scenario.State(deferred=[scenario.DeferredEvent("start", ...)])
+        scenario.State(deferred=[scenario.deferred("start", SimpleCharm._on_start)])
     )
 
 # deferred events get reemitted first
