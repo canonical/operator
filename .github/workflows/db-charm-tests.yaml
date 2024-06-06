@@ -1,6 +1,11 @@
 name: Data Charm Tests
 
-on: [push, pull_request, workflow_call]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_call:
 
 jobs:
   db-charm-tests:
