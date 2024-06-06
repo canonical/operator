@@ -1522,6 +1522,10 @@ class Secret:
         longer exists, this method will succeed, but the unit will go into error
         state on completion of the current Juju hook.
 
+        If the tracked revision is removed, then :meth:`get_content` should
+        be called immediately afterwards with ``refresh=True``, to avoid
+        leaving the unit in a 'stuck' state.
+
         Args:
             revision: The secret revision to remove. If being called from a
                 secret event, this should usually be set to
