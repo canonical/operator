@@ -1809,7 +1809,7 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: Dict[str, Type['StatusBase']] = dataclasses.field(default_factory=dict)
+    _statuses: typing.ClassVar[Dict[str, Type['StatusBase']]] = {}
 
     # Subclasses should override this attribute
     name = ''
@@ -1874,11 +1874,6 @@ class StatusBase:
         If there are multiple highest-priority statuses, return the first one.
         """
         return max(statuses, key=lambda status: cls._priorities.get(status.name, 0))
-
-
-# _statuses is a class attribute, but can't be initialised in the usual way,
-# because all class attributes in dataclasses are replaced by instance attributes.
-StatusBase._statuses = {}
 
 
 @dataclasses.dataclass(init=False, repr=False, eq=False)
