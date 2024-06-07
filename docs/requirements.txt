@@ -131,7 +131,7 @@ sphinxcontrib-serializinghtml==1.1.10
     # via sphinx
 sphinxext-opengraph==0.9.1
     # via ops (pyproject.toml)
-tornado==6.4
+tornado==6.4.1
     # via livereload
 uc-micro-py==1.0.3
     # via linkify-it-py
