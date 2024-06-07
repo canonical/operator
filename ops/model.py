@@ -1514,7 +1514,7 @@ class Secret:
     def remove_revision(self, revision: int):
         """Remove the given secret revision.
 
-        This is normally called when handling
+        This is normally only called when handling
         :class:`ops.SecretRemoveEvent <ops.charm.SecretRemoveEvent>` or
         :class:`ops.SecretExpiredEvent <ops.charm.SecretExpiredEvent>`.
 
@@ -1522,14 +1522,9 @@ class Secret:
         longer exists, this method will succeed, but the unit will go into error
         state on completion of the current Juju hook.
 
-        If the tracked revision is removed, then :meth:`get_content` should
-        be called immediately afterwards with ``refresh=True``, to avoid
-        leaving the unit in a 'stuck' state.
-
         Args:
-            revision: The secret revision to remove. If being called from a
-                secret event, this should usually be set to
-                :attr:`SecretRemoveEvent.revision`.
+            revision: The secret revision to remove. This should usually be set to
+                :attr:`SecretRemoveEvent.revision` or :attr:`SecretExpiredEvent.revision`.
         """
         if self._id is None:
             self._id = self.get_info().id
