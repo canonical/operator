@@ -165,7 +165,7 @@ a bunch of charms that use the operator framework. The script can be run locally
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
 Pull requests should have a short title that follows the
-[conventional commit style](https://www.conventionalcommits.org/en/) using one of these types::
+[conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
 
 * chore
 * ci
@@ -182,7 +182,7 @@ and otherwise leave off the scope.
 
 * harness
 
-For example::
+For example:
 
 * feat: add the ability to observe change-updated events
 * fix!: correct the type hinting for config data
