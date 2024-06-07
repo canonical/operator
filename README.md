@@ -957,9 +957,8 @@ Example:
 ```python
 import scenario
 
-cloud_spec=ops.CloudSpec(
+cloud_spec=scenario.CloudSpec(
     type="lxd",
-    name="localhost",
     endpoint="https://127.0.0.1:8443",
     credential=scenario.CloudCredential(
         auth_type="clientcertificate",

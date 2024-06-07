@@ -1,6 +1,5 @@
 import pytest
 from ops.charm import CharmBase
-from ops.model import CloudCredential, CloudSpec
 
 from scenario import Model
 from scenario.consistency_checker import check_consistency
@@ -8,6 +7,8 @@ from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Action,
+    CloudCredential,
+    CloudSpec,
     Container,
     Event,
     Network,

@@ -15,7 +15,20 @@ class MyCharm(ops.CharmBase):
 
 
 def test_get_cloud_spec():
-    cloud_spec = ops.CloudSpec(
+    scenario_cloud_spec = scenario.CloudSpec(
+        type="lxd",
+        name="localhost",
+        endpoint="https://127.0.0.1:8443",
+        credential=scenario.CloudCredential(
+            auth_type="clientcertificate",
+            attributes={
+                "client-cert": "foo",
+                "client-key": "bar",
+                "server-cert": "baz",
+            },
+        ),
+    )
+    expected_cloud_spec = ops.CloudSpec(
         type="lxd",
         name="localhost",
         endpoint="https://127.0.0.1:8443",
@@ -30,11 +43,13 @@ def test_get_cloud_spec():
     )
     ctx = scenario.Context(MyCharm, meta={"name": "foo"})
     state = scenario.State(
-        model=scenario.Model(name="lxd-model", type="lxd", cloud_spec=cloud_spec),
+        model=scenario.Model(
+            name="lxd-model", type="lxd", cloud_spec=scenario_cloud_spec
+        ),
         trusted=True,
     )
     with ctx.manager("start", state=state) as mgr:
-        assert mgr.charm.model.get_cloud_spec() == cloud_spec
+        assert mgr.charm.model.get_cloud_spec() == expected_cloud_spec
 
 
 def test_get_cloud_spec_error():

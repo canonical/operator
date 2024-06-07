@@ -641,7 +641,7 @@ class _MockModelBackend(_ModelBackend):
                 "ERROR cloud spec is empty, initialise it with "
                 "`State(model=Model(..., cloud_spec=ops.CloudSpec(...)))`",
             )
-        return self._state.model.cloud_spec
+        return self._state.model.cloud_spec._to_ops()
 
 
 class _MockPebbleClient(_TestingPebbleClient):
