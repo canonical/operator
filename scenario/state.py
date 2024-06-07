@@ -685,7 +685,7 @@ class Notice(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
-class BoundNotice(_DCBase):
+class _BoundNotice(_DCBase):
     notice: Notice
     container: "Container"
 
@@ -810,7 +810,7 @@ class Container(_DCBase):
         self,
         key: str,
         notice_type: pebble.NoticeType = pebble.NoticeType.CUSTOM,
-    ) -> BoundNotice:
+    ) -> _BoundNotice:
         """Get a Pebble notice by key and type.
 
         Raises:
@@ -818,7 +818,7 @@ class Container(_DCBase):
         """
         for notice in self.notices:
             if notice.key == key and notice.type == notice_type:
-                return BoundNotice(notice, self)
+                return _BoundNotice(notice, self)
         raise KeyError(
             f"{self.name} does not have a notice with key {key} and type {notice_type}",
         )
