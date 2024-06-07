@@ -160,6 +160,38 @@ your charm to a controller using that version of Juju. For example, with microk8
 We rely on automation to [update charm pins](.github/actions/update-charm-pins/) of
 a bunch of charms that use the operator framework. The script can be run locally too.
 
+# Contributing
+
+Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
+
+Pull requests should have a short title that follows the
+[conventional commit style](https://www.conventionalcommits.org/en/) using one of these types::
+
+* chore
+* ci
+* docs
+* feat
+* fix
+* perf
+* refactor
+* revert
+* test
+
+If the PR is limited to one of the following scopes, also include the scope in the title,
+and otherwise leave off the scope.
+
+* harness
+
+For example::
+
+* feat: add the ability to observe change-updated events
+* fix!: correct the type hinting for config data
+* docs(harness): clarify the types of exceptions that Harness.add_user_secret may raise
+
+Note that the commit messages to the PR's branch do not need to follow the
+conventional commit format, as these will be squashed into a single commit to `main`
+using the PR title as the commit message.
+
 # Documentation
 
 In general, new functionality
