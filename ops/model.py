@@ -1812,7 +1812,9 @@ class StatusBase:
     _statuses: typing.ClassVar[Dict[str, Type['StatusBase']]] = {}
 
     # Subclasses should override this attribute
-    name = ''
+    name: str = ''
+
+    message: str = ''
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
