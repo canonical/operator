@@ -632,9 +632,9 @@ class _MockModelBackend(_ModelBackend):
             )
 
     def credential_get(self) -> CloudSpec:
-        if not self._state.trusted:
+        if not self._context.app_trusted:
             raise ModelError(
-                "ERROR charm is not trusted, initialise State with trusted=True",
+                "ERROR charm is not trusted, initialise Context with `app_trusted=True`",
             )
         if not self._state.model.cloud_spec:
             raise ModelError(

@@ -967,8 +967,6 @@ class State(_DCBase):
     """Whether this charm has leadership."""
     model: Model = Model()
     """The model this charm lives in."""
-    trusted: bool = False
-    """Whether ``juju-trust`` has been run for this charm."""
     secrets: List[Secret] = dataclasses.field(default_factory=list)
     """The secrets this charm has access to (as an owner, or as a grantee).
     The presence of a secret in this list entails that the charm can read it.
