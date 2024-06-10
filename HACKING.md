@@ -177,10 +177,8 @@ Pull requests should have a short title that follows the
 * revert
 * test
 
-If the PR is limited to one of the following scopes, also include the scope in the title,
-and otherwise leave off the scope.
-
-* harness
+If the PR is limited to changes in ops.testing (Harness), also include the scope
+`(harness)` in the title. At present, we do not add a scope in any other cases.
 
 For example:
 
