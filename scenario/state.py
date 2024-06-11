@@ -88,6 +88,7 @@ FRAMEWORK_EVENTS = {
     "collect_unit_status",
 }
 PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
+PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = "_pebble_custom_notice"
 RELATION_EVENTS_SUFFIX = {
     "_relation_changed",
     "_relation_broken",
@@ -683,6 +684,96 @@ class Mount(_DCBase):
     src: Union[str, Path]
 
 
+def _now_utc():
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+_next_notice_id_counter = 1
+
+
+def next_notice_id(update=True):
+    global _next_notice_id_counter
+    cur = _next_notice_id_counter
+    if update:
+        _next_notice_id_counter += 1
+    return str(cur)
+
+
+@dataclasses.dataclass(frozen=True)
+class Notice(_DCBase):
+    key: str
+    """The notice key, a string that differentiates notices of this type.
+
+    This is in the format ``domain/path``; for example:
+    ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
+    """
+
+    id: str = dataclasses.field(default_factory=next_notice_id)
+    """Unique ID for this notice."""
+
+    user_id: Optional[int] = None
+    """UID of the user who may view this notice (None means notice is public)."""
+
+    type: Union[pebble.NoticeType, str] = pebble.NoticeType.CUSTOM
+    """Type of the notice."""
+
+    first_occurred: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    """The first time one of these notices (type and key combination) occurs."""
+
+    last_occurred: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    """The last time one of these notices occurred."""
+
+    last_repeated: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    """The time this notice was last repeated.
+
+    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    for an explanation of what "repeated" means.
+    """
+
+    occurrences: int = 1
+    """The number of times one of these notices has occurred."""
+
+    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    """Additional data captured from the last occurrence of one of these notices."""
+
+    repeat_after: Optional[datetime.timedelta] = None
+    """Minimum time after one of these was last repeated before Pebble will repeat it again."""
+
+    expire_after: Optional[datetime.timedelta] = None
+    """How long since one of these last occurred until Pebble will drop the notice."""
+
+    def _to_ops(self) -> pebble.Notice:
+        return pebble.Notice(
+            id=self.id,
+            user_id=self.user_id,
+            type=self.type,
+            key=self.key,
+            first_occurred=self.first_occurred,
+            last_occurred=self.last_occurred,
+            last_repeated=self.last_repeated,
+            occurrences=self.occurrences,
+            last_data=self.last_data,
+            repeat_after=self.repeat_after,
+            expire_after=self.expire_after,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class _BoundNotice(_DCBase):
+    notice: Notice
+    container: "Container"
+
+    @property
+    def event(self):
+        """Sugar to generate a <container's name>-pebble-custom-notice event for this notice."""
+        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX
+        return Event(
+            path=normalize_name(self.container.name) + suffix,
+            container=self.container,
+            notice=self.notice,
+        )
+
+
 @dataclasses.dataclass(frozen=True)
 class Container(_DCBase):
     name: str
@@ -719,6 +810,8 @@ class Container(_DCBase):
     mounts: Dict[str, Mount] = dataclasses.field(default_factory=dict)
 
     exec_mock: _ExecMock = dataclasses.field(default_factory=dict)
+
+    notices: List[Notice] = dataclasses.field(default_factory=list)
 
     def _render_services(self):
         # copied over from ops.testing._TestingPebbleClient._render_services()
@@ -786,6 +879,23 @@ class Container(_DCBase):
                 "but that's most likely not what you want.",
             )
         return Event(path=normalize_name(self.name + "-pebble-ready"), container=self)
+
+    def get_notice(
+        self,
+        key: str,
+        notice_type: pebble.NoticeType = pebble.NoticeType.CUSTOM,
+    ) -> _BoundNotice:
+        """Get a Pebble notice by key and type.
+
+        Raises:
+            KeyError: if the notice is not found.
+        """
+        for notice in self.notices:
+            if notice.key == key and notice.type == notice_type:
+                return _BoundNotice(notice, self)
+        raise KeyError(
+            f"{self.name} does not have a notice with key {key} and type {notice_type}",
+        )
 
 
 _RawStatusLiteral = Literal[
@@ -1265,6 +1375,8 @@ class _EventPath(str):
         # Whether the event name indicates that this is a workload event.
         if s.endswith(PEBBLE_READY_EVENT_SUFFIX):
             return PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
+            return PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.workload
 
         if s in BUILTIN_EVENTS:
             return "", _EventType.builtin
@@ -1290,6 +1402,9 @@ class Event(_DCBase):
 
     # if this is a workload (container) event, the container it refers to
     container: Optional[Container] = None
+
+    # if this is a Pebble notice event, the notice it refers to
+    notice: Optional[Notice] = None
 
     # if this is an action event, the Action instance
     action: Optional["Action"] = None
@@ -1471,6 +1586,18 @@ class Event(_DCBase):
             snapshot_data = {
                 "container_name": container.name,
             }
+            if self.notice:
+                if hasattr(self.notice.type, "value"):
+                    notice_type = cast(pebble.NoticeType, self.notice.type).value
+                else:
+                    notice_type = str(self.notice.type)
+                snapshot_data.update(
+                    {
+                        "notice_id": self.notice.id,
+                        "notice_key": self.notice.key,
+                        "notice_type": notice_type,
+                    },
+                )
 
         elif self._is_relation_event:
             # this is a RelationEvent.
@@ -1534,8 +1661,9 @@ def deferred(
     event_id: int = 1,
     relation: Optional["Relation"] = None,
     container: Optional["Container"] = None,
+    notice: Optional["Notice"] = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
-        event = Event(event, relation=relation, container=container)
+        event = Event(event, relation=relation, container=container, notice=notice)
     return event.deferred(handler=handler, event_id=event_id)

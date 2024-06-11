@@ -532,14 +532,15 @@ def check_containers_consistency(
     meta = charm_spec.meta
     meta_containers = list(map(normalize_name, meta.get("containers", {})))
     state_containers = [normalize_name(c.name) for c in state.containers]
+    all_notices = {notice.id for c in state.containers for notice in c.notices}
     errors = []
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
     # not fine if:
-    # - you're processing a pebble-ready event and that container is not in state.containers or
+    # - you're processing a Pebble event and that container is not in state.containers or
     #   meta.containers
     if event._is_workload_event:
-        evt_container_name = event.name[: -len("-pebble-ready")]
+        evt_container_name = event.name.split("_pebble_")[0]
         if evt_container_name not in meta_containers:
             errors.append(
                 f"the event being processed concerns container {evt_container_name!r}, but a "
@@ -548,8 +549,13 @@ def check_containers_consistency(
         if evt_container_name not in state_containers:
             errors.append(
                 f"the event being processed concerns container {evt_container_name!r}, but a "
-                f"container with that name is not present in the state. It's odd, but consistent, "
-                f"if it cannot connect; but it should at least be there.",
+                f"container with that name is not present in the state. It's odd, but "
+                f"consistent, if it cannot connect; but it should at least be there.",
+            )
+        if event.notice and event.notice.id not in all_notices:
+            errors.append(
+                f"the event being processed concerns notice {event.notice!r}, but that "
+                "notice is not in any of the containers present in the state.",
             )
 
     # - a container in state.containers is not in meta.containers

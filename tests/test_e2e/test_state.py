@@ -19,6 +19,7 @@ CUSTOM_EVT_SUFFIXES = {
     "storage_detaching",
     "action",
     "pebble_ready",
+    "pebble_custom_notice",
 }
 
 
