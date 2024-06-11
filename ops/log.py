@@ -53,6 +53,7 @@ def setup_root_logging(
         debug: if True, write logs to stderr as well as to juju-log.
         exc_stderr: if True, write uncaught exceptions to stderr as well as to juju-log.
     """
+    logging.captureWarnings(True)
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
