@@ -17,12 +17,12 @@ import logging
 import sys
 import warnings
 from typing import Any, Callable, Type
-from unittest.mock import Mock, ANY
+from unittest.mock import ANY, Mock
+
+import pytest
 
 from ops.log import setup_root_logging
 from ops.model import _ModelBackend
-
-import pytest
 
 
 def deprecated(msg: str, *, category: Type[Warning] = DeprecationWarning, stacklevel: int = 1):
@@ -62,9 +62,9 @@ def reset_warnings():
 
 
 def test_fixme(monkeypatch: Any, reset_warnings: Any):
-    monkeypatch.setenv("JUJU_UNIT_NAME", "dummy")
+    monkeypatch.setenv('JUJU_UNIT_NAME', 'dummy')
     # I'd rather use pytest-subprocess instead of this crude mock
-    monkeypatch.setattr(_ModelBackend, "_run", (run_mock := Mock()))
+    monkeypatch.setattr(_ModelBackend, '_run', (run_mock := Mock()))
     logging.basicConfig()
     setup_root_logging(_ModelBackend())
     dummy_charm_function()
@@ -72,9 +72,9 @@ def test_fixme(monkeypatch: Any, reset_warnings: Any):
 
 
 def test_another(monkeypatch: Any, reset_warnings: Any):
-    monkeypatch.setenv("JUJU_UNIT_NAME", "dummy")
+    monkeypatch.setenv('JUJU_UNIT_NAME', 'dummy')
     # I'd rather use pytest-subprocess instead of this crude mock
-    monkeypatch.setattr(_ModelBackend, "_run", (run_mock := Mock()))
+    monkeypatch.setattr(_ModelBackend, '_run', (run_mock := Mock()))
     logging.basicConfig()
     setup_root_logging(_ModelBackend())
     dummy_charm_function()
