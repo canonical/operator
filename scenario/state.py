@@ -692,9 +692,9 @@ class _BoundNotice(_DCBase):
     @property
     def event(self):
         """Sugar to generate a <container's name>-pebble-custom-notice event for this notice."""
-        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX.replace("_", "-")
+        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX
         return Event(
-            path=normalize_name(self.container.name + suffix),
+            path=normalize_name(self.container.name) + suffix,
             container=self.container,
             notice=self.notice,
         )
