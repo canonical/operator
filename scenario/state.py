@@ -148,7 +148,6 @@ class CloudCredential:
 
     attributes: Dict[str, str] = dataclasses.field(default_factory=dict)
     """A dictionary containing cloud credentials.
-
     For example, for AWS, it contains `access-key` and `secret-key`;
     for Azure, `application-id`, `application-password` and `subscription-id`
     can be found here.
@@ -641,6 +640,9 @@ class Model(_DCBase):
     # TODO: make this exhaustive.
     type: Literal["kubernetes", "lxd"] = "kubernetes"
 
+    cloud_spec: Optional[CloudSpec] = None
+    """Cloud specification information (metadata) including credentials."""
+
 
 # for now, proc mock allows you to map one command to one mocked output.
 # todo extend: one input -> multiple outputs, at different times
@@ -991,8 +993,6 @@ class State(_DCBase):
     """Status of the unit."""
     workload_version: str = ""
     """Workload version."""
-    cloud_spec: Optional[CloudSpec] = None
-    """Cloud specification information (metadata) including credentials."""
 
     def __post_init__(self):
         for name in ["app_status", "unit_status"]:

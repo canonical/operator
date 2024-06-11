@@ -41,10 +41,11 @@ def test_get_cloud_spec():
             },
         ),
     )
-    ctx = scenario.Context(MyCharm, meta={"name": "foo"})
+    ctx = scenario.Context(MyCharm, meta={"name": "foo"}, app_trusted=True)
     state = scenario.State(
-        cloud_spec=scenario_cloud_spec,
-        model=scenario.Model(name="lxd-model", type="lxd"),
+        model=scenario.Model(
+            name="lxd-model", type="lxd", cloud_spec=scenario_cloud_spec
+        ),
     )
     with ctx.manager("start", state=state) as mgr:
         assert mgr.charm.model.get_cloud_spec() == expected_cloud_spec
@@ -53,6 +54,17 @@ def test_get_cloud_spec():
 def test_get_cloud_spec_error():
     ctx = scenario.Context(MyCharm, meta={"name": "foo"})
     state = scenario.State(model=scenario.Model(name="lxd-model", type="lxd"))
+    with ctx.manager("start", state) as mgr:
+        with pytest.raises(ops.ModelError):
+            mgr.charm.model.get_cloud_spec()
+
+
+def test_get_cloud_spec_untrusted():
+    cloud_spec = ops.CloudSpec(type="lxd", name="localhost")
+    ctx = scenario.Context(MyCharm, meta={"name": "foo"})
+    state = scenario.State(
+        model=scenario.Model(name="lxd-model", type="lxd", cloud_spec=cloud_spec),
+    )
     with ctx.manager("start", state) as mgr:
         with pytest.raises(ops.ModelError):
             mgr.charm.model.get_cloud_spec()

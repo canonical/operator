@@ -632,11 +632,16 @@ class _MockModelBackend(_ModelBackend):
             )
 
     def credential_get(self) -> CloudSpec:
-        if not self._state.cloud_spec:
+        if not self._context.app_trusted:
             raise ModelError(
-                "ERROR cloud spec is empty, initialise it with `scenario.State(cloud_spec=scenario.CloudSpec(...))`",
+                "ERROR charm is not trusted, initialise Context with `app_trusted=True`",
             )
-        return self._state.cloud_spec._to_ops()
+        if not self._state.model.cloud_spec:
+            raise ModelError(
+                "ERROR cloud spec is empty, initialise it with "
+                "`State(model=Model(..., cloud_spec=ops.CloudSpec(...)))`",
+            )
+        return self._state.model.cloud_spec._to_ops()
 
 
 class _MockPebbleClient(_TestingPebbleClient):

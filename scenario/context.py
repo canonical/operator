@@ -169,6 +169,7 @@ class Context:
         capture_framework_events: bool = False,
         app_name: Optional[str] = None,
         unit_id: Optional[int] = 0,
+        app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
 
@@ -225,6 +226,8 @@ class Context:
         :arg app_name: App name that this charm is deployed as. Defaults to the charm name as
             defined in metadata.yaml.
         :arg unit_id: Unit ID that this charm is deployed as. Defaults to 0.
+        :arg app_trusted: whether the charm has Juju trust (deployed with ``--trust`` or added with
+            ``juju trust``). Defaults to False
         :arg charm_root: virtual charm root the charm will be executed with.
             If the charm, say, expects a `./src/foo/bar.yaml` file present relative to the
             execution cwd, you need to use this. E.g.:
@@ -268,6 +271,7 @@ class Context:
 
         self._app_name = app_name
         self._unit_id = unit_id
+        self.app_trusted = app_trusted
         self._tmp = tempfile.TemporaryDirectory()
 
         # config for what events to be captured in emitted_events.
