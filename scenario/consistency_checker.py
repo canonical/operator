@@ -2,10 +2,11 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import os
+import re
 from collections import Counter
 from collections.abc import Sequence
 from numbers import Number
-from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple
+from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple, Union
 
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
@@ -69,6 +70,7 @@ def check_consistency(
         check_storages_consistency,
         check_relation_consistency,
         check_network_consistency,
+        check_cloudspec_consistency,
     ):
         results = check(
             state=state,
@@ -326,10 +328,17 @@ def check_storages_consistency(
     return Results(errors, [])
 
 
+def _is_secret_identifier(value: Union[str, int, float, bool]) -> bool:
+    """Return true iff the value is in the form `secret:{secret id}`."""
+    # cf. https://github.com/juju/juju/blob/13eb9df3df16a84fd471af8a3c95ddbd04389b71/core/secrets/secret.go#L48
+    return bool(re.match(r"secret:[0-9a-z]{20}$", str(value)))
+
+
 def check_config_consistency(
     *,
     state: "State",
     charm_spec: "_CharmSpec",
+    juju_version: Tuple[int, ...],
     **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the consistency of the state.config with the charm_spec.config (config.yaml)."""
@@ -348,16 +357,21 @@ def check_config_consistency(
         converters = {
             "string": str,
             "int": int,
-            "integer": int,  # fixme: which one is it?
-            "number": float,
+            "float": float,
             "boolean": bool,
-            # "attrs": NotImplemented,  # fixme: wot?
+        }
+        if juju_version >= (3, 4):
+            converters["secret"] = str
+
+        validators = {
+            "secret": _is_secret_identifier,
         }
 
         expected_type_name = meta_config[key].get("type", None)
         if not expected_type_name:
             errors.append(f"config.yaml invalid; option {key!r} has no 'type'.")
             continue
+        validator = validators.get(expected_type_name)
 
         expected_type = converters.get(expected_type_name)
         if not expected_type:
@@ -369,6 +383,11 @@ def check_config_consistency(
             errors.append(
                 f"config invalid; option {key!r} should be of type {expected_type} "
                 f"but is of type {type(value)}.",
+            )
+
+        elif validator and not validator(value):
+            errors.append(
+                f"config invalid: option {key!r} value {value!r} is not valid.",
             )
 
     return Results(errors, [])
@@ -553,3 +572,25 @@ def check_containers_consistency(
         errors.append(f"Duplicate container name(s): {dupes}.")
 
     return Results(errors, [])
+
+
+def check_cloudspec_consistency(
+    *,
+    state: "State",
+    event: "Event",
+    charm_spec: "_CharmSpec",
+    **_kwargs,  # noqa: U101
+) -> Results:
+    """Check that Kubernetes charms/models don't have `state.cloud_spec`."""
+
+    errors = []
+    warnings = []
+
+    if state.model.type == "kubernetes" and state.model.cloud_spec:
+        errors.append(
+            "CloudSpec is only available for machine charms, not Kubernetes charms. "
+            "Tell Scenario to simulate a machine substrate with: "
+            "`scenario.State(..., model=scenario.Model(type='lxd'))`.",
+        )
+
+    return Results(errors, warnings)

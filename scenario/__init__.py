@@ -6,6 +6,8 @@ from scenario.state import (
     Action,
     Address,
     BindAddress,
+    CloudCredential,
+    CloudSpec,
     Container,
     DeferredEvent,
     Event,
@@ -30,6 +32,8 @@ from scenario.state import (
 __all__ = [
     "Action",
     "ActionOutput",
+    "CloudCredential",
+    "CloudSpec",
     "Context",
     "deferred",
     "StateValidationError",

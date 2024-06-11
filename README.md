@@ -20,7 +20,7 @@ union of an `Event` (why am I, charm, being executed), a `State` (am I leader? w
 config?...) and the charm's execution `Context` (what relations can I have? what containers can I have?...). The output is another `State`: the state after the charm has had a chance to interact with the
 mocked Juju model and affect the initial state back.
 
-![state transition model depiction](resources/state-transition-model.png)
+![state transition model depiction](https://raw.githubusercontent.com/canonical/ops-scenario/main/resources/state-transition-model.png)
 
 For example: a charm currently in `unknown` status is executed with a `start` event, and based on whether it has leadership or not (according to its input state), it will decide to set `active` or `blocked` status (which will be reflected in the output state).
 
@@ -980,6 +980,45 @@ state_in = scenario.State(model=scenario.Model(name="my-model"))
 out = ctx.run("start", state_in)
 assert out.model.name == "my-model"
 assert out.model.uuid == state_in.model.uuid
+```
+
+### CloudSpec
+
+You can set CloudSpec information in the model (only `type` and `name` are required).
+
+Example:
+
+```python
+import scenario
+
+cloud_spec=scenario.CloudSpec(
+    type="lxd",
+    endpoint="https://127.0.0.1:8443",
+    credential=scenario.CloudCredential(
+        auth_type="clientcertificate",
+        attributes={
+            "client-cert": "foo",
+            "client-key": "bar",
+            "server-cert": "baz",
+        },
+    ),
+)
+state = scenario.State(
+    model=scenario.Model(name="my-vm-model", type="lxd", cloud_spec=cloud_spec),
+)
+```
+
+Then you can access it by `Model.get_cloud_spec()`:
+
+```python
+# charm.py
+class MyVMCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, event: ops.StartEvent):
+        self.cloud_spec = self.model.get_cloud_spec()
 ```
 
 # Actions

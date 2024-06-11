@@ -1,11 +1,14 @@
 import pytest
 from ops.charm import CharmBase
 
+from scenario import Model
 from scenario.consistency_checker import check_consistency
 from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
     Action,
+    CloudCredential,
+    CloudSpec,
     Container,
     Event,
     Network,
@@ -170,6 +173,69 @@ def test_bad_config_option_type():
         State(config={"foo": True}),
         Event("bar"),
         _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "boolean"}}}),
+    )
+
+
+@pytest.mark.parametrize(
+    "config_type",
+    (
+        ("string", "foo", 1),
+        ("int", 1, "1"),
+        ("float", 1.0, 1),
+        ("boolean", False, "foo"),
+    ),
+)
+def test_config_types(config_type):
+    type_name, valid_value, invalid_value = config_type
+    assert_consistent(
+        State(config={"foo": valid_value}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": type_name}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": invalid_value}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": type_name}}}),
+    )
+
+
+@pytest.mark.parametrize("juju_version", ("3.4", "3.5", "4.0"))
+def test_config_secret(juju_version):
+    assert_consistent(
+        State(config={"foo": "secret:co28kefmp25c77utl3n0"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+        juju_version=juju_version,
+    )
+    assert_inconsistent(
+        State(config={"foo": 1}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": "co28kefmp25c77utl3n0"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": "secret:secret"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+    assert_inconsistent(
+        State(config={"foo": "secret:co28kefmp25c77utl3n!"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+    )
+
+
+@pytest.mark.parametrize("juju_version", ("2.9", "3.3"))
+def test_config_secret_old_juju(juju_version):
+    assert_inconsistent(
+        State(config={"foo": "secret:co28kefmp25c77utl3n0"}),
+        Event("bar"),
+        _CharmSpec(MyCharm, {}, config={"options": {"foo": {"type": "secret"}}}),
+        juju_version=juju_version,
     )
 
 
@@ -520,5 +586,39 @@ def test_networks_consistency():
                 "extra-bindings": {"foo": {}},
                 "requires": {"bar": {"interface": "bar"}},
             },
+        ),
+    )
+
+
+def test_cloudspec_consistency():
+    cloud_spec = CloudSpec(
+        name="localhost",
+        type="lxd",
+        endpoint="https://127.0.0.1:8443",
+        credential=CloudCredential(
+            auth_type="clientcertificate",
+            attributes={
+                "client-cert": "foo",
+                "client-key": "bar",
+                "server-cert": "baz",
+            },
+        ),
+    )
+
+    assert_consistent(
+        State(model=Model(name="lxd-model", type="lxd", cloud_spec=cloud_spec)),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "MyVMCharm"},
+        ),
+    )
+
+    assert_inconsistent(
+        State(model=Model(name="k8s-model", type="kubernetes", cloud_spec=cloud_spec)),
+        Event("start"),
+        _CharmSpec(
+            MyCharm,
+            meta={"name": "MyK8sCharm"},
         ),
     )

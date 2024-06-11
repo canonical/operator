@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import inspect
 import os
+import sys
 from typing import TYPE_CHECKING, Any, Optional, Sequence, cast
 
 import ops.charm
@@ -96,6 +97,9 @@ def setup_framework(
     )
     debug = "JUJU_DEBUG" in os.environ
     setup_root_logging(model_backend, debug=debug)
+    # ops sets sys.excepthook to go to Juju's debug-log, but that's not useful
+    # in a testing context, so reset it.
+    sys.excepthook = sys.__excepthook__
     ops_logger.debug(
         "Operator Framework %s up and running.",
         ops.__version__,
