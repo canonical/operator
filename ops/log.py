@@ -15,7 +15,6 @@
 """Interface to emit messages to the Juju logging system."""
 
 import logging
-import os
 import sys
 import types
 import typing
@@ -25,7 +24,7 @@ from ops.model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
-    """A handler for sending logs to Juju via juju-log."""
+    """A handler for sending logs and warnings to Juju via juju-log."""
 
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
@@ -50,6 +49,9 @@ def setup_root_logging(
 
       logging.getLogger().setLevel(logging.INFO)
 
+    Warnings issued by the warnings module are redirected to the logging system and
+    forwarded to juju-log, too.
+
     Args:
         model_backend: a ModelBackend to use for juju-log
         debug: if True, write logs to stderr as well as to juju-log.
@@ -64,8 +66,7 @@ def setup_root_logging(
         lineno: int,
         line: typing.Optional[str] = None,
     ) -> str:
-        module_name = os.path.basename(filename)
-        return f'{module_name}:{lineno}: {category.__name__}: {message}'
+        return f'{filename}:{lineno}: {category.__name__}: {message}'
 
     warnings.formatwarning = custom_warning_formatter
 
