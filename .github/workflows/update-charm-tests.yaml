@@ -5,7 +5,7 @@ on:
   # NOTE: to avoid infinite loop, exclude the branch created by this workflow if triggering on push or pull_request
   workflow_dispatch:
   schedule:
-    - cron: '0 18 * * SUN' # Sunday 6pm UTC, before international day starts
+    - cron: '0 0 25 * *' # On the 25th of each month
 
 jobs:
   update-pins:
