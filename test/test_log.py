@@ -15,6 +15,7 @@
 import io
 import logging
 import re
+import sys
 import typing
 import unittest
 from unittest.mock import patch
@@ -50,6 +51,7 @@ def logger():
     logger = logging.getLogger()
     yield logger
     logging.getLogger().handlers.clear()
+    sys.excepthook = sys.__excepthook__
 
 
 class TestLogging:
