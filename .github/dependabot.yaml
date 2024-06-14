@@ -3,4 +3,4 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"  # This is hard-coded to the 1st of the month
