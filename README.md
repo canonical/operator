@@ -173,5 +173,5 @@ Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and:
 ### Make your mark
 
 - Read our [documentation contributor guidelines](https://discourse.charmhub.io/t/documentation-guidelines-for-contributors/1245) and help improve a doc
-- Read our [codebase contributor guidelines](HACKING.md) and help improve the codebase
+- Read our [codebase contributor guidelines](https://github.com/canonical/operator/blob/main/HACKING.md) and help improve the codebase
 - Write a charm and publish it on [Charmhub](https://charmhub.io/)
