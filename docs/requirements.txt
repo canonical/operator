@@ -135,7 +135,7 @@ tornado==6.4.1
     # via livereload
 uc-micro-py==1.0.3
     # via linkify-it-py
-urllib3==2.2.1
+urllib3==2.2.2
     # via requests
 wcmatch==8.5.1
     # via pyspelling
