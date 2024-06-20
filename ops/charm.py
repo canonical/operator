@@ -905,9 +905,10 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, the charm will call
+    After any required cleanup, the charm should call
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
-    remove the now-unused revision.
+    remove the now-unused revision. If the charm does not, then the event will
+    be emitted again, when further revisions are ready for removal.
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
