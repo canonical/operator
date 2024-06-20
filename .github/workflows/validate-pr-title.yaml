@@ -1,0 +1,37 @@
+---
+name: "Validate PR Title"
+# Ensure that the PR title conforms to the Conventional Commits and our choice of types and scopes, so that library version bumps can be detected automatically
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  main:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            chore
+            ci
+            docs
+            feat
+            fix
+            perf
+            refactor
+            revert
+            test
+          scopes: |
+            harness
+          requireScope: false
