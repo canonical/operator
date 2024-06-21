@@ -11,6 +11,10 @@ All ops 2.x versions are currently supported with security updates.
 
 ## Reporting a vulnerability
 
+Please provide a description of the issue, the steps you took to
+create the issue, affected versions, and, if known, mitigations for
+the issue.
+
 The easiest way to report a security issue is through
 [GitHub](https://github.com/canonical/operator/security/advisories/new). See
 [Privately reporting a security
@@ -25,9 +29,6 @@ assigned and coordinating the release of the fix.
 You may also send email to security@ubuntu.com. Email may optionally be
 encrypted to OpenPGP key
 [`4072 60F7 616E CE4D 9D12 4627 98E9 740D C345 39E0`](https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x407260f7616ece4d9d12462798e9740dc34539e0)
-Please provide a description of the issue, the steps you took to
-create the issue, affected versions, and, if known, mitigations for
-the issue.
 
 If you have a deadline for public disclosure, please let us know.
 Our vulnerability management team intends to respond within 3 working
