@@ -353,7 +353,6 @@ def check_config_consistency(
             )
             continue
 
-        # todo unify with snapshot's when merged.
         converters = {
             "string": str,
             "int": int,
