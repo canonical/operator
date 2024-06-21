@@ -4073,6 +4073,118 @@ class TestTestingPebbleClient:
             == plan.to_yaml()
         )
 
+    def test_add_layer_checks_combine_override_replace(self, client: _TestingPebbleClient):
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
+        client.add_layer(
+            'foo',
+            pebble.Layer("""\
+            checks:
+                up:
+                    override: replace
+                    level: alive
+                    period: 30s
+                    threshold: 1
+                    exec:
+                        command: service nginx status
+            """),
+        )
+        plan = client.get_plan()
+        # The YAML should be normalized
+        assert (
+            textwrap.dedent("""\
+            checks:
+              up:
+                exec:
+                  command: service nginx status
+                level: alive
+                override: replace
+                period: 30s
+                threshold: 1
+            """)
+            == plan.to_yaml()
+        )
+        client.add_layer(
+            'foo',
+            """\
+            checks:
+                up:
+                    override: replace
+                    level: alive
+                    period: 10s
+                    threshold: 5
+                    exec:
+                        command: service nginx status
+            """,
+            combine=True,
+        )
+        plan = client.get_plan()
+        assert (
+            textwrap.dedent("""\
+            checks:
+              up:
+                exec:
+                  command: service nginx status
+                level: alive
+                override: replace
+                period: 10s
+                threshold: 5
+            """)
+            == plan.to_yaml()
+        )
+
+    def test_add_layer_checks_combine_override_merge(self, client: _TestingPebbleClient):
+        client.add_layer(
+            'foo',
+            """\
+            checks:
+                up:
+                    level: alive
+                    period: 30s
+                    threshold: 1
+                    exec:
+                        command: service nginx status
+                ready:
+                    level: ready
+                    period: 30s
+                    threshold: 1
+                    exec:
+                        command: service nginx ready
+            """,
+        )
+        client.add_layer(
+            'foo',
+            """\
+            checks:
+              up:
+                override: merge
+                level: alive
+                period: 10s
+                threshold: 5
+            """,
+            combine=True,
+        )
+        assert (
+            textwrap.dedent("""\
+            checks:
+              ready:
+                exec:
+                  command: service nginx ready
+                level: ready
+                period: 30s
+                threshold: 1
+              up:
+                exec:
+                  command: service nginx status
+                level: alive
+                override: merge
+                period: 10s
+                threshold: 5
+            """)
+            == client.get_plan().to_yaml()
+        )
+
     def test_add_layer_not_combined(self, client: _TestingPebbleClient):
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)

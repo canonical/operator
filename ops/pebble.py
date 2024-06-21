@@ -1135,6 +1135,64 @@ class Check:
         else:
             return NotImplemented
 
+    def _merge_exec(self, other: 'ExecDict') -> None:
+        """Merges this exec object with another exec definition.
+
+        For attributes present in both objects, the passed in exec
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value:
+                continue
+            if name == 'environment':
+                getattr(self.exec, name).update(value)
+            else:
+                setattr(self.exec, name, value)
+
+    def _merge_http(self, other: 'HttpDict') -> None:
+        """Merges this http object with another http definition.
+
+        For attributes present in both objects, the passed in http
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value:
+                continue
+            if name == 'headers':
+                getattr(self.http, name).update(value)
+            else:
+                setattr(self.http, name, value)
+
+    def _merge_tcp(self, other: 'TcpDict') -> None:
+        """Merges this tcp object with another tcp definition.
+
+        For attributes present in both objects, the passed in tcp
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value:
+                continue
+            else:
+                setattr(self.tcp, name, value)
+
+    def _merge(self, other: 'Check'):
+        """Merges this check object with another check definition.
+
+        For attributes present in both objects, the passed in check
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value or name == 'name':
+                continue
+            if name == 'http':
+                self._merge_http(value)
+            elif name == 'tcp':
+                self._merge_tcp(value)
+            elif name == 'exec':
+                self._merge_exec(value)
+            else:
+                setattr(self, name, value)
+
 
 class CheckLevel(enum.Enum):
     """Enum of check levels."""

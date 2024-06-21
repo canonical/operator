@@ -3197,6 +3197,25 @@ class _TestingPebbleClient:
                         s._merge(service)
                     else:
                         layer.services[name] = service
+            for name, check in layer_obj.checks.items():
+                if not check.override:
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" must define'
+                        f'"override" for check "{name}"'
+                    )
+                if check.override not in ('merge', 'replace'):
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" has invalid '
+                        f'"override" value on check "{name}"'
+                    )
+                elif check.override == 'replace':
+                    layer.checks[name] = check
+                elif check.override == 'merge':
+                    if combine and name in layer.checks:
+                        c = layer.checks[name]
+                        c._merge(check)
+                    else:
+                        layer.checks[name] = check
 
         else:
             self._layers[label] = layer_obj
