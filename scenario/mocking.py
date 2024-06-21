@@ -263,7 +263,7 @@ class _MockModelBackend(_ModelBackend):
         )
 
     def config_get(self):
-        state_config = self._state.config
+        state_config = self._state.config.copy()  # dedup or we'll mutate the state!
 
         # add defaults
         charm_config = self._charm_spec.config
