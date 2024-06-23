@@ -23,8 +23,8 @@ for instructions.
 
 The ops GitHub admins will be notified of the issue and will work with you
 to determine whether the issue qualifies as a security issue and, if so, in
-which component. We will then handle figuring out a fix, getting a CVE
-assigned and coordinating the release of the fix.
+which component. We will then figure out a fix, get a CVE
+assigned, and coordinate the release of the fix.
 
 You may also send email to security@ubuntu.com. Email may optionally be
 encrypted to OpenPGP key
