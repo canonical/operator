@@ -2,12 +2,7 @@
 
 ## Supported versions
 
-All ops 2.x versions are currently supported with security updates.
-
-| Version | Supported |
-| - | - |
-| 2.x.y | :white_check_mark: |
-| < 2.0 | :x: |
+All ops 2.x versions released within the last year are currently supported with security updates.
 
 ## Reporting a vulnerability
 
