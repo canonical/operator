@@ -26,12 +26,13 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast, Sequence
 
 import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
+from middlewares import Middleware
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
@@ -530,13 +531,15 @@ class _Manager:
             self.framework.close()
 
 
-def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
+def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None,
+         middlewares: Sequence[Type[Middleware]]=None):
     """Set up the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
 
     Args:
         charm_class: the charm class to instantiate and receive the event.
+        middlewares: operator framework middleware used to extend the framework's own functionality.
         use_juju_for_storage: whether to use controller-side storage. If not specified
             then Kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
