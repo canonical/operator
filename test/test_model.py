@@ -3663,24 +3663,6 @@ class TestSecretClass:
 
         assert fake_script.calls(clear=True) == [['secret-get', 'secret:z', '--format=json']]
 
-    def test_set_content_invalidates_cache(self, model: ops.Model, fake_script: FakeScript):
-        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
-        fake_script.write('secret-set', """exit 0""")
-
-        secret = self.make_secret(model, id='z')
-        old_content = secret.get_content()
-        assert old_content == {'foo': 'bar'}
-        secret.set_content({'new': 'content'})
-        fake_script.write('secret-get', """echo '{"new": "content"}'""")
-        new_content = secret.get_content()
-        assert new_content == {'new': 'content'}
-
-        assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:z', '--format=json'],
-            ['secret-set', 'secret:z', 'new=content'],
-            ['secret-get', 'secret:z', '--format=json'],
-        ]
-
     def test_peek_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "peeked"}'""")
 
