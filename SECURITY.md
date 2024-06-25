@@ -14,7 +14,7 @@ The easiest way to report a security issue is through
 [GitHub's security advisory for this project](https://github.com/canonical/operator/security/advisories/new). See
 [Privately reporting a security
 vulnerability](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability)
-for instructions.
+for instructions on reporting using GitHub's security advisory feature.
 
 The ops GitHub admins will be notified of the issue and will work with you
 to determine whether the issue qualifies as a security issue and, if so, in
