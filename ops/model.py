@@ -269,13 +269,19 @@ class Model:
         owners set a label using ``add_secret``, whereas secret observers set
         a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
+        The content of the secret is retrieved, so calls to
+        :meth:`Secret.get_content` do not require querying the secret storage
+        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
+        has been called.
+
         Args:
             id: Secret ID if fetching by ID.
             label: Secret label if fetching by label (or updating it).
 
         Raises:
-            SecretNotFoundError: If a secret with this ID or label doesn't exist,
-                or the caller does not have permission to view it.
+            SecretNotFoundError: If a secret with this ID or label doesn't exist.
+            ModelError: if the charm does not have permission to access the
+                secret.
         """
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1365,6 +1371,10 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> Dict[str, str]:
         """Get the secret's content.
 
+        The content of the secret is cached on the :class:`Secret` object, so
+        subsequent calls do not require querying the secret storage again,
+        unless ``refresh=True`` is used, or :meth:`set_content` is called.
+
         Returns:
             A copy of the secret's content dictionary.
 
@@ -1372,6 +1382,11 @@ class Secret:
             refresh: If true, fetch the latest revision's content and tell
                 Juju to update to tracking that revision. The default is to
                 get the content of the currently-tracked revision.
+
+        Raises:
+            SecretNotFoundError: if the secret no longer exists.
+            ModelError: if the charm does not have permission to access the
+                secret.
         """
         if refresh or self._content is None:
             self._content = self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
@@ -1381,7 +1396,13 @@ class Secret:
         """Get the content of the latest revision of this secret.
 
         This returns the content of the latest revision without updating the
-        tracking.
+        tracking. The content is not cached locally, so multiple calls will
+        result in multiple queries to the secret storage.
+
+        Raises:
+            SecretNotFoundError: if the secret no longer exists.
+            ModelError: if the charm does not have permission to access the
+                secret.
         """
         return self._backend.secret_get(id=self.id, label=self.label, peek=True)
 
@@ -1389,6 +1410,10 @@ class Secret:
         """Get this secret's information (metadata).
 
         Only secret owners can fetch this information.
+
+        Raises:
+            SecretNotFoundError: if the secret no longer exists, or if the charm
+                does not have permission to access the secret.
         """
         return self._backend.secret_info_get(id=self.id, label=self.label)
 
@@ -1399,6 +1424,10 @@ class Secret:
         the secret (the "observers") that a new revision is available with a
         :class:`ops.SecretChangedEvent <ops.charm.SecretChangedEvent>`.
 
+        If the charm does not have permission to update the secret, or the
+        secret no longer exists, this method will succeed, but the unit will go
+        into error state on completion of the current Juju hook.
+
         Args:
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
@@ -1407,7 +1436,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
         self._backend.secret_set(typing.cast(str, self.id), content=content)
-        self._content = None  # invalidate cache so it's refetched next get_content()
+        # We do not need to invalidate the cache here, as the content is the
+        # same until `refresh` is used, at which point the cache is invalidated.
 
     def set_info(
         self,
@@ -1421,6 +1451,10 @@ class Secret:
 
         This will not create a new secret revision (that applies only to
         :meth:`set_content`). Once attributes are set, they cannot be unset.
+
+        If the charm does not have permission to update the secret, or the
+        secret no longer exists, this method will succeed, but the unit will go
+        into error state on completion of the current Juju hook.
 
         Args:
             label: New label to apply.
@@ -1480,14 +1514,17 @@ class Secret:
     def remove_revision(self, revision: int):
         """Remove the given secret revision.
 
-        This is normally called when handling
+        This is normally only called when handling
         :class:`ops.SecretRemoveEvent <ops.charm.SecretRemoveEvent>` or
         :class:`ops.SecretExpiredEvent <ops.charm.SecretExpiredEvent>`.
 
+        If the charm does not have permission to remove the secret, or it no
+        longer exists, this method will succeed, but the unit will go into error
+        state on completion of the current Juju hook.
+
         Args:
-            revision: The secret revision to remove. If being called from a
-                secret event, this should usually be set to
-                :attr:`SecretRemoveEvent.revision`.
+            revision: The secret revision to remove. This should usually be set to
+                :attr:`SecretRemoveEvent.revision` or :attr:`SecretExpiredEvent.revision`.
         """
         if self._id is None:
             self._id = self.get_info().id
@@ -1498,6 +1535,10 @@ class Secret:
 
         This is called when the secret is no longer needed, for example when
         handling :class:`ops.RelationBrokenEvent <ops.charm.RelationBrokenEvent>`.
+
+        If the charm does not have permission to remove the secret, or it no
+        longer exists, this method will succeed, but the unit will go into error
+        state on completion of the current Juju hook.
         """
         if self._id is None:
             self._id = self.get_info().id

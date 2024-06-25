@@ -841,7 +841,11 @@ class SecretEvent(HookEvent):
 
     @property
     def secret(self) -> model.Secret:
-        """The secret instance this event refers to."""
+        """The secret instance this event refers to.
+
+        Note that the secret content is not retrieved from the secret storage
+        until :meth:`Secret.get_content()` is called.
+        """
         backend = self.framework.model._backend
         return model.Secret(backend=backend, id=self._id, label=self._label)
 
@@ -901,9 +905,10 @@ class SecretRemoveEvent(SecretEvent):
     observers have updated to that new revision, this event will be fired to
     inform the secret owner that the old revision can be removed.
 
-    Typically, the charm will call
+    After any required cleanup, the charm should call
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
-    remove the now-unused revision.
+    remove the now-unused revision. If the charm does not, then the event will
+    be emitted again, when further revisions are ready for removal.
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
