@@ -408,9 +408,24 @@ class _Manager:
         model_backend: Optional[ops.model._ModelBackend] = None,
         use_juju_for_storage: Optional[bool] = None,
         charm_state_path: str = CHARM_STATE_FILE,
+            middlewares:Optional[Sequence[Middleware]] = None
     ):
         self._charm_state_path = charm_state_path
-        self._charm_class = charm_class
+
+        for middleware in middlewares:
+            middleware.setup_class(charm_class)
+
+        class _MiddlewaredCharmType(charm_class):
+            def __init__(self, *args, **kwargs):
+                for middleware in middlewares:
+                    middleware.pre_init(self)
+
+                super().__init__(*args, **kwargs)
+                for middleware in middlewares:
+                    middleware.post_init(self)
+
+        self._charm_class = _MiddlewaredCharmType
+
         if model_backend is None:
             model_backend = ops.model._ModelBackend()
         self._model_backend = model_backend
@@ -546,7 +561,9 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
             otherwise local storage is used.
     """
     try:
-        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+        manager = _Manager(charm_class,
+                           use_juju_for_storage=use_juju_for_storage,
+                           middlewares=middlewares)
 
         manager.run()
     except _Abort as e:
