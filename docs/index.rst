@@ -12,7 +12,7 @@ ops module
 .. automodule:: ops
 
 
-`ops.main`
+ops.main
 -----------
 
 .. automodule:: ops.main
