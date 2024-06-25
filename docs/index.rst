@@ -12,6 +12,12 @@ ops module
 .. automodule:: ops
 
 
+`ops.main`
+-----------
+
+.. automodule:: ops.main
+
+
 ops.pebble module
 =================
 
