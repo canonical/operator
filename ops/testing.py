@@ -3223,6 +3223,25 @@ class _TestingPebbleClient:
                         c._merge(check)
                     else:
                         layer.checks[name] = check
+            for name, log_target in layer_obj.log_targets.items():
+                if not log_target.override:
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" must define'
+                        f'"override" for log target "{name}"'
+                    )
+                if log_target.override not in ('merge', 'replace'):
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" has invalid '
+                        f'"override" value on log target "{name}"'
+                    )
+                elif log_target.override == 'replace':
+                    layer.log_targets[name] = log_target
+                elif log_target.override == 'merge':
+                    if combine and name in layer.log_targets:
+                        lt = layer.log_targets[name]
+                        lt._merge(log_target)
+                    else:
+                        layer.log_targets[name] = log_target
 
         else:
             self._layers[label] = layer_obj

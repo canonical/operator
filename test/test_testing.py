@@ -4185,6 +4185,116 @@ class TestTestingPebbleClient:
             == client.get_plan().to_yaml()
         )
 
+    def test_add_layer_log_targets_combine_override_replace(self, client: _TestingPebbleClient):
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
+        client.add_layer(
+            'foo',
+            pebble.Layer("""\
+            log-targets:
+                baz:
+                    override: replace
+                    type: loki
+                    location: https://example.com:3100/loki/api/v1/push
+                    services:
+                        - foo,
+                    labels:
+                        key: value,
+                        key1: value1,
+            """),
+        )
+        plan = client.get_plan()
+        # The YAML should be normalized
+        assert (
+            textwrap.dedent("""\
+            log-targets:
+              baz:
+                labels:
+                  key: value,
+                  key1: value1,
+                location: https://example.com:3100/loki/api/v1/push
+                override: replace
+                services:
+                - foo,
+                type: loki
+            """)
+            == plan.to_yaml()
+        )
+        client.add_layer(
+            'foo',
+            pebble.Layer("""\
+            log-targets:
+                baz:
+                    override: replace
+                    type: loki
+                    location: https://example123.com:3100/loki/api/v1/push
+                    services:
+                        - foo,
+                    labels:
+                        key1: value1,
+            """),
+            combine=True,
+        )
+        plan = client.get_plan()
+        assert (
+            textwrap.dedent("""\
+            log-targets:
+              baz:
+                labels:
+                  key1: value1,
+                location: https://example123.com:3100/loki/api/v1/push
+                override: replace
+                services:
+                - foo,
+                type: loki
+            """)
+            == plan.to_yaml()
+        )
+
+    def test_add_layer_log_targets_combine_override_merge(self, client: _TestingPebbleClient):
+        client.add_layer(
+            'foo',
+            pebble.Layer("""\
+            log-targets:
+                baz:
+                    type: loki
+                    location: https://example123.com:3100/loki/api/v1/push
+                    services:
+                        - foo,
+                    labels:
+                        key1: value1,
+            """),
+        )
+        client.add_layer(
+            'foo',
+            pebble.Layer("""\
+            log-targets:
+                baz:
+                    override: merge
+                    services:
+                        - foo1,
+                        - foo2,
+            """),
+            combine=True,
+        )
+        assert (
+            textwrap.dedent("""\
+            log-targets:
+              baz:
+                labels:
+                  key1: value1,
+                location: https://example123.com:3100/loki/api/v1/push
+                override: merge
+                services:
+                - foo,
+                - foo1,
+                - foo2,
+                type: loki
+            """)
+            == client.get_plan().to_yaml()
+        )
+
     def test_add_layer_not_combined(self, client: _TestingPebbleClient):
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)

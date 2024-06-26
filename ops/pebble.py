@@ -1247,6 +1247,22 @@ class LogTarget:
         else:
             return NotImplemented
 
+    def _merge(self, other: 'LogTarget'):
+        """Merges this log target object with another log target definition.
+
+        For attributes present in both objects, the passed in log target
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value or name == 'name':
+                continue
+            if name == 'labels':
+                getattr(self, name).update(value)
+            elif name == 'services':
+                getattr(self, name).extend(value)
+            else:
+                setattr(self, name, value)
+
 
 class FileType(enum.Enum):
     """Enum of file types."""
