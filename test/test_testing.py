@@ -5894,9 +5894,9 @@ class TestSecrets:
         assert secret.get_content() == {'password': '1234'}
         with pytest.raises(ops.model.SecretNotFoundError):
             secret.get_info()
-        with pytest.raises(ops.model.SecretNotFoundError):
+        with pytest.raises(RuntimeError):
             secret.set_content({'password': '5678'})
-        with pytest.raises(ops.model.SecretNotFoundError):
+        with pytest.raises(RuntimeError):
             secret.remove_all_revisions()
 
     def test_add_user_secret(self, request: pytest.FixtureRequest):
@@ -5917,7 +5917,7 @@ class TestSecrets:
         request.addfinalizer(harness.cleanup)
         harness.begin()
         secret_id = harness.add_user_secret({'password': 'foo'})
-        with pytest.raises(ops.SecretNotFoundError):
+        with pytest.raises(ops.ModelError):
             harness.model.get_secret(id=secret_id)
 
     def test_revoke_user_secret(self, request: pytest.FixtureRequest):
@@ -5929,7 +5929,7 @@ class TestSecrets:
         secret_id = harness.add_user_secret(secret_content)
         harness.grant_secret(secret_id, 'webapp')
         harness.revoke_secret(secret_id, 'webapp')
-        with pytest.raises(ops.SecretNotFoundError):
+        with pytest.raises(ops.ModelError):
             harness.model.get_secret(id=secret_id)
 
     def test_set_user_secret_content(self, request: pytest.FixtureRequest):
@@ -5944,15 +5944,22 @@ class TestSecrets:
         secret = harness.model.get_secret(id=secret_id)
         assert secret.get_content(refresh=True) == {'password': 'bar'}
 
-    def test_get_user_secret_info(self, request: pytest.FixtureRequest):
-        harness = ops.testing.Harness(EventRecorder, meta=yaml.safe_dump({'name': 'webapp'}))
+    def test_user_secret_permissions(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: database')
         request.addfinalizer(harness.cleanup)
         harness.begin()
-        secret_id = harness.add_user_secret({'password': 'foo'})
-        harness.grant_secret(secret_id, 'webapp')
-        secret = harness.model.get_secret(id=secret_id)
-        with pytest.raises(ops.SecretNotFoundError):
+
+        # Charms can only view a user secret.
+        secret_id = harness.add_user_secret({'password': '1234'})
+        harness.grant_secret(secret_id, 'database')
+        secret = harness.charm.model.get_secret(id=secret_id)
+        assert secret.get_content() == {'password': '1234'}
+        with pytest.raises(ops.model.SecretNotFoundError):
             secret.get_info()
+        with pytest.raises(RuntimeError):
+            secret.set_content({'password': '5678'})
+        with pytest.raises(RuntimeError):
+            secret.remove_all_revisions()
 
 
 class EventRecorder(ops.CharmBase):
