@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      attestations: write
+      contents: read
     needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
@@ -25,5 +27,9 @@ jobs:
         run: pip install wheel build
       - name: Build
         run: python -m build
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1.3.2
+        with:
+          subject-path: 'dist/*'
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
