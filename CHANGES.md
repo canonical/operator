@@ -1,3 +1,30 @@
+# 2.15.0 - 27 Jun 2024
+
+## Fixes
+
+* Add connect timeout for exec websockets to avoid hanging (#1247)
+* Adjust Harness secret behaviour to align with Juju (#1248)
+
+## Tests
+
+* Fix TypeError when running test.pebble_cli (#1245)
+* Properly clean up after running setup_root_logging in test_log (#1259)
+* Verify that defer() is not usable on stop,remove,secret-expired,secret-rotate (#1233)
+
+## Documentation
+
+* Fix HACKING.md link on PyPI, and internal links (#1261, #1236)
+* Add a section to HACKING.md on PR titles (commit messages to main) (#1252)
+* Add release step to update pinned charm tests (#1213)
+* Add a security policy (#1266)
+
+## CI
+
+* Only run tests once on push to PR (#1242)
+* Validate PR title against conventional commit rules in (#1262)
+* Only update ops, not all dependencies, in charm tests in (#1275)
+* Add artefact attestation (#1267)
+
 # 2.14.0 - 29 May 2024
 
 ## Features
