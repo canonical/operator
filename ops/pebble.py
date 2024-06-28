@@ -1172,8 +1172,7 @@ class Check:
         for name, value in other.__dict__.items():
             if not value:
                 continue
-            else:
-                setattr(self.tcp, name, value)
+            setattr(self.tcp, name, value)
 
     def _merge(self, other: 'Check'):
         """Merges this check object with another check definition.
