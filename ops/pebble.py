@@ -1229,9 +1229,8 @@ class LogTarget:
         self.location = dct.get('location', '')
         self.services: List[str] = list(dct.get('services', []))
         labels = dct.get('labels')
-        if labels is not None:
-            labels = copy.deepcopy(labels)
-        self.labels: Optional[Dict[str, str]] = labels
+        labels = copy.deepcopy(labels) if labels is not None else {}
+        self.labels: Dict[str, str] = labels
 
     def to_dict(self) -> 'LogTargetDict':
         """Convert this log target object to its dict representation."""
