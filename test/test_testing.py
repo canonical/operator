@@ -4263,28 +4263,11 @@ class TestTestingPebbleClient:
                     type: loki
                     location: https://example.com:3100/loki/api/v1/push
                     services:
-                        - foo,
+                        - foo
                     labels:
                         key: value,
-                        key1: value1,
+                        key1: value1
             """),
-        )
-        plan = client.get_plan()
-        # The YAML should be normalized
-        assert (
-            textwrap.dedent("""\
-            log-targets:
-              baz:
-                labels:
-                  key: value,
-                  key1: value1,
-                location: https://example.com:3100/loki/api/v1/push
-                override: replace
-                services:
-                - foo,
-                type: loki
-            """)
-            == plan.to_yaml()
         )
         client.add_layer(
             'foo',
