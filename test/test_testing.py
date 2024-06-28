@@ -4082,28 +4082,27 @@ class TestTestingPebbleClient:
             pebble.Layer("""\
             checks:
                 up:
-                    override: replace
                     level: alive
                     period: 30s
                     threshold: 1
                     exec:
                         command: service nginx status
+                ready-http:
+                    level: ready
+                    period: 30s
+                    threshold: 1
+                    http:
+                        url: https://example.com:3100/health
+                        headers:
+                            header1: value1
+                ready-tcp:
+                    level: ready
+                    period: 30s
+                    threshold: 1
+                    tcp:
+                        port: 8080
+                        host: localhost
             """),
-        )
-        plan = client.get_plan()
-        # The YAML should be normalized
-        assert (
-            textwrap.dedent("""\
-            checks:
-              up:
-                exec:
-                  command: service nginx status
-                level: alive
-                override: replace
-                period: 30s
-                threshold: 1
-            """)
-            == plan.to_yaml()
         )
         client.add_layer(
             'foo',
@@ -4116,6 +4115,21 @@ class TestTestingPebbleClient:
                     threshold: 5
                     exec:
                         command: service nginx status
+                ready-http:
+                    override: replace
+                    level: ready
+                    period: 10s
+                    threshold: 5
+                    http:
+                        url: https://example.com:3101/health
+                ready-tcp:
+                    override: replace
+                    level: ready
+                    period: 10s
+                    threshold: 5
+                    tcp:
+                        port: 8081
+                        host: localhost1
             """,
             combine=True,
         )
@@ -4123,6 +4137,21 @@ class TestTestingPebbleClient:
         assert (
             textwrap.dedent("""\
             checks:
+              ready-http:
+                http:
+                  url: https://example.com:3101/health
+                level: ready
+                override: replace
+                period: 10s
+                threshold: 5
+              ready-tcp:
+                level: ready
+                override: replace
+                period: 10s
+                tcp:
+                  host: localhost1
+                  port: 8081
+                threshold: 5
               up:
                 exec:
                   command: service nginx status
@@ -4135,9 +4164,12 @@ class TestTestingPebbleClient:
         )
 
     def test_add_layer_checks_combine_override_merge(self, client: _TestingPebbleClient):
+        plan = client.get_plan()
+        assert isinstance(plan, pebble.Plan)
+        assert plan.to_yaml() == '{}\n'
         client.add_layer(
             'foo',
-            """\
+            pebble.Layer("""\
             checks:
                 up:
                     level: alive
@@ -4145,44 +4177,77 @@ class TestTestingPebbleClient:
                     threshold: 1
                     exec:
                         command: service nginx status
-                ready:
+                ready-http:
                     level: ready
                     period: 30s
                     threshold: 1
-                    exec:
-                        command: service nginx ready
-            """,
+                    http:
+                        url: https://example.com:3100/health
+                        headers:
+                            header1: value1
+                ready-tcp:
+                    level: ready
+                    period: 30s
+                    threshold: 1
+                    tcp:
+                        port: 8080
+                        host: localhost
+            """),
         )
         client.add_layer(
             'foo',
             """\
             checks:
-              up:
-                override: merge
-                level: alive
-                period: 10s
-                threshold: 5
+                up:
+                    level: alive
+                    override: merge
+                    exec:
+                        command: service nginx status 1
+                ready-http:
+                    level: ready
+                    override: merge
+                    http:
+                        headers:
+                            header2: value2
+                ready-tcp:
+                    level: ready
+                    override: merge
+                    tcp:
+                        port: 8082
             """,
             combine=True,
         )
+        plan = client.get_plan()
         assert (
             textwrap.dedent("""\
             checks:
-              ready:
-                exec:
-                  command: service nginx ready
+              ready-http:
+                http:
+                  headers:
+                    header1: value1
+                    header2: value2
+                  url: https://example.com:3100/health
                 level: ready
+                override: merge
                 period: 30s
+                threshold: 1
+              ready-tcp:
+                level: ready
+                override: merge
+                period: 30s
+                tcp:
+                  host: localhost
+                  port: 8082
                 threshold: 1
               up:
                 exec:
-                  command: service nginx status
+                  command: service nginx status 1
                 level: alive
                 override: merge
-                period: 10s
-                threshold: 5
+                period: 30s
+                threshold: 1
             """)
-            == client.get_plan().to_yaml()
+            == plan.to_yaml()
         )
 
     def test_add_layer_log_targets_combine_override_replace(self, client: _TestingPebbleClient):

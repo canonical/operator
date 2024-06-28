@@ -1141,13 +1141,17 @@ class Check:
         For attributes present in both objects, the passed in exec
         attributes take precedence.
         """
-        for name, value in other.__dict__.items():
+        if self.exec is None:
+            self.exec = {}
+        for name, value in other.items():
             if not value:
                 continue
             if name == 'environment':
-                getattr(self.exec, name).update(value)
+                current = self.exec.get(name, {})
+                current.update(value)
+                self.exec[name] = current
             else:
-                setattr(self.exec, name, value)
+                self.exec[name] = value
 
     def _merge_http(self, other: 'HttpDict') -> None:
         """Merges this http object with another http definition.
@@ -1155,13 +1159,17 @@ class Check:
         For attributes present in both objects, the passed in http
         attributes take precedence.
         """
-        for name, value in other.__dict__.items():
+        if self.http is None:
+            self.http = {}
+        for name, value in other.items():
             if not value:
                 continue
             if name == 'headers':
-                getattr(self.http, name).update(value)
+                current = self.http.get(name, {})
+                current.update(value)
+                self.http[name] = current
             else:
-                setattr(self.http, name, value)
+                self.http[name] = value
 
     def _merge_tcp(self, other: 'TcpDict') -> None:
         """Merges this tcp object with another tcp definition.
@@ -1169,10 +1177,12 @@ class Check:
         For attributes present in both objects, the passed in tcp
         attributes take precedence.
         """
-        for name, value in other.__dict__.items():
+        if self.tcp is None:
+            self.tcp = {}
+        for name, value in other.items():
             if not value:
                 continue
-            setattr(self.tcp, name, value)
+            self.tcp[name] = value
 
     def _merge(self, other: 'Check'):
         """Merges this check object with another check definition.
