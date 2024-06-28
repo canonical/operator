@@ -1148,7 +1148,7 @@ class Check:
                 continue
             if name == 'environment':
                 current = self.exec.get(name, {})
-                current.update(value)
+                current.update(value)  # type: ignore
                 self.exec[name] = current
             else:
                 self.exec[name] = value
@@ -1166,7 +1166,7 @@ class Check:
                 continue
             if name == 'headers':
                 current = self.http.get(name, {})
-                current.update(value)
+                current.update(value)  # type: ignore
                 self.http[name] = current
             else:
                 self.http[name] = value
