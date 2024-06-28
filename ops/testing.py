@@ -3215,7 +3215,7 @@ class _TestingPebbleClient:
                 if check.override not in ('merge', 'replace'):
                     raise RuntimeError(
                         f'500 Internal Server Error: layer "{label}" has invalid '
-                        f'"override" value on check "{name}"'
+                        f'"override" value for check "{name}"'
                     )
                 elif check.override == 'replace':
                     layer.checks[name] = check
@@ -3235,7 +3235,7 @@ class _TestingPebbleClient:
                 if log_target.override not in ('merge', 'replace'):
                     raise RuntimeError(
                         f'500 Internal Server Error: layer "{label}" has invalid '
-                        f'"override" value on log target "{name}"'
+                        f'"override" value for log target "{name}"'
                     )
                 elif log_target.override == 'replace':
                     layer.log_targets[name] = log_target
