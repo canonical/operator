@@ -3183,6 +3183,7 @@ class _TestingPebbleClient:
             if not combine:
                 raise RuntimeError(f'400 Bad Request: layer "{label}" already exists')
             layer = self._layers[label]
+
             for name, service in layer_obj.services.items():
                 # 'override' is actually single quoted in the real error, but
                 # it shouldn't be, hopefully that gets cleaned up.
@@ -3204,6 +3205,7 @@ class _TestingPebbleClient:
                         s._merge(service)
                     else:
                         layer.services[name] = service
+
             for name, check in layer_obj.checks.items():
                 if not check.override:
                     raise RuntimeError(
@@ -3223,6 +3225,7 @@ class _TestingPebbleClient:
                         c._merge(check)
                     else:
                         layer.checks[name] = check
+
             for name, log_target in layer_obj.log_targets.items():
                 if not log_target.override:
                     raise RuntimeError(
