@@ -4115,6 +4115,8 @@ class TestTestingPebbleClient:
                     threshold: 5
                     exec:
                         command: service nginx status
+                        environment:
+                            key1: value1
                 ready-http:
                     override: replace
                     level: ready
@@ -4133,6 +4135,10 @@ class TestTestingPebbleClient:
             """,
             combine=True,
         )
+        # all checks should have period 10s and threshold 5
+        # environment should be added to up check
+        # headers should be removed from ready-http check
+        # port and host should be replaced by new ones
         plan = client.get_plan()
         assert (
             textwrap.dedent("""\
@@ -4155,6 +4161,8 @@ class TestTestingPebbleClient:
               up:
                 exec:
                   command: service nginx status
+                  environment:
+                    key1: value1
                 level: alive
                 override: replace
                 period: 10s
@@ -4177,6 +4185,8 @@ class TestTestingPebbleClient:
                     threshold: 1
                     exec:
                         command: service nginx status
+                        environment:
+                            key1: value1
                 ready-http:
                     level: ready
                     period: 30s
@@ -4203,6 +4213,8 @@ class TestTestingPebbleClient:
                     override: merge
                     exec:
                         command: service nginx status 1
+                        environment:
+                            key2: value2
                 ready-http:
                     level: ready
                     override: merge
@@ -4217,6 +4229,10 @@ class TestTestingPebbleClient:
             """,
             combine=True,
         )
+        # key2 should be added to environment in up check
+        # header2 should be added to headers in ready-http check
+        # port should be changed to 8082 in ready-tcp check
+        # all other properties should remain the same
         plan = client.get_plan()
         assert (
             textwrap.dedent("""\
@@ -4242,6 +4258,9 @@ class TestTestingPebbleClient:
               up:
                 exec:
                   command: service nginx status 1
+                  environment:
+                    key1: value1
+                    key2: value2
                 level: alive
                 override: merge
                 period: 30s
