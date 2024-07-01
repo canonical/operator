@@ -4299,7 +4299,7 @@ class TestTestingPebbleClient:
                     services:
                         - foo,
                     labels:
-                        key1: value1,
+                        key1: value1
             """),
             combine=True,
         )
