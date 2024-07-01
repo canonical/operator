@@ -4309,7 +4309,7 @@ class TestTestingPebbleClient:
             log-targets:
               baz:
                 labels:
-                  key1: value1,
+                  key1: value1
                 location: https://example123.com:3100/loki/api/v1/push
                 override: replace
                 services:
