@@ -4297,7 +4297,7 @@ class TestTestingPebbleClient:
                     type: loki
                     location: https://example123.com:3100/loki/api/v1/push
                     services:
-                        - foo,
+                        - foo
                     labels:
                         key1: value1
             """),
@@ -4313,7 +4313,7 @@ class TestTestingPebbleClient:
                 location: https://example123.com:3100/loki/api/v1/push
                 override: replace
                 services:
-                - foo,
+                - foo
                 type: loki
             """)
             == plan.to_yaml()
@@ -4328,9 +4328,9 @@ class TestTestingPebbleClient:
                     type: loki
                     location: https://example123.com:3100/loki/api/v1/push
                     services:
-                        - foo,
+                        - foo
                     labels:
-                        key1: value1,
+                        key1: value1
             """),
         )
         client.add_layer(
@@ -4340,8 +4340,8 @@ class TestTestingPebbleClient:
                 baz:
                     override: merge
                     services:
-                        - foo1,
-                        - foo2,
+                        - foo1
+                        - foo2
             """),
             combine=True,
         )
@@ -4350,13 +4350,13 @@ class TestTestingPebbleClient:
             log-targets:
               baz:
                 labels:
-                  key1: value1,
+                  key1: value1
                 location: https://example123.com:3100/loki/api/v1/push
                 override: merge
                 services:
-                - foo,
-                - foo1,
-                - foo2,
+                - foo
+                - foo1
+                - foo2
                 type: loki
             """)
             == client.get_plan().to_yaml()
