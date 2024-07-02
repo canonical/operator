@@ -3221,8 +3221,7 @@ class _TestingPebbleClient:
                     layer.checks[name] = check
                 elif check.override == 'merge':
                     if combine and name in layer.checks:
-                        c = layer.checks[name]
-                        c._merge(check)
+                        layer.checks[name]._merge(check)
                     else:
                         layer.checks[name] = check
 
