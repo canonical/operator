@@ -4135,10 +4135,11 @@ class TestTestingPebbleClient:
             """,
             combine=True,
         )
-        # all checks should have period 10s and threshold 5
-        # environment should be added to up check
-        # headers should be removed from ready-http check
-        # port and host should be replaced by new ones
+        # Expected changes:
+        #  * All checks should have `period` 10s and `threshold` 5
+        #  * `environment` should be added to `up` check
+        #  * `headers` should be removed from `ready-http` check
+        #  * `port` and `host` should be replaced by new ones in `ready-tcp` check
         plan = client.get_plan()
         assert (
             textwrap.dedent("""\
