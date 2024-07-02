@@ -69,18 +69,18 @@ def test_workload_event_without_container():
     )
     assert_inconsistent(
         State(),
-        Event("foo-pebble-custom-notice", container=Container("foo")),
+        _Event("foo-pebble-custom-notice", container=Container("foo")),
         _CharmSpec(MyCharm, {}),
     )
     notice = Notice("example.com/foo")
     assert_consistent(
         State(containers=[Container("foo", notices=[notice])]),
-        Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
+        _Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
     assert_inconsistent(
         State(containers=[Container("foo")]),
-        Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
+        _Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
 
@@ -459,9 +459,7 @@ def test_action_params_type(ptype, good, bad):
 
 def test_duplicate_relation_ids():
     assert_inconsistent(
-        State(
-            relations=[Relation("foo", id=1), Relation("bar", id=1)]
-        ),
+        State(relations=[Relation("foo", id=1), Relation("bar", id=1)]),
         _Event("start"),
         _CharmSpec(
             MyCharm,
@@ -474,17 +472,13 @@ def test_duplicate_relation_ids():
 
 def test_relation_without_endpoint():
     assert_inconsistent(
-        State(
-            relations=[Relation("foo", id=1), Relation("bar", id=1)]
-        ),
+        State(relations=[Relation("foo", id=1), Relation("bar", id=1)]),
         _Event("start"),
         _CharmSpec(MyCharm, meta={"name": "charlemagne"}),
     )
 
     assert_consistent(
-        State(
-            relations=[Relation("foo", id=1), Relation("bar", id=2)]
-        ),
+        State(relations=[Relation("foo", id=1), Relation("bar", id=2)]),
         _Event("start"),
         _CharmSpec(
             MyCharm,
@@ -658,7 +652,7 @@ def test_cloudspec_consistency():
 
     assert_consistent(
         State(model=Model(name="lxd-model", type="lxd", cloud_spec=cloud_spec)),
-        Event("start"),
+        _Event("start"),
         _CharmSpec(
             MyCharm,
             meta={"name": "MyVMCharm"},
@@ -667,7 +661,7 @@ def test_cloudspec_consistency():
 
     assert_inconsistent(
         State(model=Model(name="k8s-model", type="kubernetes", cloud_spec=cloud_spec)),
-        Event("start"),
+        _Event("start"),
         _CharmSpec(
             MyCharm,
             meta={"name": "MyK8sCharm"},

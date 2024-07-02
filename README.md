@@ -439,7 +439,7 @@ needs to set up the process that will run `ops.main` with the right environment 
 
 ### Working with relation IDs
 
-Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `relation_id`.
+Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `id`.
 To inspect the ID the next relation instance will have, you can call `scenario.state.next_relation_id`.
 
 ```python
@@ -447,7 +447,7 @@ import scenario.state
 
 next_id = scenario.state.next_relation_id(update=False)
 rel = scenario.Relation('foo')
-assert rel.relation_id == next_id
+assert rel.id == next_id
 ``` 
 
 This can be handy when using `replace` to create new relations, to avoid relation ID conflicts:

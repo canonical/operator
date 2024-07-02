@@ -358,7 +358,7 @@ class _RelationBase:
     """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
     If left empty, it will be automatically derived from metadata.yaml."""
 
-    relation_id: int = dataclasses.field(default_factory=next_relation_id)
+    id: int = dataclasses.field(default_factory=next_relation_id)
     """Juju relation ID. Every new Relation instance gets a unique one,
     if there's trouble, override."""
 
@@ -614,7 +614,7 @@ def next_notice_id(update=True):
 
 
 @dataclasses.dataclass(frozen=True)
-class Notice(_DCBase):
+class Notice:
     key: str
     """The notice key, a string that differentiates notices of this type.
 
@@ -673,7 +673,7 @@ class Notice(_DCBase):
 
 
 @dataclasses.dataclass(frozen=True)
-class _BoundNotice(_DCBase):
+class _BoundNotice:
     notice: Notice
     container: "Container"
 
@@ -681,7 +681,7 @@ class _BoundNotice(_DCBase):
     def event(self):
         """Sugar to generate a <container's name>-pebble-custom-notice event for this notice."""
         suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX
-        return Event(
+        return _Event(
             path=normalize_name(self.container.name) + suffix,
             container=self.container,
             notice=self.notice,
@@ -832,6 +832,7 @@ class Container:
         raise KeyError(
             f"{self.name} does not have a notice with key {key} and type {notice_type}",
         )
+
 
 _RawStatusLiteral = Literal[
     "waiting",
@@ -1450,7 +1451,7 @@ class Event:
 
             snapshot_data = {
                 "relation_name": relation.endpoint,
-                "relation_id": relation.relation_id,
+                "relation_id": relation.id,
                 "app_name": remote_app,
                 "unit_name": f"{remote_app}/{self.relation_remote_unit_id}",
             }

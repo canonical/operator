@@ -104,7 +104,7 @@ def test_relation_data_access(mycharm):
             Relation(
                 endpoint="relation_test",
                 interface="azdrubales",
-                relation_id=1,
+                id=1,
                 remote_app_name="karlos",
                 remote_app_data={"yaba": "doodle"},
                 remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},

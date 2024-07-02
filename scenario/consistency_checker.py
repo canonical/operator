@@ -125,7 +125,7 @@ def check_event_consistency(
     state: "State",
     **_kwargs,  # noqa: U101
 ) -> Results:
-    """Check the internal consistency of the Event data structure.
+    """Check the internal consistency of the _Event data structure.
 
     For example, it checks that a relation event has a relation instance, and that
     the relation endpoint name matches the event prefix.
@@ -519,13 +519,13 @@ def check_relation_consistency(
         expected_sub = relation_meta.get("scope", "") == "container"
         relations = _get_relations(endpoint)
         for relation in relations:
-            if relation.relation_id in seen_ids:
+            if relation.id in seen_ids:
                 errors.append(
-                    f"duplicate relation ID: {relation.relation_id} is claimed "
+                    f"duplicate relation ID: {relation.id} is claimed "
                     f"by multiple Relation instances",
                 )
 
-            seen_ids.add(relation.relation_id)
+            seen_ids.add(relation.id)
             is_sub = isinstance(relation, SubordinateRelation)
             if is_sub and not expected_sub:
                 errors.append(
@@ -609,7 +609,7 @@ def check_containers_consistency(
 def check_cloudspec_consistency(
     *,
     state: "State",
-    event: "Event",
+    event: "_Event",
     charm_spec: "_CharmSpec",
     **_kwargs,  # noqa: U101
 ) -> Results:

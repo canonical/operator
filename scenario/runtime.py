@@ -211,7 +211,7 @@ class Runtime:
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
-                    "JUJU_RELATION_ID": str(relation.relation_id),
+                    "JUJU_RELATION_ID": str(relation.id),
                     "JUJU_REMOTE_APP": remote_app_name,
                 },
             )
