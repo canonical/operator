@@ -3183,6 +3183,7 @@ class _TestingPebbleClient:
             if not combine:
                 raise RuntimeError(f'400 Bad Request: layer "{label}" already exists')
             layer = self._layers[label]
+
             for name, service in layer_obj.services.items():
                 # 'override' is actually single quoted in the real error, but
                 # it shouldn't be, hopefully that gets cleaned up.
@@ -3200,10 +3201,47 @@ class _TestingPebbleClient:
                     layer.services[name] = service
                 elif service.override == 'merge':
                     if combine and name in layer.services:
-                        s = layer.services[name]
-                        s._merge(service)
+                        layer.services[name]._merge(service)
                     else:
                         layer.services[name] = service
+
+            for name, check in layer_obj.checks.items():
+                if not check.override:
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" must define'
+                        f'"override" for check "{name}"'
+                    )
+                if check.override not in ('merge', 'replace'):
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" has invalid '
+                        f'"override" value for check "{name}"'
+                    )
+                elif check.override == 'replace':
+                    layer.checks[name] = check
+                elif check.override == 'merge':
+                    if combine and name in layer.checks:
+                        layer.checks[name]._merge(check)
+                    else:
+                        layer.checks[name] = check
+
+            for name, log_target in layer_obj.log_targets.items():
+                if not log_target.override:
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" must define'
+                        f'"override" for log target "{name}"'
+                    )
+                if log_target.override not in ('merge', 'replace'):
+                    raise RuntimeError(
+                        f'500 Internal Server Error: layer "{label}" has invalid '
+                        f'"override" value for log target "{name}"'
+                    )
+                elif log_target.override == 'replace':
+                    layer.log_targets[name] = log_target
+                elif log_target.override == 'merge':
+                    if combine and name in layer.log_targets:
+                        layer.log_targets[name]._merge(log_target)
+                    else:
+                        layer.log_targets[name] = log_target
 
         else:
             self._layers[label] = layer_obj
