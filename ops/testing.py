@@ -3201,8 +3201,7 @@ class _TestingPebbleClient:
                     layer.services[name] = service
                 elif service.override == 'merge':
                     if combine and name in layer.services:
-                        s = layer.services[name]
-                        s._merge(service)
+                        layer.services[name]._merge(service)
                     else:
                         layer.services[name] = service
 
@@ -3240,8 +3239,7 @@ class _TestingPebbleClient:
                     layer.log_targets[name] = log_target
                 elif log_target.override == 'merge':
                     if combine and name in layer.log_targets:
-                        layer_target = layer.log_targets[name]
-                        layer_target._merge(log_target)
+                        layer.log_targets[name]._merge(log_target)
                     else:
                         layer.log_targets[name] = log_target
 
