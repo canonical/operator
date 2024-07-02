@@ -4230,10 +4230,11 @@ class TestTestingPebbleClient:
             """,
             combine=True,
         )
-        # key2 should be added to environment in up check
-        # header2 should be added to headers in ready-http check
-        # port should be changed to 8082 in ready-tcp check
-        # all other properties should remain the same
+        # Expected changes:
+        #  * `key2` should be added to `environment` in `up` check
+        #  * `header2` should be added to `headers` in `ready-http` check
+        #  * `port` should be changed to 8082 in `ready-tcp` check
+        #  * All other properties should remain the same
         plan = client.get_plan()
         assert (
             textwrap.dedent("""\
