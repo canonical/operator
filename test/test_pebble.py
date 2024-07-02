@@ -1150,7 +1150,7 @@ class TestLogTarget:
         assert target.type == ''
         assert target.location == ''
         assert target.services == []
-        assert target.labels is None
+        assert target.labels == {}
 
     def test_name_only(self):
         target = pebble.LogTarget('tgt')

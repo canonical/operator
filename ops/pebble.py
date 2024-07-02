@@ -1135,6 +1135,73 @@ class Check:
         else:
             return NotImplemented
 
+    def _merge_exec(self, other: 'ExecDict') -> None:
+        """Merges this exec object with another exec definition.
+
+        For attributes present in both objects, the passed in exec
+        attributes take precedence.
+        """
+        if self.exec is None:
+            self.exec = {}
+        for name, value in other.items():
+            if not value:
+                continue
+            if name == 'environment':
+                current = self.exec.get(name, {})
+                current.update(value)  # type: ignore
+                self.exec[name] = current
+            else:
+                self.exec[name] = value
+
+    def _merge_http(self, other: 'HttpDict') -> None:
+        """Merges this http object with another http definition.
+
+        For attributes present in both objects, the passed in http
+        attributes take precedence.
+        """
+        if self.http is None:
+            self.http = {}
+        for name, value in other.items():
+            if not value:
+                continue
+            if name == 'headers':
+                current = self.http.get(name, {})
+                current.update(value)  # type: ignore
+                self.http[name] = current
+            else:
+                self.http[name] = value
+
+    def _merge_tcp(self, other: 'TcpDict') -> None:
+        """Merges this tcp object with another tcp definition.
+
+        For attributes present in both objects, the passed in tcp
+        attributes take precedence.
+        """
+        if self.tcp is None:
+            self.tcp = {}
+        for name, value in other.items():
+            if not value:
+                continue
+            self.tcp[name] = value
+
+    def _merge(self, other: 'Check'):
+        """Merges this check object with another check definition.
+
+        For attributes present in both objects, the passed in check
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value or name == 'name':
+                continue
+            if name == 'http':
+                self._merge_http(value)
+            elif name == 'tcp':
+                self._merge_tcp(value)
+            elif name == 'exec':
+                self._merge_exec(value)
+            else:
+                setattr(self, name, value)
+
 
 class CheckLevel(enum.Enum):
     """Enum of check levels."""
@@ -1162,9 +1229,8 @@ class LogTarget:
         self.location = dct.get('location', '')
         self.services: List[str] = list(dct.get('services', []))
         labels = dct.get('labels')
-        if labels is not None:
-            labels = copy.deepcopy(labels)
-        self.labels: Optional[Dict[str, str]] = labels
+        labels = copy.deepcopy(labels) if labels is not None else {}
+        self.labels: Dict[str, str] = labels
 
     def to_dict(self) -> 'LogTargetDict':
         """Convert this log target object to its dict representation."""
@@ -1188,6 +1254,22 @@ class LogTarget:
             return self.to_dict() == other.to_dict()
         else:
             return NotImplemented
+
+    def _merge(self, other: 'LogTarget'):
+        """Merges this log target object with another log target definition.
+
+        For attributes present in both objects, the passed in log target
+        attributes take precedence.
+        """
+        for name, value in other.__dict__.items():
+            if not value or name == 'name':
+                continue
+            if name == 'labels':
+                getattr(self, name).update(value)
+            elif name == 'services':
+                getattr(self, name).extend(value)
+            else:
+                setattr(self, name, value)
 
 
 class FileType(enum.Enum):
