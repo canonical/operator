@@ -3240,8 +3240,8 @@ class _TestingPebbleClient:
                     layer.log_targets[name] = log_target
                 elif log_target.override == 'merge':
                     if combine and name in layer.log_targets:
-                        lt = layer.log_targets[name]
-                        lt._merge(log_target)
+                        layer_target = layer.log_targets[name]
+                        layer_target._merge(log_target)
                     else:
                         layer.log_targets[name] = log_target
 
