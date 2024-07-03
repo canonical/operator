@@ -323,7 +323,37 @@ storage:
     ]
 
 
-def test_workload_events(request: pytest.FixtureRequest):
+def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
+    def mock_change(self: ops.pebble.Client, change_id: str):
+        return ops.pebble.Change.from_dict({
+            'id': ops.pebble.ChangeID(change_id),
+            'kind': 'recover-check',
+            'ready': False,
+            'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
+            'status': 'Error',
+            'summary': 'Recovering check "test"',
+        })
+
+    monkeypatch.setattr(ops.pebble.Client, 'get_change', mock_change)
+
+    def mock_check_info(
+        self: ops.pebble.Client,
+        level: typing.Optional[ops.pebble.CheckLevel] = None,
+        names: typing.Optional[typing.Iterable[str]] = None,
+    ):
+        assert names is not None
+        names = list(names)
+        return [
+            ops.pebble.CheckInfo.from_dict({
+                'name': names[0],
+                'status': ops.pebble.CheckStatus.DOWN,
+                'failures': 3,
+                'threshold': 3,
+            })
+        ]
+
+    monkeypatch.setattr(ops.pebble.Client, 'get_checks', mock_check_info)
+
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -335,12 +365,26 @@ def test_workload_events(request: pytest.FixtureRequest):
                     self.on[workload].pebble_custom_notice,
                     self.on_any_pebble_custom_notice,
                 )
+                self.framework.observe(
+                    self.on[workload].pebble_check_failed, self.on_any_pebble_check_event
+                )
+                self.framework.observe(
+                    self.on[workload].pebble_check_recovered, self.on_any_pebble_check_event
+                )
 
         def on_any_pebble_ready(self, event: ops.PebbleReadyEvent):
             self.seen.append(type(event).__name__)
 
         def on_any_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
             self.seen.append(type(event).__name__)
+
+        def on_any_pebble_check_event(
+            self, event: typing.Union[ops.PebbleCheckFailedEvent, ops.PebbleCheckRecoveredEvent]
+        ):
+            self.seen.append(type(event).__name__)
+            info = event.info
+            assert info.name == 'test'
+            assert info.status == ops.pebble.CheckStatus.DOWN
 
     # language=YAML
     meta = ops.CharmMeta.from_yaml(
@@ -371,11 +415,20 @@ containers:
         charm.framework.model.unit.get_container('containerb'), '2', 'custom', 'y'
     )
 
+    charm.on['container-a'].pebble_check_failed.emit(
+        charm.framework.model.unit.get_container('container-a'), 'test'
+    )
+    charm.on['containerb'].pebble_check_recovered.emit(
+        charm.framework.model.unit.get_container('containerb'), 'test'
+    )
+
     assert charm.seen == [
         'PebbleReadyEvent',
         'PebbleReadyEvent',
         'PebbleCustomNoticeEvent',
         'PebbleCustomNoticeEvent',
+        'PebbleCheckFailedEvent',
+        'PebbleCheckRecoveredEvent',
     ]
 
 

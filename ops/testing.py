@@ -1218,10 +1218,137 @@ class Harness(Generic[CharmType]):
 
         id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
 
-        if self._charm is not None and type == pebble.NoticeType.CUSTOM and new_or_repeated:
-            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type.value, key)
+        if self._charm is not None and new_or_repeated:
+            if type == pebble.NoticeType.CUSTOM:
+                self.charm.on[container_name].pebble_custom_notice.emit(
+                    container, id, type.value, key
+                )
+            elif type == pebble.NoticeType.CHANGE_UPDATE and data:
+                kind = pebble.ChangeKind(data.get('kind'))
+                status = pebble.ChangeStatus(client.get_change(key).status)
+                if kind == pebble.ChangeKind.PERFORM_CHECK and status == pebble.ChangeStatus.ERROR:
+                    self.charm.on[container_name].pebble_check_failed.emit(
+                        container, data['check-name']
+                    )
+                elif (
+                    kind == pebble.ChangeKind.RECOVER_CHECK and status == pebble.ChangeStatus.DONE
+                ):
+                    self.charm.on[container_name].pebble_check_recovered.emit(
+                        container, data['check-name']
+                    )
 
         return id
+
+    def set_pebble_check_info(
+        self,
+        container_name: str,
+        name: str,
+        *,
+        level: Optional[Union[pebble.CheckLevel, str]] = None,
+        status: Union[pebble.CheckStatus, str] = pebble.CheckStatus.UP,
+        failures: int = 0,
+        threshold: int = 3,
+        change_id: Optional[pebble.ChangeID] = None,
+    ):
+        """Set the check information for a given check.
+
+        For the meaning of the arguments, see :class:`pebble.CheckInfo`.
+
+        Any existing check info for a check of the same name is replaced.
+        """
+        # TODO: should this emit a check-recovered or check-failed event if the fields match?
+        container = self.model.unit.get_container(container_name)
+        client = self._backend._pebble_clients[container.name]
+        level = level.value if isinstance(level, pebble.CheckLevel) else level
+        status = status.value if isinstance(status, pebble.CheckStatus) else status
+        check_info = pebble.CheckInfo(
+            name=name,
+            level=level,
+            status=status,
+            failures=failures,
+            threshold=threshold,
+            change_id=change_id,
+        )
+        client._check_infos[name] = check_info
+
+    def add_pebble_change(
+        self,
+        container_name: str,
+        kind: Union[pebble.ChangeKind, str],
+        *,
+        summary: str = '',
+        status: Union[pebble.ChangeStatus, str],
+        tasks: Optional[List[pebble.Task]] = None,
+        ready: bool = True,
+        err: Optional[str] = None,
+        spawn_time: Optional[datetime.datetime] = None,
+        ready_time: Optional[datetime.datetime] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> pebble.ChangeID:
+        """Record a Pebble change with the specified details.
+
+        For the meaning of the arguments, see :class:`pebble.Change`.
+        """
+        # TODO: should this emit a check-recovered or check-failed event if the fields match?
+        container = self.model.unit.get_container(container_name)
+        client = self._backend._pebble_clients[container.name]
+
+        client._last_change_id += 1
+        id = pebble.ChangeID(str(client._last_change_id))
+        kind = kind.value if isinstance(kind, pebble.ChangeKind) else kind
+        status = status.value if isinstance(status, pebble.ChangeStatus) else status
+        spawn_time = spawn_time or datetime.datetime.now()
+        change = pebble.Change(
+            id,
+            kind=kind,
+            summary=summary,
+            status=status,
+            tasks=tasks or [],
+            ready=ready,
+            err=err,
+            spawn_time=spawn_time,
+            ready_time=ready_time,
+            data=data,
+        )
+        client._changes[id] = change
+        return change.id
+
+    def update_pebble_change(
+        self,
+        container_name: str,
+        id: pebble.ChangeID,
+        *,
+        summary: Optional[str] = None,
+        status: Union[pebble.ChangeStatus, str],
+        tasks: Optional[List[pebble.Task]] = None,
+        ready: Optional[bool] = None,
+        err: Optional[str] = None,
+        ready_time: Optional[datetime.datetime] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ):
+        """Update a Pebble change with the specified details.
+
+        Raises:
+            * KeyError: if the change ID is not found.
+        """
+        container = self.model.unit.get_container(container_name)
+        client = self._backend._pebble_clients[container.name]
+
+        change = client._changes[id]
+        if summary is not None:
+            change.summary = summary
+        if status is not None:
+            change.status = status.value if isinstance(status, pebble.ChangeStatus) else status
+        if tasks is not None:
+            change.tasks = tasks
+        if ready is not None:
+            change.ready = ready
+        if err is not None:
+            change.err = err
+        if ready_time is not None:
+            change.ready_time = ready_time
+        if data is not None:
+            change.data = data
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
@@ -3023,6 +3150,9 @@ class _TestingPebbleClient:
         self._exec_handlers: Dict[Tuple[str, ...], ExecHandler] = {}
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         self._last_notice_id = 0
+        self._changes: Dict[pebble.ChangeID, pebble.Change] = {}
+        self._last_change_id = 0
+        self._check_infos: Dict[str, pebble.CheckInfo] = {}
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
@@ -3057,7 +3187,14 @@ class _TestingPebbleClient:
         raise NotImplementedError(self.get_changes)
 
     def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
-        raise NotImplementedError(self.get_change)
+        self._check_connection()
+        try:
+            return self._changes[change_id]
+        except KeyError:
+            # TODO: Make sure this properly matches the real error.
+            raise pebble.APIError(
+                body={}, code=404, status='Not found', message=f'change {change_id} not found'
+            ) from None
 
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
         raise NotImplementedError(self.abort_change)
@@ -3632,8 +3769,16 @@ class _TestingPebbleClient:
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
             raise self._api_error(500, message) from None
 
-    def get_checks(self, level=None, names=None):  # type:ignore
-        raise NotImplementedError(self.get_checks)  # type:ignore
+    def get_checks(
+        self, level: Optional[pebble.CheckLevel] = None, names: Optional[Iterable[str]] = None
+    ) -> List[pebble.CheckInfo]:
+        if names is not None:
+            names = frozenset(names)
+        return [
+            info
+            for info in self._check_infos.values()
+            if (level is None or level == info.level) and (names is None or info.name in names)
+        ]
 
     def notify(
         self,
@@ -3658,10 +3803,6 @@ class _TestingPebbleClient:
 
         Return a tuple of (notice_id, new_or_repeated).
         """
-        if type != pebble.NoticeType.CUSTOM:
-            message = f'invalid type "{type.value}" (can only add "custom" notices)'
-            raise self._api_error(400, message)
-
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
 

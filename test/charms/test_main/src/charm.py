@@ -58,6 +58,8 @@ class Charm(ops.CharmBase):
             on_collect_metrics=[],
             on_test_pebble_ready=[],
             on_test_pebble_custom_notice=[],
+            on_test_pebble_check_failed=[],
+            on_test_pebble_check_recovered=[],
             on_log_critical_action=[],
             on_log_error_action=[],
             on_log_warning_action=[],
@@ -87,6 +89,10 @@ class Charm(ops.CharmBase):
         self.framework.observe(self.on.test_pebble_ready, self._on_test_pebble_ready)
         self.framework.observe(
             self.on.test_pebble_custom_notice, self._on_test_pebble_custom_notice
+        )
+        self.framework.observe(self.on.test_pebble_check_failed, self._on_test_pebble_check_failed)
+        self.framework.observe(
+            self.on.test_pebble_check_recovered, self._on_test_pebble_check_recovered
         )
 
         self.framework.observe(self.on.secret_remove, self._on_secret_remove)
@@ -196,6 +202,20 @@ class Charm(ops.CharmBase):
         self._stored.on_test_pebble_custom_notice.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.test_pebble_custom_notice_data = event.snapshot()
+
+    def _on_test_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
+        assert event.workload is not None, 'workload events must have a reference to a container'
+        assert isinstance(event.info, ops.LazyCheckInfo)
+        self._stored.on_test_pebble_check_failed.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.test_pebble_check_failed_data = event.snapshot()
+
+    def _on_test_pebble_check_recovered(self, event: ops.PebbleCheckRecoveredEvent):
+        assert event.workload is not None, 'workload events must have a reference to a container'
+        assert isinstance(event.info, ops.LazyCheckInfo)
+        self._stored.on_test_pebble_check_recovered.append(type(event).__name__)
+        self._stored.observed_event_types.append(type(event).__name__)
+        self._stored.test_pebble_check_recovered_data = event.snapshot()
 
     def _on_start_action(self, event: ops.ActionEvent):
         assert (

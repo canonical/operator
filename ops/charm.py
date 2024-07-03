@@ -831,6 +831,55 @@ class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats."""
 
 
+class _PebbleCheckEvent(WorkloadEvent):
+    """Base class for Pebble check events."""
+
+    info: model.LazyCheckInfo
+    """Provide access to the check's current state."""
+
+    def __init__(
+        self,
+        handle: 'Handle',
+        workload: 'model.Container',
+        check_name: str,
+    ):
+        super().__init__(handle, workload)
+        self.info = model.LazyCheckInfo(workload, check_name)
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        d = super().snapshot()
+        d['check_name'] = self.info.name
+        return d
+
+    def restore(self, snapshot: Dict[str, Any]):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        check_name = snapshot.pop('check_name')
+        super().restore(snapshot)
+        self.info = model.LazyCheckInfo(self.workload, check_name)
+
+
+class PebbleCheckFailedEvent(_PebbleCheckEvent):
+    """Event triggered when a Pebble check exceeds the configured failure threshold.
+
+    Note that the check may have started passing by the time this event is
+    emitted (which will mean that a :class:`PebbleCheckRecoveredEvent` will be
+    emitted next). If the handler is executing code that should only be done
+    if the check is currently failing, check the current status with
+    attr:`event.info.status`.
+    """
+
+
+class PebbleCheckRecoveredEvent(_PebbleCheckEvent):
+    """Event triggered when a Pebble check passes after exceeding the failure threshold."""
+
+
 class SecretEvent(HookEvent):
     """Base class for all secret events."""
 
@@ -1219,6 +1268,10 @@ class CharmBase(Object):
             container_name = container_name.replace('-', '_')
             self.on.define_event(f'{container_name}_pebble_ready', PebbleReadyEvent)
             self.on.define_event(f'{container_name}_pebble_custom_notice', PebbleCustomNoticeEvent)
+            self.on.define_event(f'{container_name}_pebble_check_failed', PebbleCheckFailedEvent)
+            self.on.define_event(
+                f'{container_name}_pebble_check_recovered', PebbleCheckRecoveredEvent
+            )
 
     @property
     def app(self) -> model.Application:

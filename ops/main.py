@@ -167,6 +167,9 @@ def _get_event_args(
             notice_type = os.environ['JUJU_NOTICE_TYPE']
             notice_key = os.environ['JUJU_NOTICE_KEY']
             args.extend([notice_id, notice_type, notice_key])
+        elif issubclass(event_type, ops.charm._PebbleCheckEvent):
+            check_name = os.environ['JUJU_PEBBLE_CHECK_NAME']
+            args.append(check_name)
         return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
