@@ -6833,49 +6833,6 @@ class TestNotify:
         assert id != ''
         assert num_notices == 0
 
-    def test_notify_check_failed(self, request: pytest.FixtureRequest):
-        harness = ops.testing.Harness(
-            ContainerEventCharm,
-            meta="""
-            name: notifier
-            containers:
-              foo:
-                resource: foo-image
-        """,
-        )
-        request.addfinalizer(harness.cleanup)
-        harness.set_can_connect('foo', True)
-        harness.begin()
-        harness.charm.observe_container_events('foo')
-
-        change_id = harness.add_pebble_change(
-            container_name='foo',
-            kind=pebble.ChangeKind.PERFORM_CHECK,
-            status=pebble.ChangeStatus.ERROR,
-        )
-        harness.set_pebble_check_info(
-            container_name='foo',
-            name='http-check',
-            status=pebble.CheckStatus.DOWN,
-            failures=3,
-            change_id=change_id,
-        )
-        harness.pebble_notify(
-            'foo',
-            change_id,
-            type=pebble.NoticeType.CHANGE_UPDATE,
-            data={'kind': 'perform-check', 'check-name': 'http-check'},
-        )
-
-        expected_changes = [
-            {
-                'name': 'pebble-check-failed',
-                'container': 'foo',
-                'check_name': 'http-check',
-            }
-        ]
-        assert harness.charm.changes == expected_changes
-
     def test_check_failed(self, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
         harness = ops.testing.Harness(
             ContainerEventCharm,
