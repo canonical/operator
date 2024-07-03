@@ -454,7 +454,7 @@ class _TestMain(abc.ABC):
                 'JUJU_NOTICE_TYPE': event_spec.notice_type,
                 'JUJU_NOTICE_KEY': event_spec.notice_key,
             })
-        if issubclass(event_spec.event_type, ops.charm._PebbleCheckEvent):
+        if issubclass(event_spec.event_type, ops.charm.PebbleCheckEvent):
             assert event_spec.check_name is not None
             env['JUJU_PEBBLE_CHECK_NAME'] = event_spec.check_name
         if issubclass(event_spec.event_type, ops.ActionEvent):
