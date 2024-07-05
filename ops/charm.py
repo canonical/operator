@@ -877,7 +877,12 @@ class PebbleCheckFailedEvent(PebbleCheckEvent):
 
 
 class PebbleCheckRecoveredEvent(PebbleCheckEvent):
-    """Event triggered when a Pebble check passes after exceeding the failure threshold."""
+    """Event triggered when a Pebble check recovers.
+
+    This event is only triggered when the check has previously reached a failure
+    state (not simply failed, but failed at least as many times as the
+    configured threshold).
+    """
 
 
 class SecretEvent(HookEvent):
