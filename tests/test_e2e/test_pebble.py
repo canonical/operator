@@ -10,7 +10,7 @@ from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import Container, ExecOutput, Mount, Notice, Port, State
+from scenario.state import Container, ExecOutput, Mount, Notice, State
 from tests.helpers import jsonpatch_delta, trigger
 
 
@@ -86,7 +86,7 @@ def test_fs_push(charm_cls):
                 Container(
                     name="foo",
                     can_connect=True,
-                    mounts={"bar": Mount("/bar/baz.txt", pth)},
+                    mounts={"bar": Mount(location="/bar/baz.txt", source=pth)},
                 )
             ]
         ),
@@ -95,10 +95,6 @@ def test_fs_push(charm_cls):
         event="start",
         post_event=callback,
     )
-
-
-def test_port_equality():
-    assert Port("tcp", 42) == Port("tcp", 42)
 
 
 @pytest.mark.parametrize("make_dirs", (True, False))
@@ -122,7 +118,9 @@ def test_fs_pull(charm_cls, make_dirs):
 
     td = tempfile.TemporaryDirectory()
     container = Container(
-        name="foo", can_connect=True, mounts={"foo": Mount("/foo", td.name)}
+        name="foo",
+        can_connect=True,
+        mounts={"foo": Mount(location="/foo", source=td.name)},
     )
     state = State(containers=[container])
 
@@ -135,14 +133,15 @@ def test_fs_pull(charm_cls, make_dirs):
         callback(mgr.charm)
 
     if make_dirs:
-        # file = (out.get_container("foo").mounts["foo"].src + "bar/baz.txt").open("/foo/bar/baz.txt")
+        # file = (out.get_container("foo").mounts["foo"].source + "bar/baz.txt").open("/foo/bar/baz.txt")
 
         # this is one way to retrieve the file
         file = Path(td.name + "/bar/baz.txt")
 
         # another is:
         assert (
-            file == Path(out.get_container("foo").mounts["foo"].src) / "bar" / "baz.txt"
+            file
+            == Path(out.get_container("foo").mounts["foo"].source) / "bar" / "baz.txt"
         )
 
         # but that is actually a symlink to the context's root tmp folder:

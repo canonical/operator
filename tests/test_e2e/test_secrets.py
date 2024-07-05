@@ -572,3 +572,23 @@ def test_emit_event(evt, owner, cls):
         mgr.run()
         juju_event = mgr.charm.events[0]  # Ignore collect-status etc.
         assert isinstance(juju_event, cls)
+
+
+def test_no_additional_positional_arguments():
+    with pytest.raises(TypeError):
+        Secret({}, None)
+
+
+def test_default_values():
+    contents = {"foo": "bar"}
+    id = "secret:1"
+    secret = Secret(contents, id=id)
+    assert secret.contents == contents
+    assert secret.id == id
+    assert secret.label is None
+    assert secret.revision == 0
+    assert secret.description is None
+    assert secret.owner is None
+    assert secret.rotate is None
+    assert secret.expire is None
+    assert secret.remote_grants == {}

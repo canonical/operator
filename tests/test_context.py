@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 from ops import CharmBase
 
-from scenario import Action, Context, State
+from scenario import Action, ActionOutput, Context, State
 from scenario.state import _Event, next_action_id
 
 
@@ -59,3 +59,23 @@ def test_app_name(app_name, unit_id):
     with ctx.manager(ctx.on.start(), State()) as mgr:
         assert mgr.charm.app.name == app_name
         assert mgr.charm.unit.name == f"{app_name}/{unit_id}"
+
+
+def test_action_output_no_positional_arguments():
+    with pytest.raises(TypeError):
+        ActionOutput(None, None)
+
+
+def test_action_output_no_results():
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.act_action, self._on_act_action)
+
+        def _on_act_action(self, _):
+            pass
+
+    ctx = Context(MyCharm, meta={"name": "foo"}, actions={"act": {}})
+    out = ctx.run_action(Action("act"), State())
+    assert out.results is None
+    assert out.failure is None

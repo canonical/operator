@@ -5,7 +5,7 @@ from ops.framework import Framework
 
 from scenario import Context
 from scenario.context import InvalidEventError
-from scenario.state import Action, State, _Event
+from scenario.state import Action, State, _Event, next_action_id
 
 
 @pytest.fixture(scope="function")
@@ -154,3 +154,17 @@ def test_action_event_has_override_id(mycharm):
     action = Action("foo", id=uuid)
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
     ctx.run_action(action, State())
+
+
+def test_positional_arguments():
+    with pytest.raises(TypeError):
+        Action("foo", {})
+
+
+def test_default_arguments():
+    expected_id = next_action_id(update=False)
+    name = "foo"
+    action = Action(name)
+    assert action.name == name
+    assert action.params == {}
+    assert action.id == expected_id

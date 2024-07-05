@@ -2,7 +2,7 @@ import pytest
 from ops import CharmBase, Framework, StartEvent, StopEvent
 
 from scenario import Context, State
-from scenario.state import Port
+from scenario.state import StateValidationError, TCPPort, UDPPort, _Port
 
 
 class MyCharm(CharmBase):
@@ -35,5 +35,18 @@ def test_open_port(ctx):
 
 
 def test_close_port(ctx):
-    out = ctx.run(ctx.on.stop(), State(opened_ports=[Port("tcp", 42)]))
+    out = ctx.run(ctx.on.stop(), State(opened_ports=[TCPPort(42)]))
     assert not out.opened_ports
+
+
+def test_port_no_arguments():
+    with pytest.raises(RuntimeError):
+        _Port()
+
+
+@pytest.mark.parametrize("klass", (TCPPort, UDPPort))
+def test_port_port(klass):
+    with pytest.raises(StateValidationError):
+        klass(port=0)
+    with pytest.raises(StateValidationError):
+        klass(port=65536)

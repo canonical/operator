@@ -21,6 +21,7 @@ from scenario.state import (
     StateValidationError,
     SubordinateRelation,
     _RelationBase,
+    next_relation_id,
 )
 from tests.helpers import trigger
 
@@ -421,3 +422,54 @@ def test_broken_relation_not_in_model_relations(mycharm):
 
         assert charm.model.get_relation("foo") is None
         assert charm.model.relations["foo"] == []
+
+
+@pytest.mark.parametrize("klass", (Relation, PeerRelation, SubordinateRelation))
+def test_relation_positional_arguments(klass):
+    with pytest.raises(TypeError):
+        klass("foo", "bar", None)
+
+
+def test_relation_default_values():
+    expected_id = next_relation_id(update=False)
+    endpoint = "database"
+    interface = "postgresql"
+    relation = Relation(endpoint, interface)
+    assert relation.id == expected_id
+    assert relation.endpoint == endpoint
+    assert relation.interface == interface
+    assert relation.local_app_data == {}
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.remote_app_name == "remote"
+    assert relation.limit == 1
+    assert relation.remote_app_data == {}
+    assert relation.remote_units_data == {0: DEFAULT_JUJU_DATABAG}
+
+
+def test_subordinate_relation_default_values():
+    expected_id = next_relation_id(update=False)
+    endpoint = "database"
+    interface = "postgresql"
+    relation = SubordinateRelation(endpoint, interface)
+    assert relation.id == expected_id
+    assert relation.endpoint == endpoint
+    assert relation.interface == interface
+    assert relation.local_app_data == {}
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.remote_app_name == "remote"
+    assert relation.remote_unit_id == 0
+    assert relation.remote_app_data == {}
+    assert relation.remote_unit_data == DEFAULT_JUJU_DATABAG
+
+
+def test_peer_relation_default_values():
+    expected_id = next_relation_id(update=False)
+    endpoint = "peers"
+    interface = "shared"
+    relation = PeerRelation(endpoint, interface)
+    assert relation.id == expected_id
+    assert relation.endpoint == endpoint
+    assert relation.interface == interface
+    assert relation.local_app_data == {}
+    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.peers_data == {0: DEFAULT_JUJU_DATABAG}

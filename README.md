@@ -397,6 +397,8 @@ meta = {
 }
 ctx = scenario.Context(ops.CharmBase, meta=meta, unit_id=1)
 ctx.run(ctx.on.start(), state_in)  # invalid: this unit's id cannot be the ID of a peer.
+
+
 ```
 
 ### SubordinateRelation
@@ -531,7 +533,7 @@ local_file = pathlib.Path('/path/to/local/real/file.txt')
 container = scenario.Container(
     name="foo",
     can_connect=True,
-    mounts={'local': scenario.Mount('/local/share/config.yaml', local_file)}
+    mounts={'local': scenario.Mount(location='/local/share/config.yaml', source=local_file)}
     )
 state = scenario.State(containers=[container])
 ```
@@ -568,7 +570,7 @@ def test_pebble_push():
         container = scenario.Container(
             name='foo',
             can_connect=True,
-            mounts={'local': scenario.Mount('/local/share/config.yaml', local_file.name)}
+            mounts={'local': Mount(location='/local/share/config.yaml', source=local_file.name)}
         )
         state_in = scenario.State(containers=[container])
         ctx = scenario.Context(
@@ -667,32 +669,29 @@ Pebble can generate notices, which Juju will detect, and wake up the charm to
 let it know that something has happened in the container. The most common
 use-case is Pebble custom notices, which is a mechanism for the workload
 application to trigger a charm event.
-
+-
 When the charm is notified, there might be a queue of existing notices, or just
 the one that has triggered the event:
 
 ```python
-import ops
-import scenario
-
 class MyCharm(ops.CharmBase):
     def __init__(self, framework):
         super().__init__(framework)
-        framework.observe(self.on["cont"].pebble_custom_notice, self._on_notice)
+        framework.observe(self.on["my-container"].pebble_custom_notice, self._on_notice)
 
     def _on_notice(self, event):
         event.notice.key  # == "example.com/c"
-        for notice in self.unit.get_container("cont").get_notices():
+        for notice in self.unit.get_container("my-container").get_notices():
             ...
 
 ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": {"my-container": {}}})
 notices = [
-    scenario.Notice(key="example.com/a", occurences=10),
+    scenario.Notice(key="example.com/a", occurrences=10),
     scenario.Notice(key="example.com/b", last_data={"bar": "baz"}),
     scenario.Notice(key="example.com/c"),
 ]
-cont = scenario.Container(notices=notices)
-ctx.run(container.get_notice("example.com/c").event, scenario.State(containers=[cont]))
+container = scenario.Container("my-container", notices=notices)
+ctx.run(container.get_notice("example.com/c").event, scenario.State(containers=[container]))
 ```
 
 ## Storage
@@ -766,15 +765,14 @@ ctx.run(ctx.on.storage_attached(foo_1), scenario.State(storage=[foo_0, foo_1]))
 Since `ops 2.6.0`, charms can invoke the `open-port`, `close-port`, and `opened-ports` hook tools to manage the ports opened on the host VM/container. Using the `State.opened_ports` API, you can: 
 
 - simulate a charm run with a port opened by some previous execution
-```python
 ctx = scenario.Context(MyCharm, meta=MyCharm.META)
-ctx.run(ctx.on.start(), scenario.State(opened_ports=[scenario.Port("tcp", 42)]))
+ctx.run(ctx.on.start(), scenario.State(opened_ports=[scenario.TCPPort(42)]))
 ```
 - assert that a charm has called `open-port` or `close-port`:
 ```python
 ctx = scenario.Context(PortCharm, meta=MyCharm.META)
 state1 = ctx.run(ctx.on.start(), scenario.State())
-assert state1.opened_ports == [scenario.Port("tcp", 42)]
+assert state1.opened_ports == [scenario.TCPPort(42)]
 
 state2 = ctx.run(ctx.on.stop(), state1)
 assert state2.opened_ports == []
@@ -788,8 +786,8 @@ Scenario has secrets. Here's how you use them.
 state = scenario.State(
     secrets=[
         scenario.Secret(
+            {0: {'key': 'public'}},
             id='foo',
-            contents={0: {'key': 'public'}}
         )
     ]
 )
@@ -817,8 +815,8 @@ To specify a secret owned by this unit (or app):
 state = scenario.State(
     secrets=[
         scenario.Secret(
+            {0: {'key': 'private'}},
             id='foo',
-            contents={0: {'key': 'private'}},
             owner='unit',  # or 'app'
             remote_grants={0: {"remote"}}
             # the secret owner has granted access to the "remote" app over some relation with ID 0
@@ -833,8 +831,8 @@ To specify a secret owned by some other application and give this unit (or app) 
 state = scenario.State(
     secrets=[
         scenario.Secret(
+            {0: {'key': 'public'}},
             id='foo',
-            contents={0: {'key': 'public'}},
             # owner=None, which is the default
             revision=0,  # the revision that this unit (or app) is currently tracking
         )
