@@ -17,7 +17,7 @@ bracex==2.4
     # via wcmatch
 canonical-sphinx-extensions==0.0.20
     # via ops (pyproject.toml)
-certifi==2024.2.2
+certifi==2024.7.4
     # via requests
 charset-normalizer==3.3.2
     # via requests
