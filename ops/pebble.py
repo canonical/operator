@@ -1507,32 +1507,32 @@ class ChangeKind(enum.Enum):
 class ChangeStatus(enum.Enum):
     """Enum of Pebble Change statuses."""
 
-    HOLD = 'hold'
+    HOLD = 'Hold'
     """Hold status means the task should not run for the moment, perhaps as a
 	consequence of an error on another task."""
 
-    DO = 'do'
+    DO = 'Do'
     """Do status means the change or task is ready to start."""
 
-    DOING = 'doing'
+    DOING = 'Doing'
     """Doing status means the change or task is running or an attempt was made to run it."""
 
-    DONE = 'done'
+    DONE = 'Done'
     """Done status means the change or task was accomplished successfully."""
 
-    ABORT = 'abort'
+    ABORT = 'Abort'
     """Abort status means the task should stop doing its activities and then undo."""
 
-    UNDO = 'undo'
+    UNDO = 'Undo'
     """Undo status means the change or task should be undone, probably due to an error."""
 
-    UNDOING = 'undoing'
+    UNDOING = 'Undoing'
     """UndoingStatus means the change or task is being undone or an attempt was made to undo it."""
 
-    ERROR = 'error'
+    ERROR = 'Error'
     """Error status means the change or task has errored out while running or being undone."""
 
-    WAIT = 'wait'
+    WAIT = 'Wait'
     """Wait status means the task was accomplished successfully but some
 	external event needs to happen before work can progress further."""
 
