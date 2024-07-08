@@ -839,8 +839,8 @@ class PebbleCheckEvent(WorkloadEvent):
 
     def __init__(
         self,
-        handle: 'Handle',
-        workload: 'model.Container',
+        handle: Handle,
+        workload: model.Container,
         check_name: str,
     ):
         super().__init__(handle, workload)
