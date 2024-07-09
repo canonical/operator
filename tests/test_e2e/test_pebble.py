@@ -61,7 +61,7 @@ def test_connectivity(charm_cls, can_connect):
         assert can_connect == self.unit.get_container("foo").can_connect()
 
     trigger(
-        State(containers=[Container(name="foo", can_connect=can_connect)]),
+        State(containers={Container(name="foo", can_connect=can_connect)}),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -82,13 +82,13 @@ def test_fs_push(charm_cls):
 
     trigger(
         State(
-            containers=[
+            containers={
                 Container(
                     name="foo",
                     can_connect=True,
                     mounts={"bar": Mount(location="/bar/baz.txt", source=pth)},
                 )
-            ]
+            }
         ),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
@@ -122,7 +122,7 @@ def test_fs_pull(charm_cls, make_dirs):
         can_connect=True,
         mounts={"foo": Mount(location="/foo", source=td.name)},
     )
-    state = State(containers=[container])
+    state = State(containers={container})
 
     ctx = Context(
         charm_type=charm_cls,
@@ -156,7 +156,7 @@ def test_fs_pull(charm_cls, make_dirs):
 
     else:
         # nothing has changed
-        out_purged = dataclasses.replace(out, stored_state=state.stored_state)
+        out_purged = dataclasses.replace(out, stored_states=state.stored_states)
         assert not jsonpatch_delta(out_purged, state)
 
 
@@ -197,13 +197,13 @@ def test_exec(charm_cls, cmd, out):
 
     trigger(
         State(
-            containers=[
+            containers={
                 Container(
                     name="foo",
                     can_connect=True,
                     exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
                 )
-            ]
+            }
         ),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
@@ -220,7 +220,7 @@ def test_pebble_ready(charm_cls):
     container = Container(name="foo", can_connect=True)
 
     trigger(
-        State(containers=[container]),
+        State(containers={container}),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="pebble_ready",
@@ -287,14 +287,14 @@ def test_pebble_plan(charm_cls, starting_service_status):
     )
 
     out = trigger(
-        State(containers=[container]),
+        State(containers={container}),
         charm_type=PlanCharm,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="pebble_ready",
     )
 
     serv = lambda name, obj: pebble.Service(name, raw=obj)
-    container = out.containers[0]
+    container = out.get_container(container.name)
     assert container.plan.services == {
         "barserv": serv("barserv", {"startup": "disabled"}),
         "fooserv": serv("fooserv", {"startup": "enabled"}),
@@ -308,13 +308,13 @@ def test_pebble_plan(charm_cls, starting_service_status):
 
 def test_exec_wait_error(charm_cls):
     state = State(
-        containers=[
+        containers={
             Container(
                 name="foo",
                 can_connect=True,
                 exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
             )
-        ]
+        }
     )
 
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
@@ -328,7 +328,7 @@ def test_exec_wait_error(charm_cls):
 
 def test_exec_wait_output(charm_cls):
     state = State(
-        containers=[
+        containers={
             Container(
                 name="foo",
                 can_connect=True,
@@ -336,7 +336,7 @@ def test_exec_wait_output(charm_cls):
                     ("foo",): ExecOutput(stdout="hello pebble", stderr="oepsie")
                 },
             )
-        ]
+        }
     )
 
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
@@ -350,13 +350,13 @@ def test_exec_wait_output(charm_cls):
 
 def test_exec_wait_output_error(charm_cls):
     state = State(
-        containers=[
+        containers={
             Container(
                 name="foo",
                 can_connect=True,
                 exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
             )
-        ]
+        }
     )
 
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})

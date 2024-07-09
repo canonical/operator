@@ -52,10 +52,10 @@ def trigger(
     if isinstance(event, str):
         if event.startswith("relation_"):
             assert len(state.relations) == 1, "shortcut only works with one relation"
-            event = getattr(ctx.on, event)(state.relations[0])
+            event = getattr(ctx.on, event)(tuple(state.relations)[0])
         elif event.startswith("pebble_"):
             assert len(state.containers) == 1, "shortcut only works with one container"
-            event = getattr(ctx.on, event)(state.containers[0])
+            event = getattr(ctx.on, event)(tuple(state.containers)[0])
         else:
             event = getattr(ctx.on, event)()
     with ctx.manager(event, state=state) as mgr:
@@ -67,11 +67,22 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(input: "State", output: "State"):
-    patch = jsonpatch.make_patch(
-        dataclasses.asdict(output),
-        dataclasses.asdict(input),
-    ).patch
+def jsonpatch_delta(self, other: "State"):
+    dict_other = dataclasses.asdict(other)
+    dict_self = dataclasses.asdict(self)
+    for attr in (
+        "relations",
+        "containers",
+        "storages",
+        "opened_ports",
+        "secrets",
+        "resources",
+        "stored_states",
+        "networks",
+    ):
+        dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
+        dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
+    patch = jsonpatch.make_patch(dict_other, dict_self).patch
     return sort_patch(patch)
 
 

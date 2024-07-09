@@ -129,9 +129,11 @@ class _MockModelBackend(_ModelBackend):
         # fixme: the charm will get hit with a StateValidationError
         #  here, not the expected ModelError...
         port_ = _port_cls_by_protocol[protocol](port=port)
-        ports = self._state.opened_ports
+        ports = set(self._state.opened_ports)
         if port_ not in ports:
-            ports.append(port_)
+            ports.add(port_)
+        if ports != self._state.opened_ports:
+            self._state._update_opened_ports(frozenset(ports))
 
     def close_port(
         self,
@@ -139,9 +141,11 @@ class _MockModelBackend(_ModelBackend):
         port: Optional[int] = None,
     ):
         _port = _port_cls_by_protocol[protocol](port=port)
-        ports = self._state.opened_ports
+        ports = set(self._state.opened_ports)
         if _port in ports:
             ports.remove(_port)
+        if ports != self._state.opened_ports:
+            self._state._update_opened_ports(frozenset(ports))
 
     def get_pebble(self, socket_path: str) -> "Client":
         container_name = socket_path.split("/")[
@@ -150,7 +154,7 @@ class _MockModelBackend(_ModelBackend):
         container_root = self._context._get_container_root(container_name)
         try:
             mounts = self._state.get_container(container_name).mounts
-        except ValueError:
+        except KeyError:
             # container not defined in state.
             mounts = {}
 
@@ -168,11 +172,9 @@ class _MockModelBackend(_ModelBackend):
         rel_id,
     ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
         try:
-            return next(
-                filter(lambda r: r.id == rel_id, self._state.relations),
-            )
-        except StopIteration:
-            raise RelationNotFoundError()
+            return self._state.get_relation(rel_id)
+        except ValueError:
+            raise RelationNotFoundError() from None
 
     def _get_secret(self, id=None, label=None):
         # FIXME: what error would a charm get IRL?
@@ -314,7 +316,10 @@ class _MockModelBackend(_ModelBackend):
             raise RelationNotFoundError()
 
         # We look in State.networks for an override. If not given, we return a default network.
-        network = self._state.networks.get(binding_name, Network.default())
+        try:
+            network = self._state.get_network(binding_name)
+        except KeyError:
+            network = Network.default("default")  # The name is not used in the output.
         return network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
@@ -374,7 +379,9 @@ class _MockModelBackend(_ModelBackend):
             rotate=rotate,
             owner=owner,
         )
-        self._state.secrets.append(secret)
+        secrets = set(self._state.secrets)
+        secrets.add(secret)
+        self._state._update_secrets(frozenset(secrets))
         return secret_id
 
     def _check_can_manage_secret(
@@ -560,7 +567,7 @@ class _MockModelBackend(_ModelBackend):
 
     def storage_list(self, name: str) -> List[int]:
         return [
-            storage.index for storage in self._state.storage if storage.name == name
+            storage.index for storage in self._state.storages if storage.name == name
         ]
 
     def _storage_event_details(self) -> Tuple[int, str]:
@@ -587,7 +594,7 @@ class _MockModelBackend(_ModelBackend):
         name, index = storage_name_id.split("/")
         index = int(index)
         storages: List[Storage] = [
-            s for s in self._state.storage if s.name == name and s.index == index
+            s for s in self._state.storages if s.name == name and s.index == index
         ]
 
         # should not really happen: sanity checks. In practice, ops will guard against these paths.
@@ -627,16 +634,19 @@ class _MockModelBackend(_ModelBackend):
             "it's deprecated API)",
         )
 
+    # TODO: It seems like this method has no tests.
     def resource_get(self, resource_name: str) -> str:
-        try:
-            return str(self._state.resources[resource_name])
-        except KeyError:
-            # ops will not let us get there if the resource name is unknown from metadata.
-            # but if the user forgot to add it in State, then we remind you of that.
-            raise RuntimeError(
-                f"Inconsistent state: "
-                f"resource {resource_name} not found in State. please pass it.",
-            )
+        # We assume that there are few enough resources that a linear search
+        # will perform well enough.
+        for resource in self._state.resources:
+            if resource.name == resource_name:
+                return str(resource.path)
+        # ops will not let us get there if the resource name is unknown from metadata.
+        # but if the user forgot to add it in State, then we remind you of that.
+        raise RuntimeError(
+            f"Inconsistent state: "
+            f"resource {resource_name} not found in State. please pass it.",
+        )
 
     def credential_get(self) -> CloudSpec_Ops:
         if not self._context.app_trusted:

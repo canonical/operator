@@ -62,7 +62,7 @@ def test_charm_heals_on_start(mycharm):
 
     assert out.unit_status == ActiveStatus("yabadoodle")
 
-    out_purged = dataclasses.replace(out, stored_state=initial_state.stored_state)
+    out_purged = dataclasses.replace(out, stored_states=initial_state.stored_states)
     assert jsonpatch_delta(out_purged, initial_state) == [
         {
             "op": "replace",
@@ -100,7 +100,7 @@ def test_relation_data_access(mycharm):
         assert remote_app_data == {"yaba": "doodle"}
 
     state_in = State(
-        relations=[
+        relations={
             Relation(
                 endpoint="relation_test",
                 interface="azdrubales",
@@ -109,7 +109,7 @@ def test_relation_data_access(mycharm):
                 remote_app_data={"yaba": "doodle"},
                 remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
             )
-        ]
+        }
     )
     trigger(
         state_in,

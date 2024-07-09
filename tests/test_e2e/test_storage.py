@@ -66,7 +66,7 @@ def test_storage_usage(storage_ctx):
     (storage.get_filesystem(storage_ctx) / "myfile.txt").write_text("helloworld")
 
     with storage_ctx.manager(
-        storage_ctx.on.update_status(), State(storage=[storage])
+        storage_ctx.on.update_status(), State(storages={storage})
     ) as mgr:
         foo = mgr.charm.model.storages["foo"][0]
         loc = foo.location
@@ -85,9 +85,11 @@ def test_storage_usage(storage_ctx):
 
 def test_storage_attached_event(storage_ctx):
     storage = Storage("foo")
-    storage_ctx.run(storage_ctx.on.storage_attached(storage), State(storage=[storage]))
+    storage_ctx.run(storage_ctx.on.storage_attached(storage), State(storages={storage}))
 
 
 def test_storage_detaching_event(storage_ctx):
     storage = Storage("foo")
-    storage_ctx.run(storage_ctx.on.storage_detaching(storage), State(storage=[storage]))
+    storage_ctx.run(
+        storage_ctx.on.storage_detaching(storage), State(storages={storage})
+    )

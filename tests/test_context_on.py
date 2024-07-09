@@ -156,7 +156,7 @@ def test_revision_secret_events_as_positional_arg(event_name):
 def test_storage_events(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     storage = scenario.Storage("foo")
-    state_in = scenario.State(storage=[storage])
+    state_in = scenario.State(storages=[storage])
     # These look like:
     #   ctx.run(ctx.on.storage_attached(storage), state)
     with ctx.manager(getattr(ctx.on, event_name)(storage), state_in) as mgr:

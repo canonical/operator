@@ -15,6 +15,7 @@ from scenario.state import (
     Model,
     Network,
     Relation,
+    Resource,
     State,
 )
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
@@ -67,7 +68,7 @@ def state():
 
 def test_bare_event(state, mycharm):
     out = trigger(state, "start", mycharm, meta={"name": "foo"})
-    out_purged = replace(out, stored_state=state.stored_state)
+    out_purged = replace(out, stored_states=state.stored_states)
     assert jsonpatch_delta(state, out_purged) == []
 
 
@@ -106,7 +107,7 @@ def test_status_setting(state, mycharm):
     assert out.workload_version == ""
 
     # ignore stored state in the delta
-    out_purged = replace(out, stored_state=state.stored_state)
+    out_purged = replace(out, stored_states=state.stored_states)
     assert jsonpatch_delta(out_purged, state) == sort_patch(
         [
             {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
@@ -126,7 +127,7 @@ def test_container(connect, mycharm):
         assert container.can_connect() is connect
 
     trigger(
-        State(containers=[Container(name="foo", can_connect=connect)]),
+        State(containers={Container(name="foo", can_connect=connect)}),
         "start",
         mycharm,
         meta={
@@ -155,7 +156,7 @@ def test_relation_get(mycharm):
                 assert not rel.data[unit]
 
     state = State(
-        relations=[
+        relations={
             Relation(
                 endpoint="foo",
                 interface="bar",
@@ -165,7 +166,7 @@ def test_relation_get(mycharm):
                 local_unit_data={"c": "d"},
                 remote_units_data={0: {}, 1: {"e": "f"}, 2: {}},
             )
-        ]
+        }
     )
     trigger(
         state,
@@ -215,7 +216,7 @@ def test_relation_set(mycharm):
     state = State(
         leader=True,
         planned_units=4,
-        relations=[relation],
+        relations={relation},
     )
 
     assert not mycharm.called
@@ -231,25 +232,28 @@ def test_relation_set(mycharm):
     )
     assert mycharm.called
 
-    assert asdict(out.relations[0]) == asdict(
+    assert asdict(out.get_relation(relation.id)) == asdict(
         replace(
             relation,
             local_app_data={"a": "b"},
             local_unit_data={"c": "d", **DEFAULT_JUJU_DATABAG},
         )
     )
-
-    assert out.relations[0].local_app_data == {"a": "b"}
-    assert out.relations[0].local_unit_data == {"c": "d", **DEFAULT_JUJU_DATABAG}
+    assert out.get_relation(relation.id).local_app_data == {"a": "b"}
+    assert out.get_relation(relation.id).local_unit_data == {
+        "c": "d",
+        **DEFAULT_JUJU_DATABAG,
+    }
 
 
 @pytest.mark.parametrize(
     "klass,num_args",
     [
         (State, (1,)),
+        (Resource, (1,)),
         (Address, (0, 2)),
         (BindAddress, (0, 2)),
-        (Network, (0, 2)),
+        (Network, (1, 2)),
     ],
 )
 def test_positional_arguments(klass, num_args):
@@ -285,13 +289,13 @@ def test_container_default_values():
 def test_state_default_values():
     state = State()
     assert state.config == {}
-    assert state.relations == []
-    assert state.networks == {}
-    assert state.containers == []
-    assert state.storage == []
-    assert state.opened_ports == []
-    assert state.secrets == []
-    assert state.resources == {}
+    assert state.relations == frozenset()
+    assert state.networks == frozenset()
+    assert state.containers == frozenset()
+    assert state.storages == frozenset()
+    assert state.opened_ports == frozenset()
+    assert state.secrets == frozenset()
+    assert state.resources == frozenset()
     assert state.deferred == []
     assert isinstance(state.model, Model)
     assert state.leader is False

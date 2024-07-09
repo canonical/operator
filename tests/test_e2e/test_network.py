@@ -51,7 +51,7 @@ def test_ip_get(mycharm):
                     id=1,
                 ),
             ],
-            networks={"foo": Network.default(private_address="4.4.4.4")},
+            networks={Network.default("foo", private_address="4.4.4.4")},
         ),
     ) as mgr:
         # we have a network for the relation
@@ -113,7 +113,7 @@ def test_no_relation_error(mycharm):
                     id=1,
                 ),
             ],
-            networks={"bar": Network.default()},
+            networks={Network.default("bar")},
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):

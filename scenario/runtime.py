@@ -10,7 +10,7 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Type, Union
 
 import yaml
 from ops import pebble
@@ -62,12 +62,12 @@ class UnitStateDB:
         """Open the db."""
         return SQLiteStorage(self._state_file)
 
-    def get_stored_state(self) -> List["StoredState"]:
+    def get_stored_states(self) -> FrozenSet["StoredState"]:
         """Load any StoredState data structures from the db."""
 
         db = self._open_db()
 
-        stored_state = []
+        stored_states = set()
         for handle_path in db.list_snapshots():
             if not EVENT_REGEX.match(handle_path) and (
                 match := STORED_STATE_REGEX.match(handle_path)
@@ -75,10 +75,10 @@ class UnitStateDB:
                 stored_state_snapshot = db.load_snapshot(handle_path)
                 kwargs = match.groupdict()
                 sst = StoredState(content=stored_state_snapshot, **kwargs)
-                stored_state.append(sst)
+                stored_states.add(sst)
 
         db.close()
-        return stored_state
+        return frozenset(stored_states)
 
     def get_deferred_events(self) -> List["DeferredEvent"]:
         """Load any DeferredEvent data structures from the db."""
@@ -119,7 +119,7 @@ class UnitStateDB:
                 ) from e
             db.save_snapshot(event.handle_path, event.snapshot_data)
 
-        for stored_state in state.stored_state:
+        for stored_state in state.stored_states:
             db.save_snapshot(stored_state.handle_path, stored_state.content)
 
         db.close()
@@ -347,7 +347,7 @@ class Runtime:
         elif (
             not spec.is_autoloaded and any_metadata_files_present_in_charm_virtual_root
         ):
-            logger.warn(
+            logger.warning(
                 f"Some metadata files found in custom user-provided charm_root "
                 f"{charm_virtual_root} while you have passed meta, config or actions to "
                 f"Context.run(). "
@@ -388,8 +388,8 @@ class Runtime:
         """Now that we're done processing this event, read the charm state and expose it."""
         store = self._get_state_db(temporary_charm_root)
         deferred = store.get_deferred_events()
-        stored_state = store.get_stored_state()
-        return dataclasses.replace(state, deferred=deferred, stored_state=stored_state)
+        stored_state = store.get_stored_states()
+        return dataclasses.replace(state, deferred=deferred, stored_states=stored_state)
 
     @contextmanager
     def _exec_ctx(self, ctx: "Context"):

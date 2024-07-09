@@ -64,10 +64,10 @@ def test_get_relation(mycharm):
         State(
             config={"foo": "bar"},
             leader=True,
-            relations=[
+            relations={
                 Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
                 Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
-            ],
+            },
         ),
         "start",
         mycharm,
@@ -97,9 +97,9 @@ def test_relation_events(mycharm, evt_name):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
         f"relation_{evt_name}",
         mycharm,
@@ -141,9 +141,9 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
         f"relation_{evt_name}",
         mycharm,
@@ -202,7 +202,7 @@ def test_relation_events_attrs(
             },
         },
     )
-    state = State(relations=[relation])
+    state = State(relations={relation})
     kwargs = {}
     if has_unit:
         kwargs["remote_unit"] = remote_unit_id
@@ -242,9 +242,9 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
         f"relation_{evt_name}",
         mycharm,
@@ -302,9 +302,9 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
         f"relation_{evt_name}",
         mycharm,
@@ -356,7 +356,7 @@ def test_relation_event_trigger(relation, evt_name, mycharm):
         "peers": {"b": {"interface": "i2"}},
     }
     state = trigger(
-        State(relations=[relation]),
+        State(relations={relation}),
         f"relation_{evt_name}",
         mycharm,
         meta=meta,
@@ -389,7 +389,7 @@ def test_trigger_sub_relation(mycharm):
             assert len(relation.units) == 1
 
     trigger(
-        State(relations=[sub1, sub2]),
+        State(relations={sub1, sub2}),
         "update_status",
         mycharm,
         meta=meta,
@@ -417,7 +417,7 @@ def test_broken_relation_not_in_model_relations(mycharm):
     ctx = Context(
         mycharm, meta={"name": "local", "requires": {"foo": {"interface": "foo"}}}
     )
-    with ctx.manager(ctx.on.relation_broken(rel), state=State(relations=[rel])) as mgr:
+    with ctx.manager(ctx.on.relation_broken(rel), state=State(relations={rel})) as mgr:
         charm = mgr.charm
 
         assert charm.model.get_relation("foo") is None

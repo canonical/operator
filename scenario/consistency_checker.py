@@ -4,7 +4,7 @@
 import marshal
 import os
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple, Union
@@ -108,7 +108,7 @@ def check_resource_consistency(
     warnings = []
 
     resources_from_meta = set(charm_spec.meta.get("resources", {}))
-    resources_from_state = set(state.resources)
+    resources_from_state = {resource.name for resource in state.resources}
     if not resources_from_meta.issuperset(resources_from_state):
         errors.append(
             f"any and all resources passed to State.resources need to have been defined in "
@@ -265,7 +265,7 @@ def _check_storage_event(
             f"storage event {event.name} refers to storage {storage.name} "
             f"which is not declared in the charm metadata (metadata.yaml) under 'storage'.",
         )
-    elif storage not in state.storage:
+    elif storage not in state.storages:
         errors.append(
             f"cannot emit {event.name} because storage {storage.name} "
             f"is not in the state.",
@@ -330,11 +330,11 @@ def check_storages_consistency(
     **_kwargs,  # noqa: U101
 ) -> Results:
     """Check the consistency of the state.storages with the charm_spec.metadata (metadata.yaml)."""
-    state_storage = state.storage
+    state_storage = state.storages
     meta_storage = (charm_spec.meta or {}).get("storage", {})
     errors = []
 
-    if missing := {s.name for s in state.storage}.difference(
+    if missing := {s.name for s in state_storage}.difference(
         set(meta_storage.keys()),
     ):
         errors.append(
@@ -347,7 +347,7 @@ def check_storages_consistency(
         if tag in seen:
             errors.append(
                 f"duplicate storage in State: storage {s.name} with index {s.index} "
-                f"occurs multiple times in State.storage.",
+                f"occurs multiple times in State.storages.",
             )
         seen.append(tag)
 
@@ -465,10 +465,8 @@ def check_network_consistency(
         if metadata.get("scope") != "container"  # mark of a sub
     }
 
-    state_bindings = set(state.networks)
-    if diff := state_bindings.difference(
-        meta_bindings.union(non_sub_relations).union(implicit_bindings),
-    ):
+    state_bindings = {network.binding_name for network in state.networks}
+    if diff := state_bindings.difference(meta_bindings.union(non_sub_relations)):
         errors.append(
             f"Some network bindings defined in State are not in metadata.yaml: {diff}.",
         )
@@ -598,11 +596,6 @@ def check_containers_consistency(
             f"Missing from metadata: {diff}.",
         )
 
-    # guard against duplicate container names
-    names = Counter(state_containers)
-    if dupes := [n for n in names if names[n] > 1]:
-        errors.append(f"Duplicate container name(s): {dupes}.")
-
     return Results(errors, [])
 
 
@@ -633,12 +626,12 @@ def check_storedstate_consistency(
     state: "State",
     **_kwargs,  # noqa: U101
 ) -> Results:
-    """Check the internal consistency of `state.storedstate`."""
+    """Check the internal consistency of `state.stored_states`."""
     errors = []
 
     # Attribute names must be unique on each object.
     names = defaultdict(list)
-    for ss in state.stored_state:
+    for ss in state.stored_states:
         names[ss.owner_path].append(ss.name)
     for owner, owner_names in names.items():
         if len(owner_names) != len(set(owner_names)):
@@ -647,7 +640,7 @@ def check_storedstate_consistency(
             )
 
     # The content must be marshallable.
-    for ss in state.stored_state:
+    for ss in state.stored_states:
         # We don't need the marshalled state, just to know that it can be.
         # This is the same "only simple types" check that ops does.
         try:
