@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "6.1.1"
+version = "6.1.2"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -18,7 +18,7 @@ license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops>=2.10",
+    "ops>=2.12",
     "PyYAML>=6.0.1",
 ]
 readme = "README.md"
@@ -38,6 +38,22 @@ classifiers = [
 "Homepage" = "https://github.com/canonical/ops-scenario"
 "Bug Tracker" = "https://github.com/canonical/ops-scenario/issues"
 
+[project.optional-dependencies]
+docs = [
+    "canonical-sphinx-extensions",
+    "furo",
+    "linkify-it-py",
+    "myst-parser",
+    "pyspelling",
+    "sphinx==6.2.1",
+    "sphinx-autobuild",
+    "sphinx-copybutton",
+    "sphinx-design",
+    "sphinx-notfound-page",
+    "sphinx-tabs",
+    "sphinxcontrib-jquery",
+    "sphinxext-opengraph"
+]
 
 [tool.setuptools.package-dir]
 scenario = "scenario"

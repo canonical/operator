@@ -191,6 +191,7 @@ def test_set_legacy_behaviour(mycharm):
         )
 
         secret.set_content(rev2)
+        secret = charm.model.get_secret(label="mylabel")
         assert (
             secret.get_content()
             == secret.peek_content()
@@ -200,6 +201,7 @@ def test_set_legacy_behaviour(mycharm):
 
         secret.set_content(rev3)
         state_out = mgr.run()
+        secret = charm.model.get_secret(label="mylabel")
         assert (
             secret.get_content()
             == secret.peek_content()
