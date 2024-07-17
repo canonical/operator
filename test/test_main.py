@@ -74,6 +74,7 @@ class EventSpec:
         secret_id: typing.Optional[str] = None,
         secret_label: typing.Optional[str] = None,
         secret_revision: typing.Optional[str] = None,
+        check_name: typing.Optional[str] = None,
     ):
         self.event_type = event_type
         self.event_name = event_name
@@ -91,6 +92,7 @@ class EventSpec:
         self.secret_id = secret_id
         self.secret_label = secret_label
         self.secret_revision = secret_revision
+        self.check_name = check_name
 
 
 @patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
@@ -452,6 +454,9 @@ class _TestMain(abc.ABC):
                 'JUJU_NOTICE_TYPE': event_spec.notice_type,
                 'JUJU_NOTICE_KEY': event_spec.notice_key,
             })
+        if issubclass(event_spec.event_type, ops.charm.PebbleCheckEvent):
+            assert event_spec.check_name is not None
+            env['JUJU_PEBBLE_CHECK_NAME'] = event_spec.check_name
         if issubclass(event_spec.event_type, ops.ActionEvent):
             event_filename = event_spec.event_name[: -len('_action')].replace('_', '-')
             assert event_spec.env_var is not None
@@ -681,6 +686,30 @@ class _TestMain(abc.ABC):
                     'notice_id': '123',
                     'notice_type': 'custom',
                     'notice_key': 'example.com/a',
+                },
+            ),
+            (
+                EventSpec(
+                    ops.PebbleCheckFailedEvent,
+                    'test_pebble_check_failed',
+                    workload_name='test',
+                    check_name='http-check',
+                ),
+                {
+                    'container_name': 'test',
+                    'check_name': 'http-check',
+                },
+            ),
+            (
+                EventSpec(
+                    ops.PebbleCheckRecoveredEvent,
+                    'test_pebble_check_recovered',
+                    workload_name='test',
+                    check_name='http-check',
+                ),
+                {
+                    'container_name': 'test',
+                    'check_name': 'http-check',
                 },
             ),
             (
@@ -995,6 +1024,7 @@ class TestMainWithNoDispatch(_TestMain):
             fi
             """,
         )
+
         fake_script.write(
             'storage-list',
             """

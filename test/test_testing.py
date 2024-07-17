@@ -3612,6 +3612,12 @@ class ContainerEventCharm(RecordingCharm):
         self.framework.observe(
             self.on[container_name].pebble_custom_notice, self._on_pebble_custom_notice
         )
+        self.framework.observe(
+            self.on[container_name].pebble_check_failed, self._on_pebble_check_failed
+        )
+        self.framework.observe(
+            self.on[container_name].pebble_check_recovered, self._on_pebble_check_recovered
+        )
 
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
         self.changes.append({
@@ -3631,6 +3637,20 @@ class ContainerEventCharm(RecordingCharm):
             'notice_id': event.notice.id,
             'notice_type': type_str,
             'notice_key': event.notice.key,
+        })
+
+    def _on_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
+        self.changes.append({
+            'name': 'pebble-check-failed',
+            'container': event.workload.name,
+            'check_name': event.info.name,
+        })
+
+    def _on_pebble_check_recovered(self, event: ops.PebbleCheckRecoveredEvent):
+        self.changes.append({
+            'name': 'pebble-check-recovered',
+            'container': event.workload.name,
+            'check_name': event.info.name,
         })
 
 
@@ -6812,6 +6832,48 @@ class TestNotify:
         assert isinstance(id, str)
         assert id != ''
         assert num_notices == 0
+
+    def test_check_failed(self, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
+        harness = ops.testing.Harness(
+            ContainerEventCharm,
+            meta="""
+            name: notifier
+            containers:
+              foo:
+                resource: foo-image
+        """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('foo', True)
+        harness.begin()
+        harness.charm.observe_container_events('foo')
+
+        def get_change(_: ops.pebble.Client, change_id: str):
+            return ops.pebble.Change.from_dict({
+                'id': change_id,
+                'kind': pebble.ChangeKind.PERFORM_CHECK.value,
+                'summary': '',
+                'status': pebble.ChangeStatus.ERROR.value,
+                'ready': False,
+                'spawn-time': '2021-02-10T04:36:22.118970777Z',
+            })
+
+        monkeypatch.setattr(ops.testing._TestingPebbleClient, 'get_change', get_change)
+        harness.pebble_notify(
+            'foo',
+            '123',
+            type=pebble.NoticeType.CHANGE_UPDATE,
+            data={'kind': 'perform-check', 'check-name': 'http-check'},
+        )
+
+        expected_changes = [
+            {
+                'name': 'pebble-check-failed',
+                'container': 'foo',
+                'check_name': 'http-check',
+            }
+        ]
+        assert harness.charm.changes == expected_changes
 
 
 class PebbleNoticesMixin:

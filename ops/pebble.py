@@ -1471,6 +1471,15 @@ class NoticeType(enum.Enum):
     """Enum of notice types."""
 
     CUSTOM = 'custom'
+    """A custom notice reported via the Pebble client API or ``pebble notify``.
+    The key and data fields are provided by the user. The key must be in
+    the format ``example.com/path`` to ensure well-namespaced notice keys.
+    """
+
+    CHANGE_UPDATE = 'change-update'
+    """Recorded whenever a change's status is updated. The key for change-update
+    notices is the change ID.
+    """
 
 
 class NoticesUsers(enum.Enum):
@@ -1481,6 +1490,51 @@ class NoticesUsers(enum.Enum):
 
     This only works for Pebble admins (for example, root).
     """
+
+
+class ChangeKind(enum.Enum):
+    """Enum of Pebble Change kinds."""
+
+    START = 'start'
+    STOP = 'stop'
+    RESTART = 'restart'
+    REPLAN = 'replan'
+    EXEC = 'exec'
+    RECOVER_CHECK = 'recover-check'
+    PERFORM_CHECK = 'perform-check'
+
+
+class ChangeStatus(enum.Enum):
+    """Enum of Pebble Change statuses."""
+
+    HOLD = 'Hold'
+    """Hold status means the task should not run for the moment, perhaps as a
+	consequence of an error on another task."""
+
+    DO = 'Do'
+    """Do status means the change or task is ready to start."""
+
+    DOING = 'Doing'
+    """Doing status means the change or task is running or an attempt was made to run it."""
+
+    DONE = 'Done'
+    """Done status means the change or task was accomplished successfully."""
+
+    ABORT = 'Abort'
+    """Abort status means the task should stop doing its activities and then undo."""
+
+    UNDO = 'Undo'
+    """Undo status means the change or task should be undone, probably due to an error."""
+
+    UNDOING = 'Undoing'
+    """UndoingStatus means the change or task is being undone or an attempt was made to undo it."""
+
+    ERROR = 'Error'
+    """Error status means the change or task has errored out while running or being undone."""
+
+    WAIT = 'Wait'
+    """Wait status means the task was accomplished successfully but some
+	external event needs to happen before work can progress further."""
 
 
 @dataclasses.dataclass(frozen=True)

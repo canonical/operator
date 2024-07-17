@@ -1218,8 +1218,24 @@ class Harness(Generic[CharmType]):
 
         id, new_or_repeated = client._notify(type, key, data=data, repeat_after=repeat_after)
 
-        if self._charm is not None and type == pebble.NoticeType.CUSTOM and new_or_repeated:
-            self.charm.on[container_name].pebble_custom_notice.emit(container, id, type.value, key)
+        if self._charm is not None and new_or_repeated:
+            if type == pebble.NoticeType.CUSTOM:
+                self.charm.on[container_name].pebble_custom_notice.emit(
+                    container, id, type.value, key
+                )
+            elif type == pebble.NoticeType.CHANGE_UPDATE and data:
+                kind = pebble.ChangeKind(data.get('kind'))
+                status = pebble.ChangeStatus(client.get_change(key).status)
+                if kind == pebble.ChangeKind.PERFORM_CHECK and status == pebble.ChangeStatus.ERROR:
+                    self.charm.on[container_name].pebble_check_failed.emit(
+                        container, data['check-name']
+                    )
+                elif (
+                    kind == pebble.ChangeKind.RECOVER_CHECK and status == pebble.ChangeStatus.DONE
+                ):
+                    self.charm.on[container_name].pebble_check_recovered.emit(
+                        container, data['check-name']
+                    )
 
         return id
 
@@ -3023,6 +3039,8 @@ class _TestingPebbleClient:
         self._exec_handlers: Dict[Tuple[str, ...], ExecHandler] = {}
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         self._last_notice_id = 0
+        self._changes: Dict[str, pebble.Change] = {}
+        self._check_infos: Dict[str, pebble.CheckInfo] = {}
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)
@@ -3056,8 +3074,13 @@ class _TestingPebbleClient:
     ) -> List[pebble.Change]:
         raise NotImplementedError(self.get_changes)
 
-    def get_change(self, change_id: pebble.ChangeID) -> pebble.Change:
-        raise NotImplementedError(self.get_change)
+    def get_change(self, change_id: str) -> pebble.Change:
+        self._check_connection()
+        try:
+            return self._changes[change_id]
+        except KeyError:
+            message = f'cannot find change with id "{change_id}"'
+            raise self._api_error(404, message) from None
 
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
         raise NotImplementedError(self.abort_change)
@@ -3632,8 +3655,16 @@ class _TestingPebbleClient:
             message = f'cannot send signal to "{first_service}": invalid signal name "{sig}"'
             raise self._api_error(500, message) from None
 
-    def get_checks(self, level=None, names=None):  # type:ignore
-        raise NotImplementedError(self.get_checks)  # type:ignore
+    def get_checks(
+        self, level: Optional[pebble.CheckLevel] = None, names: Optional[Iterable[str]] = None
+    ) -> List[pebble.CheckInfo]:
+        if names is not None:
+            names = frozenset(names)
+        return [
+            info
+            for info in self._check_infos.values()
+            if (level is None or level == info.level) and (names is None or info.name in names)
+        ]
 
     def notify(
         self,
@@ -3658,10 +3689,6 @@ class _TestingPebbleClient:
 
         Return a tuple of (notice_id, new_or_repeated).
         """
-        if type != pebble.NoticeType.CUSTOM:
-            message = f'invalid type "{type.value}" (can only add "custom" notices)'
-            raise self._api_error(400, message)
-
         # The shape of the code below is taken from State.AddNotice in Pebble.
         now = datetime.datetime.now(tz=datetime.timezone.utc)
 

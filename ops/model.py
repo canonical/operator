@@ -3792,6 +3792,40 @@ class LazyNotice:
         assert self._notice.key == self.key
 
 
+class LazyCheckInfo:
+    """Provide lazily-loaded access to a Pebble check's info.
+
+    The attributes provided by this class are the same as those of
+    :class:`ops.pebble.CheckInfo`, however, the notice details are only fetched
+    from Pebble if necessary (and cached on the instance).
+    """
+
+    name: str
+    level: Optional[Union[pebble.CheckLevel, str]]
+    status: Union[pebble.CheckStatus, str]
+    failures: int
+    threshold: int
+    change_id: Optional[pebble.ChangeID]
+
+    def __init__(self, container: Container, name: str):
+        self._container = container
+        self.name = name
+        self._info: Optional[ops.pebble.CheckInfo] = None
+
+    def __repr__(self):
+        return f'LazyCheckInfo(name={self.name!r})'
+
+    def __getattr__(self, item: str):
+        # Note: not called for defined attribute `name`.
+        self._ensure_loaded()
+        return getattr(self._info, item)
+
+    def _ensure_loaded(self):
+        if self._info is not None:
+            return
+        self._info = self._container.get_check(self.name)
+
+
 @dataclasses.dataclass(frozen=True)
 class CloudCredential:
     """Credentials for cloud.
