@@ -272,6 +272,8 @@ class Runtime:
                     "JUJU_SECRET_LABEL": secret.label or "",
                 },
             )
+            if event.name in ("secret_remove", "secret_expired"):
+                env["JUJU_SECRET_REVISION"] = str(secret.revision)
 
         return env
 

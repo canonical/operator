@@ -19,7 +19,7 @@ from scenario.state import Event, State, _CharmSpec, _EventType
         ("foo_bar_baz_pebble_ready", _EventType.workload),
         ("foo_pebble_custom_notice", _EventType.workload),
         ("foo_bar_baz_pebble_custom_notice", _EventType.workload),
-        ("secret_removed", _EventType.secret),
+        ("secret_remove", _EventType.secret),
         ("pre_commit", _EventType.framework),
         ("commit", _EventType.framework),
         ("collect_unit_status", _EventType.framework),

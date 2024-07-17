@@ -106,7 +106,7 @@ STORAGE_EVENTS_SUFFIX = {
 
 SECRET_EVENTS = {
     "secret_changed",
-    "secret_removed",
+    "secret_remove",
     "secret_rotate",
     "secret_expired",
 }
@@ -292,18 +292,18 @@ class Secret(_DCBase):
         """Sugar to generate a secret-expired event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-expire for a secret it does not own.",
+                "This unit will never receive secret-expired for a secret it does not own.",
             )
-        return Event("secret_expire", secret=self)
+        return Event("secret_expired", secret=self)
 
     @property
     def remove_event(self):
         """Sugar to generate a secret-remove event."""
         if not self.owner:
             raise ValueError(
-                "This unit will never receive secret-removed for a secret it does not own.",
+                "This unit will never receive secret-remove for a secret it does not own.",
             )
-        return Event("secret_removed", secret=self)
+        return Event("secret_remove", secret=self)
 
     def _set_revision(self, revision: int):
         """Set a new tracked revision."""
