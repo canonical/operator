@@ -1953,9 +1953,12 @@ class ErrorStatus(StatusBase):
 
 @StatusBase.register
 class ActiveStatus(StatusBase):
-    """The unit is ready.
+    """The unit or application is ready and active.
 
-    The unit believes it is correctly offering all the services it has been asked to offer.
+    Set this status when the charm is correctly offering all the services it
+    has been asked to offer. If the unit or application is operational but
+    some feature (like high availability) is in a degraded state, set "active"
+    with an appropriate message.
     """
 
     name = 'active'
@@ -1966,9 +1969,10 @@ class ActiveStatus(StatusBase):
 
 @StatusBase.register
 class BlockedStatus(StatusBase):
-    """The unit requires manual intervention.
+    """The unit or application requires manual intervention.
 
-    An admin has to manually intervene to unblock the unit and let it proceed.
+    Set this status when an administrator has to manually intervene to unblock
+    the charm to let it proceed.
     """
 
     name = 'blocked'
@@ -1976,12 +1980,13 @@ class BlockedStatus(StatusBase):
 
 @StatusBase.register
 class MaintenanceStatus(StatusBase):
-    """The unit is performing maintenance tasks.
+    """The unit or application is performing maintenance tasks.
 
-    The unit is not yet providing services, but is actively doing work in preparation
-    for providing those services.  This is a "spinning" state, not an error state. It
-    reflects activity on the unit itself, not on peers or related units.
-
+    Set this status when the charm is performing an operation such as
+    ``apt install``, or is waiting for something under its control, such as
+    ``pebble-ready`` or an exec operation in the workload container. In
+    contrast to :class:`WaitingStatus`, "maintenance" reflects activity on
+    this unit or charm, not on peers or related units.
     """
 
     name = 'maintenance'
@@ -1989,11 +1994,13 @@ class MaintenanceStatus(StatusBase):
 
 @StatusBase.register
 class WaitingStatus(StatusBase):
-    """A unit is unable to progress.
+    """The unit or application is waiting on a charm it's integrated with.
 
-    The unit is unable to progress to an active state because an application with which
-    it is integrated is not running.
-
+    Set this status when waiting on a charm this is integrated with. For
+    example, a web app charm would set "waiting" status when it is integrated
+    with a database charm that is not ready yet (it might be creating a
+    database). In contrast to :class:`MaintenanceStatus`, "waiting" reflects
+    activity on related units, not on this unit or charm.
     """
 
     name = 'waiting'
