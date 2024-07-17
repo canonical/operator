@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Dict,
     Final,
     FrozenSet,
@@ -32,6 +33,7 @@ from typing import (
 )
 from uuid import uuid4
 
+import ops
 import yaml
 from ops import pebble
 from ops.charm import CharmBase, CharmEvents
@@ -956,18 +958,17 @@ _RawStatusLiteral = Literal[
 class _EntityStatus:
     """This class represents StatusBase and should not be interacted with directly."""
 
-    # Why not use StatusBase directly? Because that's not json-serializable.
+    # Why not use StatusBase directly? Because that can't be used with
+    # dataclasses.asdict to then be JSON-serializable.
 
     name: _RawStatusLiteral
     message: str = ""
 
+    _entity_statuses: ClassVar[Dict[str, Type["_EntityStatus"]]] = {}
+
     def __eq__(self, other):
         if isinstance(other, (StatusBase, _EntityStatus)):
             return (self.name, self.message) == (other.name, other.message)
-        logger.warning(
-            f"Comparing Status with {other} is not stable and will be forbidden soon."
-            f"Please compare with StatusBase directly.",
-        )
         return super().__eq__(other)
 
     def __repr__(self):
@@ -976,17 +977,89 @@ class _EntityStatus:
             return f"{status_type_name}()"
         return f"{status_type_name}('{self.message}')"
 
+    @classmethod
+    def from_status_name(
+        cls,
+        name: _RawStatusLiteral,
+        message: str = "",
+    ) -> "_EntityStatus":
+        # Note that this won't work for UnknownStatus.
+        # All subclasses have a default 'name' attribute, but the type checker can't tell that.
+        return cls._entity_statuses[name](message=message)  # type:ignore
 
-def _status_to_entitystatus(obj: StatusBase) -> _EntityStatus:
-    """Convert StatusBase to _EntityStatus."""
-    statusbase_subclass = type(StatusBase.from_name(obj.name, obj.message))
+    @classmethod
+    def from_ops(cls, obj: StatusBase) -> "_EntityStatus":
+        return cls.from_status_name(cast(_RawStatusLiteral, obj.name), obj.message)
 
-    class _MyClass(_EntityStatus, statusbase_subclass):
-        # Custom type inheriting from a specific StatusBase subclass to support instance checks:
-        #  isinstance(state.unit_status, ops.ActiveStatus)
-        pass
 
-    return _MyClass(cast(_RawStatusLiteral, obj.name), obj.message)
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class UnknownStatus(_EntityStatus, ops.UnknownStatus):
+    __doc__ = ops.UnknownStatus.__doc__
+
+    name: Literal["unknown"] = "unknown"
+
+    def __init__(self):
+        super().__init__(name=self.name)
+
+
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class ErrorStatus(_EntityStatus, ops.ErrorStatus):
+    __doc__ = ops.ErrorStatus.__doc__
+
+    name: Literal["error"] = "error"
+
+    def __init__(self, message: str = ""):
+        super().__init__(name="error", message=message)
+
+
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class ActiveStatus(_EntityStatus, ops.ActiveStatus):
+    __doc__ = ops.ActiveStatus.__doc__
+
+    name: Literal["active"] = "active"
+
+    def __init__(self, message: str = ""):
+        super().__init__(name="active", message=message)
+
+
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class BlockedStatus(_EntityStatus, ops.BlockedStatus):
+    __doc__ = ops.BlockedStatus.__doc__
+
+    name: Literal["blocked"] = "blocked"
+
+    def __init__(self, message: str = ""):
+        super().__init__(name="blocked", message=message)
+
+
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):
+    __doc__ = ops.MaintenanceStatus.__doc__
+
+    name: Literal["maintenance"] = "maintenance"
+
+    def __init__(self, message: str = ""):
+        super().__init__(name="maintenance", message=message)
+
+
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class WaitingStatus(_EntityStatus, ops.WaitingStatus):
+    __doc__ = ops.WaitingStatus.__doc__
+
+    name: Literal["waiting"] = "waiting"
+
+    def __init__(self, message: str = ""):
+        super().__init__(name="waiting", message=message)
+
+
+_EntityStatus._entity_statuses.update(
+    unknown=UnknownStatus,
+    error=ErrorStatus,
+    active=ActiveStatus,
+    blocked=BlockedStatus,
+    maintenance=MaintenanceStatus,
+    waiting=WaitingStatus,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1032,6 +1105,11 @@ class _Port(_max_posargs(1)):
                 "_Port cannot be instantiated directly; "
                 "please use TCPPort, UDPPort, or ICMPPort",
             )
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, (_Port, ops.Port)):
+            return (self.protocol, self.port) == (other.protocol, other.port)
+        return False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1112,6 +1190,11 @@ class Storage(_max_posargs(1)):
     index: int = dataclasses.field(default_factory=next_storage_index)
     # Every new Storage instance gets a new one, if there's trouble, override.
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, (Storage, ops.Storage)):
+            return (self.name, self.index) == (other.name, other.index)
+        return False
+
     def get_filesystem(self, ctx: "Context") -> Path:
         """Simulated filesystem root in this context."""
         return ctx._get_storage_root(self.name, self.index)
@@ -1182,23 +1265,45 @@ class State(_max_posargs(0)):
     )
     """Contents of a charm's stored state."""
 
-    # the current statuses. Will be cast to _EntitiyStatus in __post_init__
-    app_status: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    # the current statuses.
+    app_status: _EntityStatus = UnknownStatus()
     """Status of the application."""
-    unit_status: Union[StatusBase, _EntityStatus] = _EntityStatus("unknown")
+    unit_status: _EntityStatus = UnknownStatus()
     """Status of the unit."""
     workload_version: str = ""
     """Workload version."""
 
     def __post_init__(self):
+        # Let people pass in the ops classes, and convert them to the appropriate Scenario classes.
         for name in ["app_status", "unit_status"]:
             val = getattr(self, name)
             if isinstance(val, _EntityStatus):
                 pass
             elif isinstance(val, StatusBase):
-                object.__setattr__(self, name, _status_to_entitystatus(val))
+                object.__setattr__(self, name, _EntityStatus.from_ops(val))
             else:
                 raise TypeError(f"Invalid status.{name}: {val!r}")
+        normalised_ports = [
+            _Port(protocol=port.protocol, port=port.port)
+            if isinstance(port, ops.Port)
+            else port
+            for port in self.opened_ports
+        ]
+        if self.opened_ports != normalised_ports:
+            object.__setattr__(self, "opened_ports", normalised_ports)
+        normalised_storage = [
+            Storage(name=storage.name, index=storage.index)
+            if isinstance(storage, ops.Storage)
+            else storage
+            for storage in self.storages
+        ]
+        if self.storages != normalised_storage:
+            object.__setattr__(self, "storages", normalised_storage)
+        # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by charmers.
+        # ops.Network does not have the relation name, so cannot be converted.
+        # ops.Resources does not contain the source of the resource, so cannot be converted.
+        # ops.StoredState is not convenient to initialise with data, so not useful here.
+
         # It's convenient to pass a set, but we really want the attributes to be
         # frozen sets to increase the immutability of State objects.
         for name in [
@@ -1228,14 +1333,13 @@ class State(_max_posargs(0)):
 
     def _update_status(
         self,
-        new_status: _RawStatusLiteral,
-        new_message: str = "",
+        new_status: _EntityStatus,
         is_app: bool = False,
     ):
-        """Update the current app/unit status and add the previous one to the history."""
+        """Update the current app/unit status."""
         name = "app_status" if is_app else "unit_status"
         # bypass frozen dataclass
-        object.__setattr__(self, name, _EntityStatus(new_status, new_message))
+        object.__setattr__(self, name, new_status)
 
     def _update_opened_ports(self, new_ports: FrozenSet[_Port]):
         """Update the current opened ports."""
@@ -1262,10 +1366,7 @@ class State(_max_posargs(0)):
     def with_unit_status(self, status: StatusBase) -> "State":
         return dataclasses.replace(
             self,
-            status=dataclasses.replace(
-                cast(_EntityStatus, self.unit_status),
-                unit=_status_to_entitystatus(status),
-            ),
+            unit_status=_EntityStatus.from_ops(status),
         )
 
     def get_container(self, container: str, /) -> Container:

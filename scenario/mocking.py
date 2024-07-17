@@ -43,6 +43,7 @@ from scenario.state import (
     Network,
     PeerRelation,
     Storage,
+    _EntityStatus,
     _port_cls_by_protocol,
     _RawPortProtocolLiteral,
     _RawStatusLiteral,
@@ -338,7 +339,8 @@ class _MockModelBackend(_ModelBackend):
         is_app: bool = False,
     ):
         self._context._record_status(self._state, is_app)
-        self._state._update_status(status, message, is_app)
+        status_obj = _EntityStatus.from_status_name(status, message)
+        self._state._update_status(status_obj, is_app)
 
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))

@@ -1,17 +1,18 @@
+import ops
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
-from ops.model import (
+
+from scenario import Context
+from scenario.state import (
     ActiveStatus,
     BlockedStatus,
     ErrorStatus,
     MaintenanceStatus,
+    State,
     UnknownStatus,
     WaitingStatus,
 )
-
-from scenario import Context
-from scenario.state import State, _status_to_entitystatus
 from tests.helpers import trigger
 
 
@@ -52,9 +53,9 @@ def test_status_history(mycharm):
 
         def _on_update_status(self, _):
             for obj in (self.unit, self.app):
-                obj.status = ActiveStatus("1")
-                obj.status = BlockedStatus("2")
-                obj.status = WaitingStatus("3")
+                obj.status = ops.ActiveStatus("1")
+                obj.status = ops.BlockedStatus("2")
+                obj.status = ops.WaitingStatus("3")
 
     ctx = Context(
         StatusCharm,
@@ -70,7 +71,7 @@ def test_status_history(mycharm):
         BlockedStatus("2"),
     ]
 
-    assert out.app_status == WaitingStatus("3")
+    assert out.app_status == ops.WaitingStatus("3")
     assert ctx.app_status_history == [
         UnknownStatus(),
         ActiveStatus("1"),
@@ -151,7 +152,20 @@ def test_workload_history(mycharm):
     ),
 )
 def test_status_comparison(status):
-    entitystatus = _status_to_entitystatus(status)
-    assert entitystatus == entitystatus == status
-    assert isinstance(entitystatus, type(status))
-    assert repr(entitystatus) == repr(status)
+    if isinstance(status, UnknownStatus):
+        ops_status = ops.UnknownStatus()
+    else:
+        ops_status = getattr(ops, status.__class__.__name__)(status.message)
+    # A status can be compared to itself.
+    assert status == status
+    # A status can be compared to another instance of the scenario class.
+    if isinstance(status, UnknownStatus):
+        assert status == status.__class__()
+    else:
+        assert status == status.__class__(status.message)
+    # A status can be compared to an instance of the ops class.
+    assert status == ops_status
+    # isinstance also works for comparing to the ops classes.
+    assert isinstance(status, type(ops_status))
+    # The repr of the scenario and ops classes should be identical.
+    assert repr(status) == repr(ops_status)

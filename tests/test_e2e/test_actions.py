@@ -5,7 +5,7 @@ from ops.framework import Framework
 
 from scenario import Context
 from scenario.context import InvalidEventError
-from scenario.state import Action, State, _Event, next_action_id
+from scenario.state import Action, State, next_action_id
 
 
 @pytest.fixture(scope="function")

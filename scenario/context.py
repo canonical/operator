@@ -557,9 +557,9 @@ class Context:
     def _record_status(self, state: "State", is_app: bool):
         """Record the previous status before a status change."""
         if is_app:
-            self.app_status_history.append(cast("_EntityStatus", state.app_status))
+            self.app_status_history.append(state.app_status)
         else:
-            self.unit_status_history.append(cast("_EntityStatus", state.unit_status))
+            self.unit_status_history.append(state.unit_status)
 
     def manager(self, event: "_Event", state: "State"):
         """Context manager to introspect live charm object before and after the event is emitted.
