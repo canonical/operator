@@ -14,6 +14,7 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 
+import contextlib
 import dataclasses
 import datetime
 import enum
@@ -3626,9 +3627,16 @@ class _ModelBackend:
         if owner is not None:
             args += ['--owner', owner]
         # The content has already been validated with Secret._validate_content
-        for k, v in content.items():
-            args.append(f'{k}={v}')
-        result = self._run('secret-add', *args, return_output=True)
+        with contextlib.ExitStack() as temp_files:
+            for k, v in content.items():
+                if not isinstance(v, str):
+                    raise NotImplementedError(
+                        f'This ops version can only set string secrets: {k}={type(v)}'
+                    )
+                temp = temp_files.enter_context(tempfile.NamedTemporaryFile(buffering=0))
+                temp.write(v.encode('utf-8'))
+                args.append(f'{k}#file={temp.name}')
+            result = self._run('secret-add', *args, return_output=True)
         secret_id = typing.cast(str, result)
         return secret_id.strip()
 
