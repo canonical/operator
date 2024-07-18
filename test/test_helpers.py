@@ -153,6 +153,15 @@ class FakeScript:
             f.write(
                 """#!/bin/sh
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
+
+# Capture key and data from key#file=/some/path arguments
+for word in "$@"; do
+  echo "$word" | grep -q "#file=" || continue
+  key=$(echo "$word" | cut -d'#' -f1)
+  path=$(echo "$word" | cut -d'=' -f2)
+  cp "$path" "{path}/$key.secret"
+done
+
 {content}""".format_map(template_args)
             )
         path.chmod(0o755)
@@ -174,6 +183,9 @@ class FakeScript:
             if clear:
                 f.truncate(0)
         return calls
+
+    def secrets(self) -> typing.Dict[str, str]:
+        return {p.stem: p.read_text() for p in self.path.iterdir() if p.suffix == '.secret'}
 
 
 class FakeScriptTest(unittest.TestCase):
