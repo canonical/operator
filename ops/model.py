@@ -14,7 +14,6 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 
-import contextlib
 import dataclasses
 import datetime
 import enum
@@ -3580,16 +3579,6 @@ class _ModelBackend:
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(id, typing.cast(Dict[str, Any], info_dicts[id]))
 
-    @contextlib.contextmanager
-    def _secrets_in_temp_files(self, content: Dict[str, str]) -> Generator[List[str], None, None]:
-        rv: List[str] = []
-        with contextlib.ExitStack() as temp_files:
-            for k, v in content.items():
-                temp = temp_files.enter_context(tempfile.NamedTemporaryFile(buffering=0))
-                temp.write(v.encode('utf-8'))
-                rv.append(f'{k}#file={temp.name}')
-            yield rv
-
     def secret_set(
         self,
         id: str,
@@ -3609,9 +3598,13 @@ class _ModelBackend:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
             args += ['--rotate', rotate.value]
-        # The content is either None or has already been validated with Secret._validate_content
-        with self._secrets_in_temp_files(content or {}) as secret_args:
-            self._run_for_secret('secret-set', *args, *secret_args)
+        with tempfile.TemporaryDirectory() as tmp:
+            # The content is None or has already been validated with Secret._validate_content
+            for k, v in (content or {}).items():
+                with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+                    f.write(v)
+                args.append(f'{k}#file={tmp}/{k}')
+            self._run_for_secret('secret-set', *args)
 
     def secret_add(
         self,
@@ -3634,9 +3627,13 @@ class _ModelBackend:
             args += ['--rotate', rotate.value]
         if owner is not None:
             args += ['--owner', owner]
-        # The content has already been validated with Secret._validate_content
-        with self._secrets_in_temp_files(content) as secret_args:
-            result = self._run('secret-add', *args, *secret_args, return_output=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            # The content has already been validated with Secret._validate_content
+            for k, v in content.items():
+                with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+                    f.write(v)
+                args.append(f'{k}#file={tmp}/{k}')
+            result = self._run('secret-add', *args, return_output=True)
         secret_id = typing.cast(str, result)
         return secret_id.strip()
 
