@@ -85,7 +85,7 @@ jobs:
         run: pip install tox~=4.2
 
       - name: Install Pebble
-        run: go install github.com/canonical/pebble/cmd/pebble@master
+        run: go install github.com/canonical/pebble/cmd/pebble@v1.14.1
 
       - name: Start Pebble
         run: |
