@@ -1,3 +1,25 @@
+# 2.15.0 - 22 Jul 2024
+
+## Features
+
+* Add support for Pebble check-failed and check-recovered events (#1281)
+
+## Fixes
+
+* Pass secret data to Juju via files, rather than as command-line values (#1290)
+* Include checks and log targets when merging layers in ops.testing (#1268)
+
+## Documentation
+
+* Clarify distinction between maintenance and waiting status (#1148)
+
+## CI
+
+* Bump the Go version to match Pebble (#1285)
+* Run ruff format over charm pin update code (#1278)
+* Bump certifi from 2024.2.2 to 2024.7.4 in /docs (#1282)
+* Update charm pins (#1269)
+
 # 2.14.1 - 27 Jun 2024
 
 ## Fixes
