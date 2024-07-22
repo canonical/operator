@@ -308,7 +308,7 @@ To make a release of the ops library, do the following:
 
 1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
 2. Click "Draft a new release"
-3. The "Release Title" is simply the full version number, in the form <major>.<minor>.<patch>
+3. The "Release Title" is simply the full version number, in the form `<major>.<minor>.<patch>`
    and a brief summary of the main changes in the release
    E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
 4. Use the "Generate Release Notes" button to get a copy of the changes into the
