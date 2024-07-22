@@ -6,8 +6,8 @@
 
 ## Fixes
 
-* Use temp dir for secret data (#1290)
-* Add checks and log_targets to ops.testing (#1268)
+* Pass secret data to Juju via files, rather than as command-line values (#1290)
+* Include checks and log targets when merging layers in ops.testing (#1268)
 
 ## Documentation
 
