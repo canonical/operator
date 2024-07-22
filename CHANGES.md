@@ -2,23 +2,23 @@
 
 ## Features
 
-* Add support for Pebble check-failed and check-recovered events in https://github.com/canonical/operator/pull/1281
+* Add support for Pebble check-failed and check-recovered events (#1281)
 
 ## Fixes
 
-* Use temp dir for secret data in https://github.com/canonical/operator/pull/1290
-* Add checks and log_targets to ops.testing by @amandahla in https://github.com/canonical/operator/pull/1268
+* Use temp dir for secret data (#1290)
+* Add checks and log_targets to ops.testing (#1268)
 
 ## Documentation
 
-* Clarify distinction between maintenance and waiting status in https://github.com/canonical/operator/pull/1148
+* Clarify distinction between maintenance and waiting status (#1148)
 
 ## CI
 
-* Bump the Go version to match Pebble in https://github.com/canonical/operator/pull/1285
-* Run ruff format over charm pin update code in https://github.com/canonical/operator/pull/1278
-* Bump certifi from 2024.2.2 to 2024.7.4 in /docs in https://github.com/canonical/operator/pull/1282
-* Update charm pins in https://github.com/canonical/operator/pull/1269
+* Bump the Go version to match Pebble (#1285)
+* Run ruff format over charm pin update code (#1278)
+* Bump certifi from 2024.2.2 to 2024.7.4 in /docs (#1282)
+* Update charm pins (#1269)
 
 # 2.14.1 - 27 Jun 2024
 
