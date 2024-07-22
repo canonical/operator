@@ -24,7 +24,7 @@ import typing
 import unittest
 from collections import OrderedDict
 from textwrap import dedent
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -3349,7 +3349,8 @@ class TestSecrets:
         assert secret.id == 'secret:123'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'application', 'foo=x']]
+        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'application', ANY]]
+        assert fake_script.secrets() == {'foo': 'x'}
 
     def test_app_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:234')
@@ -3379,10 +3380,11 @@ class TestSecrets:
                 'hourly',
                 '--owner',
                 'application',
-                'foo=x',
-                'bar=y',
+                ANY,
+                ANY,
             ]
         ]
+        assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
 
     def test_unit_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:345')
@@ -3392,7 +3394,8 @@ class TestSecrets:
         assert secret.id == 'secret:345'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'unit', 'foo=x']]
+        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'unit', ANY]]
+        assert fake_script.secrets() == {'foo': 'x'}
 
     def test_unit_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:456')
@@ -3422,10 +3425,11 @@ class TestSecrets:
                 'yearly',
                 '--owner',
                 'unit',
-                'foo=w',
-                'bar=z',
+                ANY,
+                ANY,
             ]
         ]
+        assert fake_script.secrets() == {'foo': 'w', 'bar': 'z'}
 
     def test_unit_add_secret_errors(self, model: ops.Model):
         # Additional add_secret tests are done in TestApplication
@@ -3721,10 +3725,11 @@ class TestSecretClass:
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
         assert fake_script.calls(clear=True) == [
-            ['secret-set', 'secret:x', 'foo=bar'],
+            ['secret-set', 'secret:x', ANY],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', 'secret:z', 'bar=foo'],
+            ['secret-set', 'secret:z', ANY],
         ]
+        assert fake_script.secrets() == {'foo': 'bar', 'bar': 'foo'}
 
     def test_set_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")

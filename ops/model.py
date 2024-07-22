@@ -3591,11 +3591,13 @@ class _ModelBackend:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
             args += ['--rotate', rotate.value]
-        if content is not None:
-            # The content has already been validated with Secret._validate_content
-            for k, v in content.items():
-                args.append(f'{k}={v}')
-        self._run_for_secret('secret-set', *args)
+        with tempfile.TemporaryDirectory() as tmp:
+            # The content is None or has already been validated with Secret._validate_content
+            for k, v in (content or {}).items():
+                with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+                    f.write(v)
+                args.append(f'{k}#file={tmp}/{k}')
+            self._run_for_secret('secret-set', *args)
 
     def secret_add(
         self,
@@ -3618,10 +3620,13 @@ class _ModelBackend:
             args += ['--rotate', rotate.value]
         if owner is not None:
             args += ['--owner', owner]
-        # The content has already been validated with Secret._validate_content
-        for k, v in content.items():
-            args.append(f'{k}={v}')
-        result = self._run('secret-add', *args, return_output=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            # The content has already been validated with Secret._validate_content
+            for k, v in content.items():
+                with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+                    f.write(v)
+                args.append(f'{k}#file={tmp}/{k}')
+            result = self._run('secret-add', *args, return_output=True)
         secret_id = typing.cast(str, result)
         return secret_id.strip()
 
