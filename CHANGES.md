@@ -6,7 +6,7 @@
 
 ## Fixes
 
-* Pass secret data to Juju via files, rather than as command-line values (#1290)
+* Pass secret data to Juju via files, rather than as command-line values (#1290) fixing CVE-2024-41129
 * Include checks and log targets when merging layers in ops.testing (#1268)
 
 ## Documentation
