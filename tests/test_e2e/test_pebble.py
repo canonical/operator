@@ -10,7 +10,7 @@ from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import Container, ExecOutput, Mount, Notice, State
+from scenario.state import CheckInfo, Container, ExecOutput, Mount, Notice, State
 from tests.helpers import jsonpatch_delta, trigger
 
 
@@ -381,7 +381,9 @@ def test_pebble_custom_notice(charm_cls):
 
     state = State(containers=[container])
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(container.get_notice("example.com/baz").event, state) as mgr:
+    with ctx.manager(
+        ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state
+    ) as mgr:
         container = mgr.charm.unit.get_container("foo")
         assert container.get_notices() == [n._to_ops() for n in notices]
 
@@ -437,4 +439,83 @@ def test_pebble_custom_notice_in_charm():
     )
     state = State(containers=[container])
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    ctx.run(container.get_notice(key).event, state)
+    ctx.run(ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state)
+
+
+def test_pebble_check_failed():
+    infos = []
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_pebble_check_failed, self._on_check_failed)
+
+        def _on_check_failed(self, event):
+            infos.append(event.info)
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    check = CheckInfo("http-check", failures=7, status=pebble.CheckStatus.DOWN)
+    container = Container("foo", check_infos={check})
+    state = State(containers={container})
+    ctx.run(ctx.on.pebble_check_failed(container, check), state=state)
+    assert len(infos) == 1
+    assert infos[0].name == "http-check"
+    assert infos[0].status == pebble.CheckStatus.DOWN
+    assert infos[0].failures == 7
+
+
+def test_pebble_check_recovered():
+    infos = []
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(
+                self.on.foo_pebble_check_recovered, self._on_check_recovered
+            )
+
+        def _on_check_recovered(self, event):
+            infos.append(event.info)
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    check = CheckInfo("http-check")
+    container = Container("foo", check_infos={check})
+    state = State(containers={container})
+    ctx.run(ctx.on.pebble_check_recovered(container, check), state=state)
+    assert len(infos) == 1
+    assert infos[0].name == "http-check"
+    assert infos[0].status == pebble.CheckStatus.UP
+    assert infos[0].failures == 0
+
+
+def test_pebble_check_failed_two_containers():
+    foo_infos = []
+    bar_infos = []
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(
+                self.on.foo_pebble_check_failed, self._on_foo_check_failed
+            )
+            framework.observe(
+                self.on.bar_pebble_check_failed, self._on_bar_check_failed
+            )
+
+        def _on_foo_check_failed(self, event):
+            foo_infos.append(event.info)
+
+        def _on_bar_check_failed(self, event):
+            bar_infos.append(event.info)
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}, "bar": {}}})
+    check = CheckInfo("http-check", failures=7, status=pebble.CheckStatus.DOWN)
+    foo_container = Container("foo", check_infos={check})
+    bar_container = Container("bar", check_infos={check})
+    state = State(containers={foo_container, bar_container})
+    ctx.run(ctx.on.pebble_check_failed(foo_container, check), state=state)
+    assert len(foo_infos) == 1
+    assert foo_infos[0].name == "http-check"
+    assert foo_infos[0].status == pebble.CheckStatus.DOWN
+    assert foo_infos[0].failures == 7
+    assert len(bar_infos) == 0

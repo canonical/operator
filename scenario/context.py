@@ -12,8 +12,10 @@ from ops import CharmBase, EventBase
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import (
+    CheckInfo,
     Container,
     MetadataNotFoundError,
+    Notice,
     Secret,
     Storage,
     _Action,
@@ -311,6 +313,30 @@ class _CharmEvents:
     @staticmethod
     def pebble_ready(container: Container):
         return _Event(f"{container.name}_pebble_ready", container=container)
+
+    @staticmethod
+    def pebble_custom_notice(container: Container, notice: Notice):
+        return _Event(
+            f"{container.name}_pebble_custom_notice",
+            container=container,
+            notice=notice,
+        )
+
+    @staticmethod
+    def pebble_check_failed(container: Container, info: CheckInfo):
+        return _Event(
+            f"{container.name}_pebble_check_failed",
+            container=container,
+            check_info=info,
+        )
+
+    @staticmethod
+    def pebble_check_recovered(container: Container, info: CheckInfo):
+        return _Event(
+            f"{container.name}_pebble_check_recovered",
+            container=container,
+            check_info=info,
+        )
 
     @staticmethod
     def action(

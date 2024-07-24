@@ -91,6 +91,8 @@ FRAMEWORK_EVENTS = {
 }
 PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
 PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = "_pebble_custom_notice"
+PEBBLE_CHECK_FAILED_EVENT_SUFFIX = "_pebble_check_failed"
+PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX = "_pebble_check_recovered"
 RELATION_EVENTS_SUFFIX = {
     "_relation_changed",
     "_relation_broken",
@@ -770,18 +772,37 @@ class Notice(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-class _BoundNotice(_max_posargs(0)):
-    notice: Notice
-    container: "Container"
+class CheckInfo(_max_posargs(1)):
+    name: str
+    """Name of the check."""
 
-    @property
-    def event(self):
-        """Sugar to generate a <container's name>-pebble-custom-notice event for this notice."""
-        suffix = PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX
-        return _Event(
-            path=normalize_name(self.container.name) + suffix,
-            container=self.container,
-            notice=self.notice,
+    level: Optional[pebble.CheckLevel] = None
+    """Level of the check."""
+
+    status: pebble.CheckStatus = pebble.CheckStatus.UP
+    """Status of the check.
+
+    CheckStatus.UP means the check is healthy (the number of failures is less
+    than the threshold), CheckStatus.DOWN means the check is unhealthy
+    (the number of failures has reached the threshold).
+    """
+
+    failures: int = 0
+    """Number of failures since the check last succeeded."""
+
+    threshold: int = 3
+    """Failure threshold.
+
+    This is how many consecutive failures for the check to be considered “down”.
+    """
+
+    def _to_ops(self) -> pebble.CheckInfo:
+        return pebble.CheckInfo(
+            name=self.name,
+            level=self.level,
+            status=self.status,
+            failures=self.failures,
+            threshold=self.threshold,
         )
 
 
@@ -862,6 +883,8 @@ class Container(_max_posargs(1)):
 
     notices: List[Notice] = dataclasses.field(default_factory=list)
 
+    check_infos: FrozenSet[CheckInfo] = frozenset()
+
     def __hash__(self) -> int:
         return hash(self.name)
 
@@ -926,23 +949,6 @@ class Container(_max_posargs(1)):
             charm pushed to the container.
         """
         return ctx._get_container_root(self.name)
-
-    def get_notice(
-        self,
-        key: str,
-        notice_type: pebble.NoticeType = pebble.NoticeType.CUSTOM,
-    ) -> _BoundNotice:
-        """Get a Pebble notice by key and type.
-
-        Raises:
-            KeyError: if the notice is not found.
-        """
-        for notice in self.notices:
-            if notice.key == key and notice.type == notice_type:
-                return _BoundNotice(notice=notice, container=self)
-        raise KeyError(
-            f"{self.name} does not have a notice with key {key} and type {notice_type}",
-        )
 
 
 _RawStatusLiteral = Literal[
@@ -1631,6 +1637,10 @@ class _EventPath(str):
             return PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
         if s.endswith(PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
             return PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(PEBBLE_CHECK_FAILED_EVENT_SUFFIX):
+            return PEBBLE_CHECK_FAILED_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX):
+            return PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.workload
 
         if s in BUILTIN_EVENTS:
             return "", _EventType.builtin
@@ -1669,6 +1679,9 @@ class Event:
 
     notice: Optional[Notice] = None
     """If this is a Pebble notice event, the notice it refers to."""
+
+    check_info: Optional[CheckInfo] = None
+    """If this is a Pebble check event, the check info it provides."""
 
     action: Optional["_Action"] = None
     """If this is an action event, the :class:`Action` it refers to."""
@@ -1787,6 +1800,8 @@ class Event:
                         "notice_type": notice_type,
                     },
                 )
+            elif self.check_info:
+                snapshot_data["check_name"] = self.check_info.name
 
         elif self._is_relation_event:
             # this is a RelationEvent.
@@ -1860,8 +1875,15 @@ def deferred(
     relation: Optional["Relation"] = None,
     container: Optional["Container"] = None,
     notice: Optional["Notice"] = None,
+    check_info: Optional["CheckInfo"] = None,
 ):
     """Construct a DeferredEvent from an Event or an event name."""
     if isinstance(event, str):
-        event = _Event(event, relation=relation, container=container, notice=notice)
+        event = _Event(
+            event,
+            relation=relation,
+            container=container,
+            notice=notice,
+            check_info=check_info,
+        )
     return event.deferred(handler=handler, event_id=event_id)

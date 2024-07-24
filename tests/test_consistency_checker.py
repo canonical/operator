@@ -8,6 +8,7 @@ from scenario.context import Context
 from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
+    CheckInfo,
     CloudCredential,
     CloudSpec,
     Container,
@@ -84,6 +85,46 @@ def test_workload_event_without_container():
         State(containers={Container("foo")}),
         _Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
+    check = CheckInfo("http-check")
+    assert_consistent(
+        State(containers={Container("foo", check_infos={check})}),
+        _Event("foo-pebble-check-failed", container=Container("foo"), check_info=check),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
+    assert_inconsistent(
+        State(containers={Container("foo")}),
+        _Event("foo-pebble-check-failed", container=Container("foo"), check_info=check),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
+    assert_consistent(
+        State(containers={Container("foo", check_infos={check})}),
+        _Event(
+            "foo-pebble-check-recovered", container=Container("foo"), check_info=check
+        ),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
+    assert_inconsistent(
+        State(containers={Container("foo")}),
+        _Event(
+            "foo-pebble-check-recovered", container=Container("foo"), check_info=check
+        ),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+    )
+    # Ensure the check is in the correct container.
+    assert_inconsistent(
+        State(containers={Container("foo", check_infos={check}), Container("bar")}),
+        _Event(
+            "foo-pebble-check-recovered", container=Container("bar"), check_info=check
+        ),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}, "bar": {}}}),
+    )
+    assert_inconsistent(
+        State(containers={Container("foo", check_infos={check}), Container("bar")}),
+        _Event(
+            "bar-pebble-check-recovered", container=Container("bar"), check_info=check
+        ),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}, "bar": {}}}),
     )
 
 

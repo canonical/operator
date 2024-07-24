@@ -694,8 +694,9 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         self._root = container_root
 
-        # load any existing notices from the state
+        # load any existing notices and check information from the state
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
+        self._check_infos: Dict[str, pebble.CheckInfo] = {}
         for container in state.containers:
             for notice in container.notices:
                 if hasattr(notice.type, "value"):
@@ -703,6 +704,8 @@ class _MockPebbleClient(_TestingPebbleClient):
                 else:
                     notice_type = str(notice.type)
                 self._notices[notice_type, notice.key] = notice._to_ops()
+            for check in container.check_infos:
+                self._check_infos[check.name] = check._to_ops()
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
