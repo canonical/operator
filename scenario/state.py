@@ -21,6 +21,7 @@ from typing import (
     Final,
     FrozenSet,
     Generic,
+    Iterable,
     List,
     Literal,
     Optional,
@@ -1221,9 +1222,9 @@ class State(_max_posargs(0)):
         default_factory=dict,
     )
     """The present configuration of this charm."""
-    relations: FrozenSet["AnyRelation"] = dataclasses.field(default_factory=frozenset)
+    relations: Iterable["AnyRelation"] = dataclasses.field(default_factory=frozenset)
     """All relations that currently exist for this charm."""
-    networks: FrozenSet[Network] = dataclasses.field(default_factory=frozenset)
+    networks: Iterable[Network] = dataclasses.field(default_factory=frozenset)
     """Manual overrides for any relation and extra bindings currently provisioned for this charm.
     If a metadata-defined relation endpoint is not explicitly mapped to a Network in this field,
     it will be defaulted.
@@ -1231,24 +1232,24 @@ class State(_max_posargs(0)):
     support it, but use at your own risk.] If a metadata-defined extra-binding is left empty,
     it will be defaulted.
     """
-    containers: FrozenSet[Container] = dataclasses.field(default_factory=frozenset)
+    containers: Iterable[Container] = dataclasses.field(default_factory=frozenset)
     """All containers (whether they can connect or not) that this charm is aware of."""
-    storages: FrozenSet[Storage] = dataclasses.field(default_factory=frozenset)
+    storages: Iterable[Storage] = dataclasses.field(default_factory=frozenset)
     """All ATTACHED storage instances for this charm.
     If a storage is not attached, omit it from this listing."""
 
     # we don't use sets to make json serialization easier
-    opened_ports: FrozenSet[_Port] = dataclasses.field(default_factory=frozenset)
+    opened_ports: Iterable[_Port] = dataclasses.field(default_factory=frozenset)
     """Ports opened by juju on this charm."""
     leader: bool = False
     """Whether this charm has leadership."""
     model: Model = Model()
     """The model this charm lives in."""
-    secrets: FrozenSet[Secret] = dataclasses.field(default_factory=frozenset)
+    secrets: Iterable[Secret] = dataclasses.field(default_factory=frozenset)
     """The secrets this charm has access to (as an owner, or as a grantee).
     The presence of a secret in this list entails that the charm can read it.
     Whether it can manage it or not depends on the individual secret's `owner` flag."""
-    resources: FrozenSet[Resource] = dataclasses.field(default_factory=frozenset)
+    resources: Iterable[Resource] = dataclasses.field(default_factory=frozenset)
     """All resources that this charm can access."""
     planned_units: int = 1
     """Number of non-dying planned units that are expected to be running this application.
@@ -1260,7 +1261,7 @@ class State(_max_posargs(0)):
     # to this list.
     deferred: List["DeferredEvent"] = dataclasses.field(default_factory=list)
     """Events that have been deferred on this charm by some previous execution."""
-    stored_states: FrozenSet["StoredState"] = dataclasses.field(
+    stored_states: Iterable["StoredState"] = dataclasses.field(
         default_factory=frozenset,
     )
     """Contents of a charm's stored state."""
@@ -1317,9 +1318,8 @@ class State(_max_posargs(0)):
             "stored_states",
         ]:
             val = getattr(self, name)
-            # We check for "not frozenset" rather than "is set" so that you can
-            # actually pass a tuple or list or really any iterable of hashable
-            # objects, and it will end up as a frozenset.
+            # It's ok to pass any iterable (of hashable objects), but you'll get
+            # a frozenset as the actual attribute.
             if not isinstance(val, frozenset):
                 object.__setattr__(self, name, frozenset(val))
 

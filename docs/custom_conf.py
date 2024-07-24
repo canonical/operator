@@ -311,4 +311,5 @@ nitpick_ignore = [
     ('py:class', '_Event'),
     ('py:class', 'scenario.state._DCBase'),
     ('py:class', 'scenario.state._EntityStatus'),
+    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
