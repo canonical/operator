@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple, Union
 from scenario.runtime import InconsistentScenarioError
 from scenario.runtime import logger as scenario_logger
 from scenario.state import (
-    Action,
     PeerRelation,
     SubordinateRelation,
+    _Action,
     _CharmSpec,
     normalize_name,
 )
@@ -274,7 +274,7 @@ def _check_storage_event(
 
 def _check_action_param_types(
     charm_spec: _CharmSpec,
-    action: Action,
+    action: _Action,
     errors: List[str],
     warnings: List[str],
 ):

@@ -957,7 +957,7 @@ def test_backup_action():
 
     # If you didn't declare do_backup in the charm's metadata, 
     # the `ConsistencyChecker` will slap you on the wrist and refuse to proceed.
-    out: scenario.ActionOutput = ctx.run_action("do_backup_action", scenario.State())
+    out: scenario.ActionOutput = ctx.run_action(ctx.on.action("do_backup"), scenario.State())
 
     # You can assert action results, logs, failure using the ActionOutput interface:
     assert out.logs == ['baz', 'qux']
@@ -973,17 +973,18 @@ def test_backup_action():
 
 ## Parametrized Actions
 
-If the action takes parameters, you'll need to instantiate an `Action`.
+If the action takes parameters, you can pass those in the call.
 
 ```python
 def test_backup_action():
-    # Define an action:
-    action = scenario.Action('do_backup', params={'a': 'b'})
     ctx = scenario.Context(MyCharm)
 
     # If the parameters (or their type) don't match what is declared in the metadata, 
     # the `ConsistencyChecker` will slap you on the other wrist.
-    out: scenario.ActionOutput = ctx.run_action(action, scenario.State())
+    out: scenario.ActionOutput = ctx.run_action(
+        ctx.on.action("do_backup", params={'a': 'b'}),
+        scenario.State()
+    )
 
     # ...
 ```

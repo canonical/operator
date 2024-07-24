@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 from ops import CharmBase
 
-from scenario import Action, ActionOutput, Context, State
-from scenario.state import _Event, next_action_id
+from scenario import ActionOutput, Context, State
+from scenario.state import _Action, _Event, next_action_id
 
 
 class MyCharm(CharmBase):
@@ -34,22 +34,19 @@ def test_run_action():
     state = State()
     expected_id = next_action_id(update=False)
 
-    with patch.object(ctx, "_run_action") as p:
-        ctx._output_state = (
-            "foo"  # would normally be set within the _run_action call scope
-        )
-        action = Action("do-foo")
-        output = ctx.run_action(action, state)
+    with patch.object(ctx, "_run") as p:
+        ctx._output_state = "foo"  # would normally be set within the _run call scope
+        output = ctx.run_action(ctx.on.action("do-foo"), state)
         assert output.state == "foo"
 
     assert p.called
-    a = p.call_args.kwargs["action"]
+    e = p.call_args.kwargs["event"]
     s = p.call_args.kwargs["state"]
 
-    assert isinstance(a, Action)
-    assert a.event.name == "do_foo_action"
+    assert isinstance(e, _Event)
+    assert e.name == "do_foo_action"
     assert s is state
-    assert a.id == expected_id
+    assert e.action.id == expected_id
 
 
 @pytest.mark.parametrize("app_name", ("foo", "bar", "george"))
@@ -76,6 +73,6 @@ def test_action_output_no_results():
             pass
 
     ctx = Context(MyCharm, meta={"name": "foo"}, actions={"act": {}})
-    out = ctx.run_action(Action("act"), State())
+    out = ctx.run_action(ctx.on.action("act"), State())
     assert out.results is None
     assert out.failure is None

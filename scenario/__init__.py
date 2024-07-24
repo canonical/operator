@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 from scenario.context import ActionOutput, Context
 from scenario.state import (
-    Action,
     ActiveStatus,
     Address,
     BindAddress,
@@ -37,7 +36,6 @@ from scenario.state import (
 )
 
 __all__ = [
-    "Action",
     "ActionOutput",
     "CloudCredential",
     "CloudSpec",

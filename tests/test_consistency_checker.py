@@ -4,10 +4,10 @@ import pytest
 from ops.charm import CharmBase
 
 from scenario.consistency_checker import check_consistency
+from scenario.context import Context
 from scenario.runtime import InconsistentScenarioError
 from scenario.state import (
     RELATION_EVENTS_SUFFIX,
-    Action,
     CloudCredential,
     CloudSpec,
     Container,
@@ -22,6 +22,7 @@ from scenario.state import (
     Storage,
     StoredState,
     SubordinateRelation,
+    _Action,
     _CharmSpec,
     _Event,
 )
@@ -377,19 +378,19 @@ def test_relation_not_in_state():
 
 
 def test_action_not_in_meta_inconsistent():
-    action = Action("foo", params={"bar": "baz"})
+    ctx = Context(MyCharm, meta={"name": "foo"}, actions={"foo": {}})
     assert_inconsistent(
         State(),
-        action.event,
+        ctx.on.action("foo", params={"bar": "baz"}),
         _CharmSpec(MyCharm, meta={}, actions={}),
     )
 
 
 def test_action_meta_type_inconsistent():
-    action = Action("foo", params={"bar": "baz"})
+    ctx = Context(MyCharm, meta={"name": "foo"}, actions={"foo": {}})
     assert_inconsistent(
         State(),
-        action.event,
+        ctx.on.action("foo", params={"bar": "baz"}),
         _CharmSpec(
             MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "zabazaba"}}}}
         ),
@@ -397,24 +398,24 @@ def test_action_meta_type_inconsistent():
 
     assert_inconsistent(
         State(),
-        action.event,
+        ctx.on.action("foo", params={"bar": "baz"}),
         _CharmSpec(MyCharm, meta={}, actions={"foo": {"params": {"bar": {}}}}),
     )
 
 
 def test_action_name():
-    action = Action("foo", params={"bar": "baz"})
+    ctx = Context(MyCharm, meta={"name": "foo"}, actions={"foo": {}})
 
     assert_consistent(
         State(),
-        action.event,
+        ctx.on.action("foo", params={"bar": "baz"}),
         _CharmSpec(
             MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": "string"}}}}
         ),
     )
     assert_inconsistent(
         State(),
-        _Event("box_action", action=action),
+        _Event("box_action", action=ctx.on.action("foo", params={"bar": "baz"})),
         _CharmSpec(MyCharm, meta={}, actions={"foo": {}}),
     )
 
@@ -431,19 +432,18 @@ _ACTION_TYPE_CHECKS = [
 
 @pytest.mark.parametrize("ptype,good,bad", _ACTION_TYPE_CHECKS)
 def test_action_params_type(ptype, good, bad):
-    action = Action("foo", params={"bar": good})
+    ctx = Context(MyCharm, meta={"name": "foo"}, actions={"foo": {}})
     assert_consistent(
         State(),
-        action.event,
+        ctx.on.action("foo", params={"bar": good}),
         _CharmSpec(
             MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": ptype}}}}
         ),
     )
     if bad is not None:
-        action = Action("foo", params={"bar": bad})
         assert_inconsistent(
             State(),
-            action.event,
+            ctx.on.action("foo", params={"bar": bad}),
             _CharmSpec(
                 MyCharm, meta={}, actions={"foo": {"params": {"bar": {"type": ptype}}}}
             ),

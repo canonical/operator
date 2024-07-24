@@ -12,11 +12,11 @@ from ops import CharmBase, EventBase
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import (
-    Action,
     Container,
     MetadataNotFoundError,
     Secret,
     Storage,
+    _Action,
     _CharmSpec,
     _Event,
     _max_posargs,
@@ -26,7 +26,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.ops_main_mock import Ops
-    from scenario.state import AnyRelation, JujuLogLine, State, _EntityStatus
+    from scenario.state import AnyJson, AnyRelation, JujuLogLine, State, _EntityStatus
 
     PathLike = Union[str, Path]
 
@@ -81,7 +81,7 @@ class _Manager:
     def __init__(
         self,
         ctx: "Context",
-        arg: Union[str, Action, _Event],
+        arg: Union[str, _Action, _Event],
         state_in: "State",
     ):
         self._ctx = ctx
@@ -160,7 +160,7 @@ class _ActionManager(_Manager):
 
     @property
     def _runner(self):
-        return self._ctx._run_action  # noqa
+        return self._ctx._run  # noqa
 
     def _get_output(self):
         return self._ctx._finalize_action(self._ctx.output_state)  # noqa
@@ -311,6 +311,19 @@ class _CharmEvents:
     @staticmethod
     def pebble_ready(container: Container):
         return _Event(f"{container.name}_pebble_ready", container=container)
+
+    @staticmethod
+    def action(
+        name: str,
+        params: Optional[Dict[str, "AnyJson"]] = None,
+        id: Optional[str] = None,
+    ):
+        kwargs = {}
+        if params:
+            kwargs["params"] = params
+        if id:
+            kwargs["id"] = id
+        return _Event(f"{name}_action", action=_Action(name, **kwargs))
 
 
 class Context:
@@ -577,7 +590,7 @@ class Context:
         """
         return _EventManager(self, event, state)
 
-    def action_manager(self, action: "Action", state: "State"):
+    def action_manager(self, action: "_Action", state: "State"):
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage:
@@ -607,23 +620,23 @@ class Context:
         :arg state: the State instance to use as data source for the hook tool calls that the
             charm will invoke when handling the Event.
         """
-        if isinstance(event, Action) or event.action:
+        if isinstance(event, _Action) or event.action:
             raise InvalidEventError("Use run_action() to run an action event.")
         with self._run_event(event=event, state=state) as ops:
             ops.emit()
         return self.output_state
 
-    def run_action(self, action: "Action", state: "State") -> ActionOutput:
-        """Trigger a charm execution with an Action and a State.
+    def run_action(self, event: "_Event", state: "State") -> ActionOutput:
+        """Trigger a charm execution with an action event and a State.
 
         Calling this function will call ``ops.main`` and set up the context according to the
         specified ``State``, then emit the event on the charm.
 
-        :arg action: the Action that the charm will execute.
+        :arg event: the action event that the charm will execute.
         :arg state: the State instance to use as data source for the hook tool calls that the
-            charm will invoke when handling the Action (event).
+            charm will invoke when handling the action event.
         """
-        with self._run_action(action=action, state=state) as ops:
+        with self._run(event=event, state=state) as ops:
             ops.emit()
         return self._finalize_action(self.output_state)
 
@@ -641,11 +654,6 @@ class Context:
         self._action_failure = None
 
         return ao
-
-    @contextmanager
-    def _run_action(self, action: "Action", state: "State"):
-        with self._run(event=action.event, state=state) as ops:
-            yield ops
 
     @contextmanager
     def _run(self, event: "_Event", state: "State"):

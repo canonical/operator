@@ -4,7 +4,7 @@ import pytest
 from ops import ActiveStatus
 from ops.charm import CharmBase, CollectStatusEvent
 
-from scenario import Action, Context, State
+from scenario import Context, State
 from scenario.context import ActionOutput, AlreadyEmittedError, _EventManager
 
 
@@ -73,7 +73,7 @@ def test_context_manager(mycharm):
 
 def test_context_action_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
-    with ctx.action_manager(Action("do-x"), State()) as manager:
+    with ctx.action_manager(ctx.on.action("do-x"), State()) as manager:
         ao = manager.run()
         assert isinstance(ao, ActionOutput)
     assert ctx.emitted_events[0].handle.kind == "do_x_action"

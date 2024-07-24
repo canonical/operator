@@ -5,7 +5,7 @@ from ops.framework import Framework
 
 from scenario import Context
 from scenario.context import InvalidEventError
-from scenario.state import Action, State, next_action_id
+from scenario.state import State, _Action, next_action_id
 
 
 @pytest.fixture(scope="function")
@@ -34,8 +34,7 @@ def test_action_event(mycharm, baz_value):
             "foo": {"params": {"bar": {"type": "number"}, "baz": {"type": "boolean"}}}
         },
     )
-    action = Action("foo", params={"baz": baz_value, "bar": 10})
-    ctx.run_action(action, State())
+    ctx.run_action(ctx.on.action("foo", params={"baz": baz_value, "bar": 10}), State())
 
     evt = ctx.emitted_events[0]
 
@@ -51,24 +50,15 @@ def test_action_event_results_invalid(mycharm, res_value):
 
     mycharm._evt_handler = handle_evt
 
-    action = Action("foo")
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    ctx.run_action(action, State())
+    ctx.run_action(ctx.on.action("foo"), State())
 
 
 def test_cannot_run_action(mycharm):
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    action = Action("foo")
 
     with pytest.raises(InvalidEventError):
-        ctx.run(action, state=State())
-
-
-def test_cannot_run_action_event(mycharm):
-    ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    action = Action("foo")
-    with pytest.raises(InvalidEventError):
-        ctx.run(action.event, state=State())
+        ctx.run(ctx.on.action("foo"), state=State())
 
 
 @pytest.mark.parametrize("res_value", ({"a": {"b": {"c"}}}, {"d": "e"}))
@@ -82,10 +72,9 @@ def test_action_event_results_valid(mycharm, res_value):
 
     mycharm._evt_handler = handle_evt
 
-    action = Action("foo")
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
 
-    out = ctx.run_action(action, State())
+    out = ctx.run_action(ctx.on.action("foo"), State())
 
     assert out.results == res_value
     assert out.success is True
@@ -104,9 +93,8 @@ def test_action_event_outputs(mycharm, res_value):
 
     mycharm._evt_handler = handle_evt
 
-    action = Action("foo")
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    out = ctx.run_action(action, State())
+    out = ctx.run_action(ctx.on.action("foo"), State())
 
     assert out.failure == "failed becozz"
     assert out.logs == ["log1", "log2"]
@@ -133,9 +121,8 @@ def test_action_event_has_id(mycharm):
 
     mycharm._evt_handler = handle_evt
 
-    action = Action("foo")
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    ctx.run_action(action, State())
+    ctx.run_action(ctx.on.action("foo"), State())
 
 
 @pytest.mark.skipif(
@@ -151,20 +138,19 @@ def test_action_event_has_override_id(mycharm):
 
     mycharm._evt_handler = handle_evt
 
-    action = Action("foo", id=uuid)
     ctx = Context(mycharm, meta={"name": "foo"}, actions={"foo": {}})
-    ctx.run_action(action, State())
+    ctx.run_action(ctx.on.action("foo", id=uuid), State())
 
 
 def test_positional_arguments():
     with pytest.raises(TypeError):
-        Action("foo", {})
+        _Action("foo", {})
 
 
 def test_default_arguments():
     expected_id = next_action_id(update=False)
     name = "foo"
-    action = Action(name)
+    action = _Action(name)
     assert action.name == name
     assert action.params == {}
     assert action.id == expected_id

@@ -1670,7 +1670,7 @@ class Event:
     notice: Optional[Notice] = None
     """If this is a Pebble notice event, the notice it refers to."""
 
-    action: Optional["Action"] = None
+    action: Optional["_Action"] = None
     """If this is an action event, the :class:`Action` it refers to."""
 
     _owner_path: List[str] = dataclasses.field(default_factory=list)
@@ -1827,15 +1827,17 @@ def next_action_id(*, update=True):
 
 
 @dataclasses.dataclass(frozen=True)
-class Action(_max_posargs(1)):
+class _Action(_max_posargs(1)):
     """A ``juju run`` command.
 
     Used to simulate ``juju run``, passing in any parameters. For example::
 
         def test_backup_action():
-            action = scenario.Action('do_backup', params={'filename': 'foo'})
             ctx = scenario.Context(MyCharm)
-            out: scenario.ActionOutput = ctx.run_action(action, scenario.State())
+            out: scenario.ActionOutput = ctx.run_action(
+                ctx.on.action('do_backup', params={'filename': 'foo'}),
+                scenario.State()
+            )
     """
 
     name: str
@@ -1849,11 +1851,6 @@ class Action(_max_posargs(1)):
 
     Every action invocation is automatically assigned a new one. Override in
     the rare cases where a specific ID is required."""
-
-    @property
-    def event(self) -> _Event:
-        """Helper to generate an action event from this action."""
-        return _Event(self.name + ACTION_EVENT_SUFFIX, action=self)
 
 
 def deferred(

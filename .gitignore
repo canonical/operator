@@ -1,6 +1,6 @@
 venv/
 build/
-docs/build/
+docs/_build/
 *.charm
 .tox/
 .coverage

@@ -173,8 +173,7 @@ def test_action_event_no_params():
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run_action(ctx.on.action(action), state)
-    action = scenario.Action("act")
-    with ctx.action_manager(action, scenario.State()) as mgr:
+    with ctx.action_manager(ctx.on.action("act"), scenario.State()) as mgr:
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
@@ -184,18 +183,18 @@ def test_action_event_no_params():
 
 def test_action_event_with_params():
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    action = scenario.Action("act", params={"param": "hello"})
     # These look like:
     #   ctx.run_action(ctx.on.action(action=action), state)
     # So that any parameters can be included and the ID can be customised.
-    with ctx.action_manager(action, scenario.State()) as mgr:
+    call_event = ctx.on.action("act", params={"param": "hello"})
+    with ctx.action_manager(call_event, scenario.State()) as mgr:
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
         event = mgr.charm.observed[0]
         assert isinstance(event, ops.ActionEvent)
-        assert event.id == action.id
-        assert event.params["param"] == action.params["param"]
+        assert event.id == call_event.action.id
+        assert event.params["param"] == call_event.action.params["param"]
 
 
 def test_pebble_ready_event():
