@@ -340,11 +340,11 @@ def normalize_name(s: str):
 class Address(_max_posargs(1)):
     """An address in a Juju network space."""
 
-    hostname: str
-    """A host name that maps to the address in :attr:`value`."""
     value: str
     """The IP address in the space."""
-    cidr: str
+    hostname: str = ""
+    """A host name that maps to the address in :attr:`value`."""
+    cidr: str = ""
     """The CIDR of the address in :attr:`value`."""
 
     @property
@@ -379,11 +379,17 @@ class BindAddress(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-class Network(_max_posargs(1)):
+class Network(_max_posargs(2)):
     binding_name: str
-    bind_addresses: List[BindAddress]
-    ingress_addresses: List[str]
-    egress_subnets: List[str]
+    bind_addresses: List[BindAddress] = dataclasses.field(
+        default_factory=lambda: [BindAddress([Address("192.0.2.0")])],
+    )
+    ingress_addresses: List[str] = dataclasses.field(
+        default_factory=lambda: ["192.0.2.0"],
+    )
+    egress_subnets: List[str] = dataclasses.field(
+        default_factory=lambda: ["192.0.2.0/24"],
+    )
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
@@ -395,34 +401,6 @@ class Network(_max_posargs(1)):
             "egress-subnets": self.egress_subnets,
             "ingress-addresses": self.ingress_addresses,
         }
-
-    @classmethod
-    def default(
-        cls,
-        binding_name: str,
-        private_address: str = "192.0.2.0",
-        hostname: str = "",
-        cidr: str = "",
-        interface_name: str = "",
-        mac_address: Optional[str] = None,
-        egress_subnets=("192.0.2.0/24",),
-        ingress_addresses=("192.0.2.0",),
-    ) -> "Network":
-        """Helper to create a minimal, heavily defaulted Network."""
-        return cls(
-            binding_name=binding_name,
-            bind_addresses=[
-                BindAddress(
-                    interface_name=interface_name,
-                    mac_address=mac_address,
-                    addresses=[
-                        Address(hostname=hostname, value=private_address, cidr=cidr),
-                    ],
-                ),
-            ],
-            egress_subnets=list(egress_subnets),
-            ingress_addresses=list(ingress_addresses),
-        )
 
 
 _next_relation_id_counter = 1

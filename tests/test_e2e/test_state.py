@@ -253,7 +253,7 @@ def test_relation_set(mycharm):
         (Resource, (1,)),
         (Address, (0, 2)),
         (BindAddress, (0, 2)),
-        (Network, (1, 2)),
+        (Network, (0, 3)),
     ],
 )
 def test_positional_arguments(klass, num_args):

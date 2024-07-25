@@ -488,7 +488,7 @@ remote_unit_2_is_joining_event = ctx.on.relation_joined(relation, remote_unit=2)
 Simplifying a bit the Juju "spaces" model, each integration endpoint a charm defines in its metadata is associated with a network. Regardless of whether there is a living relation over that endpoint, that is.  
 
 If your charm has a relation `"foo"` (defined in its metadata), then the charm will be able at runtime to do `self.model.get_binding("foo").network`.
-The network you'll get by doing so is heavily defaulted (see `state.Network.default`) and good for most use-cases because the charm should typically not be concerned about what IP it gets. 
+The network you'll get by doing so is heavily defaulted (see `state.Network`) and good for most use-cases because the charm should typically not be concerned about what IP it gets. 
 
 On top of the relation-provided network bindings, a charm can also define some `extra-bindings` in its metadata and access them at runtime. Note that this is a deprecated feature that should not be relied upon. For completeness, we support it in Scenario.
 
@@ -496,7 +496,7 @@ If you want to, you can override any of these relation or extra-binding associat
 
 ```python
 state = scenario.State(networks={
-  scenario.Network.default("foo", private_address='192.0.2.1')
+  scenario.Network("foo", [BindAddress([Address('192.0.2.1')])])
 })
 ```
 

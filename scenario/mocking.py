@@ -320,7 +320,7 @@ class _MockModelBackend(_ModelBackend):
         try:
             network = self._state.get_network(binding_name)
         except KeyError:
-            network = Network.default("default")  # The name is not used in the output.
+            network = Network("default")  # The name is not used in the output.
         return network.hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.

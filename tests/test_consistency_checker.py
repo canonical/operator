@@ -634,7 +634,7 @@ def test_resource_states():
 
 def test_networks_consistency():
     assert_inconsistent(
-        State(networks={Network.default("foo")}),
+        State(networks={Network("foo")}),
         _Event("start"),
         _CharmSpec(
             MyCharm,
@@ -643,7 +643,7 @@ def test_networks_consistency():
     )
 
     assert_inconsistent(
-        State(networks={Network.default("foo")}),
+        State(networks={Network("foo")}),
         _Event("start"),
         _CharmSpec(
             MyCharm,
@@ -656,7 +656,7 @@ def test_networks_consistency():
     )
 
     assert_consistent(
-        State(networks={Network.default("foo")}),
+        State(networks={Network("foo")}),
         _Event("start"),
         _CharmSpec(
             MyCharm,
