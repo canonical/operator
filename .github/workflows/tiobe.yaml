@@ -1,0 +1,62 @@
+name: TIOBE Quality Checks
+
+on: [pull_request]
+
+jobs:
+#  tics-report:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - name: Set up Python
+#        uses: actions/setup-python@v5
+#
+#      - name: Install dependencies
+#        run: pip install pylint flake8 tox~=4.2 coverage[toml]
+#
+#        # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
+#      - name: Generate coverage report
+#        run: |
+#          tox -e unit
+#          coverage xml
+#          # Annoyingly, the coverage.xml file needs to be in a .coverage folder.
+#          rm .coverage
+#          mkdir .coverage
+#          mv coverage.xml .coverage/
+#
+#      - name: Produce TICS report
+#        shell: bash
+#        run: |
+#          set -x
+#          export TICSAUTHTOKEN=${{ secrets.TICS_AUTH_TOKEN }}
+#          curl --silent --show-error "https://canonical.tiobe.com/tiobeweb/TICS/api/public/v1/fapi/installtics/Script?cfg=default&platform=linux&url=https://canonical.tiobe.com/tiobeweb/TICS/" > install_tics.sh
+#          . ./install_tics.sh
+#          TICSQServer -project operator -branchdir .
+
+  TICS:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+        # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: pip install tox~=4.2 coverage[toml]
+      - name: Generate coverage report
+        run: |
+          tox -e unit
+          coverage xml
+          # Annoyingly, the coverage.xml file needs to be in a .coverage folder.
+          rm .coverage
+          mkdir .coverage
+          mv coverage.xml .coverage/
+
+      - name: TICS GitHub Action
+        uses: tiobe/tics-github-action@v3
+        with:
+          mode: qserver
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          ticsAuthToken: ${{ secrets.TICS_AUTH_TOKEN }}
+          project: operator
+          installTics: true
