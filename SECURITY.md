@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-All ops 2.x versions released within the last year are currently supported with security updates.
+Security updates will be released for all major versions that have had releases in the last year.
 
 ## Reporting a vulnerability
 
