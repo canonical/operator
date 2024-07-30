@@ -26,12 +26,13 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast, Sequence
 
 import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
+from middlewares import Middleware
 from ops.charm import CharmMeta
 from ops.jujuversion import JujuVersion
 from ops.log import setup_root_logging
@@ -410,9 +411,24 @@ class _Manager:
         model_backend: Optional[ops.model._ModelBackend] = None,
         use_juju_for_storage: Optional[bool] = None,
         charm_state_path: str = CHARM_STATE_FILE,
+            middlewares:Optional[Sequence[Middleware]] = None
     ):
         self._charm_state_path = charm_state_path
-        self._charm_class = charm_class
+
+        for middleware in middlewares:
+            middleware.setup_class(charm_class)
+
+        class _MiddlewaredCharmType(charm_class):
+            def __init__(self, *args, **kwargs):
+                for middleware in middlewares:
+                    middleware.pre_init(self)
+
+                super().__init__(*args, **kwargs)
+                for middleware in middlewares:
+                    middleware.post_init(self)
+
+        self._charm_class = _MiddlewaredCharmType
+
         if model_backend is None:
             model_backend = ops.model._ModelBackend()
         self._model_backend = model_backend
@@ -533,20 +549,24 @@ class _Manager:
             self.framework.close()
 
 
-def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
+def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None,
+         middlewares: Sequence[Type[Middleware]]=None):
     """Set up the charm and dispatch the observed event.
 
     The event name is based on the way this executable was called (argv[0]).
 
     Args:
         charm_class: the charm class to instantiate and receive the event.
+        middlewares: operator framework middleware used to extend the framework's own functionality.
         use_juju_for_storage: whether to use controller-side storage. If not specified
             then Kubernetes charms that haven't previously used local storage and that
             are running on a new enough Juju default to controller-side storage,
             otherwise local storage is used.
     """
     try:
-        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+        manager = _Manager(charm_class,
+                           use_juju_for_storage=use_juju_for_storage,
+                           middlewares=middlewares)
 
         manager.run()
     except _Abort as e:
