@@ -154,3 +154,20 @@ def test_juju_info_network_override(mycharm):
             str(mgr.charm.model.get_binding("juju-info").network.bind_address)
             == "4.4.4.4"
         )
+
+
+def test_explicit_juju_info_network_override(mycharm):
+    ctx = Context(
+        mycharm,
+        meta={
+            "name": "foo",
+            # this charm for whatever reason explicitly defines a juju-info endpoint
+            "requires": {"juju-info": {"interface": "juju-info"}},
+        },
+    )
+
+    with ctx.manager(
+        "update_status",
+        State(),
+    ) as mgr:
+        assert mgr.charm.model.get_binding("juju-info").network.bind_address
