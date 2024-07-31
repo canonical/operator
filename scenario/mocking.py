@@ -298,6 +298,9 @@ class _MockModelBackend(_ModelBackend):
                     "cannot pass relation_id to network_get if the binding name is "
                     "that of an extra-binding. Extra-bindings are not mapped to relation IDs.",
                 )
+        elif binding_name == "juju-info":
+            # implicit relation that always exists
+            pass
         # - verify that the binding is a relation endpoint name, but not a subordinate one
         elif binding_name not in non_sub_relations:
             logger.error(
