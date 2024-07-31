@@ -117,7 +117,7 @@ def test_no_relation_error(mycharm):
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
-            net = mgr.charm.model.get_binding("foo").network
+            mgr.charm.model.get_binding("foo").network
 
 
 def test_juju_info_network_default(mycharm):
