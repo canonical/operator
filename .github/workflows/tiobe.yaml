@@ -25,8 +25,7 @@ jobs:
       - name: TICS GitHub Action
         uses: tiobe/tics-github-action@v3
         with:
-#          mode: qserver
-          mode: diagnostic
+          mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
           ticsAuthToken: ${{ secrets.TICS_AUTH_TOKEN }}
           project: operator
