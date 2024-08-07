@@ -81,10 +81,8 @@ def test_simple_events(event_name, event_kind):
 )
 def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    secret = scenario.Secret(
-        id="secret:123", contents={0: {"password": "xxxx"}}, owner=owner
-    )
-    state_in = scenario.State(secrets=[secret])
+    secret = scenario.Secret({"password": "xxxx"}, owner=owner)
+    state_in = scenario.State(secrets={secret})
     # These look like:
     #   ctx.run(ctx.on.secret_changed(secret=secret), state)
     # The secret must always be passed because the same event name is used for
@@ -114,11 +112,11 @@ def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
 def test_revision_secret_events(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
-        id="secret:123",
-        contents={42: {"password": "yyyy"}, 43: {"password": "xxxx"}},
+        tracked_content={"password": "yyyy"},
+        latest_content={"password": "xxxx"},
         owner="app",
     )
-    state_in = scenario.State(secrets=[secret])
+    state_in = scenario.State(secrets={secret})
     # These look like:
     #   ctx.run(ctx.on.secret_expired(secret=secret, revision=revision), state)
     # The secret and revision must always be passed because the same event name
@@ -137,11 +135,11 @@ def test_revision_secret_events(event_name, event_kind):
 def test_revision_secret_events_as_positional_arg(event_name):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
-        id="secret:123",
-        contents={42: {"password": "yyyy"}, 43: {"password": "xxxx"}},
+        tracked_content={"password": "yyyy"},
+        latest_content={"password": "xxxx"},
         owner=None,
     )
-    state_in = scenario.State(secrets=[secret])
+    state_in = scenario.State(secrets={secret})
     with pytest.raises(TypeError):
         ctx.run(getattr(ctx.on, event_name)(secret, 42), state_in)
 

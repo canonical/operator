@@ -303,7 +303,7 @@ def test_config_secret_old_juju(juju_version):
 
 @pytest.mark.parametrize("bad_v", ("1.0", "0", "1.2", "2.35.42", "2.99.99", "2.99"))
 def test_secrets_jujuv_bad(bad_v):
-    secret = Secret("secret:foo", {0: {"a": "b"}})
+    secret = Secret({"a": "b"})
     assert_inconsistent(
         State(secrets={secret}),
         _Event("bar"),
@@ -312,14 +312,14 @@ def test_secrets_jujuv_bad(bad_v):
     )
     assert_inconsistent(
         State(secrets={secret}),
-        secret.changed_event,
+        _Event("secret_changed", secret=secret),
         _CharmSpec(MyCharm, {}),
         bad_v,
     )
 
     assert_inconsistent(
         State(),
-        secret.changed_event,
+        _Event("secret_changed", secret=secret),
         _CharmSpec(MyCharm, {}),
         bad_v,
     )
@@ -328,7 +328,7 @@ def test_secrets_jujuv_bad(bad_v):
 @pytest.mark.parametrize("good_v", ("3.0", "3.1", "3", "3.33", "4", "100"))
 def test_secrets_jujuv_bad(good_v):
     assert_consistent(
-        State(secrets={Secret(id="secret:foo", contents={0: {"a": "b"}})}),
+        State(secrets={Secret({"a": "b"})}),
         _Event("bar"),
         _CharmSpec(MyCharm, {}),
         good_v,
@@ -336,14 +336,14 @@ def test_secrets_jujuv_bad(good_v):
 
 
 def test_secret_not_in_state():
-    secret = Secret(id="secret:foo", contents={"a": "b"})
+    secret = Secret({"a": "b"})
     assert_inconsistent(
         State(),
         _Event("secret_changed", secret=secret),
         _CharmSpec(MyCharm, {}),
     )
     assert_consistent(
-        State(secrets=[secret]),
+        State(secrets={secret}),
         _Event("secret_changed", secret=secret),
         _CharmSpec(MyCharm, {}),
     )
@@ -723,11 +723,7 @@ def test_storedstate_consistency():
     )
     assert_inconsistent(
         State(
-            stored_states={
-                StoredState(
-                    owner_path=None, content={"secret": Secret(id="foo", contents={})}
-                )
-            }
+            stored_states={StoredState(owner_path=None, content={"secret": Secret({})})}
         ),
         _Event("start"),
         _CharmSpec(
