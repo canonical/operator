@@ -17,7 +17,6 @@ scenario.Context
 
 .. automodule:: scenario.context
 
-
 scenario.consistency_checker
 ============================
 

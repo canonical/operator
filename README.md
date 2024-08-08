@@ -496,7 +496,7 @@ If you want to, you can override any of these relation or extra-binding associat
 
 ```python
 state = scenario.State(networks={
-  scenario.Network("foo", [BindAddress([Address('192.0.2.1')])])
+  scenario.Network("foo", [scenario.BindAddress([scenario.Address('192.0.2.1')])])
 })
 ```
 
@@ -726,8 +726,8 @@ storage = scenario.Storage("foo")
 # Setup storage with some content:
 (storage.get_filesystem(ctx) / "myfile.txt").write_text("helloworld")
 
-with ctx.manager(ctx.on.update_status(), scenario.State(storages={storage})) as mgr:
-    foo = mgr.charm.model.storages["foo"][0]
+with ctx(ctx.on.update_status(), scenario.State(storages={storage})) as manager:
+    foo = manager.charm.model.storages["foo"][0]
     loc = foo.location
     path = loc / "myfile.txt"
     assert path.exists()
@@ -924,9 +924,9 @@ import pathlib
 
 ctx = scenario.Context(MyCharm, meta={'name': 'juliette', "resources": {"foo": {"type": "oci-image"}}})
 resource = scenario.Resource(name='foo', path='/path/to/resource.tar')
-with ctx.manager(ctx.on.start(), scenario.State(resources={resource})) as mgr:
+with ctx(ctx.on.start(), scenario.State(resources={resource})) as manager:
     # If the charm, at runtime, were to call self.model.resources.fetch("foo"), it would get '/path/to/resource.tar' back.
-    path = mgr.charm.model.resources.fetch('foo')
+    path = manager.charm.model.resources.fetch('foo')
     assert path == pathlib.Path('/path/to/resource.tar')
 ```
 
@@ -988,7 +988,6 @@ class MyVMCharm(ops.CharmBase):
 An action is a special sort of event, even though `ops` handles them almost identically.
 In most cases, you'll want to inspect the 'results' of an action, or whether it has failed or
 logged something while executing. Many actions don't have a direct effect on the output state.
-For this reason, the output state is less prominent in the return type of `Context.run_action`.
 
 How to test actions with scenario:
 
@@ -1000,18 +999,32 @@ def test_backup_action():
 
     # If you didn't declare do_backup in the charm's metadata, 
     # the `ConsistencyChecker` will slap you on the wrist and refuse to proceed.
-    out: scenario.ActionOutput = ctx.run_action(ctx.on.action("do_backup"), scenario.State())
+    state = ctx.run(ctx.on.action("do_backup"), scenario.State())
 
-    # You can assert action results, logs, failure using the ActionOutput interface:
-    assert out.logs == ['baz', 'qux']
-    
-    if out.success:
-      # If the action did not fail, we can read the results:
-      assert out.results == {'foo': 'bar'}
+    # You can assert on action results and logs using the context:
+    assert ctx.action_logs == ['baz', 'qux']
+    assert ctx.action_results == {'foo': 'bar'}
+```
 
-    else:
-      # If the action fails, we can read a failure message:
-      assert out.failure == 'boo-hoo'
+## Failing Actions
+
+If the charm code calls `event.fail()` to indicate that the action has failed,
+an `ActionFailed` exception will be raised. This avoids having to include
+success checks in every test where the action is successful.
+
+```python
+def test_backup_action_failed():
+    ctx = scenario.Context(MyCharm)
+
+    with pytest.raises(ActionFailed) as exc_info:
+        ctx.run(ctx.on.action("do_backup"), scenario.State())
+    assert exc_info.value.message == "sorry, couldn't do the backup"
+    # The state is also available if that's required:
+    assert exc_info.value.state.get_container(...)
+
+    # You can still assert action results and logs that occured as well as the failure:
+    assert ctx.action_logs == ['baz', 'qux']
+    assert ctx.action_results == {'foo': 'bar'}
 ```
 
 ## Parametrized Actions
@@ -1024,7 +1037,7 @@ def test_backup_action():
 
     # If the parameters (or their type) don't match what is declared in the metadata, 
     # the `ConsistencyChecker` will slap you on the other wrist.
-    out: scenario.ActionOutput = ctx.run_action(
+    state = ctx.run(
         ctx.on.action("do_backup", params={'a': 'b'}),
         scenario.State()
     )
@@ -1130,7 +1143,7 @@ Scenario is a black-box, state-transition testing framework. It makes it trivial
 B, but not to assert that, in the context of this charm execution, with this state, a certain charm-internal method was called and returned a
 given piece of data, or would return this and that _if_ it had been called.
 
-Scenario offers a cheekily-named context manager for this use case specifically:
+The Scenario `Context` object can be used as a context manager for this use case specifically:
 
 ```python notest
 from charms.bar.lib_name.v1.charm_lib import CharmLib
@@ -1152,8 +1165,7 @@ class MyCharm(ops.CharmBase):
 
 def test_live_charm_introspection(mycharm):
     ctx = scenario.Context(mycharm, meta=mycharm.META)
-    # If you want to do this with actions, you can use `Context.action_manager` instead.
-    with ctx.manager("start", scenario.State()) as manager:
+    with ctx(ctx.on.start(), scenario.State()) as manager:
         # This is your charm instance, after ops has set it up:
         charm: MyCharm = manager.charm
         
@@ -1174,8 +1186,8 @@ def test_live_charm_introspection(mycharm):
     assert state_out.unit_status == ...
 ```
 
-Note that you can't call `manager.run()` multiple times: the manager is a context that ensures that `ops.main` 'pauses' right
-before emitting the event to hand you some introspection hooks, but for the rest this is a regular scenario test: you
+Note that you can't call `manager.run()` multiple times: the object is a context that ensures that `ops.main` 'pauses' right
+before emitting the event to hand you some introspection hooks, but for the rest this is a regular Scenario test: you
 can't emit multiple events in a single charm execution.
 
 # The virtual charm root

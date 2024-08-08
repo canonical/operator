@@ -162,6 +162,6 @@ def test_config_defaults(tmp_path, legacy):
     ) as charm:
         # this would fail if there were no 'cuddles' relation defined in meta
         ctx = Context(charm)
-        with ctx.manager(ctx.on.start(), State()) as mgr:
+        with ctx(ctx.on.start(), State()) as mgr:
             mgr.run()
             assert mgr.charm.config["foo"] is True

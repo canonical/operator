@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-from scenario.context import ActionOutput, Context
+from scenario.context import Context, Manager
 from scenario.state import (
+    ActionFailed,
     ActiveStatus,
     Address,
     BindAddress,
@@ -21,6 +22,7 @@ from scenario.state import (
     Network,
     Notice,
     PeerRelation,
+    Port,
     Relation,
     Resource,
     Secret,
@@ -37,7 +39,7 @@ from scenario.state import (
 )
 
 __all__ = [
-    "ActionOutput",
+    "ActionFailed",
     "CheckInfo",
     "CloudCredential",
     "CloudSpec",
@@ -56,6 +58,7 @@ __all__ = [
     "Address",
     "BindAddress",
     "Network",
+    "Port",
     "ICMPPort",
     "TCPPort",
     "UDPPort",
@@ -70,4 +73,5 @@ __all__ = [
     "MaintenanceStatus",
     "ActiveStatus",
     "UnknownStatus",
+    "Manager",
 ]

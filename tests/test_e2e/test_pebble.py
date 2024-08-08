@@ -128,7 +128,7 @@ def test_fs_pull(charm_cls, make_dirs):
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
     )
-    with ctx.manager(ctx.on.start(), state=state) as mgr:
+    with ctx(ctx.on.start(), state=state) as mgr:
         out = mgr.run()
         callback(mgr.charm)
 
@@ -318,7 +318,7 @@ def test_exec_wait_error(charm_cls):
     )
 
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(ctx.on.start(), state) as mgr:
+    with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         proc = container.exec(["foo"])
         with pytest.raises(ExecError):
@@ -340,7 +340,7 @@ def test_exec_wait_output(charm_cls):
     )
 
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(ctx.on.start(), state) as mgr:
+    with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         proc = container.exec(["foo"])
         out, err = proc.wait_output()
@@ -360,7 +360,7 @@ def test_exec_wait_output_error(charm_cls):
     )
 
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(ctx.on.start(), state) as mgr:
+    with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         proc = container.exec(["foo"])
         with pytest.raises(ExecError):
@@ -381,7 +381,7 @@ def test_pebble_custom_notice(charm_cls):
 
     state = State(containers=[container])
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(
+    with ctx(
         ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state
     ) as mgr:
         container = mgr.charm.unit.get_container("foo")

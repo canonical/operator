@@ -56,7 +56,7 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
     meta_file.write_text(raw_ori_meta)
 
     ctx = Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root)
-    with ctx.manager(
+    with ctx(
         ctx.on.start(),
         State(),
     ) as mgr:
@@ -79,7 +79,7 @@ def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
     assert not meta_file.exists()
 
     ctx = Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root)
-    with ctx.manager(
+    with ctx(
         ctx.on.start(),
         State(),
     ) as mgr:

@@ -554,21 +554,24 @@ class _MockModelBackend(_ModelBackend):
         _format_action_result_dict(results)
         # but then we will store it in its unformatted,
         # original form for testing ease
-        self._context._action_results = results
+        if self._context.action_results:
+            self._context.action_results.update(results)
+        else:
+            self._context.action_results = results
 
     def action_fail(self, message: str = ""):
         if not self._event.action:
             raise ActionMissingFromContextError(
                 "not in the context of an action event: cannot action-fail",
             )
-        self._context._action_failure = message
+        self._context._action_failure_message = message
 
     def action_log(self, message: str):
         if not self._event.action:
             raise ActionMissingFromContextError(
                 "not in the context of an action event: cannot action-log",
             )
-        self._context._action_logs.append(message)
+        self._context.action_logs.append(message)
 
     def action_get(self):
         action = self._event.action

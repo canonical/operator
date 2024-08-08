@@ -58,7 +58,7 @@ def trigger(
             event = getattr(ctx.on, event)(tuple(state.containers)[0])
         else:
             event = getattr(ctx.on, event)()
-    with ctx.manager(event, state=state) as mgr:
+    with ctx(event, state=state) as mgr:
         if pre_event:
             pre_event(mgr.charm)
         state_out = mgr.run()
