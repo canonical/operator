@@ -937,7 +937,8 @@ class SecretChangedEvent(SecretEvent):
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
 
-    .. versionadded:: Juju 3.0
+    .. versionadded:: 2.0
+        Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
 
@@ -1174,16 +1175,10 @@ class CharmEvents(ObjectEvents):
     """Triggered by request to upgrade the charm (see :class:`UpgradeCharmEvent`)."""
 
     pre_series_upgrade = EventSource(PreSeriesUpgradeEvent)
-    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`).
-
-    .. versionremoved:: Juju 4.0
-    """
+    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`)."""
 
     post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
-    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`).
-
-    .. versionremoved:: Juju 4.0
-    """
+    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`)."""
 
     leader_elected = EventSource(LeaderElectedEvent)
     """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
@@ -1196,10 +1191,7 @@ class CharmEvents(ObjectEvents):
     """
 
     collect_metrics = EventSource(CollectMetricsEvent)
-    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`).
-
-    .. versionremoved:: 4.0
-    """
+    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`)."""
 
     secret_changed = EventSource(SecretChangedEvent)
     """Triggered by Juju on the observer when the secret owner changes its contents (see
