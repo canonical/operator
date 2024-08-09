@@ -877,7 +877,7 @@ class PebbleCheckFailedEvent(PebbleCheckEvent):
     if the check is currently failing, check the current status with
     ``event.info.status == ops.pebble.CheckStatus.DOWN``.
 
-    .. versionadded:: Juju 3.6
+    .. versionadded:: 3.6 of Juju
     """
 
 
