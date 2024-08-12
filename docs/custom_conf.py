@@ -337,7 +337,8 @@ nitpick_ignore = [
 # Unfortunately, the built-in class is not easily subclassable without also
 # requiring extra CSS.
 class JujuVersion(SphinxDirective):
-    """Directive to describe in which version of Juju a feature was added."""
+    """Directive to describe in which version of Juju a feature was added or removed."""
+    change = "changed"
 
     has_content = True
     required_arguments = 1
@@ -349,10 +350,11 @@ class JujuVersion(SphinxDirective):
         node = addnodes.versionmodified()
         node.document = self.state.document
         self.set_source_info(node)
-        # Make the <div> have a 'versionadded' class so that we don't need custom CSS.
-        node['type'] = 'versionadded'
+        # Make the <div> have a class matching the built-in directives so that
+        # we don't need custom CSS.
+        node['type'] = f'version{self.change}'
         node['version'] = self.arguments[0]
-        text = f'Added in Juju version {self.arguments[0]}'
+        text = f'{self.change.title()} in Juju version {self.arguments[0]}'
         if len(self.arguments) == 2:
             inodes, messages = self.state.inline_text(self.arguments[1], self.lineno + 1)
             para = nodes.paragraph(self.arguments[1], '', *inodes, translatable=False)
@@ -362,7 +364,7 @@ class JujuVersion(SphinxDirective):
             messages = []
         if self.content:
             node += self.parse_content_to_nodes()
-        classes = ['versionmodified', 'added', 'jujuversion']
+        classes = ['versionmodified', self.change, 'jujuversion']
         if len(node) > 0 and isinstance(node[0], nodes.paragraph):
             # The contents start with a paragraph.
             if node[0].rawsource:
@@ -396,5 +398,14 @@ class JujuVersion(SphinxDirective):
         return ret
 
 
+class JujuAdded(JujuVersion):
+    change = 'added'
+
+
+class JujuRemoved(JujuVersion):
+    change = 'removed'
+
+
 def setup(app):
-    app.add_directive('jujuversion', JujuVersion)
+    app.add_directive('jujuversion', JujuAdded)
+    app.add_directive('jujuremoved', JujuRemoved)

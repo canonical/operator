@@ -354,6 +354,8 @@ class PreSeriesUpgradeEvent(HookEvent):
     callback method associated with this event, the administrator will initiate
     steps to actually upgrade the series.  After the upgrade has been completed,
     the :class:`PostSeriesUpgradeEvent` will fire.
+
+    .. jujuremoved:: 4.0
     """
 
 
@@ -368,6 +370,8 @@ class PostSeriesUpgradeEvent(HookEvent):
     upgraded version of a database. Note however charms are expected to check if
     the series has actually changed or whether it was rolled back to the
     original series.
+
+    .. jujuremoved:: 4.0
     """
 
 
@@ -403,6 +407,8 @@ class CollectMetricsEvent(HookEvent):
 
     Note that associated callback methods are currently sandboxed in
     how they can interact with Juju.
+
+    .. jujuremoved:: 4.0
     """
 
     def add_metrics(
@@ -1177,10 +1183,16 @@ class CharmEvents(ObjectEvents):
     """Triggered by request to upgrade the charm (see :class:`UpgradeCharmEvent`)."""
 
     pre_series_upgrade = EventSource(PreSeriesUpgradeEvent)
-    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`)."""
+    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`).
+
+    .. jujuremoved:: 4.0
+    """
 
     post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
-    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`)."""
+    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`).
+
+    .. jujuremoved:: 4.0
+    """
 
     leader_elected = EventSource(LeaderElectedEvent)
     """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
@@ -1189,11 +1201,14 @@ class CharmEvents(ObjectEvents):
     """Triggered when leader changes any settings (see
     :class:`LeaderSettingsChangedEvent`).
 
-    .. deprecated: 2.4.0
+    .. deprecated:: 2.4.0
     """
 
     collect_metrics = EventSource(CollectMetricsEvent)
-    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`)."""
+    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`).
+
+    .. jujuremoved:: 4.0
+    """
 
     secret_changed = EventSource(SecretChangedEvent)
     """Triggered by Juju on the observer when the secret owner changes its contents (see
