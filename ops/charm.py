@@ -937,7 +937,7 @@ class SecretChangedEvent(SecretEvent):
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
 
-    .. jujuversion:: 2.0
+    .. jujuversion:: 3.0
         Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
