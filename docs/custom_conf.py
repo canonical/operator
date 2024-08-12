@@ -3,6 +3,8 @@ import datetime
 import pathlib
 import sys
 
+import sphinx.domains.changeset
+
 import furo
 import furo.navigation
 
@@ -334,3 +336,15 @@ nitpick_ignore = [
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
 ]
+
+# We want to have a custom 'jujuversion' directive, that works like
+# 'versionadded', but with different text. We essentially want the
+# sphinx.domains.changeset.VersionChange class, but it's not really
+# designed for subclassing, so we we would need to copy most of the
+# core "run" method. Instead, we use the same class and just patch in
+# the appropriate keys into the lookup tables it uses.
+sphinx.domains.changeset.versionlabels['jujuversion'] = "Added in Juju version %s"
+sphinx.domains.changeset.versionlabel_classes['jujuversion'] = 'added'
+
+def setup(app):
+    app.add_directive('jujuversion', sphinx.domains.changeset.VersionChange)
