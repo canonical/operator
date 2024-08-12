@@ -601,6 +601,24 @@ def test_emit_event(evt, owner, cls):
         assert isinstance(juju_event, cls)
 
 
+def test_set_label_on_get():
+    class SecretCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _):
+            id = self.unit.add_secret({"foo": "bar"}).id
+            secret = self.model.get_secret(id=id, label="label1")
+            assert secret.label == "label1"
+            secret = self.model.get_secret(id=id, label="label2")
+            assert secret.label == "label2"
+
+    ctx = Context(SecretCharm, meta={"name": "foo"})
+    state = ctx.run(ctx.on.start(), State())
+    assert state.get_secret(label="label2").tracked_content == {"foo": "bar"}
+
+
 def test_no_additional_positional_arguments():
     with pytest.raises(TypeError):
         Secret({}, {}, None)

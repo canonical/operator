@@ -323,6 +323,10 @@ class Secret(_max_posargs(1)):
             # bypass frozen dataclass
             object.__setattr__(self, "latest_content", self.tracked_content)
 
+    def _set_label(self, label):
+        # bypass frozen dataclass
+        object.__setattr__(self, "label", label)
+
     def _track_latest_revision(self):
         """Set the current revision to the tracked revision."""
         # bypass frozen dataclass
@@ -342,6 +346,7 @@ class Secret(_max_posargs(1)):
         object.__setattr__(self, "_latest_revision", self._latest_revision + 1)
         # TODO: if this is done twice in the same hook, then Juju ignores the
         # first call, it doesn't continue to update like this does.
+        # Fix when https://github.com/canonical/operator/issues/1288 is resolved.
         if content:
             object.__setattr__(self, "latest_content", content)
         if label:

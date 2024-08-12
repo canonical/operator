@@ -404,6 +404,9 @@ class _MockModelBackend(_ModelBackend):
         peek: bool = False,
     ) -> Dict[str, str]:
         secret = self._get_secret(id, label)
+        # If both the id and label are provided, then update the label.
+        if id is not None and label is not None:
+            secret._set_label(label)
         juju_version = self._context.juju_version
         if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # In this medieval Juju chapter,
@@ -427,6 +430,9 @@ class _MockModelBackend(_ModelBackend):
         label: Optional[str] = None,
     ) -> SecretInfo:
         secret = self._get_secret(id, label)
+        # If both the id and label are provided, then update the label.
+        if id is not None and label is not None:
+            secret._set_label(label)
 
         # only "manage"=write access level can read secret info
         self._check_can_manage_secret(secret)
