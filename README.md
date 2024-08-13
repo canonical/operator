@@ -611,13 +611,13 @@ class MyCharm(ops.CharmBase):
 
 def test_pebble_push():
     with tempfile.NamedTemporaryFile() as local_file:
-        container = scenario,Container(
+        container = scenario.Container(
             name='foo',
             can_connect=True,
-            mounts={'local': Mount('/local/share/config.yaml', local_file.name)}
+            mounts={'local': scenario.Mount('/local/share/config.yaml', local_file.name)}
         )
-        state_in = State(containers=[container])
-        ctx = Context(
+        state_in = scenario.State(containers=[container])
+        ctx = scenario.Context(
             MyCharm,
             meta={"name": "foo", "containers": {"foo": {}}}
         )
