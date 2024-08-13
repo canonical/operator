@@ -1020,8 +1020,6 @@ class SecretExpiredEvent(SecretEvent):
     revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
 
     .. jujuversion:: 3.0
-
-    .. versionadded:: 3.0
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
