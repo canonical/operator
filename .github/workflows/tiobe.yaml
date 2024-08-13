@@ -12,7 +12,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
       - name: Install dependencies
-        run: pip install tox~=4.2 coverage[toml]
+        run: pip install tox~=4.2 coverage[toml] flake8 pylint
       - name: Generate coverage report
         run: |
           tox -e unit
