@@ -49,30 +49,79 @@ class _JujuContext:
     # the HookVars function: https://github.com/juju/juju/blob/3.6/worker/uniter/runner/context/context.go#L1398
     # only allow accesing these vars because these are the currently used vars in main.py
 
-    juju_relation: str = ''
-    juju_relation_id: str = ''
-    juju_secret_revision: str = ''
-    juju_workload_name: str = ''
-    juju_action_name: Optional[str] = None
-    juju_action_uuid: Optional[str] = None
-    juju_charm_dir: Optional[str] = None
-    juju_debug: Optional[str] = None
-    juju_departing_unit: Optional[str] = None
-    juju_dispatch_path: Optional[str] = None
-    juju_notice_id: Optional[str] = None
-    juju_notice_key: Optional[str] = None
-    juju_notice_type: Optional[str] = None
-    juju_pebble_check_name: Optional[str] = None
-    juju_remote_app: Optional[str] = None
-    juju_remote_unit: Optional[str] = None
-    juju_secret_id: Optional[str] = None
-    juju_secret_label: Optional[str] = None
-    juju_storage_id: Optional[str] = ''
+    juju_action: '_JujuAction'
+    juju_charm_dir: Optional[str]
+    juju_debug: Optional[str]
+    juju_departing_unit: str
+    juju_dispatch_path: Optional[str]
+    juju_notice: '_JujuNotice'
+    juju_pebble_check_name: str
+    juju_relation: '_JujuRelation'
+    juju_remote_app: str
+    juju_remote_unit: str
+    juju_secret: '_JujuSecret'
+    juju_storage_id: str
+    juju_workload_name: str
 
     @classmethod
     def from_environ(cls) -> '_JujuContext':
-        kwargs: Dict[str, Any] = {name: os.getenv(name.upper()) for name in cls.__annotations__}
-        return cls(**kwargs)
+        return _JujuContext(
+            juju_action=_JujuAction(
+                name=os.environ.get('JUJU_ACTION_NAME', ''),
+                uuid=os.environ.get('JUJU_ACTION_UUID', ''),
+            ),
+            juju_charm_dir=os.environ.get('JUJU_CHARM_DIR'),
+            juju_debug=os.environ.get('JUJU_DEBUG'),
+            juju_departing_unit=os.environ.get('JUJU_DEPARTING_UNIT', ''),
+            juju_dispatch_path=os.environ.get('JUJU_DISPATCH_PATH'),
+            juju_notice=_JujuNotice(
+                id=os.environ.get('JUJU_NOTICE_ID', ''),
+                key=os.environ.get('JUJU_NOTICE_KEY', ''),
+                type=os.environ.get('JUJU_NOTICE_TYPE', ''),
+            ),
+            juju_pebble_check_name=os.environ.get('JUJU_PEBBLE_CHECK_NAME', ''),
+            juju_relation=_JujuRelation(
+                name=os.environ.get('JUJU_RELATION', ''),
+                id=int(os.environ.get('JUJU_RELATION_ID', '').split(':')[-1])
+                if 'JUJU_RELATION_ID' in os.environ
+                else 0,
+            ),
+            juju_remote_app=os.environ.get('JUJU_REMOTE_APP', ''),
+            juju_remote_unit=os.environ.get('JUJU_REMOTE_UNIT', ''),
+            juju_secret=_JujuSecret(
+                id=os.environ.get('JUJU_SECRET_ID', ''),
+                label=os.environ.get('JUJU_SECRET_LABEL', ''),
+                revision=int(os.environ.get('JUJU_SECRET_REVISION', 0)),
+            ),
+            juju_storage_id=os.environ.get('JUJU_STORAGE_ID', ''),
+            juju_workload_name=os.environ.get('JUJU_WORKLOAD_NAME', ''),
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class _JujuAction:
+    name: str
+    uuid: str
+
+
+@dataclasses.dataclass(frozen=True)
+class _JujuNotice:
+    id: str
+    key: str
+    type: str
+
+
+@dataclasses.dataclass(frozen=True)
+class _JujuRelation:
+    name: str
+    id: int
+
+
+@dataclasses.dataclass(frozen=True)
+class _JujuSecret:
+    id: str
+    label: str
+    revision: int
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -181,10 +230,6 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str, juju_contex
         event_to_emit.emit(*args, **kwargs)
 
 
-def _get_juju_relation_id(juju_context: _JujuContext):
-    return int(juju_context.juju_relation_id.split(':')[-1])
-
-
 def _get_event_args(
     charm: 'ops.charm.CharmBase',
     bound_event: 'ops.framework.BoundEvent',
@@ -199,9 +244,9 @@ def _get_event_args(
         container = model.unit.get_container(workload_name)
         args: List[Any] = [container]
         if issubclass(event_type, ops.charm.PebbleNoticeEvent):
-            notice_id = juju_context.juju_notice_id
-            notice_type = juju_context.juju_notice_type
-            notice_key = juju_context.juju_notice_key
+            notice_id = juju_context.juju_notice.id
+            notice_type = juju_context.juju_notice.type
+            notice_key = juju_context.juju_notice.key
             args.extend([notice_id, notice_type, notice_key])
         elif issubclass(event_type, ops.charm.PebbleCheckEvent):
             check_name = juju_context.juju_pebble_check_name
@@ -209,11 +254,11 @@ def _get_event_args(
         return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
-            juju_context.juju_secret_id,
-            juju_context.juju_secret_label,
+            juju_context.juju_secret.id,
+            juju_context.juju_secret.label,
         ]
         if issubclass(event_type, (ops.charm.SecretRemoveEvent, ops.charm.SecretExpiredEvent)):
-            args.append(int(juju_context.juju_secret_revision))
+            args.append(juju_context.juju_secret.revision)
         return args, {}
     elif issubclass(event_type, ops.charm.StorageEvent):
         storage_id = juju_context.juju_storage_id
@@ -235,11 +280,11 @@ def _get_event_args(
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, ops.charm.ActionEvent):
-        args: List[Any] = [juju_context.juju_action_uuid]
+        args: List[Any] = [juju_context.juju_action.uuid]
         return args, {}
     elif issubclass(event_type, ops.charm.RelationEvent):
-        relation_name = juju_context.juju_relation
-        relation_id = _get_juju_relation_id(juju_context)
+        relation_name = juju_context.juju_relation.name
+        relation_id = juju_context.juju_relation.id
         relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
     remote_app_name = juju_context.juju_remote_app
@@ -484,7 +529,7 @@ class _Manager:
         # For actions, there is a communication channel with the user running the
         # action, so we want to send exception details through stderr, rather than
         # only to juju-log as normal.
-        handling_action = self._juju_context.juju_action_name is not None
+        handling_action = self._juju_context.juju_action.name is not None
         setup_root_logging(self._model_backend, debug=debug, exc_stderr=handling_action)
 
         logger.debug('ops %s up and running.', ops.__version__)  # type:ignore
@@ -537,7 +582,7 @@ class _Manager:
             else ''
         )
         if juju_dispatch_path.endswith('-relation-broken'):
-            broken_relation_id = _get_juju_relation_id(self._juju_context)
+            broken_relation_id = self._juju_context.juju_relation.id
         else:
             broken_relation_id = None
 
