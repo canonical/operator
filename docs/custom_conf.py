@@ -338,7 +338,8 @@ nitpick_ignore = [
 # requiring extra CSS.
 class JujuVersion(SphinxDirective):
     """Directive to describe in which version of Juju a feature was added or removed."""
-    change = "changed"
+
+    change = 'changed'
 
     has_content = True
     required_arguments = 1
