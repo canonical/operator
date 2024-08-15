@@ -14,6 +14,7 @@
 
 """A helper to work with the Juju version."""
 
+import os
 import re
 from functools import total_ordering
 from typing import TYPE_CHECKING, Union
@@ -101,8 +102,19 @@ class JujuVersion:
         return False
 
     @classmethod
+    def from_environ(cls) -> 'JujuVersion':
+        """Build a version from the ``JUJU_VERSION`` environment variable.
+
+        Kept for backward compatibility. Use :meth:`from_context` instead.
+        """
+        v = os.environ.get('JUJU_VERSION')
+        if v is None:
+            v = '0.0.0'
+        return cls(v)
+
+    @classmethod
     def from_context(cls, juju_context: '_JujuContext') -> 'JujuVersion':
-        """Build a version from the ``_JujuContext`` dataclass."""
+        """Build a version from an instance of the ``JujuContext`` dataclass."""
         assert juju_context.version is not None
         return cls(juju_context.version)
 

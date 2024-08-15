@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import unittest.mock  # in this file, importing just 'patch' would be confusing
+
 import pytest
 
 import ops
@@ -38,6 +41,21 @@ def test_parsing(vs: str, major: int, minor: int, tag: str, patch: int, build: i
     assert v.tag == tag
     assert v.patch == patch
     assert v.build == build
+
+
+@unittest.mock.patch('os.environ', new={})  # type: ignore
+def test_from_environ():
+    # JUJU_VERSION is not set
+    v = ops.JujuVersion.from_environ()
+    assert v == ops.JujuVersion('0.0.0')
+
+    os.environ['JUJU_VERSION'] = 'no'
+    with pytest.raises(RuntimeError, match='not a valid Juju version'):
+        ops.JujuVersion.from_environ()
+
+    os.environ['JUJU_VERSION'] = '2.8.0'
+    v = ops.JujuVersion.from_environ()
+    assert v == ops.JujuVersion('2.8.0')
 
 
 def test_from_context():
