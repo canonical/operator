@@ -67,6 +67,12 @@ class _JujuContext:
     # env var JUJU_DISPATCH_PATH
     dispatch_path: Optional[str] = None
 
+    # env var JUJU_MODEL_NAME
+    model_name: Optional[str] = None
+
+    # env var JUJU_MODEL_UUID
+    model_uuid: Optional[str] = None
+
     # env var JUJU_NOTICE_ID
     notice_id: Optional[str] = None
 
@@ -103,6 +109,12 @@ class _JujuContext:
     # env var JUJU_STORAGE_ID
     storage_id: Optional[str] = None
 
+    # env var JUJU_UNIT_NAME
+    unit_name: Optional[str] = None
+
+    # env var JUJU_VERSION
+    version: Optional[str] = None
+
     # env var JUJU_WORKLOAD_NAME
     workload_name: Optional[str] = None
 
@@ -115,6 +127,8 @@ class _JujuContext:
             debug=env.get('JUJU_DEBUG'),
             departing_unit=env.get('JUJU_DEPARTING_UNIT'),
             dispatch_path=env.get('JUJU_DISPATCH_PATH'),
+            model_name=env.get('JUJU_MODEL_NAME'),
+            model_uuid=env.get('JUJU_MODEL_UUID'),
             notice_id=env.get('JUJU_NOTICE_ID'),
             notice_key=env.get('JUJU_NOTICE_KEY'),
             notice_type=env.get('JUJU_NOTICE_TYPE'),
@@ -131,6 +145,8 @@ class _JujuContext:
             if 'JUJU_SECRET_REVISION' in env
             else None,
             storage_id=env.get('JUJU_STORAGE_ID'),
+            unit_name=env.get('JUJU_UNIT_NAME'),
+            version=env.get('JUJU_VERSION', '0.0.0'),
             workload_name=env.get('JUJU_WORKLOAD_NAME'),
         )
 
@@ -345,7 +361,10 @@ class _Dispatcher:
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
         dispatch = charm_dir / 'dispatch'
-        if JujuVersion.from_environ().is_dispatch_aware() and _exe_path(dispatch) is not None:
+        if (
+            JujuVersion.from_context(self._juju_context).is_dispatch_aware()
+            and _exe_path(dispatch) is not None
+        ):
             self._init_dispatch()
         else:
             self._init_legacy()
@@ -451,7 +470,9 @@ class _Dispatcher:
         return self.event_name in ('collect_metrics',)
 
 
-def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
+def _should_use_controller_storage(
+    db_path: Path, meta: CharmMeta, juju_context: _JujuContext
+) -> bool:
     """Figure out whether we want to use controller storage or not."""
     # if local state has been used previously, carry on using that
     if db_path.exists():
@@ -464,7 +485,7 @@ def _should_use_controller_storage(db_path: Path, meta: CharmMeta) -> bool:
         return False
 
     # are we in a new enough Juju?
-    cur_version = JujuVersion.from_environ()
+    cur_version = JujuVersion.from_context(juju_context)
 
     if cur_version.has_controller_storage():
         logger.debug('Using controller storage: JUJU_VERSION=%s', cur_version)
@@ -512,7 +533,7 @@ class _Manager:
         self._charm_state_path = charm_state_path
         self._charm_class = charm_class
         if model_backend is None:
-            model_backend = ops.model._ModelBackend()
+            model_backend = ops.model._ModelBackend(juju_context=self._juju_context)
         self._model_backend = model_backend
 
         # Do this as early as possible to be sure to catch the most logs.
@@ -551,11 +572,11 @@ class _Manager:
         if use_juju_for_storage and not ops.storage.juju_backend_available():
             # raise an exception; the charm is broken and needs fixing.
             msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
-            raise RuntimeError(msg.format(JujuVersion.from_environ()))
+            raise RuntimeError(msg.format(JujuVersion.from_context(self._juju_context)))
 
         if use_juju_for_storage is None:
             use_juju_for_storage = _should_use_controller_storage(
-                charm_state_path, self._charm_meta
+                charm_state_path, self._charm_meta, self._juju_context
             )
         elif use_juju_for_storage:
             warnings.warn(
