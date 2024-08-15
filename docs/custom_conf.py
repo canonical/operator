@@ -355,7 +355,7 @@ class JujuVersion(SphinxDirective):
         # we don't need custom CSS.
         node['type'] = f'version{self.change}'
         node['version'] = self.arguments[0]
-        text = f'{self.change.title()} in Juju version {self.arguments[0]}'
+        text = f'{self.text} in Juju version {self.arguments[0]}'
         if len(self.arguments) == 2:
             inodes, messages = self.state.inline_text(self.arguments[1], self.lineno + 1)
             para = nodes.paragraph(self.arguments[1], '', *inodes, translatable=False)
@@ -401,10 +401,12 @@ class JujuVersion(SphinxDirective):
 
 class JujuAdded(JujuVersion):
     change = 'added'
+    text = 'Added'
 
 
 class JujuRemoved(JujuVersion):
     change = 'removed'
+    text = 'Scheduled for removal'
 
 
 def setup(app):
