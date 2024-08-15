@@ -1529,29 +1529,8 @@ class TestJujuContext:
             'JUJU_WORKLOAD_NAME': 'workload_name',
         }
 
-        env = {
-            'JUJU_ACTION_NAME': 'foo',
-            'JUJU_ACTION_UUID': 'foo',
-            'JUJU_CHARM_DIR': 'foo',
-            'JUJU_DEBUG': 'foo',
-            'JUJU_DEPARTING_UNIT': 'foo',
-            'JUJU_DISPATCH_PATH': 'foo',
-            'JUJU_MODEL_NAME': 'foo',
-            'JUJU_MODEL_UUID': 'foo',
-            'JUJU_NOTICE_ID': 'foo',
-            'JUJU_NOTICE_KEY': 'foo',
-            'JUJU_NOTICE_TYPE': 'foo',
-            'JUJU_PEBBLE_CHECK_NAME': 'foo',
-            'JUJU_RELATION': 'foo',
-            'JUJU_REMOTE_APP': 'foo',
-            'JUJU_REMOTE_UNIT': 'foo',
-            'JUJU_SECRET_ID': 'foo',
-            'JUJU_SECRET_LABEL': 'foo',
-            'JUJU_STORAGE_ID': 'foo',
-            'JUJU_UNIT_NAME': 'foo',
-            'JUJU_VERSION': 'foo',
-            'JUJU_WORKLOAD_NAME': 'foo',
-        }
+        env = {key: 'foo' for key in env_var_attr_mapping}
+
         juju_context = ops.main._JujuContext.from_environ(env)
 
         for key in env_var_attr_mapping:
