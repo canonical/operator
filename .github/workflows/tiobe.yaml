@@ -27,6 +27,6 @@ jobs:
         with:
           mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
-          ticsAuthToken: ${{ secrets.TICS_AUTH_TOKEN }}
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           project: operator
           installTics: true
