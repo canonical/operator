@@ -49,30 +49,90 @@ class _JujuContext:
     # the HookVars function: https://github.com/juju/juju/blob/3.6/worker/uniter/runner/context/context.go#L1398
     # only allow accesing these vars because these are the currently used vars in main.py
 
-    juju_relation: str = ''
-    juju_relation_id: str = ''
-    juju_secret_revision: str = ''
-    juju_workload_name: str = ''
-    juju_action_name: Optional[str] = None
-    juju_action_uuid: Optional[str] = None
-    juju_charm_dir: Optional[str] = None
-    juju_debug: Optional[str] = None
-    juju_departing_unit: Optional[str] = None
-    juju_dispatch_path: Optional[str] = None
-    juju_notice_id: Optional[str] = None
-    juju_notice_key: Optional[str] = None
-    juju_notice_type: Optional[str] = None
-    juju_pebble_check_name: Optional[str] = None
-    juju_remote_app: Optional[str] = None
-    juju_remote_unit: Optional[str] = None
-    juju_secret_id: Optional[str] = None
-    juju_secret_label: Optional[str] = None
-    juju_storage_id: Optional[str] = ''
+    # env var JUJU_ACTION_NAME
+    action_name: Optional[str] = None
+
+    # env var JUJU_ACTION_UUID
+    action_uuid: Optional[str] = None
+
+    # env var JUJU_CHARM_DIR
+    charm_dir: Optional[str] = None
+
+    # env var JUJU_DEBUG
+    debug: Optional[str] = None
+
+    # env var JUJU_DEPARTING_UNIT
+    departing_unit: Optional[str] = None
+
+    # env var JUJU_DISPATCH_PATH
+    dispatch_path: Optional[str] = None
+
+    # env var JUJU_NOTICE_ID
+    notice_id: Optional[str] = None
+
+    # env var JUJU_NOTICE_KEY
+    notice_key: Optional[str] = None
+
+    # env var JUJU_NOTICE_TYPE
+    notice_type: Optional[str] = None
+
+    # env var JUJU_PEBBLE_CHECK_NAME
+    pebble_check_name: Optional[str] = None
+
+    # env var JUJU_RELATION
+    relation_name: Optional[str] = None
+
+    # env var JUJU_RELATION_ID
+    relation_id: Optional[int] = None
+
+    # env var JUJU_REMOTE_APP
+    remote_app: Optional[str] = None
+
+    # env var JUJU_REMOTE_UNIT
+    remote_unit: Optional[str] = None
+
+    # env var JUJU_SECRET_ID
+    secret_id: Optional[str] = None
+
+    # env var JUJU_SECRET_LABEL
+    secret_label: Optional[str] = None
+
+    # env var JUJU_SECRET_REVISION
+    secret_revision: Optional[int] = None
+
+    # env var JUJU_STORAGE_ID
+    storage_id: Optional[str] = None
+
+    # env var JUJU_WORKLOAD_NAME
+    workload_name: Optional[str] = None
 
     @classmethod
-    def from_environ(cls) -> '_JujuContext':
-        kwargs: Dict[str, Any] = {name: os.getenv(name.upper()) for name in cls.__annotations__}
-        return cls(**kwargs)
+    def from_environ(cls, env: Dict[str, Any]) -> '_JujuContext':
+        return _JujuContext(
+            action_name=env.get('JUJU_ACTION_NAME'),
+            action_uuid=env.get('JUJU_ACTION_UUID'),
+            charm_dir=env.get('JUJU_CHARM_DIR'),
+            debug=env.get('JUJU_DEBUG'),
+            departing_unit=env.get('JUJU_DEPARTING_UNIT'),
+            dispatch_path=env.get('JUJU_DISPATCH_PATH'),
+            notice_id=env.get('JUJU_NOTICE_ID'),
+            notice_key=env.get('JUJU_NOTICE_KEY'),
+            notice_type=env.get('JUJU_NOTICE_TYPE'),
+            pebble_check_name=env.get('JUJU_PEBBLE_CHECK_NAME'),
+            relation_name=env.get('JUJU_RELATION'),
+            relation_id=int(env.get('JUJU_RELATION_ID', '').split(':')[-1])
+            if 'JUJU_RELATION_ID' in env
+            else None,
+            remote_app=env.get('JUJU_REMOTE_APP'),
+            remote_unit=env.get('JUJU_REMOTE_UNIT'),
+            secret_id=env.get('JUJU_SECRET_ID'),
+            secret_label=env.get('JUJU_SECRET_LABEL'),
+            secret_revision=int(env.get('JUJU_SECRET_REVISION', ''))
+            if 'JUJU_SECRET_REVISION' in env
+            else None,
+            storage_id=env.get('JUJU_STORAGE_ID'),
+            workload_name=env.get('JUJU_WORKLOAD_NAME'),
+        )
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -87,8 +147,8 @@ def _exe_path(path: Path) -> Optional[Path]:
 
 
 def _get_charm_dir(juju_context: _JujuContext):
-    charm_dir = juju_context.juju_charm_dir
-    if not charm_dir:
+    charm_dir = juju_context.charm_dir
+    if charm_dir is None:
         # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
         charm_dir = Path(f'{__file__}/../../..').resolve()
     else:
@@ -151,8 +211,9 @@ def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase', juju_conte
         charm_dir: A root directory of the charm.
         charm: An instance of the Charm class.
         juju_context: An instance of the _JujuContext class.
+
     """
-    link_to = os.path.realpath(juju_context.juju_dispatch_path or sys.argv[0])
+    link_to = os.path.realpath(juju_context.dispatch_path or sys.argv[0])
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         if issubclass(bound_event.event_type, (ops.charm.HookEvent, ops.charm.ActionEvent)):
@@ -165,7 +226,7 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str, juju_contex
     Args:
         charm: A charm instance to emit an event from.
         event_name: A Juju event name to emit on a charm.
-        juju_context: An instance of class _JujuContext.
+        juju_context: An instance of the _JujuContext class.
     """
     event_to_emit = None
     try:
@@ -181,10 +242,6 @@ def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str, juju_contex
         event_to_emit.emit(*args, **kwargs)
 
 
-def _get_juju_relation_id(juju_context: _JujuContext):
-    return int(juju_context.juju_relation_id.split(':')[-1])
-
-
 def _get_event_args(
     charm: 'ops.charm.CharmBase',
     bound_event: 'ops.framework.BoundEvent',
@@ -195,28 +252,29 @@ def _get_event_args(
 
     relation = None
     if issubclass(event_type, ops.charm.WorkloadEvent):
-        workload_name = juju_context.juju_workload_name
+        workload_name = juju_context.workload_name
+        assert workload_name is not None
         container = model.unit.get_container(workload_name)
         args: List[Any] = [container]
         if issubclass(event_type, ops.charm.PebbleNoticeEvent):
-            notice_id = juju_context.juju_notice_id
-            notice_type = juju_context.juju_notice_type
-            notice_key = juju_context.juju_notice_key
+            notice_id = juju_context.notice_id
+            notice_type = juju_context.notice_type
+            notice_key = juju_context.notice_key
             args.extend([notice_id, notice_type, notice_key])
         elif issubclass(event_type, ops.charm.PebbleCheckEvent):
-            check_name = juju_context.juju_pebble_check_name
+            check_name = juju_context.pebble_check_name
             args.append(check_name)
         return args, {}
     elif issubclass(event_type, ops.charm.SecretEvent):
         args: List[Any] = [
-            juju_context.juju_secret_id,
-            juju_context.juju_secret_label,
+            juju_context.secret_id,
+            juju_context.secret_label,
         ]
         if issubclass(event_type, (ops.charm.SecretRemoveEvent, ops.charm.SecretExpiredEvent)):
-            args.append(int(juju_context.juju_secret_revision))
+            args.append(juju_context.secret_revision)
         return args, {}
     elif issubclass(event_type, ops.charm.StorageEvent):
-        storage_id = juju_context.juju_storage_id
+        storage_id = juju_context.storage_id
         if storage_id:
             storage_name = storage_id.split('/')[0]
         else:
@@ -235,16 +293,17 @@ def _get_event_args(
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, ops.charm.ActionEvent):
-        args: List[Any] = [juju_context.juju_action_uuid]
+        args: List[Any] = [juju_context.action_uuid]
         return args, {}
     elif issubclass(event_type, ops.charm.RelationEvent):
-        relation_name = juju_context.juju_relation
-        relation_id = _get_juju_relation_id(juju_context)
+        relation_name = juju_context.relation_name
+        assert relation_name is not None
+        relation_id = juju_context.relation_id
         relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
-    remote_app_name = juju_context.juju_remote_app
-    remote_unit_name = juju_context.juju_remote_unit
-    departing_unit_name = juju_context.juju_departing_unit
+    remote_app_name = juju_context.remote_app
+    remote_unit_name = juju_context.remote_unit
+    departing_unit_name = juju_context.departing_unit
 
     if not remote_app_name and remote_unit_name:
         if '/' not in remote_unit_name:
@@ -283,7 +342,7 @@ class _Dispatcher:
     def __init__(self, charm_dir: Path, juju_context: _JujuContext):
         self._juju_context = juju_context
         self._charm_dir = charm_dir
-        self._exec_path = Path(self._juju_context.juju_dispatch_path or sys.argv[0])
+        self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
         dispatch = charm_dir / 'dispatch'
         if JujuVersion.from_environ().is_dispatch_aware() and _exe_path(dispatch) is not None:
@@ -371,12 +430,8 @@ class _Dispatcher:
         JUJU_DISPATCH_PATH will be set to the wanted hook, e.g. hooks/install,
         in both cases.
         """
-        juju_dispatch_path = (
-            str(self._juju_context.juju_dispatch_path)
-            if self._juju_context.juju_dispatch_path
-            else ''
-        )
-        self._dispatch_path = Path(juju_dispatch_path)
+        assert self._juju_context.dispatch_path is not None
+        self._dispatch_path = Path(self._juju_context.dispatch_path)
 
         if 'OPERATOR_DISPATCH' in os.environ:
             logger.debug('Charm called itself via %s.', self._dispatch_path)
@@ -453,7 +508,7 @@ class _Manager:
         use_juju_for_storage: Optional[bool] = None,
         charm_state_path: str = CHARM_STATE_FILE,
     ):
-        self._juju_context = _JujuContext.from_environ()
+        self._juju_context = _JujuContext.from_environ(dict(os.environ))
         self._charm_state_path = charm_state_path
         self._charm_class = charm_class
         if model_backend is None:
@@ -480,11 +535,11 @@ class _Manager:
         return charm
 
     def _setup_root_logging(self):
-        debug = self._juju_context.juju_debug is not None
+        debug = self._juju_context.debug is not None
         # For actions, there is a communication channel with the user running the
         # action, so we want to send exception details through stderr, rather than
         # only to juju-log as normal.
-        handling_action = self._juju_context.juju_action_name is not None
+        handling_action = self._juju_context.action_name is not None
         setup_root_logging(self._model_backend, debug=debug, exc_stderr=handling_action)
 
         logger.debug('ops %s up and running.', ops.__version__)  # type:ignore
@@ -531,13 +586,12 @@ class _Manager:
     def _make_framework(self, dispatcher: _Dispatcher):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
-        juju_dispatch_path = (
-            str(self._juju_context.juju_dispatch_path)
-            if self._juju_context.juju_dispatch_path
-            else ''
-        )
-        if juju_dispatch_path.endswith('-relation-broken'):
-            broken_relation_id = _get_juju_relation_id(self._juju_context)
+
+        if (
+            self._juju_context.dispatch_path is not None
+            and self._juju_context.dispatch_path.endswith('-relation-broken')
+        ):
+            broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
 
