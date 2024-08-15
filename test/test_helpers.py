@@ -108,7 +108,7 @@ def create_framework(
         _ModelBackend(
             juju_context=ops.main._JujuContext.from_environ(dict(os.environ)), unit_name='local/0'
         ),
-    )  # type: ignore
+    )
     # We can pass foo_event as event_name because we're not actually testing dispatch.
     framework = ops.Framework(SQLiteStorage(':memory:'), tmpdir, meta, model)  # type: ignore
 
