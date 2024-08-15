@@ -361,8 +361,9 @@ class _Dispatcher:
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
         dispatch = charm_dir / 'dispatch'
+        assert self._juju_context.version is not None
         if (
-            JujuVersion.from_context(self._juju_context).is_dispatch_aware()
+            JujuVersion(self._juju_context.version).is_dispatch_aware()
             and _exe_path(dispatch) is not None
         ):
             self._init_dispatch()
@@ -485,7 +486,8 @@ def _should_use_controller_storage(
         return False
 
     # are we in a new enough Juju?
-    cur_version = JujuVersion.from_context(juju_context)
+    assert juju_context.version is not None
+    cur_version = JujuVersion(juju_context.version)
 
     if cur_version.has_controller_storage():
         logger.debug('Using controller storage: JUJU_VERSION=%s', cur_version)
@@ -572,7 +574,8 @@ class _Manager:
         if use_juju_for_storage and not ops.storage.juju_backend_available():
             # raise an exception; the charm is broken and needs fixing.
             msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
-            raise RuntimeError(msg.format(JujuVersion.from_context(self._juju_context)))
+            assert self._juju_context.version is not None
+            raise RuntimeError(msg.format(JujuVersion(self._juju_context.version)))
 
         if use_juju_for_storage is None:
             use_juju_for_storage = _should_use_controller_storage(

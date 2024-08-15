@@ -58,21 +58,6 @@ def test_from_environ():
     assert v == ops.JujuVersion('2.8.0')
 
 
-def test_from_context():
-    # JUJU_VERSION is not set
-    juju_context = ops.main._JujuContext.from_environ({})
-    v = ops.JujuVersion.from_context(juju_context)
-    assert v == ops.JujuVersion('0.0.0')
-
-    juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': 'no'})
-    with pytest.raises(RuntimeError, match='not a valid Juju version'):
-        ops.JujuVersion.from_context(juju_context)
-
-    juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': '2.8.0'})
-    v = ops.JujuVersion.from_context(juju_context)
-    assert v == ops.JujuVersion('2.8.0')
-
-
 def test_has_app_data():
     assert ops.JujuVersion('2.8.0').has_app_data()
     assert ops.JujuVersion('2.7.0').has_app_data()

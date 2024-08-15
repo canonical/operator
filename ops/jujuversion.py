@@ -17,10 +17,7 @@
 import os
 import re
 from functools import total_ordering
-from typing import TYPE_CHECKING, Union
-
-if TYPE_CHECKING:
-    from ops.main import _JujuContext
+from typing import Union
 
 
 @total_ordering
@@ -103,20 +100,11 @@ class JujuVersion:
 
     @classmethod
     def from_environ(cls) -> 'JujuVersion':
-        """Build a version from the ``JUJU_VERSION`` environment variable.
-
-        Kept for backward compatibility. Use :meth:`from_context` instead.
-        """
+        """Build a version from the ``JUJU_VERSION`` environment variable."""
         v = os.environ.get('JUJU_VERSION')
         if v is None:
             v = '0.0.0'
         return cls(v)
-
-    @classmethod
-    def from_context(cls, juju_context: '_JujuContext') -> 'JujuVersion':
-        """Build a version from an instance of the ``JujuContext`` dataclass."""
-        assert juju_context.version is not None
-        return cls(juju_context.version)
 
     def has_app_data(self) -> bool:
         """Report whether this Juju version supports app data."""

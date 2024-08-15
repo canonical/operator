@@ -2865,7 +2865,8 @@ class Container:
             ExecError: if the command exits with a non-zero exit code.
         """
         if service_context is not None:
-            version = JujuVersion.from_context(self._juju_context)
+            assert self._juju_context.version is not None
+            version = JujuVersion(self._juju_context.version)
             if not version.supports_exec_service_context:
                 raise RuntimeError(
                     f'exec with service_context not supported on Juju version {version}'
@@ -3256,7 +3257,8 @@ class _ModelBackend:
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if is_app:
-            version = JujuVersion.from_context(self._juju_context)
+            assert self._juju_context.version is not None
+            version = JujuVersion(self._juju_context.version)
             if not version.has_app_data():
                 raise RuntimeError(
                     f'getting application data is not supported on Juju version {version}'
@@ -3279,7 +3281,8 @@ class _ModelBackend:
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
         if is_app:
-            version = JujuVersion.from_context(self._juju_context)
+            assert self._juju_context.version is not None
+            version = JujuVersion(self._juju_context.version)
             if not version.has_app_data():
                 raise RuntimeError(
                     f'setting application data is not supported on Juju version {version}'
