@@ -1023,7 +1023,13 @@ class TestModel:
             'disks': ops.StorageMeta('test', raw),
             'data': ops.StorageMeta('test', raw),
         }
-        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        model = ops.Model(
+            meta,
+            _ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
 
         fake_script.write(
             'storage-list',
@@ -1105,7 +1111,13 @@ class TestModel:
         assert expected == harness._get_backend_calls(reset=reset)
 
     def test_run_error(self, fake_script: FakeScript):
-        model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+        model = ops.Model(
+            ops.CharmMeta(),
+            _ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
         fake_script.write('status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
         with pytest.raises(ops.ModelError) as excinfo:
             _ = model.unit.status.message
@@ -1614,7 +1626,10 @@ containers:
   c2:
     k: v
 """)
-        backend = _ModelBackend('myapp/0')
+        backend = _ModelBackend(
+            juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+            unit_name='myapp/0',
+        )
         return ops.Model(meta, backend)
 
     def test_unit_containers(self, model: ops.Model):
@@ -1660,7 +1675,10 @@ containers:
   c1:
     k: v
 """)
-        backend = MockPebbleBackend('myapp/0')
+        backend = MockPebbleBackend(
+            juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+            unit_name='myapp/0',
+        )
         return ops.Model(meta, backend).unit.containers['c1']
 
     def test_socket_path(self, container: ops.Container):
@@ -1763,7 +1781,10 @@ containers:
     k: v
 """)
         # Only the real pebble Client checks types, so use actual backend class
-        backend = _ModelBackend('myapp/0')
+        backend = _ModelBackend(
+            juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+            unit_name='myapp/0',
+        )
         model = ops.Model(meta, backend)
         container = model.unit.containers['c1']
 
@@ -2075,8 +2096,8 @@ containers:
         assert len(caplog.records) == 1
         assert re.search(r'api error!', caplog.text)
 
-    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
     def test_exec(self, container: ops.Container):
+        container._juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': '3.1.6'})
         container.pebble.responses.append('fake_exec_process')  # type: ignore
         stdout = io.StringIO('STDOUT')
         stderr = io.StringIO('STDERR')
@@ -2119,8 +2140,8 @@ containers:
         ]
         assert p == 'fake_exec_process'
 
-    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
     def test_exec_service_context_not_supported(self, container: ops.Container):
+        container._juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': '3.1.5'})
         with pytest.raises(RuntimeError):
             container.exec(['foo'], service_context='srv1')
 
@@ -2354,7 +2375,10 @@ class TestModelBindings:
                 ops.RelationRole.peer, 'db2', {'interface': 'db2', 'scope': 'global'}
             ),
         }
-        backend = _ModelBackend('myapp/0')
+        backend = _ModelBackend(
+            juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+            unit_name='myapp/0',
+        )
         model = ops.Model(meta, backend)
 
         fake_script.write('relation-ids', """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
@@ -2502,7 +2526,10 @@ class TestModelBindings:
                 ops.RelationRole.peer, 'db2', {'interface': 'db2', 'scope': 'global'}
             ),
         }
-        backend = _ModelBackend('myapp/0')
+        backend = _ModelBackend(
+            juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+            unit_name='myapp/0',
+        )
         model = ops.Model(meta, backend, broken_relation_id=8)
         fake_script.write(
             'relation-ids',
@@ -2658,7 +2685,10 @@ class TestModelBackend:
     def backend(self):
         backend_instance = getattr(self, '_backend', None)
         if backend_instance is None:
-            self._backend = _ModelBackend('myapp/0')
+            self._backend = _ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            )
         return self._backend
 
     def test_relation_get_set_is_app_arg(self):
@@ -2769,14 +2799,14 @@ class TestModelBackend:
         fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
 
         # on 2.7.0+, things proceed as expected
-        monkeypatch.setenv('JUJU_VERSION', version)
+        self.backend._juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': version})
         rel_data = self.backend.relation_get(1, 'foo/0', is_app=True)
         assert rel_data == {'foo': 'bar'}
         calls = [' '.join(i) for i in fake_script.calls(clear=True)]
         assert calls == ['relation-get -r 1 - foo/0 --app --format=json']
 
         # before 2.7.0, it just fails (no --app support)
-        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
+        self.backend._juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': '2.6.9'})
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
@@ -2797,7 +2827,9 @@ class TestModelBackend:
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()),
             )
-            monkeypatch.setenv('JUJU_VERSION', version)
+            self.backend._juju_context = ops.main._JujuContext.from_environ({
+                'JUJU_VERSION': version
+            })
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
@@ -2809,7 +2841,7 @@ class TestModelBackend:
         assert decoded == 'foo: bar\n'
 
         # before 2.7.0, it just fails always (no --app support)
-        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
+        self.backend._juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': '2.6.9'})
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
         assert fake_script.calls() == []
@@ -3339,7 +3371,13 @@ class TestLazyMapping:
 class TestSecrets:
     @pytest.fixture
     def model(self):
-        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+        return ops.Model(
+            ops.CharmMeta(),
+            _ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
 
     def test_app_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:123')
@@ -3603,7 +3641,13 @@ class TestSecretInfo:
 class TestSecretClass:
     @pytest.fixture
     def model(self):
-        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+        return ops.Model(
+            ops.CharmMeta(),
+            _ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
 
     def make_secret(
         self,
@@ -3776,7 +3820,9 @@ class TestSecretClass:
         fake_script.write('secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
 
         secret = self.make_secret(model, id='x')
-        backend = ops.model._ModelBackend('test', 'test', 'test')
+        backend = ops.model._ModelBackend(
+            ops.main._JujuContext.from_environ(dict(os.environ)), 'test', 'test', 'test'
+        )
         meta = ops.CharmMeta()
         cache = ops.model._ModelCache(meta, backend)
         unit = ops.Unit('test', meta, backend, cache)
@@ -3875,7 +3921,13 @@ class TestSecretClass:
 class TestPorts:
     @pytest.fixture
     def unit(self):
-        model = ops.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        model = ops.Model(
+            ops.charm.CharmMeta(),
+            ops.model._ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
         return model.unit
 
     def test_open_port(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4031,7 +4083,13 @@ class TestPorts:
 
 class TestUnit:
     def test_reboot(self, fake_script: FakeScript):
-        model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+        model = ops.model.Model(
+            ops.charm.CharmMeta(),
+            ops.model._ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
         unit = model.unit
         fake_script.write('juju-reboot', 'exit 0')
         unit.reboot()
@@ -4194,7 +4252,13 @@ class TestCloudSpec:
 class TestGetCloudSpec:
     @pytest.fixture
     def model(self):
-        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+        return ops.Model(
+            ops.CharmMeta(),
+            _ModelBackend(
+                juju_context=ops.main._JujuContext.from_environ(dict(os.environ)),
+                unit_name='myapp/0',
+            ),
+        )
 
     def test_success(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('credential-get', """echo '{"type": "lxd", "name": "localhost"}'""")

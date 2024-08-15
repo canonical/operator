@@ -1468,19 +1468,23 @@ class TestStorageHeuristics:
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '1.0'}):
-            assert not _should_use_controller_storage(Path('/xyzzy'), meta)
+            juju_context = ops.main._JujuContext().from_environ(dict(os.environ))
+            assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_fallback_to_current_juju_version__new_enough(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            assert _should_use_controller_storage(Path('/xyzzy'), meta)
+            juju_context = ops.main._JujuContext().from_environ(dict(os.environ))
+            assert _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_not_in_k8s(self):
         meta = ops.CharmMeta.from_yaml('series: [ecs]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            assert not _should_use_controller_storage(Path('/xyzzy'), meta)
+            juju_context = ops.main._JujuContext().from_environ(dict(os.environ))
+            assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_already_local(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
-            assert not _should_use_controller_storage(Path(fd.name), meta)
+            juju_context = ops.main._JujuContext().from_environ(dict(os.environ))
+            assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)

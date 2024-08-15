@@ -37,7 +37,9 @@ from test.test_helpers import FakeScript
 
 def create_model():
     """Create a Model object."""
-    backend = _ModelBackend(unit_name='myapp/0')
+    backend = _ModelBackend(
+        juju_context=ops.main._JujuContext.from_environ(dict(os.environ)), unit_name='myapp/0'
+    )
     meta = ops.CharmMeta()
     model = ops.Model(meta, backend)
     return model
