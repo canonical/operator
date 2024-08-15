@@ -1488,3 +1488,71 @@ class TestStorageHeuristics:
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
             juju_context = ops.main._JujuContext().from_environ(dict(os.environ))
             assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)
+
+
+class TestJujuContext:
+    def test_both_str_and_int_fields_default_to_none(self):
+        juju_context = ops.main._JujuContext.from_environ({})
+        assert juju_context.action_name is None
+        assert juju_context.relation_id is None
+
+    def test_parsing_int_fields(self):
+        juju_context = ops.main._JujuContext.from_environ({'JUJU_RELATION_ID': 'x:42'})
+        assert juju_context.relation_id == 42
+
+    def test_parsing_secret_revision_as_int(self):
+        juju_context = ops.main._JujuContext.from_environ({'JUJU_SECRET_REVISION': '42'})
+        assert juju_context.secret_revision == 42
+
+    def test_parsing_all_str_fields(self):
+        env_var_attr_mapping = {
+            'JUJU_ACTION_NAME': 'action_name',
+            'JUJU_ACTION_UUID': 'action_uuid',
+            'JUJU_CHARM_DIR': 'charm_dir',
+            'JUJU_DEBUG': 'debug',
+            'JUJU_DEPARTING_UNIT': 'departing_unit',
+            'JUJU_DISPATCH_PATH': 'dispatch_path',
+            'JUJU_MODEL_NAME': 'model_name',
+            'JUJU_MODEL_UUID': 'model_uuid',
+            'JUJU_NOTICE_ID': 'notice_id',
+            'JUJU_NOTICE_KEY': 'notice_key',
+            'JUJU_NOTICE_TYPE': 'notice_type',
+            'JUJU_PEBBLE_CHECK_NAME': 'pebble_check_name',
+            'JUJU_RELATION': 'relation_name',
+            'JUJU_REMOTE_APP': 'remote_app',
+            'JUJU_REMOTE_UNIT': 'remote_unit',
+            'JUJU_SECRET_ID': 'secret_id',
+            'JUJU_SECRET_LABEL': 'secret_label',
+            'JUJU_STORAGE_ID': 'storage_id',
+            'JUJU_UNIT_NAME': 'unit_name',
+            'JUJU_VERSION': 'version',
+            'JUJU_WORKLOAD_NAME': 'workload_name',
+        }
+
+        env = {
+            'JUJU_ACTION_NAME': 'foo',
+            'JUJU_ACTION_UUID': 'foo',
+            'JUJU_CHARM_DIR': 'foo',
+            'JUJU_DEBUG': 'foo',
+            'JUJU_DEPARTING_UNIT': 'foo',
+            'JUJU_DISPATCH_PATH': 'foo',
+            'JUJU_MODEL_NAME': 'foo',
+            'JUJU_MODEL_UUID': 'foo',
+            'JUJU_NOTICE_ID': 'foo',
+            'JUJU_NOTICE_KEY': 'foo',
+            'JUJU_NOTICE_TYPE': 'foo',
+            'JUJU_PEBBLE_CHECK_NAME': 'foo',
+            'JUJU_RELATION': 'foo',
+            'JUJU_REMOTE_APP': 'foo',
+            'JUJU_REMOTE_UNIT': 'foo',
+            'JUJU_SECRET_ID': 'foo',
+            'JUJU_SECRET_LABEL': 'foo',
+            'JUJU_STORAGE_ID': 'foo',
+            'JUJU_UNIT_NAME': 'foo',
+            'JUJU_VERSION': 'foo',
+            'JUJU_WORKLOAD_NAME': 'foo',
+        }
+        juju_context = ops.main._JujuContext.from_environ(env)
+
+        for key in env_var_attr_mapping:
+            assert getattr(juju_context, env_var_attr_mapping[key]) == env[key]

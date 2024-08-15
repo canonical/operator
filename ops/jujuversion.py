@@ -14,7 +14,6 @@
 
 """A helper to work with the Juju version."""
 
-import os
 import re
 from functools import total_ordering
 from typing import TYPE_CHECKING, Union
