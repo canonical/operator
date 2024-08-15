@@ -683,8 +683,6 @@ class Unit:
         Use :meth:`set_ports` for a more declarative approach where all of
         the ports that should be open are provided in a single call.
 
-        .. jujuversion:: 3.1
-
         Args:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
@@ -713,8 +711,6 @@ class Unit:
         Use :meth:`set_ports` for a more declarative approach where all
         of the ports that should be open are provided in a single call.
         For example, ``set_ports()`` will close all open ports.
-
-        .. jujuversion: 3.1
 
         Args:
             protocol: String representing the protocol; must be one of
@@ -745,8 +741,6 @@ class Unit:
 
         Use :meth:`open_port` and :meth:`close_port` to manage ports
         individually.
-
-        .. jujuversion:: 3.1
 
         Args:
             ports: The ports to open. Provide an int to open a TCP port, or
@@ -795,10 +789,7 @@ class Unit:
 
 @dataclasses.dataclass(frozen=True)
 class Port:
-    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`.
-
-    .. jujuversion:: 3.1
-    """
+    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
 
     protocol: typing.Literal['tcp', 'udp', 'icmp']
     """The IP protocol."""
