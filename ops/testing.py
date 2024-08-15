@@ -56,7 +56,7 @@ from typing import (
     cast,
 )
 
-from ops import charm, framework, model, pebble, storage
+from ops import charm, framework, main, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.model import Container, RelationNotFoundError, _NetworkDict
@@ -259,6 +259,7 @@ class Harness(Generic[CharmType]):
         actions: Optional[YAMLStringOrFile] = None,
         config: Optional[YAMLStringOrFile] = None,
     ):
+        self._juju_context = main._JujuContext.from_environ(dict(os.environ))
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -268,7 +269,9 @@ class Harness(Generic[CharmType]):
         self._relation_id_counter: int = 0
         self._action_id_counter: int = 0
         config_ = self._get_config(config)
-        self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
+        self._backend = _TestingModelBackend(
+            self._juju_context, self._unit_name, self._meta, config_
+        )
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
@@ -2292,7 +2295,14 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: '_RawConfig'):
+    def __init__(
+        self,
+        juju_context: main._JujuContext,
+        unit_name: str,
+        meta: charm.CharmMeta,
+        config: '_RawConfig',
+    ):
+        self._juju_context = juju_context
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None
