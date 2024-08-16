@@ -259,7 +259,7 @@ class Harness(Generic[CharmType]):
         actions: Optional[YAMLStringOrFile] = None,
         config: Optional[YAMLStringOrFile] = None,
     ):
-        self._juju_context = main._JujuContext.from_environ(dict(os.environ))
+        self._juju_context = main._JujuContext.from_dict(os.environ)
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta

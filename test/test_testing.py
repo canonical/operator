@@ -39,6 +39,7 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
+from ops.jujuversion import JujuVersion
 from ops.model import _ModelBackend
 from ops.pebble import FileType
 from ops.testing import ExecResult, _TestingPebbleClient
@@ -6494,7 +6495,7 @@ class TestHandleExec:
         def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
 
-        container._juju_context = ops.main._JujuContext.from_environ({'JUJU_VERSION': '3.2.1'})
+        container._juju_version = JujuVersion('3.2.1')
         harness.handle_exec(container, ['ls'], handler=handler)
 
         container.exec(['ls'], service_context='test').wait()

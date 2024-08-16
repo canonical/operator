@@ -55,7 +55,6 @@ from typing import (
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
-from ops.jujuversion import JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
@@ -2211,7 +2210,8 @@ class Container:
         self, name: str, backend: '_ModelBackend', pebble_client: Optional[pebble.Client] = None
     ):
         self.name = name
-        self._juju_context = backend._juju_context
+
+        self._juju_version = backend._juju_context.version
 
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
@@ -2857,20 +2857,18 @@ class Container:
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
 
-        Note that older versions of Juju do not support the ``service_content`` parameter, so if
+        Note that older versions of Juju do not support the ``service_context`` parameter, so if
         the Charm is to be used on those versions, then
         :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
 
         Raises:
             ExecError: if the command exits with a non-zero exit code.
         """
-        if service_context is not None:
-            assert self._juju_context.version is not None
-            version = JujuVersion(self._juju_context.version)
-            if not version.supports_exec_service_context:
-                raise RuntimeError(
-                    f'exec with service_context not supported on Juju version {version}'
-                )
+        assert self._juju_version is not None
+        if service_context is not None and not self._juju_version.supports_exec_service_context:
+            raise RuntimeError(
+                f'exec with service_context not supported on Juju version {self._juju_version}'
+            )
         return self._pebble.exec(
             command,
             service_context=service_context,
@@ -3143,12 +3141,15 @@ class _ModelBackend:
 
     def __init__(
         self,
-        juju_context: 'ops.main._JujuContext',
         unit_name: Optional[str] = None,
         model_name: Optional[str] = None,
         model_uuid: Optional[str] = None,
+        juju_context: Optional['ops.main._JujuContext'] = None,
     ):
-        self._juju_context = juju_context
+        self._juju_context = (
+            juju_context if juju_context else ops.main._JujuContext.from_dict(os.environ)
+        )
+        self._juju_version = self._juju_context.version
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
         unit_name_ = unit_name or self._juju_context.unit_name
         if unit_name_ is None:
@@ -3156,8 +3157,8 @@ class _ModelBackend:
         self.unit_name: str = unit_name_
 
         # we can cast to str because these envvars are guaranteed to be set
-        self.model_name: str = model_name or typing.cast(str, self._juju_context.model_name)
-        self.model_uuid: str = model_uuid or typing.cast(str, self._juju_context.model_uuid)
+        self.model_name: str = model_name or self._juju_context.model_name
+        self.model_uuid: str = model_uuid or self._juju_context.model_uuid
         self.app_name: str = self.unit_name.split('/')[0]
 
         self._is_leader: Optional[bool] = None
@@ -3256,13 +3257,11 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
-        if is_app:
-            assert self._juju_context.version is not None
-            version = JujuVersion(self._juju_context.version)
-            if not version.has_app_data():
-                raise RuntimeError(
-                    f'getting application data is not supported on Juju version {version}'
-                )
+        assert self._juju_version is not None
+        if is_app and not self._juju_version.has_app_data():
+            raise RuntimeError(
+                f'getting application data is not supported on Juju version {self._juju_version}'
+            )
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
         if is_app:
@@ -3280,13 +3279,11 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
-        if is_app:
-            assert self._juju_context.version is not None
-            version = JujuVersion(self._juju_context.version)
-            if not version.has_app_data():
-                raise RuntimeError(
-                    f'setting application data is not supported on Juju version {version}'
-                )
+        assert self._juju_version is not None
+        if is_app and not self._juju_version.has_app_data():
+            raise RuntimeError(
+                f'setting application data is not supported on Juju version {self._juju_version}'
+            )
 
         args = ['relation-set', '-r', str(relation_id)]
         if is_app:

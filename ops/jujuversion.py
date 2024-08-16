@@ -39,7 +39,10 @@ class JujuVersion:
         re.VERBOSE,
     )
 
-    def __init__(self, version: str):
+    def __init__(self, version: Union[str, None]):
+        if version is None:
+            version = '0.0.0'
+
         m = self._pattern_re.match(version)
         if not m:
             raise RuntimeError(f'"{version}" is not a valid Juju version string')
