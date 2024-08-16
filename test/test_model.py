@@ -3568,7 +3568,7 @@ class TestSecretInfo:
             {
                 'label': 'fromdict',
                 'revision': 8,
-                'expires': '2022-12-09T14:10:00Z',
+                'expiry': '2022-12-09T14:10:00Z',
                 'rotation': 'yearly',
                 'rotates': '2023-01-09T14:10:00Z',
             },

@@ -1182,7 +1182,7 @@ class SecretInfo:
     @classmethod
     def from_dict(cls, id: str, d: Dict[str, Any]) -> 'SecretInfo':
         """Create new SecretInfo object from ID and dict parsed from JSON."""
-        expires = typing.cast(Optional[str], d.get('expires'))
+        expires = typing.cast(Optional[str], d.get('expiry'))
         try:
             rotation = SecretRotate(typing.cast(Optional[str], d.get('rotation')))
         except ValueError:
