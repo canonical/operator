@@ -16,20 +16,56 @@
 
 import logging
 
+import pytest
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
 
-async def test_smoke(ops_test: OpsTest):
-    # Verify that we can deploy charms from supported series.
+CHARMCRAFT2_YAML = """
+type: "charm"
+bases:
+  - build-on:
+    - name: "ubuntu"
+      channel: "{base}"
+    run-on:
+    - name: "ubuntu"
+      channel: "{base}"
+"""
 
-    # Build the charm. (We just build it for focal -- it *should* work to deploy it on
-    # older versions of Juju.)
+CHARMCRAFT3_YAML = """
+type: "charm"
+base: ubuntu@{base}
+platforms:
+  amd64:
+parts:
+    charm:
+        plugin: charm
+        source: .
+"""
+
+
+@pytest.mark.parametrize(
+    'base,charmcraft_version,name',
+    (
+        ('20.04', 2, 'focal'),
+        ('22.04', 2, 'jammy'),
+        ('24.04', 3, 'noble'),
+    ),
+)
+async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name: str):
+    """Verify that we can build and deploy charms from supported bases."""
+    charmcraft_yaml = {
+        2: CHARMCRAFT2_YAML,
+        3: CHARMCRAFT3_YAML,
+    }[charmcraft_version].format(base=base)
+    with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:
+        outf.write(charmcraft_yaml)
     charm = await ops_test.build_charm('./test/charms/test_smoke/')
 
-    for series in ['focal', 'bionic', 'xenial']:
-        app = await ops_test.model.deploy(charm, series=series, application_name=f'{series}-smoke')
-        await ops_test.model.wait_for_idle(timeout=600)
+    app = await ops_test.model.deploy(
+        charm, base=f'ubuntu@{base}', application_name=f'{name}-smoke'
+    )
+    await ops_test.model.wait_for_idle(timeout=600)
 
-        assert app.status == 'active', f"Series {series} failed with '{app.status}' status"
+    assert app.status == 'active', f"Base ubuntu@{base} failed with '{app.status}' status"
