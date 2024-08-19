@@ -270,7 +270,7 @@ class Harness(Generic[CharmType]):
         self._action_id_counter: int = 0
         config_ = self._get_config(config)
         self._backend = _TestingModelBackend(
-            self._juju_context, self._unit_name, self._meta, config_
+            self._unit_name, self._meta, config_, self._juju_context
         )
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
@@ -2297,10 +2297,10 @@ class _TestingModelBackend:
 
     def __init__(
         self,
-        juju_context: main._JujuContext,
         unit_name: str,
         meta: charm.CharmMeta,
         config: '_RawConfig',
+        juju_context: main._JujuContext,
     ):
         self._juju_context = juju_context
         self.unit_name = unit_name

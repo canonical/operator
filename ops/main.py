@@ -47,7 +47,7 @@ logger = logging.getLogger()
 class _JujuContext:
     # source: https://juju.is/docs/juju/charm-environment-variables
     # the HookVars function: https://github.com/juju/juju/blob/3.6/worker/uniter/runner/context/context.go#L1398
-    # only allow accesing these vars because these are the currently used vars in main.py
+    # Only a subset of the above source, because these are what are used in ops.
 
     # The action's name, for example 'backup' (from JUJU_ACTION_NAME).
     action_name: Optional[str] = None
@@ -56,13 +56,13 @@ class _JujuContext:
     action_uuid: Optional[str] = None
 
     # The root directory of the charm where it is running,
-    # for example `/var/lib/juju/agents/unit-bare-0/charm` (from JUJU_CHARM_DIR).
-    # If JUJU_CHARM_DIR is None or set to empty string,
-    # use Path(f'{__file__}/../../..') as default,
-    # assuming $JUJU_CHARM_DIR/lib/op/main.py structure.
+    # for example '/var/lib/juju/agents/unit-bare-0/charm' (from JUJU_CHARM_DIR).
+    # If JUJU_CHARM_DIR is None or set to an empty string,
+    # use Path(f'{__file__}/../../..') as default
+    # (assuming the '$JUJU_CHARM_DIR/lib/op/main.py' structure).
     charm_dir: Path = Path()
 
-    # Debug mode. If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
+    # If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
     debug: bool = False
 
     # In the format of 'actions/do-something',
@@ -88,7 +88,7 @@ class _JujuContext:
     # The name of the pebble check, for example 'http-check' (from JUJU_PEBBLE_CHECK_NAME).
     pebble_check_name: Optional[str] = None
 
-    # The unit that departs a relation, for example 'remote/42' (from JUJU_DEPARTING_UNIT).
+    # The unit that is departing a relation, for example 'remote/42' (from JUJU_DEPARTING_UNIT).
     relation_departing_unit_name: Optional[str] = None
 
     # The name of the relation, for example 'database' (from JUJU_RELATION).
@@ -116,8 +116,7 @@ class _JujuContext:
     secret_revision: Optional[int] = None
 
     # The storage name, for example 'my-storage'
-    # if the original environment variable's value is `my-storage/1`
-    # (from JUJU_STORAGE_ID)
+    # if the original environment variable's value is 'my-storage/1' (from JUJU_STORAGE_ID).
     storage_name: Optional[str] = None
 
     # The name of the unit, for example 'myapp/0' (from JUJU_UNIT_NAME)
@@ -615,10 +614,7 @@ class _Manager:
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
 
-        if (
-            self._juju_context.dispatch_path is not None
-            and self._juju_context.dispatch_path.endswith('-relation-broken')
-        ):
+        if self._juju_context.dispatch_path.endswith('-relation-broken'):
             broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
