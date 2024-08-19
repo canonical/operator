@@ -23,7 +23,6 @@ def _compute_navigation_tree(context):
 
 furo._compute_navigation_tree = _compute_navigation_tree
 
-# FIXME check if this is still needed; the PR didn't land, but I think the regexp got deprecated in Sphinx 8?
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
 import re  # noqa: E402
