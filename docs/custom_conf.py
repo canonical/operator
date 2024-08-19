@@ -31,7 +31,7 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
     r'''^ ([\w.]+::)?            # explicit module name
           ([\w.]+\.)?            # module and/or class name(s)
           ([^.()]+)  \s*         # thing name
-          (?: \[\s*(.*)\s*])?    # optional: type parameters list, Sphinx 7
+          (?: \[\s*(.*)\s*])?    # optional: type parameters list, Sphinx 7&8
           (?: \((.*)\)           # optional: arguments
            (?:\s* -> \s* (.*))?  #           return annotation
           )? $                   # and nothing more

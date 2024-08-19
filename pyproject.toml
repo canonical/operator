@@ -24,8 +24,6 @@ dynamic = ["version"]
 [project.optional-dependencies]
 docs = [
     "canonical-sphinx-extensions",
-    # pre-release `furo` that supports Sphinx 8
-    #"git+https://github.com/pradyunsg/furo.git@2d3b6baa3371451d997d879a0aa61b3592ade638",
     "furo",
     "linkify-it-py",
     "myst-parser",
