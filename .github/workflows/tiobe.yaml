@@ -1,6 +1,9 @@
 name: TIOBE Quality Checks
 
 on: [pull_request]
+#on:
+#  schedule:
+#    - cron:  '0 7 1 * *'
 
 jobs:
   TICS:
