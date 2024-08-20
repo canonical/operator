@@ -73,7 +73,7 @@ aggressive = 3
 [tool.ruff]
 line-length = 99
 target-version = "py38"
-extend-exclude = ["docs"]
+extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 
 # Ruff formatter configuration
 [tool.ruff.format]

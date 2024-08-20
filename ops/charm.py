@@ -354,6 +354,8 @@ class PreSeriesUpgradeEvent(HookEvent):
     callback method associated with this event, the administrator will initiate
     steps to actually upgrade the series.  After the upgrade has been completed,
     the :class:`PostSeriesUpgradeEvent` will fire.
+
+    .. jujuremoved:: 4.0
     """
 
 
@@ -368,6 +370,8 @@ class PostSeriesUpgradeEvent(HookEvent):
     upgraded version of a database. Note however charms are expected to check if
     the series has actually changed or whether it was rolled back to the
     original series.
+
+    .. jujuremoved:: 4.0
     """
 
 
@@ -403,6 +407,8 @@ class CollectMetricsEvent(HookEvent):
 
     Note that associated callback methods are currently sandboxed in
     how they can interact with Juju.
+
+    .. jujuremoved:: 4.0
     """
 
     def add_metrics(
@@ -828,7 +834,10 @@ class PebbleNoticeEvent(WorkloadEvent):
 
 
 class PebbleCustomNoticeEvent(PebbleNoticeEvent):
-    """Event triggered when a Pebble notice of type "custom" is created or repeats."""
+    """Event triggered when a Pebble notice of type "custom" is created or repeats.
+
+    .. jujuversion:: 3.4
+    """
 
 
 class PebbleCheckEvent(WorkloadEvent):
@@ -873,6 +882,8 @@ class PebbleCheckFailedEvent(PebbleCheckEvent):
     emitted next). If the handler is executing code that should only be done
     if the check is currently failing, check the current status with
     ``event.info.status == ops.pebble.CheckStatus.DOWN``.
+
+    .. jujuversion:: 3.6
     """
 
 
@@ -882,6 +893,8 @@ class PebbleCheckRecoveredEvent(PebbleCheckEvent):
     This event is only triggered when the check has previously reached a failure
     state (not simply failed, but failed at least as many times as the
     configured threshold).
+
+    .. jujuversion:: 3.6
     """
 
 
@@ -929,6 +942,9 @@ class SecretChangedEvent(SecretEvent):
     Typically, the charm will fetch the new content by calling
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
+
+    .. jujuversion:: 3.0
+        Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
 
@@ -938,6 +954,8 @@ class SecretRotateEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
+
+    .. jujuversion:: 3.0
     """
 
     def defer(self) -> NoReturn:
@@ -963,6 +981,8 @@ class SecretRemoveEvent(SecretEvent):
     :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
     remove the now-unused revision. If the charm does not, then the event will
     be emitted again, when further revisions are ready for removal.
+
+    .. jujuversion:: 3.0
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -998,6 +1018,8 @@ class SecretExpiredEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
     revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
+
+    .. jujuversion:: 3.0
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -1159,10 +1181,16 @@ class CharmEvents(ObjectEvents):
     """Triggered by request to upgrade the charm (see :class:`UpgradeCharmEvent`)."""
 
     pre_series_upgrade = EventSource(PreSeriesUpgradeEvent)
-    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`)."""
+    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`).
+
+    .. jujuremoved:: 4.0
+    """
 
     post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
-    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`)."""
+    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`).
+
+    .. jujuremoved:: 4.0
+    """
 
     leader_elected = EventSource(LeaderElectedEvent)
     """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
@@ -1171,30 +1199,42 @@ class CharmEvents(ObjectEvents):
     """Triggered when leader changes any settings (see
     :class:`LeaderSettingsChangedEvent`).
 
-    .. deprecated: 2.4.0
+    .. deprecated:: 2.4.0
     """
 
     collect_metrics = EventSource(CollectMetricsEvent)
-    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`)."""
+    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`).
+
+    .. jujuremoved:: 4.0
+    """
 
     secret_changed = EventSource(SecretChangedEvent)
     """Triggered by Juju on the observer when the secret owner changes its contents (see
     :class:`SecretChangedEvent`).
+
+    .. jujuversion:: 3.0
+        Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
     secret_expired = EventSource(SecretExpiredEvent)
     """Triggered by Juju on the owner when a secret's expiration time elapses (see
     :class:`SecretExpiredEvent`).
+
+    .. jujuversion:: 3.0
     """
 
     secret_rotate = EventSource(SecretRotateEvent)
     """Triggered by Juju on the owner when the secret's rotation policy elapses (see
     :class:`SecretRotateEvent`).
+
+    .. jujuversion:: 3.0
     """
 
     secret_remove = EventSource(SecretRemoveEvent)
     """Triggered by Juju on the owner when a secret revision can be removed (see
     :class:`SecretRemoveEvent`).
+
+    .. jujuversion:: 3.0
     """
 
     collect_app_status = EventSource(CollectStatusEvent)

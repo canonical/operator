@@ -1,0 +1,35 @@
+name: TIOBE Quality Checks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron:  '0 7 1 * *'
+
+jobs:
+  TICS:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+        # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23
+      - name: Generate coverage report
+        run: |
+          tox -e unit
+          coverage xml
+          # Annoyingly, the coverage.xml file needs to be in a .coverage folder.
+          rm .coverage
+          mkdir .coverage
+          mv coverage.xml .coverage/
+
+      - name: TICS GitHub Action
+        uses: tiobe/tics-github-action@v3
+        with:
+          mode: qserver
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          project: operator
+          installTics: true
