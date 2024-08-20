@@ -88,6 +88,7 @@ def create_framework(
         os.environ['PATH'],
     ])
     os.environ['JUJU_UNIT_NAME'] = 'local/0'
+    os.environ['JUJU_VERSION'] = '0.0.0'
 
     tmpdir = pathlib.Path(tempfile.mkdtemp())
 

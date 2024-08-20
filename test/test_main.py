@@ -30,7 +30,7 @@ from unittest.mock import patch
 import pytest
 
 import ops
-from ops.jujuversion import JujuVersion
+from ops.jujucontext import JujuVersion, _JujuContext
 from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
@@ -1468,60 +1468,75 @@ class TestStorageHeuristics:
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '1.0'}):
-            juju_context = ops.main._JujuContext().from_dict(os.environ)
+            juju_context = _JujuContext.from_dict(os.environ)
             assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_fallback_to_current_juju_version__new_enough(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            juju_context = ops.main._JujuContext().from_dict(os.environ)
+            juju_context = _JujuContext.from_dict(os.environ)
             assert _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_not_in_k8s(self):
         meta = ops.CharmMeta.from_yaml('series: [ecs]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            juju_context = ops.main._JujuContext().from_dict(os.environ)
+            juju_context = _JujuContext.from_dict(os.environ)
             assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_already_local(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
-            juju_context = ops.main._JujuContext().from_dict(os.environ)
+            juju_context = _JujuContext.from_dict(os.environ)
             assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)
 
 
 class TestJujuContext:
     def test_both_str_and_int_fields_default_to_none(self):
-        juju_context = ops.main._JujuContext.from_dict({})
+        juju_context = _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'})
         assert juju_context.action_name is None
         assert juju_context.relation_id is None
 
     def test_parsing_int_fields(self):
-        juju_context = ops.main._JujuContext.from_dict({'JUJU_RELATION_ID': 'x:42'})
+        juju_context = _JujuContext.from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_RELATION_ID': 'x:42',
+        })
         assert juju_context.relation_id == 42
 
     def test_parsing_secret_revision_as_int(self):
-        juju_context = ops.main._JujuContext.from_dict({'JUJU_SECRET_REVISION': '42'})
+        juju_context = _JujuContext.from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_SECRET_REVISION': '42',
+        })
         assert juju_context.secret_revision == 42
 
     def test_parsing_juju_debug_as_bool(self):
-        juju_context = ops.main._JujuContext.from_dict({'JUJU_DEBUG': 'true'})
+        juju_context = _JujuContext.from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_DEBUG': 'true',
+        })
         assert juju_context.debug is True
 
     def test_parsing_juju_charm_dir(self):
-        juju_context = ops.main._JujuContext.from_dict({'JUJU_CHARM_DIR': '/dir'})
+        juju_context = _JujuContext.from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_CHARM_DIR': '/dir',
+        })
         assert juju_context.charm_dir == Path('/dir')
 
     def test_parsing_juju_charm_dir_not_set(self):
-        juju_context = ops.main._JujuContext.from_dict({})
+        juju_context = _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'})
         assert juju_context.charm_dir == Path(f'{__file__}/../../..').resolve()
 
     def test_parsing_juju_version(self):
-        juju_context = ops.main._JujuContext.from_dict({'JUJU_VERSION': '3.4.0'})
+        juju_context = _JujuContext.from_dict({'JUJU_VERSION': '3.4.0'})
         assert juju_context.version == JujuVersion('3.4.0')
 
     def test_parsing_storage_id_to_name(self):
-        juju_context = ops.main._JujuContext.from_dict({'JUJU_STORAGE_ID': 'my-storage/1'})
+        juju_context = _JujuContext.from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_STORAGE_ID': 'my-storage/1',
+        })
         assert juju_context.storage_name == 'my-storage'
 
     def test_parsing_all_str_fields(self):
@@ -1537,7 +1552,7 @@ class TestJujuContext:
             'JUJU_PEBBLE_CHECK_NAME': 'pebble_check_name',
             'JUJU_DEPARTING_UNIT': 'relation_departing_unit_name',
             'JUJU_RELATION': 'relation_name',
-            'JUJU_REMOTE_APP': 'remote_app',
+            'JUJU_REMOTE_APP': 'remote_app_name',
             'JUJU_REMOTE_UNIT': 'remote_unit_name',
             'JUJU_SECRET_ID': 'secret_id',
             'JUJU_SECRET_LABEL': 'secret_label',
@@ -1546,8 +1561,9 @@ class TestJujuContext:
         }
 
         env = {key: 'foo' for key in env_var_attr_mapping}
+        env['JUJU_VERSION'] = '0.0.0'
 
-        juju_context = ops.main._JujuContext.from_dict(env)
+        juju_context = _JujuContext.from_dict(env)
 
         for key in env_var_attr_mapping:
             assert getattr(juju_context, env_var_attr_mapping[key]) == env[key]

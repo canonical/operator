@@ -19,7 +19,6 @@ This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
 as expected.
 """
 
-import dataclasses
 import logging
 import os
 import shutil
@@ -27,148 +26,20 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
 from ops.charm import CharmMeta
-from ops.jujuversion import JujuVersion
+from ops.jujucontext import _JujuContext
 from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
-
-
-@dataclasses.dataclass(frozen=True)
-class _JujuContext:
-    # source: https://juju.is/docs/juju/charm-environment-variables
-    # the HookVars function: https://github.com/juju/juju/blob/3.6/worker/uniter/runner/context/context.go#L1398
-    # Only a subset of the above source, because these are what are used in ops.
-
-    # The action's name, for example 'backup' (from JUJU_ACTION_NAME).
-    action_name: Optional[str] = None
-
-    # The action's uuid, for example '1' (from JUJU_ACTION_UUID).
-    action_uuid: Optional[str] = None
-
-    # The root directory of the charm where it is running,
-    # for example '/var/lib/juju/agents/unit-bare-0/charm' (from JUJU_CHARM_DIR).
-    # If JUJU_CHARM_DIR is None or set to an empty string,
-    # use Path(f'{__file__}/../../..') as default
-    # (assuming the '$JUJU_CHARM_DIR/lib/op/main.py' structure).
-    charm_dir: Path = Path()
-
-    # If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
-    debug: bool = False
-
-    # In the format of 'actions/do-something',
-    # for example 'hooks/workload-pebble-ready' (from JUJU_DISPATCH_PATH).
-    dispatch_path: str = ''
-
-    # The name of the model, for example 'foo' (from JUJU_MODEL_NAME).
-    model_name: str = ''
-
-    # The uuid of the model,
-    # for example 'cdac5656-2423-4388-8f30-41854b4cca7d' (from JUJU_MODEL_UUID).
-    model_uuid: str = ''
-
-    # The ID of the notice, for example '1', (from JUJU_NOTICE_ID).
-    notice_id: Optional[str] = None
-
-    # The key of the notice, for example 'example.com/a', (from JUJU_NOTICE_KEY).
-    notice_key: Optional[str] = None
-
-    # The type of the notice, for example 'custom' (from JUJU_NOTICE_TYPE).
-    notice_type: Optional[str] = None
-
-    # The name of the pebble check, for example 'http-check' (from JUJU_PEBBLE_CHECK_NAME).
-    pebble_check_name: Optional[str] = None
-
-    # The unit that is departing a relation, for example 'remote/42' (from JUJU_DEPARTING_UNIT).
-    relation_departing_unit_name: Optional[str] = None
-
-    # The name of the relation, for example 'database' (from JUJU_RELATION).
-    relation_name: Optional[str] = None
-
-    # The id of the relation,
-    # for example 1 (integer) if the original environment variable's value is 'database:1'
-    # (from JUJU_RELATION_ID).
-    relation_id: Optional[int] = None
-
-    # The name of the remote app, for example 'remoteapp1' (from JUJU_REMOTE_APP).
-    remote_app: Optional[str] = None
-
-    # The name of the remote unit, for example 'remoteapp1/0' (from JUJU_REMOTE_UNIT).
-    remote_unit_name: Optional[str] = None
-
-    # The ID of the secret,
-    # for example 'secret:dcc7aa9c-7202-4da6-8d5f-0fbbaa4e1a41' (from JUJU_SECRET_ID).
-    secret_id: Optional[str] = None
-
-    # The label of the secret, for example 'db-password' (from JUJU_SECRET_LABEL).
-    secret_label: Optional[str] = None
-
-    # The revision of the secret, for example 42 (integer) (from JUJU_SECRET_REVISION).
-    secret_revision: Optional[int] = None
-
-    # The storage name, for example 'my-storage'
-    # if the original environment variable's value is 'my-storage/1' (from JUJU_STORAGE_ID).
-    storage_name: Optional[str] = None
-
-    # The name of the unit, for example 'myapp/0' (from JUJU_UNIT_NAME)
-    unit_name: str = ''
-
-    # The version of Juju, for example '3.4.0' (from JUJU_VERSION)
-    version: Optional[JujuVersion] = None
-
-    # The name of the workload, for example 'workload' (from JUJU_WORKLOAD_NAME).
-    workload_name: Optional[str] = None
-
-    @classmethod
-    def from_dict(cls, env: Mapping[str, Any]) -> '_JujuContext':
-        return _JujuContext(
-            action_name=env.get('JUJU_ACTION_NAME') or None,
-            action_uuid=env.get('JUJU_ACTION_UUID') or None,
-            charm_dir=(
-                Path(f'{__file__}/../../..').resolve()
-                if not env.get('JUJU_CHARM_DIR')
-                else Path(env.get('JUJU_CHARM_DIR', '')).resolve()
-            ),
-            debug=env.get('JUJU_DEBUG', '').lower() == 'true',
-            dispatch_path=env.get('JUJU_DISPATCH_PATH', ''),
-            model_name=env.get('JUJU_MODEL_NAME', ''),
-            model_uuid=env.get('JUJU_MODEL_UUID', ''),
-            notice_id=env.get('JUJU_NOTICE_ID') or None,
-            notice_key=env.get('JUJU_NOTICE_KEY') or None,
-            notice_type=env.get('JUJU_NOTICE_TYPE') or None,
-            pebble_check_name=env.get('JUJU_PEBBLE_CHECK_NAME') or None,
-            relation_departing_unit_name=env.get('JUJU_DEPARTING_UNIT') or None,
-            relation_name=env.get('JUJU_RELATION') or None,
-            relation_id=(
-                int(env['JUJU_RELATION_ID'].split(':')[-1])
-                if env.get('JUJU_RELATION_ID')
-                else None
-            ),
-            remote_app=env.get('JUJU_REMOTE_APP') or None,
-            remote_unit_name=env.get('JUJU_REMOTE_UNIT') or None,
-            secret_id=env.get('JUJU_SECRET_ID') or None,
-            secret_label=env.get('JUJU_SECRET_LABEL') or None,
-            secret_revision=(
-                int(env['JUJU_SECRET_REVISION']) if env.get('JUJU_SECRET_REVISION') else None
-            ),
-            storage_name=(
-                env.get('JUJU_STORAGE_ID', '').split('/')[0]
-                if env.get('JUJU_STORAGE_ID')
-                else None
-            ),
-            unit_name=env.get('JUJU_UNIT_NAME', ''),
-            version=JujuVersion(env.get('JUJU_VERSION')),
-            workload_name=env.get('JUJU_WORKLOAD_NAME') or None,
-        )
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -325,7 +196,7 @@ def _get_event_args(
         relation_id = juju_context.relation_id
         relation: Optional[ops.model.Relation] = model.get_relation(relation_name, relation_id)
 
-    remote_app_name = juju_context.remote_app
+    remote_app_name = juju_context.remote_app_name
     remote_unit_name = juju_context.remote_unit_name
     departing_unit_name = juju_context.relation_departing_unit_name
 
@@ -455,7 +326,6 @@ class _Dispatcher:
         JUJU_DISPATCH_PATH will be set to the wanted hook, e.g. hooks/install,
         in both cases.
         """
-        assert self._juju_context.dispatch_path is not None
         self._dispatch_path = Path(self._juju_context.dispatch_path)
 
         if 'OPERATOR_DISPATCH' in os.environ:

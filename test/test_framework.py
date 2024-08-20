@@ -37,6 +37,8 @@ from test.test_helpers import FakeScript
 
 def create_model():
     """Create a Model object."""
+    if 'JUJU_VERSION' not in os.environ:
+        os.environ['JUJU_VERSION'] = '0.0.0'
     backend = _ModelBackend(unit_name='myapp/0')
     meta = ops.CharmMeta()
     model = ops.Model(meta, backend)

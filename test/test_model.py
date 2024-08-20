@@ -32,7 +32,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops._private import yaml
-from ops.jujuversion import JujuVersion
+from ops.jujucontext import JujuVersion
 from ops.model import _ModelBackend
 from test.test_helpers import FakeScript
 
@@ -2659,6 +2659,7 @@ class TestModelBackend:
     def backend(self):
         backend_instance = getattr(self, '_backend', None)
         if backend_instance is None:
+            os.environ['JUJU_VERSION'] = '0.0.0'
             self._backend = _ModelBackend('myapp/0')
         return self._backend
 
@@ -2700,7 +2701,7 @@ class TestModelBackend:
         assert model.unit.is_leader()
 
     def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv('JUJU_VERSION', '2.8.0')
+        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion('2.8.0'))
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [
@@ -2770,14 +2771,14 @@ class TestModelBackend:
         fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
 
         # on 2.7.0+, things proceed as expected
-        self.backend._juju_version = JujuVersion(version)
+        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion(version))
         rel_data = self.backend.relation_get(1, 'foo/0', is_app=True)
         assert rel_data == {'foo': 'bar'}
         calls = [' '.join(i) for i in fake_script.calls(clear=True)]
         assert calls == ['relation-get -r 1 - foo/0 --app --format=json']
 
         # before 2.7.0, it just fails (no --app support)
-        self.backend._juju_version = JujuVersion('2.6.9')
+        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion('2.6.9'))
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
@@ -2798,7 +2799,7 @@ class TestModelBackend:
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()),
             )
-            self.backend._juju_version = JujuVersion(version)
+            monkeypatch.setattr(self.backend, '_juju_version', JujuVersion(version))
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
@@ -2810,7 +2811,7 @@ class TestModelBackend:
         assert decoded == 'foo: bar\n'
 
         # before 2.7.0, it just fails always (no --app support)
-        self.backend._juju_version = JujuVersion('2.6.9')
+        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion('2.6.9'))
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
         assert fake_script.calls() == []

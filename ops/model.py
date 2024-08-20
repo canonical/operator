@@ -55,6 +55,11 @@ from typing import (
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
+from ops.jujucontext import JujuVersion, _JujuContext
+
+# JujuVersion is not used in ops.model, but there are charms that are importing JujuVersion
+# from ops.model, so we keep it here.
+_ = JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
@@ -3156,11 +3161,11 @@ class _ModelBackend:
         unit_name: Optional[str] = None,
         model_name: Optional[str] = None,
         model_uuid: Optional[str] = None,
-        juju_context: Optional['ops.main._JujuContext'] = None,
+        juju_context: Optional[_JujuContext] = None,
     ):
-        self._juju_context = (
-            juju_context if juju_context else ops.main._JujuContext.from_dict(os.environ)
-        )
+        if juju_context is None:
+            juju_context = _JujuContext.from_dict(os.environ)
+        self._juju_context = juju_context
         self._juju_version = self._juju_context.version
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
         unit_name_ = unit_name or self._juju_context.unit_name
@@ -3238,12 +3243,12 @@ class _ModelBackend:
         """Return remote app name for given relation ID, or None if not known."""
         if (
             self._juju_context.relation_id is not None
-            and self._juju_context.remote_app is not None
+            and self._juju_context.remote_app_name is not None
         ):
             event_relation_id = self._juju_context.relation_id
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return self._juju_context.remote_app
+                return self._juju_context.remote_app_name
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.

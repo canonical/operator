@@ -56,9 +56,10 @@ from typing import (
     cast,
 )
 
-from ops import charm, framework, main, model, pebble, storage
+from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
+from ops.jujucontext import _JujuContext
 from ops.model import Container, RelationNotFoundError, _NetworkDict
 from ops.pebble import ExecProcess
 
@@ -259,7 +260,9 @@ class Harness(Generic[CharmType]):
         actions: Optional[YAMLStringOrFile] = None,
         config: Optional[YAMLStringOrFile] = None,
     ):
-        self._juju_context = main._JujuContext.from_dict(os.environ)
+        if 'JUJU_VERSION' not in os.environ:
+            os.environ['JUJU_VERSION'] = '0.0.0'
+        self._juju_context = _JujuContext.from_dict(os.environ)
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -2300,7 +2303,7 @@ class _TestingModelBackend:
         unit_name: str,
         meta: charm.CharmMeta,
         config: '_RawConfig',
-        juju_context: main._JujuContext,
+        juju_context: _JujuContext,
     ):
         self._juju_context = juju_context
         self.unit_name = unit_name
