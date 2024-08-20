@@ -4,7 +4,7 @@
 import marshal
 import os
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Iterable, List, NamedTuple, Tuple, Union
@@ -186,27 +186,33 @@ def _check_workload_event(
     event: "_Event",
     state: "State",
     errors: List[str],
-    warnings: List[str],  # noqa: U100
+    warnings: List[str],
 ):
     if not event.container:
         errors.append(
             "cannot construct a workload event without the container instance. "
             "Please pass one.",
         )
-    elif not event.name.startswith(normalize_name(event.container.name)):
-        errors.append(
-            f"workload event should start with container name. {event.name} does "
-            f"not start with {event.container.name}.",
-        )
-        if event.container not in state.containers:
+    else:
+        if not event.name.startswith(normalize_name(event.container.name)):
             errors.append(
-                f"cannot emit {event.name} because container {event.container.name} "
-                f"is not in the state.",
+                f"workload event should start with container name. {event.name} does "
+                f"not start with {event.container.name}.",
             )
-        if not event.container.can_connect:
-            warnings.append(
-                "you **can** fire fire pebble-ready while the container cannot connect, "
-                "but that's most likely not what you want.",
+            if event.container not in state.containers:
+                errors.append(
+                    f"cannot emit {event.name} because container {event.container.name} "
+                    f"is not in the state.",
+                )
+            if not event.container.can_connect:
+                warnings.append(
+                    "you **can** fire fire pebble-ready while the container cannot connect, "
+                    "but that's most likely not what you want.",
+                )
+        names = Counter(exec.command_prefix for exec in event.container.execs)
+        if dupes := [n for n in names if names[n] > 1]:
+            errors.append(
+                f"container {event.container.name} has duplicate command prefixes: {dupes}",
             )
 
 
@@ -585,18 +591,20 @@ def check_containers_consistency(
                 f"container with that name is not present in the state. It's odd, but "
                 f"consistent, if it cannot connect; but it should at least be there.",
             )
+        # - you're processing a Notice event and that notice is not in any of the containers
         if event.notice and event.notice.id not in all_notices:
             errors.append(
                 f"the event being processed concerns notice {event.notice!r}, but that "
                 "notice is not in any of the containers present in the state.",
             )
+        # - you're processing a Check event and that check is not in the check's container
         if (
             event.check_info
             and (evt_container_name, event.check_info.name) not in all_checks
         ):
             errors.append(
                 f"the event being processed concerns check {event.check_info.name}, but that "
-                "check is not the {evt_container_name} container.",
+                f"check is not in the {evt_container_name} container.",
             )
 
     # - a container in state.containers is not in meta.containers

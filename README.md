@@ -639,6 +639,7 @@ class MyCharm(ops.CharmBase):
     def _on_start(self, _):
         foo = self.unit.get_container('foo')
         proc = foo.exec(['ls', '-ll'])
+        proc.stdin.write("...")
         stdout, _ = proc.wait_output()
         assert stdout == LS_LL
 
@@ -646,10 +647,12 @@ class MyCharm(ops.CharmBase):
 def test_pebble_exec():
     container = scenario.Container(
         name='foo',
-        exec_mock={
-            ('ls', '-ll'):  # this is the command we're mocking
-                scenario.ExecOutput(return_code=0,  # this data structure contains all we need to mock the call.
-                                    stdout=LS_LL)
+        execs={
+            scenario.Exec(
+                command_prefix=['ls'],
+                return_code=0,
+                stdout=LS_LL,
+            ),
         }
     )
     state_in = scenario.State(containers={container})
@@ -661,7 +664,19 @@ def test_pebble_exec():
         ctx.on.pebble_ready(container),
         state_in,
     )
+    assert ctx.exec_history[container.name][0].command == ['ls', '-ll']
+    assert ctx.exec_history[container.name][0].stdin == "..."
 ```
+
+Scenario will attempt to find the right `Exec` object by matching the provided
+command prefix against the command used in the ops `container.exec()` call. For
+example if the command is `['ls', '-ll']` then the searching will be:
+
+ 1. an `Exec` with exactly the same as command prefix, `('ls', '-ll')`
+ 2. an `Exec` with the command prefix `('ls', )`
+ 3. an `Exec` with the command prefix `()`
+
+If none of these are found Scenario will raise an `ExecError`.
 
 ### Pebble Notices
 

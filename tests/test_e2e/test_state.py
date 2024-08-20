@@ -279,9 +279,9 @@ def test_container_default_values():
     assert container.name == name
     assert container.can_connect is False
     assert container.layers == {}
-    assert container.service_status == {}
+    assert container.service_statuses == {}
     assert container.mounts == {}
-    assert container.exec_mock == {}
+    assert container.execs == frozenset()
     assert container.layers == {}
     assert container._base_plan == {}
 

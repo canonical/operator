@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
 
 from ops import CharmBase, EventBase
+from ops.testing import ExecArgs
 
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
@@ -450,6 +451,7 @@ class Context:
         self.juju_log: List["JujuLogLine"] = []
         self.app_status_history: List["_EntityStatus"] = []
         self.unit_status_history: List["_EntityStatus"] = []
+        self.exec_history: Dict[str, List[ExecArgs]] = {}
         self.workload_version_history: List[str] = []
         self.removed_secret_revisions: List[int] = []
         self.emitted_events: List[EventBase] = []

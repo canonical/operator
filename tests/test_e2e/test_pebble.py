@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import io
 import tempfile
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import CheckInfo, Container, ExecOutput, Mount, Notice, State
+from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
 from tests.helpers import jsonpatch_delta, trigger
 
 
@@ -193,7 +194,7 @@ def test_exec(charm_cls, cmd, out):
         container = self.unit.get_container("foo")
         proc = container.exec([cmd])
         proc.wait()
-        assert proc.stdout.read() == "hello pebble"
+        assert proc.stdout.read() == out
 
     trigger(
         State(
@@ -201,7 +202,7 @@ def test_exec(charm_cls, cmd, out):
                 Container(
                     name="foo",
                     can_connect=True,
-                    exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
+                    execs={Exec([cmd], stdout=out)},
                 )
             }
         ),
@@ -210,6 +211,32 @@ def test_exec(charm_cls, cmd, out):
         event="start",
         post_event=callback,
     )
+
+
+@pytest.mark.parametrize(
+    "stdin,write",
+    (
+        [None, "hello world!"],
+        ["hello world!", None],
+        [io.StringIO("hello world!"), None],
+    ),
+)
+def test_exec_history_stdin(stdin, write):
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.foo_pebble_ready, self._on_ready)
+
+        def _on_ready(self, _):
+            proc = self.unit.get_container("foo").exec(["ls"], stdin=stdin)
+            if write:
+                proc.stdin.write(write)
+            proc.wait()
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    container = Container(name="foo", can_connect=True, execs={Exec([])})
+    ctx.run(ctx.on.pebble_ready(container=container), State(containers={container}))
+    assert ctx.exec_history[container.name][0].stdin == "hello world!"
 
 
 def test_pebble_ready(charm_cls):
@@ -279,7 +306,7 @@ def test_pebble_plan(charm_cls, starting_service_status):
                 }
             )
         },
-        service_status={
+        service_statuses={
             "fooserv": pebble.ServiceStatus.ACTIVE,
             # todo: should we disallow setting status for services that aren't known YET?
             "barserv": starting_service_status,
@@ -312,7 +339,7 @@ def test_exec_wait_error(charm_cls):
             Container(
                 name="foo",
                 can_connect=True,
-                exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
+                execs={Exec(["foo"], stdout="hello pebble", return_code=1)},
             )
         }
     )
@@ -321,20 +348,19 @@ def test_exec_wait_error(charm_cls):
     with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         proc = container.exec(["foo"])
-        with pytest.raises(ExecError):
-            proc.wait()
-        assert proc.stdout.read() == "hello pebble"
+        with pytest.raises(ExecError) as exc_info:
+            proc.wait_output()
+        assert exc_info.value.stdout == "hello pebble"
 
 
-def test_exec_wait_output(charm_cls):
+@pytest.mark.parametrize("command", (["foo"], ["foo", "bar"], ["foo", "bar", "baz"]))
+def test_exec_wait_output(charm_cls, command):
     state = State(
         containers={
             Container(
                 name="foo",
                 can_connect=True,
-                exec_mock={
-                    ("foo",): ExecOutput(stdout="hello pebble", stderr="oepsie")
-                },
+                execs={Exec(["foo"], stdout="hello pebble", stderr="oepsie")},
             )
         }
     )
@@ -342,10 +368,11 @@ def test_exec_wait_output(charm_cls):
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
     with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
-        proc = container.exec(["foo"])
+        proc = container.exec(command)
         out, err = proc.wait_output()
         assert out == "hello pebble"
         assert err == "oepsie"
+        assert ctx.exec_history[container.name][0].command == command
 
 
 def test_exec_wait_output_error(charm_cls):
@@ -354,7 +381,7 @@ def test_exec_wait_output_error(charm_cls):
             Container(
                 name="foo",
                 can_connect=True,
-                exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
+                execs={Exec(["foo"], stdout="hello pebble", return_code=1)},
             )
         }
     )
