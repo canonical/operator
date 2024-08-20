@@ -35,7 +35,6 @@ from scenario.state import (
     UDPPort,
     UnknownStatus,
     WaitingStatus,
-    deferred,
 )
 
 __all__ = [
@@ -44,7 +43,6 @@ __all__ = [
     "CloudCredential",
     "CloudSpec",
     "Context",
-    "deferred",
     "StateValidationError",
     "Secret",
     "Relation",

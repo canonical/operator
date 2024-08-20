@@ -12,7 +12,7 @@ from ops.charm import (
 from ops.framework import Framework
 
 from scenario import Context
-from scenario.state import Container, Notice, Relation, State, _Event, deferred
+from scenario.state import Container, Notice, Relation, State, _Event
 from tests.helpers import trigger
 
 CHARM_CALLED = 0
@@ -54,7 +54,7 @@ def test_deferred_evt_emitted(mycharm):
     mycharm.defer_next = 2
 
     out = trigger(
-        State(deferred=[deferred(event="update_status", handler=mycharm._on_event)]),
+        State(deferred=[_Event("update_status").deferred(handler=mycharm._on_event)]),
         "start",
         mycharm,
         meta=mycharm.META,
@@ -72,49 +72,6 @@ def test_deferred_evt_emitted(mycharm):
     assert isinstance(start, StartEvent)
 
 
-def test_deferred_relation_event_without_relation_raises(mycharm):
-    with pytest.raises(AttributeError):
-        deferred(event="foo_relation_changed", handler=mycharm._on_event)
-
-
-def test_deferred_relation_evt(mycharm):
-    rel = Relation(endpoint="foo", remote_app_name="remote")
-    evt1 = _Event("foo_relation_changed", relation=rel).deferred(
-        handler=mycharm._on_event
-    )
-    evt2 = deferred(
-        event="foo_relation_changed",
-        handler=mycharm._on_event,
-        relation=rel,
-    )
-
-    assert asdict(evt2) == asdict(evt1)
-
-
-def test_deferred_workload_evt(mycharm):
-    ctr = Container("foo")
-    evt1 = _Event("foo_pebble_ready", container=ctr).deferred(handler=mycharm._on_event)
-    evt2 = deferred(event="foo_pebble_ready", handler=mycharm._on_event, container=ctr)
-
-    assert asdict(evt2) == asdict(evt1)
-
-
-def test_deferred_notice_evt(mycharm):
-    notice = Notice(key="example.com/bar")
-    ctr = Container("foo", notices=[notice])
-    evt1 = _Event("foo_pebble_custom_notice", notice=notice, container=ctr).deferred(
-        handler=mycharm._on_event
-    )
-    evt2 = deferred(
-        event="foo_pebble_custom_notice",
-        handler=mycharm._on_event,
-        container=ctr,
-        notice=notice,
-    )
-
-    assert asdict(evt2) == asdict(evt1)
-
-
 def test_deferred_relation_event(mycharm):
     mycharm.defer_next = 2
 
@@ -124,10 +81,8 @@ def test_deferred_relation_event(mycharm):
         State(
             relations={rel},
             deferred=[
-                deferred(
-                    event="foo_relation_changed",
+                _Event("foo_relation_changed", relation=rel).deferred(
                     handler=mycharm._on_event,
-                    relation=rel,
                 )
             ],
         ),
