@@ -3166,7 +3166,6 @@ class _ModelBackend:
         if juju_context is None:
             juju_context = _JujuContext.from_dict(os.environ)
         self._juju_context = juju_context
-        self._juju_version = self._juju_context.version
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
         unit_name_ = unit_name or self._juju_context.unit_name
         if unit_name_ is None:
@@ -3274,10 +3273,10 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
-        assert self._juju_version is not None
-        if is_app and not self._juju_version.has_app_data():
+        if is_app and not self._juju_context.version.has_app_data():
             raise RuntimeError(
-                f'getting application data is not supported on Juju version {self._juju_version}'
+                'getting application data is not supported on Juju version '
+                f'{self._juju_context.version}'
             )
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
@@ -3296,10 +3295,10 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
-        assert self._juju_version is not None
-        if is_app and not self._juju_version.has_app_data():
+        if is_app and not self._juju_context.version.has_app_data():
             raise RuntimeError(
-                f'setting application data is not supported on Juju version {self._juju_version}'
+                'setting application data is not supported on Juju version '
+                f'{self._juju_context.version}'
             )
 
         args = ['relation-set', '-r', str(relation_id)]

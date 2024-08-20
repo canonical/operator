@@ -240,7 +240,6 @@ class _Dispatcher:
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
         dispatch = charm_dir / 'dispatch'
-        assert self._juju_context.version is not None
         if self._juju_context.version.is_dispatch_aware() and _exe_path(dispatch) is not None:
             self._init_dispatch()
         else:
@@ -361,7 +360,6 @@ def _should_use_controller_storage(
         return False
 
     # are we in a new enough Juju?
-    assert juju_context.version is not None
     if juju_context.version.has_controller_storage():
         logger.debug('Using controller storage: JUJU_VERSION=%s', juju_context.version)
         return True

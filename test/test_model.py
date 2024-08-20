@@ -32,7 +32,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops._private import yaml
-from ops.jujucontext import JujuVersion
+from ops.jujucontext import JujuVersion, _JujuContext
 from ops.model import _ModelBackend
 from test.test_helpers import FakeScript
 
@@ -2076,8 +2076,8 @@ containers:
         assert len(caplog.records) == 1
         assert re.search(r'api error!', caplog.text)
 
-    def test_exec(self, container: ops.Container):
-        container._juju_version = JujuVersion('3.1.6')
+    def test_exec(self, container: ops.Container, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(container, '_juju_version', JujuVersion('3.1.6'))
         container.pebble.responses.append('fake_exec_process')  # type: ignore
         stdout = io.StringIO('STDOUT')
         stderr = io.StringIO('STDERR')
@@ -2120,8 +2120,10 @@ containers:
         ]
         assert p == 'fake_exec_process'
 
-    def test_exec_service_context_not_supported(self, container: ops.Container):
-        container._juju_version = JujuVersion('3.1.5')
+    def test_exec_service_context_not_supported(
+        self, container: ops.Container, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(container, '_juju_version', JujuVersion('3.1.5'))
         with pytest.raises(RuntimeError):
             container.exec(['foo'], service_context='srv1')
 
@@ -2701,7 +2703,9 @@ class TestModelBackend:
         assert model.unit.is_leader()
 
     def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion('2.8.0'))
+        monkeypatch.setattr(
+            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.8.0'})
+        )
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [
@@ -2771,14 +2775,18 @@ class TestModelBackend:
         fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
 
         # on 2.7.0+, things proceed as expected
-        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion(version))
+        monkeypatch.setattr(
+            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
+        )
         rel_data = self.backend.relation_get(1, 'foo/0', is_app=True)
         assert rel_data == {'foo': 'bar'}
         calls = [' '.join(i) for i in fake_script.calls(clear=True)]
         assert calls == ['relation-get -r 1 - foo/0 --app --format=json']
 
         # before 2.7.0, it just fails (no --app support)
-        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion('2.6.9'))
+        monkeypatch.setattr(
+            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
+        )
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
@@ -2799,7 +2807,9 @@ class TestModelBackend:
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()),
             )
-            monkeypatch.setattr(self.backend, '_juju_version', JujuVersion(version))
+            monkeypatch.setattr(
+                self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
+            )
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
@@ -2811,7 +2821,9 @@ class TestModelBackend:
         assert decoded == 'foo: bar\n'
 
         # before 2.7.0, it just fails always (no --app support)
-        monkeypatch.setattr(self.backend, '_juju_version', JujuVersion('2.6.9'))
+        monkeypatch.setattr(
+            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
+        )
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
             self.backend.relation_set(1, 'foo', 'bar', is_app=True)
         assert fake_script.calls() == []
