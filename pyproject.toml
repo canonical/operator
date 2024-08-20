@@ -28,7 +28,7 @@ docs = [
     "linkify-it-py",
     "myst-parser",
     "pyspelling",
-    "sphinx==6.2.1",
+    "sphinx ~= 8.0.0",
     "sphinx-autobuild",
     "sphinx-copybutton",
     "sphinx-design",
