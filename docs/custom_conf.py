@@ -3,6 +3,11 @@ import datetime
 import pathlib
 import sys
 
+from docutils import nodes
+
+from sphinx import addnodes
+from sphinx.util.docutils import SphinxDirective
+
 import furo
 import furo.navigation
 
@@ -16,8 +21,8 @@ _old_compute_navigation_tree = furo._compute_navigation_tree
 
 def _compute_navigation_tree(context):
     tree_html = _old_compute_navigation_tree(context)
-    if not tree_html and context.get("toc"):
-        tree_html = furo.navigation.get_navigation_tree(context["toc"])
+    if not tree_html and context.get('toc'):
+        tree_html = furo.navigation.get_navigation_tree(context['toc'])
     return tree_html
 
 
@@ -27,14 +32,17 @@ furo._compute_navigation_tree = _compute_navigation_tree
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
 import re  # noqa: E402
 import sphinx.ext.autodoc  # noqa: E402
+
 sphinx.ext.autodoc.py_ext_sig_re = re.compile(
-    r'''^ ([\w.]+::)?            # explicit module name
+    r"""^ ([\w.]+::)?            # explicit module name
           ([\w.]+\.)?            # module and/or class name(s)
           ([^.()]+)  \s*         # thing name
           (?: \((.*)\)           # optional: arguments
            (?:\s* -> \s* (.*))?  #           return annotation
           )? $                   # and nothing more
-          ''', re.VERBOSE)
+          """,
+    re.VERBOSE,
+)
 
 # Custom configuration for the Sphinx documentation builder.
 # All configuration specific to your project should be done in this file.
@@ -98,53 +106,43 @@ html_favicon = '.sphinx/_static/favicon.png'
 # (Some settings must be part of the html_context dictionary, while others
 #  are on root level. Don't move the settings.)
 html_context = {
-
     # Change to the link to the website of your product (without "https://")
     # For example: "ubuntu.com/lxd" or "microcloud.is"
     # If there is no product website, edit the header template to remove the
     # link (see the readme for instructions).
     'product_page': 'juju.is/docs/sdk',
-
     # Add your product tag (the orange part of your logo, will be used in the
     # header) to ".sphinx/_static" and change the path here (start with "_static")
     # (default is the circle of friends)
     'product_tag': '_static/tag.png',
-
     # Change to the discourse instance you want to be able to link to
     # using the :discourse: metadata at the top of a file
     # (use an empty value if you don't want to link)
     'discourse': 'https://discourse.charmhub.io/',
-
     # Change to the Mattermost channel you want to link to
     # (use an empty value if you don't want to link)
     'mattermost': '',
-
     # Change to the Matrix channel you want to link to
     # (use an empty value if you don't want to link)
     'matrix': 'https://matrix.to/#/#charmhub-charmdev:ubuntu.com',
-
     # Change to the GitHub URL for your project
     'github_url': 'https://github.com/canonical/operator',
-
     # Change to the branch for this version of the documentation
     'github_version': 'main',
-
     # Change to the folder that contains the documentation
     # (usually "/" or "/docs/")
     'github_folder': '/docs/',
-
     # Change to an empty value if your GitHub repo doesn't have issues enabled.
     # This will disable the feedback button and the issue link in the footer.
     'github_issues': 'enabled',
-
     # Controls the existence of Previous / Next buttons at the bottom of pages
     # Valid options: none, prev, next, both
-    'sequential_nav': "none"
+    'sequential_nav': 'none',
 }
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
-slug = ""
+slug = ''
 
 ############################################################
 ### Redirects
@@ -163,9 +161,7 @@ redirects = {}
 ############################################################
 
 # Links to ignore when checking links
-linkcheck_ignore = [
-    'http://127.0.0.1:8000'
-    ]
+linkcheck_ignore = ['http://127.0.0.1:8000']
 
 # Pages on which to ignore anchors
 # (This list will be appended to linkcheck_anchors_ignore_for_url)
@@ -197,7 +193,7 @@ custom_extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
-    ]
+]
 
 # Add custom required Python modules that must be added to the
 # .sphinx/requirements.txt file.
@@ -211,7 +207,7 @@ custom_required_modules = []
 # Add files or directories that should be excluded from processing.
 custom_excludes = [
     'doc-cheat-sheet*',
-    ]
+]
 
 # Add CSS files (located in .sphinx/_static/)
 custom_html_css_files = []
@@ -241,10 +237,10 @@ custom_tags = []
 ## Add any configuration that is not covered by the common conf.py file.
 
 # Define a :center: role that can be used to center the content of table cells.
-rst_prolog = '''
+rst_prolog = """
 .. role:: center
    :class: align-center
-'''
+"""
 
 
 # -- Options for sphinx.ext.todo ---------------------------------------------
@@ -280,7 +276,7 @@ autoclass_content = 'class'
 autodoc_member_order = 'alphabetical'
 
 autodoc_default_options = {
-    'members': None,            # None here means "yes"
+    'members': None,  # None here means "yes"
     'undoc-members': None,
     'show-inheritance': None,
 }
@@ -334,3 +330,85 @@ nitpick_ignore = [
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
 ]
+
+
+# This is very strongly based on
+# https://github.com/sphinx-doc/sphinx/blob/03b9134ee00e98df4f8b5f6d22f345cdafe31870/sphinx/domains/changeset.py#L46
+# Unfortunately, the built-in class is not easily subclassable without also
+# requiring extra CSS.
+class JujuVersion(SphinxDirective):
+    """Directive to describe in which version of Juju a feature was added or removed."""
+
+    change = 'changed'
+
+    has_content = True
+    required_arguments = 1
+    optional_arguments = 1
+    final_argument_whitespace = True
+    option_spec = {}
+
+    def run(self):
+        node = addnodes.versionmodified()
+        node.document = self.state.document
+        self.set_source_info(node)
+        # Make the <div> have a class matching the built-in directives so that
+        # we don't need custom CSS.
+        node['type'] = f'version{self.change}'
+        node['version'] = self.arguments[0]
+        text = f'{self.text} in Juju version {self.arguments[0]}'
+        if len(self.arguments) == 2:
+            inodes, messages = self.state.inline_text(self.arguments[1], self.lineno + 1)
+            para = nodes.paragraph(self.arguments[1], '', *inodes, translatable=False)
+            self.set_source_info(para)
+            node.append(para)
+        else:
+            messages = []
+        if self.content:
+            node += self.parse_content_to_nodes()
+        classes = ['versionmodified', self.change, 'jujuversion']
+        if len(node) > 0 and isinstance(node[0], nodes.paragraph):
+            # The contents start with a paragraph.
+            if node[0].rawsource:
+                # Make the first paragraph translatable.
+                content = nodes.inline(node[0].rawsource, translatable=True)
+                content.source = node[0].source
+                content.line = node[0].line
+                content += node[0].children
+                node[0].replace_self(nodes.paragraph('', '', content, translatable=False))
+
+            para = node[0]
+            para.insert(0, nodes.inline('', '%s: ' % text, classes=classes))
+        elif len(node) > 0:
+            # The contents do not start with a paragraph.
+            para = nodes.paragraph(
+                '', '', nodes.inline('', '%s: ' % text, classes=classes), translatable=False
+            )
+            node.insert(0, para)
+        else:
+            # The contents are empty.
+            para = nodes.paragraph(
+                '', '', nodes.inline('', '%s.' % text, classes=classes), translatable=False
+            )
+            node.append(para)
+
+        domain = self.env.get_domain('changeset')
+        domain.note_changeset(node)
+
+        ret: list[Node] = [node]
+        ret += messages
+        return ret
+
+
+class JujuAdded(JujuVersion):
+    change = 'added'
+    text = 'Added'
+
+
+class JujuRemoved(JujuVersion):
+    change = 'removed'
+    text = 'Scheduled for removal'
+
+
+def setup(app):
+    app.add_directive('jujuversion', JujuAdded)
+    app.add_directive('jujuremoved', JujuRemoved)

@@ -538,6 +538,9 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
 
     The event name is based on the way this executable was called (argv[0]).
 
+    .. jujuremoved:: 4.0
+        The ``use_juju_for_storage`` argument is not available from Juju 4.0
+
     Args:
         charm_class: the charm class to instantiate and receive the event.
         use_juju_for_storage: whether to use controller-side storage. If not specified
