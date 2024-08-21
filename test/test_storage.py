@@ -55,7 +55,7 @@ class StoragePermutations(abc.ABC):
             None,  # type: ignore
             None,  # type: ignore
             None,  # type: ignore
-            juju_context=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}),
+            juju_debug_at=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}).debug_at,
         )
 
     @abc.abstractmethod

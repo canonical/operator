@@ -112,7 +112,7 @@ def create_framework(
         tmpdir,
         meta,
         model,
-        juju_context=_JujuContext.from_dict(os.environ),
+        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
     )
 
     def finalizer():

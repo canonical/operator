@@ -73,7 +73,7 @@ def create_framework(
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
         model=model,  # type: ignore
-        juju_context=_JujuContext.from_dict(os.environ),
+        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
     )
     request.addfinalizer(framework.close)
     request.addfinalizer(patcher.stop)
@@ -94,7 +94,7 @@ class TestFramework:
                 None,  # type: ignore
                 None,  # type: ignore
                 None,  # type: ignore
-                juju_context=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}),
+                juju_debug_at=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}).debug_at,
             )
         assert 'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path' in [
             f'{record.levelname}:{record.name}:{record.message}' for record in caplog.records
@@ -1506,7 +1506,7 @@ class TestStoredState:
                     meta,
                     model,
                     event_name,
-                    juju_context=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}),
+                    juju_debug_at=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}).debug_at,
                 )
                 self.snapshots: typing.List[typing.Any] = []
 

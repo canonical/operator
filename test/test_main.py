@@ -375,7 +375,7 @@ class _TestMain(abc.ABC):
                 meta,
                 None,  # type: ignore
                 event_name,
-                juju_context=_JujuContext.from_dict(env),
+                juju_debug_at=_JujuContext.from_dict(env).debug_at,
             )
 
             class ThisCharmEvents(MyCharmEvents):

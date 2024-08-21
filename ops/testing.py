@@ -282,7 +282,7 @@ class Harness(Generic[CharmType]):
             self._charm_dir,
             self._meta,
             self._model,
-            juju_context=self._juju_context,
+            juju_debug_at=self._juju_context.debug_at,
         )
 
     def _event_context(self, event_name: str):
