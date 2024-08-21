@@ -278,7 +278,7 @@ class Harness(Generic[CharmType]):
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
-            self._storage, self._charm_dir, self._meta, self._model
+            self._storage, self._charm_dir, self._meta, self._model, self._juju_context
         )
 
     def _event_context(self, event_name: str):

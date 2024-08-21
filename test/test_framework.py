@@ -30,6 +30,7 @@ import pytest
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
+from ops.jujucontext import _JujuContext
 from ops.model import _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 from test.test_helpers import FakeScript
@@ -66,11 +67,13 @@ def create_framework(
 
     patcher = patch('ops.storage.SQLiteStorage.DB_LOCK_TIMEOUT', datetime.timedelta(0))
     patcher.start()
+    os.environ.update({'JUJU_VERSION': '0.0.0'})
     framework = ops.Framework(
         SQLiteStorage(data_fpath),
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
         model=model,  # type: ignore
+        juju_context=_JujuContext.from_dict(os.environ),
     )
     request.addfinalizer(framework.close)
     request.addfinalizer(patcher.stop)
@@ -86,7 +89,13 @@ class TestFramework:
     def test_deprecated_init(self, caplog: pytest.LogCaptureFixture):
         # For 0.7, this still works, but it is deprecated.
         with caplog.at_level(logging.WARNING):
-            framework = ops.Framework(':memory:', None, None, None)  # type: ignore
+            framework = ops.Framework(
+                ':memory:',  # type: ignore
+                None,  # type: ignore
+                None,  # type: ignore
+                None,  # type: ignore
+                _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}),
+            )
         assert 'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path' in [
             f'{record.levelname}:{record.name}:{record.message}' for record in caplog.records
         ]
@@ -1491,7 +1500,14 @@ class TestStoredState:
                 model: ops.Model,
                 event_name: str,
             ):
-                super().__init__(store, charm_dir, meta, model, event_name)
+                super().__init__(
+                    store,
+                    charm_dir,
+                    meta,
+                    model,
+                    _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}),
+                    event_name,
+                )
                 self.snapshots: typing.List[typing.Any] = []
 
             def save_snapshot(self, value: typing.Union[ops.StoredStateData, ops.EventBase]):

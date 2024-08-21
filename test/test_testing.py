@@ -39,7 +39,7 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
-from ops.jujucontext import JujuVersion
+from ops.jujuversion import JujuVersion
 from ops.model import _ModelBackend
 from ops.pebble import FileType
 from ops.testing import ExecResult, _TestingPebbleClient

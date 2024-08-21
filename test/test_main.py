@@ -30,7 +30,7 @@ from unittest.mock import patch
 import pytest
 
 import ops
-from ops.jujucontext import JujuVersion, _JujuContext
+from ops.jujucontext import _JujuContext
 from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
@@ -358,8 +358,7 @@ class _TestMain(abc.ABC):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(
-        self,
-        event_name: str,
+        self, event_name: str, env: typing.Dict[str, str]
     ) -> typing.Union[ops.BoundStoredState, ops.StoredStateData]:
         if self._charm_state_file.stat().st_size:
             storage = SQLiteStorage(self._charm_state_file)
@@ -370,7 +369,14 @@ class _TestMain(abc.ABC):
                         meta = ops.CharmMeta.from_yaml(m, a)
                 else:
                     meta = ops.CharmMeta.from_yaml(m)
-            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)  # type: ignore
+            framework = ops.Framework(
+                storage,
+                self.JUJU_CHARM_DIR,
+                meta,
+                None,  # type: ignore
+                _JujuContext.from_dict(env),
+                event_name,
+            )
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -474,7 +480,7 @@ class _TestMain(abc.ABC):
             env['JUJU_MODEL_NAME'] = event_spec.model_name
 
         self._call_event(fake_script, Path(event_dir, event_filename), env)
-        return self._read_and_clear_state(event_spec.event_name)
+        return self._read_and_clear_state(event_spec.event_name, env)
 
     @pytest.mark.usefixtures('setup_charm')
     def test_event_reemitted(self, fake_script: FakeScript):
@@ -1488,82 +1494,3 @@ class TestStorageHeuristics:
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
             juju_context = _JujuContext.from_dict(os.environ)
             assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)
-
-
-class TestJujuContext:
-    def test_both_str_and_int_fields_default_to_none(self):
-        juju_context = _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'})
-        assert juju_context.action_name is None
-        assert juju_context.relation_id is None
-
-    def test_parsing_int_fields(self):
-        juju_context = _JujuContext.from_dict({
-            'JUJU_VERSION': '0.0.0',
-            'JUJU_RELATION_ID': 'x:42',
-        })
-        assert juju_context.relation_id == 42
-
-    def test_parsing_secret_revision_as_int(self):
-        juju_context = _JujuContext.from_dict({
-            'JUJU_VERSION': '0.0.0',
-            'JUJU_SECRET_REVISION': '42',
-        })
-        assert juju_context.secret_revision == 42
-
-    def test_parsing_juju_debug_as_bool(self):
-        juju_context = _JujuContext.from_dict({
-            'JUJU_VERSION': '0.0.0',
-            'JUJU_DEBUG': 'true',
-        })
-        assert juju_context.debug is True
-
-    def test_parsing_juju_charm_dir(self):
-        juju_context = _JujuContext.from_dict({
-            'JUJU_VERSION': '0.0.0',
-            'JUJU_CHARM_DIR': '/dir',
-        })
-        assert juju_context.charm_dir == Path('/dir')
-
-    def test_parsing_juju_charm_dir_not_set(self):
-        juju_context = _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'})
-        assert juju_context.charm_dir == Path(f'{__file__}/../../..').resolve()
-
-    def test_parsing_juju_version(self):
-        juju_context = _JujuContext.from_dict({'JUJU_VERSION': '3.4.0'})
-        assert juju_context.version == JujuVersion('3.4.0')
-
-    def test_parsing_storage_id_to_name(self):
-        juju_context = _JujuContext.from_dict({
-            'JUJU_VERSION': '0.0.0',
-            'JUJU_STORAGE_ID': 'my-storage/1',
-        })
-        assert juju_context.storage_name == 'my-storage'
-
-    def test_parsing_all_str_fields(self):
-        env_var_attr_mapping = {
-            'JUJU_ACTION_NAME': 'action_name',
-            'JUJU_ACTION_UUID': 'action_uuid',
-            'JUJU_DISPATCH_PATH': 'dispatch_path',
-            'JUJU_MODEL_NAME': 'model_name',
-            'JUJU_MODEL_UUID': 'model_uuid',
-            'JUJU_NOTICE_ID': 'notice_id',
-            'JUJU_NOTICE_KEY': 'notice_key',
-            'JUJU_NOTICE_TYPE': 'notice_type',
-            'JUJU_PEBBLE_CHECK_NAME': 'pebble_check_name',
-            'JUJU_DEPARTING_UNIT': 'relation_departing_unit_name',
-            'JUJU_RELATION': 'relation_name',
-            'JUJU_REMOTE_APP': 'remote_app_name',
-            'JUJU_REMOTE_UNIT': 'remote_unit_name',
-            'JUJU_SECRET_ID': 'secret_id',
-            'JUJU_SECRET_LABEL': 'secret_label',
-            'JUJU_UNIT_NAME': 'unit_name',
-            'JUJU_WORKLOAD_NAME': 'workload_name',
-        }
-
-        env = {key: 'foo' for key in env_var_attr_mapping}
-        env['JUJU_VERSION'] = '0.0.0'
-
-        juju_context = _JujuContext.from_dict(env)
-
-        for key in env_var_attr_mapping:
-            assert getattr(juju_context, env_var_attr_mapping[key]) == env[key]

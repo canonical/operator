@@ -55,7 +55,8 @@ from typing import (
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
-from ops.jujucontext import JujuVersion, _JujuContext
+from ops.jujucontext import _JujuContext
+from ops.jujuversion import JujuVersion
 
 # JujuVersion is not used in ops.model, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.

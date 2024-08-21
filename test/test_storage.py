@@ -30,6 +30,7 @@ import yaml
 
 import ops
 import ops.storage
+from ops.jujucontext import _JujuContext
 from test.test_helpers import FakeScript
 
 
@@ -49,7 +50,13 @@ class StoragePermutations(abc.ABC):
     ) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
         storage = self.create_storage(request, fake_script)
-        return ops.Framework(storage, None, None, None)  # type: ignore
+        return ops.Framework(
+            storage,
+            None,  # type: ignore
+            None,  # type: ignore
+            None,  # type: ignore
+            _JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}),
+        )
 
     @abc.abstractmethod
     def create_storage(

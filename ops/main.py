@@ -492,7 +492,12 @@ class _Manager:
         )
         store = self._make_storage(dispatcher)
         framework = ops.framework.Framework(
-            store, self._charm_root, self._charm_meta, model, event_name=dispatcher.event_name
+            store,
+            self._charm_root,
+            self._charm_meta,
+            model,
+            juju_context=self._juju_context,
+            event_name=dispatcher.event_name,
         )
         framework.set_breakpointhook()
         return framework
