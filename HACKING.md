@@ -190,6 +190,12 @@ Note that the commit messages to the PR's branch do not need to follow the
 conventional commit format, as these will be squashed into a single commit to `main`
 using the PR title as the commit message.
 
+## Copyright
+
+The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt).
+New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)).
+The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
+
 # Documentation
 
 In general, new functionality
