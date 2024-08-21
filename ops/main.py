@@ -496,8 +496,8 @@ class _Manager:
             self._charm_root,
             self._charm_meta,
             model,
-            juju_context=self._juju_context,
             event_name=dispatcher.event_name,
+            juju_context=self._juju_context,
         )
         framework.set_breakpointhook()
         return framework

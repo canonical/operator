@@ -603,8 +603,8 @@ class Framework(Object):
         charm_dir: Union[str, pathlib.Path],
         meta: 'charm.CharmMeta',
         model: 'Model',
-        juju_context: _JujuContext,
         event_name: Optional[str] = None,
+        juju_context: Optional[_JujuContext] = None,
     ):
         super().__init__(self, None)
 

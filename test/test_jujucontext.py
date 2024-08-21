@@ -45,6 +45,13 @@ class TestJujuContext:
         })
         assert juju_context.debug is True
 
+    def test_parsing_juju_debug_at_as_set(self):
+        juju_context = _JujuContext.from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_DEBUG_AT': 'all,hook',
+        })
+        assert juju_context.debug_at == set(('all', 'hook'))
+
     def test_parsing_juju_charm_dir(self):
         juju_context = _JujuContext.from_dict({
             'JUJU_VERSION': '0.0.0',
