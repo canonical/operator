@@ -108,7 +108,11 @@ def create_framework(
     model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
     # We can pass foo_event as event_name because we're not actually testing dispatch.
     framework = ops.Framework(
-        SQLiteStorage(':memory:'), tmpdir, meta, model, _JujuContext.from_dict(os.environ)
+        SQLiteStorage(':memory:'),
+        tmpdir,
+        meta,
+        model,
+        juju_context=_JujuContext.from_dict(os.environ),
     )
 
     def finalizer():
