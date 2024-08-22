@@ -235,7 +235,7 @@ custom_html_js_files = []
 # Specify a reST string that is included at the end of each file.
 # If commented out, use the default (which pulls the reuse/links.txt
 # file into each reST file).
-# custom_rst_epilog = ''
+custom_rst_epilog = ''
 
 # By default, the documentation includes a feedback button at the top.
 # You can disable it by setting the following configuration to True.
