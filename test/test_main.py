@@ -148,7 +148,7 @@ class TestCharmInit:
                 with fake_metadata.open('wb') as fh:
                     fh.write(b'name: test')
 
-                ops.main(charm_class, **kwargs)  # type: ignore
+                ops.main(charm_class, **kwargs)
 
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
@@ -236,7 +236,7 @@ class TestDispatch:
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops.main._emit_charm_event') as mock_charm_event:
-                    ops.main(MyCharm)  # type: ignore
+                    ops.main(MyCharm)
 
         assert mock_charm_event.call_count == 1
         return mock_charm_event.call_args[0][1]
