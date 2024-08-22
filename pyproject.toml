@@ -160,6 +160,7 @@ ignore = [
     # Unnecessary `tuple` call (rewrite as a literal)
     "C408",
 ]
+
 [tool.ruff.lint.per-file-ignores]
 "test/*" = [
     # All documentation linting.
@@ -180,6 +181,16 @@ ignore = [
 "test/test_helpers.py" = [
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
     "S607",  # Starting a process with a partial executable path
+]
+"docs/custom_conf.py" = [
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "E266",  # Too many leading `#` before block comment
+    "I001",  # Import block is un-sorted or un-formatted
+    "RUF003",  # Comment contains ambiguous unicode characters (EN DASH, RIGHT SINGLE QUOTATION MARK)
+    "UP031",  # Use format specifiers instead of percent format
 ]
 
 [tool.ruff.lint.pydocstyle]
