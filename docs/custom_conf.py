@@ -409,7 +409,7 @@ class JujuVersion(SphinxDirective):
         domain = self.env.get_domain('changeset')
         domain.note_changeset(node)
 
-        ret: list[Node] = [node]
+        ret = [node]
         ret += messages
         return ret
 
