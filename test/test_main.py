@@ -235,7 +235,7 @@ class TestDispatch:
                 dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
-                with patch('ops._main._emit_charm_event') as mock_charm_event:
+                with patch('ops.main._emit_charm_event') as mock_charm_event:
                     ops.main(MyCharm)
 
         assert mock_charm_event.call_count == 1
