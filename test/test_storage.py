@@ -30,7 +30,6 @@ import yaml
 
 import ops
 import ops.storage
-from ops.jujucontext import _JujuContext
 from test.test_helpers import FakeScript
 
 
@@ -55,7 +54,7 @@ class StoragePermutations(abc.ABC):
             None,  # type: ignore
             None,  # type: ignore
             None,  # type: ignore
-            juju_debug_at=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}).debug_at,
+            juju_debug_at=set(),
         )
 
     @abc.abstractmethod

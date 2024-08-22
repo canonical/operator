@@ -20,7 +20,6 @@ import inspect
 import keyword
 import logging
 import marshal
-import os
 import pathlib
 import pdb
 import re
@@ -49,7 +48,6 @@ from typing import (
 )
 
 from ops import charm
-from ops.jujucontext import _JujuContext
 from ops.model import Model, _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
@@ -651,9 +649,7 @@ class Framework(Object):
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed: bool = False
-        if juju_debug_at is None:
-            juju_debug_at = _JujuContext.from_dict(os.environ).debug_at
-        self._juju_debug_at = juju_debug_at
+        self._juju_debug_at = juju_debug_at or set()
 
     def set_breakpointhook(self) -> Optional[Any]:
         """Hook into ``sys.breakpointhook`` so the builtin ``breakpoint()`` works as expected.

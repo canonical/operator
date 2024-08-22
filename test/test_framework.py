@@ -94,7 +94,7 @@ class TestFramework:
                 None,  # type: ignore
                 None,  # type: ignore
                 None,  # type: ignore
-                juju_debug_at=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}).debug_at,
+                juju_debug_at=set(),
             )
         assert 'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path' in [
             f'{record.levelname}:{record.name}:{record.message}' for record in caplog.records
@@ -1506,7 +1506,7 @@ class TestStoredState:
                     meta,
                     model,
                     event_name,
-                    juju_debug_at=_JujuContext.from_dict({'JUJU_VERSION': '0.0.0'}).debug_at,
+                    juju_debug_at=set(),
                 )
                 self.snapshots: typing.List[typing.Any] = []
 
