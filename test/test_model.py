@@ -2075,7 +2075,7 @@ containers:
         assert len(caplog.records) == 1
         assert re.search(r'api error!', caplog.text)
 
-    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
+    @patch('ops.model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.6'))
     def test_exec(self, container: ops.Container):
         container.pebble.responses.append('fake_exec_process')  # type: ignore
         stdout = io.StringIO('STDOUT')
@@ -2119,7 +2119,7 @@ containers:
         ]
         assert p == 'fake_exec_process'
 
-    @patch('model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
+    @patch('ops.model.JujuVersion.from_environ', new=lambda: ops.model.JujuVersion('3.1.5'))
     def test_exec_service_context_not_supported(self, container: ops.Container):
         with pytest.raises(RuntimeError):
             container.exec(['foo'], service_context='srv1')
