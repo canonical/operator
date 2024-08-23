@@ -49,7 +49,13 @@ class StoragePermutations(abc.ABC):
     ) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
         storage = self.create_storage(request, fake_script)
-        return ops.Framework(storage, None, None, None)  # type: ignore
+        return ops.Framework(
+            storage,
+            None,  # type: ignore
+            None,  # type: ignore
+            None,  # type: ignore
+            juju_debug_at=set(),
+        )
 
     @abc.abstractmethod
     def create_storage(

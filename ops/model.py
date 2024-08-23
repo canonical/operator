@@ -55,7 +55,12 @@ from typing import (
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
+from ops.jujucontext import _JujuContext
 from ops.jujuversion import JujuVersion
+
+# JujuVersion is not used in ops.model, but there are charms that are importing JujuVersion
+# from ops.model, so we keep it here.
+_ = JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
@@ -2220,6 +2225,8 @@ class Container:
     ):
         self.name = name
 
+        self._juju_version = backend._juju_context.version
+
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
             pebble_client = backend.get_pebble(socket_path)
@@ -2864,19 +2871,18 @@ class Container:
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
         and return value, as well as examples.
 
-        Note that older versions of Juju do not support the ``service_content`` parameter, so if
+        Note that older versions of Juju do not support the ``service_context`` parameter, so if
         the Charm is to be used on those versions, then
         :meth:`JujuVersion.supports_exec_service_context` should be used as a guard.
 
         Raises:
             ExecError: if the command exits with a non-zero exit code.
         """
-        if service_context is not None:
-            version = JujuVersion.from_environ()
-            if not version.supports_exec_service_context:
-                raise RuntimeError(
-                    f'exec with service_context not supported on Juju version {version}'
-                )
+        assert self._juju_version is not None
+        if service_context is not None and not self._juju_version.supports_exec_service_context:
+            raise RuntimeError(
+                f'exec with service_context not supported on Juju version {self._juju_version}'
+            )
         return self._pebble.exec(
             command,
             service_context=service_context,
@@ -3156,16 +3162,20 @@ class _ModelBackend:
         unit_name: Optional[str] = None,
         model_name: Optional[str] = None,
         model_uuid: Optional[str] = None,
+        juju_context: Optional[_JujuContext] = None,
     ):
+        if juju_context is None:
+            juju_context = _JujuContext.from_dict(os.environ)
+        self._juju_context = juju_context
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
-        unit_name_ = unit_name or os.getenv('JUJU_UNIT_NAME')
+        unit_name_ = unit_name or self._juju_context.unit_name
         if unit_name_ is None:
             raise ValueError('JUJU_UNIT_NAME not set')
         self.unit_name: str = unit_name_
 
         # we can cast to str because these envvars are guaranteed to be set
-        self.model_name: str = model_name or typing.cast(str, os.getenv('JUJU_MODEL_NAME'))
-        self.model_uuid: str = model_uuid or typing.cast(str, os.getenv('JUJU_MODEL_UUID'))
+        self.model_name: str = model_name or self._juju_context.model_name
+        self.model_uuid: str = model_uuid or self._juju_context.model_uuid
         self.app_name: str = self.unit_name.split('/')[0]
 
         self._is_leader: Optional[bool] = None
@@ -3231,11 +3241,14 @@ class _ModelBackend:
 
     def relation_remote_app_name(self, relation_id: int) -> Optional[str]:
         """Return remote app name for given relation ID, or None if not known."""
-        if 'JUJU_RELATION_ID' in os.environ and 'JUJU_REMOTE_APP' in os.environ:
-            event_relation_id = int(os.environ['JUJU_RELATION_ID'].split(':')[-1])
+        if (
+            self._juju_context.relation_id is not None
+            and self._juju_context.remote_app_name is not None
+        ):
+            event_relation_id = self._juju_context.relation_id
             if relation_id == event_relation_id:
                 # JUJU_RELATION_ID is this relation, use JUJU_REMOTE_APP.
-                return os.getenv('JUJU_REMOTE_APP') or None
+                return self._juju_context.remote_app_name
 
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
@@ -3261,12 +3274,11 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
 
-        if is_app:
-            version = JujuVersion.from_environ()
-            if not version.has_app_data():
-                raise RuntimeError(
-                    f'getting application data is not supported on Juju version {version}'
-                )
+        if is_app and not self._juju_context.version.has_app_data():
+            raise RuntimeError(
+                'getting application data is not supported on Juju version '
+                f'{self._juju_context.version}'
+            )
 
         args = ['relation-get', '-r', str(relation_id), '-', member_name]
         if is_app:
@@ -3284,12 +3296,11 @@ class _ModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
-        if is_app:
-            version = JujuVersion.from_environ()
-            if not version.has_app_data():
-                raise RuntimeError(
-                    f'setting application data is not supported on Juju version {version}'
-                )
+        if is_app and not self._juju_context.version.has_app_data():
+            raise RuntimeError(
+                'setting application data is not supported on Juju version '
+                f'{self._juju_context.version}'
+            )
 
         args = ['relation-set', '-r', str(relation_id)]
         if is_app:

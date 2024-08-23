@@ -20,7 +20,6 @@ import inspect
 import keyword
 import logging
 import marshal
-import os
 import pathlib
 import pdb
 import re
@@ -604,6 +603,7 @@ class Framework(Object):
         meta: 'charm.CharmMeta',
         model: 'Model',
         event_name: Optional[str] = None,
+        juju_debug_at: Optional[Set[str]] = None,
     ):
         super().__init__(self, None)
 
@@ -618,7 +618,6 @@ class Framework(Object):
         if event_name:
             event_name = event_name.replace('-', '_')
         self._event_name = event_name
-
         self.meta = meta
         self.model = model
         # [(observer_path, method_name, parent_path, event_key)]
@@ -650,13 +649,7 @@ class Framework(Object):
 
         # Flag to indicate that we already presented the welcome message in a debugger breakpoint
         self._breakpoint_welcomed: bool = False
-
-        # Parse the env var once, which may be used multiple times later
-        debug_at = os.environ.get('JUJU_DEBUG_AT')
-        if debug_at:
-            self._juju_debug_at = {x.strip() for x in debug_at.split(',')}
-        else:
-            self._juju_debug_at: Set[str] = set()
+        self._juju_debug_at = juju_debug_at or set()
 
     def set_breakpointhook(self) -> Optional[Any]:
         """Hook into ``sys.breakpointhook`` so the builtin ``breakpoint()`` works as expected.

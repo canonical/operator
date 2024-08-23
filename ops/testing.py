@@ -59,6 +59,7 @@ from typing import (
 from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
+from ops.jujucontext import _JujuContext
 from ops.model import Container, RelationNotFoundError, _NetworkDict
 from ops.pebble import ExecProcess
 
@@ -259,6 +260,9 @@ class Harness(Generic[CharmType]):
         actions: Optional[YAMLStringOrFile] = None,
         config: Optional[YAMLStringOrFile] = None,
     ):
+        if 'JUJU_VERSION' not in os.environ:
+            os.environ['JUJU_VERSION'] = '0.0.0'
+        self._juju_context = _JujuContext.from_dict(os.environ)
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -268,11 +272,17 @@ class Harness(Generic[CharmType]):
         self._relation_id_counter: int = 0
         self._action_id_counter: int = 0
         config_ = self._get_config(config)
-        self._backend = _TestingModelBackend(self._unit_name, self._meta, config_)
+        self._backend = _TestingModelBackend(
+            self._unit_name, self._meta, config_, self._juju_context
+        )
         self._model = model.Model(self._meta, self._backend)
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
-            self._storage, self._charm_dir, self._meta, self._model
+            self._storage,
+            self._charm_dir,
+            self._meta,
+            self._model,
+            juju_debug_at=self._juju_context.debug_at,
         )
 
     def _event_context(self, event_name: str):
@@ -2292,7 +2302,14 @@ class _TestingModelBackend:
     as the only public methods of this type are for implementing ModelBackend.
     """
 
-    def __init__(self, unit_name: str, meta: charm.CharmMeta, config: '_RawConfig'):
+    def __init__(
+        self,
+        unit_name: str,
+        meta: charm.CharmMeta,
+        config: '_RawConfig',
+        juju_context: _JujuContext,
+    ):
+        self._juju_context = juju_context
         self.unit_name = unit_name
         self.app_name = self.unit_name.split('/')[0]
         self.model_name = None

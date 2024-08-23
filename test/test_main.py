@@ -30,6 +30,7 @@ from unittest.mock import patch
 import pytest
 
 import ops
+from ops.jujucontext import _JujuContext
 from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
@@ -138,16 +139,16 @@ class TestCharmInit:
         }
         if extra_environ is not None:
             fake_environ.update(extra_environ)
-        with patch.dict(os.environ, fake_environ):
-            with patch('ops.main._get_charm_dir') as mock_charmdir:
-                with tempfile.TemporaryDirectory() as tmpdirname:
-                    tmpdirname = Path(tmpdirname)
-                    fake_metadata = tmpdirname / 'metadata.yaml'
-                    with fake_metadata.open('wb') as fh:
-                        fh.write(b'name: test')
-                    mock_charmdir.return_value = tmpdirname
 
-                    ops.main(charm_class, **kwargs)  # type: ignore
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            fake_environ.update({'JUJU_CHARM_DIR': tmpdirname})
+            with patch.dict(os.environ, fake_environ):
+                tmpdirname = Path(tmpdirname)
+                fake_metadata = tmpdirname / 'metadata.yaml'
+                with fake_metadata.open('wb') as fh:
+                    fh.write(b'name: test')
+
+                ops.main(charm_class, **kwargs)  # type: ignore
 
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
@@ -223,6 +224,7 @@ class TestDispatch:
             fake_environ['JUJU_VERSION'] = '2.7.0'
 
         with tempfile.TemporaryDirectory() as tmpdir:
+            fake_environ.update({'JUJU_CHARM_DIR': tmpdir})
             tmpdir = Path(tmpdir)
             fake_metadata = tmpdir / 'metadata.yaml'
             with fake_metadata.open('wb') as fh:
@@ -234,9 +236,7 @@ class TestDispatch:
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops.main._emit_charm_event') as mock_charm_event:
-                    with patch('ops.main._get_charm_dir') as mock_charmdir:
-                        mock_charmdir.return_value = tmpdir
-                        ops.main(MyCharm)  # type: ignore
+                    ops.main(MyCharm)  # type: ignore
 
         assert mock_charm_event.call_count == 1
         return mock_charm_event.call_args[0][1]
@@ -358,8 +358,7 @@ class _TestMain(abc.ABC):
             self._setup_entry_point(actions_dir, action_name)
 
     def _read_and_clear_state(
-        self,
-        event_name: str,
+        self, event_name: str, env: typing.Dict[str, str]
     ) -> typing.Union[ops.BoundStoredState, ops.StoredStateData]:
         if self._charm_state_file.stat().st_size:
             storage = SQLiteStorage(self._charm_state_file)
@@ -370,7 +369,14 @@ class _TestMain(abc.ABC):
                         meta = ops.CharmMeta.from_yaml(m, a)
                 else:
                     meta = ops.CharmMeta.from_yaml(m)
-            framework = ops.Framework(storage, self.JUJU_CHARM_DIR, meta, None, event_name)  # type: ignore
+            framework = ops.Framework(
+                storage,
+                self.JUJU_CHARM_DIR,
+                meta,
+                None,  # type: ignore
+                event_name,
+                juju_debug_at=_JujuContext.from_dict(env).debug_at,
+            )
 
             class ThisCharmEvents(MyCharmEvents):
                 pass
@@ -474,7 +480,7 @@ class _TestMain(abc.ABC):
             env['JUJU_MODEL_NAME'] = event_spec.model_name
 
         self._call_event(fake_script, Path(event_dir, event_filename), env)
-        return self._read_and_clear_state(event_spec.event_name)
+        return self._read_and_clear_state(event_spec.event_name, env)
 
     @pytest.mark.usefixtures('setup_charm')
     def test_event_reemitted(self, fake_script: FakeScript):
@@ -1468,19 +1474,23 @@ class TestStorageHeuristics:
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '1.0'}):
-            assert not _should_use_controller_storage(Path('/xyzzy'), meta)
+            juju_context = _JujuContext.from_dict(os.environ)
+            assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_fallback_to_current_juju_version__new_enough(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            assert _should_use_controller_storage(Path('/xyzzy'), meta)
+            juju_context = _JujuContext.from_dict(os.environ)
+            assert _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_not_in_k8s(self):
         meta = ops.CharmMeta.from_yaml('series: [ecs]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            assert not _should_use_controller_storage(Path('/xyzzy'), meta)
+            juju_context = _JujuContext.from_dict(os.environ)
+            assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_already_local(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
-            assert not _should_use_controller_storage(Path(fd.name), meta)
+            juju_context = _JujuContext.from_dict(os.environ)
+            assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)

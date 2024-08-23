@@ -23,6 +23,7 @@ import unittest
 import pytest
 
 import ops
+from ops.jujucontext import _JujuContext
 from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -88,6 +89,7 @@ def create_framework(
         os.environ['PATH'],
     ])
     os.environ['JUJU_UNIT_NAME'] = 'local/0'
+    os.environ['JUJU_VERSION'] = '0.0.0'
 
     tmpdir = pathlib.Path(tempfile.mkdtemp())
 
@@ -105,7 +107,13 @@ def create_framework(
         meta = ops.CharmMeta()
     model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
     # We can pass foo_event as event_name because we're not actually testing dispatch.
-    framework = ops.Framework(SQLiteStorage(':memory:'), tmpdir, meta, model)  # type: ignore
+    framework = ops.Framework(
+        SQLiteStorage(':memory:'),
+        tmpdir,
+        meta,
+        model,
+        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
+    )
 
     def finalizer():
         os.environ.clear()
