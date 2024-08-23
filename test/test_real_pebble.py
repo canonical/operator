@@ -163,6 +163,7 @@ class TestRealPebble:
         process = client.exec(['true'])
         process.wait()
 
+        excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
         with pytest.raises(pebble.ExecError) as excinfo:
             process = client.exec(['/bin/sh', '-c', 'exit 42'])
             process.wait()
@@ -179,13 +180,13 @@ class TestRealPebble:
         assert out == b'OUT\n'
         assert err == b'ERR\n'
 
+        excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
         with pytest.raises(pebble.ExecError) as excinfo:
             process = client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
             process.wait_output()
-        exc = typing.cast(pebble.ExecError[str], excinfo.value)
-        assert exc.exit_code == 42
-        assert exc.stdout == 'OUT\n'
-        assert exc.stderr == 'ERR\n'
+        assert excinfo.value.exit_code == 42
+        assert excinfo.value.stdout == 'OUT\n'
+        assert excinfo.value.stderr == 'ERR\n'
 
     def test_exec_send_stdin(self, client: pebble.Client):
         process = client.exec(['awk', '{ print toupper($0) }'], stdin='foo\nBar\n')

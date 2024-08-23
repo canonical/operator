@@ -2598,7 +2598,7 @@ class Client:
         if itself:
             query['itself'] = 'true'
         resp = self._request('GET', '/v1/files', query)
-        result = resp['result'] or []  # in case it's null instead of []
+        result: 'List[_FileInfoDict]' = resp['result'] or []  # in case it's null instead of []
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(

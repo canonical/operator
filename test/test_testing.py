@@ -6313,6 +6313,7 @@ class TestHandleExec:
     ):
         harness.handle_exec(container, ['foo'], result=10)
 
+        excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
         with pytest.raises(pebble.ExecError) as excinfo:
             container.exec(['foo']).wait()
         assert excinfo.value.exit_code == 10

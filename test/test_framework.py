@@ -1458,14 +1458,14 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: set(),
+                lambda: {},
                 None,
                 set(),
                 lambda a, b: None,
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: set(),
+                lambda: {},
                 'a',
                 {'a'},
                 lambda a, b: a.add(b),
@@ -1479,7 +1479,7 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: set(),
+                lambda: {},
                 {'a'},
                 set(),
                 # Nested sets are not allowed as sets themselves are not hashable.

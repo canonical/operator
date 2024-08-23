@@ -381,10 +381,7 @@ class _TestMain(abc.ABC):
             class ThisCharmEvents(MyCharmEvents):
                 pass
 
-            class _HasStored(typing.Protocol):
-                _stored: ops.StoredState
-
-            class Charm(self.charm_module.Charm, _HasStored):  # type: ignore
+            class Charm(self.charm_module.Charm):
                 on = ThisCharmEvents()
 
             mycharm = Charm(framework)
