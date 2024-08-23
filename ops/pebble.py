@@ -17,6 +17,8 @@
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
 
+from __future__ import annotations
+
 import binascii
 import builtins
 import copy
@@ -466,10 +468,10 @@ class ChangeError(Error):
     err: str
     """Human-readable error message."""
 
-    change: 'Change'
+    change: Change
     """Change object associated with this error."""
 
-    def __init__(self, err: str, change: 'Change'):
+    def __init__(self, err: str, change: Change):
         """This shouldn't be instantiated directly."""
         self.err = err
         self.change = change
@@ -569,7 +571,7 @@ class SystemInfo:
         self.version = version
 
     @classmethod
-    def from_dict(cls, d: '_SystemInfoDict') -> 'SystemInfo':
+    def from_dict(cls, d: _SystemInfoDict) -> SystemInfo:
         """Create new SystemInfo object from dict parsed from JSON."""
         return cls(version=d['version'])
 
@@ -597,7 +599,7 @@ class Warning:
         self.repeat_after = repeat_after
 
     @classmethod
-    def from_dict(cls, d: '_WarningDict') -> 'Warning':
+    def from_dict(cls, d: _WarningDict) -> Warning:
         """Create new Warning object from dict parsed from JSON."""
         return cls(
             message=d['message'],
@@ -638,7 +640,7 @@ class TaskProgress:
         self.total = total
 
     @classmethod
-    def from_dict(cls, d: '_ProgressDict') -> 'TaskProgress':
+    def from_dict(cls, d: _ProgressDict) -> TaskProgress:
         """Create new TaskProgress object from dict parsed from JSON."""
         return cls(
             label=d['label'],
@@ -688,7 +690,7 @@ class Task:
         self.data = data or {}
 
     @classmethod
-    def from_dict(cls, d: '_TaskDict') -> 'Task':
+    def from_dict(cls, d: _TaskDict) -> Task:
         """Create new Task object from dict parsed from JSON."""
         return cls(
             id=TaskID(d['id']),
@@ -756,7 +758,7 @@ class Change:
         self.data = data or {}
 
     @classmethod
-    def from_dict(cls, d: '_ChangeDict') -> 'Change':
+    def from_dict(cls, d: _ChangeDict) -> Change:
         """Create new Change object from dict parsed from JSON."""
         return cls(
             id=ChangeID(d['id']),
@@ -798,7 +800,7 @@ class Plan:
     documented at https://github.com/canonical/pebble/#layer-specification.
     """
 
-    def __init__(self, raw: Optional[Union[str, 'PlanDict']] = None):
+    def __init__(self, raw: Optional[Union[str, PlanDict]] = None):
         if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore
         else:
@@ -817,7 +819,7 @@ class Plan:
         }
 
     @property
-    def services(self) -> Dict[str, 'Service']:
+    def services(self) -> Dict[str, Service]:
         """This plan's services mapping (maps service name to Service).
 
         This property is currently read-only.
@@ -825,7 +827,7 @@ class Plan:
         return self._services
 
     @property
-    def checks(self) -> Dict[str, 'Check']:
+    def checks(self) -> Dict[str, Check]:
         """This plan's checks mapping (maps check name to :class:`Check`).
 
         This property is currently read-only.
@@ -833,14 +835,14 @@ class Plan:
         return self._checks
 
     @property
-    def log_targets(self) -> Dict[str, 'LogTarget']:
+    def log_targets(self) -> Dict[str, LogTarget]:
         """This plan's log targets mapping (maps log target name to :class:`LogTarget`).
 
         This property is currently read-only.
         """
         return self._log_targets
 
-    def to_dict(self) -> 'PlanDict':
+    def to_dict(self) -> PlanDict:
         """Convert this plan to its dict representation."""
         fields = [
             ('services', {name: service.to_dict() for name, service in self._services.items()}),
@@ -859,7 +861,7 @@ class Plan:
 
     __str__ = to_yaml
 
-    def __eq__(self, other: Union['PlanDict', 'Plan']) -> bool:
+    def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, Plan):
@@ -879,13 +881,13 @@ class Layer:
     #: Long-form description of this layer.
     description: str
     #: Mapping of name to :class:`Service` defined by this layer.
-    services: Dict[str, 'Service']
+    services: Dict[str, Service]
     #: Mapping of check to :class:`Check` defined by this layer.
-    checks: Dict[str, 'Check']
+    checks: Dict[str, Check]
     #: Mapping of target to :class:`LogTarget` defined by this layer.
-    log_targets: Dict[str, 'LogTarget']
+    log_targets: Dict[str, LogTarget]
 
-    def __init__(self, raw: Optional[Union[str, 'LayerDict']] = None):
+    def __init__(self, raw: Optional[Union[str, LayerDict]] = None):
         if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
@@ -906,7 +908,7 @@ class Layer:
         """Convert this layer to its YAML representation."""
         return yaml.safe_dump(self.to_dict())
 
-    def to_dict(self) -> 'LayerDict':
+    def to_dict(self) -> LayerDict:
         """Convert this layer to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -921,7 +923,7 @@ class Layer:
     def __repr__(self) -> str:
         return f'Layer({self.to_dict()!r})'
 
-    def __eq__(self, other: Union['LayerDict', 'Layer']) -> bool:
+    def __eq__(self, other: Union[LayerDict, Layer]) -> bool:
         """Reports whether this layer configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -936,7 +938,7 @@ class Layer:
 class Service:
     """Represents a service description in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional['ServiceDict'] = None):
+    def __init__(self, name: str, raw: Optional[ServiceDict] = None):
         self.name = name
         dct: ServiceDict = raw or {}
         self.summary = dct.get('summary', '')
@@ -961,7 +963,7 @@ class Service:
         self.backoff_limit = dct.get('backoff-limit', '')
         self.kill_delay = dct.get('kill-delay', '')
 
-    def to_dict(self) -> 'ServiceDict':
+    def to_dict(self) -> ServiceDict:
         """Convert this service object to its dict representation."""
         fields = [
             ('summary', self.summary),
@@ -989,7 +991,7 @@ class Service:
         dct = {name: value for name, value in fields if value}
         return typing.cast('ServiceDict', dct)
 
-    def _merge(self, other: 'Service'):
+    def _merge(self, other: Service):
         """Merges this service object with another service definition.
 
         For attributes present in both objects, the passed in service
@@ -1008,7 +1010,7 @@ class Service:
     def __repr__(self) -> str:
         return f'Service({self.to_dict()!r})'
 
-    def __eq__(self, other: Union['ServiceDict', 'Service']) -> bool:
+    def __eq__(self, other: Union[ServiceDict, Service]) -> bool:
         """Reports whether this service configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1051,7 +1053,7 @@ class ServiceInfo:
         return self.current == ServiceStatus.ACTIVE
 
     @classmethod
-    def from_dict(cls, d: '_ServiceInfoDict') -> 'ServiceInfo':
+    def from_dict(cls, d: _ServiceInfoDict) -> ServiceInfo:
         """Create new ServiceInfo object from dict parsed from JSON."""
         try:
             startup = ServiceStartup(d['startup'])
@@ -1079,7 +1081,7 @@ class ServiceInfo:
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional['CheckDict'] = None):
+    def __init__(self, name: str, raw: Optional[CheckDict] = None):
         self.name = name
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
@@ -1107,7 +1109,7 @@ class Check:
             exec_ = copy.deepcopy(exec_)
         self.exec: Optional[ExecDict] = exec_
 
-    def to_dict(self) -> 'CheckDict':
+    def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
         level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
         fields = [
@@ -1126,7 +1128,7 @@ class Check:
     def __repr__(self) -> str:
         return f'Check({self.to_dict()!r})'
 
-    def __eq__(self, other: Union['CheckDict', 'Check']) -> bool:
+    def __eq__(self, other: Union[CheckDict, Check]) -> bool:
         """Reports whether this check configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1135,7 +1137,7 @@ class Check:
         else:
             return NotImplemented
 
-    def _merge_exec(self, other: 'ExecDict') -> None:
+    def _merge_exec(self, other: ExecDict) -> None:
         """Merges this exec object with another exec definition.
 
         For attributes present in both objects, the passed in exec
@@ -1153,7 +1155,7 @@ class Check:
             else:
                 self.exec[name] = value
 
-    def _merge_http(self, other: 'HttpDict') -> None:
+    def _merge_http(self, other: HttpDict) -> None:
         """Merges this http object with another http definition.
 
         For attributes present in both objects, the passed in http
@@ -1171,7 +1173,7 @@ class Check:
             else:
                 self.http[name] = value
 
-    def _merge_tcp(self, other: 'TcpDict') -> None:
+    def _merge_tcp(self, other: TcpDict) -> None:
         """Merges this tcp object with another tcp definition.
 
         For attributes present in both objects, the passed in tcp
@@ -1184,7 +1186,7 @@ class Check:
                 continue
             self.tcp[name] = value
 
-    def _merge(self, other: 'Check'):
+    def _merge(self, other: Check):
         """Merges this check object with another check definition.
 
         For attributes present in both objects, the passed in check
@@ -1221,7 +1223,7 @@ class CheckStatus(enum.Enum):
 class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional['LogTargetDict'] = None):
+    def __init__(self, name: str, raw: Optional[LogTargetDict] = None):
         self.name = name
         dct: LogTargetDict = raw or {}
         self.override: str = dct.get('override', '')
@@ -1232,7 +1234,7 @@ class LogTarget:
         labels = copy.deepcopy(labels) if labels is not None else {}
         self.labels: Dict[str, str] = labels
 
-    def to_dict(self) -> 'LogTargetDict':
+    def to_dict(self) -> LogTargetDict:
         """Convert this log target object to its dict representation."""
         fields = [
             ('override', self.override),
@@ -1247,7 +1249,7 @@ class LogTarget:
     def __repr__(self):
         return f'LogTarget({self.to_dict()!r})'
 
-    def __eq__(self, other: Union['LogTargetDict', 'LogTarget']):
+    def __eq__(self, other: Union[LogTargetDict, LogTarget]):
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, LogTarget):
@@ -1255,7 +1257,7 @@ class LogTarget:
         else:
             return NotImplemented
 
-    def _merge(self, other: 'LogTarget'):
+    def _merge(self, other: LogTarget):
         """Merges this log target object with another log target definition.
 
         For attributes present in both objects, the passed in log target
@@ -1293,7 +1295,7 @@ class FileInfo:
     name: str
     """Base name of the file."""
 
-    type: Union['FileType', str]
+    type: Union[FileType, str]
     """Type of the file ("file", "directory", "symlink", etc)."""
 
     size: Optional[int]
@@ -1321,7 +1323,7 @@ class FileInfo:
         self,
         path: str,
         name: str,
-        type: Union['FileType', str],
+        type: Union[FileType, str],
         size: Optional[int],
         permissions: int,
         last_modified: datetime.datetime,
@@ -1342,7 +1344,7 @@ class FileInfo:
         self.group = group
 
     @classmethod
-    def from_dict(cls, d: '_FileInfoDict') -> 'FileInfo':
+    def from_dict(cls, d: _FileInfoDict) -> FileInfo:
         """Create new FileInfo object from dict parsed from JSON."""
         try:
             file_type = FileType(d['type'])
@@ -1436,7 +1438,7 @@ class CheckInfo:
         self.change_id = change_id
 
     @classmethod
-    def from_dict(cls, d: '_CheckInfoDict') -> 'CheckInfo':
+    def from_dict(cls, d: _CheckInfoDict) -> CheckInfo:
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
         try:
             level = CheckLevel(d.get('level', ''))
@@ -1582,7 +1584,7 @@ class Notice:
     """How long since one of these last occurred until Pebble will drop the notice."""
 
     @classmethod
-    def from_dict(cls, d: '_NoticeDict') -> 'Notice':
+    def from_dict(cls, d: _NoticeDict) -> Notice:
         """Create new Notice object from dict parsed from JSON."""
         try:
             notice_type = NoticeType(d['type'])
@@ -1649,11 +1651,11 @@ class ExecProcess(Generic[AnyStr]):
         stdin: Optional[IO[AnyStr]],
         stdout: Optional[IO[AnyStr]],
         stderr: Optional[IO[AnyStr]],
-        client: 'Client',
+        client: Client,
         timeout: Optional[float],
-        control_ws: '_WebSocket',
-        stdio_ws: '_WebSocket',
-        stderr_ws: Optional['_WebSocket'],
+        control_ws: _WebSocket,
+        stdio_ws: _WebSocket,
+        stderr_ws: Optional[_WebSocket],
         command: List[str],
         encoding: Optional[str],
         change_id: ChangeID,
@@ -1801,8 +1803,8 @@ def _has_fileno(f: Any) -> bool:
 
 
 def _reader_to_websocket(
-    reader: '_WebsocketReader',
-    ws: '_WebSocket',
+    reader: _WebsocketReader,
+    ws: _WebSocket,
     encoding: str,
     cancel_reader: Optional[int] = None,
     bufsize: int = 16 * 1024,
@@ -1825,7 +1827,7 @@ def _reader_to_websocket(
     ws.send('{"command":"end"}')  # type: ignore # Send "end" command as TEXT frame to signal EOF
 
 
-def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter', encoding: Optional[str]):
+def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: Optional[str]):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
         chunk = ws.recv()
@@ -1853,7 +1855,7 @@ def _websocket_to_writer(ws: '_WebSocket', writer: '_WebsocketWriter', encoding:
 class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
-    def __init__(self, ws: '_WebSocket'):
+    def __init__(self, ws: _WebSocket):
         self.ws = ws
 
     def writable(self):
@@ -1875,7 +1877,7 @@ class _WebsocketWriter(io.BufferedIOBase):
 class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
-    def __init__(self, ws: '_WebSocket'):
+    def __init__(self, ws: _WebSocket):
         self.ws = ws
         self.remaining = b''
         self.eof = False
@@ -2000,7 +2002,7 @@ class Client:
     @staticmethod
     def _ensure_content_type(
         headers: email.message.Message,
-        expected: 'Literal["multipart/form-data", "application/json"]',
+        expected: Literal['multipart/form-data', 'application/json'],
     ):
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
@@ -2317,9 +2319,7 @@ class Client:
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
-    def add_layer(
-        self, label: str, layer: Union[str, 'LayerDict', Layer], *, combine: bool = False
-    ):
+    def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
@@ -2431,7 +2431,7 @@ class Client:
         return f
 
     @staticmethod
-    def _raise_on_path_error(resp: '_FilesResponse', path: str):
+    def _raise_on_path_error(resp: _FilesResponse, path: str):
         result = resp['result'] or []  # in case it's null instead of []
         paths = {item['path']: item for item in result}
         if path not in paths:
@@ -2443,7 +2443,7 @@ class Client:
     def push(
         self,
         path: str,
-        source: '_IOSource',
+        source: _IOSource,
         *,
         encoding: str = 'utf-8',
         make_dirs: bool = False,
@@ -2504,7 +2504,7 @@ class Client:
         user: Optional[str],
         group_id: Optional[int],
         group: Optional[str],
-    ) -> '_AuthDict':
+    ) -> _AuthDict:
         d: _AuthDict = {}
         if permissions is not None:
             d['permissions'] = format(permissions, '03o')
@@ -2519,7 +2519,7 @@ class Client:
         return d
 
     def _encode_multipart(
-        self, metadata: Dict[str, Any], path: str, source: '_IOSource', encoding: str
+        self, metadata: Dict[str, Any], path: str, source: _IOSource, encoding: str
     ):
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
@@ -2598,7 +2598,7 @@ class Client:
         if itself:
             query['itself'] = 'true'
         resp = self._request('GET', '/v1/files', query)
-        result: 'List[_FileInfoDict]' = resp['result'] or []  # in case it's null instead of []
+        result: List[_FileInfoDict] = resp['result'] or []  # in case it's null instead of []
         return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
@@ -2966,7 +2966,7 @@ class Client:
         )
         return process
 
-    def _connect_websocket(self, task_id: str, websocket_id: str) -> '_WebSocket':
+    def _connect_websocket(self, task_id: str, websocket_id: str) -> _WebSocket:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         # Set socket timeout to a short timeout during connection phase, in
         # case the Pebble side times out (5s), so this side doesn't hang. See:
@@ -3207,7 +3207,7 @@ class _FilesParser:
     def _get_open_tempfile(self):
         return self._files[self.current_filename]
 
-    def get_response(self) -> Optional['_FilesResponse']:
+    def get_response(self) -> Optional[_FilesResponse]:
         """Return the deserialized JSON object from the multipart "response" field."""
         return self._response
 
@@ -3215,7 +3215,7 @@ class _FilesParser:
         """Return a list of filenames from the "files" parts of the response."""
         return list(self._files.keys())
 
-    def get_file(self, path: str, encoding: Optional[str]) -> '_TextOrBinaryIO':
+    def get_file(self, path: str, encoding: Optional[str]) -> _TextOrBinaryIO:
         """Return an open file object containing the data."""
         mode = 'r' if encoding else 'rb'
         # We're using text-based file I/O purely for file encoding purposes, not for
@@ -3235,8 +3235,8 @@ class _MultipartParser:
     def __init__(
         self,
         marker: bytes,
-        handle_header: '_HeaderHandler',
-        handle_body: '_BodyHandler',
+        handle_header: _HeaderHandler,
+        handle_body: _BodyHandler,
         max_lookahead: int = 0,
         max_boundary_length: int = 0,
     ):
