@@ -175,7 +175,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # isort:skip_file
 
 # Import pebble explicitly. It's the one module we don't import names from below.
-from . import pebble  # type: ignore
+from . import pebble
 
 # Also import charm explicitly. This is not strictly necessary as the
 # "from .charm" import automatically does that, but be explicit since this
@@ -184,7 +184,7 @@ from . import charm  # type: ignore # noqa: F401 `.charm` imported but unused
 
 # Import the main module, which we've overriden in main.py to be callable.
 # This allows "import ops; ops.main(Charm)" to work as expected.
-from . import main  # type: ignore
+from . import main
 
 # Explicitly import names from submodules so users can just "import ops" and
 # then use them as "ops.X".

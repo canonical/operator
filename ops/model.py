@@ -896,7 +896,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         is_peer = relation_name in self._peers
         relation_list: Optional[List[Relation]] = self._data[relation_name]
         if not isinstance(relation_list, list):
-            relation_list = self._data[relation_name] = []  # type: ignore
+            relation_list = self._data[relation_name] = []
             for rid in self._backend.relation_ids(relation_name):
                 if rid == self._broken_relation_id:
                     continue
@@ -2083,7 +2083,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
             storage_name: None for storage_name in storage_names
         }
 
-    def __contains__(self, key: str):  # pyright: ignore[reportIncompatibleMethodOverride]
+    def __contains__(self, key: str):
         return key in self._storage_map
 
     def __len__(self):
@@ -2101,7 +2101,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
             storage_list = self._storage_map[storage_name] = []
             for storage_index in self._backend.storage_list(storage_name):
                 storage = Storage(storage_name, storage_index, self._backend)
-                storage_list.append(storage)  # type: ignore
+                storage_list.append(storage)
         return storage_list
 
     def request(self, storage_name: str, count: int = 1):
@@ -3144,7 +3144,7 @@ def _format_action_result_dict(
                 f"duplicate key detected in dictionary passed to 'action-set': {key!r}"
             )
         else:
-            output_[key] = value  # type: ignore
+            output_[key] = value
 
     return output_
 
@@ -3761,7 +3761,7 @@ class _ModelBackendValidator:
 
     @classmethod
     def format_metric_value(cls, value: Union[int, float]):
-        if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(value, (int, float)):
             raise ModelError(
                 f'invalid metric value {value!r} provided:' ' must be a positive finite float'
             )

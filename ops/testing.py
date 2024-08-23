@@ -389,7 +389,7 @@ class Harness(Generic[CharmType]):
 
         TestEvents.__name__ = self._charm_cls.on.__class__.__name__
 
-        class TestCharm(self._charm_cls):  # type: ignore
+        class TestCharm(self._charm_cls):
             on = TestEvents()
 
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
