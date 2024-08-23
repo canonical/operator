@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# ruff: noqa
 import datetime
 import pathlib
 import sys
@@ -100,7 +99,7 @@ html_title = project + ' documentation'
 #   -H 'Accept: application/vnd.github.v3.raw' \
 #   https://api.github.com/repos/canonical/<REPO> | jq '.created_at'
 
-copyright = '%s, %s' % (datetime.date.today().year, author)
+copyright = '%s, %s' % (datetime.date.today().year, author)  # noqa: A001
 
 ## Open Graph configuration - defines what is displayed as a link preview
 ## when linking to the documentation from another website (see https://ogp.me/)
@@ -235,7 +234,7 @@ custom_html_js_files = []
 # Specify a reST string that is included at the end of each file.
 # If commented out, use the default (which pulls the reuse/links.txt
 # file into each reST file).
-# custom_rst_epilog = ''
+custom_rst_epilog = ''
 
 # By default, the documentation includes a feedback button at the top.
 # You can disable it by setting the following configuration to True.
@@ -409,7 +408,7 @@ class JujuVersion(SphinxDirective):
         domain = self.env.get_domain('changeset')
         domain.note_changeset(node)
 
-        ret: list[Node] = [node]
+        ret = [node]
         ret += messages
         return ret
 
