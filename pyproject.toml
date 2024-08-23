@@ -216,5 +216,6 @@ reportMissingModuleSource = false
 reportPrivateUsage = false
 reportUnnecessaryIsInstance = false
 reportUnnecessaryComparison = false
+reportUnnecessaryTypeIgnoreComment = "error"
 disableBytesTypePromotions = false
 stubPath = ""

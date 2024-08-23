@@ -25,7 +25,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Generator, List, Optional, Tuple, Union, cast
 
-import yaml  # pyright: ignore[reportMissingModuleSource]
+import yaml
 
 logger = logging.getLogger()
 
@@ -402,7 +402,7 @@ class _JujuStorageBackend:
         p = _run(['state-get', key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
-        return yaml.load(p.stdout, Loader=_SimpleLoader)  # type: ignore  # noqa: S506
+        return yaml.load(p.stdout, Loader=_SimpleLoader)
 
     def delete(self, key: str) -> None:
         """Remove a key from being tracked.

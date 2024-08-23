@@ -67,7 +67,7 @@ from typing import (
     Union,
 )
 
-import websocket  # type: ignore
+import websocket
 
 from ops._private import timeconv, yaml
 
@@ -1824,7 +1824,7 @@ def _reader_to_websocket(
             chunk = chunk.encode(encoding)
         ws.send_binary(chunk)
 
-    ws.send('{"command":"end"}')  # type: ignore # Send "end" command as TEXT frame to signal EOF
+    ws.send('{"command":"end"}')
 
 
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: Optional[str]):
@@ -2891,7 +2891,7 @@ class Client:
             stdio_ws = self._connect_websocket(task_id, 'stdio')
             if not combine_stderr:
                 stderr_ws = self._connect_websocket(task_id, 'stderr')
-        except websocket.WebSocketException as e:  # type: ignore
+        except websocket.WebSocketException as e:
             # Error connecting to websockets, probably due to the exec/change
             # finishing early with an error. Call wait_change to pick that up.
             change = self.wait_change(ChangeID(change_id))

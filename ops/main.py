@@ -437,7 +437,7 @@ class _Manager:
             self._model_backend, debug=self._juju_context.debug, exc_stderr=handling_action
         )
 
-        logger.debug('ops %s up and running.', ops.__version__)  # type:ignore
+        logger.debug('ops %s up and running.', ops.__version__)
 
     def _make_storage(self, dispatcher: _Dispatcher):
         charm_state_path = self._charm_root / self._charm_state_path

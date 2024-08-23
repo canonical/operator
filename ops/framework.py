@@ -789,7 +789,7 @@ class Framework(Object):
         event_kind = bound_event.event_kind
         emitter = bound_event.emitter
 
-        self.register_type(event_type, emitter, event_kind)  # type: ignore
+        self.register_type(event_type, emitter, event_kind)
 
         if hasattr(emitter, 'handle'):
             emitter_path = emitter.handle.path
@@ -824,7 +824,7 @@ class Framework(Object):
         """Return the next event key that should be used, incrementing the internal counter."""
         # Increment the count first; this means the keys will start at 1, and 0
         # means no events have been emitted.
-        self._stored['event_count'] += 1  # type: ignore  #(we know event_count holds an int)
+        self._stored['event_count'] += 1
         return str(self._stored['event_count'])
 
     def _emit(self, event: EventBase):
@@ -956,7 +956,7 @@ class Framework(Object):
                 self._storage.drop_notice(event_path, observer_path, method_name)
             # We intentionally consider this event to be dead and reload it from
             # scratch in the next path.
-            self.framework._forget(event)  # type: ignore
+            self.framework._forget(event)
 
         if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
@@ -1068,10 +1068,10 @@ class BoundStoredState:
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def _data(self) -> StoredStateData: ...  # type: ignore
+        def _data(self) -> StoredStateData: ...
 
         @property
-        def _attr_name(self) -> str: ...  # type: ignore
+        def _attr_name(self) -> str: ...
 
     def __init__(self, parent: Object, attr_name: str):
         parent.framework.register_type(StoredStateData, parent)
@@ -1086,7 +1086,7 @@ class BoundStoredState:
         self.__dict__['_data'] = data
         self.__dict__['_attr_name'] = attr_name
 
-        parent.framework.observe(parent.framework.on.commit, self._data.on_commit)  # type: ignore
+        parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
     @typing.overload
     def __getattr__(self, key: Literal['on']) -> ObjectEvents:
@@ -1228,14 +1228,14 @@ def _wrap_stored(parent_data: StoredStateData, value: Any) -> Any:
 
 def _unwrap_stored(parent_data: StoredStateData, value: Any) -> Any:
     if isinstance(value, (StoredDict, StoredList, StoredSet)):
-        return value._under  # pyright: ignore[reportPrivateUsage]
+        return value._under
     return value
 
 
 def _wrapped_repr(obj: '_StoredObject') -> str:
     t = type(obj)
     if obj._under:
-        return f'{t.__module__}.{t.__name__}({obj._under!r})'  # type: ignore
+        return f'{t.__module__}.{t.__name__}({obj._under!r})'
     else:
         return f'{t.__module__}.{t.__name__}()'
 

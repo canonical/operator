@@ -43,7 +43,7 @@ def test_parsing(vs: str, major: int, minor: int, tag: str, patch: int, build: i
     assert v.build == build
 
 
-@unittest.mock.patch('os.environ', new={})  # type: ignore
+@unittest.mock.patch('os.environ', new={})
 def test_from_environ():
     # JUJU_VERSION is not set
     v = ops.JujuVersion.from_environ()
