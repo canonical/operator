@@ -60,4 +60,6 @@ jobs:
         run: pip install tox~=4.2
 
       - name: Run smoke tests
-        run: tox -e smoke
+        # pytest-operator runs charmcraft pack with `sg lxd`, which seems to
+        # prompt for a password, so bypass that.
+        run: sudo tox -e smoke
