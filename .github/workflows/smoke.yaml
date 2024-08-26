@@ -41,6 +41,7 @@ jobs:
 
       - name: Bootstrap Juju controller (k8s)
         if: matrix.cloud == 'microk8s'
+        # TODO: instead of sudo, use `sg` to do this? `sudo usermod -a -G snap_microk8s runner`
         run: sudo juju bootstrap microk8s
 
       - name: Bootstrap Juju controller (lxd)
