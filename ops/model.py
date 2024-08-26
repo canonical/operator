@@ -1181,6 +1181,7 @@ class SecretInfo:
         expires: Optional[datetime.datetime],
         rotation: Optional[SecretRotate],
         rotates: Optional[datetime.datetime],
+        description: Optional[str] = None,
     ):
         self.id = Secret._canonicalize_id(id)
         self.label = label
@@ -1188,6 +1189,7 @@ class SecretInfo:
         self.expires = expires
         self.rotation = rotation
         self.rotates = rotates
+        self.description = description
 
     @classmethod
     def from_dict(cls, id: str, d: Dict[str, Any]) -> 'SecretInfo':
@@ -1205,6 +1207,7 @@ class SecretInfo:
             expires=timeconv.parse_rfc3339(expires) if expires is not None else None,
             rotation=rotation,
             rotates=timeconv.parse_rfc3339(rotates) if rotates is not None else None,
+            description=typing.cast(Optional[str], d.get('description')),
         )
 
     def __repr__(self):
@@ -1215,7 +1218,8 @@ class SecretInfo:
             f'revision={self.revision}, '
             f'expires={self.expires!r}, '
             f'rotation={self.rotation}, '
-            f'rotates={self.rotates!r})'
+            f'rotates={self.rotates!r}, '
+            f'description={self.description!r})'
         )
 
 
