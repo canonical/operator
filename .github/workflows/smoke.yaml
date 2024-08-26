@@ -30,10 +30,11 @@ jobs:
 
       - name: Set up Microk8s
         if: matrix.cloud == 'microk8s'
-        run: |
-          sudo snap install microk8s --classic
-          sudo microk8s status --wait-ready
-          sudo microk8s enable hostpath-storage dns
+        uses: balchua/microk8s-actions@v0.3.2
+        with:
+          channel: '1.26-strict/stable'
+          devMode: 'true'
+          addons: '["dns", "hostpath-storage"]'
 
       - name: Set up Juju
         run: sudo snap install juju --channel=${{ matrix.juju-version }}
