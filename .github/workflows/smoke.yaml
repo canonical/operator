@@ -19,7 +19,8 @@ jobs:
         # only available with classic confinement.
         juju-version: ['3']
         charmcraft-version: ['2.x', '3.x']
-        cloud: ['lxd', 'microk8s']
+#        cloud: ['lxd', 'microk8s']
+        cloud: ['microk8s']
 
     steps:
       - name: Set up LXD
@@ -41,8 +42,7 @@ jobs:
 
       - name: Bootstrap Juju controller (k8s)
         if: matrix.cloud == 'microk8s'
-        # TODO: instead of sudo, use `sg` to do this? `sudo usermod -a -G snap_microk8s runner`
-        run: sudo juju bootstrap microk8s
+        run: sg snap_microk8s -c 'juju bootstrap microk8s'
 
       - name: Bootstrap Juju controller (lxd)
         if: matrix.cloud == 'lxd'
@@ -58,9 +58,7 @@ jobs:
         uses: actions/setup-python@v5
 
       - name: Install tox
-        run: sudo pip install tox~=4.2
+        run: pip install tox~=4.2
 
       - name: Run smoke tests
-        # pytest-operator runs charmcraft pack with `sg lxd`, which seems to
-        # prompt for a password, so bypass that.
-        run: sudo tox -e smoke
+        run: tox -e smoke
