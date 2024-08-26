@@ -3565,6 +3565,7 @@ class TestSecretInfo:
             expires=datetime.datetime(2022, 12, 9, 14, 10, 0),
             rotation=ops.SecretRotate.MONTHLY,
             rotates=datetime.datetime(2023, 1, 9, 14, 10, 0),
+            description='desc',
         )
         assert info.id == 'secret:3'
         assert info.label == 'lbl'
@@ -3572,6 +3573,7 @@ class TestSecretInfo:
         assert info.expires == datetime.datetime(2022, 12, 9, 14, 10, 0)
         assert info.rotation == ops.SecretRotate.MONTHLY
         assert info.rotates == datetime.datetime(2023, 1, 9, 14, 10, 0)
+        assert info.description == 'desc'
 
         assert repr(info).startswith('SecretInfo(')
         assert repr(info).endswith(')')
@@ -3586,6 +3588,7 @@ class TestSecretInfo:
                 'expiry': '2022-12-09T14:10:00Z',
                 'rotation': 'yearly',
                 'rotates': '2023-01-09T14:10:00Z',
+                'description': 'desc',
             },
         )
         assert info.id == 'secret:4'
@@ -3594,6 +3597,7 @@ class TestSecretInfo:
         assert info.expires == datetime.datetime(2022, 12, 9, 14, 10, 0, tzinfo=utc)
         assert info.rotation == ops.SecretRotate.YEARLY
         assert info.rotates == datetime.datetime(2023, 1, 9, 14, 10, 0, tzinfo=utc)
+        assert info.description == 'desc'
 
         info = ops.SecretInfo.from_dict(
             'secret:4',
@@ -3609,6 +3613,7 @@ class TestSecretInfo:
         assert info.expires is None
         assert info.rotation is None
         assert info.rotates is None
+        assert info.description is None
 
         info = ops.SecretInfo.from_dict('5', {'revision': 9})
         assert info.id == 'secret:5'

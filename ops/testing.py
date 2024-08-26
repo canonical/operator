@@ -2814,6 +2814,7 @@ class _TestingModelBackend:
             expires=secret.expire_time,
             rotation=rotation,
             rotates=rotates,
+            description=secret.description,
         )
 
     def secret_set(
