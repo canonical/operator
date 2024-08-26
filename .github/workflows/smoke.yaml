@@ -13,15 +13,21 @@ jobs:
       matrix:
         juju-version: ['2.9 --classic', '3', '4.0/beta']
         charmcraft-version: ['2.x', '3.x']
+        cloud: ['lxd', 'microk8s']
 
     steps:
       - name: Set up Juju
         run: sudo snap install juju --channel=${{ matrix.juju-version }}
 
       - name: Set up LXD
+        if: ${{ matrix.cloud }} == 'lxd'
         uses: canonical/setup-lxd@ce8decb3609c0a03c5abd5034d02a6c145e2076f
         with:
           channel: 5.0/stable
+
+      - name: Set up Microk8s
+        if: ${{ matrix.cloud }} == 'microk8s'
+        run: snap install microk8s
 
       - name: Bootstrap Juju controller
         run: juju bootstrap localhost
