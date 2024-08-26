@@ -26,6 +26,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import ops.charm
@@ -555,14 +556,8 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
         sys.exit(e.exit_code)
 
 
-# Make this module callable and call main(), so that "import ops" and then
-# "ops.main(Charm)" works as expected now that everything is imported in
-# ops/__init__.py. Idea from https://stackoverflow.com/a/48100440/68707
-class _CallableModule(sys.modules[__name__].__class__):
-    def __call__(
-        self, charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None
-    ):
-        return main(charm_class, use_juju_for_storage=use_juju_for_storage)
-
-
-sys.modules[__name__].__class__ = _CallableModule
+# Support old and new style main calls at run time and for type checking
+# - ops.main.main(SomeCharm)
+# - ops.main(SomeCharm)
+class _CallableMainModule(ModuleType):  # pyright: ignore[reportUnusedClass] as it's used in __init__.py
+    __call__ = main = staticmethod(main)
