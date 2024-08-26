@@ -11,6 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Verify that `ops.main` can be invoked in every possible way.
+
+Validate that main can be called at runtime and according to the static type checker.
+
+Runtime tests:
+- Ensure that `ops.main` and `ops.main.main` can be invoked with a charm class.
+- Across 3 import styles: ops, main from ops, main from ops.main.
+- Confirm that calling main without a charm class fails.
+
+Typing tests:
+- Ensure that `ops.main` and `ops.main.main` are callable with correct argument.
+- Across same 3 import styles as above.
+- Confirm that calling main without a charm class is caught by static analysis.
+"""
+
 import os
 from pathlib import Path
 from typing import Callable, Type
