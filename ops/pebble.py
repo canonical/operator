@@ -1824,7 +1824,7 @@ def _reader_to_websocket(
             chunk = chunk.encode(encoding)
         ws.send_binary(chunk)
 
-    ws.send('{"command":"end"}')
+    ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
 
 
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: Optional[str]):
