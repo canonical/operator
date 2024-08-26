@@ -11,7 +11,13 @@ jobs:
 
     strategy:
       matrix:
-        juju-version: ['2.9 --classic', '3', '4.0/beta']
+        # pylibjuju does not currently support Juju 4.x
+        # TODO: we should run against 2.9, but that means installing pylibjuju
+        # "<3", and we need to do that inside the tox environment, so that's a
+        # bit more complex than having everything inside this workflow.
+        # Note that Juju 2.9 needs to be '2.9 --classic' because the snap is
+        # only available with classic confinement.
+        juju-version: ['3']
         charmcraft-version: ['2.x', '3.x']
         cloud: ['lxd', 'microk8s']
 
