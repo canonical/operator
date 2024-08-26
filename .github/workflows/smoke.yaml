@@ -32,11 +32,9 @@ jobs:
         if: matrix.cloud == 'microk8s'
         run: |
           sudo snap install microk8s --classic
-          sudo adduser $USER snap_microk8s
           sudo chown -f -R $USER ~/.kube
           sudo microk8s status --wait-ready
           sudo microk8s enable hostpath-storage dns
-          newgrp snap_microk8s
 
       - name: Set up Juju
         run: sudo snap install juju --channel=${{ matrix.juju-version }}
