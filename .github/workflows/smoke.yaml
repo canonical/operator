@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        juju-version: ['2.9 --classic', '3', '4.0']
+        juju-version: ['2.9 --classic', '3', '4.0/beta']
         charmcraft-version: ['2.x', '3.x']
 
     steps:
