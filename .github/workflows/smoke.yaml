@@ -1,0 +1,36 @@
+name: ops Smoke Tests
+
+on:
+  workflow_dispatch:
+    schedule:
+      - cron:  '0 7 25 * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        juju-version: ['2.9', '3', '4.0']
+        charmcraft-version: ['2.x', '3.x']
+
+    steps:
+      - name: Set up Juju
+        run: sudo snap install juju --channel=${{ matrix.juju-version }}
+
+      - name: Set up LXD
+        uses: canonical/setup-lxd@ce8decb3609c0a03c5abd5034d02a6c145e2076f
+        with:
+          channel: 5.0/stable
+
+      - name: Bootstrap Juju controller
+        run: juju bootstrap localhost
+
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --channel=${{ matrix.charmcraft-version }}
+
+      - name: Install tox
+        run: pip install tox~=4.2
+
+      - name: Run smoke tests
+        run: tox -e smoke
