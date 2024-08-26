@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import inspect
 import os
+import pathlib
 import sys
 from typing import TYPE_CHECKING, Any, Optional, Sequence, cast
 
@@ -15,7 +16,7 @@ from ops.charm import CharmMeta
 from ops.log import setup_root_logging
 
 # use logger from ops.main so that juju_log will be triggered
-from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_charm_dir, _get_event_args
+from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_event_args
 from ops.main import logger as ops_logger
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -31,6 +32,17 @@ class NoObserverError(RuntimeError):
 
 class BadOwnerPath(RuntimeError):
     """Error raised when the owner path does not lead to a valid ObjectEvents instance."""
+
+
+# TODO: Use ops.jujucontext's _JujuContext.charm_dir.
+def _get_charm_dir():
+    charm_dir = os.environ.get("JUJU_CHARM_DIR")
+    if charm_dir is None:
+        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
+        charm_dir = pathlib.Path(f"{__file__}/../../..").resolve()
+    else:
+        charm_dir = pathlib.Path(charm_dir).resolve()
+    return charm_dir
 
 
 def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
@@ -75,7 +87,17 @@ def _emit_charm_event(
             f"Use Context.run_custom instead.",
         )
 
-    args, kwargs = _get_event_args(charm, event_to_emit)
+    try:
+        args, kwargs = _get_event_args(charm, event_to_emit)
+    except TypeError:
+        # ops 2.16+
+        import ops.jujucontext  # type: ignore
+
+        args, kwargs = _get_event_args(
+            charm,
+            event_to_emit,
+            ops.jujucontext._JujuContext.from_dict(os.environ),  # type: ignore
+        )
     ops_logger.debug("Emitting Juju event %s.", event_name)
     event_to_emit.emit(*args, **kwargs)
 
@@ -159,7 +181,16 @@ def setup(state: "State", event: "Event", context: "Context", charm_spec: "_Char
     charm_class = charm_spec.charm_type
     charm_dir = _get_charm_dir()
 
-    dispatcher = _Dispatcher(charm_dir)
+    try:
+        dispatcher = _Dispatcher(charm_dir)
+    except TypeError:
+        # ops 2.16+
+        import ops.jujucontext  # type: ignore
+
+        dispatcher = _Dispatcher(
+            charm_dir,
+            ops.jujucontext._JujuContext.from_dict(os.environ),  # type: ignore
+        )
     dispatcher.run_any_legacy_hook()
 
     framework = setup_framework(charm_dir, state, event, context, charm_spec)
