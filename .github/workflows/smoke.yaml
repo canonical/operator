@@ -41,7 +41,7 @@ jobs:
 
       - name: Bootstrap Juju controller (k8s)
         if: matrix.cloud == 'microk8s'
-        run: juju bootstrap localhost
+        run: juju bootstrap microk8s
 
       - name: Bootstrap Juju controller (lxd)
         if: matrix.cloud == 'lxd'
