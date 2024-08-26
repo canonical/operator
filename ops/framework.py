@@ -485,7 +485,7 @@ class ObjectEvents(Object):
                 event_kinds.append(attr_name)
         return event_kinds
 
-    def events(self) -> Dict[str, EventSource]:
+    def events(self) -> Dict[str, BoundEvent]:
         """Return a mapping of event_kinds to bound_events for all available events."""
         return {event_kind: getattr(self, event_kind) for event_kind in self._event_kinds()}
 

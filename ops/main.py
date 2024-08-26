@@ -55,7 +55,7 @@ def _exe_path(path: Path) -> Optional[Path]:
 
 def _create_event_link(
     charm: 'ops.charm.CharmBase',
-    bound_event: 'ops.framework.EventSource',
+    bound_event: 'ops.framework.BoundEvent',
     link_to: Union[str, Path],
 ):
     """Create a symlink for a particular event.
@@ -66,7 +66,7 @@ def _create_event_link(
         link_to: What the event link should point to
     """
     # type guard
-    assert bound_event.event_kind, f'unbound EventSource {bound_event}'
+    assert bound_event.event_kind, f'unbound BoundEvent {bound_event}'
 
     if issubclass(bound_event.event_type, ops.charm.HookEvent):
         event_dir = charm.framework.charm_dir / 'hooks'
