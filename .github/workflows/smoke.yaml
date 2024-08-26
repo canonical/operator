@@ -23,8 +23,9 @@ jobs:
         cloud: ['microk8s']
 
     steps:
+      # LXD is required for charmcraft to pack, even if it's not used as the
+      # Juju cloud.
       - name: Set up LXD
-        if: matrix.cloud == 'lxd'
         uses: canonical/setup-lxd@ce8decb3609c0a03c5abd5034d02a6c145e2076f
         with:
           channel: 5.0/stable
