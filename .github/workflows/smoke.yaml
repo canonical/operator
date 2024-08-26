@@ -29,6 +29,12 @@ jobs:
       - name: Install charmcraft
         run: sudo snap install charmcraft --channel=${{ matrix.charmcraft-version }} --classic
 
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+
       - name: Install tox
         run: pip install tox~=4.2
 
