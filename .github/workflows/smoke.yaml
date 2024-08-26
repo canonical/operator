@@ -57,7 +57,7 @@ jobs:
         uses: actions/setup-python@v5
 
       - name: Install tox
-        run: pip install tox~=4.2
+        run: sudo pip install tox~=4.2
 
       - name: Run smoke tests
         # pytest-operator runs charmcraft pack with `sg lxd`, which seems to
