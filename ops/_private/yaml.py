@@ -25,7 +25,7 @@ _safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
 
 def safe_load(stream: Union[str, TextIO]) -> Any:
     """Same as yaml.safe_load, but use fast C loader if available."""
-    return yaml.load(stream, Loader=_safe_loader)
+    return yaml.load(stream, Loader=_safe_loader)  # noqa: S506
 
 
 def safe_dump(data: Any, stream: Optional[TextIO] = None) -> str:
