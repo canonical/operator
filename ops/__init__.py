@@ -182,7 +182,7 @@ from . import pebble
 # import was here previously
 from . import charm  # type: ignore # noqa: F401 `.charm` imported but unused
 
-from . import main as _main
+from ._main import main
 
 # Explicitly import names from submodules so users can just "import ops" and
 # then use them as "ops.X".
@@ -319,6 +319,3 @@ from .model import (
 # rather than a runtime concern.
 
 from .version import version as __version__
-
-# This allows "import ops; ops.main(Charm)" to work as expected.
-main = _main._CallableMainModule('ops.main', _main.__doc__)
