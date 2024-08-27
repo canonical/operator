@@ -65,7 +65,7 @@ def test_top_level_import_legacy_call(charm_env: None):
 def test_submodule_import(charm_env: None):
     import ops.main
 
-    ops.main(IdleCharm)  # type: ignore https://github.com/microsoft/pyright/issues/8830
+    ops.main(IdleCharm)  # type: ignore # https://github.com/microsoft/pyright/issues/8830
 
     with pytest.raises(TypeError):
         ops.main()  # type: ignore
