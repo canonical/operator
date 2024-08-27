@@ -141,12 +141,6 @@ ignore = [
     # Manual dict comprehension.
     "PERF403",
 
-    # Convert Dict[X] to dict[x], which we cannot do while we support Python 3.8
-    "UP006",
-
-    # Convert Union[X, Y] to X | Y, which we cannot do while we support Python 3.8
-    "UP007",
-
     # Convert {} from `TypedDict` functional to class syntax
     # Note that since we have some `TypedDict`s that cannot use the class
     # syntax, we're currently choosing to be consistent in syntax even though
