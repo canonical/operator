@@ -53,7 +53,7 @@ def top_level_import():
 def submodule_import():
     import ops.main
 
-    type_test_dummy(ops.main.__call__)  # type: ignore https://github.com/microsoft/pyright/issues/8830
+    type_test_dummy(ops.main.__call__)  # type: ignore # https://github.com/microsoft/pyright/issues/8830
     type_test_dummy(ops.main.main)
 
     type_test_negative(ops.main.__call__)  # type: ignore

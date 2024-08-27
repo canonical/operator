@@ -27,7 +27,7 @@ import sys
 import warnings
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Type, Union, cast
 
 import ops.charm
 import ops.framework
@@ -557,7 +557,17 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
 
 
 # FIXME maybe support the old-school import ops; ops.main.main()
+class Main(Protocol):
+    def __call__(
+        self, charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None
+    ): ...
+
+    main: Callable[[Type[ops.charm.CharmBase], Optional[bool]], None]
+
+
+main: Main = main  # type: ignore
 main.main = main
+
 
 # Support old and new style main calls at run time and for type checking
 # - ops.main.main(SomeCharm)
