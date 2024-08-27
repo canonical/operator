@@ -96,8 +96,8 @@ class EventSpec:
         self.check_name = check_name
 
 
-@patch('ops.main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
-@patch('ops.main._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops._main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops._main._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestCharmInit:
     @patch('sys.stderr', new_callable=io.StringIO)
@@ -203,7 +203,7 @@ class TestCharmInit:
 
 
 @patch('sys.argv', new=('hooks/config-changed',))
-@patch('ops.main._Manager._setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops._main._Manager._setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestDispatch:
     def _check(self, *, with_dispatch: bool = False, dispatch_path: str = ''):
@@ -235,7 +235,7 @@ class TestDispatch:
                 dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
-                with patch('ops.main._emit_charm_event') as mock_charm_event:
+                with patch('ops._main._emit_charm_event') as mock_charm_event:
                     ops.main(MyCharm)
 
         assert mock_charm_event.call_count == 1
