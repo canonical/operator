@@ -556,6 +556,9 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
         sys.exit(e.exit_code)
 
 
+# FIXME maybe support the old-school import ops; ops.main.main()
+main.main = main
+
 # Support old and new style main calls at run time and for type checking
 # - ops.main.main(SomeCharm)
 # - ops.main(SomeCharm)
