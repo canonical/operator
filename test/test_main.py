@@ -30,8 +30,8 @@ from unittest.mock import patch
 import pytest
 
 import ops
+from ops._main import _should_use_controller_storage
 from ops.jujucontext import _JujuContext
-from ops.main import _should_use_controller_storage
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
