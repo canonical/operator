@@ -56,8 +56,6 @@ def test_top_level_import(charm_env: None):
 def test_top_level_import_legacy_call(charm_env: None):
     import ops
 
-    ops.main.main(IdleCharm)
-
     with pytest.deprecated_call():
         ops.main.main(IdleCharm)
 
