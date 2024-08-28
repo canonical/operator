@@ -173,7 +173,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # The isort command wants to rearrange the nicely-formatted imports below;
 # just skip it for this file.
 # isort:skip_file
-from typing import  Optional, Protocol, Type, cast
+from typing import Optional, Protocol, Type, cast
 
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble
