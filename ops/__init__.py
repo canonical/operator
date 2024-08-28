@@ -173,7 +173,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # The isort command wants to rearrange the nicely-formatted imports below;
 # just skip it for this file.
 # isort:skip_file
-from typing import Optional, Protocol, Type, cast
+from typing import Optional, Type
 
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble
@@ -323,15 +323,18 @@ from .model import (
 from .version import version as __version__
 
 
-class Main(Protocol):
+class Main:
     def __call__(
         self, charm_class: Type[charm.CharmBase], use_juju_for_storage: Optional[bool] = None
-    ): ...
+    ):
+        return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
 
     def main(
         self, charm_class: Type[charm.CharmBase], use_juju_for_storage: Optional[bool] = None
-    ): ...
+    ):
+        return _legacy_main.main(
+            charm_class=charm_class, use_juju_for_storage=use_juju_for_storage
+        )
 
 
-main: Main = cast(Main, _main.main)
-main.main = _legacy_main.main
+main = Main()
