@@ -105,7 +105,7 @@ def create_framework(
 
     if meta is None:
         meta = ops.CharmMeta()
-    model = ops.Model(meta, _ModelBackend('local/0'))  # type: ignore
+    model = ops.Model(meta, _ModelBackend('local/0'))
     # We can pass foo_event as event_name because we're not actually testing dispatch.
     framework = ops.Framework(
         SQLiteStorage(':memory:'),
@@ -175,7 +175,7 @@ done
         path.chmod(0o755)
         # TODO: this hardcodes the path to bash.exe, which works for now but might
         #       need to be set via environ or something like that.
-        path.with_suffix('.bat').write_text(  # type: ignore
+        path.with_suffix('.bat').write_text(
             f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n'
         )
 

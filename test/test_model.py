@@ -1865,7 +1865,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
-            }),  # type: ignore
+            }),
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
                 'level': 'alive',
@@ -1911,7 +1911,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
-            })  # type: ignore
+            })
         ])
         c = container.get_check('c1')
         assert container.pebble.requests == [('get_checks', None, ('c1',))]  # type: ignore
@@ -1934,7 +1934,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
-            }),  # type: ignore
+            }),
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
                 'level': 'alive',
@@ -3206,7 +3206,7 @@ class TestModelBackend:
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
             ({'foo': 'bar'}, {}),  # type: ignore
-            ({'foo': '1O'}, {}),  # type: ignore
+            ({'foo': '1O'}, {}),
         ]
         for metrics, labels in invalid_inputs:
             with pytest.raises(ops.ModelError):
@@ -3454,7 +3454,7 @@ class TestSecrets:
         ]
         for content, kwargs, exc_type in errors:
             with pytest.raises(exc_type):
-                model.unit.add_secret(content, **kwargs)  # type: ignore
+                model.unit.add_secret(content, **kwargs)
 
     def test_add_secret_errors(self, model: ops.Model):
         errors: typing.Any = [
@@ -3474,9 +3474,9 @@ class TestSecrets:
         ]
         for content, kwargs, exc_type in errors:
             with pytest.raises(exc_type):
-                model.app.add_secret(content, **kwargs)  # type: ignore
+                model.app.add_secret(content, **kwargs)
             with pytest.raises(exc_type):
-                model.unit.add_secret(content, **kwargs)  # type: ignore
+                model.unit.add_secret(content, **kwargs)
 
     def test_get_secret_id(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-get', """echo '{"foo": "g"}'""")

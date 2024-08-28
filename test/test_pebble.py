@@ -26,7 +26,7 @@ import unittest.mock
 import unittest.util
 
 import pytest
-import websocket  # type: ignore
+import websocket
 
 import test.fake_pebble as fake_pebble
 from ops import pebble
@@ -3338,8 +3338,8 @@ class TestExec:
             process.wait()
         assert excinfo.value.command == ['false']
         assert excinfo.value.exit_code == 1
-        assert excinfo.value.stdout is None  # type: ignore
-        assert excinfo.value.stderr is None  # type: ignore
+        assert excinfo.value.stdout is None
+        assert excinfo.value.stderr is None
 
         assert client.requests == [
             ('POST', '/v1/exec', None, self.build_exec_data(['false'])),

@@ -354,8 +354,8 @@ class TestFramework:
 
         framework.commit()
 
-        assert obs._stored.myinitdata == 41  # type: ignore
-        assert obs._stored.mydata == 42  # type: ignore
+        assert obs._stored.myinitdata == 41
+        assert obs._stored.mydata == 42
         assert obs.seen, [ops.PreCommitEvent, ops.CommitEvent]
         framework.close()
 
@@ -363,11 +363,11 @@ class TestFramework:
 
         new_obs = PreCommitObserver(other_framework, None)
 
-        assert obs._stored.myinitdata == 41  # type: ignore
-        assert new_obs._stored.mydata == 42  # type: ignore
+        assert obs._stored.myinitdata == 41
+        assert new_obs._stored.mydata == 42
 
         with pytest.raises(AttributeError):
-            new_obs._stored.myotherdata  # type: ignore
+            new_obs._stored.myotherdata
 
     def test_defer_and_reemit(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
@@ -1083,7 +1083,7 @@ class TestStoredState:
                 ops.StoredList(None, [1, 2, 3])  # type: ignore
             )
             == 'ops.framework.StoredList([1, 2, 3])'
-        )  # type: ignore
+        )
 
     def test_stored_set_repr(self):
         assert repr(ops.StoredSet(None, set())) == 'ops.framework.StoredSet()'  # type: ignore
@@ -1159,14 +1159,14 @@ class TestStoredState:
         assert isinstance(obj, _StoredProtocol)
 
         try:
-            obj._stored.foo  # type: ignore
+            obj._stored.foo
         except AttributeError as e:
             assert str(e) == "attribute 'foo' is not stored"
         else:
             pytest.fail('AttributeError not raised')
 
         try:
-            obj._stored.on = 'nonono'  # type: ignore
+            obj._stored.on = 'nonono'
         except AttributeError as e:
             assert str(e) == "attribute 'on' is reserved and cannot be set"
         else:
@@ -1850,7 +1850,7 @@ class TestBreakpoint:
     def test_breakpoint_not_really_names(self, request: pytest.FixtureRequest, name: typing.Any):
         framework = create_framework(request)
         with pytest.raises(TypeError) as excinfo:
-            framework.breakpoint(name)  # type: ignore
+            framework.breakpoint(name)
         assert str(excinfo.value) == 'breakpoint names must be strings'
 
     def check_trace_set(
