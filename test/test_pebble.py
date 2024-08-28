@@ -1902,6 +1902,7 @@ class TestClient:
             'status-code': 200,
             'type': 'sync',
         })
+        excinfo: pytest.ExceptionInfo[pebble.ChangeError]
         with pytest.raises(pebble.ChangeError) as excinfo:
             client.autostart_services()
         assert isinstance(excinfo.value, pebble.Error)
@@ -3332,6 +3333,7 @@ class TestExec:
         self.add_responses(client, '456', 1)
 
         process = client.exec(['false'])
+        excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
         with pytest.raises(pebble.ExecError) as excinfo:
             process.wait()
         assert excinfo.value.command == ['false']
