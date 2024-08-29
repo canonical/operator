@@ -18,7 +18,7 @@
 
 * Update the smoke test series/bases in https://github.com/canonical/operator/pull/1318
 * Run pytest in parallel with pytest xdist in https://github.com/canonical/operator/pull/1319
-* Bump pyright to 1.1.377 in https://github.com/canonical/operator/pull/1332
+* Bump Pyright to 1.1.377 in https://github.com/canonical/operator/pull/1332
 * Run tests on Python 3.12 and the install test on Python 3.13 in https://github.com/canonical/operator/pull/1315
 * Add a workflow that runs the TIOBE quality checks in https://github.com/canonical/operator/pull/1301
 * Allow executing the TIOBE workflow manually in https://github.com/canonical/operator/pull/1321
