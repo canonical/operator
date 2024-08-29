@@ -18,7 +18,7 @@ import ops
 
 def type_test_dummy(_arg: Callable[[Type[ops.CharmBase], bool], None]):
     """
-    Helper to verify that
+    Helper to verify the function signature of ops.main and ops.main.main
     Usage:
 
     from somewhere import main
@@ -29,6 +29,7 @@ def type_test_dummy(_arg: Callable[[Type[ops.CharmBase], bool], None]):
 
 def type_test_negative(_arg: Callable[[], None]):
     """
+    Helper for negative tests of the function signatures of ops.main and ops.main.main
     Usage:
 
     from somewhere import main

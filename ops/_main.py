@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Imeplement the main entry point to the framework."""
+"""Implement the main entry point to the framework."""
 
 import logging
 import os
