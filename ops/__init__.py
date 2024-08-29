@@ -347,10 +347,11 @@ The event name is based on the way this executable was called (argv[0]).
 
 Args:
     charm_class: the charm class to instantiate and receive the event.
-    use_juju_for_storage: whether to use controller-side storage. If not specified
-        then Kubernetes charms that haven't previously used local storage and that
+    use_juju_for_storage: whether to use controller-side storage.
+        The default is ``False`` for most charms.
+        Podspec charms that haven't previously used local storage and that
         are running on a new enough Juju default to controller-side storage,
-        otherwise local storage is used.
+        and local storage otherwise.
 
 Recommended usage:
 

@@ -16,14 +16,6 @@ ops module
 ops.main entry point
 ====================
 .. autofunction:: ops.main
-   :noindex:
-
-
-_main module
-------------
-
-.. automodule:: ops._main
-   :noindex:
 
 
 legacy main module

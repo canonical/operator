@@ -39,15 +39,10 @@ def charm_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     os.environ.pop('OPERATOR_DISPATCH', None)
 
 
-class IdleCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-
-
 def test_top_level_import(charm_env: None):
     import ops
 
-    ops.main(IdleCharm)
+    ops.main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         ops.main()  # type: ignore
@@ -57,7 +52,7 @@ def test_top_level_import_legacy_call(charm_env: None):
     import ops
 
     with pytest.deprecated_call():
-        ops.main.main(IdleCharm)
+        ops.main.main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         ops.main.main()  # type: ignore
@@ -66,7 +61,7 @@ def test_top_level_import_legacy_call(charm_env: None):
 def test_submodule_import(charm_env: None):
     import ops.main
 
-    ops.main(IdleCharm)  # type: ignore # https://github.com/microsoft/pyright/issues/8830
+    ops.main(ops.CharmBase)  # type: ignore # https://github.com/microsoft/pyright/issues/8830
 
     with pytest.raises(TypeError):
         ops.main()  # type: ignore
@@ -76,7 +71,7 @@ def test_submodule_import_legacy_call(charm_env: None):
     import ops.main
 
     with pytest.deprecated_call():
-        ops.main.main(IdleCharm)
+        ops.main.main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         ops.main.main()  # type: ignore
@@ -85,7 +80,7 @@ def test_submodule_import_legacy_call(charm_env: None):
 def test_import_from_top_level_module(charm_env: None):
     from ops import main
 
-    main(IdleCharm)
+    main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         main()  # type: ignore
@@ -95,7 +90,7 @@ def test_import_from_top_level_module_legacy_call(charm_env: None):
     from ops import main
 
     with pytest.deprecated_call():
-        main.main(IdleCharm)
+        main.main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         main.main()  # type: ignore
@@ -105,7 +100,7 @@ def test_legacy_import_from_submodule(charm_env: None):
     from ops.main import main
 
     with pytest.deprecated_call():
-        main(IdleCharm)
+        main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         main()  # type: ignore
