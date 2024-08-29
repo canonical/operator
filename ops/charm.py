@@ -1260,7 +1260,7 @@ class CharmBase(Object):
 
         import ops
 
-        def MyCharm(ops.CharmBase):
+        class MyCharm(ops.CharmBase):
             def __init__(self, *args):
                 super().__init__(*args)
                 self.framework.observe(self.on.config_changed, self._on_config_changed)
