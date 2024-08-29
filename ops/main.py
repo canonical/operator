@@ -27,7 +27,7 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     .. deprecated:: 2.16.0
         This entrypoint has been deprecated, use `ops.main()` instead.
 
-    See :func:`ops.main` for details.
+    See ``ops.main()`` for details.
     """
     warnings.warn(
         'Calling `ops.main.main()` is deprecated, call `ops.main()` instead',

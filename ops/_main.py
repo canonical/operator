@@ -530,7 +530,7 @@ class _Manager:
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
     """Set up the charm and dispatch the observed event.
 
-    See :func:`ops.main` for details.
+    See ``ops.main`` for details.
     """
     try:
         manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
