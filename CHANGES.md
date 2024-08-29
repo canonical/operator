@@ -1,3 +1,39 @@
+# 2.16.0 - 29 Aug 2024
+
+## Features
+
+* Add the description field to SecretInfo in https://github.com/canonical/operator/pull/1338
+
+## Refactor
+
+* Parse JUJU_* environment variables in one place in https://github.com/canonical/operator/pull/1313
+
+## Fixes
+
+* Fix reading Juju secret expiry dates in https://github.com/canonical/operator/pull/1317
+* Correct the signature of .events() in https://github.com/canonical/operator/pull/1342
+
+## Documentation
+
+* Security policy change to only support each active major release in https://github.com/canonical/operator/pull/1297
+* Add Juju version markers in https://github.com/canonical/operator/pull/1311
+* Use Sphinx 8 in https://github.com/canonical/operator/pull/1303
+* Live reload documentation with sphinx-autobuild in https://github.com/canonical/operator/pull/1323
+
+## Tests
+
+* Update the smoke test series/bases in https://github.com/canonical/operator/pull/1318
+* Run pytest in parallel with pytest xdist in https://github.com/canonical/operator/pull/1319
+* Bump Pyright to 1.1.377 in https://github.com/canonical/operator/pull/1332
+* Run tests on Python 3.12 and the install test on Python 3.13 in https://github.com/canonical/operator/pull/1315
+
+## CI
+
+* Add a workflow that runs the TIOBE quality checks in https://github.com/canonical/operator/pull/1301
+* Allow executing the TIOBE workflow manually in https://github.com/canonical/operator/pull/1321
+* Make Pyright report unnecessary type ignore comments in https://github.com/canonical/operator/pull/1333
+* Enable linting of docs/custom_conf.py in https://github.com/canonical/operator/pull/1330
+
 # 2.15.0 - 22 Jul 2024
 
 ## Features
