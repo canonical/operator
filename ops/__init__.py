@@ -363,5 +363,6 @@ Recommended usage:
     class SomeCharm(ops.CharmBase):
         ...
 
-    ops.main(SomeCharm)
+    if __name__ == "__main__":
+        ops.main(SomeCharm)
 """
