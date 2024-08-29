@@ -10,25 +10,38 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Type, TypeVar, Union
 
 import yaml
-from ops import pebble
-from ops.framework import _event_regex
+from ops import CollectStatusEvent, pebble
+from ops.framework import (
+    CommitEvent,
+    EventBase,
+    Framework,
+    Handle,
+    NoTypeError,
+    PreCommitEvent,
+    _event_regex,
+)
 from ops.storage import NoSnapshotError, SQLiteStorage
 
-from scenario.capture_events import capture_events
+from scenario.errors import UncaughtCharmError
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
-from scenario.state import ActionFailed, DeferredEvent, PeerRelation, StoredState
+from scenario.state import (
+    ActionFailed,
+    DeferredEvent,
+    PeerRelation,
+    Relation,
+    StoredState,
+    SubordinateRelation,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.context import Context
     from scenario.state import State, _CharmSpec, _Event
-
-    PathLike = Union[str, Path]
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
@@ -37,18 +50,6 @@ STORED_STATE_REGEX = re.compile(
 EVENT_REGEX = re.compile(_event_regex)
 
 RUNTIME_MODULE = Path(__file__).parent
-
-
-class ScenarioRuntimeError(RuntimeError):
-    """Base class for exceptions raised by scenario.runtime."""
-
-
-class UncaughtCharmError(ScenarioRuntimeError):
-    """Error raised if the charm raises while handling the event being dispatched."""
-
-
-class InconsistentScenarioError(ScenarioRuntimeError):
-    """Error raised when the combination of state and event is inconsistent."""
 
 
 class UnitStateDB:
@@ -156,7 +157,7 @@ class Runtime:
     def __init__(
         self,
         charm_spec: "_CharmSpec",
-        charm_root: Optional["PathLike"] = None,
+        charm_root: Optional[Union[str, Path]] = None,
         juju_version: str = "3.0.0",
         app_name: Optional[str] = None,
         unit_id: Optional[int] = 0,
@@ -206,8 +207,10 @@ class Runtime:
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
-            else:
+            elif isinstance(relation, (Relation, SubordinateRelation)):
                 remote_app_name = relation.remote_app_name
+            else:
+                raise ValueError(f"Unknown relation type: {relation}")
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
@@ -398,8 +401,8 @@ class Runtime:
     def _exec_ctx(self, ctx: "Context"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
-            # todo allow customizing capture_events
-            with capture_events(
+            # TODO: allow customising capture_events
+            with _capture_events(
                 include_deferred=ctx.capture_deferred_events,
                 include_framework=ctx.capture_framework_events,
             ) as captured:
@@ -423,7 +426,7 @@ class Runtime:
         # todo consider forking out a real subprocess and do the mocking by
         #  mocking hook tool executables
 
-        from scenario.consistency_checker import check_consistency  # avoid cycles
+        from scenario._consistency_checker import check_consistency  # avoid cycles
 
         check_consistency(state, event, self._charm_spec, self._juju_version)
 
@@ -485,3 +488,88 @@ class Runtime:
         context.emitted_events.extend(captured)
         logger.info("event dispatched. done.")
         context._set_output_state(output_state)
+
+
+_T = TypeVar("_T", bound=EventBase)
+
+
+@contextmanager
+def _capture_events(
+    *types: Type[EventBase],
+    include_framework=False,
+    include_deferred=True,
+):
+    """Capture all events of type `*types` (using instance checks).
+
+    Arguments exposed so that you can define your own fixtures if you want to.
+
+    Example::
+    >>> from ops.charm import StartEvent
+    >>> from scenario import Event, State
+    >>> from charm import MyCustomEvent, MyCharm  # noqa
+    >>>
+    >>> def test_my_event():
+    >>>     with capture_events(StartEvent, MyCustomEvent) as captured:
+    >>>         trigger(State(), ("start", MyCharm, meta=MyCharm.META)
+    >>>
+    >>>     assert len(captured) == 2
+    >>>     e1, e2 = captured
+    >>>     assert isinstance(e2, MyCustomEvent)
+    >>>     assert e2.custom_attr == 'foo'
+    """
+    allowed_types = types or (EventBase,)
+
+    captured = []
+    _real_emit = Framework._emit
+    _real_reemit = Framework.reemit
+
+    def _wrapped_emit(self, evt):
+        if not include_framework and isinstance(
+            evt,
+            (PreCommitEvent, CommitEvent, CollectStatusEvent),
+        ):
+            return _real_emit(self, evt)
+
+        if isinstance(evt, allowed_types):
+            # dump/undump the event to ensure any custom attributes are (re)set by restore()
+            evt.restore(evt.snapshot())
+            captured.append(evt)
+
+        return _real_emit(self, evt)
+
+    def _wrapped_reemit(self):
+        # Framework calls reemit() before emitting the main juju event. We intercept that call
+        # and capture all events in storage.
+
+        if not include_deferred:
+            return _real_reemit(self)
+
+        # load all notices from storage as events.
+        for event_path, _, _ in self._storage.notices():
+            event_handle = Handle.from_path(event_path)
+            try:
+                event = self.load_snapshot(event_handle)
+            except NoTypeError:
+                continue
+            event = typing.cast(EventBase, event)
+            event.deferred = False
+            self._forget(event)  # prevent tracking conflicts
+
+            if not include_framework and isinstance(
+                event,
+                (PreCommitEvent, CommitEvent),
+            ):
+                continue
+
+            if isinstance(event, allowed_types):
+                captured.append(event)
+
+        return _real_reemit(self)
+
+    Framework._emit = _wrapped_emit  # type: ignore
+    Framework.reemit = _wrapped_reemit  # type: ignore
+
+    yield captured
+
+    Framework._emit = _real_emit  # type: ignore
+    Framework.reemit = _real_reemit  # type: ignore

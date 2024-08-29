@@ -19,30 +19,13 @@ from ops.log import setup_root_logging
 from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_event_args
 from ops.main import logger as ops_logger
 
+from scenario.errors import BadOwnerPath, NoObserverError
+
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import State, _CharmSpec, _Event
 
 # pyright: reportPrivateUsage=false
-
-
-class NoObserverError(RuntimeError):
-    """Error raised when the event being dispatched has no registered observers."""
-
-
-class BadOwnerPath(RuntimeError):
-    """Error raised when the owner path does not lead to a valid ObjectEvents instance."""
-
-
-# TODO: Use ops.jujucontext's _JujuContext.charm_dir.
-def _get_charm_dir():
-    charm_dir = os.environ.get("JUJU_CHARM_DIR")
-    if charm_dir is None:
-        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = pathlib.Path(f"{__file__}/../../..").resolve()
-    else:
-        charm_dir = pathlib.Path(charm_dir).resolve()
-    return charm_dir
 
 
 def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:

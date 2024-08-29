@@ -3,11 +3,11 @@ import dataclasses
 import pytest
 from ops.charm import CharmBase
 
-from scenario.consistency_checker import check_consistency
+from scenario._consistency_checker import check_consistency
 from scenario.context import Context
-from scenario.runtime import InconsistentScenarioError
+from scenario.errors import InconsistentScenarioError
 from scenario.state import (
-    RELATION_EVENTS_SUFFIX,
+    _RELATION_EVENTS_SUFFIX,
     CheckInfo,
     CloudCredential,
     CloudSpec,
@@ -181,19 +181,7 @@ def test_evt_bad_container_name():
     )
 
 
-def test_duplicate_execs_in_container():
-    container = Container(
-        "foo",
-        execs={Exec(["ls", "-l"], return_code=0), Exec(["ls", "-l"], return_code=1)},
-    )
-    assert_inconsistent(
-        State(containers=[container]),
-        _Event("foo-pebble-ready", container=container),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
-    )
-
-
-@pytest.mark.parametrize("suffix", RELATION_EVENTS_SUFFIX)
+@pytest.mark.parametrize("suffix", _RELATION_EVENTS_SUFFIX)
 def test_evt_bad_relation_name(suffix):
     assert_inconsistent(
         State(),
@@ -208,7 +196,7 @@ def test_evt_bad_relation_name(suffix):
     )
 
 
-@pytest.mark.parametrize("suffix", RELATION_EVENTS_SUFFIX)
+@pytest.mark.parametrize("suffix", _RELATION_EVENTS_SUFFIX)
 def test_evt_no_relation(suffix):
     assert_inconsistent(State(), _Event(f"foo{suffix}"), _CharmSpec(MyCharm, {}))
     relation = Relation("bar")

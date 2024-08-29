@@ -45,6 +45,7 @@ from ops.model import CloudCredential as CloudCredential_Ops
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import SecretRotate, StatusBase
 
+from scenario.errors import MetadataNotFoundError, StateValidationError
 from scenario.logger import logger as scenario_logger
 
 JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
@@ -52,8 +53,6 @@ JujuLogLine = namedtuple("JujuLogLine", ("level", "message"))
 if TYPE_CHECKING:  # pragma: no cover
     from scenario import Context
 
-PathLike = Union[str, Path]
-AnyRelation = Union["Relation", "PeerRelation", "SubordinateRelation"]
 AnyJson = Union[str, bool, dict, int, float, list]
 RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
 UnitID = int
@@ -67,9 +66,9 @@ CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
 BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
 DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
 
-ACTION_EVENT_SUFFIX = "_action"
+_ACTION_EVENT_SUFFIX = "_action"
 # all builtin events except secret events. They're special because they carry secret metadata.
-BUILTIN_EVENTS = {
+_BUILTIN_EVENTS = {
     "start",
     "stop",
     "install",
@@ -86,52 +85,34 @@ BUILTIN_EVENTS = {
     "leader_settings_changed",
     "collect_metrics",
 }
-FRAMEWORK_EVENTS = {
+_FRAMEWORK_EVENTS = {
     "pre_commit",
     "commit",
     "collect_app_status",
     "collect_unit_status",
 }
-PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
-PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = "_pebble_custom_notice"
-PEBBLE_CHECK_FAILED_EVENT_SUFFIX = "_pebble_check_failed"
-PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX = "_pebble_check_recovered"
-RELATION_EVENTS_SUFFIX = {
+_PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
+_PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = "_pebble_custom_notice"
+_PEBBLE_CHECK_FAILED_EVENT_SUFFIX = "_pebble_check_failed"
+_PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX = "_pebble_check_recovered"
+_RELATION_EVENTS_SUFFIX = {
     "_relation_changed",
     "_relation_broken",
     "_relation_joined",
     "_relation_departed",
     "_relation_created",
 }
-STORAGE_EVENTS_SUFFIX = {
+_STORAGE_EVENTS_SUFFIX = {
     "_storage_detaching",
     "_storage_attached",
 }
 
-SECRET_EVENTS = {
+_SECRET_EVENTS = {
     "secret_changed",
     "secret_remove",
     "secret_rotate",
     "secret_expired",
 }
-
-META_EVENTS = {
-    "CREATE_ALL_RELATIONS": "_relation_created",
-    "BREAK_ALL_RELATIONS": "_relation_broken",
-    "DETACH_ALL_STORAGES": "_storage_detaching",
-    "ATTACH_ALL_STORAGES": "_storage_attached",
-}
-
-
-class StateValidationError(RuntimeError):
-    """Raised when individual parts of the State are inconsistent."""
-
-    # as opposed to InconsistentScenario error where the
-    # **combination** of several parts of the State are.
-
-
-class MetadataNotFoundError(RuntimeError):
-    """Raised when Scenario can't find a metadata.yaml file in the provided charm root."""
 
 
 class ActionFailed(Exception):
@@ -362,7 +343,7 @@ class Secret(_max_posargs(1)):
             object.__setattr__(self, "rotate", rotate)
 
 
-def normalize_name(s: str):
+def _normalise_name(s: str):
     """Event names, in Scenario, uniformly use underscores instead of dashes."""
     return s.replace("-", "_")
 
@@ -397,7 +378,7 @@ class BindAddress(_max_posargs(1)):
     interface_name: str = ""
     mac_address: Optional[str] = None
 
-    def hook_tool_output_fmt(self):
+    def _hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
         # todo support for legacy (deprecated) `interfacename` and `macaddress` fields?
         dct = {
@@ -425,10 +406,12 @@ class Network(_max_posargs(2)):
     def __hash__(self) -> int:
         return hash(self.binding_name)
 
-    def hook_tool_output_fmt(self):
+    def _hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
         return {
-            "bind-addresses": [ba.hook_tool_output_fmt() for ba in self.bind_addresses],
+            "bind-addresses": [
+                ba._hook_tool_output_fmt() for ba in self.bind_addresses
+            ],
             "egress-subnets": self.egress_subnets,
             "ingress-addresses": self.ingress_addresses,
         }
@@ -437,7 +420,7 @@ class Network(_max_posargs(2)):
 _next_relation_id_counter = 1
 
 
-def next_relation_id(*, update=True):
+def _next_relation_id(*, update=True):
     global _next_relation_id_counter
     cur = _next_relation_id_counter
     if update:
@@ -454,7 +437,7 @@ class RelationBase(_max_posargs(2)):
     """Interface name. Must match the interface name attached to this endpoint in metadata.yaml.
     If left empty, it will be automatically derived from metadata.yaml."""
 
-    id: int = dataclasses.field(default_factory=next_relation_id)
+    id: int = dataclasses.field(default_factory=_next_relation_id)
     """Juju relation ID. Every new Relation instance gets a unique one,
     if there's trouble, override."""
 
@@ -462,7 +445,7 @@ class RelationBase(_max_posargs(2)):
     """This application's databag for this relation."""
 
     local_unit_data: "RawDataBagContents" = dataclasses.field(
-        default_factory=lambda: DEFAULT_JUJU_DATABAG.copy(),
+        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
     )
     """This unit's databag for this relation."""
 
@@ -510,8 +493,8 @@ class RelationBase(_max_posargs(2)):
                 )
 
 
-_DEFAULT_IP = " 192.0.2.0"
-DEFAULT_JUJU_DATABAG = {
+_DEFAULT_IP = "192.0.2.0"
+_DEFAULT_JUJU_DATABAG = {
     "egress-subnets": _DEFAULT_IP,
     "ingress-address": _DEFAULT_IP,
     "private-address": _DEFAULT_IP,
@@ -531,7 +514,7 @@ class Relation(RelationBase):
     remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
     """The current content of the application databag."""
     remote_units_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
-        default_factory=lambda: {0: DEFAULT_JUJU_DATABAG.copy()},  # dedup
+        default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
     """The current content of the databag for each unit in the relation."""
 
@@ -565,7 +548,7 @@ class Relation(RelationBase):
 class SubordinateRelation(RelationBase):
     remote_app_data: "RawDataBagContents" = dataclasses.field(default_factory=dict)
     remote_unit_data: "RawDataBagContents" = dataclasses.field(
-        default_factory=lambda: DEFAULT_JUJU_DATABAG.copy(),
+        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
     )
 
     # app name and ID of the remote unit that *this unit* is attached to.
@@ -607,7 +590,7 @@ class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
     peers_data: Dict["UnitID", "RawDataBagContents"] = dataclasses.field(
-        default_factory=lambda: {0: DEFAULT_JUJU_DATABAG.copy()},
+        default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},
     )
     """Current contents of the peer databags."""
     # Consistency checks will validate that *this unit*'s ID is not in here.
@@ -729,7 +712,7 @@ def _now_utc():
 _next_notice_id_counter = 1
 
 
-def next_notice_id(*, update=True):
+def _next_notice_id(*, update=True):
     global _next_notice_id_counter
     cur = _next_notice_id_counter
     if update:
@@ -746,7 +729,7 @@ class Notice(_max_posargs(1)):
     ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
     """
 
-    id: str = dataclasses.field(default_factory=next_notice_id)
+    id: str = dataclasses.field(default_factory=_next_notice_id)
     """Unique ID for this notice."""
 
     user_id: Optional[int] = None
@@ -1212,7 +1195,7 @@ _port_cls_by_protocol = {
 _next_storage_index_counter = 0  # storage indices start at 0
 
 
-def next_storage_index(*, update=True):
+def _next_storage_index(*, update=True):
     """Get the index (used to be called ID) the next Storage to be created will get.
 
     Pass update=False if you're only inspecting it.
@@ -1231,7 +1214,7 @@ class Storage(_max_posargs(1)):
 
     name: str
 
-    index: int = dataclasses.field(default_factory=next_storage_index)
+    index: int = dataclasses.field(default_factory=_next_storage_index)
     # Every new Storage instance gets a new one, if there's trouble, override.
 
     def __eq__(self, other: object) -> bool:
@@ -1249,7 +1232,7 @@ class Resource(_max_posargs(0)):
     """Represents a resource made available to the charm."""
 
     name: str
-    path: "PathLike"
+    path: Union[str, Path]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1265,7 +1248,7 @@ class State(_max_posargs(0)):
         default_factory=dict,
     )
     """The present configuration of this charm."""
-    relations: Iterable["AnyRelation"] = dataclasses.field(default_factory=frozenset)
+    relations: Iterable["RelationBase"] = dataclasses.field(default_factory=frozenset)
     """All relations that currently exist for this charm."""
     networks: Iterable[Network] = dataclasses.field(default_factory=frozenset)
     """Manual overrides for any relation and extra bindings currently provisioned for this charm.
@@ -1394,24 +1377,6 @@ class State(_max_posargs(0)):
         # bypass frozen dataclass
         object.__setattr__(self, "secrets", new_secrets)
 
-    def with_can_connect(self, container_name: str, can_connect: bool) -> "State":
-        def replacer(container: Container):
-            if container.name == container_name:
-                return dataclasses.replace(container, can_connect=can_connect)
-            return container
-
-        ctrs = tuple(map(replacer, self.containers))
-        return dataclasses.replace(self, containers=ctrs)
-
-    def with_leadership(self, leader: bool) -> "State":
-        return dataclasses.replace(self, leader=leader)
-
-    def with_unit_status(self, status: StatusBase) -> "State":
-        return dataclasses.replace(
-            self,
-            unit_status=_EntityStatus.from_ops(status),
-        )
-
     def get_container(self, container: str, /) -> Container:
         """Get container from this State, based on its name."""
         for state_container in self.containers:
@@ -1473,14 +1438,14 @@ class State(_max_posargs(0)):
             f"storage: name={storage}, index={index} not found in the State",
         )
 
-    def get_relation(self, relation: int, /) -> "AnyRelation":
+    def get_relation(self, relation: int, /) -> "RelationBase":
         """Get relation from this State, based on the relation's id."""
         for state_relation in self.relations:
             if state_relation.id == relation:
                 return state_relation
         raise KeyError(f"relation: id={relation} not found in the State")
 
-    def get_relations(self, endpoint: str) -> Tuple["AnyRelation", ...]:
+    def get_relations(self, endpoint: str) -> Tuple["RelationBase", ...]:
         """Get all relations on this endpoint from the current state."""
 
         # we rather normalize the endpoint than worry about cursed metadata situations such as:
@@ -1488,11 +1453,11 @@ class State(_max_posargs(0)):
         #   foo-bar: ...
         #   foo_bar: ...
 
-        normalized_endpoint = normalize_name(endpoint)
+        normalized_endpoint = _normalise_name(endpoint)
         return tuple(
             r
             for r in self.relations
-            if normalize_name(r.endpoint) == normalized_endpoint
+            if _normalise_name(r.endpoint) == normalized_endpoint
         )
 
 
@@ -1643,7 +1608,7 @@ class _EventPath(str):
         type: _EventType
 
     def __new__(cls, string):
-        string = normalize_name(string)
+        string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
         instance.name = name = string.split(".")[-1]
@@ -1662,35 +1627,35 @@ class _EventPath(str):
 
     @staticmethod
     def _get_suffix_and_type(s: str) -> Tuple[str, _EventType]:
-        for suffix in RELATION_EVENTS_SUFFIX:
+        for suffix in _RELATION_EVENTS_SUFFIX:
             if s.endswith(suffix):
                 return suffix, _EventType.relation
 
-        if s.endswith(ACTION_EVENT_SUFFIX):
-            return ACTION_EVENT_SUFFIX, _EventType.action
+        if s.endswith(_ACTION_EVENT_SUFFIX):
+            return _ACTION_EVENT_SUFFIX, _EventType.action
 
-        if s in SECRET_EVENTS:
+        if s in _SECRET_EVENTS:
             return s, _EventType.secret
 
-        if s in FRAMEWORK_EVENTS:
+        if s in _FRAMEWORK_EVENTS:
             return s, _EventType.framework
 
         # Whether the event name indicates that this is a storage event.
-        for suffix in STORAGE_EVENTS_SUFFIX:
+        for suffix in _STORAGE_EVENTS_SUFFIX:
             if s.endswith(suffix):
                 return suffix, _EventType.storage
 
         # Whether the event name indicates that this is a workload event.
-        if s.endswith(PEBBLE_READY_EVENT_SUFFIX):
-            return PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
-        if s.endswith(PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
-            return PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.workload
-        if s.endswith(PEBBLE_CHECK_FAILED_EVENT_SUFFIX):
-            return PEBBLE_CHECK_FAILED_EVENT_SUFFIX, _EventType.workload
-        if s.endswith(PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX):
-            return PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(_PEBBLE_READY_EVENT_SUFFIX):
+            return _PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(_PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
+            return _PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(_PEBBLE_CHECK_FAILED_EVENT_SUFFIX):
+            return _PEBBLE_CHECK_FAILED_EVENT_SUFFIX, _EventType.workload
+        if s.endswith(_PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX):
+            return _PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.workload
 
-        if s in BUILTIN_EVENTS:
+        if s in _BUILTIN_EVENTS:
             return "", _EventType.builtin
 
         return "", _EventType.custom
@@ -1711,7 +1676,7 @@ class Event:
 
     storage: Optional["Storage"] = None
     """If this is a storage event, the storage it refers to."""
-    relation: Optional["AnyRelation"] = None
+    relation: Optional["RelationBase"] = None
     """If this is a relation event, the relation it refers to."""
     relation_remote_unit_id: Optional[int] = None
     relation_departed_unit_id: Optional[int] = None
@@ -1860,8 +1825,10 @@ class Event:
                 # FIXME: relation.unit for peers should point to <this unit>, but we
                 #  don't have access to the local app name in this context.
                 remote_app = "local"
-            else:
+            elif isinstance(relation, (Relation, SubordinateRelation)):
                 remote_app = relation.remote_app_name
+            else:
+                raise RuntimeError(f"unexpected relation type: {relation!r}")
 
             snapshot_data.update(
                 {
@@ -1915,7 +1882,7 @@ class Event:
 _next_action_id_counter = 1
 
 
-def next_action_id(*, update=True):
+def _next_action_id(*, update=True):
     global _next_action_id_counter
     cur = _next_action_id_counter
     if update:
@@ -1946,7 +1913,7 @@ class _Action(_max_posargs(1)):
     params: Dict[str, "AnyJson"] = dataclasses.field(default_factory=dict)
     """Parameter values passed to the action."""
 
-    id: str = dataclasses.field(default_factory=next_action_id)
+    id: str = dataclasses.field(default_factory=_next_action_id)
     """Juju action ID.
 
     Every action invocation is automatically assigned a new one. Override in

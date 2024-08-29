@@ -8,7 +8,7 @@ from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
-    DEFAULT_JUJU_DATABAG,
+    _DEFAULT_JUJU_DATABAG,
     Address,
     BindAddress,
     Container,
@@ -236,13 +236,13 @@ def test_relation_set(mycharm):
         replace(
             relation,
             local_app_data={"a": "b"},
-            local_unit_data={"c": "d", **DEFAULT_JUJU_DATABAG},
+            local_unit_data={"c": "d", **_DEFAULT_JUJU_DATABAG},
         )
     )
     assert out.get_relation(relation.id).local_app_data == {"a": "b"}
     assert out.get_relation(relation.id).local_unit_data == {
         "c": "d",
-        **DEFAULT_JUJU_DATABAG,
+        **_DEFAULT_JUJU_DATABAG,
     }
 
 

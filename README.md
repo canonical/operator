@@ -263,51 +263,6 @@ def test_emitted_full():
     ]
 ```
 
-### Low-level access: using directly `capture_events`
-
-If you need more control over what events are captured (or you're not into pytest), you can use directly the context
-manager that powers the `emitted_events` fixture: `scenario.capture_events`.
-This context manager allows you to intercept any events emitted by the framework.
-
-Usage:
-
-```python
-import scenario.capture_events
-
-with scenario.capture_events.capture_events() as emitted:
-    ctx = scenario.Context(SimpleCharm, meta={"name": "capture"})
-    state_out = ctx.run(
-        ctx.on.update_status(),
-        scenario.State(deferred=[ctx.on.start().deferred(SimpleCharm._on_start)])
-    )
-
-# deferred events get reemitted first
-assert isinstance(emitted[0], ops.StartEvent)
-# the main Juju event gets emitted next
-assert isinstance(emitted[1], ops.UpdateStatusEvent)
-# possibly followed by a tail of all custom events that the main Juju event triggered in turn
-# assert isinstance(emitted[2], MyFooEvent)
-# ...
-```
-
-You can filter events by type like so:
-
-```python
-import scenario.capture_events
-
-with scenario.capture_events.capture_events(ops.StartEvent, ops.RelationEvent) as emitted:
-    # capture all `start` and `*-relation-*` events.
-    pass
-```
-
-Configuration:
-
-- Passing no event types, like: `capture_events()`, is equivalent to `capture_events(ops.EventBase)`.
-- By default, **framework events** (`PreCommit`, `Commit`) are not considered for inclusion in the output list even if
-  they match the instance check. You can toggle that by passing: `capture_events(include_framework=True)`.
-- By default, **deferred events** are included in the listing if they match the instance check. You can toggle that by
-  passing: `capture_events(include_deferred=False)`.
-
 ## Relations
 
 You can write scenario tests to verify the shape of relation data:
@@ -438,32 +393,6 @@ joined_event = ctx.on.relation_joined(relation=relation)
 
 The reason for this construction is that the event is associated with some relation-specific metadata, that Scenario
 needs to set up the process that will run `ops.main` with the right environment variables.
-
-### Working with relation IDs
-
-Every time you instantiate `Relation` (or peer, or subordinate), the new instance will be given a unique `id`.
-To inspect the ID the next relation instance will have, you can call `scenario.state.next_relation_id`.
-
-```python
-import scenario.state
-
-next_id = scenario.state.next_relation_id(update=False)
-rel = scenario.Relation('foo')
-assert rel.id == next_id
-``` 
-
-This can be handy when using `replace` to create new relations, to avoid relation ID conflicts:
-
-```python
-import dataclasses
-import scenario.state
-
-rel = scenario.Relation('foo')
-rel2 = dataclasses.replace(rel, local_app_data={"foo": "bar"}, id=scenario.state.next_relation_id())
-assert rel2.id == rel.id + 1 
-``` 
-
-If you don't do this, and pass both relations into a `State`, you will trigger a consistency checker error.
 
 ### Additional event parameters
 
@@ -1231,7 +1160,7 @@ therefore, so far as we're concerned, that can't happen, and therefore we help y
 are consistent and raise an exception if that isn't so.
 
 That happens automatically behind the scenes whenever you trigger an event;
-`scenario.consistency_checker.check_consistency` is called and verifies that the scenario makes sense.
+`scenario._consistency_checker.check_consistency` is called and verifies that the scenario makes sense.
 
 ## Caveats:
 

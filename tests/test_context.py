@@ -4,7 +4,7 @@ import pytest
 from ops import CharmBase
 
 from scenario import Context, State
-from scenario.state import _Event, next_action_id
+from scenario.state import _Event, _next_action_id
 
 
 class MyCharm(CharmBase):
@@ -32,7 +32,7 @@ def test_run():
 def test_run_action():
     ctx = Context(MyCharm, meta={"name": "foo"})
     state = State()
-    expected_id = next_action_id(update=False)
+    expected_id = _next_action_id(update=False)
 
     with patch.object(ctx, "_run") as p:
         ctx._output_state = "foo"  # would normally be set within the _run call scope

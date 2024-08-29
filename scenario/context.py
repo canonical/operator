@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
 from ops import CharmBase, EventBase
 from ops.testing import ExecArgs
 
+from scenario.errors import AlreadyEmittedError, ContextSetupError
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import (
@@ -28,29 +29,11 @@ if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.ops_main_mock import Ops
-    from scenario.state import AnyJson, AnyRelation, JujuLogLine, State, _EntityStatus
-
-    PathLike = Union[str, Path]
+    from scenario.state import AnyJson, JujuLogLine, RelationBase, State, _EntityStatus
 
 logger = scenario_logger.getChild("runtime")
 
-DEFAULT_JUJU_VERSION = "3.4"
-
-
-class InvalidEventError(RuntimeError):
-    """raised when something is wrong with the event passed to Context.run"""
-
-
-class InvalidActionError(InvalidEventError):
-    """raised when something is wrong with an action passed to Context.run"""
-
-
-class ContextSetupError(RuntimeError):
-    """Raised by Context when setup fails."""
-
-
-class AlreadyEmittedError(RuntimeError):
-    """Raised when ``run()`` is called more than once."""
+_DEFAULT_JUJU_VERSION = "3.5"
 
 
 class Manager:
@@ -218,11 +201,11 @@ class _CharmEvents:
         return _Event("collect_unit_status")
 
     @staticmethod
-    def relation_created(relation: "AnyRelation"):
+    def relation_created(relation: "RelationBase"):
         return _Event(f"{relation.endpoint}_relation_created", relation=relation)
 
     @staticmethod
-    def relation_joined(relation: "AnyRelation", *, remote_unit: Optional[int] = None):
+    def relation_joined(relation: "RelationBase", *, remote_unit: Optional[int] = None):
         return _Event(
             f"{relation.endpoint}_relation_joined",
             relation=relation,
@@ -230,7 +213,11 @@ class _CharmEvents:
         )
 
     @staticmethod
-    def relation_changed(relation: "AnyRelation", *, remote_unit: Optional[int] = None):
+    def relation_changed(
+        relation: "RelationBase",
+        *,
+        remote_unit: Optional[int] = None,
+    ):
         return _Event(
             f"{relation.endpoint}_relation_changed",
             relation=relation,
@@ -239,7 +226,7 @@ class _CharmEvents:
 
     @staticmethod
     def relation_departed(
-        relation: "AnyRelation",
+        relation: "RelationBase",
         *,
         remote_unit: Optional[int] = None,
         departing_unit: Optional[int] = None,
@@ -252,7 +239,7 @@ class _CharmEvents:
         )
 
     @staticmethod
-    def relation_broken(relation: "AnyRelation"):
+    def relation_broken(relation: "RelationBase"):
         return _Event(f"{relation.endpoint}_relation_broken", relation=relation)
 
     @staticmethod
@@ -384,8 +371,8 @@ class Context:
         *,
         actions: Optional[Dict[str, Any]] = None,
         config: Optional[Dict[str, Any]] = None,
-        charm_root: Optional["PathLike"] = None,
-        juju_version: str = DEFAULT_JUJU_VERSION,
+        charm_root: Optional[Union[str, Path]] = None,
+        juju_version: str = _DEFAULT_JUJU_VERSION,
         capture_deferred_events: bool = False,
         capture_framework_events: bool = False,
         app_name: Optional[str] = None,
@@ -471,19 +458,6 @@ class Context:
         """Hook for Runtime to set the output state."""
         self._output_state = output_state
 
-    @property
-    def output_state(self) -> "State":
-        """The output state obtained by running an event on this context.
-
-        Raises:
-            RuntimeError: if this ``Context`` hasn't been :meth:`run` yet.
-        """
-        if not self._output_state:
-            raise RuntimeError(
-                "No output state available. ``.run()`` this Context first.",
-            )
-        return self._output_state
-
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
         return Path(self._tmp.name) / "containers" / container_name
@@ -538,10 +512,13 @@ class Context:
             self._action_failure_message = None
         with self._run(event=event, state=state) as ops:
             ops.emit()
+        # We know that the output state will have been set by this point,
+        # so let the type checkers know that too.
+        assert self._output_state is not None
         if event.action:
             if self._action_failure_message is not None:
-                raise ActionFailed(self._action_failure_message, self.output_state)
-        return self.output_state
+                raise ActionFailed(self._action_failure_message, self._output_state)
+        return self._output_state
 
     @contextmanager
     def _run(self, event: "_Event", state: "State"):

@@ -4,7 +4,7 @@ from ops.charm import ActionEvent, CharmBase
 from ops.framework import Framework
 
 from scenario import ActionFailed, Context
-from scenario.state import State, _Action, next_action_id
+from scenario.state import State, _Action, _next_action_id
 
 
 @pytest.fixture(scope="function")
@@ -199,7 +199,7 @@ def test_positional_arguments():
 
 
 def test_default_arguments():
-    expected_id = next_action_id(update=False)
+    expected_id = _next_action_id(update=False)
     name = "foo"
     action = _Action(name)
     assert action.name == name

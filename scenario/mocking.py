@@ -35,13 +35,17 @@ from ops.model import (
 from ops.pebble import Client, ExecError
 from ops.testing import ExecArgs, _TestingPebbleClient
 
+from scenario.errors import ActionMissingFromContextError
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
     JujuLogLine,
     Mount,
     Network,
     PeerRelation,
+    Relation,
+    RelationBase,
     Storage,
+    SubordinateRelation,
     _EntityStatus,
     _port_cls_by_protocol,
     _RawPortProtocolLiteral,
@@ -51,24 +55,9 @@ from scenario.state import (
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
     from scenario.state import Container as ContainerSpec
-    from scenario.state import (
-        Exec,
-        Relation,
-        Secret,
-        State,
-        SubordinateRelation,
-        _CharmSpec,
-        _Event,
-    )
+    from scenario.state import Exec, Secret, State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild("mocking")
-
-
-class ActionMissingFromContextError(Exception):
-    """Raised when the user attempts to invoke action hook tools outside an action context."""
-
-    # This is not an ops error: in ops, you'd have to go exceptionally out of your way to trigger
-    # this flow.
 
 
 class _MockExecProcess:
@@ -189,10 +178,7 @@ class _MockModelBackend(_ModelBackend):
             container_name=container_name,
         )
 
-    def _get_relation_by_id(
-        self,
-        rel_id,
-    ) -> Union["Relation", "SubordinateRelation", "PeerRelation"]:
+    def _get_relation_by_id(self, rel_id) -> "RelationBase":
         try:
             return self._state.get_relation(rel_id)
         except ValueError:
@@ -254,7 +240,10 @@ class _MockModelBackend(_ModelBackend):
         elif is_app:
             if isinstance(relation, PeerRelation):
                 return relation.local_app_data
-            return relation.remote_app_data
+            elif isinstance(relation, (Relation, SubordinateRelation)):
+                return relation.remote_app_data
+            else:
+                raise TypeError("relation_get: unknown relation type")
         elif member_name == self.unit_name:
             return relation.local_unit_data
 
@@ -337,7 +326,7 @@ class _MockModelBackend(_ModelBackend):
             network = self._state.get_network(binding_name)
         except KeyError:
             network = Network("default")  # The name is not used in the output.
-        return network.hook_tool_output_fmt()
+        return network._hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
@@ -570,8 +559,10 @@ class _MockModelBackend(_ModelBackend):
 
         if isinstance(relation, PeerRelation):
             return self.app_name
-        else:
+        elif isinstance(relation, (Relation, SubordinateRelation)):
             return relation.remote_app_name
+        else:
+            raise TypeError("relation_remote_app_name: unknown relation type")
 
     def action_set(self, results: Dict[str, Any]):
         if not self._event.action:
