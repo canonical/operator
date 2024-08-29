@@ -11,7 +11,7 @@
 
 ## Fixes
 
-* Juju passes the expiry in a field 'expiry', not 'expires' in https://github.com/canonical/operator/pull/1317
+* Fix reading Juju secret expiry dates in https://github.com/canonical/operator/pull/1317
 * Correct the signature of .events() by @PietroPasotti in https://github.com/canonical/operator/pull/1342
 
 ## Test/CI
