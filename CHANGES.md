@@ -30,7 +30,7 @@
 * Security policy change to only support each active major release by in https://github.com/canonical/operator/pull/1297
 * Add example Juju version markers in https://github.com/canonical/operator/pull/1311
 * Use Sphinx 8 in https://github.com/canonical/operator/pull/1303
-* Live reload with sphinx-autobuild in https://github.com/canonical/operator/pull/1323
+* Live reload documentation with sphinx-autobuild in https://github.com/canonical/operator/pull/1323
 
 # 2.15.0 - 22 Jul 2024
 
