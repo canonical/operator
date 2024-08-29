@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Main entry point to the framework.
-
-Note that this module is callable, and calls the :func:`ops.main.main` function.
-This is so that :code:`import ops` followed by :code:`ops.main(MyCharm)` works
-as expected.
-"""
+"""Imeplement the main entry point to the framework."""
 
 import logging
 import os
@@ -535,17 +530,7 @@ class _Manager:
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
     """Set up the charm and dispatch the observed event.
 
-    The event name is based on the way this executable was called (argv[0]).
-
-    .. jujuremoved:: 4.0
-        The ``use_juju_for_storage`` argument is not available from Juju 4.0
-
-    Args:
-        charm_class: the charm class to instantiate and receive the event.
-        use_juju_for_storage: whether to use controller-side storage. If not specified
-            then Kubernetes charms that haven't previously used local storage and that
-            are running on a new enough Juju default to controller-side storage,
-            otherwise local storage is used.
+    See :func:`ops.main` for details.
     """
     try:
         manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)

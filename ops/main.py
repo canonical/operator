@@ -24,20 +24,10 @@ from . import _main
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
     """Legacy entrypoint to set up the charm and dispatch the observed event.
 
-    The event name is based on the way this executable was called (argv[0]).
-
-    .. jujuremoved:: 4.0
-        The ``use_juju_for_storage`` argument is not available from Juju 4.0
-
-    Args:
-        charm_class: the charm class to instantiate and receive the event.
-        use_juju_for_storage: whether to use controller-side storage. If not specified
-            then Kubernetes charms that haven't previously used local storage and that
-            are running on a new enough Juju default to controller-side storage,
-            otherwise local storage is used.
-
     .. deprecated:: 2.16.0
         This entrypoint has been deprecated, use `ops.main()` instead.
+
+    See :func:`ops.main` for details.
     """
     warnings.warn(
         'Calling `ops.main.main()` is deprecated, call `ops.main()` instead',

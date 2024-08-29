@@ -10,12 +10,27 @@ ops module
 ==========
 
 .. automodule:: ops
+   :exclude-members: main
 
 
-main
------------
+ops.main entry point
+====================
+.. autofunction:: ops.main
+   :noindex:
+
+
+_main module
+------------
+
+.. automodule:: ops._main
+   :noindex:
+
+
+legacy main module
+------------------
 
 .. automodule:: ops.main
+   :noindex:
 
 
 ops.pebble module
