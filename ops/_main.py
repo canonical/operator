@@ -216,8 +216,13 @@ def _get_event_args(
 class _Dispatcher:
     """Encapsulate how to figure out what event Juju wants us to run.
 
-    Also knows how to run “legacy” hooks when Juju called us via a top-level
-    ``dispatch`` binary.
+    Juju 2.7.0 and later provide the JUJU_DISPATCH_PATH environment variable.
+    Earlier versions called individual hook scripts, and that are supported via
+    two separate mechanisms:
+    - Charmcraft 0.1.2 and produce `dispatch` shell script that fills this
+      environment variable if it's missing
+    - Ops 0.8.0 and later likewise take use ``sys.argv[0]`` if the environment
+      variable is missing
 
     Args:
         charm_dir: the toplevel directory of the charm
