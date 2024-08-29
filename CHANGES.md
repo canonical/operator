@@ -12,7 +12,7 @@
 ## Fixes
 
 * Fix reading Juju secret expiry dates in https://github.com/canonical/operator/pull/1317
-* Correct the signature of .events() by @PietroPasotti in https://github.com/canonical/operator/pull/1342
+* Correct the signature of .events() in https://github.com/canonical/operator/pull/1342
 
 ## Test/CI
 
