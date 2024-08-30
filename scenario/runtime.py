@@ -121,7 +121,7 @@ class UnitStateDB:
             db.save_snapshot(event.handle_path, event.snapshot_data)
 
         for stored_state in state.stored_states:
-            db.save_snapshot(stored_state.handle_path, stored_state.content)
+            db.save_snapshot(stored_state._handle_path, stored_state.content)
 
         db.close()
 

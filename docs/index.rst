@@ -1,21 +1,13 @@
-
 Scenario API reference
 ======================
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+scenario
+========
 
-scenario.State
-==============
+.. automodule:: scenario
+   :special-members: __call__
 
-.. automodule:: scenario.state
-
-
-scenario.Context
-================
-
-.. automodule:: scenario.context
+.. automodule:: scenario.errors
 
 
 Indices
