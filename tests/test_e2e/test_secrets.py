@@ -573,34 +573,6 @@ def test_remove_bad_revision():
     )
 
 
-@pytest.mark.parametrize(
-    "evt,owner,cls",
-    (
-        ("changed", None, SecretChangedEvent),
-        ("rotate", "app", SecretRotateEvent),
-        ("expired", "app", SecretExpiredEvent),
-        ("remove", "app", SecretRemoveEvent),
-    ),
-)
-def test_emit_event(evt, owner, cls):
-    class MyCharm(CharmBase):
-        def __init__(self, framework):
-            super().__init__(framework)
-            for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
-            self.events = []
-
-        def _on_event(self, event):
-            self.events.append(event)
-
-    ctx = Context(MyCharm, meta={"name": "local"})
-    secret = Secret(contents={"foo": "bar"}, id="foo", owner=owner)
-    with ctx.manager(getattr(secret, evt + "_event"), State(secrets=[secret])) as mgr:
-        mgr.run()
-        juju_event = mgr.charm.events[0]  # Ignore collect-status etc.
-        assert isinstance(juju_event, cls)
-
-
 def test_set_label_on_get():
     class SecretCharm(CharmBase):
         def __init__(self, framework):

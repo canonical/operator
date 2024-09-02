@@ -497,7 +497,9 @@ def check_network_consistency(
     }
 
     state_bindings = {network.binding_name for network in state.networks}
-    if diff := state_bindings.difference(meta_bindings.union(non_sub_relations)):
+    if diff := state_bindings.difference(
+        meta_bindings.union(non_sub_relations).union(implicit_bindings),
+    ):
         errors.append(
             f"Some network bindings defined in State are not in the metadata: {diff}.",
         )

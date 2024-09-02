@@ -412,7 +412,6 @@ class Address(_max_posargs(1)):
 class BindAddress(_max_posargs(1)):
     """An address bound to a network interface in a Juju space."""
 
-    interface_name: str
     addresses: List[Address]
     """The addresses in the space."""
     interface_name: str = ""
@@ -557,6 +556,7 @@ _DEFAULT_JUJU_DATABAG = {
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
     """An integration between the charm and another application."""
+
     remote_app_name: str = "remote"
     """The name of the remote application, as in the charm's metadata."""
 
@@ -760,7 +760,7 @@ class Mount(_max_posargs(0)):
 
     location: Union[str, PurePosixPath]
     """The location inside of the container."""
-    src: Union[str, Path]
+    source: Union[str, Path]
     """The content to provide when the charm does :meth:`ops.Container.pull`."""
 
 
@@ -1770,7 +1770,7 @@ class _EventPath(str):
 
 
 @dataclasses.dataclass(frozen=True)
-class Event:
+class _Event:
     """A Juju, ops, or custom event that can be run against a charm.
 
     Typically, for simple events, the string name (e.g. ``install``) can be used,

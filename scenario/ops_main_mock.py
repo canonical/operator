@@ -28,6 +28,17 @@ if TYPE_CHECKING:  # pragma: no cover
 # pyright: reportPrivateUsage=false
 
 
+# TODO: Use ops.jujucontext's _JujuContext.charm_dir.
+def _get_charm_dir():
+    charm_dir = os.environ.get("JUJU_CHARM_DIR")
+    if charm_dir is None:
+        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
+        charm_dir = pathlib.Path(f"{__file__}/../../..").resolve()
+    else:
+        charm_dir = pathlib.Path(charm_dir).resolve()
+    return charm_dir
+
+
 def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
     """Walk path on root to an ObjectEvents instance."""
     obj = root
@@ -70,7 +81,7 @@ def _emit_charm_event(
         )
 
     try:
-        args, kwargs = _get_event_args(charm, event_to_emit)
+        args, kwargs = _get_event_args(charm, event_to_emit)  # type: ignore
     except TypeError:
         # ops 2.16+
         import ops.jujucontext  # type: ignore
@@ -169,7 +180,7 @@ def setup(
     charm_dir = _get_charm_dir()
 
     try:
-        dispatcher = _Dispatcher(charm_dir)
+        dispatcher = _Dispatcher(charm_dir)  # type: ignore
     except TypeError:
         # ops 2.16+
         import ops.jujucontext  # type: ignore

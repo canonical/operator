@@ -133,33 +133,14 @@ def test_juju_info_network_default(mycharm):
         meta={"name": "foo"},
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(),
     ) as mgr:
         # we have a network for the relation
         assert (
             str(mgr.charm.model.get_binding("juju-info").network.bind_address)
             == "192.0.2.0"
-        )
-
-
-def test_juju_info_network_override(mycharm):
-    ctx = Context(
-        mycharm,
-        meta={"name": "foo"},
-    )
-
-    with ctx.manager(
-        "update_status",
-        State(
-            networks={"juju-info": Network.default(private_address="4.4.4.4")},
-        ),
-    ) as mgr:
-        # we have a network for the relation
-        assert (
-            str(mgr.charm.model.get_binding("juju-info").network.bind_address)
-            == "4.4.4.4"
         )
 
 
@@ -173,8 +154,8 @@ def test_explicit_juju_info_network_override(mycharm):
         },
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(),
     ) as mgr:
         assert mgr.charm.model.get_binding("juju-info").network.bind_address
