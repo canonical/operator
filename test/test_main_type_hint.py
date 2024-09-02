@@ -11,69 +11,98 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable, Type
+"""Validate the type signatures on ops.main().
+
+This file doesn't contain any run-time tests, rather we rely on pyright to run over this code.
+Assignment to a variable declared to follow a protocol is equivalent to backwards compatibility.
+"""
+
+from dataclasses import dataclass
+from typing import Optional, Protocol, Type
 
 import ops
 
 
-def type_test_dummy(_arg: Callable[[Type[ops.CharmBase], bool], None]):
-    """
-    Helper to verify the function signature of ops.main and ops.main.main
-    Usage:
+class CallableWithCharmClassOnly(Protocol):
+    """Encapsulate main function type for simple charms.
 
-    from somewhere import main
-
-    type_test_dummy(main)
+    Supports:
+    - ops.main(SomeCharm)
+    - ops.main(charm_class=SomeCharm)
     """
 
+    def __call__(self, charm_class: Type[ops.charm.CharmBase]): ...
 
-def type_test_negative(_arg: Callable[[], None]):
-    """
-    Helper for negative tests of the function signatures of ops.main and ops.main.main
-    Usage:
 
-    from somewhere import main
+class CallableWithCharmClassAndStorageFlag(Protocol):
+    """Encapsulate main function type for advanced charms.
 
-    type_test_negative(main)  # type: ignore
-
-    The `reportUnnecessaryTypeIgnoreComment` setting is expected to kick up a fuss,
-    should the passed argument match the expected argument type.
+    Supports permutations of:
+    - ops.main(SomeCharm, False)
+    - ops.main(charm_class=SomeCharm, use_juju_for_storage=False)
     """
 
+    def __call__(
+        self, charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None
+    ): ...
 
-def top_level_import():
+
+class CallableWithoutArguments(Protocol):
+    """Bad charm code should be caught by type checker.
+
+    For example:
+    - ops.main()  # type: ignore or pyright complains
+    """
+
+    def __call__(self): ...
+
+
+@dataclass
+class MainCalls:
+    simple: CallableWithCharmClassOnly
+    full: CallableWithCharmClassAndStorageFlag
+    bad: CallableWithoutArguments
+
+
+sink = MainCalls(None, None, None)  # type: ignore
+
+
+def top_level_import() -> None:
     import ops
 
-    type_test_dummy(ops.main)
-    type_test_dummy(ops.main.main)
+    sink.full = ops.main
+    sink.full = ops.main.main
+    sink.simple = ops.main.main
+    sink.simple = ops.main.main
+    sink.bad = ops.main  # type: ignore[assignment]
+    sink.bad = ops.main.main  # type: ignore[assignment]
 
-    type_test_negative(ops.main)  # type: ignore
-    type_test_negative(ops.main.main)  # type: ignore
 
-
-def submodule_import():
+def submodule_import() -> None:
     import ops.main
 
-    type_test_dummy(ops.main)  # type: ignore # https://github.com/microsoft/pyright/issues/8830
-    type_test_dummy(ops.main.main)
+    sink.full = ops.main  # type: ignore # type checker limitation https://github.com/microsoft/pyright/issues/8830
+    sink.full = ops.main.main
+    sink.simple = ops.main  # type: ignore # https://github.com/microsoft/pyright/issues/8830
+    sink.simple = ops.main.main
+    sink.bad = ops.main  # type: ignore[assignment]
+    sink.bad = ops.main.main  # type: ignore[assignment]
 
-    type_test_negative(ops.main)  # type: ignore
-    type_test_negative(ops.main.main)  # type: ignore
 
-
-def import_from_top_level_module():
+def import_from_top_level_module() -> None:
     from ops import main
 
-    type_test_dummy(main)
-    type_test_dummy(main.main)
+    sink.full = main
+    sink.full = main.main
+    sink.simple = main
+    sink.simple = main.main
+    sink.bad = main  # type: ignore[assignment]
+    sink.bad = main.main  # type: ignore[assignment]
 
-    type_test_negative(main)  # type: ignore
-    type_test_negative(main.main)  # type: ignore
 
-
-def import_from_submodule():
+def import_from_submodule() -> None:
     from ops.main import main
 
-    type_test_dummy(main)
-
-    type_test_negative(main)  # type: ignore
+    sink.full = main
+    sink.simple = main
+    sink.bad = main  # type: ignore[assignment]
