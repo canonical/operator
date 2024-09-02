@@ -346,10 +346,7 @@ Recommended usage:
 
     import ops
 
-
-    class SomeCharm(ops.CharmBase):
-        ...
-
+    class SomeCharm(ops.CharmBase): ...
 
     if __name__ == "__main__":
         ops.main(SomeCharm)
