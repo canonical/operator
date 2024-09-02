@@ -20,6 +20,14 @@ import ops.charm
 
 from . import _main
 
+# Re-export specific set of symbols that Scenario 6 imports from ops.main
+from ._main import (  # noqa: F401
+    CHARM_STATE_FILE,  # type: ignore[reportUnusedImport]
+    _Dispatcher,  # type: ignore[reportUnusedImport]
+    _get_event_args,  # type: ignore[reportUnusedImport]
+    logger,  # type: ignore[reportUnusedImport]
+)
+
 
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
     """Legacy entrypoint to set up the charm and dispatch the observed event.
