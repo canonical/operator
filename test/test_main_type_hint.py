@@ -70,10 +70,10 @@ sink = MainCalls(None, None, None)  # type: ignore
 def top_level_import() -> None:
     import ops
 
+    sink.simple = ops.main
+    sink.simple = ops.main.main
     sink.full = ops.main
     sink.full = ops.main.main
-    sink.simple = ops.main.main
-    sink.simple = ops.main.main
     sink.bad = ops.main  # type: ignore[assignment]
     sink.bad = ops.main.main  # type: ignore[assignment]
 
@@ -81,10 +81,10 @@ def top_level_import() -> None:
 def submodule_import() -> None:
     import ops.main
 
+    sink.simple = ops.main  # type: ignore # type checker limitation https://github.com/microsoft/pyright/issues/8830
+    sink.simple = ops.main.main
     sink.full = ops.main  # type: ignore # type checker limitation https://github.com/microsoft/pyright/issues/8830
     sink.full = ops.main.main
-    sink.simple = ops.main  # type: ignore # https://github.com/microsoft/pyright/issues/8830
-    sink.simple = ops.main.main
     sink.bad = ops.main  # type: ignore[assignment]
     sink.bad = ops.main.main  # type: ignore[assignment]
 
@@ -92,10 +92,10 @@ def submodule_import() -> None:
 def import_from_top_level_module() -> None:
     from ops import main
 
-    sink.full = main
-    sink.full = main.main
     sink.simple = main
     sink.simple = main.main
+    sink.full = main
+    sink.full = main.main
     sink.bad = main  # type: ignore[assignment]
     sink.bad = main.main  # type: ignore[assignment]
 
@@ -103,6 +103,6 @@ def import_from_top_level_module() -> None:
 def import_from_submodule() -> None:
     from ops.main import main
 
-    sink.full = main
     sink.simple = main
+    sink.full = main
     sink.bad = main  # type: ignore[assignment]
