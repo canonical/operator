@@ -25,6 +25,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -2023,7 +2024,7 @@ class _Action(_max_posargs(1)):
     name: str
     """Juju action name, as found in the charm metadata."""
 
-    params: Dict[str, "AnyJson"] = dataclasses.field(default_factory=dict)
+    params: Mapping[str, "AnyJson"] = dataclasses.field(default_factory=dict)
     """Parameter values passed to the action."""
 
     id: str = dataclasses.field(default_factory=_next_action_id)
