@@ -6,7 +6,7 @@ import functools
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Type, Union, cast
 
 import ops
 import ops.testing
@@ -326,7 +326,7 @@ class CharmEvents:
     @_copy_doc(ops.ActionEvent)
     def action(
         name: str,
-        params: Optional[Dict[str, "AnyJson"]] = None,
+        params: Optional[Mapping[str, "AnyJson"]] = None,
         id: Optional[str] = None,
     ):
         kwargs = {}
