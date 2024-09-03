@@ -75,7 +75,6 @@ _SettableStatusNames: Tuple[_SettableStatusName, ...] = get_args(_SettableStatus
 _StatusName = Union[_SettableStatusName, Literal['error', 'unknown']]
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 
-
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
 # mapping from container name to container metadata
@@ -1897,7 +1896,7 @@ class StatusBase:
         return f'{self.__class__.__name__}({self.message!r})'
 
     @classmethod
-    def from_name(cls, name: _StatusName, message: str):
+    def from_name(cls, name: str, message: str):
         """Create a status instance from a name and message.
 
         If ``name`` is "unknown", ``message`` is ignored, because unknown status
@@ -1914,7 +1913,7 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[name](message)
+            return cls._statuses[typing.cast(_StatusName, name)](message)
 
     @classmethod
     def register(cls, child: Type['StatusBase']):
