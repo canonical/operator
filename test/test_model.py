@@ -823,8 +823,8 @@ class TestModel:
         class NoNameStatus(ops.StatusBase):
             pass
 
-        with pytest.raises(AttributeError):
-            ops.StatusBase.register_status(NoNameStatus)  # type: ignore
+        with pytest.raises(TypeError):
+            ops.StatusBase.register(NoNameStatus)
 
     def test_status_repr(self):
         test_cases = {
