@@ -429,8 +429,6 @@ class Application:
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
 
-        for _key in {'name', 'message'}:
-            assert isinstance(getattr(value, _key), str), f'status.{_key} must be a string'
         self._backend.status_set(
             typing.cast(_SettableStatusName, value.name),  # TODO: narrower type for value
             value.message,
@@ -600,7 +598,6 @@ class Unit:
         if not self._is_our_unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
-        # fixme: if value.messages
         self._backend.status_set(
             typing.cast(_SettableStatusName, value.name),  # TODO: narrower type for value
             value.message,
@@ -3430,6 +3427,8 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
+        if not isinstance(message, str):
+            raise TypeError('message parameter must be a string')
         if status not in _SettableStatusNames:
             raise ModelError(f'status must be in {_SettableStatusNames}, not {status}')
         self._run('status-set', f'--application={is_app}', status, message)

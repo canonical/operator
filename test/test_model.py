@@ -2950,6 +2950,14 @@ class TestModelBackend:
                     is_app=is_app_v,  # type: ignore[assignment]
                 )
 
+    def test_status_set_message_not_str_raises(self):
+        for message in [None, 1, 2.0, True, b'beef', object]:
+            with pytest.raises(TypeError):
+                self.backend.status_set(
+                    'active',
+                    message=message,  # type: ignore[assignment]
+                )
+
     def test_storage_tool_errors(self, fake_script: FakeScript):
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
