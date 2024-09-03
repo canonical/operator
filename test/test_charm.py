@@ -22,7 +22,7 @@ import yaml
 
 import ops
 import ops.charm
-from ops.model import ModelError
+from ops.model import ModelError, _StatusName
 
 from .test_helpers import FakeScript, create_framework
 
@@ -967,11 +967,11 @@ def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: Fake
 def test_collect_status_priority(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
-    statuses: typing.List[str],
+    statuses: typing.List[_StatusName],
     expected: str,
 ):
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework, statuses: typing.List[str]):
+        def __init__(self, framework: ops.Framework, statuses: typing.List[_StatusName]):
             super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
             self.statuses = statuses

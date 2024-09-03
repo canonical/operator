@@ -41,6 +41,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -68,7 +69,10 @@ K8sSpec = Mapping[str, Any]
 _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
-_StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
+_SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
+_StatusName = Union[_SettableStatusName, Literal['error', 'unknown']]
+_StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
+
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -425,7 +429,12 @@ class Application:
 
         for _key in {'name', 'message'}:
             assert isinstance(getattr(value, _key), str), f'status.{_key} must be a string'
-        self._backend.status_set(value.name, value.message, is_app=True)
+        self._backend.status_set(
+            typing.cast(_SettableStatusName, value.name),  # TODO: narrower type for value
+            value.message,
+            is_app=True,
+        )
+
         self._status = value
 
     def planned_units(self) -> int:
@@ -590,7 +599,11 @@ class Unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
         # fixme: if value.messages
-        self._backend.status_set(value.name, value.message, is_app=False)
+        self._backend.status_set(
+            typing.cast(_SettableStatusName, value.name),  # TODO: narrower type for value
+            value.message,
+            is_app=False,
+        )
         self._status = value
 
     def __repr__(self):
@@ -1866,10 +1879,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: Dict[str, Type['StatusBase']] = {}
+    _statuses: Dict[_StatusName, Type['StatusBase']] = {}
 
-    # Subclasses should override this attribute
-    name = ''
+    # Subclasses must provide this attribute
+    name: _StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -1885,7 +1898,7 @@ class StatusBase:
         return f'{self.__class__.__name__}({self.message!r})'
 
     @classmethod
-    def from_name(cls, name: str, message: str):
+    def from_name(cls, name: _StatusName, message: str):
         """Create a status instance from a name and message.
 
         If ``name`` is "unknown", ``message`` is ignored, because unknown status
@@ -1907,7 +1920,7 @@ class StatusBase:
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
-        if not isinstance(child.name, str):
+        if not (hasattr(child, 'name') and isinstance(child.name, str)):
             raise TypeError(
                 f"Can't register StatusBase subclass {child}: ",
                 'missing required `name: str` class attribute',
@@ -3396,13 +3409,15 @@ class _ModelBackend:
         #       status-data: {}
 
         if is_app:
-            content = typing.cast(Dict[str, Dict[str, str]], content)
+            content = typing.cast(Dict[str, '_StatusDict'], content)
             app_status = content['application-status']
             return {'status': app_status['status'], 'message': app_status['message']}
         else:
             return typing.cast('_StatusDict', content)
 
-    def status_set(self, status: str, message: str = '', *, is_app: bool = False) -> None:
+    def status_set(
+        self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
+    ) -> None:
         """Set a status of a unit or an application.
 
         Args:
