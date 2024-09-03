@@ -2878,12 +2878,11 @@ class TestModelBackend:
                 case()
 
     def test_local_set_invalid_status(self, fake_script: FakeScript):
-        # juju returns exit code 1 if you ask to set status to 'unknown' or 'error'
+        # ops will directly raise a ModelError if you try to set status to 'unknown' or 'error'
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
         model = ops.Model(meta, self.backend)
-        fake_script.write('status-set', 'exit 1')
         fake_script.write('is-leader', 'echo true')
 
         with pytest.raises(ops.ModelError):
@@ -2891,10 +2890,7 @@ class TestModelBackend:
         with pytest.raises(ops.ModelError):
             model.unit.status = ops.ErrorStatus()
 
-        assert fake_script.calls(True) == [
-            ['status-set', '--application=False', 'unknown', ''],
-            ['status-set', '--application=False', 'error', ''],
-        ]
+        assert fake_script.calls(True) == []
 
         with pytest.raises(ops.ModelError):
             model.app.status = ops.UnknownStatus()
@@ -2904,8 +2900,6 @@ class TestModelBackend:
         # A leadership check is needed for application status.
         assert fake_script.calls(True) == [
             ['is-leader', '--format=json'],
-            ['status-set', '--application=True', 'unknown', ''],
-            ['status-set', '--application=True', 'error', ''],
         ]
 
     @pytest.mark.parametrize('name', ['active', 'waiting', 'blocked', 'maintenance', 'error'])

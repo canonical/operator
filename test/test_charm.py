@@ -956,15 +956,13 @@ def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: Fake
 @pytest.mark.parametrize(
     'statuses,expected',
     [
-        (['blocked', 'error'], 'error'),
         (['waiting', 'blocked'], 'blocked'),
         (['waiting', 'maintenance'], 'maintenance'),
         (['active', 'waiting'], 'waiting'),
         (['active', 'unknown'], 'active'),
-        (['unknown'], 'unknown'),
     ],
 )
-def test_collect_status_priority(
+def test_collect_status_priority_valid(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
     statuses: typing.List[_StatusName],
@@ -989,6 +987,36 @@ def test_collect_status_priority(
 
     status_set_calls = [call for call in fake_script.calls(True) if call[0] == 'status-set']
     assert status_set_calls == [['status-set', '--application=True', expected, '']]
+
+
+@pytest.mark.parametrize(
+    'statuses',
+    [
+        ['blocked', 'error'],
+        ['unknown'],
+    ],
+)
+def test_collect_status_priority_invalid(
+    request: pytest.FixtureRequest,
+    fake_script: FakeScript,
+    statuses: typing.List[_StatusName],
+):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework, statuses: typing.List[_StatusName]):
+            super().__init__(framework)
+            self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+            self.statuses = statuses
+
+        def _on_collect_status(self, event: ops.CollectStatusEvent):
+            for status in self.statuses:
+                event.add_status(ops.StatusBase.from_name(status, ''))
+
+    fake_script.write('is-leader', 'echo true')
+
+    framework = create_framework(request)
+    charm = MyCharm(framework, statuses=statuses)
+    with pytest.raises(ModelError):
+        ops.charm._evaluate_status(charm)
 
 
 def test_meta_links():

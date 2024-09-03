@@ -51,6 +51,7 @@ from typing import (
     Type,
     TypedDict,
     Union,
+    get_args,
 )
 
 import ops
@@ -70,6 +71,7 @@ _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
+_SettableStatusNames: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 _StatusName = Union[_SettableStatusName, Literal['error', 'unknown']]
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 
@@ -3428,6 +3430,8 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
+        if status not in _SettableStatusNames:
+            raise ModelError(f'status must be in {_SettableStatusNames}, not {status}')
         self._run('status-set', f'--application={is_app}', status, message)
 
     def storage_list(self, name: str) -> List[int]:
