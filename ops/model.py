@@ -429,7 +429,7 @@ class Application:
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         self._backend.status_set(
-            typing.cast(_SettableStatusName, value.name),  # TODO: narrower type for value
+            typing.cast(_SettableStatusName, value.name),  # status_set will validate at runtime
             value.message,
             is_app=True,
         )
@@ -598,7 +598,7 @@ class Unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
         self._backend.status_set(
-            typing.cast(_SettableStatusName, value.name),  # TODO: narrower type for value
+            typing.cast(_SettableStatusName, value.name),  # status_set will validate at runtime
             value.message,
             is_app=False,
         )
