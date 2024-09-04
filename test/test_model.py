@@ -3482,11 +3482,13 @@ class TestSecrets:
         fake_script.write('secret-get', """echo '{"foo": "g"}'""")
 
         secret = model.get_secret(id='123')
-        assert secret.id == 'secret:123'
+        assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.label is None
         assert secret.get_content() == {'foo': 'g'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', 'secret:123', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json']
+        ]
 
     def test_get_secret_label(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-get', """echo '{"foo": "g"}'""")
@@ -3502,12 +3504,18 @@ class TestSecrets:
         fake_script.write('secret-get', """echo '{"foo": "h"}'""")
 
         secret = model.get_secret(id='123', label='l')
-        assert secret.id == 'secret:123'
+        assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.label == 'l'
         assert secret.get_content() == {'foo': 'h'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:123', '--label', 'l', '--format=json']
+            [
+                'secret-get',
+                f'secret://{model._backend.model_uuid}/123',
+                '--label',
+                'l',
+                '--format=json',
+            ]
         ]
 
     def test_get_secret_no_args(self, model: ops.Model):
@@ -3537,7 +3545,7 @@ class TestSecrets:
         assert secret.unique_identifier is None
 
         secret = model.get_secret(id='123')
-        assert secret.id == 'secret:123'
+        assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.unique_identifier == '123'
 
         secret = model.get_secret(id='secret:124')
@@ -3550,7 +3558,7 @@ class TestSecrets:
 
         assert fake_script.calls(clear=True) == [
             ['secret-get', '--label', 'lbl', '--format=json'],
-            ['secret-get', 'secret:123', '--format=json'],
+            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json'],
             ['secret-get', 'secret:124', '--format=json'],
             ['secret-get', 'secret://modeluuid/125', '--format=json'],
         ]
@@ -3566,8 +3574,9 @@ class TestSecretInfo:
             rotation=ops.SecretRotate.MONTHLY,
             rotates=datetime.datetime(2023, 1, 9, 14, 10, 0),
             description='desc',
+            model_uuid='abcd',
         )
-        assert info.id == 'secret:3'
+        assert info.id == 'secret://abcd/3'
         assert info.label == 'lbl'
         assert info.revision == 7
         assert info.expires == datetime.datetime(2022, 12, 9, 14, 10, 0)
@@ -3590,6 +3599,7 @@ class TestSecretInfo:
                 'rotates': '2023-01-09T14:10:00Z',
                 'description': 'desc',
             },
+            model_uuid='abcd',
         )
         assert info.id == 'secret:4'
         assert info.label == 'fromdict'
@@ -3600,14 +3610,15 @@ class TestSecretInfo:
         assert info.description == 'desc'
 
         info = ops.SecretInfo.from_dict(
-            'secret:4',
+            '4',
             {
                 'label': 'fromdict',
                 'revision': 8,
                 'rotation': 'badvalue',
             },
+            model_uuid='abcd',
         )
-        assert info.id == 'secret:4'
+        assert info.id == 'secret://abcd/4'
         assert info.label == 'fromdict'
         assert info.revision == 8
         assert info.expires is None
@@ -3619,11 +3630,15 @@ class TestSecretInfo:
         assert info.id == 'secret:5'
         assert info.revision == 9
 
+        info = ops.SecretInfo.from_dict('secret://abcd/6', {'revision': 9})
+        assert info.id == 'secret://abcd/6'
+        assert info.revision == 9
+
 
 class TestSecretClass:
     @pytest.fixture
     def model(self):
-        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0', model_uuid='abcd'))
 
     def make_secret(
         self,
@@ -3636,11 +3651,11 @@ class TestSecretClass:
 
     def test_id_and_label(self, model: ops.Model):
         secret = self.make_secret(model, id=' abc ', label='lbl')
-        assert secret.id == 'secret:abc'
+        assert secret.id == f'secret://{model._backend.model_uuid}/abc'
         assert secret.label == 'lbl'
 
         secret = self.make_secret(model, id='x')
-        assert secret.id == 'secret:x'
+        assert secret.id == f'secret://{model._backend.model_uuid}/x'
         assert secret.label is None
 
         secret = self.make_secret(model, label='y')
@@ -3664,7 +3679,7 @@ class TestSecretClass:
         assert content == {'foo': 'refreshed'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:y', '--refresh', '--format=json']
+            ['secret-get', f'secret://{model._backend.model_uuid}/y', '--refresh', '--format=json']
         ]
 
     def test_get_content_uncached(self, model: ops.Model, fake_script: FakeScript):
@@ -3674,7 +3689,9 @@ class TestSecretClass:
         content = secret.get_content()
         assert content == {'foo': 'notcached'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', 'secret:z', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+        ]
 
     def test_get_content_copies_dict(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
@@ -3685,7 +3702,9 @@ class TestSecretClass:
         content['new'] = 'value'
         assert secret.get_content() == {'foo': 'bar'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', 'secret:z', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+        ]
 
     def test_peek_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "peeked"}'""")
@@ -3695,7 +3714,14 @@ class TestSecretClass:
         assert content == {'foo': 'peeked'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']
+            [
+                'secret-get',
+                f'secret://{model._backend.model_uuid}/a',
+                '--label',
+                'b',
+                '--peek',
+                '--format=json',
+            ]
         ]
 
     def test_get_info(self, model: ops.Model, fake_script: FakeScript):
@@ -3704,28 +3730,28 @@ class TestSecretClass:
         # Secret with ID only
         secret = self.make_secret(model, id='x')
         info = secret.get_info()
-        assert info.id == 'secret:x'
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
         assert info.label == 'y'
         assert info.revision == 7
 
         # Secret with label only
         secret = self.make_secret(model, label='y')
         info = secret.get_info()
-        assert info.id == 'secret:x'
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
         assert info.label == 'y'
         assert info.revision == 7
 
         # Secret with ID and label
         secret = self.make_secret(model, id='x', label='y')
         info = secret.get_info()
-        assert info.id == 'secret:x'
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
         assert info.label == 'y'
         assert info.revision == 7
 
         assert fake_script.calls(clear=True) == [
-            ['secret-info-get', 'secret:x', '--format=json'],
+            ['secret-info-get', f'secret://{model._backend.model_uuid}/x', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-info-get', 'secret:x', '--format=json'],
+            ['secret-info-get', f'secret://{model._backend.model_uuid}/x', '--format=json'],
         ]
 
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
@@ -3739,15 +3765,15 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.set_content({'bar': 'foo'})
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         with pytest.raises(ValueError):
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
         assert fake_script.calls(clear=True) == [
-            ['secret-set', 'secret:x', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/x', ANY],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', 'secret:z', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/z', ANY],
         ]
         assert fake_script.secrets() == {'foo': 'bar', 'bar': 'foo'}
 
@@ -3768,12 +3794,12 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.set_info(label='lbl')
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
             [
                 'secret-set',
-                'secret:x',
+                f'secret://{model._backend.model_uuid}/x',
                 '--label',
                 'lab',
                 '--description',
@@ -3784,7 +3810,7 @@ class TestSecretClass:
                 'monthly',
             ],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', 'secret:z', '--label', 'lbl'],
+            ['secret-set', f'secret://{model._backend.model_uuid}/z', '--label', 'lbl'],
         ]
 
         with pytest.raises(TypeError):
@@ -3811,16 +3837,23 @@ class TestSecretClass:
         assert secret.id is None
         rel345 = ops.Relation('test', 345, True, unit, backend, cache)
         secret.grant(rel345)
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '123', '--format=json'],
             ['relation-list', '-r', '234', '--format=json'],
-            ['secret-grant', 'secret:x', '--relation', '123'],
-            ['secret-grant', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['secret-grant', f'secret://{model._backend.model_uuid}/x', '--relation', '123'],
+            [
+                'secret-grant',
+                f'secret://{model._backend.model_uuid}/x',
+                '--relation',
+                '234',
+                '--unit',
+                'app/0',
+            ],
             ['relation-list', '-r', '345', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-grant', 'secret:z', '--relation', '345'],
+            ['secret-grant', f'secret://{model._backend.model_uuid}/z', '--relation', '345'],
         ]
 
     def test_revoke(self, model: ops.Model, fake_script: FakeScript):
@@ -3841,16 +3874,23 @@ class TestSecretClass:
         assert secret.id is None
         rel345 = ops.Relation('test', 345, True, unit, model._backend, model._cache)
         secret.revoke(rel345)
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '123', '--format=json'],
             ['relation-list', '-r', '234', '--format=json'],
-            ['secret-revoke', 'secret:x', '--relation', '123'],
-            ['secret-revoke', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['secret-revoke', f'secret://{model._backend.model_uuid}/x', '--relation', '123'],
+            [
+                'secret-revoke',
+                f'secret://{model._backend.model_uuid}/x',
+                '--relation',
+                '234',
+                '--unit',
+                'app/0',
+            ],
             ['relation-list', '-r', '345', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-revoke', 'secret:z', '--relation', '345'],
+            ['secret-revoke', f'secret://{model._backend.model_uuid}/z', '--relation', '345'],
         ]
 
     def test_remove_revision(self, model: ops.Model, fake_script: FakeScript):
@@ -3864,12 +3904,12 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.remove_revision(234)
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['secret-remove', 'secret:x', '--revision', '123'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/x', '--revision', '123'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-remove', 'secret:z', '--revision', '234'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/z', '--revision', '234'],
         ]
 
     def test_remove_all_revisions(self, model: ops.Model, fake_script: FakeScript):
@@ -3883,12 +3923,12 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.remove_all_revisions()
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['secret-remove', 'secret:x'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/x'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-remove', 'secret:z'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/z'],
         ]
 
 

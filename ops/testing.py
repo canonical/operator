@@ -2815,6 +2815,7 @@ class _TestingModelBackend:
             rotation=rotation,
             rotates=rotates,
             description=secret.description,
+            model_uuid=self.model_uuid,
         )
 
     def secret_set(

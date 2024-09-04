@@ -30,6 +30,7 @@ import sys
 import tempfile
 import time
 import typing
+import warnings
 import weakref
 from abc import ABC, abstractmethod
 from pathlib import Path, PurePath
@@ -295,7 +296,7 @@ class Model:
             raise TypeError('Must provide an id or label, or both')
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
-            id = Secret._canonicalize_id(id)
+            id = Secret._canonicalize_id(id, self.uuid)
         content = self._backend.secret_get(id=id, label=label)
         return Secret(self._backend, id=id, label=label, content=content)
 
@@ -1182,8 +1183,17 @@ class SecretInfo:
         rotation: Optional[SecretRotate],
         rotates: Optional[datetime.datetime],
         description: Optional[str] = None,
+        *,
+        model_uuid: Optional[str] = None,
     ):
-        self.id = Secret._canonicalize_id(id)
+        if model_uuid is None:
+            warnings.warn(
+                '`model_uuid` should always be provided when creating a '
+                'SecretInfo instance, and will be required in the future.',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.id = Secret._canonicalize_id(id, model_uuid)
         self.label = label
         self.revision = revision
         self.expires = expires
@@ -1192,7 +1202,9 @@ class SecretInfo:
         self.description = description
 
     @classmethod
-    def from_dict(cls, id: str, d: Dict[str, Any]) -> 'SecretInfo':
+    def from_dict(
+        cls, id: str, d: Dict[str, Any], model_uuid: Optional[str] = None
+    ) -> 'SecretInfo':
         """Create new SecretInfo object from ID and dict parsed from JSON."""
         expires = typing.cast(Optional[str], d.get('expiry'))
         try:
@@ -1208,6 +1220,7 @@ class SecretInfo:
             rotation=rotation,
             rotates=timeconv.parse_rfc3339(rotates) if rotates is not None else None,
             description=typing.cast(Optional[str], d.get('description')),
+            model_uuid=model_uuid,
         )
 
     def __repr__(self):
@@ -1249,7 +1262,7 @@ class Secret:
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
         if id is not None:
-            id = self._canonicalize_id(id)
+            id = self._canonicalize_id(id, backend.model_uuid)
         self._backend = backend
         self._id = id
         self._label = label
@@ -1264,11 +1277,13 @@ class Secret:
         return f"<Secret {' '.join(fields)}>"
 
     @staticmethod
-    def _canonicalize_id(id: str) -> str:
+    def _canonicalize_id(id: str, model_uuid: Optional[str]) -> str:
         """Return the canonical form of the given secret ID, with the 'secret:' prefix."""
         id = id.strip()
         if not id.startswith('secret:'):
-            id = f'secret:{id}'  # add the prefix if not there already
+            # Add the prefix and, if provided, model UUID.
+            id = f'secret:{id}' if model_uuid is None else f'secret://{model_uuid}/{id}'
+
         return id
 
     @classmethod
@@ -1308,8 +1323,8 @@ class Secret:
         """Locator ID (URI) for this secret.
 
         This has an unfortunate name for historical reasons, as it's not
-        really a unique identifier, but the secret's locator URI, which may or
-        may not include the model UUID (for cross-model secrets).
+        really a unique identifier, but the secret's locator URI, which will
+        include the model UUID (for cross-model secrets).
 
         Charms should treat this as an opaque string for looking up secrets
         and sharing them via relation data. If a charm-local "name" is needed
@@ -3604,7 +3619,9 @@ class _ModelBackend:
         result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
         info_dicts = typing.cast(Dict[str, Any], result)
         id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
-        return SecretInfo.from_dict(id, typing.cast(Dict[str, Any], info_dicts[id]))
+        return SecretInfo.from_dict(
+            id, typing.cast(Dict[str, Any], info_dicts[id]), model_uuid=self.model_uuid
+        )
 
     def secret_set(
         self,
