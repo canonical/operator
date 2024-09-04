@@ -2492,9 +2492,8 @@ class _TestingModelBackend:
         self, status: model._SettableStatusName, message: str = '', *, is_app: bool = False
     ):
         if status not in model._SettableStatusNames:
-            raise model.ModelError(
-                f'ERROR invalid status "{status}", expected one of'
-                ' [maintenance blocked waiting active]'
+            raise model.InvalidStatusError(
+                f'status must be in {model._SettableStatusNames}, not {status!r}'
             )
         if is_app:
             self._app_status = {'status': status, 'message': message}

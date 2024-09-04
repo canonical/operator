@@ -1952,7 +1952,7 @@ class UnknownStatus(StatusBase):
     charm has not called status-set yet.
 
     This status is read-only; trying to set unit or application status to
-    ``UnknownStatus`` will raise :class:`ModelError`.
+    ``UnknownStatus`` will raise :class:`InvalidStatusError`.
     """
 
     name = 'unknown'
@@ -1973,7 +1973,7 @@ class ErrorStatus(StatusBase):
     human intervention in order to operate correctly).
 
     This status is read-only; trying to set unit or application status to
-    ``ErrorStatus`` will raise :class:`ModelError`.
+    ``ErrorStatus`` will raise :class:`InvalidStatusError`.
     """
 
     name = 'error'
@@ -3429,7 +3429,7 @@ class _ModelBackend:
         if not isinstance(message, str):
             raise TypeError('message parameter must be a string')
         if status not in _SettableStatusNames:
-            raise ModelError(f'status must be in {_SettableStatusNames}, not {status}')
+            raise InvalidStatusError(f'status must be in {_SettableStatusNames}, not {status!r}')
         self._run('status-set', f'--application={is_app}', status, message)
 
     def storage_list(self, name: str) -> List[int]:

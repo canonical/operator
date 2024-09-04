@@ -2878,23 +2878,23 @@ class TestModelBackend:
                 case()
 
     def test_local_set_invalid_status(self, fake_script: FakeScript):
-        # ops will directly raise a ModelError if you try to set status to 'unknown' or 'error'
+        # ops will directly raise InvalidStatusError if you try to set status to unknown or error
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
         model = ops.Model(meta, self.backend)
         fake_script.write('is-leader', 'echo true')
 
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.unit.status = ops.UnknownStatus()
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.unit.status = ops.ErrorStatus()
 
         assert fake_script.calls(True) == []
 
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.app.status = ops.UnknownStatus()
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.app.status = ops.ErrorStatus()
 
         # A leadership check is needed for application status.
