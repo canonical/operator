@@ -304,6 +304,7 @@ class ConfigChangedEvent(HookEvent):
       rescheduling, on unit upgrade or refresh, and so on.
     - As a specific instance of the above point: when networking changes
       (if the machine reboots and comes up with a different IP).
+    - When the app config changes, for example when `juju trust` is run.
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
