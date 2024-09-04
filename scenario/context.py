@@ -61,7 +61,6 @@ class Manager:
         self._emitted: bool = False
 
         self.ops: Optional["Ops"] = None
-        self.output: Optional["State"] = None
 
     @property
     def charm(self) -> ops.CharmBase:
@@ -564,6 +563,16 @@ class Context:
         """
         return Manager(self, event, state)
 
+    def run_action(self, action: str, state: "State"):
+        """Use `run()` instead.
+
+        :private:
+        """
+        raise AttributeError(
+            f"call with `ctx.run`, like `ctx.run(ctx.on.action({action!r})` "
+            "and find the results in `ctx.action_results`",
+        )
+
     def run(self, event: "_Event", state: "State") -> "State":
         """Trigger a charm execution with an event and a State.
 
@@ -575,6 +584,52 @@ class Context:
         :arg state: the :class:`State` instance to use as data source for the hook tool calls that
             the charm will invoke when handling the event.
         """
+        # Help people transition from Scenario 6:
+        if isinstance(event, str):
+            event = event.replace("-", "_")  # type: ignore
+            if event in (
+                "install",
+                "start",
+                "stop",
+                "remove",
+                "update_status",
+                "config_changed",
+                "upgrade_charm",
+                "pre_series_upgrade",
+                "post_series_upgrade",
+                "leader_elected",
+                "collect_app_status",
+                "collect_unit_status",
+            ):
+                suggested = f"{event}()"
+            elif event in ("secret_changed", "secret_rotate"):
+                suggested = f"{event}(my_secret)"
+            elif event in ("secret_expired", "secret_remove"):
+                suggested = f"{event}(my_secret, revision=1)"
+            elif event in (
+                "relation_created",
+                "relation_joined",
+                "relation_changed",
+                "relation_departed",
+                "relation_broken",
+            ):
+                suggested = f"{event}(my_relation)"
+            elif event in ("storage_attached", "storage_detaching"):
+                suggested = f"{event}(my_storage)"
+            elif event == "pebble_ready":
+                suggested = f"{event}(my_container)"
+            elif event == "pebble_custom_notice":
+                suggested = f"{event}(my_container, my_notice)"
+            else:
+                suggested = "event()"
+            raise TypeError(
+                f"call with an event from `ctx.on`, like `ctx.on.{suggested}`",
+            )
+        if callable(event):
+            raise TypeError(
+                "You should call the event method. Did you forget to add parentheses?",
+            )
+
         if event.action:
             # Reset the logs, failure status, and results, in case the context
             # is reused.

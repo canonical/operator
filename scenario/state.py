@@ -26,6 +26,7 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NoReturn,
     Optional,
     Sequence,
     Set,
@@ -501,6 +502,14 @@ class RelationBase(_max_posargs(2)):
         default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
     )
     """This unit's databag for this relation."""
+
+    @property
+    def relation_id(self) -> NoReturn:
+        """Use `.id` instead of `.relation_id`.
+
+        :private:
+        """
+        raise AttributeError("use .id instead of .relation_id")
 
     @property
     def _databags(self):
@@ -1435,6 +1444,7 @@ class State(_max_posargs(0)):
         ]
         if self.storages != normalised_storage:
             object.__setattr__(self, "storages", normalised_storage)
+
         # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by charmers.
         # ops.Network does not have the relation name, so cannot be converted.
         # ops.Resources does not contain the source of the resource, so cannot be converted.
