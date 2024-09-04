@@ -257,7 +257,7 @@ class _Dispatcher:
         # code is not triggered on config-changed.
         #
         # 'start' event is included as Juju does not fire the install event for
-        # K8s charms (see LP: #1854635).
+        # K8s charms https://bugs.launchpad.net/juju/+bug/1854635, fixed in juju 2.7.6 and 2.8
         if self.event_name in ('install', 'start', 'upgrade_charm') or self.event_name.endswith(
             '_storage_attached'
         ):
