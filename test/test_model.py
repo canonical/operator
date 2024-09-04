@@ -2943,7 +2943,7 @@ class TestModelBackend:
         assert model.app.status.message == 'bar'
 
     def test_status_set_is_app_not_bool_raises(self):
-        for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
+        for is_app_v in [None, 1, 2.0, 'a', b'beef', object()]:
             with pytest.raises(TypeError):
                 self.backend.status_set(
                     'active',
@@ -2951,7 +2951,7 @@ class TestModelBackend:
                 )
 
     def test_status_set_message_not_str_raises(self):
-        for message in [None, 1, 2.0, True, b'beef', object]:
+        for message in [None, 1, 2.0, True, b'beef', object()]:
             with pytest.raises(TypeError):
                 self.backend.status_set(
                     'active',
