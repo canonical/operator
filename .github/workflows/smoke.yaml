@@ -12,15 +12,12 @@ jobs:
     strategy:
       matrix:
         # pylibjuju does not currently support Juju 4.x
-        # TODO: we should run against 2.9, but that means installing pylibjuju
-        # "<3", and we need to do that inside the tox environment, so that's a
-        # bit more complex than having everything inside this workflow.
-        # Note that Juju 2.9 needs to be '2.9 --classic' because the snap is
-        # only available with classic confinement.
-        juju-version: ['3']
+        juju-version: ['2.9', '3.5']
         charmcraft-version: ['2.x', '3.x']
-#        cloud: ['lxd', 'microk8s']
-        cloud: ['microk8s']
+        cloud: ['lxd', 'microk8s']
+
+    env:
+      JUJU_VERSION: "${{ matrix.juju-version }}"
 
     steps:
       # LXD is required for charmcraft to pack, even if it's not used as the
@@ -38,7 +35,12 @@ jobs:
           devMode: 'true'
           addons: '["dns", "hostpath-storage"]'
 
+      - name: Set up Juju (classic)
+        if: matrix.juju-version == '2.9'
+        run: sudo snap install juju --classic --channel=${{ matrix.juju-version }}
+
       - name: Set up Juju
+        if: matrix.juju-version != '2.9'
         run: sudo snap install juju --channel=${{ matrix.juju-version }}
 
       - name: Bootstrap Juju controller (k8s)
