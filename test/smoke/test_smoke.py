@@ -73,7 +73,7 @@ def pack(charm_dir: pathlib.Path):
         dest_name = charm_dir / charm.name
         charm.rename(dest_name)
     # With the way we use charmcraft, we know that there will only be one.
-    return dest_name
+    return dest_name.absolute()
 
 
 @pytest.mark.parametrize(
