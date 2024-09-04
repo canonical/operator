@@ -12,7 +12,8 @@ jobs:
     strategy:
       matrix:
         # pylibjuju does not currently support Juju 4.x
-        juju-version: ['2.9', '3.5']
+        # The smoke tests do not yet work on Juju 2.9.
+        juju-version: ['3.5']
         charmcraft-version: ['2.x', '3.x']
         cloud: ['lxd', 'microk8s']
 
