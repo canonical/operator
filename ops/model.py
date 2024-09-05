@@ -1601,6 +1601,8 @@ class Relation:
     ``relation-broken`` event associated with this relation.
     """
 
+    _event_remote_unit: Optional[Unit] = None
+
     def __init__(
         self,
         relation_name: str,
@@ -1629,6 +1631,11 @@ class Relation:
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
+
+        # In relation-departed, the relation ID is not included in relation-list,
+        # but the data should still be accessible, so we explicitly include it here.
+        if self._event_remote_unit:
+            self.units.add(self._event_remote_unit)
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".

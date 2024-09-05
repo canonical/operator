@@ -205,6 +205,8 @@ def _get_event_args(
         kwargs['app'] = model.get_app(remote_app_name)
     if remote_unit_name:
         kwargs['unit'] = model.get_unit(remote_unit_name)
+        if relation:
+            relation._event_remote_unit = kwargs['unit']
     if departing_unit_name:
         kwargs['departing_unit_name'] = departing_unit_name
 
