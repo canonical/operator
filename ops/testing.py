@@ -260,9 +260,10 @@ class Harness(Generic[CharmType]):
         actions: Optional[YAMLStringOrFile] = None,
         config: Optional[YAMLStringOrFile] = None,
     ):
-        if 'JUJU_VERSION' not in os.environ:
-            os.environ['JUJU_VERSION'] = '0.0.0'
-        self._juju_context = _JujuContext.from_dict(os.environ)
+        context_environ = os.environ.copy()
+        if 'JUJU_VERSION' not in context_environ:
+            context_environ['JUJU_VERSION'] = '0.0.0'
+        self._juju_context = _JujuContext.from_dict(context_environ)
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
