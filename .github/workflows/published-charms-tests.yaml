@@ -39,7 +39,6 @@ jobs:
           - charm-repo: canonical/temporal-admin-k8s-operator
           - charm-repo: canonical/dex-auth-operator
           - charm-repo: canonical/temporal-ui-k8s-operator
-          - charm-repo: canonical/notebook-operators
           - charm-repo: canonical/temporal-worker-k8s-operator
           - charm-repo: canonical/content-cache-k8s-operator
           - charm-repo: canonical/ranger-k8s-operator
@@ -81,6 +80,38 @@ jobs:
           else
             sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
             poetry lock --no-update
+          fi
+
+      - name: Install dependencies
+        run: pip install tox~=4.2
+
+      - name: Run the charm's unit tests
+        run: tox -vve unit
+
+  charmcraft-profile-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: machine
+          - profile: kubernetes
+          - profile: simple
+    steps:
+      - name: Checkout the operator repository
+        uses: actions/checkout@v4
+        with:
+          path: myops
+
+      - name: Charmcraft init
+        run: charmcraft init --profile=${{ matrix.profile }}
+
+      - name: Update 'ops' dependency in test charm to latest
+        run: |
+          rm -rf myops/test
+          if [ -e "requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           fi
 
       - name: Install dependencies
