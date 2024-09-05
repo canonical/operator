@@ -12,7 +12,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - charm-repo: canonical/data-platform-libs
           - charm-repo: canonical/kafka-operator
           - charm-repo: canonical/mongodb-operator
           - charm-repo: canonical/traefik-k8s-operator
@@ -25,18 +24,15 @@ jobs:
           - charm-repo: canonical/openfga-operator
           - charm-repo: canonical/indico-operator
           - charm-repo: canonical/trino-k8s-operator
-          - charm-repo: canonical/charm-openstack-service-checks
           - charm-repo: canonical/route53-lego-k8s-operator
           - charm-repo: canonical/wordpress-k8s-operator
           - charm-repo: canonical/temporal-k8s-operator
           - charm-repo: canonical/jenkins-agent-operator
-          - charm-repo: canonical/juju-dashboard
           - charm-repo: canonical/seldon-core-operator
           - charm-repo: canonical/nginx-ingress-integrator-operator
           - charm-repo: canonical/oathkeeper-operator
           - charm-repo: canonical/jenkins-agent-k8s-operator
           - charm-repo: canonical/grafana-agent-k8s-operator
-          - charm-repo: canonical/juju-dashboard
           - charm-repo: canonical/namecheap-lego-k8s-operator
           - charm-repo: canonical/superset-k8s-operator
           - charm-repo: canonical/identity-platform-login-ui-operator
@@ -45,7 +41,6 @@ jobs:
           - charm-repo: canonical/temporal-ui-k8s-operator
           - charm-repo: canonical/notebook-operators
           - charm-repo: canonical/temporal-worker-k8s-operator
-          - charm-repo: canonical/charm-prometheus-libvirt-exporter
           - charm-repo: canonical/content-cache-k8s-operator
           - charm-repo: canonical/ranger-k8s-operator
           - charm-repo: canonical/oauth2-proxy-k8s-operator
@@ -54,7 +49,6 @@ jobs:
           - charm-repo: canonical/saml-integrator-operator
           - charm-repo: canonical/smtp-integrator-operator
           - charm-repo: canonical/manual-tls-certificates-operator
-          - charm-repo: canonical/jimm
           - charm-repo: canonical/hardware-observer-operator
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
@@ -72,6 +66,15 @@ jobs:
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          rm -rf myops/test
+          if [ -e "test-requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> test-requirements.txt
+          fi
+          if [ -e "requirements-charmcraft.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements-charmcraft.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements-charmcraft.txt
+          fi
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
