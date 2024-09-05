@@ -56,7 +56,7 @@ jobs:
           - charm-repo: canonical/manual-tls-certificates-operator
           - charm-repo: canonical/jimm
           - charm-repo: canonical/hardware-observer-operator
-      steps:
+    steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
         with:
