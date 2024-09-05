@@ -209,7 +209,9 @@ def _get_event_args(
             # In relation-departed, the relation ID is not included in
             # relation-list, but the data should still be accessible, so we
             # explicitly include it here.
-            relation.units.add(kwargs['unit'])
+            relation.data._data[kwargs['unit']] = ops.model.RelationDataContent(
+                relation, kwargs['unit'], model._backend
+            )
     if departing_unit_name:
         kwargs['departing_unit_name'] = departing_unit_name
 
