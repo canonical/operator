@@ -1,3 +1,9 @@
+# 2.16.1 - 5 Sep 2024
+
+## Fixes
+
+* Don't alter os.environ when creating a Harness in https://github.com/canonical/operator/pull/1359
+
 # 2.16.0 - 29 Aug 2024
 
 ## Features
