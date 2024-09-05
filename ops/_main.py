@@ -206,7 +206,10 @@ def _get_event_args(
     if remote_unit_name:
         kwargs['unit'] = model.get_unit(remote_unit_name)
         if relation:
-            relation._event_remote_unit = kwargs['unit']
+            # In relation-departed, the relation ID is not included in
+            # relation-list, but the data should still be accessible, so we
+            # explicitly include it here.
+            relation.units.add(kwargs['unit'])
     if departing_unit_name:
         kwargs['departing_unit_name'] = departing_unit_name
 
