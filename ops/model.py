@@ -118,13 +118,19 @@ class Model:
         meta: 'ops.charm.CharmMeta',
         backend: '_ModelBackend',
         broken_relation_id: Optional[int] = None,
+        remote_unit_name: Optional[str] = None,
     ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: Dict[str, ops.RelationMeta] = meta.relations
         self._relations = RelationMapping(
-            relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
+            relations,
+            self.unit,
+            self._backend,
+            self._cache,
+            broken_relation_id=broken_relation_id,
+            _remote_unit=self._cache.get(Unit, remote_unit_name) if remote_unit_name else None,
         )
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
@@ -872,12 +878,14 @@ class RelationMapping(Mapping[str, List['Relation']]):
         backend: '_ModelBackend',
         cache: '_ModelCache',
         broken_relation_id: Optional[int],
+        _remote_unit: Optional['Unit'] = None,
     ):
         self._peers: Set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
                 self._peers.add(name)
         self._our_unit = our_unit
+        self._remote_unit = _remote_unit
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
@@ -901,7 +909,13 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 if rid == self._broken_relation_id:
                     continue
                 relation = Relation(
-                    relation_name, rid, is_peer, self._our_unit, self._backend, self._cache
+                    relation_name,
+                    rid,
+                    is_peer,
+                    self._our_unit,
+                    self._backend,
+                    self._cache,
+                    _remote_unit=self._remote_unit,
                 )
                 relation_list.append(relation)
         return relation_list
@@ -936,6 +950,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                     self._backend,
                     self._cache,
                     active=False,
+                    _remote_unit=self._remote_unit,
                 )
         relations = self[relation_name]
         num_related = len(relations)
@@ -1601,6 +1616,8 @@ class Relation:
     ``relation-broken`` event associated with this relation.
     """
 
+    _remote_unit: Optional[Unit]
+
     def __init__(
         self,
         relation_name: str,
@@ -1610,6 +1627,7 @@ class Relation:
         backend: '_ModelBackend',
         cache: '_ModelCache',
         active: bool = True,
+        _remote_unit: Optional[Unit] = None,
     ):
         self.name = relation_name
         self.id = relation_id
@@ -1629,6 +1647,11 @@ class Relation:
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
+
+        # In relation-departing and relation-broken, `relation-list` doesn't
+        # include the remote unit, but the data should still be available.
+        if _remote_unit is not None:
+            self.units.add(_remote_unit)
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
