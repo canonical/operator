@@ -103,6 +103,9 @@ jobs:
         with:
           path: myops
 
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
+
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }}
 
