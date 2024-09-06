@@ -102,7 +102,7 @@ jobs:
         run: sudo snap install charmcraft --classic
 
       - name: Charmcraft init
-        run: charmcraft init --profile=${{ matrix.profile }}
+        run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
 
       - name: Checkout the operator repository
         uses: actions/checkout@v4
