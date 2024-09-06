@@ -98,16 +98,16 @@ jobs:
           - profile: kubernetes
           - profile: simple
     steps:
-      - name: Checkout the operator repository
-        uses: actions/checkout@v4
-        with:
-          path: myops
-
       - name: Install charmcraft
         run: sudo snap install charmcraft --classic
 
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }}
+
+      - name: Checkout the operator repository
+        uses: actions/checkout@v4
+        with:
+          path: myops
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
