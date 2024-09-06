@@ -1445,6 +1445,9 @@ class Secret:
         secret no longer exists, this method will succeed, but the unit will go
         into error state on completion of the current Juju hook.
 
+        Changed in Juju 3.6: setting the content to the same exact value no
+        longer creates a new secret revision.
+
         Args:
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
