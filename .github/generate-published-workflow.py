@@ -37,7 +37,6 @@ import yaml
 
 console = rich.console.Console()
 
-
 URL_BASE = 'https://api.charmhub.io/v2/charms/info'
 WORKFLOW = pathlib.Path(__file__).parent / 'workflows' / 'published-charms-tests.yaml'
 
@@ -48,12 +47,21 @@ SKIP = {
     'mysql-operator',
     'mysql-k8s-operator',
     # Handled by hello-charm-tests.yaml
-    'hello-kubecon',  # Also not in the canonical org, but jnsgruk.
-    'hello-juju-charm',  # Also not in the canonical org, but juju.
-    # Handler by observability-charms-tests.yaml
+    'hello-kubecon',  # Not in the canonical org anyway (jnsgruk).
+    'hello-juju-charm',  # Not in the canonical org anyway (juju).
+    # Handled by observability-charms-tests.yaml
     'alertmanager-k8s-operator',
     'prometheus-k8s-operator',
     'grafana-k8s-operator',
+    # This has a redirect, which is too complicated to handle for now.
+    'bundle-jupyter',
+    # The charms are in a subfolder, which this can't handle yet.
+    'jimm',
+    'notebook-operators',
+    # Not ops.
+    'charm-prometheus-libvirt-exporter',
+    'juju-dashboard',
+    'charm-openstack-service-checks',
 }
 
 
@@ -80,8 +88,7 @@ def get_source_url(charm: str, session: requests.Session):
         return source.json()['result']['bugs-url']
     except (requests.HTTPError, KeyError):
         pass
-    # TODO: Can we try anything else?
-    console.log(f'Could not find a source URL for {charm}')
+    console.log(f'Could not find a source URL for {charm}', style='bold red')
     return None
 
 
@@ -97,10 +104,11 @@ def url_to_charm_name(url: str):
         # TODO: Maybe we can include some of these anyway?
         # 'juju-solutions' and 'charmed-kubernetes' seem viable, for example.
         console.log(f'URL {url} is not a Canonical charm')
+        return None
     try:
         return urllib.parse.urlparse(url).path.split('/')[2]
     except IndexError:
-        console.log(f'Could not get charm name from URL {url}')
+        console.log(f'Could not get charm name from URL {url}', style='bold red')
         return None
 
 
