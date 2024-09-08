@@ -18,8 +18,7 @@ jobs:
         run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23
       - name: Generate coverage report
         run: |
-          tox -e unit
-          coverage xml
+          tox -e coverage
           # Annoyingly, the coverage.xml file needs to be in a .coverage folder.
           rm .coverage
           mkdir .coverage
