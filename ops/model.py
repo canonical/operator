@@ -279,7 +279,7 @@ class Model:
         again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
         has been called.
 
-        .. jujuversion:: 3.0
+        .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
 
         Args:
@@ -464,7 +464,7 @@ class Application:
     ) -> 'Secret':
         """Create a :class:`Secret` owned by this application.
 
-        .. jujuversion:: 3.0
+        .. jujuadded:: 3.0
 
         Args:
             content: A key-value mapping containing the payload of the secret,
@@ -1233,7 +1233,7 @@ class Secret:
     All secret events have a :code:`.secret` attribute which provides the
     :class:`Secret` associated with that event.
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
         Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
@@ -2927,7 +2927,7 @@ class Container:
     def get_notice(self, id: str) -> pebble.Notice:
         """Get details about a single notice by ID.
 
-        .. jujuversion:: 3.4
+        .. jujuadded:: 3.4
 
         Raises:
             ModelError: if a notice with the given ID is not found
@@ -2952,7 +2952,7 @@ class Container:
         See :meth:`ops.pebble.Client.get_notices` for documentation of the
         parameters.
 
-        .. jujuversion:: 3.4
+        .. jujuadded:: 3.4
         """
         return self._pebble.get_notices(
             users=users,
