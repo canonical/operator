@@ -139,12 +139,13 @@ def _max_posargs(n: int):
             # declared, which aligns with dataclasses. Simpler ways of
             # getting the arguments (like __annotations__) do not have that
             # guarantee, although in practice it is the case.
-            parameters = inspect.signature(cls).parameters
+            parameters = inspect.signature(cls.__init__).parameters
             required_args = [
                 name
                 for name in tuple(parameters)
                 if parameters[name].default is inspect.Parameter.empty
                 and name not in kwargs
+                and name != "self"
             ]
             n_posargs = len(args)
             max_n_posargs = cls._max_positional_args
