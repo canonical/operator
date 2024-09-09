@@ -4,7 +4,14 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 
 from scenario import Context
-from scenario.state import Network, Relation, State, SubordinateRelation
+from scenario.state import (
+    Address,
+    BindAddress,
+    Network,
+    Relation,
+    State,
+    SubordinateRelation,
+)
 
 
 @pytest.fixture(scope="function")
@@ -40,18 +47,18 @@ def test_ip_get(mycharm):
         },
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(
             relations=[
                 Relation(
                     interface="foo",
                     remote_app_name="remote",
                     endpoint="metrics-endpoint",
-                    relation_id=1,
+                    id=1,
                 ),
             ],
-            networks={"foo": Network.default(private_address="4.4.4.4")},
+            networks={Network("foo", [BindAddress([Address("4.4.4.4")])])},
         ),
     ) as mgr:
         # we have a network for the relation
@@ -77,8 +84,8 @@ def test_no_sub_binding(mycharm):
         },
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(
             relations=[
                 SubordinateRelation("bar"),
@@ -102,18 +109,18 @@ def test_no_relation_error(mycharm):
         },
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(
             relations=[
                 Relation(
                     interface="foo",
                     remote_app_name="remote",
                     endpoint="metrics-endpoint",
-                    relation_id=1,
+                    id=1,
                 ),
             ],
-            networks={"bar": Network.default()},
+            networks={Network("bar")},
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
@@ -126,33 +133,14 @@ def test_juju_info_network_default(mycharm):
         meta={"name": "foo"},
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(),
     ) as mgr:
         # we have a network for the relation
         assert (
             str(mgr.charm.model.get_binding("juju-info").network.bind_address)
             == "192.0.2.0"
-        )
-
-
-def test_juju_info_network_override(mycharm):
-    ctx = Context(
-        mycharm,
-        meta={"name": "foo"},
-    )
-
-    with ctx.manager(
-        "update_status",
-        State(
-            networks={"juju-info": Network.default(private_address="4.4.4.4")},
-        ),
-    ) as mgr:
-        # we have a network for the relation
-        assert (
-            str(mgr.charm.model.get_binding("juju-info").network.bind_address)
-            == "4.4.4.4"
         )
 
 
@@ -166,8 +154,8 @@ def test_explicit_juju_info_network_override(mycharm):
         },
     )
 
-    with ctx.manager(
-        "update_status",
+    with ctx(
+        ctx.on.update_status(),
         State(),
     ) as mgr:
         assert mgr.charm.model.get_binding("juju-info").network.bind_address

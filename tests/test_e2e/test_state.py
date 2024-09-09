@@ -1,4 +1,5 @@
-from dataclasses import asdict
+import copy
+from dataclasses import asdict, replace
 from typing import Type
 
 import pytest
@@ -6,8 +7,18 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
-from scenario.state import DEFAULT_JUJU_DATABAG, Container, Relation, State, sort_patch
-from tests.helpers import trigger
+from scenario.state import (
+    _DEFAULT_JUJU_DATABAG,
+    Address,
+    BindAddress,
+    Container,
+    Model,
+    Network,
+    Relation,
+    Resource,
+    State,
+)
+from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {
     "relation_created",
@@ -57,8 +68,8 @@ def state():
 
 def test_bare_event(state, mycharm):
     out = trigger(state, "start", mycharm, meta={"name": "foo"})
-    out_purged = out.replace(stored_state=state.stored_state)
-    assert state.jsonpatch_delta(out_purged) == []
+    out_purged = replace(out, stored_states=state.stored_states)
+    assert jsonpatch_delta(state, out_purged) == []
 
 
 def test_leader_get(state, mycharm):
@@ -96,8 +107,8 @@ def test_status_setting(state, mycharm):
     assert out.workload_version == ""
 
     # ignore stored state in the delta
-    out_purged = out.replace(stored_state=state.stored_state)
-    assert out_purged.jsonpatch_delta(state) == sort_patch(
+    out_purged = replace(out, stored_states=state.stored_states)
+    assert jsonpatch_delta(out_purged, state) == sort_patch(
         [
             {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
             {"op": "replace", "path": "/app_status/name", "value": "waiting"},
@@ -116,7 +127,7 @@ def test_container(connect, mycharm):
         assert container.can_connect() is connect
 
     trigger(
-        State(containers=[Container(name="foo", can_connect=connect)]),
+        State(containers={Container(name="foo", can_connect=connect)}),
         "start",
         mycharm,
         meta={
@@ -145,7 +156,7 @@ def test_relation_get(mycharm):
                 assert not rel.data[unit]
 
     state = State(
-        relations=[
+        relations={
             Relation(
                 endpoint="foo",
                 interface="bar",
@@ -155,7 +166,7 @@ def test_relation_get(mycharm):
                 local_unit_data={"c": "d"},
                 remote_units_data={0: {}, 1: {"e": "f"}, 2: {}},
             )
-        ]
+        }
     )
     trigger(
         state,
@@ -177,7 +188,6 @@ def test_relation_set(mycharm):
 
         # this will NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
-        # todo: how do we warn against the user abusing pre/post_event to mess with an unguarded state?
         with pytest.raises(Exception):
             rel.data[rel.app]["a"] = "b"
         with pytest.raises(Exception):
@@ -191,7 +201,6 @@ def test_relation_set(mycharm):
 
         # this would NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
-        # todo: how do we warn against the user abusing pre/post_event to mess with an unguarded state?
         # with pytest.raises(Exception):
         #     rel.data[rel.app]["a"] = "b"
         # with pytest.raises(Exception):
@@ -207,7 +216,7 @@ def test_relation_set(mycharm):
     state = State(
         leader=True,
         planned_units=4,
-        relations=[relation],
+        relations={relation},
     )
 
     assert not mycharm.called
@@ -223,12 +232,91 @@ def test_relation_set(mycharm):
     )
     assert mycharm.called
 
-    assert asdict(out.relations[0]) == asdict(
-        relation.replace(
+    assert asdict(out.get_relation(relation.id)) == asdict(
+        replace(
+            relation,
             local_app_data={"a": "b"},
-            local_unit_data={"c": "d", **DEFAULT_JUJU_DATABAG},
+            local_unit_data={"c": "d", **_DEFAULT_JUJU_DATABAG},
         )
     )
+    assert out.get_relation(relation.id).local_app_data == {"a": "b"}
+    assert out.get_relation(relation.id).local_unit_data == {
+        "c": "d",
+        **_DEFAULT_JUJU_DATABAG,
+    }
 
-    assert out.relations[0].local_app_data == {"a": "b"}
-    assert out.relations[0].local_unit_data == {"c": "d", **DEFAULT_JUJU_DATABAG}
+
+@pytest.mark.parametrize(
+    "klass,num_args",
+    [
+        (State, (1,)),
+        (Resource, (1,)),
+        (Address, (0, 2)),
+        (BindAddress, (0, 2)),
+        (Network, (0, 3)),
+    ],
+)
+def test_positional_arguments(klass, num_args):
+    for num in num_args:
+        args = (None,) * num
+        with pytest.raises(TypeError):
+            klass(*args)
+
+
+def test_model_positional_arguments():
+    with pytest.raises(TypeError):
+        Model("", "")
+
+
+def test_container_positional_arguments():
+    with pytest.raises(TypeError):
+        Container("", "")
+
+
+def test_container_default_values():
+    name = "foo"
+    container = Container(name)
+    assert container.name == name
+    assert container.can_connect is False
+    assert container.layers == {}
+    assert container.service_statuses == {}
+    assert container.mounts == {}
+    assert container.execs == frozenset()
+    assert container.layers == {}
+    assert container._base_plan == {}
+
+
+def test_state_default_values():
+    state = State()
+    assert state.config == {}
+    assert state.relations == frozenset()
+    assert state.networks == frozenset()
+    assert state.containers == frozenset()
+    assert state.storages == frozenset()
+    assert state.opened_ports == frozenset()
+    assert state.secrets == frozenset()
+    assert state.resources == frozenset()
+    assert state.deferred == []
+    assert isinstance(state.model, Model)
+    assert state.leader is False
+    assert state.planned_units == 1
+    assert state.app_status == UnknownStatus()
+    assert state.unit_status == UnknownStatus()
+    assert state.workload_version == ""
+
+
+def test_deepcopy_state():
+    containers = [Container("foo"), Container("bar")]
+    state = State(containers=containers)
+    state_copy = copy.deepcopy(state)
+    for container in state.containers:
+        copied_container = state_copy.get_container(container.name)
+        assert container.name == copied_container.name
+
+
+def test_replace_state():
+    containers = [Container("foo"), Container("bar")]
+    state = State(containers=containers, leader=True)
+    state2 = replace(state, leader=False)
+    assert state.leader != state2.leader
+    assert state.containers == state2.containers

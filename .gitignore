@@ -1,6 +1,7 @@
 venv/
+.venv/
 build/
-docs/build/
+docs/_build/
 *.charm
 .tox/
 .coverage
@@ -11,3 +12,4 @@ __pycache__/
 dist/
 *.pytest_cache
 htmlcov/
+.vscode

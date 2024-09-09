@@ -5,7 +5,6 @@ from ops.charm import CharmBase, CollectStatusEvent
 
 from scenario import Context
 from scenario.state import JujuLogLine, State
-from tests.helpers import trigger
 
 logger = logging.getLogger("testing logger")
 
@@ -31,7 +30,7 @@ def mycharm():
 
 def test_juju_log(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
-    ctx.run("start", State())
+    ctx.run(ctx.on.start(), State())
     assert ctx.juju_log[-2] == JujuLogLine(
         level="DEBUG", message="Emitting Juju event start."
     )

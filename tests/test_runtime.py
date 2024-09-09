@@ -10,7 +10,7 @@ from ops.framework import EventBase
 
 from scenario import Context
 from scenario.runtime import Runtime, UncaughtCharmError
-from scenario.state import Event, Relation, State, _CharmSpec
+from scenario.state import Relation, State, _CharmSpec, _Event
 
 
 def charm_type():
@@ -56,7 +56,9 @@ def test_event_emission():
         )
 
         with runtime.exec(
-            state=State(), event=Event("bar"), context=Context(my_charm_type, meta=meta)
+            state=State(),
+            event=_Event("bar"),
+            context=Context(my_charm_type, meta=meta),
         ) as ops:
             pass
 
@@ -84,7 +86,7 @@ def test_unit_name(app_name, unit_id):
 
     with runtime.exec(
         state=State(),
-        event=Event("start"),
+        event=_Event("start"),
         context=Context(my_charm_type, meta=meta),
     ) as ops:
         assert ops.charm.unit.name == f"{app_name}/{unit_id}"
@@ -105,7 +107,7 @@ def test_env_cleanup_on_charm_error():
     with pytest.raises(UncaughtCharmError):
         with runtime.exec(
             state=State(),
-            event=Event("box_relation_changed", relation=Relation("box")),
+            event=_Event("box_relation_changed", relation=Relation("box")),
             context=Context(my_charm_type, meta=meta),
         ):
             assert os.getenv("JUJU_REMOTE_APP")

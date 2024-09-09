@@ -47,7 +47,7 @@ def test_charm_virtual_root(charm_virtual_root):
         meta=MyCharm.META,
         charm_root=charm_virtual_root,
     )
-    assert out.unit_status == ("active", "hello world")
+    assert out.unit_status == ActiveStatus("hello world")
 
 
 def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
@@ -55,8 +55,9 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
     raw_ori_meta = yaml.safe_dump({"name": "karl"})
     meta_file.write_text(raw_ori_meta)
 
-    with Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root).manager(
-        "start",
+    ctx = Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root)
+    with ctx(
+        ctx.on.start(),
         State(),
     ) as mgr:
         assert meta_file.exists()
@@ -77,8 +78,9 @@ def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
 
     assert not meta_file.exists()
 
-    with Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root).manager(
-        "start",
+    ctx = Context(MyCharm, meta=MyCharm.META, charm_root=charm_virtual_root)
+    with ctx(
+        ctx.on.start(),
         State(),
     ) as mgr:
         assert meta_file.exists()

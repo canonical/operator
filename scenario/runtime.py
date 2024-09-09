@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import copy
+import dataclasses
 import marshal
 import os
 import re
@@ -8,45 +10,46 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Type, TypeVar, Union
 
 import yaml
-from ops import pebble
-from ops.framework import _event_regex
+from ops import CollectStatusEvent, pebble
+from ops.framework import (
+    CommitEvent,
+    EventBase,
+    Framework,
+    Handle,
+    NoTypeError,
+    PreCommitEvent,
+    _event_regex,
+)
 from ops.storage import NoSnapshotError, SQLiteStorage
 
-from scenario.capture_events import capture_events
+from scenario.errors import UncaughtCharmError
 from scenario.logger import logger as scenario_logger
 from scenario.ops_main_mock import NoObserverError
-from scenario.state import DeferredEvent, PeerRelation, StoredState
+from scenario.state import (
+    ActionFailed,
+    DeferredEvent,
+    PeerRelation,
+    Relation,
+    StoredState,
+    SubordinateRelation,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops.testing import CharmType
 
     from scenario.context import Context
-    from scenario.state import Event, State, _CharmSpec
-
-    PathLike = Union[str, Path]
+    from scenario.state import State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
-    r"((?P<owner_path>.*)\/)?(?P<data_type_name>\D+)\[(?P<name>.*)\]",
+    r"((?P<owner_path>.*)\/)?(?P<_data_type_name>\D+)\[(?P<name>.*)\]",
 )
 EVENT_REGEX = re.compile(_event_regex)
 
 RUNTIME_MODULE = Path(__file__).parent
-
-
-class ScenarioRuntimeError(RuntimeError):
-    """Base class for exceptions raised by scenario.runtime."""
-
-
-class UncaughtCharmError(ScenarioRuntimeError):
-    """Error raised if the charm raises while handling the event being dispatched."""
-
-
-class InconsistentScenarioError(ScenarioRuntimeError):
-    """Error raised when the combination of state and event is inconsistent."""
 
 
 class UnitStateDB:
@@ -60,12 +63,12 @@ class UnitStateDB:
         """Open the db."""
         return SQLiteStorage(self._state_file)
 
-    def get_stored_state(self) -> List["StoredState"]:
+    def get_stored_states(self) -> FrozenSet["StoredState"]:
         """Load any StoredState data structures from the db."""
 
         db = self._open_db()
 
-        stored_state = []
+        stored_states = set()
         for handle_path in db.list_snapshots():
             if not EVENT_REGEX.match(handle_path) and (
                 match := STORED_STATE_REGEX.match(handle_path)
@@ -73,10 +76,10 @@ class UnitStateDB:
                 stored_state_snapshot = db.load_snapshot(handle_path)
                 kwargs = match.groupdict()
                 sst = StoredState(content=stored_state_snapshot, **kwargs)
-                stored_state.append(sst)
+                stored_states.add(sst)
 
         db.close()
-        return stored_state
+        return frozenset(stored_states)
 
     def get_deferred_events(self) -> List["DeferredEvent"]:
         """Load any DeferredEvent data structures from the db."""
@@ -117,8 +120,8 @@ class UnitStateDB:
                 ) from e
             db.save_snapshot(event.handle_path, event.snapshot_data)
 
-        for stored_state in state.stored_state:
-            db.save_snapshot(stored_state.handle_path, stored_state.content)
+        for stored_state in state.stored_states:
+            db.save_snapshot(stored_state._handle_path, stored_state.content)
 
         db.close()
 
@@ -154,7 +157,7 @@ class Runtime:
     def __init__(
         self,
         charm_spec: "_CharmSpec",
-        charm_root: Optional["PathLike"] = None,
+        charm_root: Optional[Union[str, Path]] = None,
         juju_version: str = "3.0.0",
         app_name: Optional[str] = None,
         unit_id: Optional[int] = 0,
@@ -179,7 +182,7 @@ class Runtime:
             # os.unsetenv does not always seem to work !?
             del os.environ[key]
 
-    def _get_event_env(self, state: "State", event: "Event", charm_root: Path):
+    def _get_event_env(self, state: "State", event: "_Event", charm_root: Path):
         """Build the simulated environment the operator framework expects."""
         env = {
             "JUJU_VERSION": self._juju_version,
@@ -204,12 +207,14 @@ class Runtime:
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
-            else:
+            elif isinstance(relation, (Relation, SubordinateRelation)):
                 remote_app_name = relation.remote_app_name
+            else:
+                raise ValueError(f"Unknown relation type: {relation}")
             env.update(
                 {
                     "JUJU_RELATION": relation.endpoint,
-                    "JUJU_RELATION_ID": str(relation.relation_id),
+                    "JUJU_RELATION_ID": str(relation.id),
                     "JUJU_REMOTE_APP": remote_app_name,
                 },
             )
@@ -217,7 +222,9 @@ class Runtime:
             remote_unit_id = event.relation_remote_unit_id
 
             # don't check truthiness because remote_unit_id could be 0
-            if remote_unit_id is None:
+            if remote_unit_id is None and not event.name.endswith(
+                ("_relation_created", "relation_broken"),
+            ):
                 remote_unit_ids = relation._remote_unit_ids  # pyright: ignore
 
                 if len(remote_unit_ids) == 1:
@@ -244,7 +251,12 @@ class Runtime:
                 remote_unit = f"{remote_app_name}/{remote_unit_id}"
                 env["JUJU_REMOTE_UNIT"] = remote_unit
                 if event.name.endswith("_relation_departed"):
-                    env["JUJU_DEPARTING_UNIT"] = remote_unit
+                    if event.relation_departed_unit_id:
+                        env[
+                            "JUJU_DEPARTING_UNIT"
+                        ] = f"{remote_app_name}/{event.relation_departed_unit_id}"
+                    else:
+                        env["JUJU_DEPARTING_UNIT"] = remote_unit
 
         if container := event.container:
             env.update({"JUJU_WORKLOAD_NAME": container.name})
@@ -262,6 +274,9 @@ class Runtime:
                 },
             )
 
+        if check_info := event.check_info:
+            env["JUJU_PEBBLE_CHECK_NAME"] = check_info.name
+
         if storage := event.storage:
             env.update({"JUJU_STORAGE_ID": f"{storage.name}/{storage.index}"})
 
@@ -272,8 +287,9 @@ class Runtime:
                     "JUJU_SECRET_LABEL": secret.label or "",
                 },
             )
-            if event.name in ("secret_remove", "secret_expired"):
-                env["JUJU_SECRET_REVISION"] = str(secret.revision)
+            # Don't check truthiness because revision could be 0.
+            if event.secret_revision is not None:
+                env["JUJU_SECRET_REVISION"] = str(event.secret_revision)
 
         return env
 
@@ -337,7 +353,7 @@ class Runtime:
         elif (
             not spec.is_autoloaded and any_metadata_files_present_in_charm_virtual_root
         ):
-            logger.warn(
+            logger.warning(
                 f"Some metadata files found in custom user-provided charm_root "
                 f"{charm_virtual_root} while you have passed meta, config or actions to "
                 f"Context.run(). "
@@ -378,15 +394,15 @@ class Runtime:
         """Now that we're done processing this event, read the charm state and expose it."""
         store = self._get_state_db(temporary_charm_root)
         deferred = store.get_deferred_events()
-        stored_state = store.get_stored_state()
-        return state.replace(deferred=deferred, stored_state=stored_state)
+        stored_state = store.get_stored_states()
+        return dataclasses.replace(state, deferred=deferred, stored_states=stored_state)
 
     @contextmanager
     def _exec_ctx(self, ctx: "Context"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
-            # todo allow customizing capture_events
-            with capture_events(
+            # TODO: allow customising capture_events
+            with _capture_events(
                 include_deferred=ctx.capture_deferred_events,
                 include_framework=ctx.capture_framework_events,
             ) as captured:
@@ -396,7 +412,7 @@ class Runtime:
     def exec(
         self,
         state: "State",
-        event: "Event",
+        event: "_Event",
         context: "Context",
     ):
         """Runs an event with this state as initial state on a charm.
@@ -410,7 +426,7 @@ class Runtime:
         # todo consider forking out a real subprocess and do the mocking by
         #  mocking hook tool executables
 
-        from scenario.consistency_checker import check_consistency  # avoid cycles
+        from scenario._consistency_checker import check_consistency  # avoid cycles
 
         check_consistency(state, event, self._charm_spec, self._juju_version)
 
@@ -418,7 +434,7 @@ class Runtime:
         logger.info(f"Preparing to fire {event.name} on {charm_type.__name__}")
 
         # we make a copy to avoid mutating the input state
-        output_state = state.copy()
+        output_state = copy.deepcopy(state)
 
         logger.info(" - generating virtual charm root")
         with self._exec_ctx(context) as (temporary_charm_root, captured):
@@ -441,7 +457,8 @@ class Runtime:
                     state=output_state,
                     event=event,
                     context=context,
-                    charm_spec=self._charm_spec.replace(
+                    charm_spec=dataclasses.replace(
+                        self._charm_spec,
                         charm_type=self._wrap(charm_type),
                     ),
                 )
@@ -452,7 +469,7 @@ class Runtime:
                 # if the caller did not manually emit or commit: do that.
                 ops.finalize()
 
-            except NoObserverError:
+            except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
                 raise UncaughtCharmError(
@@ -471,3 +488,88 @@ class Runtime:
         context.emitted_events.extend(captured)
         logger.info("event dispatched. done.")
         context._set_output_state(output_state)
+
+
+_T = TypeVar("_T", bound=EventBase)
+
+
+@contextmanager
+def _capture_events(
+    *types: Type[EventBase],
+    include_framework=False,
+    include_deferred=True,
+):
+    """Capture all events of type `*types` (using instance checks).
+
+    Arguments exposed so that you can define your own fixtures if you want to.
+
+    Example::
+    >>> from ops.charm import StartEvent
+    >>> from scenario import Event, State
+    >>> from charm import MyCustomEvent, MyCharm  # noqa
+    >>>
+    >>> def test_my_event():
+    >>>     with capture_events(StartEvent, MyCustomEvent) as captured:
+    >>>         trigger(State(), ("start", MyCharm, meta=MyCharm.META)
+    >>>
+    >>>     assert len(captured) == 2
+    >>>     e1, e2 = captured
+    >>>     assert isinstance(e2, MyCustomEvent)
+    >>>     assert e2.custom_attr == 'foo'
+    """
+    allowed_types = types or (EventBase,)
+
+    captured = []
+    _real_emit = Framework._emit
+    _real_reemit = Framework.reemit
+
+    def _wrapped_emit(self, evt):
+        if not include_framework and isinstance(
+            evt,
+            (PreCommitEvent, CommitEvent, CollectStatusEvent),
+        ):
+            return _real_emit(self, evt)
+
+        if isinstance(evt, allowed_types):
+            # dump/undump the event to ensure any custom attributes are (re)set by restore()
+            evt.restore(evt.snapshot())
+            captured.append(evt)
+
+        return _real_emit(self, evt)
+
+    def _wrapped_reemit(self):
+        # Framework calls reemit() before emitting the main juju event. We intercept that call
+        # and capture all events in storage.
+
+        if not include_deferred:
+            return _real_reemit(self)
+
+        # load all notices from storage as events.
+        for event_path, _, _ in self._storage.notices():
+            event_handle = Handle.from_path(event_path)
+            try:
+                event = self.load_snapshot(event_handle)
+            except NoTypeError:
+                continue
+            event = typing.cast(EventBase, event)
+            event.deferred = False
+            self._forget(event)  # prevent tracking conflicts
+
+            if not include_framework and isinstance(
+                event,
+                (PreCommitEvent, CommitEvent),
+            ):
+                continue
+
+            if isinstance(event, allowed_types):
+                captured.append(event)
+
+        return _real_reemit(self)
+
+    Framework._emit = _wrapped_emit  # type: ignore
+    Framework.reemit = _wrapped_reemit  # type: ignore
+
+    yield captured
+
+    Framework._emit = _real_emit  # type: ignore
+    Framework.reemit = _real_reemit  # type: ignore

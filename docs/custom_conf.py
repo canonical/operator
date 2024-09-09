@@ -31,6 +31,7 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
     r'''^ ([\w.]+::)?            # explicit module name
           ([\w.]+\.)?            # module and/or class name(s)
           ([^.()]+)  \s*         # thing name
+          (?: \[\s*(.*)\s*])?    # optional: type parameters list, Sphinx 7&8
           (?: \((.*)\)           # optional: arguments
            (?:\s* -> \s* (.*))?  #           return annotation
           )? $                   # and nothing more
@@ -306,8 +307,32 @@ nitpicky = True
 # ('envvar', 'LD_LIBRARY_PATH').
 nitpick_ignore = [
     # Please keep this list sorted alphabetically.
-    ('py:class', 'AnyJson'),
-    ('py:class', '_CharmSpec'),
-    ('py:class', 'scenario.state._DCBase'),
+    ('py:class', '_Event'),
+    ('py:class', '_EntityStatus'),
+    ('py:class', 'ModelError'),  # This is in a copied docstring so we can't fix it.
     ('py:class', 'scenario.state._EntityStatus'),
+    ('py:class', 'scenario.state._Event'),
+    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
+
+# Monkeypatch Sphinx to look for __init__ rather than __new__ for the subclasses
+# of _MaxPositionalArgs.
+import inspect
+import sphinx.ext.autodoc
+
+_real_get_signature = sphinx.ext.autodoc.ClassDocumenter._get_signature
+
+def _custom_get_signature(self):
+    if any(p.__name__ == '_MaxPositionalArgs' for p in self.object.__mro__):
+        signature = inspect.signature(self.object)
+        parameters = []
+        for position, param in enumerate(signature.parameters.values()):
+            if position >= self.object._max_positional_args:
+                parameters.append(param.replace(kind=inspect.Parameter.KEYWORD_ONLY))
+            else:
+                parameters.append(param)
+        signature = signature.replace(parameters=parameters)
+        return None, None, signature
+    return _real_get_signature(self)
+
+sphinx.ext.autodoc.ClassDocumenter._get_signature = _custom_get_signature

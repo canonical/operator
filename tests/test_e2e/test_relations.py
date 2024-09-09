@@ -5,6 +5,8 @@ from ops.charm import (
     CharmBase,
     CharmEvents,
     CollectStatusEvent,
+    RelationBrokenEvent,
+    RelationCreatedEvent,
     RelationDepartedEvent,
     RelationEvent,
 )
@@ -12,13 +14,14 @@ from ops.framework import EventBase, Framework
 
 from scenario import Context
 from scenario.state import (
-    DEFAULT_JUJU_DATABAG,
+    _DEFAULT_JUJU_DATABAG,
     PeerRelation,
     Relation,
     RelationBase,
     State,
     StateValidationError,
     SubordinateRelation,
+    _next_relation_id,
 )
 from tests.helpers import trigger
 
@@ -61,10 +64,10 @@ def test_get_relation(mycharm):
         State(
             config={"foo": "bar"},
             leader=True,
-            relations=[
+            relations={
                 Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
                 Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
-            ],
+            },
         ),
         "start",
         mycharm,
@@ -80,6 +83,7 @@ def test_get_relation(mycharm):
             },
         },
         config={"options": {"foo": {"type": "string"}}},
+        pre_event=pre_event,
     )
 
 
@@ -93,11 +97,11 @@ def test_relation_events(mycharm, evt_name):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -137,11 +141,11 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -153,8 +157,14 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
 
 
 @pytest.mark.parametrize(
-    "evt_name",
-    ("changed", "broken", "departed", "joined", "created"),
+    "evt_name,has_unit",
+    [
+        ("changed", True),
+        ("broken", False),
+        ("departed", True),
+        ("joined", True),
+        ("created", False),
+    ],
 )
 @pytest.mark.parametrize(
     "remote_app_name",
@@ -164,7 +174,9 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
     "remote_unit_id",
     (0, 1),
 )
-def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_id):
+def test_relation_events_attrs(
+    mycharm, evt_name, has_unit, remote_app_name, remote_unit_id
+):
     relation = Relation(
         endpoint="foo", interface="foo", remote_app_name=remote_app_name
     )
@@ -174,20 +186,15 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
             return
 
         assert event.app
-        assert event.unit
+        if not isinstance(event, (RelationCreatedEvent, RelationBrokenEvent)):
+            assert event.unit
         if isinstance(event, RelationDepartedEvent):
             assert event.departing_unit
 
     mycharm._call = callback
 
-    trigger(
-        State(
-            relations=[
-                relation,
-            ],
-        ),
-        getattr(relation, f"{evt_name}_event")(remote_unit_id=remote_unit_id),
-        mycharm,
+    ctx = Context(
+        charm_type=mycharm,
         meta={
             "name": "local",
             "requires": {
@@ -195,6 +202,12 @@ def test_relation_events_attrs(mycharm, evt_name, remote_app_name, remote_unit_i
             },
         },
     )
+    state = State(relations={relation})
+    kwargs = {}
+    if has_unit:
+        kwargs["remote_unit"] = remote_unit_id
+    event = getattr(ctx.on, f"relation_{evt_name}")(relation, **kwargs)
+    ctx.run(event, state=state)
 
 
 @pytest.mark.parametrize(
@@ -218,18 +231,22 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
             return
 
         assert event.app  # that's always present
-        assert event.unit
+        # .unit is always None for created and broken.
+        if isinstance(event, (RelationCreatedEvent, RelationBrokenEvent)):
+            assert event.unit is None
+        else:
+            assert event.unit
         assert (evt_name == "departed") is bool(getattr(event, "departing_unit", False))
 
     mycharm._call = callback
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -239,26 +256,28 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
         },
     )
 
-    assert (
-        "remote unit ID unset, and multiple remote unit IDs are present" in caplog.text
-    )
+    if evt_name not in ("created", "broken"):
+        assert (
+            "remote unit ID unset, and multiple remote unit IDs are present"
+            in caplog.text
+        )
 
 
 def test_relation_default_unit_data_regular():
     relation = Relation("baz")
-    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
-    assert relation.remote_units_data == {0: DEFAULT_JUJU_DATABAG}
+    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.remote_units_data == {0: _DEFAULT_JUJU_DATABAG}
 
 
 def test_relation_default_unit_data_sub():
     relation = SubordinateRelation("baz")
-    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
-    assert relation.remote_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.remote_unit_data == _DEFAULT_JUJU_DATABAG
 
 
 def test_relation_default_unit_data_peer():
     relation = PeerRelation("baz")
-    assert relation.local_unit_data == DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
 
 
 @pytest.mark.parametrize(
@@ -283,11 +302,11 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
 
     trigger(
         State(
-            relations=[
+            relations={
                 relation,
-            ],
+            },
         ),
-        getattr(relation, f"{evt_name}_event"),
+        f"relation_{evt_name}",
         mycharm,
         meta={
             "name": "local",
@@ -297,7 +316,8 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
         },
     )
 
-    assert "remote unit ID unset; no remote unit data present" in caplog.text
+    if evt_name not in ("created", "broken"):
+        assert "remote unit ID unset; no remote unit data present" in caplog.text
 
 
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
@@ -336,8 +356,8 @@ def test_relation_event_trigger(relation, evt_name, mycharm):
         "peers": {"b": {"interface": "i2"}},
     }
     state = trigger(
-        State(relations=[relation]),
-        getattr(relation, evt_name + "_event"),
+        State(relations={relation}),
+        f"relation_{evt_name}",
         mycharm,
         meta=meta,
     )
@@ -369,8 +389,8 @@ def test_trigger_sub_relation(mycharm):
             assert len(relation.units) == 1
 
     trigger(
-        State(relations=[sub1, sub2]),
-        "update-status",
+        State(relations={sub1, sub2}),
+        "update_status",
         mycharm,
         meta=meta,
         post_event=post_event,
@@ -388,16 +408,68 @@ def test_relation_ids():
     initial_id = _next_relation_id_counter
     for i in range(10):
         rel = Relation("foo")
-        assert rel.relation_id == initial_id + i
+        assert rel.id == initial_id + i
 
 
 def test_broken_relation_not_in_model_relations(mycharm):
     rel = Relation("foo")
 
-    with Context(
+    ctx = Context(
         mycharm, meta={"name": "local", "requires": {"foo": {"interface": "foo"}}}
-    ).manager(rel.broken_event, state=State(relations=[rel])) as mgr:
+    )
+    with ctx(ctx.on.relation_broken(rel), state=State(relations={rel})) as mgr:
         charm = mgr.charm
 
         assert charm.model.get_relation("foo") is None
         assert charm.model.relations["foo"] == []
+
+
+@pytest.mark.parametrize("klass", (Relation, PeerRelation, SubordinateRelation))
+def test_relation_positional_arguments(klass):
+    with pytest.raises(TypeError):
+        klass("foo", "bar", None)
+
+
+def test_relation_default_values():
+    expected_id = _next_relation_id(update=False)
+    endpoint = "database"
+    interface = "postgresql"
+    relation = Relation(endpoint, interface)
+    assert relation.id == expected_id
+    assert relation.endpoint == endpoint
+    assert relation.interface == interface
+    assert relation.local_app_data == {}
+    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.remote_app_name == "remote"
+    assert relation.limit == 1
+    assert relation.remote_app_data == {}
+    assert relation.remote_units_data == {0: _DEFAULT_JUJU_DATABAG}
+
+
+def test_subordinate_relation_default_values():
+    expected_id = _next_relation_id(update=False)
+    endpoint = "database"
+    interface = "postgresql"
+    relation = SubordinateRelation(endpoint, interface)
+    assert relation.id == expected_id
+    assert relation.endpoint == endpoint
+    assert relation.interface == interface
+    assert relation.local_app_data == {}
+    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.remote_app_name == "remote"
+    assert relation.remote_unit_id == 0
+    assert relation.remote_app_data == {}
+    assert relation.remote_unit_data == _DEFAULT_JUJU_DATABAG
+
+
+def test_peer_relation_default_values():
+    expected_id = _next_relation_id(update=False)
+    endpoint = "peers"
+    interface = "shared"
+    relation = PeerRelation(endpoint, interface)
+    assert relation.id == expected_id
+    assert relation.endpoint == endpoint
+    assert relation.interface == interface
+    assert relation.local_app_data == {}
+    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.peers_data == {0: _DEFAULT_JUJU_DATABAG}

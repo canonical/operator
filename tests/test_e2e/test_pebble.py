@@ -1,4 +1,6 @@
+import dataclasses
 import datetime
+import io
 import tempfile
 from pathlib import Path
 
@@ -9,8 +11,8 @@ from ops.framework import Framework
 from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
-from scenario.state import Container, ExecOutput, Mount, Notice, Port, State
-from tests.helpers import trigger
+from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
+from tests.helpers import jsonpatch_delta, trigger
 
 
 @pytest.fixture(scope="function")
@@ -60,7 +62,7 @@ def test_connectivity(charm_cls, can_connect):
         assert can_connect == self.unit.get_container("foo").can_connect()
 
     trigger(
-        State(containers=[Container(name="foo", can_connect=can_connect)]),
+        State(containers={Container(name="foo", can_connect=can_connect)}),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
@@ -81,23 +83,19 @@ def test_fs_push(charm_cls):
 
     trigger(
         State(
-            containers=[
+            containers={
                 Container(
                     name="foo",
                     can_connect=True,
-                    mounts={"bar": Mount("/bar/baz.txt", pth)},
+                    mounts={"bar": Mount(location="/bar/baz.txt", source=pth)},
                 )
-            ]
+            }
         ),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
         post_event=callback,
     )
-
-
-def test_port_equality():
-    assert Port("tcp", 42) == Port("tcp", 42)
 
 
 @pytest.mark.parametrize("make_dirs", (True, False))
@@ -121,29 +119,30 @@ def test_fs_pull(charm_cls, make_dirs):
 
     td = tempfile.TemporaryDirectory()
     container = Container(
-        name="foo", can_connect=True, mounts={"foo": Mount("/foo", td.name)}
+        name="foo",
+        can_connect=True,
+        mounts={"foo": Mount(location="/foo", source=td.name)},
     )
-    state = State(containers=[container])
+    state = State(containers={container})
 
     ctx = Context(
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
     )
-    out = ctx.run(
-        event="start",
-        state=state,
-        post_event=callback,
-    )
+    with ctx(ctx.on.start(), state=state) as mgr:
+        out = mgr.run()
+        callback(mgr.charm)
 
     if make_dirs:
-        # file = (out.get_container("foo").mounts["foo"].src + "bar/baz.txt").open("/foo/bar/baz.txt")
+        # file = (out.get_container("foo").mounts["foo"].source + "bar/baz.txt").open("/foo/bar/baz.txt")
 
         # this is one way to retrieve the file
         file = Path(td.name + "/bar/baz.txt")
 
         # another is:
         assert (
-            file == Path(out.get_container("foo").mounts["foo"].src) / "bar" / "baz.txt"
+            file
+            == Path(out.get_container("foo").mounts["foo"].source) / "bar" / "baz.txt"
         )
 
         # but that is actually a symlink to the context's root tmp folder:
@@ -158,8 +157,8 @@ def test_fs_pull(charm_cls, make_dirs):
 
     else:
         # nothing has changed
-        out_purged = out.replace(stored_state=state.stored_state)
-        assert not out_purged.jsonpatch_delta(state)
+        out_purged = dataclasses.replace(out, stored_states=state.stored_states)
+        assert not jsonpatch_delta(out_purged, state)
 
 
 LS = """
@@ -195,23 +194,49 @@ def test_exec(charm_cls, cmd, out):
         container = self.unit.get_container("foo")
         proc = container.exec([cmd])
         proc.wait()
-        assert proc.stdout.read() == "hello pebble"
+        assert proc.stdout.read() == out
 
     trigger(
         State(
-            containers=[
+            containers={
                 Container(
                     name="foo",
                     can_connect=True,
-                    exec_mock={(cmd,): ExecOutput(stdout="hello pebble")},
+                    execs={Exec([cmd], stdout=out)},
                 )
-            ]
+            }
         ),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
         event="start",
         post_event=callback,
     )
+
+
+@pytest.mark.parametrize(
+    "stdin,write",
+    (
+        [None, "hello world!"],
+        ["hello world!", None],
+        [io.StringIO("hello world!"), None],
+    ),
+)
+def test_exec_history_stdin(stdin, write):
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.foo_pebble_ready, self._on_ready)
+
+        def _on_ready(self, _):
+            proc = self.unit.get_container("foo").exec(["ls"], stdin=stdin)
+            if write:
+                proc.stdin.write(write)
+            proc.wait()
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    container = Container(name="foo", can_connect=True, execs={Exec([])})
+    ctx.run(ctx.on.pebble_ready(container=container), State(containers={container}))
+    assert ctx.exec_history[container.name][0].stdin == "hello world!"
 
 
 def test_pebble_ready(charm_cls):
@@ -222,47 +247,52 @@ def test_pebble_ready(charm_cls):
     container = Container(name="foo", can_connect=True)
 
     trigger(
-        State(containers=[container]),
+        State(containers={container}),
         charm_type=charm_cls,
         meta={"name": "foo", "containers": {"foo": {}}},
-        event=container.pebble_ready_event,
+        event="pebble_ready",
         post_event=callback,
     )
 
 
 @pytest.mark.parametrize("starting_service_status", pebble.ServiceStatus)
 def test_pebble_plan(charm_cls, starting_service_status):
-    def callback(self: CharmBase):
-        foo = self.unit.get_container("foo")
+    class PlanCharm(charm_cls):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        assert foo.get_plan().to_dict() == {
-            "services": {"fooserv": {"startup": "enabled"}}
-        }
-        fooserv = foo.get_services("fooserv")["fooserv"]
-        assert fooserv.startup == ServiceStartup.ENABLED
-        assert fooserv.current == ServiceStatus.ACTIVE
+        def _on_ready(self, event):
+            foo = event.workload
 
-        foo.add_layer(
-            "bar",
-            {
-                "summary": "bla",
-                "description": "deadbeef",
-                "services": {"barserv": {"startup": "disabled"}},
-            },
-        )
-
-        foo.replan()
-        assert foo.get_plan().to_dict() == {
-            "services": {
-                "barserv": {"startup": "disabled"},
-                "fooserv": {"startup": "enabled"},
+            assert foo.get_plan().to_dict() == {
+                "services": {"fooserv": {"startup": "enabled"}}
             }
-        }
+            fooserv = foo.get_services("fooserv")["fooserv"]
+            assert fooserv.startup == ServiceStartup.ENABLED
+            assert fooserv.current == ServiceStatus.ACTIVE
 
-        assert foo.get_service("barserv").current == starting_service_status
-        foo.start("barserv")
-        # whatever the original state, starting a service sets it to active
-        assert foo.get_service("barserv").current == ServiceStatus.ACTIVE
+            foo.add_layer(
+                "bar",
+                {
+                    "summary": "bla",
+                    "description": "deadbeef",
+                    "services": {"barserv": {"startup": "disabled"}},
+                },
+            )
+
+            foo.replan()
+            assert foo.get_plan().to_dict() == {
+                "services": {
+                    "barserv": {"startup": "disabled"},
+                    "fooserv": {"startup": "enabled"},
+                }
+            }
+
+            assert foo.get_service("barserv").current == starting_service_status
+            foo.start("barserv")
+            # whatever the original state, starting a service sets it to active
+            assert foo.get_service("barserv").current == ServiceStatus.ACTIVE
 
     container = Container(
         name="foo",
@@ -276,7 +306,7 @@ def test_pebble_plan(charm_cls, starting_service_status):
                 }
             )
         },
-        service_status={
+        service_statuses={
             "fooserv": pebble.ServiceStatus.ACTIVE,
             # todo: should we disallow setting status for services that aren't known YET?
             "barserv": starting_service_status,
@@ -284,15 +314,14 @@ def test_pebble_plan(charm_cls, starting_service_status):
     )
 
     out = trigger(
-        State(containers=[container]),
-        charm_type=charm_cls,
+        State(containers={container}),
+        charm_type=PlanCharm,
         meta={"name": "foo", "containers": {"foo": {}}},
-        event=container.pebble_ready_event,
-        post_event=callback,
+        event="pebble_ready",
     )
 
     serv = lambda name, obj: pebble.Service(name, raw=obj)
-    container = out.containers[0]
+    container = out.get_container(container.name)
     assert container.plan.services == {
         "barserv": serv("barserv", {"startup": "disabled"}),
         "fooserv": serv("fooserv", {"startup": "enabled"}),
@@ -306,62 +335,59 @@ def test_pebble_plan(charm_cls, starting_service_status):
 
 def test_exec_wait_error(charm_cls):
     state = State(
-        containers=[
+        containers={
             Container(
                 name="foo",
                 can_connect=True,
-                exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
+                execs={Exec(["foo"], stdout="hello pebble", return_code=1)},
             )
-        ]
+        }
     )
 
-    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
-        "start", state
-    ) as mgr:
+    ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         proc = container.exec(["foo"])
-        with pytest.raises(ExecError):
-            proc.wait()
-        assert proc.stdout.read() == "hello pebble"
+        with pytest.raises(ExecError) as exc_info:
+            proc.wait_output()
+        assert exc_info.value.stdout == "hello pebble"
 
 
-def test_exec_wait_output(charm_cls):
+@pytest.mark.parametrize("command", (["foo"], ["foo", "bar"], ["foo", "bar", "baz"]))
+def test_exec_wait_output(charm_cls, command):
     state = State(
-        containers=[
+        containers={
             Container(
                 name="foo",
                 can_connect=True,
-                exec_mock={
-                    ("foo",): ExecOutput(stdout="hello pebble", stderr="oepsie")
-                },
+                execs={Exec(["foo"], stdout="hello pebble", stderr="oepsie")},
             )
-        ]
+        }
     )
 
-    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
-        "start", state
-    ) as mgr:
+    ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
-        proc = container.exec(["foo"])
+        proc = container.exec(command)
         out, err = proc.wait_output()
         assert out == "hello pebble"
         assert err == "oepsie"
+        assert ctx.exec_history[container.name][0].command == command
 
 
 def test_exec_wait_output_error(charm_cls):
     state = State(
-        containers=[
+        containers={
             Container(
                 name="foo",
                 can_connect=True,
-                exec_mock={("foo",): ExecOutput(stdout="hello pebble", return_code=1)},
+                execs={Exec(["foo"], stdout="hello pebble", return_code=1)},
             )
-        ]
+        }
     )
 
-    with Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}}).manager(
-        "start", state
-    ) as mgr:
+    ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
+    with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container("foo")
         proc = container.exec(["foo"])
         with pytest.raises(ExecError):
@@ -382,7 +408,9 @@ def test_pebble_custom_notice(charm_cls):
 
     state = State(containers=[container])
     ctx = Context(charm_cls, meta={"name": "foo", "containers": {"foo": {}}})
-    with ctx.manager(container.get_notice("example.com/baz").event, state) as mgr:
+    with ctx(
+        ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state
+    ) as mgr:
         container = mgr.charm.unit.get_container("foo")
         assert container.get_notices() == [n._to_ops() for n in notices]
 
@@ -438,4 +466,83 @@ def test_pebble_custom_notice_in_charm():
     )
     state = State(containers=[container])
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    ctx.run(container.get_notice(key).event, state)
+    ctx.run(ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state)
+
+
+def test_pebble_check_failed():
+    infos = []
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_pebble_check_failed, self._on_check_failed)
+
+        def _on_check_failed(self, event):
+            infos.append(event.info)
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    check = CheckInfo("http-check", failures=7, status=pebble.CheckStatus.DOWN)
+    container = Container("foo", check_infos={check})
+    state = State(containers={container})
+    ctx.run(ctx.on.pebble_check_failed(container, check), state=state)
+    assert len(infos) == 1
+    assert infos[0].name == "http-check"
+    assert infos[0].status == pebble.CheckStatus.DOWN
+    assert infos[0].failures == 7
+
+
+def test_pebble_check_recovered():
+    infos = []
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(
+                self.on.foo_pebble_check_recovered, self._on_check_recovered
+            )
+
+        def _on_check_recovered(self, event):
+            infos.append(event.info)
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
+    check = CheckInfo("http-check")
+    container = Container("foo", check_infos={check})
+    state = State(containers={container})
+    ctx.run(ctx.on.pebble_check_recovered(container, check), state=state)
+    assert len(infos) == 1
+    assert infos[0].name == "http-check"
+    assert infos[0].status == pebble.CheckStatus.UP
+    assert infos[0].failures == 0
+
+
+def test_pebble_check_failed_two_containers():
+    foo_infos = []
+    bar_infos = []
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(
+                self.on.foo_pebble_check_failed, self._on_foo_check_failed
+            )
+            framework.observe(
+                self.on.bar_pebble_check_failed, self._on_bar_check_failed
+            )
+
+        def _on_foo_check_failed(self, event):
+            foo_infos.append(event.info)
+
+        def _on_bar_check_failed(self, event):
+            bar_infos.append(event.info)
+
+    ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}, "bar": {}}})
+    check = CheckInfo("http-check", failures=7, status=pebble.CheckStatus.DOWN)
+    foo_container = Container("foo", check_infos={check})
+    bar_container = Container("bar", check_infos={check})
+    state = State(containers={foo_container, bar_container})
+    ctx.run(ctx.on.pebble_check_failed(foo_container, check), state=state)
+    assert len(foo_infos) == 1
+    assert foo_infos[0].name == "http-check"
+    assert foo_infos[0].status == pebble.CheckStatus.DOWN
+    assert foo_infos[0].failures == 7
+    assert len(bar_infos) == 0

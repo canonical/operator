@@ -1,10 +1,12 @@
+import dataclasses
+
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
 from scenario.state import Relation, State
-from tests.helpers import trigger
+from tests.helpers import jsonpatch_delta, trigger
 
 
 @pytest.fixture(scope="function")
@@ -60,8 +62,8 @@ def test_charm_heals_on_start(mycharm):
 
     assert out.unit_status == ActiveStatus("yabadoodle")
 
-    out_purged = out.replace(stored_state=initial_state.stored_state)
-    assert out_purged.jsonpatch_delta(initial_state) == [
+    out_purged = dataclasses.replace(out, stored_states=initial_state.stored_states)
+    assert jsonpatch_delta(out_purged, initial_state) == [
         {
             "op": "replace",
             "path": "/unit_status/message",
@@ -98,16 +100,16 @@ def test_relation_data_access(mycharm):
         assert remote_app_data == {"yaba": "doodle"}
 
     state_in = State(
-        relations=[
+        relations={
             Relation(
                 endpoint="relation_test",
                 interface="azdrubales",
-                relation_id=1,
+                id=1,
                 remote_app_name="karlos",
                 remote_app_data={"yaba": "doodle"},
                 remote_units_data={0: {"foo": "bar"}, 1: {"baz": "qux"}},
             )
-        ]
+        }
     )
     trigger(
         state_in,

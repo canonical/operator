@@ -32,20 +32,47 @@ def mycharm():
 
 def test_stored_state_default(mycharm):
     out = trigger(State(), "start", mycharm, meta=mycharm.META)
-    assert out.stored_state[0].content == {"foo": "bar", "baz": {12: 142}}
+    assert out.get_stored_state("_stored", owner_path="MyCharm").content == {
+        "foo": "bar",
+        "baz": {12: 142},
+    }
+    assert out.get_stored_state("_stored2", owner_path="MyCharm").content == {
+        "foo": "bar",
+        "baz": {12: 142},
+    }
 
 
 def test_stored_state_initialized(mycharm):
     out = trigger(
         State(
-            stored_state=[
-                StoredState("MyCharm", name="_stored", content={"foo": "FOOX"}),
-            ]
+            stored_states={
+                StoredState(
+                    owner_path="MyCharm", name="_stored", content={"foo": "FOOX"}
+                ),
+            }
         ),
         "start",
         mycharm,
         meta=mycharm.META,
     )
-    # todo: ordering is messy?
-    assert out.stored_state[1].content == {"foo": "FOOX", "baz": {12: 142}}
-    assert out.stored_state[0].content == {"foo": "bar", "baz": {12: 142}}
+    assert out.get_stored_state("_stored", owner_path="MyCharm").content == {
+        "foo": "FOOX",
+        "baz": {12: 142},
+    }
+    assert out.get_stored_state("_stored2", owner_path="MyCharm").content == {
+        "foo": "bar",
+        "baz": {12: 142},
+    }
+
+
+def test_positional_arguments():
+    with pytest.raises(TypeError):
+        StoredState("_stored", "")
+
+
+def test_default_arguments():
+    s = StoredState()
+    assert s.name == "_stored"
+    assert s.owner_path == None
+    assert s.content == {}
+    assert s._data_type_name == "StoredStateData"

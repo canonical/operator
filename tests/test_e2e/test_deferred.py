@@ -12,7 +12,7 @@ from ops.charm import (
 from ops.framework import Framework
 
 from scenario import Context
-from scenario.state import Container, DeferredEvent, Notice, Relation, State, deferred
+from scenario.state import Container, Notice, Relation, State, _Event
 from tests.helpers import trigger
 
 CHARM_CALLED = 0
@@ -54,7 +54,7 @@ def test_deferred_evt_emitted(mycharm):
     mycharm.defer_next = 2
 
     out = trigger(
-        State(deferred=[deferred(event="update_status", handler=mycharm._on_event)]),
+        State(deferred=[_Event("update_status").deferred(handler=mycharm._on_event)]),
         "start",
         mycharm,
         meta=mycharm.META,
@@ -72,45 +72,6 @@ def test_deferred_evt_emitted(mycharm):
     assert isinstance(start, StartEvent)
 
 
-def test_deferred_relation_event_without_relation_raises(mycharm):
-    with pytest.raises(AttributeError):
-        deferred(event="foo_relation_changed", handler=mycharm._on_event)
-
-
-def test_deferred_relation_evt(mycharm):
-    rel = Relation(endpoint="foo", remote_app_name="remote")
-    evt1 = rel.changed_event.deferred(handler=mycharm._on_event)
-    evt2 = deferred(
-        event="foo_relation_changed",
-        handler=mycharm._on_event,
-        relation=rel,
-    )
-
-    assert asdict(evt2) == asdict(evt1)
-
-
-def test_deferred_workload_evt(mycharm):
-    ctr = Container("foo")
-    evt1 = ctr.pebble_ready_event.deferred(handler=mycharm._on_event)
-    evt2 = deferred(event="foo_pebble_ready", handler=mycharm._on_event, container=ctr)
-
-    assert asdict(evt2) == asdict(evt1)
-
-
-def test_deferred_notice_evt(mycharm):
-    notice = Notice(key="example.com/bar")
-    ctr = Container("foo", notices=[notice])
-    evt1 = ctr.get_notice("example.com/bar").event.deferred(handler=mycharm._on_event)
-    evt2 = deferred(
-        event="foo_pebble_custom_notice",
-        handler=mycharm._on_event,
-        container=ctr,
-        notice=notice,
-    )
-
-    assert asdict(evt2) == asdict(evt1)
-
-
 def test_deferred_relation_event(mycharm):
     mycharm.defer_next = 2
 
@@ -118,12 +79,10 @@ def test_deferred_relation_event(mycharm):
 
     out = trigger(
         State(
-            relations=[rel],
+            relations={rel},
             deferred=[
-                deferred(
-                    event="foo_relation_changed",
+                _Event("foo_relation_changed", relation=rel).deferred(
                     handler=mycharm._on_event,
-                    relation=rel,
                 )
             ],
         ),
@@ -145,13 +104,16 @@ def test_deferred_relation_event(mycharm):
 
 
 def test_deferred_relation_event_from_relation(mycharm):
+    ctx = Context(mycharm, meta=mycharm.META)
     mycharm.defer_next = 2
     rel = Relation(endpoint="foo", remote_app_name="remote")
     out = trigger(
         State(
-            relations=[rel],
+            relations={rel},
             deferred=[
-                rel.changed_event(remote_unit_id=1).deferred(handler=mycharm._on_event)
+                ctx.on.relation_changed(rel, remote_unit=1).deferred(
+                    handler=mycharm._on_event
+                )
             ],
         ),
         "start",
@@ -164,7 +126,7 @@ def test_deferred_relation_event_from_relation(mycharm):
     assert out.deferred[0].name == "foo_relation_changed"
     assert out.deferred[0].snapshot_data == {
         "relation_name": rel.endpoint,
-        "relation_id": rel.relation_id,
+        "relation_id": rel.id,
         "app_name": "remote",
         "unit_name": "remote/1",
     }
@@ -185,8 +147,12 @@ def test_deferred_workload_event(mycharm):
 
     out = trigger(
         State(
-            containers=[ctr],
-            deferred=[ctr.pebble_ready_event.deferred(handler=mycharm._on_event)],
+            containers={ctr},
+            deferred=[
+                _Event("foo_pebble_ready", container=ctr).deferred(
+                    handler=mycharm._on_event
+                )
+            ],
         ),
         "start",
         mycharm,
@@ -210,10 +176,10 @@ def test_defer_reemit_lifecycle_event(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)
 
     mycharm.defer_next = 1
-    state_1 = ctx.run("update-status", State())
+    state_1 = ctx.run(ctx.on.update_status(), State())
 
     mycharm.defer_next = 0
-    state_2 = ctx.run("start", state_1)
+    state_2 = ctx.run(ctx.on.start(), state_1)
 
     assert [type(e).__name__ for e in ctx.emitted_events] == [
         "UpdateStatusEvent",
@@ -229,10 +195,10 @@ def test_defer_reemit_relation_event(mycharm):
 
     rel = Relation("foo")
     mycharm.defer_next = 1
-    state_1 = ctx.run(rel.created_event, State(relations=[rel]))
+    state_1 = ctx.run(ctx.on.relation_created(rel), State(relations={rel}))
 
     mycharm.defer_next = 0
-    state_2 = ctx.run("start", state_1)
+    state_2 = ctx.run(ctx.on.start(), state_1)
 
     assert [type(e).__name__ for e in ctx.emitted_events] == [
         "RelationCreatedEvent",

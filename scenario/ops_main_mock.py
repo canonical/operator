@@ -19,19 +19,13 @@ from ops.log import setup_root_logging
 from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_event_args
 from ops.main import logger as ops_logger
 
+from scenario.errors import BadOwnerPath, NoObserverError
+
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
-    from scenario.state import Event, State, _CharmSpec
+    from scenario.state import State, _CharmSpec, _Event
 
 # pyright: reportPrivateUsage=false
-
-
-class NoObserverError(RuntimeError):
-    """Error raised when the event being dispatched has no registered observers."""
-
-
-class BadOwnerPath(RuntimeError):
-    """Error raised when the owner path does not lead to a valid ObjectEvents instance."""
 
 
 # TODO: Use ops.jujucontext's _JujuContext.charm_dir.
@@ -66,7 +60,7 @@ def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
 def _emit_charm_event(
     charm: "CharmBase",
     event_name: str,
-    event: Optional["Event"] = None,
+    event: Optional["_Event"] = None,
 ):
     """Emits a charm event based on a Juju event name.
 
@@ -83,8 +77,7 @@ def _emit_charm_event(
         ops_logger.debug("Event %s not defined for %s.", event_name, charm)
         raise NoObserverError(
             f"Cannot fire {event_name!r} on {owner}: "
-            f"invalid event (not on charm.on). "
-            f"Use Context.run_custom instead.",
+            f"invalid event (not on charm.on).",
         )
 
     try:
@@ -105,7 +98,7 @@ def _emit_charm_event(
 def setup_framework(
     charm_dir,
     state: "State",
-    event: "Event",
+    event: "_Event",
     context: "Context",
     charm_spec: "_CharmSpec",
 ):
@@ -141,7 +134,7 @@ def setup_framework(
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
         broken_relation_id = (
-            event.relation.relation_id  # type: ignore
+            event.relation.id  # type: ignore
             if event.name.endswith("_relation_broken")
             else None
         )
@@ -176,7 +169,12 @@ def setup_charm(charm_class, framework, dispatcher):
     return charm
 
 
-def setup(state: "State", event: "Event", context: "Context", charm_spec: "_CharmSpec"):
+def setup(
+    state: "State",
+    event: "_Event",
+    context: "Context",
+    charm_spec: "_CharmSpec",
+):
     """Setup dispatcher, framework and charm objects."""
     charm_class = charm_spec.charm_type
     charm_dir = _get_charm_dir()
@@ -204,7 +202,7 @@ class Ops:
     def __init__(
         self,
         state: "State",
-        event: "Event",
+        event: "_Event",
         context: "Context",
         charm_spec: "_CharmSpec",
     ):

@@ -12,16 +12,16 @@ def test_plugin_ctx_run(pytester):
         from scenario import State
         from scenario import Context
         import ops
-        
+
         class MyCharm(ops.CharmBase):
             pass
-        
+
         @pytest.fixture
         def context():
             return Context(charm_type=MyCharm, meta={"name": "foo"})
-        
+
         def test_sth(context):
-            context.run('start', State())
+            context.run(context.on.start(), State())
     """
     )
 
