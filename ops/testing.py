@@ -2701,11 +2701,9 @@ class _TestingModelBackend:
         return len(units) + 1  # Account for this unit.
 
     def _get_secret(self, id: str) -> Optional[_Secret]:
-        id = Secret._canonicalize_id(id, self.model_uuid)
-        return next((s for s in self._secrets if s.id == id), None)
+        return next((s for s in self._secrets if self._secret_ids_are_equal(s.id, id)), None)
 
     def _ensure_secret(self, id: str) -> _Secret:
-        id = Secret._canonicalize_id(id, self.model_uuid)
         secret = self._get_secret(id)
         if secret is None:
             raise model.SecretNotFoundError(f'Secret {id!r} not found')
@@ -2714,7 +2712,6 @@ class _TestingModelBackend:
     def _ensure_secret_id_or_label(self, id: Optional[str], label: Optional[str]):
         secret = None
         if id is not None:
-            id = Secret._canonicalize_id(id, self.model_uuid)
             secret = self._get_secret(id)
             if secret is not None and label is not None:
                 secret.label = label  # both id and label given, update label
@@ -2725,6 +2722,21 @@ class _TestingModelBackend:
                 f'Secret not found by ID ({id!r}) or label ({label!r})'
             )
         return secret
+
+    def _secret_ids_are_equal(self, id1: str, id2: str) -> bool:
+        if id1.startswith("secret:"):
+            id1 = id1.split(":", 1)[1]
+        if id2.startswith("secret:"):
+            id2 = id2.split(":", 1)[1]
+        if "/" in id1:
+            model_uuid1, id1 = id1.split("/", 1)
+        else:
+            model_uuid1 = self.model_uuid
+        if "/" in id2:
+            model_uuid2, id2 = id2.split("/", 1)
+        else:
+            model_uuid2 = self.model_uuid
+        return model_uuid1 == model_uuid2 and id1 == id2
 
     def secret_get(
         self,
@@ -2927,7 +2939,6 @@ class _TestingModelBackend:
         secret.grants[relation_id].discard(unit or remote_app_name)
 
     def secret_remove(self, id: str, *, revision: Optional[int] = None) -> None:
-        id = Secret._canonicalize_id(id, self.model_uuid)
         secret = self._ensure_secret(id)
         if not self._has_secret_owner_permission(secret):
             raise RuntimeError(f'You must own secret {secret.id!r} to perform this operation')
@@ -2940,9 +2951,11 @@ class _TestingModelBackend:
                 secret.revisions = revisions
             else:
                 # Last revision removed, remove entire secret
-                self._secrets = [s for s in self._secrets if s.id != id]
+                self._secrets = [
+                    s for s in self._secrets if not self._secret_ids_are_equal(s.id, id)
+                ]
         else:
-            self._secrets = [s for s in self._secrets if s.id != id]
+            self._secrets = [s for s in self._secrets if not self._secret_ids_are_equal(s.id, id)]
 
     def open_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
