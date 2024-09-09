@@ -422,6 +422,7 @@ class JujuChanged(JujuVersion):
     change = 'changed'
     text = 'Changed'
 
+
 class JujuRemoved(JujuVersion):
     change = 'removed'
     text = 'Scheduled for removal'
