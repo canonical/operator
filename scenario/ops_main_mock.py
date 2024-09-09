@@ -88,7 +88,7 @@ def _emit_charm_event(
         )
 
     try:
-        args, kwargs = _get_event_args(charm, event_to_emit)
+        args, kwargs = _get_event_args(charm, event_to_emit)  # type: ignore
     except TypeError:
         # ops 2.16+
         import ops.jujucontext  # type: ignore
@@ -182,7 +182,7 @@ def setup(state: "State", event: "Event", context: "Context", charm_spec: "_Char
     charm_dir = _get_charm_dir()
 
     try:
-        dispatcher = _Dispatcher(charm_dir)
+        dispatcher = _Dispatcher(charm_dir)  # type: ignore
     except TypeError:
         # ops 2.16+
         import ops.jujucontext  # type: ignore

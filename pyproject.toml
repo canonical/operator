@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "6.1.6"
+version = "6.1.7"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -18,7 +18,7 @@ license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops>=2.12",
+    "ops>=2.12,<=2.16",
     "PyYAML>=6.0.1",
 ]
 readme = "README.md"
