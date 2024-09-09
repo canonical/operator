@@ -797,7 +797,8 @@ class Plan:
     """Represents the effective Pebble configuration.
 
     A plan is the combined layer configuration. The layer configuration is
-    documented at https://github.com/canonical/pebble/#layer-specification.
+    documented at
+    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
     """
 
     def __init__(self, raw: Optional[Union[str, PlanDict]] = None):
@@ -873,7 +874,7 @@ class Layer:
     """Represents a Pebble configuration layer.
 
     The format of this is documented at
-    https://github.com/canonical/pebble/#layer-specification.
+    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
     """
 
     #: Summary of the purpose of this layer.
@@ -1567,7 +1568,7 @@ class Notice:
     last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://github.com/canonical/pebble/#notices>`_
+    See Pebble's `Notices documentation <https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
