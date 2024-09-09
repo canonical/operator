@@ -1228,7 +1228,7 @@ class CharmEvents(ObjectEvents):
     """Triggered by Juju on the owner when the secret's rotation policy elapses (see
     :class:`SecretRotateEvent`).
 
-    .. jujuvadded:: 3.0
+    .. jujuadded:: 3.0
     """
 
     secret_remove = EventSource(SecretRemoveEvent)
