@@ -24,6 +24,7 @@ import ipaddress
 import os
 import pathlib
 import random
+import re
 import shutil
 import signal
 import tempfile
@@ -2724,18 +2725,19 @@ class _TestingModelBackend:
         return secret
 
     def _secret_ids_are_equal(self, id1: str, id2: str) -> bool:
-        if id1.startswith("secret:"):
-            id1 = id1.split(":", 1)[1]
-        if id2.startswith("secret:"):
-            id2 = id2.split(":", 1)[1]
-        if "/" in id1:
-            model_uuid1, id1 = id1.split("/", 1)
-        else:
-            model_uuid1 = self.model_uuid
-        if "/" in id2:
-            model_uuid2, id2 = id2.split("/", 1)
-        else:
-            model_uuid2 = self.model_uuid
+        secret_re = re.compile(
+            r'^(?:secret:)?(?://)?(?:(?P<uuid>[a-z0-9-]+)/)?(?P<id>[a-z0-9-]+)$', re.IGNORECASE
+        )
+        mo = secret_re.match(id1)
+        if not mo:
+            return False
+        model_uuid1 = mo.group('uuid') or self.model_uuid
+        id1 = mo.group('id')
+        mo = secret_re.match(id2)
+        if not mo:
+            return False
+        model_uuid2 = mo.group('uuid') or self.model_uuid
+        id2 = mo.group('id')
         return model_uuid1 == model_uuid2 and id1 == id2
 
     def secret_get(
