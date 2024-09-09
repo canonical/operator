@@ -6168,6 +6168,9 @@ class TestSecrets:
         request.addfinalizer(harness.cleanup)
         harness.add_relation('db', 'database')
         harness.begin()
+
+        # Local (app and unit) secrets, secrets that belong to other apps,
+        # and user secrets should have uniform ID behaviour.
         app_secret = harness.model.app.add_secret({'password': '1234'})
         unit_secret = harness.model.unit.add_secret({'password': '5678'})
         remote_secret_id = harness.add_model_secret('database', {'password': 'abcd'})
@@ -6176,6 +6179,9 @@ class TestSecrets:
         user_secret_id = harness.add_user_secret({'password': 'efgh'})
         harness.grant_secret(user_secret_id, 'webapp')
         user_secret = harness.model.get_secret(id=user_secret_id)
+
+        # Ensure that all three variants of the secret ID can be used to
+        # retrieve the secret from Harness.
         for secret in (app_secret, unit_secret, remote_secret, user_secret):
             id_only = secret.unique_identifier
             id_with_prefix = f'secret:{id_only}'
