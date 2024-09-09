@@ -6161,6 +6161,28 @@ class TestSecrets:
         with pytest.raises(RuntimeError):
             secret.remove_all_revisions()
 
+    def test_secret_id_variants(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase, meta='name: webapp\nrequires:\n db:\n  interface: database'
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'database')
+        harness.begin()
+        app_secret = harness.model.app.add_secret({'password': '1234'})
+        unit_secret = harness.model.unit.add_secret({'password': '5678'})
+        remote_secret_id = harness.add_model_secret('database', {'password': 'abcd'})
+        harness.grant_secret(remote_secret_id, 'webapp')
+        remote_secret = harness.model.get_secret(id=remote_secret_id)
+        user_secret_id = harness.add_user_secret({'password': 'efgh'})
+        harness.grant_secret(user_secret_id, 'webapp')
+        user_secret = harness.model.get_secret(id=user_secret_id)
+        for secret in (app_secret, unit_secret, remote_secret, user_secret):
+            id_only = secret.unique_identifier
+            id_with_prefix = f'secret:{id_only}'
+            id_with_model = f'secret://{harness.model.uuid}/{id_only}'
+            for uri in (id_only, id_with_prefix, id_with_model):
+                assert harness.model.get_secret(id=uri).get_content() == secret.get_content()
+
 
 class EventRecorder(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
