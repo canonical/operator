@@ -1903,7 +1903,8 @@ class StatusBase:
         does not have an associated message.
 
         Args:
-            name: Name of the status, for example "active" or "blocked".
+            name: Name of the status, one of:
+                "active", "blocked", "maintenance", "waiting", "error", or "unknown".
             message: Message to include with the status.
 
         Raises:
