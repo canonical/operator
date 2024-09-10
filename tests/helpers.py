@@ -18,9 +18,7 @@ import jsonpatch
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ops.testing import CharmType
-
-    from scenario.state import State, _Event
+    from scenario.state import CharmType, State, _Event
 
     _CT = TypeVar("_CT", bound=Type[CharmType])
 

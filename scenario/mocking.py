@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import datetime
+import io
 import shutil
 from pathlib import Path
 from typing import (
@@ -20,6 +22,7 @@ from typing import (
 )
 
 from ops import JujuVersion, pebble
+from ops._private.harness import ExecArgs, _TestingPebbleClient
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import ModelError
 from ops.model import Port as Port_Ops
@@ -33,7 +36,6 @@ from ops.model import (
     _ModelBackend,
 )
 from ops.pebble import Client, ExecError
-from ops.testing import ExecArgs, _TestingPebbleClient
 
 from scenario.errors import ActionMissingFromContextError
 from scenario.logger import logger as scenario_logger
@@ -66,9 +68,9 @@ class _MockExecProcess:
         change_id: int,
         args: ExecArgs,
         return_code: int,
-        stdin: Optional[TextIO],
-        stdout: Optional[TextIO],
-        stderr: Optional[TextIO],
+        stdin: Optional[Union[TextIO, io.BytesIO]],
+        stdout: Optional[Union[TextIO, io.BytesIO]],
+        stderr: Optional[Union[TextIO, io.BytesIO]],
     ):
         self._change_id = change_id
         self._args = args
@@ -99,7 +101,12 @@ class _MockExecProcess:
         stdout = self.stdout.read() if self.stdout is not None else None
         stderr = self.stderr.read() if self.stderr is not None else None
         if self._return_code != 0:
-            raise ExecError(list(self._args.command), self._return_code, stdout, stderr)
+            raise ExecError(
+                list(self._args.command),
+                self._return_code,
+                stdout,  # type: ignore
+                stderr,  # type: ignore
+            )
         return stdout, stderr
 
     def send_signal(self, sig: Union[int, str]):  # noqa: U100
@@ -167,15 +174,18 @@ class _MockModelBackend(_ModelBackend):
             # container not defined in state.
             mounts = {}
 
-        return _MockPebbleClient(
-            socket_path=socket_path,
-            container_root=container_root,
-            mounts=mounts,
-            state=self._state,
-            event=self._event,
-            charm_spec=self._charm_spec,
-            context=self._context,
-            container_name=container_name,
+        return cast(
+            Client,
+            _MockPebbleClient(
+                socket_path=socket_path,
+                container_root=container_root,
+                mounts=mounts,
+                state=self._state,
+                event=self._event,
+                charm_spec=self._charm_spec,
+                context=self._context,
+                container_name=container_name,
+            ),
         )
 
     def _get_relation_by_id(self, rel_id) -> "RelationBase":
@@ -607,7 +617,7 @@ class _MockModelBackend(_ModelBackend):
             )
 
         if "/" in name:
-            # this error is raised by ops.testing but not by ops at runtime
+            # this error is raised by Harness but not by ops at runtime
             raise ModelError('storage name cannot contain "/"')
 
         self._context.requested_storages[name] = count
@@ -743,6 +753,10 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         self._root = container_root
 
+        self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
+        self._last_notice_id = 0
+        self._changes: Dict[str, pebble.Change] = {}
+
         # load any existing notices and check information from the state
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         self._check_infos: Dict[str, pebble.CheckInfo] = {}
@@ -781,7 +795,7 @@ class _MockPebbleClient(_TestingPebbleClient):
     def _service_status(self) -> Dict[str, pebble.ServiceStatus]:
         return self._container.service_statuses
 
-    # Based on a method of the same name from ops.testing.
+    # Based on a method of the same name from Harness.
     def _find_exec_handler(self, command) -> Optional["Exec"]:
         handlers = {exec.command_prefix: exec for exec in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last

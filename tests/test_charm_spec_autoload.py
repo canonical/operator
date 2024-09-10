@@ -1,18 +1,15 @@
 import importlib
 import sys
-import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Type
 
 import pytest
 import yaml
-from ops import CharmBase
-from ops.testing import CharmType
 
 from scenario import Context, Relation, State
 from scenario.context import ContextSetupError
-from scenario.state import MetadataNotFoundError, _CharmSpec
+from scenario.state import CharmType, MetadataNotFoundError, _CharmSpec
 
 CHARM = """
 from ops import CharmBase

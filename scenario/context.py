@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Type, Union, cast
 
 import ops
-import ops.testing
 
 from scenario.errors import AlreadyEmittedError, ContextSetupError
 from scenario.logger import logger as scenario_logger
@@ -28,8 +27,17 @@ from scenario.state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from ops._private.harness import ExecArgs
+
     from scenario.ops_main_mock import Ops
-    from scenario.state import AnyJson, JujuLogLine, RelationBase, State, _EntityStatus
+    from scenario.state import (
+        AnyJson,
+        CharmType,
+        JujuLogLine,
+        RelationBase,
+        State,
+        _EntityStatus,
+    )
 
 logger = scenario_logger.getChild("runtime")
 
@@ -426,7 +434,7 @@ class Context:
 
     def __init__(
         self,
-        charm_type: Type[ops.testing.CharmType],
+        charm_type: Type["CharmType"],
         meta: Optional[Dict[str, Any]] = None,
         *,
         actions: Optional[Dict[str, Any]] = None,
@@ -508,7 +516,7 @@ class Context:
         self.juju_log: List["JujuLogLine"] = []
         self.app_status_history: List["_EntityStatus"] = []
         self.unit_status_history: List["_EntityStatus"] = []
-        self.exec_history: Dict[str, List[ops.testing.ExecArgs]] = {}
+        self.exec_history: Dict[str, List["ExecArgs"]] = {}
         self.workload_version_history: List[str] = []
         self.removed_secret_revisions: List[int] = []
         self.emitted_events: List[ops.EventBase] = []
@@ -644,7 +652,10 @@ class Context:
         assert self._output_state is not None
         if event.action:
             if self._action_failure_message is not None:
-                raise ActionFailed(self._action_failure_message, self._output_state)
+                raise ActionFailed(
+                    self._action_failure_message,
+                    state=self._output_state,
+                )
         return self._output_state
 
     @contextmanager

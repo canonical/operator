@@ -38,10 +38,8 @@ from scenario.state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ops.testing import CharmType
-
     from scenario.context import Context
-    from scenario.state import State, _CharmSpec, _Event
+    from scenario.state import CharmType, State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(

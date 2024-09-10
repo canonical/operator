@@ -117,7 +117,7 @@ _SECRET_EVENTS = {
 class ActionFailed(Exception):
     """Raised at the end of the hook if the charm has called ``event.fail()``."""
 
-    def __init__(self, message: str, state: "State"):
+    def __init__(self, message: str, *, state: "State"):
         self.message = message
         self.state = state
 
