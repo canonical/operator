@@ -13,26 +13,21 @@
 # limitations under the License.
 """Framework for unit testing charms in a simulated environment.
 
-The recommended structure delineates three kinds of tests:
+The module provides:
 
-- **Unit Tests**: Test charm code against mock Juju APIs and mocked-out
-  workloads using this module, ``ops.testing``. Validate isolated behavior
-  without external interactions.
-- **Interface Tests**: Validate charm library behavior without individual
-  charm code against mock Juju APIs. For more information, see
-  `Interface Tests <https://juju.is/docs/sdk/interface-tests>`_.
-- **Integration Tests**: Spin up several charms in a test model in a real Juju
-  controller, set up the integrations between the charms, and validate the
-  workload behavior and connections between the integrated workloads. See
-  `Integration Tests <https://juju.is/docs/sdk/write-integration-tests-for-a-charm>`_.
+- :class:`ops.testing.Harness`, a class to set up the environment for charms, and its:
+- :meth:`~ops.testing.Harness.begin_with_initial_hooks` convenience method for declarative
+  test setup.
+- individual :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
+  methods to start and end the testing lifecycle.
+- :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
+  status of the charm after test interactions.
+- :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
+  :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
 
-The key elements of this module are the :class:`ops.testing.Harness` class, the
-convenience entrypoint :meth:`~ops.testing.Harness.begin_with_initial_hooks` as
-well as individual lifecycle methods :meth:`~ops.testing.Harness.begin` and
-:meth:`~ops.testing.Harness.cleanup`; collection functionality via
-:meth:`~ops.testing.Harness.evaluate_status`, along with individual Model properties
-like :attr:`~ops.Model.unit` exposed via :attr:`~ops.testing.Harness.model` that's
-driven by Harness.
+.. note::
+    Unit testing is only one aspect of a comprehensive testing strategy. For more
+    on testing charms, see `Testing Strategies <https://juju.is/docs/sdk/testing>`_.
 """
 
 import dataclasses
