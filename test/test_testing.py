@@ -42,7 +42,8 @@ from ops import pebble
 from ops.jujuversion import JujuVersion
 from ops.model import _ModelBackend
 from ops.pebble import FileType
-from ops.testing import ExecResult, _TestingPebbleClient
+from ops.testing import ExecResult
+from ops.testing._harness import _TestingPebbleClient
 
 is_linux = platform.system() == 'Linux'
 
@@ -6888,7 +6889,7 @@ class TestNotify:
                 'spawn-time': '2021-02-10T04:36:22.118970777Z',
             })
 
-        monkeypatch.setattr(ops.testing._TestingPebbleClient, 'get_change', get_change)
+        monkeypatch.setattr(_TestingPebbleClient, 'get_change', get_change)
         harness.pebble_notify(
             'foo',
             '123',
