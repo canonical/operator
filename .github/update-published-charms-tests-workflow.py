@@ -14,12 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# /// script
-# dependencies = [
-#   "PyYAML",
-# ]
-# ///
-
 """Update a GitHub workload that runs `tox -e unit` on all published charms.
 
 Charms that are not hosted on GitHub are skipped, as well as any charms where
@@ -29,11 +23,11 @@ the source URL could not be found.
 import json
 import logging
 import pathlib
+import re
+import typing
 import urllib.error
 import urllib.parse
 import urllib.request
-
-import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +94,7 @@ def get_source_url(charm: str):
     return None
 
 
-def url_to_charm_name(url: str):
+def url_to_charm_name(url: typing.Optional[str]):
     """Get the charm name from a URL."""
     if not url:
         return None
@@ -123,21 +117,18 @@ def url_to_charm_name(url: str):
 def main():
     """Update the workflow file."""
     logging.basicConfig(level=logging.INFO)
-    charms = (url_to_charm_name(get_source_url(package['name'])) for package in packages())
+    charms = [url_to_charm_name(get_source_url(package['name'])) for package in packages()]
+    charms = [charm for charm in charms if charm and charm not in SKIP]
+    charms.sort()
     with WORKFLOW.open('r') as f:
-        workflow = yaml.safe_load(f)
-    workflow['jobs']['charm-tests']['strategy']['matrix']['include'] = [
-        {'charm-repo': f'canonical/{charm}'} for charm in charms if charm and charm not in SKIP
-    ]
+        workflow = f.read()
+    repos = '\n'.join(
+        f'          - charm-repo: canonical/{charm}'
+        for charm in charms
+    )
+    workflow = re.sub(r'(\s{10}- charm-repo: \S+\n)+', repos + '\n', workflow, count=1)
     with WORKFLOW.open('w') as f:
-        yaml.dump(workflow, f)
-    # yaml.safe_load transforms "on" to "true". See https://github.com/yaml/pyyaml/issues/376
-    # The 'run' step that patches the requirements files also ends up looking
-    # rather unfriendly, but it's still functionally the same, so works.
-    with WORKFLOW.open('r') as f:
-        content = f.read().replace('\ntrue:', '\non:')
-    with WORKFLOW.open('w') as f:
-        f.write(content)
+        f.write(workflow)
 
 
 if __name__ == '__main__':
