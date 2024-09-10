@@ -3,8 +3,6 @@
 # /// script
 # dependencies = [
 #   "PyYAML",
-#   "requests",
-#   "rich",
 # ]
 # ///
 
@@ -28,14 +26,17 @@ Charms that are not hosted on GitHub are skipped, as well as any charms where
 the source URL could not be found.
 """
 
+import json
+import logging
 import pathlib
+import urllib.error
 import urllib.parse
+import urllib.request
 
-import requests
-import rich.console
+logger = logging.getLogger(__name__)
+
 import yaml
 
-console = rich.console.Console()
 
 URL_BASE = 'https://api.charmhub.io/v2/charms/info'
 WORKFLOW = pathlib.Path(__file__).parent / 'workflows' / 'published-charms-tests.yaml'
@@ -65,30 +66,33 @@ SKIP = {
 }
 
 
-def packages(session: requests.Session):
+def packages():
     """Get the list of published charms from Charmhub."""
-    console.log('Fetching the list of published charms')
-    resp = session.get('https://charmhub.io/packages.json')
-    return resp.json()['packages']
+    logger.info('Fetching the list of published charms')
+    url = 'https://charmhub.io/packages.json'
+    with urllib.request.urlopen(url) as response:
+        data = response.read().decode()
+        packages = json.loads(data)['packages']
+    return packages
 
 
-def get_source_url(charm: str, session: requests.Session):
+def get_source_url(charm: str):
     """Get the source URL for a charm."""
-    console.log(f"Looking for a 'source' URL for {charm}")
+    logger.info("Looking for a 'source' URL for %s", charm)
     try:
-        source = session.get(f'{URL_BASE}/{charm}?fields=result.links')
-        source.raise_for_status()
-        return source.json()['result']['links']['source'][0]
-    except (requests.HTTPError, KeyError):
+        with urllib.request.urlopen(f'{URL_BASE}/{charm}?fields=result.links') as response:
+            data = json.loads(response.read().decode())
+            return data['result']['links']['source'][0]
+    except (urllib.error.HTTPError, KeyError):
         pass
-    console.log(f"Looking for a 'bugs-url' URL for {charm}")
+    logger.info("Looking for a 'bugs-url' URL for %s", charm)
     try:
-        source = session.get(f'{URL_BASE}/{charm}?fields=result.bugs-url')
-        source.raise_for_status()
-        return source.json()['result']['bugs-url']
-    except (requests.HTTPError, KeyError):
+        with urllib.request.urlopen(f'{URL_BASE}/{charm}?fields=result.bugs-url') as response:
+            data = json.loads(response.read().decode())
+            return data['result']['bugs-url']
+    except (urllib.error.HTTPError, KeyError):
         pass
-    console.log(f'Could not find a source URL for {charm}', style='bold red')
+    logger.warning('Could not find a source URL for %s', charm)
     return None
 
 
@@ -98,27 +102,23 @@ def url_to_charm_name(url: str):
         return None
     parsed = urllib.parse.urlparse(url)
     if parsed.netloc != 'github.com':
-        console.log(f'URL {url} is not a GitHub URL')
+        logger.info('URL %s is not a GitHub URL', url)
         return None
     if not parsed.path.startswith('/canonical'):
         # TODO: Maybe we can include some of these anyway?
         # 'juju-solutions' and 'charmed-kubernetes' seem viable, for example.
-        console.log(f'URL {url} is not a Canonical charm')
+        logger.info('URL %s is not a Canonical charm', url)
         return None
     try:
         return urllib.parse.urlparse(url).path.split('/')[2]
     except IndexError:
-        console.log(f'Could not get charm name from URL {url}', style='bold red')
+        logger.warning('Could not get charm name from URL %s', url)
         return None
 
 
 def main():
     """Update the workflow file."""
-    session = requests.Session()
-    charms = (
-        url_to_charm_name(get_source_url(package['name'], session))
-        for package in packages(session)
-    )
+    charms = (url_to_charm_name(get_source_url(package['name'])) for package in packages())
     with WORKFLOW.open('r') as f:
         workflow = yaml.safe_load(f)
     workflow['jobs']['charm-tests']['strategy']['matrix']['include'] = [
