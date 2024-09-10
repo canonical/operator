@@ -1,124 +1,104 @@
 name: Broad Charm Compatibility Tests
-
 on:
   schedule:
-    - cron: '0 1 25 * *'
-  workflow_dispatch:
-
+  - cron: 0 1 25 * *
+  workflow_dispatch: null
 jobs:
   charm-tests:
     runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the ${{ matrix.charm-repo }} repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ matrix.charm-repo }}
+    - name: Checkout the operator repository
+      uses: actions/checkout@v4
+      with:
+        path: myops
+    - name: Install patch dependencies
+      run: pip install poetry~=1.6
+    - name: Update 'ops' dependency in test charm to latest
+      run: "rm -rf myops/test\nif [ -e \"test-requirements.txt\" ]; then\n  sed -i\
+        \ -e \"/^ops[ ><=]/d\" -e \"/canonical\\/operator/d\" -e \"/#egg=ops/d\" test-requirements.txt\n\
+        \  echo -e \"\\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops\"\
+        \ >> test-requirements.txt\nfi\nif [ -e \"requirements-charmcraft.txt\" ];\
+        \ then\n  sed -i -e \"/^ops[ ><=]/d\" -e \"/canonical\\/operator/d\" -e \"\
+        /#egg=ops/d\" requirements-charmcraft.txt\n  echo -e \"\\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops\"\
+        \ >> requirements-charmcraft.txt\nfi\nif [ -e \"requirements.txt\" ]; then\n\
+        \  sed -i -e \"/^ops[ ><=]/d\" -e \"/canonical\\/operator/d\" -e \"/#egg=ops/d\"\
+        \ requirements.txt\n  echo -e \"\\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops\"\
+        \ >> requirements.txt\nelse\n  sed -i -e \"s/^ops[ ><=].*/ops = {path = \\\
+        \"myops\\\"}/\" pyproject.toml\n  poetry lock --no-update\nfi\n"
+    - name: Install dependencies
+      run: pip install tox~=4.2
+    - name: Run the charm's unit tests
+      run: tox -vve unit
     strategy:
       fail-fast: false
       matrix:
         include:
-          - charm-repo: canonical/kafka-operator
-          - charm-repo: canonical/mongodb-operator
-          - charm-repo: canonical/traefik-k8s-operator
-          - charm-repo: canonical/mysql-router-k8s-operator
-          - charm-repo: canonical/pgbouncer-k8s-operator
-          - charm-repo: canonical/discourse-k8s-operator
-          - charm-repo: canonical/s3-integrator
-          - charm-repo: canonical/zookeeper-operator
-          - charm-repo: canonical/loki-k8s-operator
-          - charm-repo: canonical/openfga-operator
-          - charm-repo: canonical/indico-operator
-          - charm-repo: canonical/trino-k8s-operator
-          - charm-repo: canonical/route53-lego-k8s-operator
-          - charm-repo: canonical/wordpress-k8s-operator
-          - charm-repo: canonical/temporal-k8s-operator
-          - charm-repo: canonical/jenkins-agent-operator
-          - charm-repo: canonical/seldon-core-operator
-          - charm-repo: canonical/nginx-ingress-integrator-operator
-          - charm-repo: canonical/oathkeeper-operator
-          - charm-repo: canonical/jenkins-agent-k8s-operator
-          - charm-repo: canonical/grafana-agent-k8s-operator
-          - charm-repo: canonical/namecheap-lego-k8s-operator
-          - charm-repo: canonical/superset-k8s-operator
-          - charm-repo: canonical/identity-platform-login-ui-operator
-          - charm-repo: canonical/temporal-admin-k8s-operator
-          - charm-repo: canonical/dex-auth-operator
-          - charm-repo: canonical/temporal-ui-k8s-operator
-          - charm-repo: canonical/temporal-worker-k8s-operator
-          - charm-repo: canonical/content-cache-k8s-operator
-          - charm-repo: canonical/ranger-k8s-operator
-          - charm-repo: canonical/oauth2-proxy-k8s-operator
-          - charm-repo: canonical/livepatch-k8s-operator
-          - charm-repo: canonical/self-signed-certificates-operator
-          - charm-repo: canonical/saml-integrator-operator
-          - charm-repo: canonical/smtp-integrator-operator
-          - charm-repo: canonical/manual-tls-certificates-operator
-          - charm-repo: canonical/hardware-observer-operator
-    steps:
-      - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ matrix.charm-repo }}
-
-      - name: Checkout the operator repository
-        uses: actions/checkout@v4
-        with:
-          path: myops
-
-      - name: Install patch dependencies
-        run: pip install poetry~=1.6
-
-      - name: Update 'ops' dependency in test charm to latest
-        run: |
-          rm -rf myops/test
-          if [ -e "test-requirements.txt" ]; then
-            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> test-requirements.txt
-          fi
-          if [ -e "requirements-charmcraft.txt" ]; then
-            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements-charmcraft.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements-charmcraft.txt
-          fi
-          if [ -e "requirements.txt" ]; then
-            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-          else
-            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock --no-update
-          fi
-
-      - name: Install dependencies
-        run: pip install tox~=4.2
-
-      - name: Run the charm's unit tests
-        run: tox -vve unit
-
+        - charm-repo: canonical/data-platform-libs
+        - charm-repo: canonical/kafka-operator
+        - charm-repo: canonical/mongodb-operator
+        - charm-repo: canonical/traefik-k8s-operator
+        - charm-repo: canonical/mysql-router-k8s-operator
+        - charm-repo: canonical/pgbouncer-k8s-operator
+        - charm-repo: canonical/discourse-k8s-operator
+        - charm-repo: canonical/s3-integrator
+        - charm-repo: canonical/zookeeper-operator
+        - charm-repo: canonical/loki-k8s-operator
+        - charm-repo: canonical/openfga-operator
+        - charm-repo: canonical/indico-operator
+        - charm-repo: canonical/trino-k8s-operator
+        - charm-repo: canonical/route53-lego-k8s-operator
+        - charm-repo: canonical/wordpress-k8s-operator
+        - charm-repo: canonical/temporal-k8s-operator
+        - charm-repo: canonical/jenkins-agent-operator
+        - charm-repo: canonical/seldon-core-operator
+        - charm-repo: canonical/nginx-ingress-integrator-operator
+        - charm-repo: canonical/oathkeeper-operator
+        - charm-repo: canonical/jenkins-agent-k8s-operator
+        - charm-repo: canonical/grafana-agent-k8s-operator
+        - charm-repo: canonical/namecheap-lego-k8s-operator
+        - charm-repo: canonical/superset-k8s-operator
+        - charm-repo: canonical/identity-platform-login-ui-operator
+        - charm-repo: canonical/temporal-admin-k8s-operator
+        - charm-repo: canonical/dex-auth-operator
+        - charm-repo: canonical/temporal-ui-k8s-operator
+        - charm-repo: canonical/temporal-worker-k8s-operator
+        - charm-repo: canonical/content-cache-k8s-operator
+        - charm-repo: canonical/ranger-k8s-operator
+        - charm-repo: canonical/oauth2-proxy-k8s-operator
+        - charm-repo: canonical/livepatch-k8s-operator
+        - charm-repo: canonical/self-signed-certificates-operator
+        - charm-repo: canonical/saml-integrator-operator
+        - charm-repo: canonical/smtp-integrator-operator
+        - charm-repo: canonical/manual-tls-certificates-operator
+        - charm-repo: canonical/hardware-observer-operator
   charmcraft-profile-tests:
     runs-on: ubuntu-latest
+    steps:
+    - name: Install charmcraft
+      run: sudo snap install charmcraft --classic
+    - name: Charmcraft init
+      run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
+    - name: Checkout the operator repository
+      uses: actions/checkout@v4
+      with:
+        path: myops
+    - name: Update 'ops' dependency in test charm to latest
+      run: "rm -rf myops/test\nif [ -e \"requirements.txt\" ]; then\n  sed -i -e \"\
+        /^ops[ ><=]/d\" -e \"/canonical\\/operator/d\" -e \"/#egg=ops/d\" requirements.txt\n\
+        \  echo -e \"\\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops\"\
+        \ >> requirements.txt\nfi\n"
+    - name: Install dependencies
+      run: pip install tox~=4.2
+    - name: Run the charm's unit tests
+      run: tox -vve unit
     strategy:
       fail-fast: false
       matrix:
         include:
-          - profile: machine
-          - profile: kubernetes
-          - profile: simple
-    steps:
-      - name: Install charmcraft
-        run: sudo snap install charmcraft --classic
-
-      - name: Charmcraft init
-        run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
-
-      - name: Checkout the operator repository
-        uses: actions/checkout@v4
-        with:
-          path: myops
-
-      - name: Update 'ops' dependency in test charm to latest
-        run: |
-          rm -rf myops/test
-          if [ -e "requirements.txt" ]; then
-            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-          fi
-
-      - name: Install dependencies
-        run: pip install tox~=4.2
-
-      - name: Run the charm's unit tests
-        run: tox -vve unit
+        - profile: machine
+        - profile: kubernetes
+        - profile: simple
