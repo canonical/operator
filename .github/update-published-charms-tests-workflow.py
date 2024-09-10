@@ -70,7 +70,7 @@ def packages():
     """Get the list of published charms from Charmhub."""
     logger.info('Fetching the list of published charms')
     url = 'https://charmhub.io/packages.json'
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(url, timeout=120) as response:
         data = response.read().decode()
         packages = json.loads(data)['packages']
     return packages
@@ -80,14 +80,18 @@ def get_source_url(charm: str):
     """Get the source URL for a charm."""
     logger.info("Looking for a 'source' URL for %s", charm)
     try:
-        with urllib.request.urlopen(f'{URL_BASE}/{charm}?fields=result.links') as response:
+        with urllib.request.urlopen(
+            f'{URL_BASE}/{charm}?fields=result.links', timeout=30
+        ) as response:
             data = json.loads(response.read().decode())
             return data['result']['links']['source'][0]
     except (urllib.error.HTTPError, KeyError):
         pass
     logger.info("Looking for a 'bugs-url' URL for %s", charm)
     try:
-        with urllib.request.urlopen(f'{URL_BASE}/{charm}?fields=result.bugs-url') as response:
+        with urllib.request.urlopen(
+            f'{URL_BASE}/{charm}?fields=result.bugs-url', timeout=30
+        ) as response:
             data = json.loads(response.read().decode())
             return data['result']['bugs-url']
     except (urllib.error.HTTPError, KeyError):
@@ -118,6 +122,7 @@ def url_to_charm_name(url: str):
 
 def main():
     """Update the workflow file."""
+    logging.basicConfig(level=logging.INFO)
     charms = (url_to_charm_name(get_source_url(package['name'])) for package in packages())
     with WORKFLOW.open('r') as f:
         workflow = yaml.safe_load(f)
@@ -126,13 +131,13 @@ def main():
     ]
     with WORKFLOW.open('w') as f:
         yaml.dump(workflow, f)
-    # yaml.safe_load/yaml.dump transforms "on" to "true". I'm not sure how to avoid that.
+    # yaml.safe_load transforms "on" to "true". See https://github.com/yaml/pyyaml/issues/376
+    # The 'run' step that patches the requirements files also ends up looking
+    # rather unfriendly, but it's still functionally the same, so works.
     with WORKFLOW.open('r') as f:
         content = f.read().replace('true:', 'on:')
     with WORKFLOW.open('w') as f:
         f.write(content)
-    # TODO: the "Update 'ops' dependency in test charm to latest" run command also gets messed up
-    # and has to get fixed.
 
 
 if __name__ == '__main__':
