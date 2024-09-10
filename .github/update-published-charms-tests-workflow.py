@@ -122,10 +122,7 @@ def main():
     charms.sort()
     with WORKFLOW.open('r') as f:
         workflow = f.read()
-    repos = '\n'.join(
-        f'          - charm-repo: canonical/{charm}'
-        for charm in charms
-    )
+    repos = '\n'.join(f'          - charm-repo: canonical/{charm}' for charm in charms)
     workflow = re.sub(r'(\s{10}- charm-repo: \S+\n)+', repos + '\n', workflow, count=1)
     with WORKFLOW.open('w') as f:
         f.write(workflow)
