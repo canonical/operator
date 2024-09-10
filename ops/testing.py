@@ -24,6 +24,7 @@ import ipaddress
 import os
 import pathlib
 import random
+import re
 import shutil
 import signal
 import tempfile
@@ -2702,7 +2703,7 @@ class _TestingModelBackend:
         return len(units) + 1  # Account for this unit.
 
     def _get_secret(self, id: str) -> Optional[_Secret]:
-        return next((s for s in self._secrets if s.id == id), None)
+        return next((s for s in self._secrets if self._secret_ids_are_equal(s.id, id)), None)
 
     def _ensure_secret(self, id: str) -> _Secret:
         secret = self._get_secret(id)
@@ -2723,6 +2724,22 @@ class _TestingModelBackend:
                 f'Secret not found by ID ({id!r}) or label ({label!r})'
             )
         return secret
+
+    def _secret_ids_are_equal(self, id1: str, id2: str) -> bool:
+        secret_re = re.compile(
+            r'^(?:secret:)?(?://)?(?:(?P<uuid>[a-z0-9-]+)/)?(?P<id>[a-z0-9-]+)$', re.IGNORECASE
+        )
+        mo = secret_re.match(id1)
+        if not mo:
+            return False
+        model_uuid1 = mo.group('uuid') or self.model_uuid
+        id1 = mo.group('id')
+        mo = secret_re.match(id2)
+        if not mo:
+            return False
+        model_uuid2 = mo.group('uuid') or self.model_uuid
+        id2 = mo.group('id')
+        return model_uuid1 == model_uuid2 and id1 == id2
 
     def secret_get(
         self,
@@ -2816,6 +2833,7 @@ class _TestingModelBackend:
             rotation=rotation,
             rotates=rotates,
             description=secret.description,
+            model_uuid=self.model_uuid,
         )
 
     def secret_set(
@@ -2899,7 +2917,7 @@ class _TestingModelBackend:
             description=description,
         )
         self._secrets.append(secret)
-        return id
+        return id  # Note that this is the 'short' ID, not the canonicalised one.
 
     def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None) -> None:
         secret = self._ensure_secret(id)
@@ -2936,9 +2954,11 @@ class _TestingModelBackend:
                 secret.revisions = revisions
             else:
                 # Last revision removed, remove entire secret
-                self._secrets = [s for s in self._secrets if s.id != id]
+                self._secrets = [
+                    s for s in self._secrets if not self._secret_ids_are_equal(s.id, id)
+                ]
         else:
-            self._secrets = [s for s in self._secrets if s.id != id]
+            self._secrets = [s for s in self._secrets if not self._secret_ids_are_equal(s.id, id)]
 
     def open_port(self, protocol: str, port: Optional[int] = None):
         self._check_protocol_and_port(protocol, port)
