@@ -1446,8 +1446,8 @@ class Secret:
         into error state on completion of the current Juju hook.
 
         .. jujuchanged:: 3.6
-            Setting the content with the same content as the latest revision
-            longer creates a new secret revision.
+            A new secret revision will *not* be created if the content being set
+            is identical to the latest revision.
 
         Args:
             content: A key-value mapping containing the payload of the secret,
