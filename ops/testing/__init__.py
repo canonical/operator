@@ -14,6 +14,9 @@
 
 """Infrastructure to build unit tests for charms using the ops library."""
 
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _get_package_version
+
 # A small number of objects are common to both testing frameworks.
 from ._core import ExecArgs as ExecArgs
 
@@ -23,9 +26,12 @@ from ._harness import *  # noqa: F403 (import *)
 # If the 'ops.testing' optional extra is installed, make those
 # names available in this namespace.
 try:
-    from scenario import *  # noqa: F403 (import *)
-except ImportError:
+    version = _get_package_version('ops-scenario')
+except _PackageNotFoundError:
     pass
+else:
+    if version and int(version.split('.', 1)[0]) >= 7:
+        from scenario import *  # noqa: F403 (import *)
 
 # These names are exposed for backwards compatibility but not expected to be
 # used by charms.
