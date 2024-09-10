@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The ops library: a Python framework for writing Juju charms.
+"""The API for managing a Juju application.
 
-The ops library is a Python framework (`available on PyPI`_) for developing
-and testing Juju charms in a consistent way, using standard Python constructs
-to allow for clean, maintainable, and reusable code.
+- lifecycle fixme fixme
+- state managment
+- responding to events
+- handling of units, relatiuons and resources
 
 A charm is an operator -- business logic encapsulated in a reusable software
 package that automates every aspect of an application's life.
@@ -35,8 +36,6 @@ Full developer documentation for the Charm SDK is available at
 https://juju.is/docs/sdk.
 
 To learn more about Juju, visit https://juju.is/docs/olm.
-
-.. _available on PyPI: https://pypi.org/project/ops/
 """
 
 # The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)
