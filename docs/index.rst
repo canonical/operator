@@ -10,15 +10,26 @@ consistent readable charms, reuse code via charm libs, and separate typical char
 concerns, such as application state management from integration management and
 lifecycle management from testability.
 
-- ``ops`` is the API to respond to Juju events and manage the application
-  [units, relations, storage, secrets and resources].
-- ``ops.pebble`` is the interface to control services and respond to their
-  events in the workload container for Kubernetes charms.  
-- ``ops.testing`` is the unit testing framework for your charm.
+- :ref:`ops_main_entry_point` used to initialise and run your charm.
+- :ref:`ops_module`, the API to respond to Juju events and manage the application.
+- :ref:`ops_pebble_module` to control services and respond to their events for Kubernetes charms.  
+- :ref:`ops_testing_module`, the framework for unit testing charms in a simulated environment.
+
+You can write a charm in any way you want, but with the `ops` library you get a
+framework that helps you write consistent readable charms following the latest
+best practices, reuse code via charm libs, and separate typical charm concerns
+--- application state management from integration management or lifecycle
+management from testability.
+
+Whether you are a machine or a Kubernetes charm author, `ops` is the recommended way to go.
+
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
+
+.. _ops_module:
 
 ops module
 ==========
@@ -27,8 +38,11 @@ ops module
    :exclude-members: main
 
 
+.. _ops_main_entry_point:
+
 ops.main entry point
 ====================
+
 .. autofunction:: ops.main
 
 
@@ -39,11 +53,15 @@ legacy main module
    :noindex:
 
 
+.. _ops_pebble_module:
+
 ops.pebble module
 =================
 
 .. automodule:: ops.pebble
 
+
+.. _ops_testing_module:
 
 ops.testing module
 ==================
