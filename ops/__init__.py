@@ -12,12 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The API for managing a Juju application.
+"""The API to respond to Juju events and manage the application.
 
-- lifecycle fixme fixme
-- state managment
-- responding to events
-- handling of units, relatiuons and resources
+This module provides:
+
+- :class:`~ops.CharmBase` and :class:`~ops.Object` classes that charms and
+  charm libs extend, respectively, to register with the framework.
+- :class:`~ops.framework.EventBase` class and individual event types, like
+  :class:`~ops.ActionEvent` class.
+- :class:`~ops.Framework` class, accessible as ``self.framework`` in a charm,
+  the main interface for the charm to `ops` library infrastructure, including:
+
+  - :meth:`~ops.Framework.on` shorthand property used to
+    :meth:`~ops.Framework.observe` and react to Juju events.
+  - :attr:`~ops.Framework.model` attribute to get hold of the Model instance.
+- :class:`~ops.model.Model` class that represents the Juju Model, including:
+
+  - :attr:`~ops.Model.app` attribute, fixme
+  - unit fixme
+  - relations fixme
+  - secrets fixme
+- Status
 
 A charm is an operator -- business logic encapsulated in a reusable software
 package that automates every aspect of an application's life.
