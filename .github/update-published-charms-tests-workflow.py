@@ -33,9 +33,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-logger = logging.getLogger(__name__)
-
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 URL_BASE = 'https://api.charmhub.io/v2/charms/info'
@@ -70,7 +70,7 @@ def packages():
     """Get the list of published charms from Charmhub."""
     logger.info('Fetching the list of published charms')
     url = 'https://charmhub.io/packages.json'
-    with urllib.request.urlopen(url, timeout=120) as response:
+    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 (unsafe URL)
         data = response.read().decode()
         packages = json.loads(data)['packages']
     return packages
@@ -80,7 +80,7 @@ def get_source_url(charm: str):
     """Get the source URL for a charm."""
     logger.info("Looking for a 'source' URL for %s", charm)
     try:
-        with urllib.request.urlopen(
+        with urllib.request.urlopen(  # noqa: S310 (unsafe URL)
             f'{URL_BASE}/{charm}?fields=result.links', timeout=30
         ) as response:
             data = json.loads(response.read().decode())
@@ -89,7 +89,7 @@ def get_source_url(charm: str):
         pass
     logger.info("Looking for a 'bugs-url' URL for %s", charm)
     try:
-        with urllib.request.urlopen(
+        with urllib.request.urlopen(  # noqa: S310 (unsafe URL)
             f'{URL_BASE}/{charm}?fields=result.bugs-url', timeout=30
         ) as response:
             data = json.loads(response.read().decode())
