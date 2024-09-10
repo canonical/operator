@@ -1,11 +1,5 @@
 #! /usr/bin/env python
 
-# /// script
-# dependencies = [
-#   "PyYAML",
-# ]
-# ///
-
 # Copyright 2024 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# /// script
+# dependencies = [
+#   "PyYAML",
+# ]
+# ///
 
 """Update a GitHub workload that runs `tox -e unit` on all published charms.
 
