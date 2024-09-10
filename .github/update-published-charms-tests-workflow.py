@@ -135,7 +135,7 @@ def main():
     # The 'run' step that patches the requirements files also ends up looking
     # rather unfriendly, but it's still functionally the same, so works.
     with WORKFLOW.open('r') as f:
-        content = f.read().replace('true:', 'on:')
+        content = f.read().replace('\ntrue:', '\non:')
     with WORKFLOW.open('w') as f:
         f.write(content)
 
