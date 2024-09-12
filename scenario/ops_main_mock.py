@@ -12,12 +12,17 @@ import ops.framework
 import ops.model
 import ops.storage
 from ops import CharmBase
+
+# use logger from ops._main so that juju_log will be triggered
+try:
+    from ops._main import CHARM_STATE_FILE, _Dispatcher, _get_event_args  # type: ignore
+    from ops._main import logger as ops_logger  # type: ignore
+except ImportError:
+    # Ops 2.16
+    from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_event_args  # type: ignore
+    from ops.main import logger as ops_logger  # type: ignore
 from ops.charm import CharmMeta
 from ops.log import setup_root_logging
-
-# use logger from ops.main so that juju_log will be triggered
-from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_event_args
-from ops.main import logger as ops_logger
 
 from scenario.errors import BadOwnerPath, NoObserverError
 

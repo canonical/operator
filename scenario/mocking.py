@@ -209,11 +209,20 @@ class _MockModelBackend(_ModelBackend):
             # in scenario, you can create Secret(id="foo"),
             # but ops.Secret will prepend a "secret:" prefix to that ID.
             # we allow getting secret by either version.
-            secrets = [
-                s
-                for s in self._state.secrets
-                if canonicalize_id(s.id) == canonicalize_id(id)
-            ]
+            try:
+                secrets = [
+                    s
+                    for s in self._state.secrets
+                    if canonicalize_id(s.id, model_uuid=self._state.model.uuid)  # type: ignore
+                    == canonicalize_id(id, model_uuid=self._state.model.uuid)  # type: ignore
+                ]
+            except TypeError:
+                # ops 2.16
+                secrets = [
+                    s
+                    for s in self._state.secrets
+                    if canonicalize_id(s.id) == canonicalize_id(id)  # type: ignore
+                ]
             if not secrets:
                 raise SecretNotFoundError(id)
             return secrets[0]
