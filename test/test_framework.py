@@ -373,7 +373,15 @@ class TestFramework:
         framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
-            pass
+            def __init__(self, handle: ops.Handle, data: str):
+                super().__init__(handle)
+                self.data: str = data
+
+            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+                self.data = typing.cast(str, snapshot['data'])
+
+            def snapshot(self) -> typing.Dict[str, typing.Any]:
+                return {'data': self.data}
 
         class MyNotifier1(ops.Object):
             a = ops.EventSource(MyEvent)
@@ -404,18 +412,18 @@ class TestFramework:
         framework.observe(pub1.b, obs2.on_any)
         framework.observe(pub2.c, obs2.on_any)
 
-        pub1.a.emit()
-        pub1.b.emit()
-        pub2.c.emit()
+        pub1.a.emit('a')
+        pub1.b.emit('b')
+        pub2.c.emit('c')
 
-        # Events remain stored because they were deferred.
+        # Events remain stored because they were deferred (and distinct).
         ev_a_handle = ops.Handle(pub1, 'a', '1')
         framework.load_snapshot(ev_a_handle)
         ev_b_handle = ops.Handle(pub1, 'b', '2')
         framework.load_snapshot(ev_b_handle)
         ev_c_handle = ops.Handle(pub2, 'c', '3')
         framework.load_snapshot(ev_c_handle)
-        # make sure the objects are gone before we reemit them
+        # Make sure the objects are gone before we reemit them.
         gc.collect()
 
         framework.reemit()
@@ -438,6 +446,113 @@ class TestFramework:
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_a_handle)
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
+
+    def test_repeated_defer(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
+
+        class MyEvent(ops.EventBase):
+            data: typing.Optional[str] = None
+
+        class MyDataEvent(MyEvent):
+            def __init__(self, handle: ops.Handle, data: str):
+                super().__init__(handle)
+                self.data: typing.Optional[str] = data
+
+            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+                self.data = typing.cast(typing.Optional[str], snapshot['data'])
+
+            def snapshot(self) -> typing.Dict[str, typing.Any]:
+                return {'data': self.data}
+
+        class ReleaseEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            n = ops.EventSource(MyEvent)
+            nd = ops.EventSource(MyDataEvent)
+            r = ops.EventSource(ReleaseEvent)
+
+        class MyObserver(ops.Object):
+            def __init__(self, parent: ops.Object, key: str):
+                super().__init__(parent, key)
+                self.defer_all = True
+
+            def stop_deferring(self, _: MyEvent):
+                self.defer_all = False
+
+            def on_any(self, event: MyEvent):
+                if self.defer_all:
+                    event.defer()
+
+        pub = MyNotifier(framework, 'n')
+        obs1 = MyObserver(framework, '1')
+        obs2 = MyObserver(framework, '2')
+
+        framework.observe(pub.n, obs1.on_any)
+        framework.observe(pub.n, obs2.on_any)
+        framework.observe(pub.nd, obs1.on_any)
+        framework.observe(pub.nd, obs2.on_any)
+        framework.observe(pub.r, obs1.stop_deferring)
+
+        # Emit an event, which will be deferred.
+        pub.nd.emit('foo')
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 2  # One per observer.
+        assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
+
+        # Emit the same event, and we'll still just have the single notice.
+        pub.nd.emit('foo')
+        assert len(tuple(framework._storage.notices())) == 2
+
+        # Emit the same event kind but with a different snapshot, and we'll get a new notice.
+        pub.nd.emit('bar')
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 4
+        assert framework._storage.load_snapshot(notices[2][0]) == {'data': 'bar'}
+
+        # Emit a totally different event, and we'll get a new notice.
+        pub.n.emit()
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 6
+        assert framework._storage.load_snapshot(notices[2][0]) == {'data': 'bar'}
+        assert framework._storage.load_snapshot(notices[4][0]) == {}
+
+        # Even though these events are far back in the queue, since they're
+        # duplicates, they will get skipped.
+        pub.nd.emit('foo')
+        pub.nd.emit('bar')
+        pub.n.emit()
+        assert len(tuple(framework._storage.notices())) == 6
+
+        def notices_for_observer(n: int):
+            return [
+                notice for notice in framework._storage.notices() if notice[1].endswith(f'[{n}]')
+            ]
+
+        # Stop deferring on the first observer, and all those events will be
+        # completed and the notices removed, while the second observer will
+        # still have them queued.
+        pub.r.emit()
+        assert len(tuple(framework._storage.notices())) == 6
+        pub.n.emit()
+        framework.reemit()
+        assert len(notices_for_observer(1)) == 0
+        assert len(notices_for_observer(2)) == 3
+
+        # Without the defer active, the first observer always ends up with an
+        # empty queue, while the second observer's queue continues to skip
+        # duplicates and add new events.
+        pub.nd.emit('foo')
+        pub.nd.emit('foo')
+        pub.nd.emit('bar')
+        pub.n.emit()
+        pub.nd.emit('foo')
+        pub.nd.emit('bar')
+        pub.n.emit()
+        pub.nd.emit('baz')
+        framework.reemit()
+        assert len(notices_for_observer(1)) == 0
+        assert len(notices_for_observer(2)) == 4
 
     def test_custom_event_data(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
