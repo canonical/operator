@@ -144,3 +144,13 @@ class JujuVersion:
             # releases have the change (3.2.1 tag was never released).
             return False
         return True
+
+    @property
+    def supports_pebble_log_forwarding(self) -> bool:
+        """Report whether the Pebble bundled with this Juju version supports log forwarding."""
+        # Log forwarding was available from Pebble 1.4, but labels were added in
+        # 1.6, and that's when this became really useful, so we use that as a
+        # cutoff. Juju 3.4.0 was the first to have Pebble 1.6 (actually 1.7).
+        # https://github.com/canonical/pebble/releases/tag/v1.6.0
+        # https://github.com/juju/juju/blob/e1b7dcd7390348c37f8b860011e7436e6ed3f4cc/go.mod#L27
+        return (self.major, self.minor, self.patch) >= (3, 4, 0)

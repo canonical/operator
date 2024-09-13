@@ -101,6 +101,20 @@ def test_supports_exec_service_context():
 
 
 @pytest.mark.parametrize(
+    'version,has_support',
+    [
+        ('2.9.50', False),
+        ('3.3.6', False),
+        ('3.4.0', True),
+        ('3.4.1', True),
+        ('4.0.0', True),
+    ],
+)
+def test_supports_pebble_log_forwarding(version: str, has_support: bool):
+    assert ops.JujuVersion(version).supports_pebble_log_forwarding is has_support
+
+
+@pytest.mark.parametrize(
     'invalid_version',
     [
         'xyz',
