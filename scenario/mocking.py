@@ -22,7 +22,12 @@ from typing import (
 )
 
 from ops import JujuVersion, pebble
-from ops._private.harness import ExecArgs, _TestingPebbleClient
+
+try:
+    from ops._private.harness import ExecArgs, _TestingPebbleClient  # type: ignore
+except ImportError:
+    from ops.testing import ExecArgs, _TestingPebbleClient  # type: ignore
+
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import ModelError
 from ops.model import Port as Port_Ops

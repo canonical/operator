@@ -27,7 +27,10 @@ from scenario.state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ops._private.harness import ExecArgs
+    try:
+        from ops._private.harness import ExecArgs  # type: ignore
+    except ImportError:
+        from ops.testing import ExecArgs  # type: ignore
 
     from scenario.ops_main_mock import Ops
     from scenario.state import (
@@ -499,7 +502,7 @@ class Context:
         self.charm_root = charm_root
         self.juju_version = juju_version
         if juju_version.split(".")[0] == "2":
-            logger.warn(
+            logger.warning(
                 "Juju 2.x is closed and unsupported. You may encounter inconsistencies.",
             )
 
