@@ -109,10 +109,6 @@ _NetworkDict = TypedDict(
 )
 
 
-class _SecretSetSequenceError(Exception):
-    """Raised when calling secret-set without content after previously calling it with content."""
-
-
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
@@ -1517,7 +1513,6 @@ class Secret:
                 effect only after the currently-scheduled rotation.
 
         Raises:
-            TypeError: if no attributes are provided.
             ModelError: if used after previously using :meth:`set_content` in the
                 same hook.
         """
@@ -1527,18 +1522,13 @@ class Secret:
             )
         if self._id is None:
             self._id = self.get_info().id
-        try:
-            self._backend.secret_set(
-                typing.cast(str, self.id),
-                label=label,
-                description=description,
-                expire=_calculate_expiry(expire),
-                rotate=rotate,
-            )
-        except _SecretSetSequenceError:
-            raise ModelError(
-                "Can't set secret info after setting content in the same hook."
-            ) from None
+        self._backend.secret_set(
+            typing.cast(str, self.id),
+            label=label,
+            description=description,
+            expire=_calculate_expiry(expire),
+            rotate=rotate,
+        )
 
     def grant(self, relation: 'Relation', *, unit: Optional[Unit] = None):
         """Grant read access to this secret.
@@ -3694,9 +3684,8 @@ class _ModelBackend:
         elif 'rotate' in self._secret_cache[id]:
             args += ['--rotate', self._secret_cache[id]['rotate'].value]
         if content is None and 'content' in self._secret_cache[id]:
-            raise _SecretSetSequenceError(
-                'secret-set called without content, and previously used in this hook'
-            )
+            # Get the previous content from the unit agent's cache.
+            content = self.secret_get(id=id, peek=True)
         elif content is not None:
             self._secret_cache[id]['content'] = object()
         with tempfile.TemporaryDirectory() as tmp:
