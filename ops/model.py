@@ -14,6 +14,7 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 
+import collections
 import dataclasses
 import datetime
 import enum
@@ -3217,6 +3218,7 @@ class _ModelBackend:
         self._is_leader: Optional[bool] = None
         self._leader_check_time = None
         self._hook_is_running = ''
+        self._secret_cache: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
 
     def _run(
         self,
@@ -3659,12 +3661,28 @@ class _ModelBackend:
         args = [id]
         if label is not None:
             args.extend(['--label', label])
+            self._secret_cache[id]['label'] = label
+        elif 'label' in self._secret_cache[id]:
+            args.extend(['--label', self._secret_cache[id]['label']])
         if description is not None:
             args.extend(['--description', description])
+            self._secret_cache[id]['description'] = description
+        elif 'description' in self._secret_cache[id]:
+            args.extend(['--description', self._secret_cache[id]['description']])
         if expire is not None:
             args.extend(['--expire', expire.isoformat()])
+            self._secret_cache[id]['expire'] = expire
+        elif 'expire' in self._secret_cache[id]:
+            args.extend(['--expire', self._secret_cache[id]['expire'].isoformat()])
         if rotate is not None:
             args += ['--rotate', rotate.value]
+            self._secret_cache[id]['rotate'] = rotate
+        elif 'rotate' in self._secret_cache[id]:
+            args += ['--rotate', self._secret_cache[id]['rotate'].value]
+        if content is None and 'content' in self._secret_cache[id]:
+            raise ValueError('secret-set called without content, and previously used in this hook')
+        elif content is not None:
+            self._secret_cache[id]['content'] = object()
         with tempfile.TemporaryDirectory() as tmp:
             # The content is None or has already been validated with Secret._validate_content
             for k, v in (content or {}).items():
