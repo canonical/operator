@@ -4,11 +4,9 @@ ops library API reference
 
 The `ops` library is a Python framework for writing and testing Juju charms.
 
-It is the recommended way to write charms for both Kubernetes and machines.
-The framework encapsulates the best charming practice and helps you write
-consistent readable charms, reuse code via charm libs, and separate typical charm
-concerns, such as application state management from integration management and
-lifecycle management from testability.
+For more about the Charm SDK, see https://juju.is/docs/sdk.
+
+The library provides:
 
 - :ref:`ops_main_entry_point` used to initialise and run your charm.
 - :ref:`ops_module`, the API to respond to Juju events and manage the application.
