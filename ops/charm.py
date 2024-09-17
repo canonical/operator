@@ -304,6 +304,7 @@ class ConfigChangedEvent(HookEvent):
       rescheduling, on unit upgrade or refresh, and so on.
     - As a specific instance of the above point: when networking changes
       (if the machine reboots and comes up with a different IP).
+    - When the app config changes, for example when `juju trust` is run.
 
     Any callback method bound to this event cannot assume that the
     software has already been started; it should not start stopped
@@ -836,7 +837,7 @@ class PebbleNoticeEvent(WorkloadEvent):
 class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats.
 
-    .. jujuversion:: 3.4
+    .. jujuadded:: 3.4
     """
 
 
@@ -883,7 +884,7 @@ class PebbleCheckFailedEvent(PebbleCheckEvent):
     if the check is currently failing, check the current status with
     ``event.info.status == ops.pebble.CheckStatus.DOWN``.
 
-    .. jujuversion:: 3.6
+    .. jujuadded:: 3.6
     """
 
 
@@ -894,7 +895,7 @@ class PebbleCheckRecoveredEvent(PebbleCheckEvent):
     state (not simply failed, but failed at least as many times as the
     configured threshold).
 
-    .. jujuversion:: 3.6
+    .. jujuadded:: 3.6
     """
 
 
@@ -943,7 +944,7 @@ class SecretChangedEvent(SecretEvent):
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
         Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
@@ -955,7 +956,7 @@ class SecretRotateEvent(SecretEvent):
     be rotated. The event will keep firing until the owner creates a new
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
     """
 
     def defer(self) -> NoReturn:
@@ -982,7 +983,7 @@ class SecretRemoveEvent(SecretEvent):
     remove the now-unused revision. If the charm does not, then the event will
     be emitted again, when further revisions are ready for removal.
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -1019,7 +1020,7 @@ class SecretExpiredEvent(SecretEvent):
     must be removed. The event will keep firing until the owner removes the
     revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
     """
 
     def __init__(self, handle: 'Handle', id: str, label: Optional[str], revision: int):
@@ -1217,7 +1218,7 @@ class CharmEvents(ObjectEvents):
     """Triggered by Juju on the observer when the secret owner changes its contents (see
     :class:`SecretChangedEvent`).
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
         Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
 
@@ -1225,21 +1226,21 @@ class CharmEvents(ObjectEvents):
     """Triggered by Juju on the owner when a secret's expiration time elapses (see
     :class:`SecretExpiredEvent`).
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
     """
 
     secret_rotate = EventSource(SecretRotateEvent)
     """Triggered by Juju on the owner when the secret's rotation policy elapses (see
     :class:`SecretRotateEvent`).
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
     """
 
     secret_remove = EventSource(SecretRemoveEvent)
     """Triggered by Juju on the owner when a secret revision can be removed (see
     :class:`SecretRemoveEvent`).
 
-    .. jujuversion:: 3.0
+    .. jujuadded:: 3.0
     """
 
     collect_app_status = EventSource(CollectStatusEvent)

@@ -173,6 +173,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # The isort command wants to rearrange the nicely-formatted imports below;
 # just skip it for this file.
 # isort:skip_file
+from typing import Optional, Type
 
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble
@@ -180,11 +181,10 @@ from . import pebble
 # Also import charm explicitly. This is not strictly necessary as the
 # "from .charm" import automatically does that, but be explicit since this
 # import was here previously
-from . import charm  # type: ignore # noqa: F401 `.charm` imported but unused
+from . import charm
 
-# Import the main module, which we've overriden in main.py to be callable.
-# This allows "import ops; ops.main(Charm)" to work as expected.
-from . import main
+from . import _main
+from . import main as _legacy_main
 
 # Explicitly import names from submodules so users can just "import ops" and
 # then use them as "ops.X".
@@ -321,3 +321,44 @@ from .model import (
 # rather than a runtime concern.
 
 from .version import version as __version__
+
+
+class _Main:
+    def __call__(
+        self, charm_class: Type[charm.CharmBase], use_juju_for_storage: Optional[bool] = None
+    ):
+        return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+
+    def main(
+        self, charm_class: Type[charm.CharmBase], use_juju_for_storage: Optional[bool] = None
+    ):
+        return _legacy_main.main(
+            charm_class=charm_class, use_juju_for_storage=use_juju_for_storage
+        )
+
+
+main = _Main()
+"""Set up the charm and dispatch the observed event.
+
+Recommended usage:
+
+.. code-block:: python
+
+    import ops
+
+    class SomeCharm(ops.CharmBase): ...
+
+    if __name__ == "__main__":
+        ops.main(SomeCharm)
+
+Args:
+    charm_class: the charm class to instantiate and receive the event.
+    use_juju_for_storage: whether to use controller-side storage.
+        The default is ``False`` for most charms.
+        Podspec charms that haven't previously used local storage and that
+        are running on a new enough Juju default to controller-side storage,
+        and local storage otherwise.
+
+.. jujuremoved:: 4.0
+    The ``use_juju_for_storage`` argument is not available from Juju 4.0
+"""

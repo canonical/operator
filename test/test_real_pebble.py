@@ -322,12 +322,6 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         yield pebble_dir
         shutil.rmtree(pebble_dir)
 
-    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
-    # test mixin class.
-    @pytest.mark.skip(reason='pending resolution of https://github.com/canonical/pebble/issues/80')
-    def test_make_dir_with_permission_mask(self):
-        pass
-
 
 @pytest.mark.skipif(
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
