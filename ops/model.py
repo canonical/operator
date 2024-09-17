@@ -71,9 +71,9 @@ _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_SettableStatusNames: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 _StatusName = Union[_SettableStatusName, Literal['error', 'unknown']]
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
+_SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -3429,8 +3429,8 @@ class _ModelBackend:
             raise TypeError('is_app parameter must be boolean')
         if not isinstance(message, str):
             raise TypeError('message parameter must be a string')
-        if status not in _SettableStatusNames:
-            raise InvalidStatusError(f'status must be in {_SettableStatusNames}, not {status!r}')
+        if status not in _SETTABLE_STATUS_NAMES:
+            raise InvalidStatusError(f'status must be in {_SETTABLE_STATUS_NAMES}, not {status!r}')
         self._run('status-set', f'--application={is_app}', status, message)
 
     def storage_list(self, name: str) -> List[int]:
