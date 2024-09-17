@@ -364,7 +364,7 @@ class PreSeriesUpgradeEvent(HookEvent):
         warnings.warn(
             'pre-series-upgrade events will not be emitted from Juju 4.0 onwards',
             DeprecationWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
         super().__init__(handle)
 
@@ -388,7 +388,7 @@ class PostSeriesUpgradeEvent(HookEvent):
         warnings.warn(
             'post-series-upgrade events will not be emitted from Juju 4.0 onwards',
             DeprecationWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
         super().__init__(handle)
 
@@ -434,7 +434,7 @@ class CollectMetricsEvent(HookEvent):
             'collect-metrics events will not be emitted from Juju 4.0 onwards - '
             'consider using the Canonical Observability Stack',
             DeprecationWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
         super().__init__(handle)
 
