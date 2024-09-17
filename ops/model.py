@@ -72,8 +72,8 @@ _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
-_StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
+StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
+_StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
@@ -1878,10 +1878,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: Dict[_StatusName, Type['StatusBase']] = {}
+    _statuses: Dict[StatusName, Type['StatusBase']] = {}
 
     # Subclasses must provide this attribute
-    name: _StatusName
+    name: StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -1915,7 +1915,7 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[typing.cast(_StatusName, name)](message)
+            return cls._statuses[typing.cast(StatusName, name)](message)
 
     @classmethod
     def register(cls, child: Type['StatusBase']):

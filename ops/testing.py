@@ -60,7 +60,7 @@ from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.jujucontext import _JujuContext
-from ops.model import Container, RelationNotFoundError, _NetworkDict, _StatusName
+from ops.model import Container, RelationNotFoundError, _NetworkDict, StatusName
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -82,7 +82,7 @@ _RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[st
 _RawStatus = TypedDict(
     '_RawStatus',
     {
-        'status': _StatusName,
+        'status': StatusName,
         'message': str,
     },
 )
