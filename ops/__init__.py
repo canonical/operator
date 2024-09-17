@@ -23,7 +23,7 @@ This module provides:
 - [OPT2] :class:`~ops.framework.EventBase` and its subclasses:
 
   - :class:`~ops.HookEvent` class for Juju events, like the
-    :class:`~ops.ActionEvent` class.
+    :class:`~ops.StartEvent` class.
   - :class:`~ops.LifecycleEvent` class for synthetic events, like the
     :class:`~ops.CollectStatusEvent` class.
 
@@ -44,6 +44,15 @@ This module provides:
     defined in the charm, allowing interaction with other applications.
   - :meth:`~ops.Model.get_secret` method, to access Juju :class:`~ops.Secret`
     objects.
+
+- :class:`~ops.Container` class to control Kubernetes workloads, including:
+
+  - :meth:`~ops.Container.add_layer` and :meth:`~ops.Container.replan` methods
+    to update Pebble configuration.
+  - :meth:`~ops.Container.pull` and :meth:`~ops.Container.push` methods to copy
+    data to and from container, respectively.
+  - :meth:`~ops.Container.exec` method to run arbitrary commands inside the
+    container.
 
 - :class:`~ops.StatusBase` class and individual status types, like
   :class:`~ops.ActiveStatus` class.

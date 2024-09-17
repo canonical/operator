@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Client for the Pebble API (HTTP over Unix socket).
+"""Low-level Pebble API.
+
+This module provides:
+
+- :class:`~ops.pebble.Client` class to communicate directly Pebble.
+- :class:`~ops.pebble.Layer` class to define Pebble configuration layers,
+  including:
+
+  - :class:`~ops.pebble.Check` class to represent Pebble checks.
+  - :class:`~ops.pebble.LogTarget` class to represent Pebble log targets.
+  - :class:`~ops.pebble.Service` class to represent Pebble service descriptions.
 
 For a command-line interface for local testing, see test/pebble_cli.py.
 """
@@ -2186,6 +2196,9 @@ class Client:
         delay: float = 0.1,
     ) -> ChangeID:
         """Restart services by name and wait (poll) for them to be started.
+
+        Listed running services will be stopped and restarted, and listed stopped
+        services will be started.
 
         Args:
             services: Non-empty list of services to restart.
