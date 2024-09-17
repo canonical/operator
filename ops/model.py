@@ -1511,10 +1511,6 @@ class Secret:
             expire: New expiration time (or timedelta from now) to apply.
             rotate: New rotation policy to apply. The new policy will take
                 effect only after the currently-scheduled rotation.
-
-        Raises:
-            ModelError: if used after previously using :meth:`set_content` in the
-                same hook.
         """
         if label is None and description is None and expire is None and rotate is None:
             raise TypeError(
