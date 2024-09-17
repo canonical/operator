@@ -1078,12 +1078,17 @@ class CollectStatusEvent(LifecycleEvent):
 
     The order of priorities is as follows, from highest to lowest:
 
-    * error
+    * error (Note: will always result in an InvalidStatusError!)
     * blocked
     * maintenance
     * waiting
     * active
-    * unknown
+    * unknown (Note: will result in InvalidStatusError if set as the status)
+
+    Note that "error" and "unknown" are read-only statuses, and an InvalidStatusError
+    will be raised if either of these are chosen as the highest-priority status and
+    set as the status. Note also that as "error" has the highest priority, it will
+    always cause in an InvalidStatusError.
 
     If there are multiple statuses with the same priority, the first one added
     wins (and if an event is observed multiple times, the handlers are called
