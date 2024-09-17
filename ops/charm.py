@@ -18,6 +18,7 @@ import dataclasses
 import enum
 import logging
 import pathlib
+import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -359,6 +360,14 @@ class PreSeriesUpgradeEvent(HookEvent):
     .. jujuremoved:: 4.0
     """
 
+    def __init__(self, handle: 'Handle'):
+        warnings.warn(
+            'pre-series-upgrade events will not be emitted from Juju 4.0 onwards',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(handle)
+
 
 class PostSeriesUpgradeEvent(HookEvent):
     """Event triggered after a series upgrade.
@@ -374,6 +383,14 @@ class PostSeriesUpgradeEvent(HookEvent):
 
     .. jujuremoved:: 4.0
     """
+
+    def __init__(self, handle: 'Handle'):
+        warnings.warn(
+            'post-series-upgrade events will not be emitted from Juju 4.0 onwards',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(handle)
 
 
 class LeaderElectedEvent(HookEvent):
@@ -411,6 +428,15 @@ class CollectMetricsEvent(HookEvent):
 
     .. jujuremoved:: 4.0
     """
+
+    def __init__(self, handle: 'Handle'):
+        warnings.warn(
+            'collect-metrics events will not be emitted from Juju 4.0 onwards - '
+            'consider using the Canonical Observability Stack',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(handle)
 
     def add_metrics(
         self, metrics: Mapping[str, Union[int, float]], labels: Optional[Mapping[str, str]] = None
