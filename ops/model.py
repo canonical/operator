@@ -3687,6 +3687,8 @@ class _ModelBackend:
             # Get the previous content from the unit agent's cache.
             content = self.secret_get(id=id, peek=True)
         elif content is not None:
+            # Don't store the actual secret content in memory, but put a sentinel there to indicate
+            # that the content has been set during this hook.
             self._secret_cache[id]['content'] = object()
         with tempfile.TemporaryDirectory() as tmp:
             # The content is None or has already been validated with Secret._validate_content

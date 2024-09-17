@@ -3823,6 +3823,62 @@ class TestSecretClass:
         with pytest.raises(TypeError):
             secret.set_info()  # no args provided
 
+    def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
+
+        secret = self.make_secret(model, id='q')
+        secret.set_content({'foo': 'bar'})
+        description = 'desc'
+        secret.set_info(description=description)
+
+        calls = fake_script.calls(clear=True)
+        assert calls == [
+            ['secret-set', f'secret://{model._backend.model_uuid}/q', ANY],
+            ['secret-get', f'secret://{model._backend.model_uuid}/q', '--peek', '--format=json'],
+            [
+                'secret-set',
+                f'secret://{model._backend.model_uuid}/q',
+                '--description',
+                description,
+                ANY,
+            ],
+        ]
+        # For this test we don't need to check that the content was in the temporary file, but we
+        # do want to be certain that there was a file passed to the call (but don't care about
+        # what the name of the file was).
+        assert calls[0][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
+        assert calls[2][-1].startswith('foo#file=') and calls[2][-1].endswith('/foo')
+
+    def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+
+        secret = self.make_secret(model, id='q')
+        description = 'desc'
+        secret.set_info(description=description)
+        secret.set_content({'foo': 'bar'})
+
+        calls = fake_script.calls(clear=True)
+        assert calls == [
+            [
+                'secret-set',
+                f'secret://{model._backend.model_uuid}/q',
+                '--description',
+                description,
+            ],
+            [
+                'secret-set',
+                f'secret://{model._backend.model_uuid}/q',
+                '--description',
+                description,
+                ANY,
+            ],
+        ]
+        # For this test we don't need to check that the content was in the temporary file, but we
+        # do want to be certain that there was a file passed to the call (but don't care about
+        # what the name of the file was).
+        assert calls[1][-1].startswith('foo#file=') and calls[1][-1].endswith('/foo')
+
     def test_grant(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('relation-list', """echo '[]'""")
         fake_script.write('secret-grant', """exit 0""")
