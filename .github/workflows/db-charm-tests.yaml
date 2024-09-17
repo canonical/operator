@@ -15,15 +15,15 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: e59139a097bd407b5e785daf8193b777cc691af9  # 2024-08-26T10:45:00Z
+            commit: 01cfd3e268ecd5024ded6bb6aede43ff85417b78  # 2024-09-11T16:07:20Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: beed68055e33191721896a3b8e28274a99e7de7b  # 2024-08-26T16:47:32Z
+            commit: f203e4d9d3ab9856b5dc0786217fce8428384e90  # 2024-09-16T12:00:58Z
           # Waiting for an upstream PR:
           # https://github.com/canonical/mysql-operator/pull/519
           #- charm-repo: canonical/mysql-operator
-          #  commit: 25a8a79680f3fbf3c36e9e1d8c20a852f54129c1  # 2024-08-26T13:48:51Z
+          #  commit: 4ff2dc867a1586d43a93d0017cc648d591fc9886  # 2024-09-13T15:38:12Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: 52df6266067d7233b7a067f7a967170b4096dba8  # rev183 rev182 2024-08-26T13:44:33Z
+            commit: 2009919583eddad22656b9b4ebe95adbcd518c0f  # rev199 rev198 2024-09-16T18:14:16Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
