@@ -16,9 +16,9 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 4b2f567c43bc67e9d1fe24f018ba186dcd0396ed  # 2024-08-28T11:32:28Z
+            commit: 7518ec8343941ca91248614fd8f2d50fdd9e068c  # rev135 2024-09-06T12:10:02Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 27025e5d840ec09331608b398cf4e49e5fe256e9  # 2024-08-28T11:32:32Z
+            commit: 1bd9e7fd96a9f5a91443e5932667c58a92c1ce5e  # 2024-09-03T14:57:42Z
           - charm-repo: canonical/grafana-k8s-operator
             commit: 1c80f746f8edeae6fd23ddf31eed45f5b88c06b4  # rev118 2024-08-12T14:02:32Z
     steps:
