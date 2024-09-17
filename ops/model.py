@@ -70,8 +70,9 @@ K8sSpec = Mapping[str, Any]
 _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
+_ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_StatusName = Union[_SettableStatusName, Literal['error', 'unknown']]
+_StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
