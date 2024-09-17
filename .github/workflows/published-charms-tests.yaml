@@ -1,3 +1,6 @@
+# To update the list of charms included here, run:
+# python .github/update-published-charms-tests-workflow.py
+
 name: Broad Charm Compatibility Tests
 
 on:
