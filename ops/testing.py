@@ -16,14 +16,15 @@
 The module provides:
 
 - :class:`ops.testing.Harness`, a class to set up the environment for charms, and its:
-- :meth:`~ops.testing.Harness.begin_with_initial_hooks` convenience method for declarative
-  test setup.
-- individual :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
-  methods to start and end the testing lifecycle.
-- :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
-  status of the charm after test interactions.
-- :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
-  :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
+
+  - :meth:`~ops.testing.Harness.begin_with_initial_hooks` convenience method for declarative
+    test setup.
+  - individual :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
+    methods to start and end the testing lifecycle.
+  - :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
+    status of the charm after test interactions.
+  - :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
+    :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
