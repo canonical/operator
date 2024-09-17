@@ -3679,13 +3679,15 @@ class _ModelBackend:
             self._secret_cache[id]['rotate'] = rotate
         elif 'rotate' in self._secret_cache[id]:
             args += ['--rotate', self._secret_cache[id]['rotate'].value]
-        if content is None and 'content' in self._secret_cache[id]:
-            # Get the previous content from the unit agent's cache.
-            content = self.secret_get(id=id, peek=True)
-        elif content is not None:
+
+        if content is not None:
             # Don't store the actual secret content in memory, but put a sentinel there to indicate
             # that the content has been set during this hook.
             self._secret_cache[id]['content'] = object()
+        elif content is None and 'content' in self._secret_cache[id]:
+            # Get the previous content from the unit agent's cache.
+            content = self.secret_get(id=id, peek=True)
+
         with tempfile.TemporaryDirectory() as tmp:
             # The content is None or has already been validated with Secret._validate_content
             for k, v in (content or {}).items():
