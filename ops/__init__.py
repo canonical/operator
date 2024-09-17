@@ -16,8 +16,8 @@
 
 This module provides:
 
-- :class:`~ops.CharmBase` and :class:`~ops.Object` classes that charms and
-  charm libs extend, respectively, to register with the framework.
+- :class:`~ops.CharmBase` and :class:`~ops.Object` to register the charm or
+  a charm lib with the framework.
 - :class:`~ops.framework.EventBase` class and individual event types, like
   :class:`~ops.ActionEvent` class.
 - :class:`~ops.Framework` class, accessible as ``self.framework`` in a charm,
@@ -28,11 +28,17 @@ This module provides:
   - :attr:`~ops.Framework.model` attribute to get hold of the Model instance.
 - :class:`~ops.model.Model` class that represents the Juju Model, including:
 
-  - :attr:`~ops.Model.app` attribute, fixme
-  - unit fixme
-  - relations fixme
-  - secrets fixme
-- Status
+  - :attr:`~ops.Model.app` attribute, representing the application associated
+    with the charm.
+  - :attr:`~ops.Model.unit` attribute, representing the unit of the application
+    the charm is running on.
+  - :attr:`~ops.Model.relations` attribute, which provides access to relations
+    defined in the charm, allowing interaction with other applications.
+  - :meth:`~ops.Model.get_secret` method, to access Juju :class:`~ops.Secret`
+    objects.
+- :class:`~ops.StatusBase` class and individual status types, like
+  :class:`~ops.ActiveStatus` class.
+
 
 A charm is an operator -- business logic encapsulated in a reusable software
 package that automates every aspect of an application's life.
