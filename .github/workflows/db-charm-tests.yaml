@@ -18,8 +18,10 @@ jobs:
             commit: 01cfd3e268ecd5024ded6bb6aede43ff85417b78  # 2024-09-11T16:07:20Z
           - charm-repo: canonical/postgresql-k8s-operator
             commit: f203e4d9d3ab9856b5dc0786217fce8428384e90  # 2024-09-16T12:00:58Z
-          - charm-repo: canonical/mysql-operator
-            commit: 4ff2dc867a1586d43a93d0017cc648d591fc9886  # 2024-09-13T15:38:12Z
+          # Waiting for an upstream PR:
+          # https://github.com/canonical/mysql-operator/pull/519
+          #- charm-repo: canonical/mysql-operator
+          #  commit: 4ff2dc867a1586d43a93d0017cc648d591fc9886  # 2024-09-13T15:38:12Z
           - charm-repo: canonical/mysql-k8s-operator
             commit: 2009919583eddad22656b9b4ebe95adbcd518c0f  # rev199 rev198 2024-09-16T18:14:16Z
     steps:

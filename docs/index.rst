@@ -34,7 +34,11 @@ ops.pebble module
 ops.testing module
 ==================
 
-.. automodule:: ops.testing
+.. autoclass:: ops.testing.ActionFailed
+.. autoclass:: ops.testing.ActionOutput
+.. autoclass:: ops.testing.ExecArgs
+.. autoclass:: ops.testing.ExecResult
+.. autoclass:: ops.testing.Harness
 
 
 Indices
