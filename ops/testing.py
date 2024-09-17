@@ -60,7 +60,7 @@ from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.jujucontext import _JujuContext
-from ops.model import Container, RelationNotFoundError, _NetworkDict, StatusName
+from ops.model import Container, RelationNotFoundError, StatusName, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
