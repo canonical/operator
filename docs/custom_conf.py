@@ -381,7 +381,7 @@ class JujuVersion(SphinxDirective):
             messages = []
         if self.content:
             node += self.parse_content_to_nodes()
-        classes = ['versionmodified', self.change, 'jujuversion']
+        classes = ['versionmodified', self.change]
         if len(node) > 0 and isinstance(node[0], nodes.paragraph):
             # The contents start with a paragraph.
             if node[0].rawsource:
@@ -420,11 +420,17 @@ class JujuAdded(JujuVersion):
     text = 'Added'
 
 
+class JujuChanged(JujuVersion):
+    change = 'changed'
+    text = 'Changed'
+
+
 class JujuRemoved(JujuVersion):
     change = 'removed'
     text = 'Scheduled for removal'
 
 
 def setup(app):
-    app.add_directive('jujuversion', JujuAdded)
+    app.add_directive('jujuadded', JujuAdded)
+    app.add_directive('jujuchanged', JujuChanged)
     app.add_directive('jujuremoved', JujuRemoved)

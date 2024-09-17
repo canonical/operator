@@ -117,7 +117,7 @@ sphinx==8.0.2
     #   sphinx-tabs
     #   sphinxcontrib-jquery
     #   sphinxext-opengraph
-sphinx-autobuild==2024.4.16
+sphinx-autobuild==2024.9.3
     # via ops (pyproject.toml)
 sphinx-basic-ng==1.0.0b2
     # via furo
