@@ -3675,10 +3675,10 @@ class _ModelBackend:
         elif 'expire' in self._secret_cache[id]:
             args.extend(['--expire', self._secret_cache[id]['expire'].isoformat()])
         if rotate is not None:
-            args += ['--rotate', rotate.value]
+            args.extend(['--rotate', rotate.value])
             self._secret_cache[id]['rotate'] = rotate
         elif 'rotate' in self._secret_cache[id]:
-            args += ['--rotate', self._secret_cache[id]['rotate'].value]
+            args.extend(['--rotate', self._secret_cache[id]['rotate'].value])
 
         if content is not None:
             # Don't store the actual secret content in memory, but put a sentinel there to indicate
@@ -3714,9 +3714,9 @@ class _ModelBackend:
         if expire is not None:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
-            args += ['--rotate', rotate.value]
+            args.extend(['--rotate', rotate.value])
         if owner is not None:
-            args += ['--owner', owner]
+            args.extend(['--owner', owner])
         with tempfile.TemporaryDirectory() as tmp:
             # The content has already been validated with Secret._validate_content
             for k, v in content.items():
