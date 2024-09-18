@@ -39,7 +39,6 @@ from typing import (
     Any,
     BinaryIO,
     Callable,
-    ClassVar,
     Dict,
     Generator,
     Iterable,
@@ -306,7 +305,13 @@ class Model:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id, self.uuid)
         content = self._backend.secret_get(id=id, label=label)
-        return Secret(self._backend, id=id, label=label, content=content)
+        return Secret(
+            self._backend,
+            id=id,
+            label=label,
+            content=content,
+            _secret_set_cache=self._cache._secret_set_cache,
+        )
 
     def get_cloud_spec(self) -> 'CloudSpec':
         """Get details of the cloud in which the model is deployed.
@@ -335,6 +340,7 @@ class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
+        self._secret_set_cache: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
         self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
@@ -504,7 +510,13 @@ class Application:
             rotate=rotate,
             owner='application',
         )
-        return Secret(self._backend, id=id, label=label, content=content)
+        return Secret(
+            self._backend,
+            id=id,
+            label=label,
+            content=content,
+            _secret_set_cache=self._cache._secret_set_cache,
+        )
 
 
 def _calculate_expiry(
@@ -687,7 +699,13 @@ class Unit:
             rotate=rotate,
             owner='unit',
         )
-        return Secret(self._backend, id=id, label=label, content=content)
+        return Secret(
+            self._backend,
+            id=id,
+            label=label,
+            content=content,
+            _secret_set_cache=self._cache._secret_set_cache,
+        )
 
     def open_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: Optional[int] = None
@@ -1266,14 +1284,13 @@ class Secret:
 
     _key_re = re.compile(r'^([a-z](?:-?[a-z0-9]){2,})$')  # copied from Juju code
 
-    _secret_set_cache: ClassVar[Dict[str, Dict[str, Any]]] = collections.defaultdict(dict)
-
     def __init__(
         self,
         backend: '_ModelBackend',
         id: Optional[str] = None,
         label: Optional[str] = None,
         content: Optional[Dict[str, str]] = None,
+        _secret_set_cache: Optional[Dict[str, Dict[str, Any]]] = None,
     ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1283,6 +1300,7 @@ class Secret:
         self._id = id
         self._label = label
         self._content = content
+        self._secret_set_cache = _secret_set_cache or collections.defaultdict(dict)
 
     def __repr__(self):
         fields: List[str] = []
