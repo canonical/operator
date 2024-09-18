@@ -18,15 +18,8 @@ This module provides:
 
 - :class:`~ops.CharmBase` and :class:`~ops.Object` to register the charm or
   a charm lib, respectively, with the framework.
-- [OPT1] :class:`~ops.framework.EventBase` class and individual event types, like
+- :class:`~ops.framework.EventBase` class and individual event types, like
   :class:`~ops.ActionEvent` class.
-- [OPT2] :class:`~ops.framework.EventBase` and its subclasses:
-
-  - :class:`~ops.HookEvent` class for Juju events, like the
-    :class:`~ops.StartEvent` class.
-  - :class:`~ops.LifecycleEvent` class for synthetic events, like the
-    :class:`~ops.CollectStatusEvent` class.
-
 - :class:`~ops.Framework` class, accessible as ``self.framework`` in a charm,
   the main interface for the charm to `ops` library infrastructure, including:
 
