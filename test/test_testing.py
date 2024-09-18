@@ -7041,11 +7041,11 @@ def test_scenario_available():
 )
 def test_merged_actionfailed():
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.go_action, self._on_go)
 
-        def _on_go(self, event):
+        def _on_go(self, event: ops.ActionEvent):
             event.log('\U0001f680')
             event.set_results({'interim': '\U0001f97a'})
             event.fail('\U0001f61e')
