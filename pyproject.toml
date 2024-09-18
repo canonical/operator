@@ -37,6 +37,9 @@ docs = [
     "sphinxcontrib-jquery",
     "sphinxext-opengraph"
 ]
+testing = [
+    "ops-scenario>=7.0.5,<8",
+]
 
 [project.urls]
 "Homepage" = "https://juju.is/docs/sdk"

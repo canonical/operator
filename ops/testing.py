@@ -32,6 +32,10 @@ The module includes:
     on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
 """
 
+import typing as _typing
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _get_package_version
+
 from ._private.harness import (
     ActionFailed,
     ActionOutput,
@@ -56,8 +60,144 @@ from ._private.harness import (
     storage,
 )
 
-# The Harness testing framework.
-_ = ActionFailed
+# If the 'ops.testing' optional extra is installed, make those
+# names available in this namespace.
+try:
+    _version = _get_package_version('ops-scenario')
+except _PackageNotFoundError:
+    pass
+else:
+    if _version and int(_version.split('.', 1)[0]) >= 7:
+        from scenario import (
+            ActionFailed as _ScenarioActionFailed,
+        )
+        from scenario import (
+            ActiveStatus,
+            Address,
+            AnyJson,
+            BindAddress,
+            BlockedStatus,
+            CheckInfo,
+            CloudCredential,
+            CloudSpec,
+            Container,
+            Context,
+            DeferredEvent,
+            ErrorStatus,
+            Exec,
+            ICMPPort,
+            JujuLogLine,
+            MaintenanceStatus,
+            Manager,
+            Model,
+            Mount,
+            Network,
+            Notice,
+            PeerRelation,
+            Port,
+            RawDataBagContents,
+            RawSecretRevisionContents,
+            Relation,
+            RelationBase,
+            Resource,
+            Secret,
+            State,
+            StateValidationError,
+            Storage,
+            StoredState,
+            SubordinateRelation,
+            TCPPort,
+            UDPPort,
+            UnitID,
+            UnknownStatus,
+            WaitingStatus,
+        )
+
+        # The Scenario unit testing framework.
+        _ = ActiveStatus
+        _ = Address
+        _ = AnyJson
+        _ = BindAddress
+        _ = BlockedStatus
+        _ = CheckInfo
+        _ = CloudCredential
+        _ = CloudSpec
+        _ = Container
+        _ = Context
+        _ = DeferredEvent
+        _ = ErrorStatus
+        _ = Exec
+        _ = ICMPPort
+        _ = JujuLogLine
+        _ = MaintenanceStatus
+        _ = Manager
+        _ = Model
+        _ = Mount
+        _ = Network
+        _ = Notice
+        _ = PeerRelation
+        _ = Port
+        _ = RawDataBagContents
+        _ = RawSecretRevisionContents
+        _ = Relation
+        _ = RelationBase
+        _ = Resource
+        _ = Secret
+        _ = State
+        _ = StateValidationError
+        _ = Storage
+        _ = StoredState
+        _ = SubordinateRelation
+        _ = TCPPort
+        _ = UDPPort
+        _ = UnitID
+        _ = UnknownStatus
+        _ = WaitingStatus
+
+        # Handle the name clash between Harness's and Scenario's ActionFailed.
+        class _MergedActionFailed(ActionFailed, _ScenarioActionFailed):
+            """Raised when :code:`event.fail()` is called during an action handler."""
+
+            message: str
+            """Optional details of the failure, as provided by :meth:`ops.ActionEvent.fail`."""
+
+            output: ActionOutput
+            """Any logs and results set by the Charm.
+
+            When using Context.run, both logs and results will be empty - these
+            can be found in Context.action_logs and Context.action_results.
+            """
+
+            state: _typing.Optional[State]
+            """The Juju state after the action has been run.
+
+            When using Harness.run_action, this will be None.
+            """
+
+            def __init__(
+                self,
+                message: str,
+                output: _typing.Optional[ActionOutput] = None,
+                *,
+                state: _typing.Optional[State] = None,
+            ):
+                self.message = message
+                self.output = ActionOutput([], {}) if output is None else output
+                self.state = state
+
+        ActionFailed = _MergedActionFailed
+
+        # Also monkeypatch this merged one in so that isinstance checks work.
+        import ops._private.harness as _harness
+
+        _harness.ActionFailed = _MergedActionFailed
+        import scenario.context as _context
+
+        _context.ActionFailed = _MergedActionFailed
+
+
+# The Harness unit testing framework.
+_ = ActionFailed  # If Scenario has been installed, then this will be the merged ActionFailed.
 _ = ActionOutput
 _ = AppUnitOrName
 _ = CharmType
@@ -71,7 +211,7 @@ _ = YAMLStringOrFile
 # Names exposed for backwards compatibility
 _ = CharmBase
 _ = CharmMeta
-_ = Container
+_ = Container  # If Scenario has been installed, then this will be scenario.Container.
 _ = ExecProcess
 _ = RelationNotFoundError
 _ = RelationRole

@@ -7025,3 +7025,42 @@ class TestCloudSpec:
         harness.begin()
         with pytest.raises(ops.ModelError):
             harness.model.get_cloud_spec()
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_scenario_available():
+    ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
+    state = ctx.run(ctx.on.start(), ops.testing.State())
+    assert isinstance(state.unit_status, ops.testing.UnknownStatus)
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_merged_actionfailed():
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.go_action, self._on_go)
+
+        def _on_go(self, event):
+            event.log('\U0001f680')
+            event.set_results({'interim': '\U0001f97a'})
+            event.fail('\U0001f61e')
+
+    harness = ops.testing.Harness(MyCharm, actions="""go:\n description: go""")
+    harness.begin()
+    with pytest.raises(ops.testing.ActionFailed) as excinfo:
+        harness.run_action('go')
+    assert excinfo.value.message == '\U0001f61e'
+    assert excinfo.value.output.logs == ['\U0001f680']
+    assert excinfo.value.output.results == {'interim': '\U0001f97a'}
+
+    ctx = ops.testing.Context(MyCharm, meta={'name': 'foo'}, actions={'go': {}})
+    with pytest.raises(ops.testing.ActionFailed) as excinfo:
+        ctx.run(ctx.on.action('go'), ops.testing.State())
+    assert excinfo.value.message == '\U0001f61e'
+    assert ctx.action_logs == ['\U0001f680']
+    assert ctx.action_results == {'interim': '\U0001f97a'}
