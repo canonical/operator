@@ -24,7 +24,7 @@ import typing
 import unittest
 from collections import OrderedDict
 from textwrap import dedent
-from unittest.mock import ANY, MagicMock, patch
+from unittest import mock
 
 import pytest
 
@@ -1114,9 +1114,9 @@ class TestModel:
         assert str(excinfo.value) == 'ERROR cannot get status\n'
         assert excinfo.value.args[0] == 'ERROR cannot get status\n'
 
-    @patch('grp.getgrgid')
-    @patch('pwd.getpwuid')
-    def test_push_path_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+    @mock.patch('grp.getgrgid')
+    @mock.patch('pwd.getpwuid')
+    def test_push_path_unnamed(self, getpwuid: mock.MagicMock, getgrgid: mock.MagicMock):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
         harness = ops.testing.Harness(
@@ -3369,7 +3369,9 @@ class TestSecrets:
         assert secret.id == 'secret:123'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'application', ANY]]
+        assert fake_script.calls(clear=True) == [
+            ['secret-add', '--owner', 'application', mock.ANY]
+        ]
         assert fake_script.secrets() == {'foo': 'x'}
 
     def test_app_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
@@ -3400,8 +3402,8 @@ class TestSecrets:
                 'hourly',
                 '--owner',
                 'application',
-                ANY,
-                ANY,
+                mock.ANY,
+                mock.ANY,
             ]
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
@@ -3414,7 +3416,7 @@ class TestSecrets:
         assert secret.id == 'secret:345'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'unit', ANY]]
+        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'unit', mock.ANY]]
         assert fake_script.secrets() == {'foo': 'x'}
 
     def test_unit_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
@@ -3445,8 +3447,8 @@ class TestSecrets:
                 'yearly',
                 '--owner',
                 'unit',
-                ANY,
-                ANY,
+                mock.ANY,
+                mock.ANY,
             ]
         ]
         assert fake_script.secrets() == {'foo': 'w', 'bar': 'z'}
@@ -3776,9 +3778,9 @@ class TestSecretClass:
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
         assert fake_script.calls(clear=True) == [
-            ['secret-set', f'secret://{model._backend.model_uuid}/x', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/x', mock.ANY],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', f'secret://{model._backend.model_uuid}/z', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/z', mock.ANY],
         ]
         assert fake_script.secrets() == {'foo': 'bar', 'bar': 'foo'}
 
