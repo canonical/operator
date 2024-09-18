@@ -4,7 +4,7 @@ ops library API reference
 
 The `ops` library is a Python framework for writing and testing Juju charms.
 
-For more about the Charm SDK, see https://juju.is/docs/sdk.
+  See more: `Charm SDK documentation <https://juju.is/docs/sdk>`_
 
 The library provides:
 
