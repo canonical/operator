@@ -3787,6 +3787,7 @@ class TestSecretClass:
     def test_set_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
         fake_script.write('secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
+        ops.Secret._secret_set_cache.clear()
 
         secret = self.make_secret(model, id='x')
         expire = datetime.datetime(2022, 12, 9, 16, 59, 0)
@@ -3826,6 +3827,7 @@ class TestSecretClass:
     def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
+        ops.Secret._secret_set_cache.clear()
 
         secret = self.make_secret(model, id='q')
         secret.set_content({'foo': 'bar'})
@@ -3852,6 +3854,7 @@ class TestSecretClass:
 
     def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
+        ops.Secret._secret_set_cache.clear()
 
         secret = self.make_secret(model, id='q')
         description = 'desc'

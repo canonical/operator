@@ -39,6 +39,7 @@ from typing import (
     Any,
     BinaryIO,
     Callable,
+    ClassVar,
     Dict,
     Generator,
     Iterable,
@@ -1265,6 +1266,8 @@ class Secret:
 
     _key_re = re.compile(r'^([a-z](?:-?[a-z0-9]){2,})$')  # copied from Juju code
 
+    _secret_set_cache: ClassVar[Dict[str, Dict[str, Any]]] = collections.defaultdict(dict)
+
     def __init__(
         self,
         backend: '_ModelBackend',
@@ -1484,7 +1487,26 @@ class Secret:
         self._validate_content(content)
         if self._id is None:
             self._id = self.get_info().id
-        self._backend.secret_set(typing.cast(str, self.id), content=content)
+
+        # If `_backend.secret_set` has already been called, this call will
+        # overwrite anything done in the previous call (even if it was in a
+        # different event handler, as long as it was in the same Juju hook
+        # context). We want to provide more predictable behavior, so we cache
+        # the values and provide them in subsequent calls.
+        cached_data = self._secret_set_cache[self._id]
+        expire = _calculate_expiry(cached_data['expire']) if 'expire' in cached_data else None
+        # Don't store the actual secret content in memory, but put a sentinel
+        # there to indicate that the content has been set during this hook.
+        cached_data['content'] = object()
+
+        self._backend.secret_set(
+            typing.cast(str, self.id),
+            content=content,
+            label=cached_data.get('label'),
+            description=cached_data.get('description'),
+            expire=expire,
+            rotate=cached_data.get('rotate'),
+        )
         # We do not need to invalidate the cache here, as the content is the
         # same until `refresh` is used, at which point the cache is invalidated.
 
@@ -1518,8 +1540,29 @@ class Secret:
             )
         if self._id is None:
             self._id = self.get_info().id
+
+        # If `_backend.secret_set` has already been called, this call will
+        # overwrite anything done in the previous call (even if it was in a
+        # different event handler, as long as it was in the same Juju hook
+        # context). We want to provide more predictable behavior, so we cache
+        # the values and provide them in subsequent calls.
+        cached_data = self._secret_set_cache[self._id]
+        label = cached_data.get('label') if label is None else label
+        cached_data['label'] = label
+        description = cached_data.get('description') if description is None else description
+        cached_data['description'] = description
+        expire = cached_data.get('expire') if expire is None else expire
+        cached_data['expire'] = expire
+        rotate = cached_data.get('rotate') if rotate is None else rotate
+        cached_data['rotate'] = rotate
+        # Get the previous content from the unit agent's cache.
+        content = (
+            self._backend.secret_get(id=self._id, peek=True) if 'content' in cached_data else None
+        )
+
         self._backend.secret_set(
             typing.cast(str, self.id),
+            content=content,
             label=label,
             description=description,
             expire=_calculate_expiry(expire),
@@ -3218,7 +3261,6 @@ class _ModelBackend:
         self._is_leader: Optional[bool] = None
         self._leader_check_time = None
         self._hook_is_running = ''
-        self._secret_cache: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
 
     def _run(
         self,
@@ -3661,32 +3703,12 @@ class _ModelBackend:
         args = [id]
         if label is not None:
             args.extend(['--label', label])
-            self._secret_cache[id]['label'] = label
-        elif 'label' in self._secret_cache[id]:
-            args.extend(['--label', self._secret_cache[id]['label']])
         if description is not None:
             args.extend(['--description', description])
-            self._secret_cache[id]['description'] = description
-        elif 'description' in self._secret_cache[id]:
-            args.extend(['--description', self._secret_cache[id]['description']])
         if expire is not None:
             args.extend(['--expire', expire.isoformat()])
-            self._secret_cache[id]['expire'] = expire
-        elif 'expire' in self._secret_cache[id]:
-            args.extend(['--expire', self._secret_cache[id]['expire'].isoformat()])
         if rotate is not None:
             args.extend(['--rotate', rotate.value])
-            self._secret_cache[id]['rotate'] = rotate
-        elif 'rotate' in self._secret_cache[id]:
-            args.extend(['--rotate', self._secret_cache[id]['rotate'].value])
-
-        if content is not None:
-            # Don't store the actual secret content in memory, but put a sentinel there to indicate
-            # that the content has been set during this hook.
-            self._secret_cache[id]['content'] = object()
-        elif content is None and 'content' in self._secret_cache[id]:
-            # Get the previous content from the unit agent's cache.
-            content = self.secret_get(id=id, peek=True)
 
         with tempfile.TemporaryDirectory() as tmp:
             # The content is None or has already been validated with Secret._validate_content
