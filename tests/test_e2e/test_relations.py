@@ -412,6 +412,19 @@ def test_relation_ids():
         assert rel.id == initial_id + i
 
 
+def test_broken_relation_not_in_model_relations(mycharm):
+    rel = Relation("foo")
+
+    ctx = Context(
+        mycharm, meta={"name": "local", "requires": {"foo": {"interface": "foo"}}}
+    )
+    with ctx(ctx.on.relation_broken(rel), state=State(relations={rel})) as mgr:
+        charm = mgr.charm
+
+        assert charm.model.get_relation("foo") is None
+        assert charm.model.relations["foo"] == []
+
+
 def test_get_relation_when_missing():
     class MyCharm(CharmBase):
         def __init__(self, framework):
