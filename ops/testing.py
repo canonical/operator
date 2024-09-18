@@ -37,7 +37,6 @@ from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
 from importlib.metadata import version as _get_package_version
 
 from ._private.harness import (
-    ActionFailed,
     ActionOutput,
     AppUnitOrName,
     CharmBase,
@@ -65,12 +64,9 @@ from ._private.harness import (
 try:
     _version = _get_package_version('ops-scenario')
 except _PackageNotFoundError:
-    pass
+    from ops._private.harness import ActionFailed  # type: ignore
 else:
     if _version and int(_version.split('.', 1)[0]) >= 7:
-        from scenario import (
-            ActionFailed as _ScenarioActionFailed,
-        )
         from scenario import (
             ActiveStatus,
             Address,
@@ -102,7 +98,6 @@ else:
             Resource,
             Secret,
             State,
-            StateValidationError,
             Storage,
             StoredState,
             SubordinateRelation,
@@ -111,6 +106,7 @@ else:
             UnitID,
             UnknownStatus,
             WaitingStatus,
+            errors,
         )
 
         # The Scenario unit testing framework.
@@ -144,7 +140,6 @@ else:
         _ = Resource
         _ = Secret
         _ = State
-        _ = StateValidationError
         _ = Storage
         _ = StoredState
         _ = SubordinateRelation
@@ -153,9 +148,10 @@ else:
         _ = UnitID
         _ = UnknownStatus
         _ = WaitingStatus
+        _ = errors
 
         # Handle the name clash between Harness's and Scenario's ActionFailed.
-        class _MergedActionFailed(ActionFailed, _ScenarioActionFailed):
+        class ActionFailed(Exception):  # noqa: N818
             """Raised when :code:`event.fail()` is called during an action handler."""
 
             message: str
@@ -185,16 +181,15 @@ else:
                 self.output = ActionOutput([], {}) if output is None else output
                 self.state = state
 
-        ActionFailed = _MergedActionFailed
-
-        # Also monkeypatch this merged one in so that isinstance checks work.
+        # Monkeypatch this merged one in so that isinstance checks work.
         import ops._private.harness as _harness
 
-        _harness.ActionFailed = _MergedActionFailed
+        _harness.ActionFailed = ActionFailed
         import scenario.context as _context
 
-        _context.ActionFailed = _MergedActionFailed
-
+        _context.ActionFailed = ActionFailed
+    else:
+        from ops._private.harness import ActionFailed  # type: ignore
 
 # The Harness unit testing framework.
 _ = ActionFailed  # If Scenario has been installed, then this will be the merged ActionFailed.
