@@ -13,6 +13,7 @@ from ops.charm import (
 from ops.framework import EventBase, Framework
 
 from scenario import Context
+from scenario.errors import UncaughtCharmError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
     PeerRelation,
@@ -411,17 +412,50 @@ def test_relation_ids():
         assert rel.id == initial_id + i
 
 
-def test_broken_relation_not_in_model_relations(mycharm):
-    rel = Relation("foo")
+def test_get_relation_when_missing():
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.update_status, self._on_update_status)
+            self.framework.observe(self.on.config_changed, self._on_config_changed)
+            self.relation = None
+
+        def _on_update_status(self, _):
+            self.relation = self.model.get_relation("foo")
+
+        def _on_config_changed(self, _):
+            self.relation = self.model.get_relation("foo", self.config["relation-id"])
 
     ctx = Context(
-        mycharm, meta={"name": "local", "requires": {"foo": {"interface": "foo"}}}
+        MyCharm,
+        meta={"name": "foo", "requires": {"foo": {"interface": "foo"}}},
+        config={"options": {"relation-id": {"type": "int", "description": "foo"}}},
     )
-    with ctx(ctx.on.relation_broken(rel), state=State(relations={rel})) as mgr:
-        charm = mgr.charm
+    # There should be no error if the relation is missing - get_relation returns
+    # None in that case.
+    with ctx(ctx.on.update_status(), State()) as mgr:
+        mgr.run()
+        assert mgr.charm.relation is None
 
-        assert charm.model.get_relation("foo") is None
-        assert charm.model.relations["foo"] == []
+    # There should also be no error if the relation is present, of course.
+    rel = Relation("foo")
+    with ctx(ctx.on.update_status(), State(relations={rel})) as mgr:
+        mgr.run()
+        assert mgr.charm.relation.id == rel.id
+
+    # If a relation that doesn't exist is requested, that should also not raise
+    # an error.
+    with ctx(ctx.on.config_changed(), State(config={"relation-id": 42})) as mgr:
+        mgr.run()
+        rel = mgr.charm.relation
+        assert rel.id == 42
+        assert not rel.active
+
+    # If there's no defined relation with the name, then get_relation raises KeyError.
+    ctx = Context(MyCharm, meta={"name": "foo"})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.update_status(), State())
+    assert isinstance(exc.value.__cause__, KeyError)
 
 
 @pytest.mark.parametrize("klass", (Relation, PeerRelation, SubordinateRelation))
