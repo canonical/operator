@@ -3834,14 +3834,14 @@ class TestSecretClass:
 
         calls = fake_script.calls(clear=True)
         assert calls == [
-            ['secret-set', f'secret://{model._backend.model_uuid}/q', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/q', mock.ANY],
             ['secret-get', f'secret://{model._backend.model_uuid}/q', '--peek', '--format=json'],
             [
                 'secret-set',
                 f'secret://{model._backend.model_uuid}/q',
                 '--description',
                 description,
-                ANY,
+                mock.ANY,
             ],
         ]
         # For this test we don't need to check that the content was in the temporary file, but we
@@ -3871,7 +3871,7 @@ class TestSecretClass:
                 f'secret://{model._backend.model_uuid}/q',
                 '--description',
                 description,
-                ANY,
+                mock.ANY,
             ],
         ]
         # For this test we don't need to check that the content was in the temporary file, but we
