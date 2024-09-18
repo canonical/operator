@@ -43,7 +43,7 @@ This module provides:
   - :meth:`~ops.Container.add_layer` and :meth:`~ops.Container.replan` methods
     to update Pebble configuration.
   - :meth:`~ops.Container.pull` and :meth:`~ops.Container.push` methods to copy
-    data to and from container, respectively.
+    data to and from a container, respectively.
   - :meth:`~ops.Container.exec` method to run arbitrary commands inside the
     container.
 

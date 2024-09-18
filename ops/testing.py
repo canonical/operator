@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Framework for unit testing charms in a simulated environment.
+"""Framework for unit testing charms in a simulated Juju environment.
 
 The module provides:
 
@@ -28,7 +28,7 @@ The module provides:
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see `Testing Strategies <https://juju.is/docs/sdk/testing>`_.
+    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
 """
 
 import dataclasses
