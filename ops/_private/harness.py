@@ -61,7 +61,7 @@ from ops import charm, framework, model, pebble, storage
 from ops._private import yaml
 from ops.charm import CharmBase, CharmMeta, RelationRole
 from ops.jujucontext import _JujuContext
-from ops.model import Container, RelationNotFoundError, _NetworkDict
+from ops.model import Container, RelationNotFoundError, StatusName, _NetworkDict
 from ops.pebble import ExecProcess
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
@@ -80,11 +80,10 @@ _FileKwargs = TypedDict(
 
 _RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[str]})
 
-_StatusName = Literal['unknown', 'blocked', 'active', 'maintenance', 'waiting']
 _RawStatus = TypedDict(
     '_RawStatus',
     {
-        'status': _StatusName,
+        'status': StatusName,
         'message': str,
     },
 )
@@ -2491,7 +2490,7 @@ class _TestingModelBackend:
         else:
             return self._unit_status
 
-    def status_set(self, status: '_StatusName', message: str = '', *, is_app: bool = False):
+    def status_set(self, status: 'StatusName', message: str = '', *, is_app: bool = False):
         if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
             raise model.ModelError(
                 f'ERROR invalid status "{status}", expected one of'

@@ -823,8 +823,8 @@ class TestModel:
         class NoNameStatus(ops.StatusBase):
             pass
 
-        with pytest.raises(AttributeError):
-            ops.StatusBase.register_status(NoNameStatus)  # type: ignore
+        with pytest.raises(TypeError):
+            ops.StatusBase.register(NoNameStatus)
 
     def test_status_repr(self):
         test_cases = {
@@ -2878,34 +2878,28 @@ class TestModelBackend:
                 case()
 
     def test_local_set_invalid_status(self, fake_script: FakeScript):
-        # juju returns exit code 1 if you ask to set status to 'unknown' or 'error'
+        # ops will directly raise InvalidStatusError if you try to set status to unknown or error
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
         model = ops.Model(meta, self.backend)
-        fake_script.write('status-set', 'exit 1')
         fake_script.write('is-leader', 'echo true')
 
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.unit.status = ops.UnknownStatus()
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.unit.status = ops.ErrorStatus()
 
-        assert fake_script.calls(True) == [
-            ['status-set', '--application=False', 'unknown', ''],
-            ['status-set', '--application=False', 'error', ''],
-        ]
+        assert fake_script.calls(True) == []
 
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.app.status = ops.UnknownStatus()
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.app.status = ops.ErrorStatus()
 
         # A leadership check is needed for application status.
         assert fake_script.calls(True) == [
             ['is-leader', '--format=json'],
-            ['status-set', '--application=True', 'unknown', ''],
-            ['status-set', '--application=True', 'error', ''],
         ]
 
     @pytest.mark.parametrize('name', ['active', 'waiting', 'blocked', 'maintenance', 'error'])
@@ -2949,9 +2943,20 @@ class TestModelBackend:
         assert model.app.status.message == 'bar'
 
     def test_status_set_is_app_not_bool_raises(self):
-        for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
+        for is_app_v in [None, 1, 2.0, 'a', b'beef', object()]:
             with pytest.raises(TypeError):
-                self.backend.status_set(ops.ActiveStatus, is_app=is_app_v)  # type: ignore
+                self.backend.status_set(
+                    'active',
+                    is_app=is_app_v,  # type: ignore[assignment]
+                )
+
+    def test_status_set_message_not_str_raises(self):
+        for message in [None, 1, 2.0, True, b'beef', object()]:
+            with pytest.raises(TypeError):
+                self.backend.status_set(
+                    'active',
+                    message=message,  # type: ignore[assignment]
+                )
 
     def test_storage_tool_errors(self, fake_script: FakeScript):
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')

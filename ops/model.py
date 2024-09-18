@@ -42,6 +42,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -51,6 +52,7 @@ from typing import (
     Type,
     TypedDict,
     Union,
+    get_args,
 )
 
 import ops
@@ -69,7 +71,11 @@ K8sSpec = Mapping[str, Any]
 _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
-_StatusDict = TypedDict('_StatusDict', {'status': str, 'message': str})
+_ReadOnlyStatusName = Literal['error', 'unknown']
+_SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
+StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
+_StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
+_SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -424,9 +430,12 @@ class Application:
         if not self._backend.is_leader():
             raise RuntimeError('cannot set application status as a non-leader unit')
 
-        for _key in {'name', 'message'}:
-            assert isinstance(getattr(value, _key), str), f'status.{_key} must be a string'
-        self._backend.status_set(value.name, value.message, is_app=True)
+        self._backend.status_set(
+            typing.cast(_SettableStatusName, value.name),  # status_set will validate at runtime
+            value.message,
+            is_app=True,
+        )
+
         self._status = value
 
     def planned_units(self) -> int:
@@ -590,8 +599,11 @@ class Unit:
         if not self._is_our_unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
-        # fixme: if value.messages
-        self._backend.status_set(value.name, value.message, is_app=False)
+        self._backend.status_set(
+            typing.cast(_SettableStatusName, value.name),  # status_set will validate at runtime
+            value.message,
+            is_app=False,
+        )
         self._status = value
 
     def __repr__(self):
@@ -1885,10 +1897,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: Dict[str, Type['StatusBase']] = {}
+    _statuses: Dict[StatusName, Type['StatusBase']] = {}
 
-    # Subclasses should override this attribute
-    name = ''
+    # Subclasses must provide this attribute
+    name: StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -1911,7 +1923,8 @@ class StatusBase:
         does not have an associated message.
 
         Args:
-            name: Name of the status, for example "active" or "blocked".
+            name: Name of the status, one of:
+                "active", "blocked", "maintenance", "waiting", "error", or "unknown".
             message: Message to include with the status.
 
         Raises:
@@ -1921,12 +1934,12 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[name](message)
+            return cls._statuses[typing.cast(StatusName, name)](message)
 
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """Register a Status for the child's name."""
-        if not isinstance(child.name, str):
+        if not (hasattr(child, 'name') and isinstance(child.name, str)):
             raise TypeError(
                 f"Can't register StatusBase subclass {child}: ",
                 'missing required `name: str` class attribute',
@@ -1960,7 +1973,7 @@ class UnknownStatus(StatusBase):
     charm has not called status-set yet.
 
     This status is read-only; trying to set unit or application status to
-    ``UnknownStatus`` will raise :class:`ModelError`.
+    ``UnknownStatus`` will raise :class:`InvalidStatusError`.
     """
 
     name = 'unknown'
@@ -1981,7 +1994,7 @@ class ErrorStatus(StatusBase):
     human intervention in order to operate correctly).
 
     This status is read-only; trying to set unit or application status to
-    ``ErrorStatus`` will raise :class:`ModelError`.
+    ``ErrorStatus`` will raise :class:`InvalidStatusError`.
     """
 
     name = 'error'
@@ -3415,13 +3428,15 @@ class _ModelBackend:
         #       status-data: {}
 
         if is_app:
-            content = typing.cast(Dict[str, Dict[str, str]], content)
+            content = typing.cast(Dict[str, '_StatusDict'], content)
             app_status = content['application-status']
             return {'status': app_status['status'], 'message': app_status['message']}
         else:
             return typing.cast('_StatusDict', content)
 
-    def status_set(self, status: str, message: str = '', *, is_app: bool = False) -> None:
+    def status_set(
+        self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
+    ) -> None:
         """Set a status of a unit or an application.
 
         Args:
@@ -3432,6 +3447,10 @@ class _ModelBackend:
         """
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter must be boolean')
+        if not isinstance(message, str):
+            raise TypeError('message parameter must be a string')
+        if status not in _SETTABLE_STATUS_NAMES:
+            raise InvalidStatusError(f'status must be in {_SETTABLE_STATUS_NAMES}, not {status!r}')
         self._run('status-set', f'--application={is_app}', status, message)
 
     def storage_list(self, name: str) -> List[int]:
