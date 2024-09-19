@@ -64,7 +64,148 @@ ops.pebble module
 ops.testing module
 ==================
 
+Frameworks for unit testing charms in a simulated Juju environment.
+
+Two frameworks are available:
+
+* State-transition testing, which tests the charm's state transitions in response
+  to events. This is the recommended approach. Install ops with the `testing`
+  extra to use this framework; for example: `pip install ops[testing]`
+* Harness, which provides an API similar to the Juju CLI. This is a legacy
+  framework, and has issues, particularly with resetting the charm state between
+  Juju events.
+
+.. note::
+    Unit testing is only one aspect of a comprehensive testing strategy. For more
+    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+
+State-transition testing
+------------------------
+
+Write tests that declaratively define the Juju state all at once, define the
+Juju context against which to test the charm, and fire a single event on the
+charm to execute its logic. The tests can then assert that the Juju state has
+changed as expected.
+
+These tests are 'state-transition' tests, a way to test isolated units of charm
+functionality (how the state changes in reaction to events). They are not
+necessarily tests of individual methods or functions (but might be, depending on
+the charm's event observers); they are testing the 'contract' of the charm: given
+a certain state, when a certain event happens, the charm should transition to a
+certain (likely different) state. They do not test against a real Juju
+controller and model, and focus on a single Juju unit, unlike integration tests.
+For simplicity, we refer to them as 'unit' tests in the charm context.
+
+Writing these tests should nudge you into thinking of a charm as a black-box
+input->output function. The input is the union of an `Event` (why am I, charm,
+being executed), a `State` (am I leader? what is my integration data? what is my
+config?...) and the charm's execution `Context` (what integrations can I have?
+what containers can I have?...). The output is another `State`: the state after
+the charm has had a chance to interact with the mocked Juju model and affect the
+state.
+
+.. image:: https://raw.githubusercontent.com/canonical/ops-scenario/main/resources/state-transition-model.png
+   :alt: Transition diagram, with the input state and event on the left, the context including the charm in the centre, and the state out on the right
+
+Writing unit tests for a charm, then, means verifying that:
+
+- the charm does not raise uncaught exceptions while handling the event
+- the output state (as compared with the input state) is as expected.
+
+A test consists of three broad steps:
+
+- **Arrange**:
+    - declare the context
+    - declare the input state
+- **Act**:
+    - select an event to fire
+    - run the context (i.e. obtain the output state, given the input state and the event)
+- **Assert**:
+    - verify that the output state (as compared with the input state) is how you expect it to be
+    - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
+    - optionally, you can use a context manager to get a hold of the charm instance and run
+      assertions on APIs and state internal to it.
+
+The most basic scenario is one in which all is defaulted and barely any data is
+available. The charm has no config, no integrations, no leadership, and its
+status is `unknown`. With that, we can write the simplest possible test:
+
+.. code-block:: python
+
+    def test_base():
+        ctx = Context(MyCharm)
+        out = ctx.run(ctx.on.start(), State())
+        assert out.unit_status == UnknownStatus()
+
 .. autoclass:: ops.testing.ActionFailed
+.. autoclass:: ops.testing.ActiveStatus
+.. autoclass:: ops.testing.Address
+.. autoclass:: ops.testing.BindAddress
+.. autoclass:: ops.testing.BlockedStatus
+.. autoclass:: ops.testing.CharmEvents
+.. autoclass:: ops.testing.CheckInfo
+.. autoclass:: ops.testing.CloudCredential
+.. autoclass:: ops.testing.CloudSpec
+.. autoclass:: ops.testing.Container
+.. autoclass:: ops.testing.Context
+   :special-members: __call__
+.. autoclass:: ops.testing.DeferredEvent
+.. autoclass:: ops.testing.ErrorStatus
+.. autoclass:: ops.testing.Exec
+.. autoclass:: ops.testing.ICMPPort
+.. autoclass:: ops.testing.JujuLogLine
+.. autoclass:: ops.testing.MaintenanceStatus
+.. autoclass:: ops.testing.Manager
+.. autoclass:: ops.testing.Model
+.. autoclass:: ops.testing.Mount
+.. autoclass:: ops.testing.Network
+.. autoclass:: ops.testing.Notice
+.. autoclass:: ops.testing.PeerRelation
+.. autoclass:: ops.testing.Port
+.. autoclass:: ops.testing.RawDataBagContents
+.. autoclass:: ops.testing.RawSecretRevisionContents
+.. autoclass:: ops.testing.Relation
+.. autoclass:: ops.testing.RelationBase
+.. autoclass:: ops.testing.Resource
+.. autoclass:: ops.testing.Secret
+.. autoclass:: ops.testing.State
+.. autoclass:: ops.testing.Storage
+.. autoclass:: ops.testing.StoredState
+.. autoclass:: ops.testing.SubordinateRelation
+.. autoclass:: ops.testing.TCPPort
+.. autoclass:: ops.testing.UDPPort
+.. autoclass:: ops.testing.UnknownStatus
+.. autoclass:: ops.testing.WaitingStatus
+.. autoclass:: ops.testing.errors.ContextSetupError
+.. autoclass:: ops.testing.errors.AlreadyEmittedError
+.. autoclass:: ops.testing.errors.ScenarioRuntimeError
+.. autoclass:: ops.testing.errors.UncaughtCharmError
+.. autoclass:: ops.testing.errors.InconsistentScenarioError
+.. autoclass:: ops.testing.errors.StateValidationError
+.. autoclass:: ops.testing.errors.MetadataNotFoundError
+.. autoclass:: ops.testing.errors.ActionMissingFromContextError
+.. autoclass:: ops.testing.errors.NoObserverError
+.. autoclass:: ops.testing.errors.BadOwnerPath
+
+Harness
+-------
+
+The Harness framework includes:
+
+- :class:`ops.testing.Harness`, a class to set up the simulated environment,
+  that provides:
+
+  - :meth:`~ops.testing.Harness.add_relation` method, to declare a relation
+    (integration) with another app.
+  - :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
+    methods to start and end the testing lifecycle.
+  - :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
+    status of the charm after test interactions.
+  - :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
+    :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
+
+.. autoclass:: ops.testing.ActionFailed
+   :noindex:
 .. autoclass:: ops.testing.ActionOutput
 .. autoclass:: ops.testing.ExecArgs
 .. autoclass:: ops.testing.ExecResult
@@ -75,5 +216,3 @@ Indices
 =======
 
 * :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
