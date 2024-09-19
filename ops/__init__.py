@@ -27,7 +27,8 @@ This module provides:
     :meth:`~ops.Framework.observe` and react to Juju events.
   - :attr:`~ops.Framework.model` attribute to get hold of the Model instance.
 
-- :class:`~ops.model.Model` class that represents the Juju model, including:
+- :class:`~ops.model.Model` class that represents the Juju model, accessible as
+  ``self.model`` in a charm, including:
 
   - :attr:`~ops.Model.app` attribute, representing the application associated
     with the charm.
