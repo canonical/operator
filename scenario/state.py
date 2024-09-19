@@ -52,7 +52,7 @@ from scenario.logger import logger as scenario_logger
 if TYPE_CHECKING:  # pragma: no cover
     from scenario import Context
 
-AnyJson = Union[str, bool, dict, int, float, list]
+AnyJson = Union[str, bool, Dict[str, "AnyJson"], int, float, List["AnyJson"]]
 RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
 UnitID = int
 
