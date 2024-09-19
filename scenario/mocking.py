@@ -196,7 +196,7 @@ class _MockModelBackend(_ModelBackend):
     def _get_relation_by_id(self, rel_id) -> "RelationBase":
         try:
             return self._state.get_relation(rel_id)
-        except ValueError:
+        except KeyError:
             raise RelationNotFoundError() from None
 
     def _get_secret(self, id=None, label=None):
