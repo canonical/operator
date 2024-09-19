@@ -941,7 +941,12 @@ class SecretEvent(HookEvent):
         until :meth:`Secret.get_content()` is called.
         """
         backend = self.framework.model._backend
-        return model.Secret(backend=backend, id=self._id, label=self._label)
+        return model.Secret(
+            backend=backend,
+            id=self._id,
+            label=self._label,
+            _secret_set_cache=self.framework.model._cache._secret_set_cache,
+        )
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.

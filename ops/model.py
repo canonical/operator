@@ -340,7 +340,9 @@ class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
-        self._secret_set_cache: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
+        self._secret_set_cache: collections.defaultdict[str, Dict[str, Any]] = (
+            collections.defaultdict(dict)
+        )
         self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
@@ -1290,7 +1292,7 @@ class Secret:
         id: Optional[str] = None,
         label: Optional[str] = None,
         content: Optional[Dict[str, str]] = None,
-        _secret_set_cache: Optional[Dict[str, Dict[str, Any]]] = None,
+        _secret_set_cache: Optional['collections.defaultdict[str, Dict[str, Any]]'] = None,
     ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1300,7 +1302,9 @@ class Secret:
         self._id = id
         self._label = label
         self._content = content
-        self._secret_set_cache = _secret_set_cache or collections.defaultdict(dict)
+        self._secret_set_cache: collections.defaultdict[str, Dict[str, Any]] = (
+            collections.defaultdict(dict) if _secret_set_cache is None else _secret_set_cache
+        )
 
     def __repr__(self):
         fields: List[str] = []
