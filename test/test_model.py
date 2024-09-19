@@ -3833,22 +3833,21 @@ class TestSecretClass:
         secret.set_info(description=description)
 
         calls = fake_script.calls(clear=True)
-        assert calls == [
-            ['secret-set', f'secret://{model._backend.model_uuid}/q', mock.ANY],
-            ['secret-get', f'secret://{model._backend.model_uuid}/q', '--peek', '--format=json'],
-            [
-                'secret-set',
-                f'secret://{model._backend.model_uuid}/q',
-                '--description',
-                description,
-                mock.ANY,
-            ],
-        ]
-        # For this test we don't need to check that the content was in the temporary file, but we
-        # do want to be certain that there was a file passed to the call (but don't care about
-        # what the name of the file was).
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
         assert calls[0][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
-        assert calls[2][-1].startswith('foo#file=') and calls[2][-1].endswith('/foo')
+        assert calls[1] == [
+            'secret-get',
+            f'secret://{model._backend.model_uuid}/q',
+            '--peek',
+            '--format=json',
+        ]
+        assert calls[2][:-1] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[2][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
 
     def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -3859,25 +3858,31 @@ class TestSecretClass:
         secret.set_content({'foo': 'bar'})
 
         calls = fake_script.calls(clear=True)
-        assert calls == [
-            [
-                'secret-set',
-                f'secret://{model._backend.model_uuid}/q',
-                '--description',
-                description,
-            ],
-            [
-                'secret-set',
-                f'secret://{model._backend.model_uuid}/q',
-                '--description',
-                description,
-                mock.ANY,
-            ],
+        assert calls[0] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
         ]
-        # For this test we don't need to check that the content was in the temporary file, but we
-        # do want to be certain that there was a file passed to the call (but don't care about
-        # what the name of the file was).
+        assert calls[1][:-1] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
         assert calls[1][-1].startswith('foo#file=') and calls[1][-1].endswith('/foo')
+
+    def test_set_content_aggregates(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+
+        secret = self.make_secret(model, id='q')
+        secret.set_content({'foo': 'bar'})
+        secret.set_content({'baz': 'qux', 'foo': 'newbar'})
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert fake_script.secrets() == {'foo': 'newbar', 'baz': 'qux'}
 
     def test_grant(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('relation-list', """echo '[]'""")
