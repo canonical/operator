@@ -77,6 +77,9 @@ StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
 _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
+# for the StatusBase.register class decorator
+_StatusBaseType = typing.TypeVar("_StatusBaseType", bound="Type[StatusBase]")
+
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
 # mapping from container name to container metadata
@@ -1937,7 +1940,7 @@ class StatusBase:
             return cls._statuses[typing.cast(StatusName, name)](message)
 
     @classmethod
-    def register(cls, child: Type['StatusBase']):
+    def register(cls, child: _StatusBaseType) -> _StatusBaseType:
         """Register a Status for the child's name."""
         if not (hasattr(child, 'name') and isinstance(child.name, str)):
             raise TypeError(
