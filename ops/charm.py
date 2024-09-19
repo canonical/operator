@@ -118,10 +118,11 @@ class ActionEvent(EventBase):
     invokes a Juju Action. Callbacks bound to these events may be used
     for responding to the administrator's Juju Action request.
 
-    To read the parameters for the action, see the instance variable :attr:`params`.
-    To respond with the result of the action, call :meth:`set_results`. To add
-    progress messages that are visible as the action is progressing use
-    :meth:`log`.
+    To read the parameters for the action, see the instance variable
+    :attr:`~ops.ActionEvent.params`.
+    To respond with the result of the action, call
+    :meth:`~ops.ActionEvent.set_results`. To add progress messages that are
+    visible as the action is progressing use :meth:`~ops.ActionEvent.log`.
     """
 
     id: str = ''
@@ -240,7 +241,7 @@ class StartEvent(HookEvent):
     """Event triggered immediately after first configuration change.
 
     This event is triggered immediately after the first
-    :class:`ConfigChangedEvent`. Callback methods bound to the event should be
+    :class:`~ops.ConfigChangedEvent`. Callback methods bound to the event should be
     used to ensure that the charm's software is in a running state. Note that
     the charm's software should be configured so as to persist in this state
     through reboots without further intervention on Juju's part.
@@ -298,8 +299,8 @@ class ConfigChangedEvent(HookEvent):
       specifically has changed in the config).
     - Right after the unit starts up for the first time.
       This event notifies the charm of its initial configuration.
-      Typically, this event will fire between an :class:`install <InstallEvent>`
-      and a :class:`start <StartEvent>` during the startup sequence
+      Typically, this event will fire between an :class:`~ops.InstallEvent`
+      and a :class:~`ops.StartEvent` during the startup sequence
       (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
@@ -323,7 +324,7 @@ class UpdateStatusEvent(HookEvent):
     to this event should determine the "health" of the application and
     set the status appropriately.
 
-    The interval between :class:`update-status <UpdateStatusEvent>` events can
+    The interval between :class:`~ops.UpdateStatusEvent` events can
     be configured model-wide, e.g.  ``juju model-config
     update-status-hook-interval=1m``.
     """
@@ -355,7 +356,7 @@ class PreSeriesUpgradeEvent(HookEvent):
     It can be assumed that only after all units on a machine have executed the
     callback method associated with this event, the administrator will initiate
     steps to actually upgrade the series.  After the upgrade has been completed,
-    the :class:`PostSeriesUpgradeEvent` will fire.
+    the :class:`~ops.PostSeriesUpgradeEvent` will fire.
 
     .. jujuremoved:: 4.0
     """
@@ -412,7 +413,7 @@ class LeaderSettingsChangedEvent(HookEvent):
     .. deprecated:: 2.4.0
         This event has been deprecated in favor of using a Peer relation,
         and having the leader set a value in the Application data bag for
-        that peer relation. (See :class:`RelationChangedEvent`.)
+        that peer relation. (See :class:`~ops.RelationChangedEvent`.)
     """
 
 
@@ -550,7 +551,7 @@ class RelationCreatedEvent(RelationEvent):
 
     This is triggered when a new integration with another app is added in Juju. This
     can occur before units for those applications have started. All existing
-    relations will trigger `RelationCreatedEvent` before :class:`StartEvent` is
+    relations will trigger `RelationCreatedEvent` before :class:`~ops.StartEvent` is
     emitted.
     """
 
@@ -582,7 +583,7 @@ class RelationChangedEvent(RelationEvent):
     to see the new information, where ``event`` is the event object passed to
     the callback method bound to this event.
 
-    This event always fires once, after :class:`RelationJoinedEvent`, and
+    This event always fires once, after :class:`~ops.RelationJoinedEvent`, and
     will subsequently fire whenever that remote unit changes its data for
     the relation. Callback methods bound to this event should be the only ones
     that rely on remote relation data. They should not error if the data
@@ -597,7 +598,7 @@ class RelationChangedEvent(RelationEvent):
 class RelationDepartedEvent(RelationEvent):
     """Event triggered when a unit leaves a relation.
 
-    This is the inverse of the :class:`RelationJoinedEvent`, representing when a
+    This is the inverse of the :class:`~ops.RelationJoinedEvent`, representing when a
     unit is leaving the relation (the unit is being removed, the app is being
     removed, the relation is being removed). For remaining units, this event is
     emitted once for each departing unit.  For departing units, this event is
@@ -610,7 +611,7 @@ class RelationDepartedEvent(RelationEvent):
     unit has already shut down.
 
     Once all callback methods bound to this event have been run for such a
-    relation, the unit agent will fire the :class:`RelationBrokenEvent`.
+    relation, the unit agent will fire the :class:`~ops.RelationBrokenEvent`.
     """
 
     unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -670,7 +671,7 @@ class RelationBrokenEvent(RelationEvent):
     The event indicates that the current relation is no longer valid, and that
     the charm's software must be configured as though the relation had never
     existed. It will only be called after every callback method bound to
-    :class:`RelationDepartedEvent` has been run. If a callback method
+    :class:`~ops.RelationDepartedEvent` has been run. If a callback method
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
     """
@@ -741,7 +742,7 @@ class StorageAttachedEvent(StorageEvent):
 
     Callback methods bound to this event allow the charm to run code
     when storage has been added. Such methods will be run before the
-    :class:`InstallEvent` fires, so that the installation routine may
+    :class:`~ops.InstallEvent` fires, so that the installation routine may
     use the storage. The name prefix of this hook will depend on the
     storage key defined in the ``metadata.yaml`` file.
     """
@@ -755,7 +756,7 @@ class StorageDetachingEvent(StorageEvent):
 
     Callback methods bound to this event allow the charm to run code
     before storage is removed. Such methods will be run before storage
-    is detached, and always before the :class:`StopEvent` fires, thereby
+    is detached, and always before the :class:`~ops.StopEvent` fires, thereby
     allowing the charm to gracefully release resources before they are
     removed and before the unit terminates. The name prefix of the
     hook will depend on the storage key defined in the ``metadata.yaml``
@@ -905,7 +906,7 @@ class PebbleCheckFailedEvent(PebbleCheckEvent):
     """Event triggered when a Pebble check exceeds the configured failure threshold.
 
     Note that the check may have started passing by the time this event is
-    emitted (which will mean that a :class:`PebbleCheckRecoveredEvent` will be
+    emitted (which will mean that a :class:`~ops.PebbleCheckRecoveredEvent` will be
     emitted next). If the handler is executing code that should only be done
     if the check is currently failing, check the current status with
     ``event.info.status == ops.pebble.CheckStatus.DOWN``.
@@ -1185,59 +1186,59 @@ class CharmEvents(ObjectEvents):
     #       each event class's docstring. Please keep in sync.
 
     install = EventSource(InstallEvent)
-    """Triggered when a charm is installed (see :class:`InstallEvent`)."""
+    """Triggered when a charm is installed (see :class:`~ops.InstallEvent`)."""
 
     start = EventSource(StartEvent)
-    """Triggered immediately after first configuration change (see :class:`StartEvent`)."""
+    """Triggered immediately after first configuration change (see :class:`~ops.StartEvent`)."""
 
     stop = EventSource(StopEvent)
-    """Triggered when a charm is shut down (see :class:`StopEvent`)."""
+    """Triggered when a charm is shut down (see :class:`~ops.StopEvent`)."""
 
     remove = EventSource(RemoveEvent)
-    """Triggered when a unit is about to be terminated (see :class:`RemoveEvent`)."""
+    """Triggered when a unit is about to be terminated (see :class:`~ops.RemoveEvent`)."""
 
     update_status = EventSource(UpdateStatusEvent)
     """Triggered periodically by a status update request from Juju (see
-    :class:`UpdateStatusEvent`).
+    :class:`~ops.UpdateStatusEvent`).
     """
 
     config_changed = EventSource(ConfigChangedEvent)
-    """Triggered when a configuration change occurs (see :class:`ConfigChangedEvent`)."""
+    """Triggered when a configuration change occurs (see :class:`~ops.ConfigChangedEvent`)."""
 
     upgrade_charm = EventSource(UpgradeCharmEvent)
-    """Triggered by request to upgrade the charm (see :class:`UpgradeCharmEvent`)."""
+    """Triggered by request to upgrade the charm (see :class:`~ops.UpgradeCharmEvent`)."""
 
     pre_series_upgrade = EventSource(PreSeriesUpgradeEvent)
-    """Triggered to prepare a unit for series upgrade (see :class:`PreSeriesUpgradeEvent`).
+    """Triggered to prepare a unit for series upgrade (see :class:`~ops.PreSeriesUpgradeEvent`).
 
     .. jujuremoved:: 4.0
     """
 
     post_series_upgrade = EventSource(PostSeriesUpgradeEvent)
-    """Triggered after a series upgrade (see :class:`PostSeriesUpgradeEvent`).
+    """Triggered after a series upgrade (see :class:`~ops.PostSeriesUpgradeEvent`).
 
     .. jujuremoved:: 4.0
     """
 
     leader_elected = EventSource(LeaderElectedEvent)
-    """Triggered when a new leader has been elected (see :class:`LeaderElectedEvent`)."""
+    """Triggered when a new leader has been elected (see :class:`~ops.LeaderElectedEvent`)."""
 
     leader_settings_changed = EventSource(LeaderSettingsChangedEvent)
     """Triggered when leader changes any settings (see
-    :class:`LeaderSettingsChangedEvent`).
+    :class:`~ops.LeaderSettingsChangedEvent`).
 
     .. deprecated:: 2.4.0
     """
 
     collect_metrics = EventSource(CollectMetricsEvent)
-    """Triggered by Juju to collect metrics (see :class:`CollectMetricsEvent`).
+    """Triggered by Juju to collect metrics (see :class:`~ops.CollectMetricsEvent`).
 
     .. jujuremoved:: 4.0
     """
 
     secret_changed = EventSource(SecretChangedEvent)
     """Triggered by Juju on the observer when the secret owner changes its contents (see
-    :class:`SecretChangedEvent`).
+    :class:`~ops.SecretChangedEvent`).
 
     .. jujuadded:: 3.0
         Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
@@ -1245,33 +1246,33 @@ class CharmEvents(ObjectEvents):
 
     secret_expired = EventSource(SecretExpiredEvent)
     """Triggered by Juju on the owner when a secret's expiration time elapses (see
-    :class:`SecretExpiredEvent`).
+    :class:`~ops.SecretExpiredEvent`).
 
     .. jujuadded:: 3.0
     """
 
     secret_rotate = EventSource(SecretRotateEvent)
     """Triggered by Juju on the owner when the secret's rotation policy elapses (see
-    :class:`SecretRotateEvent`).
+    :class:`~ops.SecretRotateEvent`).
 
     .. jujuadded:: 3.0
     """
 
     secret_remove = EventSource(SecretRemoveEvent)
     """Triggered by Juju on the owner when a secret revision can be removed (see
-    :class:`SecretRemoveEvent`).
+    :class:`~ops.SecretRemoveEvent`).
 
     .. jujuadded:: 3.0
     """
 
     collect_app_status = EventSource(CollectStatusEvent)
     """Triggered on the leader at the end of every hook to collect app statuses for evaluation
-    (see :class:`CollectStatusEvent`).
+    (see :class:`~ops.CollectStatusEvent`).
     """
 
     collect_unit_status = EventSource(CollectStatusEvent)
     """Triggered at the end of every hook to collect unit statuses for evaluation
-    (see :class:`CollectStatusEvent`).
+    (see :class:`~ops.CollectStatusEvent`).
     """
 
 
