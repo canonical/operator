@@ -14,7 +14,7 @@ The library provides:
 - :ref:`ops_testing_module`, the framework for unit testing charms in a simulated environment;
 
 You can write a charm in any way you want, but with the `ops` library you get a
-framework that helps you write consistent readable charms following the latest
+framework that helps you write consistent and readable charms following the latest
 best practices, reuse code via charm libs, and separate typical charm concerns
 --- application state management from integration management or lifecycle
 management from testability.
