@@ -16,14 +16,14 @@
 
 This module provides:
 
-- :class:`~ops.CharmBase` and :class:`~ops.Object` to register the charm or
-  a charm lib, respectively, with the framework.
+- :class:`~ops.CharmBase`, the base class for charms and :class:`~ops.Object`,
+  the base class for charm libraries.
 - :class:`~ops.framework.EventBase` class and individual event types, like
-  :class:`~ops.ActionEvent` class.
+  the :class:`~ops.ActionEvent` class.
 - :class:`~ops.Framework` class, accessible as ``self.framework`` in a charm,
   the main interface for the charm to `ops` library infrastructure, including:
 
-  - :meth:`~ops.Framework.on` shorthand property used to
+  - :attr:`~ops.Framework.on` shorthand property used to
     :meth:`~ops.Framework.observe` and react to Juju events.
   - :attr:`~ops.Framework.model` attribute to get hold of the Model instance.
 
@@ -35,9 +35,7 @@ This module provides:
   - :attr:`~ops.Model.unit` attribute, representing the unit of the application
     the charm is running on.
   - :attr:`~ops.Model.relations` attribute, which provides access to relations
-    defined in the charm, allowing interaction with other applications.
-  - :meth:`~ops.Model.get_secret` method, to access Juju :class:`~ops.Secret`
-    objects.
+    (integrations) defined in the charm, allowing interaction with other applications.
 
 - :class:`~ops.Container` class to control Kubernetes workloads, including:
 
@@ -48,7 +46,7 @@ This module provides:
   - :meth:`~ops.Container.exec` method to run arbitrary commands inside the
     container.
 
-- :class:`~ops.StatusBase` class and individual status types, like
+- :class:`~ops.StatusBase` class and individual status types, like the
   :class:`~ops.ActiveStatus` class.
 """
 
