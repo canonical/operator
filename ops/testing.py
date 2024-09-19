@@ -17,9 +17,9 @@ The module provides:
 
 - :class:`ops.testing.Harness`, a class to set up the environment for charms, and its:
 
-  - :meth:`~ops.testing.Harness.begin_with_initial_hooks` convenience method for declarative
-    test setup.
-  - individual :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
+  - :meth:`~ops.testing.Harness.add_relation` method, to declare a relation
+    (integration) with another app.
+  - :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
     methods to start and end the testing lifecycle.
   - :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
     status of the charm after test interactions.
