@@ -520,7 +520,8 @@ class PrefixedEvents:
 class LifecycleEvent(EventBase):
     """Events tied to the lifecycle of the Framework object.
 
-    Note: Here, "lifecycle" has nothing to do with the Juju [application] lifecycle.
+    Note: Here, "lifecycle" was poorly named and has nothing to do with the
+    Juju [application] lifecycle.
     """
 
     def defer(self) -> NoReturn:
