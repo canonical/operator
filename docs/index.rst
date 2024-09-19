@@ -19,8 +19,6 @@ best practices, reuse code via charm libs, and separate typical charm concerns
 --- application state management from integration management or lifecycle
 management from testability.
 
-Whether your charm is for machines or Kubernetes, `ops` is the recommended way to go.
-
 
 .. toctree::
    :maxdepth: 2
