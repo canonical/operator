@@ -10,7 +10,7 @@ The library provides:
 
 - :ref:`ops_main_entry_point`, used to initialise and run your charm;
 - :ref:`ops_module`, the API to respond to Juju events and manage the application;
-- :ref:`ops_pebble_module`, the low-level API for Pebble in Kubernetes containers;
+- :ref:`ops_pebble_module`, the Pebble client, a low-level API for Kubernetes containers;
 - :ref:`ops_testing_module`, the framework for unit testing charms in a simulated environment;
 
 You can write a charm in any way you want, but with the `ops` library you get a

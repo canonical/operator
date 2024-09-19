@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Low-level Pebble API.
+"""Client for the Pebble API.
 
 This module provides:
 
