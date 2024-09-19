@@ -16,7 +16,7 @@
 
 This module provides:
 
-- :class:`~ops.pebble.Client` class to communicate directly Pebble.
+- :class:`~ops.pebble.Client`; communicates directly with the Pebble API.
 - :class:`~ops.pebble.Layer` class to define Pebble configuration layers,
   including:
 

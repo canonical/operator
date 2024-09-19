@@ -13,9 +13,10 @@
 # limitations under the License.
 """Framework for unit testing charms in a simulated Juju environment.
 
-The module provides:
+The module includes:
 
-- :class:`ops.testing.Harness`, a class to set up the environment for charms, and its:
+- :class:`ops.testing.Harness`, a class to set up the simulated environment,
+  that provides:
 
   - :meth:`~ops.testing.Harness.add_relation` method, to declare a relation
     (integration) with another app.
