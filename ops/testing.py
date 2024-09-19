@@ -188,8 +188,10 @@ else:
 
         _harness.ActionFailed = ActionFailed
         import scenario.context as _context
+        import scenario.runtime as _runtime
 
-        _context.ActionFailed = ActionFailed
+        _context.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
+        _runtime.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
     else:
         from ops._private.harness import ActionFailed  # type: ignore
 
