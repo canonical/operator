@@ -178,7 +178,7 @@ class CharmEvents:
         return _Event("config_changed")
 
     @staticmethod
-    @_copy_doc(ops.UpdateStatusEvent)
+    @_copy_doc(ops.UpgradeCharmEvent)
     def upgrade_charm():
         return _Event("upgrade_charm")
 
