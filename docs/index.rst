@@ -13,10 +13,11 @@ The library provides:
 - :ref:`ops_pebble_module`, the Pebble client, a low-level API for Kubernetes containers;
 - :ref:`ops_testing_module`, the framework for unit testing charms in a simulated environment;
 
-You can write a charm in any way you want, but with the `ops` library you get a
-framework that helps you write consistent and readable charms following the latest
-best practices, reuse code, and separate typical charm concerns --- application
-state management from integration management or lifecycle management from testability.
+You can structure your charm however you like, but with the `ops` library, you
+get a framework that promotes consistency and readability by following best
+practices. It also helps you organize your code better by separating different
+aspects of the charm, such as managing the application’s state, handling
+integrations with other services, and making the charm easier to test.
 
 
 .. toctree::
