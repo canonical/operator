@@ -24,7 +24,9 @@ This module provides:
   - :class:`~ops.pebble.LogTarget` class to represent Pebble log targets.
   - :class:`~ops.pebble.Service` class to represent Pebble service descriptions.
 
-For a command-line interface for local testing, see test/pebble_cli.py.
+For a command-line interface for local testing, see ``test/pebble_cli.py``.
+
+  See more: `Pebble documentation <https://canonical-pebble.readthedocs-hosted.com/>`_
 """
 
 from __future__ import annotations
