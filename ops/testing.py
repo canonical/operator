@@ -108,6 +108,7 @@ else:
             WaitingStatus,
             errors,
         )
+        from scenario.context import CharmEvents
 
         # The Scenario unit testing framework.
         _ = ActiveStatus
@@ -115,6 +116,7 @@ else:
         _ = AnyJson
         _ = BindAddress
         _ = BlockedStatus
+        _ = CharmEvents
         _ = CheckInfo
         _ = CloudCredential
         _ = CloudSpec
