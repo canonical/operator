@@ -1907,6 +1907,9 @@ class StatusBase:
             raise TypeError('cannot instantiate a base class')
         self.message = message
 
+    def __init_subclass__(cls):
+        StatusBase.register(cls)
+
     def __eq__(self, other: 'StatusBase') -> bool:
         if not isinstance(self, type(other)):
             return False
@@ -1965,7 +1968,6 @@ class StatusBase:
         return max(statuses, key=lambda status: cls._priorities.get(status.name, 0))
 
 
-@StatusBase.register
 class UnknownStatus(StatusBase):
     """The unit status is unknown.
 
@@ -1986,7 +1988,6 @@ class UnknownStatus(StatusBase):
         return 'UnknownStatus()'
 
 
-@StatusBase.register
 class ErrorStatus(StatusBase):
     """The unit status is error.
 
@@ -2000,7 +2001,6 @@ class ErrorStatus(StatusBase):
     name = 'error'
 
 
-@StatusBase.register
 class ActiveStatus(StatusBase):
     """The unit or application is ready and active.
 
@@ -2016,7 +2016,6 @@ class ActiveStatus(StatusBase):
         super().__init__(message)
 
 
-@StatusBase.register
 class BlockedStatus(StatusBase):
     """The unit or application requires manual intervention.
 
@@ -2027,7 +2026,6 @@ class BlockedStatus(StatusBase):
     name = 'blocked'
 
 
-@StatusBase.register
 class MaintenanceStatus(StatusBase):
     """The unit or application is performing maintenance tasks.
 
@@ -2041,7 +2039,6 @@ class MaintenanceStatus(StatusBase):
     name = 'maintenance'
 
 
-@StatusBase.register
 class WaitingStatus(StatusBase):
     """The unit or application is waiting on a charm it's integrated with.
 

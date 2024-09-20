@@ -820,11 +820,9 @@ class TestModel:
         with pytest.raises(TypeError):
             ops.StatusBase('test')
 
-        class NoNameStatus(ops.StatusBase):
-            pass
-
         with pytest.raises(TypeError):
-            ops.StatusBase.register(NoNameStatus)
+            class NoNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
+                pass
 
     def test_status_repr(self):
         test_cases = {
