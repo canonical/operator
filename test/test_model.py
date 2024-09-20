@@ -821,6 +821,7 @@ class TestModel:
             ops.StatusBase('test')
 
         with pytest.raises(TypeError):
+
             class NoNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
                 pass
 
