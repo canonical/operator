@@ -2317,7 +2317,11 @@ class Container:
         self._pebble.start_services(service_names)
 
     def restart(self, *service_names: str):
-        """Restart the given service(s) by name."""
+        """Restart the given service(s) by name.
+
+        Listed running services will be stopped and restarted, and listed stopped
+        services will be started.
+        """
         if not service_names:
             raise TypeError('restart expected at least 1 argument, got 0')
 

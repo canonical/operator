@@ -11,8 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Framework for unit testing charms in a simulated Juju environment.
 
-"""Infrastructure to build unit tests for charms using the ops library."""
+The module includes:
+
+- :class:`ops.testing.Harness`, a class to set up the simulated environment,
+  that provides:
+
+  - :meth:`~ops.testing.Harness.add_relation` method, to declare a relation
+    (integration) with another app.
+  - :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
+    methods to start and end the testing lifecycle.
+  - :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
+    status of the charm after test interactions.
+  - :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
+    :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
+
+.. note::
+    Unit testing is only one aspect of a comprehensive testing strategy. For more
+    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+"""
 
 from ._private.harness import (
     ActionFailed,

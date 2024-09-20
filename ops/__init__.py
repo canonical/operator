@@ -12,31 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The ops library: a Python framework for writing Juju charms.
+"""The API to respond to Juju events and manage the application.
 
-The ops library is a Python framework (`available on PyPI`_) for developing
-and testing Juju charms in a consistent way, using standard Python constructs
-to allow for clean, maintainable, and reusable code.
+This module provides code freatures to your charm, including:
 
-A charm is an operator -- business logic encapsulated in a reusable software
-package that automates every aspect of an application's life.
+- :class:`~ops.CharmBase`, the base class for charms and :class:`~ops.Object`,
+  the base class for charm libraries.
+- :class:`~ops.framework.EventBase` class and individual event types, like
+  the :class:`~ops.ActionEvent` class.
+- :class:`~ops.Framework` class, accessible as ``self.framework`` in a charm,
+  the main interface for the charm to `ops` library infrastructure, including:
 
-Charms written with ops support Kubernetes using Juju's "sidecar charm"
-pattern, as well as charms that deploy to Linux-based machines and containers.
+  - :attr:`~ops.Framework.on` shorthand property used to
+    :meth:`~ops.Framework.observe` and react to Juju events.
+  - :attr:`~ops.Framework.model` attribute to get hold of the Model instance.
 
-Charms should do one thing and do it well. Each charm drives a single
-application and can be integrated with other charms to deliver a complex
-system. A charm handles creating the application in addition to scaling,
-configuration, optimisation, networking, service mesh, observability, and other
-day-2 operations specific to the application.
+- :class:`~ops.model.Model` class that represents the Juju model, accessible as
+  ``self.model`` in a charm, including:
 
-The ops library is part of the Charm SDK (the other part being Charmcraft).
-Full developer documentation for the Charm SDK is available at
-https://juju.is/docs/sdk.
+  - :attr:`~ops.Model.app` attribute, representing the application associated
+    with the charm.
+  - :attr:`~ops.Model.unit` attribute, representing the unit of the application
+    the charm is running on.
+  - :attr:`~ops.Model.relations` attribute, which provides access to relations
+    (integrations) defined in the charm, allowing interaction with other applications.
 
-To learn more about Juju, visit https://juju.is/docs/olm.
+- :class:`~ops.Container` class to control Kubernetes workloads, including:
 
-.. _available on PyPI: https://pypi.org/project/ops/
+  - :meth:`~ops.Container.add_layer` and :meth:`~ops.Container.replan` methods
+    to update Pebble configuration.
+  - :meth:`~ops.Container.pull` and :meth:`~ops.Container.push` methods to copy
+    data to and from a container, respectively.
+  - :meth:`~ops.Container.exec` method to run arbitrary commands inside the
+    container.
+
+- :class:`~ops.StatusBase` class and individual status types, like the
+  :class:`~ops.ActiveStatus` class.
 """
 
 # The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)
