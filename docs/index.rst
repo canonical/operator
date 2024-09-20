@@ -15,7 +15,7 @@ The library provides:
 
 You can structure your charm however you like, but with the `ops` library, you
 get a framework that promotes consistency and readability by following best
-practices. It also helps you organize your code better by separating different
+practices. It also helps you organise your code better by separating different
 aspects of the charm, such as managing the application’s state, handling
 integrations with other services, and making the charm easier to test.
 
