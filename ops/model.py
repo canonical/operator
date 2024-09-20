@@ -78,7 +78,7 @@ _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # for the StatusBase.register class decorator
-_StatusBaseType = typing.TypeVar('_StatusBaseType', bound=Type['StatusBase'])
+_StatusClass = typing.TypeVar('_StatusClass', bound='StatusBase')
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -1940,8 +1940,19 @@ class StatusBase:
             return cls._statuses[typing.cast(StatusName, name)](message)
 
     @classmethod
-    def register(cls, child: _StatusBaseType) -> _StatusBaseType:
-        """Register a Status for the child's name."""
+    def register(cls, child: Type[_StatusClass]) -> Type[_StatusClass]:
+        """Class decorator to register a subclass for lookup using :meth:`from_name`.
+
+        .. code-block:: python
+
+            _StatusClass = typing.TypeVar('_StatusClass', bound='StatusBase')
+
+        Args:
+            child: A subclass of StatusBase, with a ``name`` attribute of type ``str``.
+
+        Returns:
+            The decorated class, unmodified.
+        """
         if not (hasattr(child, 'name') and isinstance(child.name, str)):
             raise TypeError(
                 f"Can't register StatusBase subclass {child}: ",
