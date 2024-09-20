@@ -78,7 +78,7 @@ _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # for the StatusBase.register class decorator
-_StatusBaseType = typing.TypeVar("_StatusBaseType", bound="Type[StatusBase]")
+_StatusBaseType = typing.TypeVar('_StatusBaseType', bound=Type['StatusBase'])
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
