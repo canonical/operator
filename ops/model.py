@@ -1944,11 +1944,7 @@ class StatusBase:
         """Class decorator to register a subclass for lookup using :meth:`from_name`.
 
         Note: this method is intended for internal use only.
-        It is used to make the six valid Juju statuses available by name.
-
-        .. code-block:: python
-
-            _StatusClass = typing.TypeVar('_StatusClass', bound='StatusBase')
+        It is used to make the valid Juju statuses available by name.
 
         Args:
             child: A subclass of StatusBase, with a ``name`` attribute of type ``str``.
