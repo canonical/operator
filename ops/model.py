@@ -1908,7 +1908,7 @@ class StatusBase:
         self.message = message
 
     def __init_subclass__(cls):
-        StatusBase.register(cls)
+        StatusBase._register(cls)
 
     def __eq__(self, other: 'StatusBase') -> bool:
         if not isinstance(self, type(other)):
@@ -1941,14 +1941,38 @@ class StatusBase:
 
     @classmethod
     def register(cls, child: Type['StatusBase']):
-        """Register a Status for the child's name."""
+        """Class decorator to register a subclass for lookup using :meth:`from_name`.
+
+        Note: this method is deprecated. Registration is now automatic via __init_subclass.
+        Also, this decorator obscures the class type when used as a decorator.
+
+        Note: this method is intended for internal use only.
+        It is used to make the valid Juju statuses available by name.
+
+        Args:
+            child: A subclass of StatusBase, with a ``name`` attribute of type ``str``.
+
+        Returns:
+            The decorated class, unmodified.
+        """
+        warnings.warn(
+            'StatusBase.register should not be called. It is intended'
+            'for internal use only and is superseded by automatic subclass'
+            'registration via __init_subclass__',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        cls._register(child)
+        return child
+
+    @classmethod
+    def _register(cls, child: Type['StatusBase']) -> None:
         if not (hasattr(child, 'name') and isinstance(child.name, str)):
             raise TypeError(
                 f"Can't register StatusBase subclass {child}: ",
                 'missing required `name: str` class attribute',
             )
         cls._statuses[child.name] = child
-        return child
 
     _priorities = {
         'error': 5,
