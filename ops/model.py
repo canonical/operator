@@ -1941,27 +1941,8 @@ class StatusBase:
 
     @classmethod
     def register(cls, child: Type['StatusBase']):
-        """Class decorator to register a subclass for lookup using :meth:`from_name`.
-
-        Note: this method is deprecated. Registration is now automatic via __init_subclass.
-        Also, this decorator obscures the class type when used as a decorator.
-
-        Note: this method is intended for internal use only.
-        It is used to make the valid Juju statuses available by name.
-
-        Args:
-            child: A subclass of StatusBase, with a ``name`` attribute of type ``str``.
-
-        Returns:
-            The decorated class, unmodified.
-        """
-        warnings.warn(
-            'StatusBase.register should not be called. It is intended'
-            'for internal use only and is superseded by automatic subclass'
-            'registration via __init_subclass__',
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        """.. deprecated:: 2.17.0 Deprecated - this was for internal use only."""
+        warnings.warn('StatusBase.register is for internal use only', DeprecationWarning)
         cls._register(child)
         return child
 
