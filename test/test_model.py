@@ -820,11 +820,15 @@ class TestModel:
         with pytest.raises(TypeError):
             ops.StatusBase('test')
 
-        class NoNameStatus(ops.StatusBase):
-            pass
+        with pytest.raises(TypeError):
+            # TypeError due to missing `name` attribute
+            class NoNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
+                pass
 
         with pytest.raises(TypeError):
-            ops.StatusBase.register(NoNameStatus)
+            # TypeError due to non str type `name` attribute
+            class NonStringNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
+                name = None  # pyright: ignore[reportAssignmentType]
 
     def test_status_repr(self):
         test_cases = {
