@@ -3242,7 +3242,7 @@ class TestModelBackend:
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:5')
         monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
         assert self.backend.relation_remote_app_name(5) == 'remoteapp1'
-        os.environ['JUJU_RELATION_ID'] = '5'
+        monkeypatch.setenv('JUJU_RELATION_ID', '5')
         assert self.backend.relation_remote_app_name(5) == 'remoteapp1'
 
     def test_relation_remote_app_name_script_success(
@@ -3266,7 +3266,7 @@ echo '"remoteapp2"'
 
         # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
         monkeypatch.delenv('JUJU_RELATION_ID')
-        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
         assert self.backend.relation_remote_app_name(5) == 'remoteapp2'
 
         # Both set, but JUJU_RELATION_ID a different relation
