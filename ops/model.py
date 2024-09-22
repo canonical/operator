@@ -1942,7 +1942,9 @@ class StatusBase:
     @classmethod
     def register(cls, child: Type['StatusBase']):
         """.. deprecated:: 2.17.0 Deprecated - this was for internal use only."""
-        warnings.warn('StatusBase.register is for internal use only', DeprecationWarning)
+        warnings.warn(
+            'StatusBase.register is for internal use only', DeprecationWarning, stacklevel=2
+        )
         cls._register(child)
         return child
 
