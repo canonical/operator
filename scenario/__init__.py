@@ -60,7 +60,7 @@ status is `unknown`. With that, we can write the simplest possible test:
         assert out.unit_status == UnknownStatus()
 """
 
-from scenario.context import Context, Manager
+from scenario.context import CharmEvents, Context, Manager
 from scenario.state import (
     ActionFailed,
     ActiveStatus,
@@ -110,6 +110,7 @@ __all__ = [
     "AnyJson",
     "BindAddress",
     "BlockedStatus",
+    "CharmEvents",
     "CharmType",
     "CheckInfo",
     "CloudCredential",
