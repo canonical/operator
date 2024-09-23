@@ -112,12 +112,15 @@ controller and model, and focus on a single Juju unit.
 For simplicity, we refer to them as 'unit' tests.
 
 Writing these tests should nudge you into thinking of a charm as a black-box
-input->output function. The input is the union of an `Event` (why am I, charm,
-being executed), a `State` (am I leader? what is my integration data? what is my
-config?...) and the charm's execution `Context` (what integrations can I have?
-what containers can I have?...). The output is another `State`: the state after
-the charm has had a chance to interact with the mocked Juju model and affect the
-state.
+'input to output' function. The inputs are:
+
+- Event: why am I, the charm, being executed
+- State: am I the leader? what is my integration data? what is my config?
+- Context: what integrations can I have? what containers can I have?
+
+The output is another `State`: the state after
+the charm has interacted with the mocked Juju model.
+The output state is the same type of data structure as the input state.
 
 .. image:: https://raw.githubusercontent.com/canonical/ops-scenario/main/resources/state-transition-model.png
    :alt: Transition diagram, with the input state and event on the left, the context including the charm in the centre, and the state out on the right
