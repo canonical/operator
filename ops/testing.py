@@ -33,6 +33,7 @@ The module includes:
 """
 
 # ruff: noqa: F401 (unused import)
+# pyright: reportUnusedImport=false
 
 import importlib.metadata
 
@@ -196,4 +197,4 @@ _compatibility_names = [
     'pebble',
     'storage',
 ]
-__all__.extend(_compatibility_names)
+__all__.extend(_compatibility_names)  # type: ignore[reportUnsupportedDunderAll]

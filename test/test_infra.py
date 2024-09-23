@@ -16,6 +16,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import typing
 
 import pytest
 
@@ -74,11 +75,13 @@ def test_ops_testing_doc():
     # even though the above compatibility_names logic would exclude it.
     expected_names.add('Container')
 
-    with open('docs/index.rst') as testing_doc:
-        found_names = {
-            line.split(prefix, 1)[1].strip()
-            for line in testing_doc
-            if line.strip().startswith(prefix)
-        }
+    found_names: typing.Set[str] = set()
+    for test_doc in ('docs/harness.rst', 'docs/state-transition-testing.rst'):
+        with open(test_doc) as testing_doc:
+            found_names.update({
+                line.split(prefix, 1)[1].strip()
+                for line in testing_doc
+                if line.strip().startswith(prefix)
+            })
 
     assert expected_names == found_names
