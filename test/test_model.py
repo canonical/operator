@@ -830,6 +830,10 @@ class TestModel:
             class NonStringNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
                 name = None  # pyright: ignore[reportAssignmentType]
 
+    def test_base_status_register_is_deprecated(self):
+        with pytest.deprecated_call():
+            ops.StatusBase.register(ops.ActiveStatus)
+
     def test_status_repr(self):
         test_cases = {
             "ActiveStatus('Seashell')": ops.ActiveStatus('Seashell'),

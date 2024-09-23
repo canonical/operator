@@ -1908,7 +1908,7 @@ class StatusBase:
         self.message = message
 
     def __init_subclass__(cls):
-        StatusBase.register(cls)
+        StatusBase._register(cls)
 
     def __eq__(self, other: 'StatusBase') -> bool:
         if not isinstance(self, type(other)):
@@ -1941,14 +1941,21 @@ class StatusBase:
 
     @classmethod
     def register(cls, child: Type['StatusBase']):
-        """Register a Status for the child's name."""
+        """.. deprecated:: 2.17.0 Deprecated - this was for internal use only."""
+        warnings.warn(
+            'StatusBase.register is for internal use only', DeprecationWarning, stacklevel=2
+        )
+        cls._register(child)
+        return child
+
+    @classmethod
+    def _register(cls, child: Type['StatusBase']) -> None:
         if not (hasattr(child, 'name') and isinstance(child.name, str)):
             raise TypeError(
                 f"Can't register StatusBase subclass {child}: ",
                 'missing required `name: str` class attribute',
             )
         cls._statuses[child.name] = child
-        return child
 
     _priorities = {
         'error': 5,
