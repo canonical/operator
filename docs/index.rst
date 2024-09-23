@@ -71,10 +71,10 @@ Two frameworks are available:
 * State-transition testing, which tests the charm's state transitions in response
   to events. This is the recommended approach. Install ops with the ``testing``
   extra to use this framework; for example: ``pip install ops[testing]``
-* Harness, which provides an API similar to the Juju CLI. This is a deprecated
-  framework, and has issues, particularly with resetting the charm state between
-  Juju events. It will be moved out of the base ``ops`` install in a future
-  release.
+* Harness, which provides an API reminiscent of the Juju CLI. This is a
+  deprecated framework, and has issues, particularly with resetting the charm
+  state between Juju events. It will be moved out of the base ``ops`` install in
+  a future release.
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
