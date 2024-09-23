@@ -1,5 +1,5 @@
-ops library API reference
-=========================
+API reference
+=============
 
 The `ops` library is a Python framework for writing and testing Juju charms.
 
@@ -21,13 +21,17 @@ integrations with other services, and making the charm easier to test.
 .. _available on PyPI: https://pypi.org/project/ops/
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
-   :caption: Contents:
+
+   self
+   state-transition-testing
+   harness
 
 .. _ops_module:
 
 ops
-===
+---
 
 .. automodule:: ops
    :exclude-members: main
@@ -37,7 +41,7 @@ ops
 .. _ops_main_entry_point:
 
 ops.main entry point
-====================
+--------------------
 
 The main entry point to initialise and run your charm.
 
@@ -52,7 +56,7 @@ legacy main module
 .. _ops_pebble_module:
 
 ops.pebble
-==========
+----------
 
 .. automodule:: ops.pebble
 
@@ -61,21 +65,18 @@ ops.pebble
 .. _ops_testing_module:
 
 Testing
-=======
+-------
 
 Two frameworks for unit testing charms in a simulated Juju environment are
 available:
 
-* `State-transition testing`_, which tests the charm's state transitions in response
+* :doc:`State-transition testing </state-transition-testing>`, which tests the charm's state transitions in response
   to events. This is the recommended approach. Install ops with the ``testing``
   extra to use this framework; for example: ``pip install ops[testing]``
-* `Harness`_, which provides an API reminiscent of the Juju CLI. This is a
+* :doc:`Harness </harness>`, which provides an API reminiscent of the Juju CLI. This is a
   deprecated framework, and has issues, particularly with resetting the charm
   state between Juju events. It will be moved out of the base ``ops`` install in
   a future release.
-
-.. _State-transition testing: <state-transition-tests>
-.. _Harness: <harness>
 
 
 .. note::

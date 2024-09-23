@@ -23,29 +23,12 @@ import sphinx.ext.autodoc
 from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
-import furo
-import furo.navigation
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
-# Furo patch to get local TOC to show in sidebar (as sphinx-rtd-theme did)
-# See https://github.com/pradyunsg/furo/blob/490527b2aef00b1198770c3389a1979911ee1fcb/src/furo/__init__.py#L115-L128
-
-_old_compute_navigation_tree = furo._compute_navigation_tree
-
-
-def _compute_navigation_tree(context):
-    tree_html = _old_compute_navigation_tree(context)
-    if not tree_html and context.get('toc'):
-        tree_html = furo.navigation.get_navigation_tree(context['toc'])
-    return tree_html
-
-
-furo._compute_navigation_tree = _compute_navigation_tree
-
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
-import re  # noqa: E402
+import re
 
 sphinx.ext.autodoc.py_ext_sig_re = re.compile(
     r"""^ ([\w.]+::)?            # explicit module name

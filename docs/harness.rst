@@ -1,0 +1,31 @@
+:orphan:
+
+.. _harness:
+
+Harness Unit Test Framework
+===========================
+
+.. deprecated:: 2.17
+    The Harness framework is deprecated and will be moved out of the base
+    install in a future ops release.
+
+The Harness framework includes:
+
+- :class:`ops.testing.Harness`, a class to set up the simulated environment,
+  that provides:
+
+  - :meth:`~ops.testing.Harness.add_relation` method, to declare a relation
+    (integration) with another app.
+  - :meth:`~ops.testing.Harness.begin` and :meth:`~ops.testing.Harness.cleanup`
+    methods to start and end the testing lifecycle.
+  - :meth:`~ops.testing.Harness.evaluate_status` method, which aggregates the
+    status of the charm after test interactions.
+  - :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
+    :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
+
+.. autoclass:: ops.testing.ActionFailed
+   :noindex:
+.. autoclass:: ops.testing.ActionOutput
+.. autoclass:: ops.testing.ExecArgs
+.. autoclass:: ops.testing.ExecResult
+.. autoclass:: ops.testing.Harness
