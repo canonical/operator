@@ -38,8 +38,6 @@ ops
 
 .. _ops_main_entry_point:
 
-.. _ops_main_entry_point:
-
 ops.main entry point
 --------------------
 
