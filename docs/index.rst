@@ -71,9 +71,10 @@ Two frameworks are available:
 * State-transition testing, which tests the charm's state transitions in response
   to events. This is the recommended approach. Install ops with the ``testing``
   extra to use this framework; for example: ``pip install ops[testing]``
-* Harness, which provides an API similar to the Juju CLI. This is a legacy
+* Harness, which provides an API similar to the Juju CLI. This is a deprecated
   framework, and has issues, particularly with resetting the charm state between
-  Juju events. This is currently included with a base ``ops`` install.
+  Juju events. It will be moved out of the base ``ops`` install in a future
+  release.
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
@@ -82,10 +83,24 @@ Two frameworks are available:
 State-transition testing
 ------------------------
 
-Write tests that declaratively define the Juju state all at once, define the
-Juju context against which to test the charm, and fire a single event on the
+State-transition tests expect you to define the Juju state all at once, define
+the Juju context against which to test the charm, and fire a single event on the
 charm to execute its logic. The tests can then assert that the Juju state has
 changed as expected.
+
+A very simple test, where the charm has no config, no integrations, the unit
+is the leader, and has a `start` handler that sets the status to active might
+look like this:
+
+.. code-block:: python
+
+   from ops import testing
+
+    def test_base():
+        ctx = testing.Context(MyCharm)
+        state = testing.State(leader=True)
+        out = ctx.run(ctx.on.start(), state)
+        assert out.unit_status == testing.ActiveStatus()
 
 These tests are 'state-transition' tests, a way to test isolated units of charm
 functionality (how the state changes in reaction to events). They are not
@@ -109,8 +124,8 @@ state.
 
 Writing unit tests for a charm, then, means verifying that:
 
+- the output state (as compared with the input state) is as expected
 - the charm does not raise uncaught exceptions while handling the event
-- the output state (as compared with the input state) is as expected.
 
 A test consists of three broad steps:
 
@@ -118,24 +133,18 @@ A test consists of three broad steps:
     - declare the context
     - declare the input state
 - **Act**:
-    - select an event to fire
-    - run the context (i.e. obtain the output state, given the input state and the event)
+    - run an event (ie. obtain the output state, given the input state and the event)
 - **Assert**:
     - verify that the output state (as compared with the input state) is how you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
-    - optionally, you can use a context manager to get a hold of the charm instance and run
-      assertions on APIs and state internal to it.
 
-The most basic scenario is one in which all is defaulted and barely any data is
-available. The charm has no config, no integrations, no leadership, and its
-status is `unknown`. With that, we can write the simplest possible test:
-
-.. code-block:: python
-
-    def test_base():
-        ctx = Context(MyCharm)
-        out = ctx.run(ctx.on.start(), State())
-        assert out.unit_status == UnknownStatus()
+..
+   _The list here is manually maintained, because the `automodule` directive
+   expects to document names defined in the module, and not imported ones, and
+   we're doing the opposite of that - and we also want to use the 'ops.testing'
+   namespace, not expose the 'ops._private.harness' and 'scenario' ones.
+   Ideally, someone will figure out a nicer way to do this that doesn't require
+   keeping this list in sync (see test/test_infra.py for a check that we are ok).
 
 .. autoclass:: ops.testing.ActionFailed
 .. autoclass:: ops.testing.ActiveStatus
@@ -162,8 +171,6 @@ status is `unknown`. With that, we can write the simplest possible test:
 .. autoclass:: ops.testing.Notice
 .. autoclass:: ops.testing.PeerRelation
 .. autoclass:: ops.testing.Port
-.. autoclass:: ops.testing.RawDataBagContents
-.. autoclass:: ops.testing.RawSecretRevisionContents
 .. autoclass:: ops.testing.Relation
 .. autoclass:: ops.testing.RelationBase
 .. autoclass:: ops.testing.Resource
@@ -190,7 +197,8 @@ status is `unknown`. With that, we can write the simplest possible test:
 Harness
 -------
 
-The Harness framework includes:
+The Harness framework is deprecated and will be moved out of the base install in
+a future ops release. The Harness framework includes:
 
 - :class:`ops.testing.Harness`, a class to set up the simulated environment,
   that provides:

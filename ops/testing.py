@@ -183,7 +183,7 @@ else:
         _runtime.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
 
 # Names exposed for backwards compatibility
-__all__.extend([
+_compatibility_names = [
     'CharmBase',
     'CharmMeta',
     'Container',  # If Scenario has been installed, then this will be scenario.Container.
@@ -195,4 +195,5 @@ __all__.extend([
     'model',
     'pebble',
     'storage',
-])
+]
+__all__.extend(_compatibility_names)
