@@ -1110,6 +1110,9 @@ class CollectStatusEvent(LifecycleEvent):
     * waiting
     * active
 
+    It is an error to call :meth:`add_status` with an instance of
+    :class:`ErrorStatus` or :class:`UnknownStatus`.
+
     If there are multiple statuses with the same priority, the first one added
     wins (and if an event is observed multiple times, the handlers are called
     in the order they were observed).
@@ -1142,18 +1145,16 @@ class CollectStatusEvent(LifecycleEvent):
                 event.add_status(ops.ActiveStatus())
     """  # noqa: D405, D214, D411, D416  Final return confuses docstyle.
 
-    def add_status(self, status: model.SettableStatus) -> None:
+    def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.
 
         See :class:`CollectStatusEvent` for a description of how to use this.
         """
         if not isinstance(status, model.StatusBase):
-            raise TypeError(
-                f'status should be one of {model._SETTABLE_STATUSES}, not {type(status).__name__}'
-            )
-        if not isinstance(status, model._SETTABLE_STATUSES):
+            raise TypeError(f'status should be a StatusBase, not {type(status).__name__}')
+        if status.name not in model._SETTABLE_STATUS_NAMES:
             raise model.InvalidStatusError(
-                f'status should be one of {model._SETTABLE_STATUSES}, not {type(status).__name__}'
+                f'status.name must be in {model._SETTABLE_STATUS_NAMES}, not {status.name!r}'
             )
         model_ = self.framework.model
         if self.handle.kind == 'collect_app_status':

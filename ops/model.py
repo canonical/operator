@@ -72,10 +72,10 @@ _StorageDictType = Dict[str, Optional[List['Storage']]]
 _BindingDictType = Dict[Union[str, 'Relation'], 'Binding']
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
-SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-StatusName = Union[SettableStatusName, _ReadOnlyStatusName]
+_SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
+StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
 _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
-_SETTABLE_STATUS_NAMES: Tuple[SettableStatusName, ...] = get_args(SettableStatusName)
+_SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
@@ -431,7 +431,7 @@ class Application:
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         self._backend.status_set(
-            typing.cast(SettableStatusName, value.name),  # status_set will validate at runtime
+            typing.cast(_SettableStatusName, value.name),  # status_set will validate at runtime
             value.message,
             is_app=True,
         )
@@ -600,7 +600,7 @@ class Unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
         self._backend.status_set(
-            typing.cast(SettableStatusName, value.name),  # status_set will validate at runtime
+            typing.cast(_SettableStatusName, value.name),  # status_set will validate at runtime
             value.message,
             is_app=False,
         )
@@ -1918,26 +1918,8 @@ class StatusBase:
     def __repr__(self):
         return f'{self.__class__.__name__}({self.message!r})'
 
-    @typing.overload
     @classmethod
-    def from_name(cls, name: Literal['active'], message: str) -> 'ActiveStatus': ...
-    @typing.overload
-    @classmethod
-    def from_name(cls, name: Literal['blocked'], message: str) -> 'BlockedStatus': ...
-    @typing.overload
-    @classmethod
-    def from_name(cls, name: Literal['error'], message: str) -> 'ErrorStatus': ...
-    @typing.overload
-    @classmethod
-    def from_name(cls, name: Literal['maintenance'], message: str) -> 'MaintenanceStatus': ...
-    @typing.overload
-    @classmethod
-    def from_name(cls, name: Literal['unknown'], message: str) -> 'UnknownStatus': ...
-    @typing.overload
-    @classmethod
-    def from_name(cls, name: Literal['waiting'], message: str) -> 'WaitingStatus': ...
-    @classmethod
-    def from_name(cls, name: str, message: str) -> 'StatusBase':
+    def from_name(cls, name: str, message: str):
         """Create a status instance from a name and message.
 
         If ``name`` is "unknown", ``message`` is ignored, because unknown status
@@ -2075,10 +2057,6 @@ class WaitingStatus(StatusBase):
     """
 
     name = 'waiting'
-
-
-SettableStatus = Union[ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus]
-_SETTABLE_STATUSES: Tuple[Type[SettableStatus], ...] = get_args(SettableStatus)
 
 
 class Resources:
@@ -3465,7 +3443,7 @@ class _ModelBackend:
             return typing.cast('_StatusDict', content)
 
     def status_set(
-        self, status: SettableStatusName, message: str = '', *, is_app: bool = False
+        self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
     ) -> None:
         """Set a status of a unit or an application.
 

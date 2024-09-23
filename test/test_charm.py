@@ -22,7 +22,7 @@ import yaml
 
 import ops
 import ops.charm
-from ops.model import ModelError, SettableStatusName, StatusName
+from ops.model import ModelError, StatusName
 
 from .test_helpers import FakeScript, create_framework
 
@@ -964,11 +964,11 @@ def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: Fake
 def test_collect_status_priority_valid(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
-    statuses: typing.List[SettableStatusName],
+    statuses: typing.List[StatusName],
     expected: str,
 ):
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework, statuses: typing.List[SettableStatusName]):
+        def __init__(self, framework: ops.Framework, statuses: typing.List[StatusName]):
             super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
             self.statuses = statuses
@@ -1009,7 +1009,7 @@ def test_collect_status_priority_invalid(
 
         def _on_collect_status(self, event: ops.CollectStatusEvent):
             for status in self.statuses:
-                event.add_status(ops.StatusBase.from_name(status, ''))  # pyright: ignore[reportArgumentType]
+                event.add_status(ops.StatusBase.from_name(status, ''))
 
     fake_script.write('is-leader', 'echo true')
 

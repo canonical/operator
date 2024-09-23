@@ -3232,8 +3232,8 @@ class TestHarness:
 
     def test_evaluate_status(self):
         class TestCharm(ops.CharmBase):
-            app_status_to_add: ops.SettableStatus
-            unit_status_to_add: ops.SettableStatus
+            app_status_to_add: ops.StatusBase
+            unit_status_to_add: ops.StatusBase
 
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
