@@ -102,14 +102,14 @@ look like this:
         out = ctx.run(ctx.on.start(), state)
         assert out.unit_status == testing.ActiveStatus()
 
-These tests are 'state-transition' tests, a way to test isolated units of charm
-functionality (how the state changes in reaction to events). They are not
-necessarily tests of individual methods or functions (but might be, depending on
-the charm's event observers); they are testing the 'contract' of the charm: given
-a certain state, when a certain event happens, the charm should transition to a
-certain (likely different) state. They do not test against a real Juju
-controller and model, and focus on a single Juju unit, unlike integration tests.
-For simplicity, we refer to them as 'unit' tests in the charm context.
+These 'state-transition' tests give charm authors a way to test
+how the state changes in reaction to events. They are not
+necessarily tests of individual methods or functions;
+they are testing the 'contract' of the charm: given
+a certain state, when a certain event happens, the charm should transition to
+another state. Unlike integration tests, they do not test using a real Juju
+controller and model, and focus on a single Juju unit.
+For simplicity, we refer to them as 'unit' tests.
 
 Writing these tests should nudge you into thinking of a charm as a black-box
 input->output function. The input is the union of an `Event` (why am I, charm,
