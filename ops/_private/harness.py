@@ -314,6 +314,13 @@ class Harness(Generic[CharmType]):
             juju_debug_at=self._juju_context.debug_at,
         )
 
+        warnings.warn(
+            'Harness is deprecated; we recommend using state transition testing '
+            "(previously known as 'Scenario') instead",
+            PendingDeprecationWarning,
+            stacklevel=2,
+        )
+
     def _event_context(self, event_name: str):
         """Configures the Harness to behave as if an event hook were running.
 
