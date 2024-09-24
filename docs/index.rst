@@ -60,8 +60,6 @@ ops.pebble
 
 .. _ops_testing_module:
 
-.. _ops_testing_module:
-
 Testing
 -------
 
