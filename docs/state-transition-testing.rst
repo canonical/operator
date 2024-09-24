@@ -1,14 +1,15 @@
-:orphan:
-
 .. _state-transition-tests:
 
-Unit Test Framework
-===================
+Unit testing (was: Scenario)
+============================
 
-State-transition tests expect you to define the Juju state all at once, define
-the Juju context against which to test the charm, and fire a single event on the
-charm to execute its logic. The tests can then assert that the Juju state has
-changed as expected.
+Install ops with the ``testing`` extra to use this API; for example:
+``pip install ops[testing]``
+
+State-transition tests, previously known as 'Scenario', expect you to define the
+Juju state all at once, define the Juju context against which to test the charm,
+and fire a single event on the charm to execute its logic. The tests can then
+assert that the Juju state has changed as expected.
 
 A very simple test, where the charm has no config, no integrations, the unit
 is the leader, and has a `start` handler that sets the status to active might
@@ -16,7 +17,7 @@ look like this:
 
 .. code-block:: python
 
-   from ops import testing
+    from ops import testing
 
     def test_base():
         ctx = testing.Context(MyCharm)
@@ -62,6 +63,11 @@ A test consists of three broad steps:
 - **Assert**:
     - verify that the output state is what you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
+
+.. note::
+    Unit testing is only one aspect of a comprehensive testing strategy. For more
+    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+
 
 ..
    _The list here is manually maintained, because the `automodule` directive

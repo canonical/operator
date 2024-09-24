@@ -1,9 +1,7 @@
-:orphan:
-
 .. _harness:
 
-Harness Unit Test Framework
-===========================
+Harness (legacy unit testing)
+=============================
 
 .. deprecated:: 2.17
     The Harness framework is deprecated and will be moved out of the base
@@ -22,6 +20,11 @@ The Harness framework includes:
     status of the charm after test interactions.
   - :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
     :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
+
+.. note::
+    Unit testing is only one aspect of a comprehensive testing strategy. For more
+    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+
 
 .. autoclass:: ops.testing.ActionFailed
    :noindex:
