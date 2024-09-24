@@ -199,7 +199,7 @@ class ActionFailed(Exception):  # noqa: N818 (name doesn't end with "Error")
         state: typing.Optional['State'] = None,
     ):
         self.message = message
-        self.output = ActionOutput([], {}) if output is None else output
+        self.output = output or ActionOutput([], {})
         self.state = state
 
     def __str__(self):
