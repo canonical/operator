@@ -56,7 +56,7 @@ def pack(charm_dir: pathlib.Path):
     box in GitHub actions, and there isn't really any reason that it should be
     part of the plugin, so we just have a simple subprocess here.
     """
-    cmd = ['charmcraft', 'pack']
+    cmd = ['charmcraft', 'pack', '--verbose']
     # We need to use `sudo` in the GitHub actions environment, just as in
     # the pack test. `sg lxd -c` should work, but does not - perhaps because of
     # the way we are installing LXD?
