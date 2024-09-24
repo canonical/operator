@@ -15,10 +15,7 @@ The library (`available on PyPI`_) provides:
   - :doc:`State-transition testing </state-transition-testing>`. This is the
     recommended approach (it was previously known as 'Scenario').
   - :doc:`Harness </harness>`. This is a deprecated framework, and has issues,
-    particularly with resetting the charm state between Juju events. It will be
-    moved out of the base ``ops`` install in an ops release in the future. Charm
-    authors that don't want to upgrade will still be able to use it with
-    ``pip install ops[harness]``.
+    particularly with resetting the charm state between Juju events.
 
 You can structure your charm however you like, but with the `ops` library, you
 get a framework that promotes consistency and readability by following best

@@ -5,9 +5,10 @@ Harness (legacy unit testing)
 
 .. deprecated:: 2.17
     The Harness framework is deprecated and will be moved out of the base
-    install in a future ops release.
+    install in a future ops release. Charm authors that don't want to upgrade
+    will still be able to use it with ``pip install ops[harness]``.
 
-The Harness framework includes:
+The Harness API includes:
 
 - :class:`ops.testing.Harness`, a class to set up the simulated environment,
   that provides:
@@ -20,6 +21,10 @@ The Harness framework includes:
     status of the charm after test interactions.
   - :attr:`~ops.testing.Harness.model` attribute, which exposes e.g. the
     :attr:`~ops.Model.unit` attribute for detailed assertions on the unit's state.
+
+.. warning:: The Harness API has flaws with resetting the charm state between
+    Juju events. Care must be taken when emitting multiple events with the same
+    Harness object.
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
