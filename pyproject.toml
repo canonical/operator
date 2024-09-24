@@ -41,6 +41,9 @@ docs = [
 testing = [
     "ops-scenario>=7.0.5,<8",
 ]
+# Empty for now, because Harness is bundled with the base install, but allow
+# specifying the extra to ease transition later.
+harness = []
 
 [project.urls]
 "Homepage" = "https://juju.is/docs/sdk"
