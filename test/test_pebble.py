@@ -1207,19 +1207,29 @@ class TestServiceInfo:
         assert list(pebble.ServiceStartup) == [
             pebble.ServiceStartup.ENABLED,
             pebble.ServiceStartup.DISABLED,
+            pebble.ServiceStartup.UNKNOWN,
         ]
         assert pebble.ServiceStartup.ENABLED.value == 'enabled'
         assert pebble.ServiceStartup.DISABLED.value == 'disabled'
+        assert not isinstance(
+            pebble.ServiceStartup.UNKNOWN.value,
+            (str, float, int, dict, list, type(None)),  # json serialisable types
+        )
 
     def test_service_status(self):
         assert list(pebble.ServiceStatus) == [
             pebble.ServiceStatus.ACTIVE,
             pebble.ServiceStatus.INACTIVE,
             pebble.ServiceStatus.ERROR,
+            pebble.ServiceStatus.UNKNOWN,
         ]
         assert pebble.ServiceStatus.ACTIVE.value == 'active'
         assert pebble.ServiceStatus.INACTIVE.value == 'inactive'
         assert pebble.ServiceStatus.ERROR.value == 'error'
+        assert not isinstance(
+            pebble.ServiceStartup.UNKNOWN.value,
+            (str, float, int, dict, list, type(None)),  # json serialisable types
+        )
 
     def test_service_info(self):
         s = pebble.ServiceInfo('svc1', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
@@ -1247,15 +1257,29 @@ class TestServiceInfo:
             'current': 'bob',
         })
         assert s.name == 'svc2'
-        assert s.startup == 'thingy'
-        assert s.current == 'bob'
+        assert s.startup == pebble.ServiceStartup.UNKNOWN
+        assert s.current == pebble.ServiceStatus.UNKNOWN
 
     def test_is_running(self):
         s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
         assert s.is_running()
-        for current in [pebble.ServiceStatus.INACTIVE, pebble.ServiceStatus.ERROR, 'other']:
+        for current in (
+            status for status in pebble.ServiceStatus if status is not pebble.ServiceStatus.ACTIVE
+        ):
             s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
             assert not s.is_running()
+
+        # This is just for the PR, to highlight the current runtime behaviour with strings.
+        # This behaviour might be worth changing as it seems error prone,
+        # though there is a static type checking error.
+        pebble.ServiceInfo(
+            name='s',
+            startup=pebble.ServiceStartup.ENABLED,
+            current='active',  # pyright: ignore[reportArgumentType]
+        )
+        assert 'active' == pebble.ServiceStatus.ACTIVE.value
+        assert 'active' != pebble.ServiceStatus.ACTIVE
+        assert not s.is_running()
 
 
 class TestCheckInfo:

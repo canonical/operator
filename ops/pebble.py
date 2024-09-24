@@ -197,7 +197,7 @@ _AuthDict = TypedDict(
 
 _ServiceInfoDict = TypedDict(
     '_ServiceInfoDict',
-    {'startup': Union['ServiceStartup', str], 'current': Union['ServiceStatus', str], 'name': str},
+    {'startup': str, 'current': str, 'name': str},
 )
 
 # Callback types for _MultiParser header and body handlers
@@ -350,6 +350,18 @@ class _NotProvidedFlag:
 
 
 _not_provided = _NotProvidedFlag()
+
+
+class _Unknown:
+    """Get a value that will never be in Pebble's json.
+
+    Used as the value for UNKNOWN in enums, to avoid silent success
+    on collision with a string returned from Pebble, e.g. if
+    'unknown' value was added on Pebble's end as a valid value.
+    """
+
+    def __repr__(self):
+        return f'{self.__module__}.{self.__class__.__name__}()'
 
 
 class _UnixSocketConnection(http.client.HTTPConnection):
@@ -1038,6 +1050,7 @@ class ServiceStartup(enum.Enum):
 
     ENABLED = 'enabled'
     DISABLED = 'disabled'
+    UNKNOWN = _Unknown()
 
 
 class ServiceStatus(enum.Enum):
@@ -1046,6 +1059,7 @@ class ServiceStatus(enum.Enum):
     ACTIVE = 'active'
     INACTIVE = 'inactive'
     ERROR = 'error'
+    UNKNOWN = _Unknown()
 
 
 class ServiceInfo:
@@ -1054,8 +1068,8 @@ class ServiceInfo:
     def __init__(
         self,
         name: str,
-        startup: Union[ServiceStartup, str],
-        current: Union[ServiceStatus, str],
+        startup: ServiceStartup,
+        current: ServiceStatus,
     ):
         self.name = name
         self.startup = startup
@@ -1071,11 +1085,13 @@ class ServiceInfo:
         try:
             startup = ServiceStartup(d['startup'])
         except ValueError:
-            startup = d['startup']
+            warnings.warn(f'Unknown ServiceStartup value {d["startup"]!r}')
+            startup = ServiceStartup.UNKNOWN
         try:
             current = ServiceStatus(d['current'])
         except ValueError:
-            current = d['current']
+            warnings.warn(f'Unknown ServiceStatus value {d["current"]!r}')
+            current = ServiceStatus.UNKNOWN
         return cls(
             name=d['name'],
             startup=startup,
