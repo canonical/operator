@@ -13,7 +13,7 @@ The library (`available on PyPI`_) provides:
 - the APIs for unit testing charms in a simulated environment:
 
   - :doc:`State-transition testing </state-transition-testing>`. This is the
-    recommended approach.
+    recommended approach (it was previously known as 'Scenario').
   - :doc:`Harness </harness>`. This is a deprecated framework, and has issues,
     particularly with resetting the charm state between Juju events. It will be
     moved out of the base ``ops`` install in an ops release in the future. Charm
