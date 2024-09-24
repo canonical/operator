@@ -224,3 +224,7 @@ reportUnnecessaryComparison = false
 reportUnnecessaryTypeIgnoreComment = "error"
 disableBytesTypePromotions = false
 stubPath = ""
+
+[tool.codespell]
+skip = './docs/_build,.venv,venv,build'
+quiet-level = 3
