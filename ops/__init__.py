@@ -14,7 +14,7 @@
 
 """The API to respond to Juju events and manage the application.
 
-This module provides code features to your charm, including:
+This module provides core features to your charm, including:
 
 - :class:`~ops.CharmBase`, the base class for charms and :class:`~ops.Object`,
   the base class for charm libraries.
