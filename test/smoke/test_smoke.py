@@ -87,14 +87,14 @@ def pack(charm_dir: pathlib.Path):
 async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name: str):
     """Verify that we can build and deploy charms from supported bases."""
     available_charmcraft_version = (
-        subprocess.run(['charmcraft', '--version'], check=True, capture_output=True)  # noqa: S607
+        subprocess.run(['charmcraft', 'version'], check=True, capture_output=True)  # noqa: S607
         .stdout.decode()
         .strip()
-        .rsplit()[1]
+        .rsplit()[-1]
         .split('.')
     )
-    if available_charmcraft_version[0] > str(charmcraft_version):
-        pytest.skip(f'charmcraft version {available_charmcraft_version} is too new for this test')
+    if int(available_charmcraft_version[0]) < charmcraft_version:
+        pytest.skip(f'charmcraft version {available_charmcraft_version} is too old for this test')
         return
     charmcraft_yaml = {
         2: CHARMCRAFT2_YAML,
