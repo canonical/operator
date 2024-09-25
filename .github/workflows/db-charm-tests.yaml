@@ -17,7 +17,7 @@ jobs:
           - charm-repo: canonical/postgresql-operator
             commit: 7219d1ed1a118abbfca23aeacf3b7bf67e81a937  # rev480 rev479 2024-09-23T16:12:27Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: 5c2ae046546a7d163b9d040d6a12d1abc0ca1f70  # rev398 rev397 2024-09-24T19:23:37Z
+            commit: 9fe60aa9f0a00636e06902d0849d36e1e1525df2  # 2024-09-22
           - charm-repo: canonical/mysql-operator
             commit: 4ff2dc867a1586d43a93d0017cc648d591fc9886  # 2024-09-13T15:38:12Z
           - charm-repo: canonical/mysql-k8s-operator
