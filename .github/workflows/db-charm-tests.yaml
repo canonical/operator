@@ -21,7 +21,7 @@ jobs:
           - charm-repo: canonical/mysql-operator
             commit: 4ff2dc867a1586d43a93d0017cc648d591fc9886  # 2024-09-13T15:38:12Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: 61db833ba8318773de565d7d9b56031baf3e75f7  # 2024-09-19T11:48:20Z
+            commit: 9fe60aa9f0a00636e06902d0849d36e1e1525df2  # 2024-09-22
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
