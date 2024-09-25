@@ -1110,6 +1110,9 @@ class CollectStatusEvent(LifecycleEvent):
     * waiting
     * active
 
+    It is an error to call :meth:`add_status` with an instance of
+    :class:`ErrorStatus` or :class:`UnknownStatus`.
+
     If there are multiple statuses with the same priority, the first one added
     wins (and if an event is observed multiple times, the handlers are called
     in the order they were observed).
@@ -1144,10 +1147,6 @@ class CollectStatusEvent(LifecycleEvent):
 
     def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.
-
-        Raises:
-            InvalidStatusError: when called with an instance of :class:`ErrorStatus`
-                or :class:`UnknownStatus`
 
         See :class:`CollectStatusEvent` for a description of how to use this.
         """
