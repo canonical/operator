@@ -3831,6 +3831,67 @@ class TestSecretClass:
         with pytest.raises(TypeError):
             secret.set_info()  # no args provided
 
+    def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
+
+        secret = self.make_secret(model, id='q')
+        secret.set_content({'foo': 'bar'})
+        description = 'desc'
+        secret.set_info(description=description)
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
+        assert calls[1] == [
+            'secret-get',
+            f'secret://{model._backend.model_uuid}/q',
+            '--peek',
+            '--format=json',
+        ]
+        assert calls[2][:-1] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[2][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
+
+    def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+
+        secret = self.make_secret(model, id='q')
+        description = 'desc'
+        secret.set_info(description=description)
+        secret.set_content({'foo': 'bar'})
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[1][:-1] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[1][-1].startswith('foo#file=') and calls[1][-1].endswith('/foo')
+
+    def test_set_content_aggregates(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+
+        secret = self.make_secret(model, id='q')
+        secret.set_content({'foo': 'bar'})
+        secret.set_content({'baz': 'qux', 'foo': 'newbar'})
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert fake_script.secrets() == {'foo': 'newbar', 'baz': 'qux'}
+
     def test_grant(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('relation-list', """echo '[]'""")
         fake_script.write('secret-grant', """exit 0""")

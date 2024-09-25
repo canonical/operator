@@ -14,6 +14,7 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 
+import collections
 import dataclasses
 import datetime
 import enum
@@ -304,7 +305,13 @@ class Model:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id, self.uuid)
         content = self._backend.secret_get(id=id, label=label)
-        return Secret(self._backend, id=id, label=label, content=content)
+        return Secret(
+            self._backend,
+            id=id,
+            label=label,
+            content=content,
+            _secret_set_cache=self._cache._secret_set_cache,
+        )
 
     def get_cloud_spec(self) -> 'CloudSpec':
         """Get details of the cloud in which the model is deployed.
@@ -333,6 +340,9 @@ class _ModelCache:
     def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
+        self._secret_set_cache: collections.defaultdict[str, Dict[str, Any]] = (
+            collections.defaultdict(dict)
+        )
         self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
@@ -502,7 +512,13 @@ class Application:
             rotate=rotate,
             owner='application',
         )
-        return Secret(self._backend, id=id, label=label, content=content)
+        return Secret(
+            self._backend,
+            id=id,
+            label=label,
+            content=content,
+            _secret_set_cache=self._cache._secret_set_cache,
+        )
 
 
 def _calculate_expiry(
@@ -685,7 +701,13 @@ class Unit:
             rotate=rotate,
             owner='unit',
         )
-        return Secret(self._backend, id=id, label=label, content=content)
+        return Secret(
+            self._backend,
+            id=id,
+            label=label,
+            content=content,
+            _secret_set_cache=self._cache._secret_set_cache,
+        )
 
     def open_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: Optional[int] = None
@@ -1270,6 +1292,7 @@ class Secret:
         id: Optional[str] = None,
         label: Optional[str] = None,
         content: Optional[Dict[str, str]] = None,
+        _secret_set_cache: Optional['collections.defaultdict[str, Dict[str, Any]]'] = None,
     ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1279,6 +1302,9 @@ class Secret:
         self._id = id
         self._label = label
         self._content = content
+        self._secret_set_cache: collections.defaultdict[str, Dict[str, Any]] = (
+            collections.defaultdict(dict) if _secret_set_cache is None else _secret_set_cache
+        )
 
     def __repr__(self):
         fields: List[str] = []
@@ -1483,7 +1509,26 @@ class Secret:
         self._validate_content(content)
         if self._id is None:
             self._id = self.get_info().id
-        self._backend.secret_set(typing.cast(str, self.id), content=content)
+
+        # If `_backend.secret_set` has already been called, this call will
+        # overwrite anything done in the previous call (even if it was in a
+        # different event handler, as long as it was in the same Juju hook
+        # context). We want to provide more predictable behavior, so we cache
+        # the values and provide them in subsequent calls.
+        cached_data = self._secret_set_cache[self._id]
+        expire = _calculate_expiry(cached_data['expire']) if 'expire' in cached_data else None
+        # Don't store the actual secret content in memory, but put a sentinel
+        # there to indicate that the content has been set during this hook.
+        cached_data['content'] = object()
+
+        self._backend.secret_set(
+            typing.cast(str, self.id),
+            content=content,
+            label=cached_data.get('label'),
+            description=cached_data.get('description'),
+            expire=expire,
+            rotate=cached_data.get('rotate'),
+        )
         # We do not need to invalidate the cache here, as the content is the
         # same until `refresh` is used, at which point the cache is invalidated.
 
@@ -1513,12 +1558,33 @@ class Secret:
         """
         if label is None and description is None and expire is None and rotate is None:
             raise TypeError(
-                'Must provide a label, description, expiration time, ' 'or rotation policy'
+                'Must provide a label, description, expiration time, or rotation policy'
             )
         if self._id is None:
             self._id = self.get_info().id
+
+        # If `_backend.secret_set` has already been called, this call will
+        # overwrite anything done in the previous call (even if it was in a
+        # different event handler, as long as it was in the same Juju hook
+        # context). We want to provide more predictable behavior, so we cache
+        # the values and provide them in subsequent calls.
+        cached_data = self._secret_set_cache[self._id]
+        label = cached_data.get('label') if label is None else label
+        cached_data['label'] = label
+        description = cached_data.get('description') if description is None else description
+        cached_data['description'] = description
+        expire = cached_data.get('expire') if expire is None else expire
+        cached_data['expire'] = expire
+        rotate = cached_data.get('rotate') if rotate is None else rotate
+        cached_data['rotate'] = rotate
+        # Get the previous content from the unit agent's cache.
+        content = (
+            self._backend.secret_get(id=self._id, peek=True) if 'content' in cached_data else None
+        )
+
         self._backend.secret_set(
             typing.cast(str, self.id),
+            content=content,
             label=label,
             description=description,
             expire=_calculate_expiry(expire),
@@ -3672,7 +3738,8 @@ class _ModelBackend:
         if expire is not None:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
-            args += ['--rotate', rotate.value]
+            args.extend(['--rotate', rotate.value])
+
         with tempfile.TemporaryDirectory() as tmp:
             # The content is None or has already been validated with Secret._validate_content
             for k, v in (content or {}).items():
@@ -3699,9 +3766,9 @@ class _ModelBackend:
         if expire is not None:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
-            args += ['--rotate', rotate.value]
+            args.extend(['--rotate', rotate.value])
         if owner is not None:
-            args += ['--owner', owner]
+            args.extend(['--owner', owner])
         with tempfile.TemporaryDirectory() as tmp:
             # The content has already been validated with Secret._validate_content
             for k, v in content.items():

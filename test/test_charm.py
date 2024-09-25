@@ -797,6 +797,32 @@ def test_secret_events(request: pytest.FixtureRequest):
     ]
 
 
+def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_script: FakeScript):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.secrets: typing.List[ops.Secret] = []
+            self.framework.observe(self.on.secret_changed, self.on_secret_changed)
+
+        def on_secret_changed(self, event: ops.SecretChangedEvent):
+            event.secret.set_info(description='desc')
+            event.secret.set_content({'key': 'value'})
+            self.secrets.append(event.secret)
+
+    fake_script.write('secret-get', """echo '{"key": "value"}'""")
+    fake_script.write('secret-set', 'exit 0')
+
+    framework = create_framework(request)
+    charm = MyCharm(framework)
+
+    charm.on.secret_changed.emit('secret:changed', None)
+    charm.on.secret_changed.emit('secret:changed', None)
+    cache = charm.secrets[0]._secret_set_cache
+    assert cache is charm.secrets[1]._secret_set_cache
+    assert charm.secrets[0]._secret_set_cache['secret:changed']['description'] == 'desc'
+    assert 'content' in cache['secret:changed']
+
+
 def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
