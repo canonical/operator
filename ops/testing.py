@@ -32,6 +32,11 @@ The module includes:
     on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
 """
 
+# ruff: noqa: F401 (unused import)
+# pyright: reportUnusedImport=false
+
+import importlib.metadata
+
 from ._private.harness import (
     ActionFailed,
     ActionOutput,
@@ -56,27 +61,140 @@ from ._private.harness import (
     storage,
 )
 
-# The Harness testing framework.
-_ = ActionFailed
-_ = ActionOutput
-_ = AppUnitOrName
-_ = CharmType
-_ = ExecArgs
-_ = ExecHandler
-_ = ExecResult
-_ = Harness
-_ = ReadableBuffer
-_ = YAMLStringOrFile
+# The Harness unit testing framework.
+__all__ = [
+    'ActionFailed',
+    'ActionOutput',
+    'AppUnitOrName',
+    'CharmType',
+    'ExecArgs',
+    'ExecHandler',
+    'ExecResult',
+    'Harness',
+    'ReadableBuffer',
+    'YAMLStringOrFile',
+]
+
+# If the 'ops.testing' optional extra is installed, make those
+# names available in this namespace.
+try:
+    _version = importlib.metadata.version('ops-scenario')
+except importlib.metadata.PackageNotFoundError:
+    pass
+else:
+    if _version and int(_version.split('.', 1)[0]) >= 7:
+        from scenario import (
+            ActiveStatus,
+            Address,
+            AnyJson,
+            BindAddress,
+            BlockedStatus,
+            CheckInfo,
+            CloudCredential,
+            CloudSpec,
+            Container,
+            Context,
+            DeferredEvent,
+            ErrorStatus,
+            Exec,
+            ICMPPort,
+            JujuLogLine,
+            MaintenanceStatus,
+            Manager,
+            Model,
+            Mount,
+            Network,
+            Notice,
+            PeerRelation,
+            Port,
+            RawDataBagContents,
+            RawSecretRevisionContents,
+            Relation,
+            RelationBase,
+            Resource,
+            Secret,
+            State,
+            Storage,
+            StoredState,
+            SubordinateRelation,
+            TCPPort,
+            UDPPort,
+            UnitID,
+            UnknownStatus,
+            WaitingStatus,
+            errors,
+        )
+
+        # This can be imported in the group above after Scenario exposes it at the top level.
+        # https://github.com/canonical/ops-scenario/pull/200
+        from scenario.context import CharmEvents
+
+        # The Scenario unit testing framework.
+        __all__.extend([
+            'ActiveStatus',
+            'Address',
+            'AnyJson',
+            'BindAddress',
+            'BlockedStatus',
+            'CharmEvents',
+            'CheckInfo',
+            'CloudCredential',
+            'CloudSpec',
+            'Container',
+            'Context',
+            'DeferredEvent',
+            'ErrorStatus',
+            'Exec',
+            'ICMPPort',
+            'JujuLogLine',
+            'MaintenanceStatus',
+            'Manager',
+            'Model',
+            'Mount',
+            'Network',
+            'Notice',
+            'PeerRelation',
+            'Port',
+            'RawDataBagContents',
+            'RawSecretRevisionContents',
+            'Relation',
+            'RelationBase',
+            'Resource',
+            'Secret',
+            'State',
+            'Storage',
+            'StoredState',
+            'SubordinateRelation',
+            'TCPPort',
+            'UDPPort',
+            'UnitID',
+            'UnknownStatus',
+            'WaitingStatus',
+            'errors',
+        ])
+
+        # Until Scenario uses the ops._private.harness.ActionFailed, we need to
+        # monkeypatch it in, so that the ops.testing.ActionFailed object is the
+        # one that we expect, even if people are mixing Harness and Scenario.
+        # https://github.com/canonical/ops-scenario/issues/201
+        import scenario.context as _context
+        import scenario.runtime as _runtime
+
+        _context.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
+        _runtime.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
 
 # Names exposed for backwards compatibility
-_ = CharmBase
-_ = CharmMeta
-_ = Container
-_ = ExecProcess
-_ = RelationNotFoundError
-_ = RelationRole
-_ = charm
-_ = framework
-_ = model
-_ = pebble
-_ = storage
+_compatibility_names = [
+    'CharmBase',
+    'CharmMeta',
+    'Container',  # If Scenario has been installed, then this will be scenario.Container.
+    'ExecProcess',
+    'RelationNotFoundError',
+    'RelationRole',
+    'charm',
+    'framework',
+    'model',
+    'pebble',
+    'storage',
+]
+__all__.extend(_compatibility_names)  # type: ignore[reportUnsupportedDunderAll]

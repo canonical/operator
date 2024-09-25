@@ -18,33 +18,17 @@ import sys
 
 from docutils import nodes
 
+import inspect
+import sphinx.ext.autodoc
 from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
-import furo
-import furo.navigation
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
-# Furo patch to get local TOC to show in sidebar (as sphinx-rtd-theme did)
-# See https://github.com/pradyunsg/furo/blob/490527b2aef00b1198770c3389a1979911ee1fcb/src/furo/__init__.py#L115-L128
-
-_old_compute_navigation_tree = furo._compute_navigation_tree
-
-
-def _compute_navigation_tree(context):
-    tree_html = _old_compute_navigation_tree(context)
-    if not tree_html and context.get('toc'):
-        tree_html = furo.navigation.get_navigation_tree(context['toc'])
-    return tree_html
-
-
-furo._compute_navigation_tree = _compute_navigation_tree
-
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
-import re  # noqa: E402
-import sphinx.ext.autodoc  # noqa: E402
+import re
 
 sphinx.ext.autodoc.py_ext_sig_re = re.compile(
     r"""^ ([\w.]+::)?            # explicit module name
@@ -216,7 +200,9 @@ custom_extensions = [
 # pyspelling, sphinx, sphinx-autobuild, sphinx-copybutton, sphinx-design,
 # sphinx-notfound-page, sphinx-reredirects, sphinx-tabs, sphinxcontrib-jquery,
 # sphinxext-opengraph
-custom_required_modules = []
+custom_required_modules = [
+    'ops-scenario>=7.0.5,<8',
+]
 
 # Add files or directories that should be excluded from processing.
 custom_excludes = [
@@ -315,6 +301,8 @@ nitpick_ignore = [
     # Please keep this list sorted alphabetically.
     ('py:class', '_ChangeDict'),
     ('py:class', '_CheckInfoDict'),
+    ('py:class', '_EntityStatus'),
+    ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
@@ -326,6 +314,8 @@ nitpick_ignore = [
     ('py:class', '_TextOrBinaryIO'),
     ('py:class', '_WarningDict'),
     ('py:class', '_Writeable'),
+    ('py:class', 'AnyJson'),
+    ('py:class', 'CharmType'),
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
@@ -345,7 +335,32 @@ nitpick_ignore = [
     ('py:class', 'ops.testing._ConfigOption'),
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
+    ('py:class', 'scenario.state._EntityStatus'),
+    ('py:class', 'scenario.state._Event'),
+    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
+
+
+# Monkeypatch Sphinx to look for __init__ rather than __new__ for the subclasses
+# of _MaxPositionalArgs.
+_real_get_signature = sphinx.ext.autodoc.ClassDocumenter._get_signature
+
+
+def _custom_get_signature(self):
+    if any(p.__name__ == '_MaxPositionalArgs' for p in self.object.__mro__):
+        signature = inspect.signature(self.object)
+        parameters = []
+        for position, param in enumerate(signature.parameters.values()):
+            if position >= self.object._max_positional_args:
+                parameters.append(param.replace(kind=inspect.Parameter.KEYWORD_ONLY))
+            else:
+                parameters.append(param)
+        signature = signature.replace(parameters=parameters)
+        return None, None, signature
+    return _real_get_signature(self)
+
+
+sphinx.ext.autodoc.ClassDocumenter._get_signature = _custom_get_signature
 
 
 # This is very strongly based on

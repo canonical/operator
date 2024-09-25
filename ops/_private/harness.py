@@ -64,6 +64,17 @@ from ops.jujucontext import _JujuContext
 from ops.model import Container, RelationNotFoundError, StatusName, _NetworkDict
 from ops.pebble import ExecProcess
 
+if typing.TYPE_CHECKING:
+    try:
+        from ops.testing import State  # type: ignore
+    except ImportError:
+        # This is used in the ActionFailed type annotations: it will never be
+        # used in this case, because it's only relevant when ops.testing has
+        # the State class, so we just define it as a dummy class.
+        class State:
+            pass
+
+
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
 _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
 _FileKwargs = TypedDict(
@@ -161,18 +172,35 @@ class ActionOutput:
     """The action's results, as set or updated by :meth:`ops.ActionEvent.set_results`."""
 
 
-class ActionFailed(Exception):  # noqa
-    """Raised when :code:`event.fail()` is called during a :meth:`Harness.run_action` call."""
+class ActionFailed(Exception):  # noqa: N818 (name doesn't end with "Error")
+    """Raised when :code:`event.fail()` is called during an action handler."""
 
     message: str
     """Optional details of the failure, as provided by :meth:`ops.ActionEvent.fail`."""
 
     output: ActionOutput
-    """Any logs and results set by the Charm."""
+    """Any logs and results set by the Charm.
 
-    def __init__(self, message: str, output: ActionOutput):
+    When using Context.run, both logs and results will be empty - these
+    can be found in Context.action_logs and Context.action_results.
+    """
+
+    state: typing.Optional['State']
+    """The Juju state after the action has been run.
+
+    When using Harness.run_action, this will be None.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        output: typing.Optional[ActionOutput] = None,
+        *,
+        state: typing.Optional['State'] = None,
+    ):
         self.message = message
-        self.output = output
+        self.output = output or ActionOutput([], {})
+        self.state = state
 
     def __str__(self):
         if self.message:
@@ -284,6 +312,13 @@ class Harness(Generic[CharmType]):
             self._meta,
             self._model,
             juju_debug_at=self._juju_context.debug_at,
+        )
+
+        warnings.warn(
+            'Harness is deprecated; we recommend using state transition testing '
+            "(previously known as 'Scenario') instead",
+            PendingDeprecationWarning,
+            stacklevel=2,
         )
 
     def _event_context(self, event_name: str):

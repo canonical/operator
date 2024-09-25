@@ -7025,3 +7025,12 @@ class TestCloudSpec:
         harness.begin()
         with pytest.raises(ops.ModelError):
             harness.model.get_cloud_spec()
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_scenario_available():
+    ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
+    state = ctx.run(ctx.on.start(), ops.testing.State())
+    assert isinstance(state.unit_status, ops.testing.UnknownStatus)

@@ -16,8 +16,11 @@ import os
 import pathlib
 import subprocess
 import sys
+import typing
 
 import pytest
+
+import ops.testing
 
 
 @pytest.mark.parametrize(
@@ -45,3 +48,40 @@ def test_import(mod_name: str, tmp_path: pathlib.Path):
 
     proc = subprocess.run([sys.executable, testfile], env=environ)
     assert proc.returncode == 0
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_ops_testing_doc():
+    """Ensure that ops.testing's documentation includes all the expected names."""
+    prefix = '.. autoclass:: ops.testing.'
+    # We don't document the type aliases.
+    expected_names = set(
+        name
+        for name in ops.testing.__all__
+        if name != 'errors'
+        and name not in ops.testing._compatibility_names
+        and getattr(ops.testing, name).__class__.__module__ != 'typing'
+    )
+    expected_names.update(
+        f'errors.{name}' for name in dir(ops.testing.errors) if not name.startswith('_')
+    )
+    # ops.testing.UnitID is `int` - we don't document it, but it's hard to fit
+    # into the above logic, so we just exclude it here.
+    expected_names.discard('UnitID')
+    # ops.testing.Container is a documented class when Scenario is installed,
+    # but exported for compatibility when not, so we do want to have it present
+    # even though the above compatibility_names logic would exclude it.
+    expected_names.add('Container')
+
+    found_names: typing.Set[str] = set()
+    for test_doc in ('docs/harness.rst', 'docs/state-transition-testing.rst'):
+        with open(test_doc) as testing_doc:
+            found_names.update({
+                line.split(prefix, 1)[1].strip()
+                for line in testing_doc
+                if line.strip().startswith(prefix)
+            })
+
+    assert expected_names == found_names

@@ -2048,7 +2048,7 @@ class UnknownStatus(StatusBase):
     charm has not called status-set yet.
 
     This status is read-only; trying to set unit or application status to
-    ``UnknownStatus`` will raise :class:`InvalidStatusError`.
+    ``UnknownStatus`` will raise :class:`~ops.InvalidStatusError`.
     """
 
     name = 'unknown'
@@ -2068,7 +2068,7 @@ class ErrorStatus(StatusBase):
     human intervention in order to operate correctly).
 
     This status is read-only; trying to set unit or application status to
-    ``ErrorStatus`` will raise :class:`InvalidStatusError`.
+    ``ErrorStatus`` will raise :class:`~ops.InvalidStatusError`.
     """
 
     name = 'error'
