@@ -1,0 +1,68 @@
+name: ops Smoke Tests
+
+on:
+  workflow_dispatch:
+    schedule:
+      - cron:  '0 7 25 * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # pylibjuju does not currently support Juju 4.x
+        # The smoke tests do not yet work on Juju 2.9.
+        juju-version: ['3.5']
+        charmcraft-version: ['2.x', '3.x']
+        cloud: ['lxd', 'microk8s']
+
+    env:
+      JUJU_VERSION: "${{ matrix.juju-version }}"
+
+    steps:
+      # LXD is required for charmcraft to pack, even if it's not used as the
+      # Juju cloud.
+      - name: Set up LXD
+        uses: canonical/setup-lxd@8fb85546a934dfb994becf81341dd387ffe6aabb
+        with:
+          channel: 5.0/stable
+
+      - name: Set up Microk8s
+        if: matrix.cloud == 'microk8s'
+        uses: balchua/microk8s-actions@v0.3.2
+        with:
+          channel: '1.26-strict/stable'
+          devMode: 'true'
+          addons: '["dns", "hostpath-storage"]'
+
+      - name: Set up Juju (classic)
+        if: matrix.juju-version == '2.9'
+        run: sudo snap install juju --classic --channel=${{ matrix.juju-version }}
+
+      - name: Set up Juju
+        if: matrix.juju-version != '2.9'
+        run: sudo snap install juju --channel=${{ matrix.juju-version }}
+
+      - name: Bootstrap Juju controller (k8s)
+        if: matrix.cloud == 'microk8s'
+        run: sg snap_microk8s -c 'juju bootstrap microk8s'
+
+      - name: Bootstrap Juju controller (lxd)
+        if: matrix.cloud == 'lxd'
+        run: juju bootstrap localhost
+
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --channel=${{ matrix.charmcraft-version }} --classic
+
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+
+      - name: Install tox
+        run: pip install tox~=4.2
+
+      - name: Run smoke tests
+        run: tox -e smoke
