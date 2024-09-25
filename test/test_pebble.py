@@ -1277,8 +1277,8 @@ class TestServiceInfo:
             startup=pebble.ServiceStartup.ENABLED,
             current='active',  # pyright: ignore[reportArgumentType]
         )
-        assert 'active' == pebble.ServiceStatus.ACTIVE.value
-        assert 'active' != pebble.ServiceStatus.ACTIVE
+        assert pebble.ServiceStatus.ACTIVE.value == 'active'
+        assert pebble.ServiceStatus.ACTIVE != 'active'
         assert not s.is_running()
 
 
