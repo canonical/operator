@@ -1105,12 +1105,13 @@ class CollectStatusEvent(LifecycleEvent):
 
     The order of priorities is as follows, from highest to lowest:
 
-    * error
     * blocked
     * maintenance
     * waiting
     * active
-    * unknown
+
+    It is an error to call :meth:`add_status` with an instance of
+    :class:`ErrorStatus` or :class:`UnknownStatus`.
 
     If there are multiple statuses with the same priority, the first one added
     wins (and if an event is observed multiple times, the handlers are called
@@ -1151,6 +1152,10 @@ class CollectStatusEvent(LifecycleEvent):
         """
         if not isinstance(status, model.StatusBase):
             raise TypeError(f'status should be a StatusBase, not {type(status).__name__}')
+        if status.name not in model._SETTABLE_STATUS_NAMES:
+            raise model.InvalidStatusError(
+                f'status.name must be in {model._SETTABLE_STATUS_NAMES}, not {status.name!r}'
+            )
         model_ = self.framework.model
         if self.handle.kind == 'collect_app_status':
             if not isinstance(status, model.ActiveStatus):

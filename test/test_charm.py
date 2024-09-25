@@ -959,7 +959,6 @@ def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: Fake
         (['waiting', 'blocked'], 'blocked'),
         (['waiting', 'maintenance'], 'maintenance'),
         (['active', 'waiting'], 'waiting'),
-        (['active', 'unknown'], 'active'),
     ],
 )
 def test_collect_status_priority_valid(
@@ -994,6 +993,7 @@ def test_collect_status_priority_valid(
     [
         ['blocked', 'error'],
         ['unknown'],
+        ['active', 'unknown'],
     ],
 )
 def test_collect_status_priority_invalid(
@@ -1015,7 +1015,7 @@ def test_collect_status_priority_invalid(
 
     framework = create_framework(request)
     charm = MyCharm(framework, statuses=statuses)
-    with pytest.raises(ModelError):
+    with pytest.raises(ops.InvalidStatusError):
         ops.charm._evaluate_status(charm)
 
 
