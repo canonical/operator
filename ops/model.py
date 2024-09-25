@@ -3133,7 +3133,7 @@ def _format_action_result_dict(
     parent_key: Optional[str] = None,
     output: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
-    """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
+    """Turn a nested dictionary into a flattened dictionary, using '.' as a key separator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
     the Juju `action-set` hook tool in order to set nested data on an action.
@@ -3973,7 +3973,7 @@ class CloudSpec:
     """A list of CA certificates."""
 
     skip_tls_verify: bool = False
-    """Whether to skip TLS verfication."""
+    """Whether to skip TLS verification."""
 
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller, defaults to False."""

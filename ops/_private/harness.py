@@ -380,7 +380,7 @@ class Harness(Generic[CharmType]):
         if self._charm is not None:
             raise RuntimeError('cannot call the begin method on the harness more than once')
 
-        # The Framework adds attributes to class objects for events, etc. As such, we can't re-use
+        # The Framework adds attributes to class objects for events, etc. As such, we can't reuse
         # the original class against multiple Frameworks. So create a locally defined class
         # and register it.
         # TODO: jam 2020-03-16 We are looking to changes this to Instance attributes instead of
