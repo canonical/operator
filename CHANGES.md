@@ -55,7 +55,7 @@
 
 ## Fix
 
-* avoid changing `os.environ` in Harness in (#1359)
+* Don't alter os.environ when creating a Harness (#1359)
 
 # 2.16.0 - 29 Aug 2024
 
