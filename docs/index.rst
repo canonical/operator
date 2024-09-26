@@ -9,7 +9,7 @@ The library (`available on PyPI`_) provides:
 
 - :ref:`ops_module`, the API to respond to Juju events and manage the application;
 - :ref:`ops_main_entry_point`, used to initialise and run your charm;
-- :ref:`ops_pebble_module`, the Pebble client, a low-level API for Kubernetes containers;
+- :doc:`ops.pebble </pebble>`, the Pebble client, a low-level API for Kubernetes containers;
 - the APIs for unit testing charms in a simulated environment:
 
   - :doc:`State-transition testing </state-transition-testing>`. This is the
@@ -30,6 +30,7 @@ integrations with other services, and making the charm easier to test.
    :maxdepth: 2
 
    self
+   pebble
    state-transition-testing
    harness
 
@@ -55,15 +56,6 @@ legacy main module
 
 .. automodule:: ops.main
    :noindex:
-
-.. _ops_pebble_module:
-
-ops.pebble
-----------
-
-.. automodule:: ops.pebble
-
-.. _ops_testing_module:
 
 
 Indices
