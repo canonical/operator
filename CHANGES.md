@@ -42,7 +42,7 @@
 
 ## Chores
 
-* note juju version on legacy workaround in (#1355)
+* Note Juju version on legacy workaround (#1355)
 * re-enable test now that Pebble directory permissions are fixed in (#1363)
 * generate warnings for events that will be removed in Juju 4.0 in (#1374)
 * update charm pins in (#1390)
