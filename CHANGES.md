@@ -1,38 +1,97 @@
+# 2.17.0 - 26 Sep 2024
+
+## Features
+
+* optionally install Scenario with `ops[testing]` and expose the names in ops.testing in (#1381)
+* add a JujuVersion property for Pebble log forwarding to Loki in (#1370)
+* expand the secret ID out to the full URI when only given the ID in (#1358)
+* pre-emptively raise `InvalidStatusError` instead of waiting for Juju:
+    * make it an error to call `CollectStatusEvent.add_status` with error or unknown in (#1386)
+    * document and validate settable status values in `_ModelBackend.set_status` in (#1354)
+
+## Fixes
+
+* rework `ops.main` type hints to allow different flavours (callable class) in (#1345)
+* fix type of `StatusBase` subclasses by calling `StatusBase.register` in `__init_subclass__` in (#1383)
+* `Secret.set_info` and `Secret.set_content` can be called in the same hook in (#1373)
+
+## Documentation
+
+* add top-level intro and module-level intros in (#1320)
+* update the links to the Pebble docs in (#1362)
+* note about repeatedly setting secret value in Juju 3.6 in (#1366)
+* `config-changed` is triggered by Juju trust in (#1357)
+* typo on `CharmBase` inheritance example by @theofpa in (#1349)
+
+## Continuous Integration
+
+* periodically run the unit tests of all GitHub-hosted published charms in (#1365)
+* update the TIOBE reporting for the changes in coverage calculation in (#1367)
+* spell-check the code as part of linting in (#1388)
+* run the smoke tests on a schedule in (#1387)
+
+## Testing
+
+* properly mock the environment in (#1385)
+
+## Refactoring
+
+* move the content of `ops.testing` to `ops._private.harness` in (#1369)
+* keep the `unittest.mock` names in the 'mock' namespace in (#1379)
+* deprecate `StatusBase.register` decorator in (#1384)
+
+## Chores
+
+* note juju version on legacy workaround in (#1355)
+* re-enable test now that Pebble directory permissions are fixed in (#1363)
+* generate warnings for events that will be removed in Juju 4.0 in (#1374)
+* update charm pins in (#1390)
+* update charm pins in (#1375)
+* bump version in (#1348)
+* bump canonical/setup-lxd version in (#1350)
+* bump actions/attest-build-provenance from 1.4.0 to 1.4.2 in (#1351)
+
+# 2.16.1 - 5 Sep 2024
+
+## Fix
+
+* avoid changing `os.environ` in Harness in (#1359)
+
 # 2.16.0 - 29 Aug 2024
 
 ## Features
 
-* Add the description field to SecretInfo in https://github.com/canonical/operator/pull/1338
+* Add the description field to SecretInfo in (#1338)
 
 ## Refactor
 
-* Parse JUJU_* environment variables in one place in https://github.com/canonical/operator/pull/1313
+* Parse JUJU_* environment variables in one place in (#1313)
 
 ## Fixes
 
-* Fix reading Juju secret expiry dates in https://github.com/canonical/operator/pull/1317
-* Correct the signature of .events() in https://github.com/canonical/operator/pull/1342
+* Fix reading Juju secret expiry dates in (#1317)
+* Correct the signature of .events() in (#1342)
 
 ## Documentation
 
-* Security policy change to only support each active major release in https://github.com/canonical/operator/pull/1297
-* Add Juju version markers in https://github.com/canonical/operator/pull/1311
-* Use Sphinx 8 in https://github.com/canonical/operator/pull/1303
-* Live reload documentation with sphinx-autobuild in https://github.com/canonical/operator/pull/1323
+* Security policy change to only support each active major release in (#1297)
+* Add Juju version markers in (#1311)
+* Use Sphinx 8 in (#1303)
+* Live reload documentation with sphinx-autobuild in (#1323)
 
 ## Tests
 
-* Update the smoke test series/bases in https://github.com/canonical/operator/pull/1318
-* Run pytest in parallel with pytest xdist in https://github.com/canonical/operator/pull/1319
-* Bump Pyright to 1.1.377 in https://github.com/canonical/operator/pull/1332
-* Run tests on Python 3.12 and the install test on Python 3.13 in https://github.com/canonical/operator/pull/1315
+* Update the smoke test series/bases in (#1318)
+* Run pytest in parallel with pytest xdist in (#1319)
+* Bump Pyright to 1.1.377 in (#1332)
+* Run tests on Python 3.12 and the install test on Python 3.13 in (#1315)
 
 ## CI
 
-* Add a workflow that runs the TIOBE quality checks in https://github.com/canonical/operator/pull/1301
-* Allow executing the TIOBE workflow manually in https://github.com/canonical/operator/pull/1321
-* Make Pyright report unnecessary type ignore comments in https://github.com/canonical/operator/pull/1333
-* Enable linting of docs/custom_conf.py in https://github.com/canonical/operator/pull/1330
+* Add a workflow that runs the TIOBE quality checks in (#1301)
+* Allow executing the TIOBE workflow manually in (#1321)
+* Make Pyright report unnecessary type ignore comments in (#1333)
+* Enable linting of docs/custom_conf.py in (#1330)
 
 # 2.15.0 - 22 Jul 2024
 
