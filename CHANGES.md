@@ -3,15 +3,15 @@
 ## Features
 
 * Optionally install Scenario with `ops[testing]` and expose the names in ops.testing (#1381)
-* Add a JujuVersion property for Pebble log forwarding to Loki (#1370)
+* Change ops.main() so that you don't need to `type: ignore` it (#1345)
 * Expand the secret ID out to the full URI when only given the ID (#1358)
+* Add a JujuVersion property for Pebble log forwarding to Loki (#1370)
 * Pre-emptively raise `InvalidStatusError` instead of waiting for Juju:
     * Make it an error to call `CollectStatusEvent.add_status` with error or unknown (#1386)
     * Document and validate settable status values in `_ModelBackend.set_status` (#1354)
 
 ## Fixes
 
-* Change ops.main() so that you don't need to `type: ignore` it (#1345)
 * Fix type of `StatusBase` subclasses by calling `StatusBase.register` in `__init_subclass__` (#1383)
 * `Secret.set_info` and `Secret.set_content` can be called in the same hook (#1373)
 
