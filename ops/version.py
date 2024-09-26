@@ -17,4 +17,4 @@
 This module is NOT to be used when developing charms using ops.
 """
 
-version: str = '2.17.0'
+version: str = '2.17.1.dev0'
