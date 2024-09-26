@@ -11,7 +11,7 @@
 
 ## Fixes
 
-* rework `ops.main` type hints to allow different flavours (callable class) in (#1345)
+* Change ops.main() so that you don't need to `type: ignore` it (#1345)
 * fix type of `StatusBase` subclasses by calling `StatusBase.register` in `__init_subclass__` in (#1383)
 * `Secret.set_info` and `Secret.set_content` can be called in the same hook in (#1373)
 
