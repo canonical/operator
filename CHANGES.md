@@ -2,33 +2,33 @@
 
 ## Features
 
-* optionally install Scenario with `ops[testing]` and expose the names in ops.testing in (#1381)
-* add a JujuVersion property for Pebble log forwarding to Loki in (#1370)
-* expand the secret ID out to the full URI when only given the ID in (#1358)
-* pre-emptively raise `InvalidStatusError` instead of waiting for Juju:
-    * make it an error to call `CollectStatusEvent.add_status` with error or unknown in (#1386)
-    * document and validate settable status values in `_ModelBackend.set_status` in (#1354)
+* Optionally install Scenario with `ops[testing]` and expose the names in ops.testing (#1381)
+* Add a JujuVersion property for Pebble log forwarding to Loki (#1370)
+* Expand the secret ID out to the full URI when only given the ID (#1358)
+* Pre-emptively raise `InvalidStatusError` instead of waiting for Juju:
+    * Make it an error to call `CollectStatusEvent.add_status` with error or unknown (#1386)
+    * Document and validate settable status values in `_ModelBackend.set_status` (#1354)
 
 ## Fixes
 
 * Change ops.main() so that you don't need to `type: ignore` it (#1345)
-* fix type of `StatusBase` subclasses by calling `StatusBase.register` in `__init_subclass__` in (#1383)
-* `Secret.set_info` and `Secret.set_content` can be called in the same hook in (#1373)
+* Fix type of `StatusBase` subclasses by calling `StatusBase.register` in `__init_subclass__` (#1383)
+* `Secret.set_info` and `Secret.set_content` can be called in the same hook (#1373)
 
 ## Documentation
 
-* add top-level intro and module-level intros in (#1320)
-* update the links to the Pebble docs in (#1362)
-* note about repeatedly setting secret value in Juju 3.6 in (#1366)
-* `config-changed` is triggered by Juju trust in (#1357)
-* typo on `CharmBase` inheritance example by @theofpa in (#1349)
+* Add top-level intro and module-level intros (#1320)
+* Update the links to the Pebble docs (#1362)
+* Note about repeatedly setting secret value in Juju 3.6 (#1366)
+* `config-changed` is triggered by Juju trust (#1357)
+* Typo on `CharmBase` inheritance example by @theofpa (#1349)
 
 ## Continuous Integration
 
-* periodically run the unit tests of all GitHub-hosted published charms in (#1365)
-* update the TIOBE reporting for the changes in coverage calculation in (#1367)
-* spell-check the code as part of linting in (#1388)
-* run the smoke tests on a schedule in (#1387)
+* Periodically run the unit tests of all GitHub-hosted published charms (#1365)
+* Update the TIOBE reporting for the changes in coverage calculation (#1367)
+* Spell-check the code as part of linting (#1388)
+* Run the smoke tests on a schedule (#1387)
 
 ## Testing
 
@@ -36,20 +36,20 @@
 
 ## Refactoring
 
-* move the content of `ops.testing` to `ops._private.harness` in (#1369)
-* keep the `unittest.mock` names in the 'mock' namespace in (#1379)
-* deprecate `StatusBase.register` decorator in (#1384)
+* Move the content of `ops.testing` to `ops._private.harness` (#1369)
+* Keep the `unittest.mock` names in the 'mock' namespace (#1379)
+* Deprecate `StatusBase.register` decorator (#1384)
 
 ## Chores
 
 * Note Juju version on legacy workaround (#1355)
-* re-enable test now that Pebble directory permissions are fixed in (#1363)
-* generate warnings for events that will be removed in Juju 4.0 in (#1374)
-* update charm pins in (#1390)
-* update charm pins in (#1375)
-* bump version in (#1348)
-* bump canonical/setup-lxd version in (#1350)
-* bump actions/attest-build-provenance from 1.4.0 to 1.4.2 in (#1351)
+* Re-enable test now that Pebble directory permissions are fixed (#1363)
+* Generate warnings for events that will be removed in Juju 4.0 (#1374)
+* Update charm pins (#1390)
+* Update charm pins (#1375)
+* Bump version (#1348)
+* Bump canonical/setup-lxd version (#1350)
+* Bump actions/attest-build-provenance from 1.4.0 to 1.4.2 (#1351)
 
 # 2.16.1 - 5 Sep 2024
 
