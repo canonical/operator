@@ -32,7 +32,7 @@
 
 ## Testing
 
-* properly mock the environment in (#1385)
+* Fix tests that leaked environment variables (#1385)
 
 ## Refactoring
 
