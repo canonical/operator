@@ -1263,17 +1263,14 @@ class TestServiceInfo:
             s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
             assert not s.is_running()
 
-        # This is just for the PR, to highlight the current runtime behaviour with strings.
-        # This behaviour might be worth changing as it seems error prone,
-        # though there is a static type checking error.
-        pebble.ServiceInfo(
+        s = pebble.ServiceInfo(
             name='s',
             startup=pebble.ServiceStartup.ENABLED,
             current='active',  # pyright: ignore[reportArgumentType]
         )
-        assert pebble.ServiceStatus.ACTIVE.value == 'active'
         assert pebble.ServiceStatus.ACTIVE != 'active'
-        assert not s.is_running()
+        with pytest.raises(ValueError):
+            s.is_running()
 
 
 class TestCheckInfo:

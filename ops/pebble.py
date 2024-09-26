@@ -1065,6 +1065,11 @@ class ServiceInfo:
 
     def is_running(self) -> bool:
         """Return True if this service is running (in the active state)."""
+        if not isinstance(self.current, ServiceStatus):
+            raise ValueError(
+                'self.current must be a ServiceStatus member (e.g. ServiceStatus.ACTIVE)'
+                f', not {self.current}'
+            )
         return self.current == ServiceStatus.ACTIVE
 
     @classmethod
