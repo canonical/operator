@@ -45,11 +45,6 @@
 * Note Juju version on legacy workaround (#1355)
 * Re-enable test now that Pebble directory permissions are fixed (#1363)
 * Generate warnings for events that will be removed in Juju 4.0 (#1374)
-* Update charm pins (#1390)
-* Update charm pins (#1375)
-* Bump version (#1348)
-* Bump canonical/setup-lxd version (#1350)
-* Bump actions/attest-build-provenance from 1.4.0 to 1.4.2 (#1351)
 
 # 2.16.1 - 5 Sep 2024
 
