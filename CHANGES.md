@@ -22,6 +22,7 @@
 * Note about repeatedly setting secret value in Juju 3.6 (#1366)
 * `config-changed` is triggered by Juju trust (#1357)
 * Typo on `CharmBase` inheritance example by @theofpa (#1349)
+* Docs: move Pebble to a separate page (#1392)
 
 ## Continuous Integration
 
