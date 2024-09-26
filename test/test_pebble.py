@@ -1211,10 +1211,7 @@ class TestServiceInfo:
         ]
         assert pebble.ServiceStartup.ENABLED.value == 'enabled'
         assert pebble.ServiceStartup.DISABLED.value == 'disabled'
-        assert not isinstance(
-            pebble.ServiceStartup.UNKNOWN.value,
-            (str, float, int, dict, list, type(None)),  # json serialisable types
-        )
+        assert pebble.ServiceStartup.UNKNOWN.value == 'unknown'
 
     def test_service_status(self):
         assert list(pebble.ServiceStatus) == [
@@ -1226,10 +1223,7 @@ class TestServiceInfo:
         assert pebble.ServiceStatus.ACTIVE.value == 'active'
         assert pebble.ServiceStatus.INACTIVE.value == 'inactive'
         assert pebble.ServiceStatus.ERROR.value == 'error'
-        assert not isinstance(
-            pebble.ServiceStartup.UNKNOWN.value,
-            (str, float, int, dict, list, type(None)),  # json serialisable types
-        )
+        assert pebble.ServiceStatus.UNKNOWN.value == 'unknown'
 
     def test_service_info(self):
         s = pebble.ServiceInfo('svc1', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)

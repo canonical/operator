@@ -352,18 +352,6 @@ class _NotProvidedFlag:
 _not_provided = _NotProvidedFlag()
 
 
-class _Unknown:
-    """Get a value that will never be in Pebble's json.
-
-    Used as the value for UNKNOWN in enums, to avoid silent success
-    on collision with a string returned from Pebble, e.g. if
-    'unknown' value was added on Pebble's end as a valid value.
-    """
-
-    def __repr__(self):
-        return f'{self.__module__}.{self.__class__.__name__}()'
-
-
 class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
@@ -1050,7 +1038,7 @@ class ServiceStartup(enum.Enum):
 
     ENABLED = 'enabled'
     DISABLED = 'disabled'
-    UNKNOWN = _Unknown()
+    UNKNOWN = 'unknown'
 
 
 class ServiceStatus(enum.Enum):
@@ -1059,7 +1047,7 @@ class ServiceStatus(enum.Enum):
     ACTIVE = 'active'
     INACTIVE = 'inactive'
     ERROR = 'error'
-    UNKNOWN = _Unknown()
+    UNKNOWN = 'unknown'
 
 
 class ServiceInfo:
