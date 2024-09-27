@@ -3047,7 +3047,7 @@ class Container:
         *,
         users: Optional[pebble.NoticesUsers] = None,
         user_id: Optional[int] = None,
-        types: Optional[Iterable[Union[pebble.NoticeType, str]]] = None,
+        types: Optional[Iterable[pebble.NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
     ) -> List[pebble.Notice]:
         """Query for notices that match all of the provided filters.

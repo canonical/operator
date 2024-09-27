@@ -3863,7 +3863,7 @@ class _TestingPebbleClient:
         # For example: if user_id filter is set and it doesn't match, return False.
         if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
             return False
-        if types is not None and notice.type not in types:
+        if types is not None and notice.type.value not in types:
             return False
         if keys is not None and notice.key not in keys:
             return False

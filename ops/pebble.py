@@ -1556,6 +1556,9 @@ class NoticeType(enum.Enum):
     notices is the change ID.
     """
 
+    UNKNOWN = 'unknown'
+    """Used if we receive an unrecognised notice type (e.g. from future Pebble versions)."""
+
 
 class NoticesUsers(enum.Enum):
     """Enum of :meth:`Client.get_notices` ``users`` values."""
@@ -1622,7 +1625,7 @@ class Notice:
     user_id: Optional[int]
     """UID of the user who may view this notice (None means notice is public)."""
 
-    type: Union[NoticeType, str]
+    type: NoticeType
     """Type of the notice."""
 
     key: str
@@ -1662,7 +1665,8 @@ class Notice:
         try:
             notice_type = NoticeType(d['type'])
         except ValueError:
-            notice_type = d['type']
+            warnings.warn(f'Unknown NoticeType value {d["type"]!r}')
+            notice_type = NoticeType.UNKNOWN
         return cls(
             id=d['id'],
             user_id=d.get('user-id'),
@@ -3161,7 +3165,7 @@ class Client:
         *,
         users: Optional[NoticesUsers] = None,
         user_id: Optional[int] = None,
-        types: Optional[Iterable[Union[NoticeType, str]]] = None,
+        types: Optional[Iterable[NoticeType]] = None,
         keys: Optional[Iterable[str]] = None,
     ) -> List[Notice]:
         """Query for notices that match all of the provided filters.

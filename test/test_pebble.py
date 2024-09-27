@@ -480,19 +480,20 @@ single log
             expire_after=datetime.timedelta(hours=24),
         )
 
-        notice = pebble.Notice.from_dict({
-            'id': '124',
-            'type': 'other',
-            'key': 'example.com/b',
-            'first-occurred': '2023-12-07T17:01:02.123456789Z',
-            'last-occurred': '2023-12-07T17:01:03.123456789Z',
-            'last-repeated': '2023-12-07T17:01:04.123456789Z',
-            'occurrences': 8,
-        })
+        with pytest.warns(UserWarning):
+            notice = pebble.Notice.from_dict({
+                'id': '124',
+                'type': 'other',
+                'key': 'example.com/b',
+                'first-occurred': '2023-12-07T17:01:02.123456789Z',
+                'last-occurred': '2023-12-07T17:01:03.123456789Z',
+                'last-repeated': '2023-12-07T17:01:04.123456789Z',
+                'occurrences': 8,
+            })
         assert notice == pebble.Notice(
             id='124',
             user_id=None,
-            type='other',
+            type=pebble.NoticeType.UNKNOWN,
             key='example.com/b',
             first_occurred=datetime_utc(2023, 12, 7, 17, 1, 2, 123457),
             last_occurred=datetime_utc(2023, 12, 7, 17, 1, 3, 123457),
@@ -3143,10 +3144,13 @@ bad path\r
             'type': 'sync',
         })
 
-        checks = client.get_notices()
+        with pytest.warns(UserWarning):
+            checks = client.get_notices()
         assert len(checks) == 2
         assert checks[0].id == '123'
         assert checks[1].id == '124'
+        assert checks[0].type is pebble.NoticeType.CUSTOM
+        assert checks[1].type is pebble.NoticeType.UNKNOWN
 
         assert client.requests == [
             ('GET', '/v1/notices', {}, None),
@@ -3180,15 +3184,18 @@ bad path\r
             'type': 'sync',
         })
 
-        notices = client.get_notices(
-            user_id=1000,
-            users=pebble.NoticesUsers.ALL,
-            types=[pebble.NoticeType.CUSTOM],
-            keys=['example.com/a', 'example.com/b'],
-        )
+        with pytest.warns(UserWarning):
+            notices = client.get_notices(
+                user_id=1000,
+                users=pebble.NoticesUsers.ALL,
+                types=[pebble.NoticeType.CUSTOM],
+                keys=['example.com/a', 'example.com/b'],
+            )
         assert len(notices) == 2
         assert notices[0].id == '123'
         assert notices[1].id == '124'
+        assert notices[0].type is pebble.NoticeType.CUSTOM
+        assert notices[1].type is pebble.NoticeType.UNKNOWN
 
         query = {
             'user-id': '1000',
