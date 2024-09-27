@@ -1338,7 +1338,7 @@ class TestCheckInfo:
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
-            'level': pebble.CheckLevel.UNSET,
+            'level': pebble.CheckLevel.UNSET.value,
             'status': pebble.CheckStatus.DOWN,
             'failures': 3,
             'threshold': 3,
@@ -2977,7 +2977,7 @@ bad path\r
         checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
-        assert checks[0].level == 'foobar!'  # stays a raw string
+        assert checks[0].level is pebble.CheckLevel.UNKNOWN
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3

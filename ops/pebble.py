@@ -242,7 +242,7 @@ if TYPE_CHECKING:
         '_CheckInfoDict',
         {
             'name': str,
-            'level': NotRequired[Optional[Union['CheckLevel', str]]],
+            'level': NotRequired[Optional[str]],
             'status': Union['CheckStatus', str],
             'failures': NotRequired[int],
             'threshold': int,
@@ -1443,11 +1443,14 @@ class CheckInfo:
     name: str
     """Name of the check."""
 
-    level: Optional[Union[CheckLevel, str]]
+    level: Optional[CheckLevel]
     """Check level.
 
     This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
     """
+    # suspicious that we're documenting None as the value for unset ...
+    # from_dict will use CheckLevel.UNSET if no value is provided for level
+    # but it will pass along None, since that isn't defined in CheckLevel
 
     status: Union[CheckStatus, str]
     """Status of the check.
@@ -1479,7 +1482,7 @@ class CheckInfo:
     def __init__(
         self,
         name: str,
-        level: Optional[Union[CheckLevel, str]],
+        level: Optional[CheckLevel],
         status: Union[CheckStatus, str],
         failures: int = 0,
         threshold: int = 0,
@@ -1495,10 +1498,19 @@ class CheckInfo:
     @classmethod
     def from_dict(cls, d: _CheckInfoDict) -> CheckInfo:
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
-        try:
-            level = CheckLevel(d.get('level', ''))
-        except ValueError:
-            level = d.get('level')
+        d_level = d.get('level', '')  # CheckLevel('') -> CheckLevel.UNSET
+        if d_level is None:
+            # previously None would get a ValueError and end up with level = None
+            # the same way that we'd have handled 'my-weird-new-value-for-level'
+            # but it's documented as a valid argument for CheckInfo, indicating not set
+            # so we shouldn't turn it into CheckLevel.UNKNOWN
+            # TODO: look into turning it into CheckLevel.UNSET instead? Or forbid it?
+            level = None
+        else:
+            try:
+                level = CheckLevel(d_level)
+            except ValueError:
+                level = CheckLevel.UNKNOWN
         try:
             status = CheckStatus(d['status'])
         except ValueError:
@@ -3088,6 +3100,9 @@ class Client:
         """
         query: Dict[str, Any] = {}
         if level is not None:
+            # is this bad now that value could be 'unknown'?
+            # should we explicitly avoid it here?
+            # if level is not None and level.value is not CheckLevel.UNKNOWN:
             query['level'] = level.value
         if names:
             query['names'] = list(names)
