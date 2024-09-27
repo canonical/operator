@@ -1100,12 +1100,10 @@ class CollectStatusEvent(LifecycleEvent):
     way after the end of every hook, it should observe the
     :attr:`collect_app_status <CharmEvents.collect_app_status>` or
     :attr:`collect_unit_status <CharmEvents.collect_unit_status>` event,
-    respectively. Note that this event is triggered at the end of *every* hook,
-    so any observer of these events will be run on every hook, regardless of
-    whether the charm observes that hook event. For example, even if you don't
-    observe :attr:`config_changed <CharmEvents.config_changed>`, your collect status
+    respectively. Note that observing the specific hook event is not required. For example, even
+    if you don't observe :attr:`config_changed <CharmEvents.config_changed>`, your collect status
     observer will run at the end of every :attr:`config_changed <CharmEvents.config_changed>`
-    event.
+    event, as well as all others.
 
     The framework will trigger these events after the hook code runs
     successfully (``collect_app_status`` will only be triggered on the leader
