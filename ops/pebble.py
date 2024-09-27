@@ -1108,9 +1108,11 @@ class Check:
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
         self.level: CheckLevel
+        dct_level = dct.get('level', '')
         try:
-            self.level = CheckLevel(dct.get('level', ''))  # CheckLevel('') -> CheckLevel.UNSET
+            self.level = CheckLevel(dct_level)  # CheckLevel('') -> CheckLevel.UNSET
         except ValueError:
+            warnings.warn(f'Unknown CheckLevel value {dct_level!r}')
             self.level = CheckLevel.UNKNOWN
         #
         # these are all Optional in CheckDict and here, why '' instead of None?
@@ -1511,10 +1513,12 @@ class CheckInfo:
             try:
                 level = CheckLevel(d_level)
             except ValueError:
+                warnings.warn(f'Unknown CheckLevel value {d_level!r}')
                 level = CheckLevel.UNKNOWN
         try:
             status = CheckStatus(d['status'])
         except ValueError:
+            warnings.warn(f'Unknown CheckStatus value {d["status"]!r}')
             status = CheckStatus.UNKNOWN
         return cls(
             name=d['name'],
