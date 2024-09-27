@@ -243,7 +243,7 @@ if TYPE_CHECKING:
         {
             'name': str,
             'level': NotRequired[Optional[str]],
-            'status': Union['CheckStatus', str],
+            'status': str,
             'failures': NotRequired[int],
             'threshold': int,
             'change-id': NotRequired[str],
@@ -1273,6 +1273,7 @@ class CheckStatus(enum.Enum):
 
     UP = 'up'
     DOWN = 'down'
+    UNKNOWN = 'unknown'
 
 
 class LogTarget:
@@ -1452,7 +1453,7 @@ class CheckInfo:
     # from_dict will use CheckLevel.UNSET if no value is provided for level
     # but it will pass along None, since that isn't defined in CheckLevel
 
-    status: Union[CheckStatus, str]
+    status: CheckStatus
     """Status of the check.
 
     :attr:`CheckStatus.UP` means the check is healthy (the number of failures
@@ -1483,7 +1484,7 @@ class CheckInfo:
         self,
         name: str,
         level: Optional[CheckLevel],
-        status: Union[CheckStatus, str],
+        status: CheckStatus,
         failures: int = 0,
         threshold: int = 0,
         change_id: Optional[ChangeID] = None,
@@ -1514,7 +1515,7 @@ class CheckInfo:
         try:
             status = CheckStatus(d['status'])
         except ValueError:
-            status = d['status']
+            status = CheckStatus.UNKNOWN
         return cls(
             name=d['name'],
             level=level,

@@ -1290,9 +1290,11 @@ class TestCheckInfo:
         assert list(pebble.CheckStatus) == [
             pebble.CheckStatus.UP,
             pebble.CheckStatus.DOWN,
+            pebble.CheckStatus.UNKNOWN,
         ]
         assert pebble.CheckStatus.UP.value == 'up'
         assert pebble.CheckStatus.DOWN.value == 'down'
+        assert pebble.CheckStatus.UNKNOWN.value == 'unknown'
 
     def test_check_info(self):
         check = pebble.CheckInfo(
@@ -1339,7 +1341,7 @@ class TestCheckInfo:
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
             'level': pebble.CheckLevel.UNSET.value,
-            'status': pebble.CheckStatus.DOWN,
+            'status': pebble.CheckStatus.DOWN.value,
             'failures': 3,
             'threshold': 3,
             'change-id': '42',
@@ -2979,6 +2981,32 @@ bad path\r
         assert checks[0].name == 'chk2'
         assert checks[0].level is pebble.CheckLevel.UNKNOWN
         assert checks[0].status == pebble.CheckStatus.UP
+        assert checks[0].failures == 0
+        assert checks[0].threshold == 3
+
+        assert client.requests == [
+            ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
+        ]
+
+    def test_checkstatus_conversion(self, client: MockClient):
+        client.responses.append({
+            'result': [
+                {
+                    'name': 'chk2',
+                    'level': 'ready',
+                    'status': 'foobar!!',
+                    'threshold': 3,
+                },
+            ],
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        assert len(checks) == 1
+        assert checks[0].name == 'chk2'
+        assert checks[0].level is pebble.CheckLevel.READY
+        assert checks[0].status == pebble.CheckStatus.UNKNOWN
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
 
