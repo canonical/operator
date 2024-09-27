@@ -2352,7 +2352,7 @@ class Container:
             # Check that Pebble is still reachable now.
             container = self.unit.get_container("example")
             if not container.can_connect():
-                event.add_status(ops.WaitingStatus("Waiting for Pebble..."))
+                event.add_status(ops.MaintenanceStatus("Waiting for Pebble..."))
         """
         try:
             self._pebble.get_system_info()
