@@ -1119,7 +1119,7 @@ class TestCheck:
             'http': {'url': 'https://example.com/'},
         }
         check = pebble.Check('chk-http', d)
-        assert check.level == 'foobar!'  # remains a string
+        assert check.level is pebble.CheckLevel.UNKNOWN
 
     def test_equality(self):
         d: pebble.CheckDict = {

@@ -134,7 +134,7 @@ CheckDict = typing.TypedDict(
     'CheckDict',
     {
         'override': str,
-        'level': Union['CheckLevel', str],
+        'level': str,
         'period': Optional[str],
         'timeout': Optional[str],
         'http': Optional[HttpDict],
@@ -1107,11 +1107,14 @@ class Check:
         self.name = name
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
+        self.level: CheckLevel
         try:
-            level: Union[CheckLevel, str] = CheckLevel(dct.get('level', ''))
+            self.level = CheckLevel(dct.get('level', ''))  # CheckLevel('') -> CheckLevel.UNSET
         except ValueError:
-            level = dct.get('level', '')
-        self.level = level
+            self.level = CheckLevel.UNKNOWN
+        #
+        # these are all Optional in CheckDict and here, why '' instead of None?
+        # note that all falsey values are filtered out in to_dict
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
@@ -1133,7 +1136,25 @@ class Check:
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
-        level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
+        # is this the behaviour we want for unknown?
+        level: str = '' if self.level is CheckLevel.UNKNOWN else self.level.value
+        #
+        # This has better type checking -- keys and values actually checked
+        # against CheckDict type, and no cast. Worth switching to this version?
+        fields: CheckDict = {
+            'override': self.override,
+            'level': level,
+            'period': self.period,
+            'timeout': self.timeout,
+            'threshold': self.threshold,
+            'http': self.http,
+            'tcp': self.tcp,
+            'exec': self.exec,
+        }
+        for name, value in tuple(fields.items()):
+            if not value:
+                del fields[name]
+        return fields
         fields = [
             ('override', self.override),
             ('level', level),
@@ -1214,8 +1235,19 @@ class Check:
         For attributes present in both objects, the passed in check
         attributes take precedence.
         """
+        # wouldn't it be better to use other.to_dict?
+        # it would let us skip these checks
         for name, value in other.__dict__.items():
             if not value or name == 'name':
+                continue
+            # how to handle CheckLevel.UNKNOWN?
+            #
+            # it would be skipped here if we used other.to_dict
+            #
+            # previously it would have been <some-unknown-value-string>
+            # while we might want <some-unknown-value-string> to overwrite,
+            # would we ever want Checklevel.UNKNOWN to overwrite?
+            if value is CheckLevel.UNKNOWN:
                 continue
             if name == 'http':
                 self._merge_http(value)
