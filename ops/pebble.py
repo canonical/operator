@@ -1140,23 +1140,18 @@ class Check:
         """Convert this check object to its dict representation."""
         # is this the behaviour we want for unknown?
         level: str = '' if self.level is CheckLevel.UNKNOWN else self.level.value
+        # it seems unfortunate that we'd have
         #
-        # This has better type checking -- keys and values actually checked
-        # against CheckDict type, and no cast. Worth switching to this version?
-        fields: CheckDict = {
-            'override': self.override,
-            'level': level,
-            'period': self.period,
-            'timeout': self.timeout,
-            'threshold': self.threshold,
-            'http': self.http,
-            'tcp': self.tcp,
-            'exec': self.exec,
-        }
-        for name, value in tuple(fields.items()):
-            if not value:
-                del fields[name]
-        return fields
+        #  d = {'level'='unknown-level'}
+        # c1 = Check.from_dict(d)
+        # c2 = Check.from_dict(c1.to_dict())
+        # c1.level == CheckLevel.UNKNOWN
+        # c2.level == CheckLevel.UNSET
+        #
+        # so do we want to just use 'unknown' for CheckLevel.UNKNOWN here?
+        # we still get a warning on making `c1` but not on `c2`, but maybe that's ok
+        # but is it useful to have 'unknown' in the dict?
+        # It'll error if that value makes it to pebble, right?
         fields = [
             ('override', self.override),
             ('level', level),
