@@ -443,8 +443,9 @@ single log
         d['user'] = 'bob'
         d['group-id'] = 34
         d['group'] = 'staff'
-        info = pebble.FileInfo.from_dict(d)
-        assert info.type == 'foobar'
+        with pytest.warns(UserWarning):
+            info = pebble.FileInfo.from_dict(d)
+        assert info.type == pebble.FileType.UNKNOWN
         assert info.size == 123
         assert info.user_id == 12
         assert info.user == 'bob'
@@ -1245,7 +1246,6 @@ class TestServiceInfo:
         assert s.name == 'svc2'
         assert s.startup == pebble.ServiceStartup.DISABLED
         assert s.current == pebble.ServiceStatus.INACTIVE
-
 
         with pytest.warns(UserWarning):
             s = pebble.ServiceInfo.from_dict({

@@ -261,7 +261,7 @@ if TYPE_CHECKING:
             'user': NotRequired[Optional[str]],
             'group-id': NotRequired[Optional[int]],
             'group': NotRequired[Optional[str]],
-            'type': Union['FileType', str],
+            'type': str,
         },
     )
 
@@ -1353,8 +1353,8 @@ class FileInfo:
     name: str
     """Base name of the file."""
 
-    type: Union[FileType, str]
-    """Type of the file ("file", "directory", "symlink", etc)."""
+    type: FileType
+    """Type of the file (FileType.FILE, FileType.DIRECTORY, FileType.SYMLINK, etc)."""
 
     size: Optional[int]
     """Size of the file (will be 0 if ``type`` is not "file")."""
@@ -1381,7 +1381,7 @@ class FileInfo:
         self,
         path: str,
         name: str,
-        type: Union[FileType, str],
+        type: FileType,
         size: Optional[int],
         permissions: int,
         last_modified: datetime.datetime,
@@ -1407,7 +1407,8 @@ class FileInfo:
         try:
             file_type = FileType(d['type'])
         except ValueError:
-            file_type = d['type']
+            warnings.warn(f'Unknown FileType value {d["type"]!r}')
+            file_type = FileType.UNKNOWN
         return cls(
             path=d['path'],
             name=d['name'],
