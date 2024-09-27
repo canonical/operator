@@ -1279,10 +1279,12 @@ class TestCheckInfo:
             pebble.CheckLevel.UNSET,
             pebble.CheckLevel.ALIVE,
             pebble.CheckLevel.READY,
+            pebble.CheckLevel.UNKNOWN,
         ]
         assert pebble.CheckLevel.UNSET.value == ''
         assert pebble.CheckLevel.ALIVE.value == 'alive'
         assert pebble.CheckLevel.READY.value == 'ready'
+        assert pebble.CheckLevel.UNKNOWN.value == 'unknown'
 
     def test_check_status(self):
         assert list(pebble.CheckStatus) == [

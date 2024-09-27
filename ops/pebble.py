@@ -1233,6 +1233,7 @@ class CheckLevel(enum.Enum):
     UNSET = ''
     ALIVE = 'alive'
     READY = 'ready'
+    UNKNOWN = 'unknown'
 
 
 class CheckStatus(enum.Enum):
