@@ -1118,7 +1118,8 @@ class TestCheck:
             'threshold': 5,
             'http': {'url': 'https://example.com/'},
         }
-        check = pebble.Check('chk-http', d)
+        with pytest.warns(UserWarning):
+            check = pebble.Check('chk-http', d)
         assert check.level is pebble.CheckLevel.UNKNOWN
 
     def test_equality(self):
@@ -1245,11 +1246,13 @@ class TestServiceInfo:
         assert s.startup == pebble.ServiceStartup.DISABLED
         assert s.current == pebble.ServiceStatus.INACTIVE
 
-        s = pebble.ServiceInfo.from_dict({
-            'name': 'svc2',
-            'startup': 'thingy',
-            'current': 'bob',
-        })
+
+        with pytest.warns(UserWarning):
+            s = pebble.ServiceInfo.from_dict({
+                'name': 'svc2',
+                'startup': 'thingy',
+                'current': 'bob',
+            })
         assert s.name == 'svc2'
         assert s.startup == pebble.ServiceStartup.UNKNOWN
         assert s.current == pebble.ServiceStatus.UNKNOWN
@@ -2976,7 +2979,8 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        with pytest.warns(UserWarning):
+            checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
         assert checks[0].level is pebble.CheckLevel.UNKNOWN
@@ -3002,7 +3006,8 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        with pytest.warns(UserWarning):
+            checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
         assert checks[0].level is pebble.CheckLevel.READY
