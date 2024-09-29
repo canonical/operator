@@ -1100,14 +1100,13 @@ class CollectStatusEvent(LifecycleEvent):
     way after the end of every hook, it should observe the
     :attr:`collect_app_status <CharmEvents.collect_app_status>` or
     :attr:`collect_unit_status <CharmEvents.collect_unit_status>` event,
-    respectively. Note that observing the specific hook event is not required. For example, even
-    if you don't observe :attr:`config_changed <CharmEvents.config_changed>`, your collect status
-    observer will run at the end of every :attr:`config_changed <CharmEvents.config_changed>`
-    event, as well as all others.
+    respectively.
 
     The framework will trigger these events after the hook code runs
     successfully (``collect_app_status`` will only be triggered on the leader
-    unit). If any statuses were added by the event handler using
+    unit). This happens on every Juju event, whether it was
+    :meth:`observed <ops.Framework.observe>` or not.
+    If any statuses were added by the event handler using
     :meth:`add_status`, the framework will choose the highest-priority status
     and set that as the status (application status for ``collect_app_status``,
     or unit status for ``collect_unit_status``).
