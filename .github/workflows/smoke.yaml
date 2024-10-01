@@ -30,7 +30,7 @@ jobs:
 
       - name: Set up Microk8s
         if: matrix.cloud == 'microk8s'
-        uses: balchua/microk8s-actions@v0.3.2
+        uses: balchua/microk8s-actions@v0.4.3
         with:
           channel: '1.26-strict/stable'
           devMode: 'true'
