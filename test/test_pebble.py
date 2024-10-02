@@ -1122,7 +1122,7 @@ class TestCheck:
         }
         with pytest.warns(UserWarning):
             check = pebble.Check('chk-http', d)
-        assert check.level is pebble.CheckLevel.UNKNOWN
+        assert check.level == pebble.CheckLevel.UNKNOWN
 
     def test_equality(self):
         d: pebble.CheckDict = {
@@ -2983,7 +2983,7 @@ bad path\r
             checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
-        assert checks[0].level is pebble.CheckLevel.UNKNOWN
+        assert checks[0].level == pebble.CheckLevel.UNKNOWN
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
@@ -3010,7 +3010,7 @@ bad path\r
             checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
-        assert checks[0].level is pebble.CheckLevel.READY
+        assert checks[0].level == pebble.CheckLevel.READY
         assert checks[0].status == pebble.CheckStatus.UNKNOWN
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
@@ -3148,8 +3148,8 @@ bad path\r
         assert len(checks) == 2
         assert checks[0].id == '123'
         assert checks[1].id == '124'
-        assert checks[0].type is pebble.NoticeType.CUSTOM
-        assert checks[1].type is pebble.NoticeType.UNKNOWN
+        assert checks[0].type == pebble.NoticeType.CUSTOM
+        assert checks[1].type == pebble.NoticeType.UNKNOWN
 
         assert client.requests == [
             ('GET', '/v1/notices', {}, None),
@@ -3193,8 +3193,8 @@ bad path\r
         assert len(notices) == 2
         assert notices[0].id == '123'
         assert notices[1].id == '124'
-        assert notices[0].type is pebble.NoticeType.CUSTOM
-        assert notices[1].type is pebble.NoticeType.UNKNOWN
+        assert notices[0].type == pebble.NoticeType.CUSTOM
+        assert notices[1].type == pebble.NoticeType.UNKNOWN
 
         query = {
             'user-id': '1000',
