@@ -1073,12 +1073,16 @@ class ServiceInfo:
         try:
             startup = ServiceStartup(d['startup'])
         except ValueError:
-            warnings.warn(f'Unknown ServiceStartup value {d["startup"]!r}; do you need to update ops?')
+            warnings.warn(
+                f'Unknown ServiceStartup value {d["startup"]!r}; do you need to update ops?'
+            )
             startup = ServiceStartup.UNKNOWN
         try:
             current = ServiceStatus(d['current'])
         except ValueError:
-            warnings.warn(f'Unknown ServiceStatus value {d["current"]!r}; do you need to update ops?')
+            warnings.warn(
+                f'Unknown ServiceStatus value {d["current"]!r}; do you need to update ops?'
+            )
             current = ServiceStatus.UNKNOWN
         return cls(
             name=d['name'],
