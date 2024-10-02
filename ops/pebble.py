@@ -242,7 +242,7 @@ if TYPE_CHECKING:
         '_CheckInfoDict',
         {
             'name': str,
-            'level': NotRequired[Optional[str]],
+            'level': NotRequired[str],
             'status': str,
             'failures': NotRequired[int],
             'threshold': int,
@@ -1102,7 +1102,6 @@ class Check:
         self.name = name
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
-        self.level: CheckLevel
         dct_level = dct.get('level', '')
         try:
             self.level = CheckLevel(dct_level)  # CheckLevel('') -> CheckLevel.UNSET
@@ -1133,23 +1132,9 @@ class Check:
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
-        # is this the behaviour we want for unknown?
-        level: str = '' if self.level is CheckLevel.UNKNOWN else self.level.value
-        # it seems unfortunate that we'd have
-        #
-        #  d = {'level'='unknown-level'}
-        # c1 = Check.from_dict(d)
-        # c2 = Check.from_dict(c1.to_dict())
-        # c1.level == CheckLevel.UNKNOWN
-        # c2.level == CheckLevel.UNSET
-        #
-        # so do we want to just use 'unknown' for CheckLevel.UNKNOWN here?
-        # we still get a warning on making `c1` but not on `c2`, but maybe that's ok
-        # but is it useful to have 'unknown' in the dict?
-        # It'll error if that value makes it to pebble, right?
         fields = [
             ('override', self.override),
-            ('level', level),
+            ('level', self.level.value),
             ('period', self.period),
             ('timeout', self.timeout),
             ('threshold', self.threshold),
@@ -1227,19 +1212,8 @@ class Check:
         For attributes present in both objects, the passed in check
         attributes take precedence.
         """
-        # wouldn't it be better to use other.to_dict?
-        # it would let us skip these checks
         for name, value in other.__dict__.items():
             if not value or name == 'name':
-                continue
-            # how to handle CheckLevel.UNKNOWN?
-            #
-            # it would be skipped here if we used other.to_dict
-            #
-            # previously it would have been <some-unknown-value-string>
-            # while we might want <some-unknown-value-string> to overwrite,
-            # would we ever want Checklevel.UNKNOWN to overwrite?
-            if value is CheckLevel.UNKNOWN:
                 continue
             if name == 'http':
                 self._merge_http(value)
@@ -1437,14 +1411,8 @@ class CheckInfo:
     name: str
     """Name of the check."""
 
-    level: Optional[CheckLevel]
-    """Check level.
-
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
-    """
-    # suspicious that we're documenting None as the value for unset ...
-    # from_dict will use CheckLevel.UNSET if no value is provided for level
-    # but it will pass along None, since that isn't defined in CheckLevel
+    level: CheckLevel
+    """Check level."""
 
     status: CheckStatus
     """Status of the check.
@@ -1476,7 +1444,7 @@ class CheckInfo:
     def __init__(
         self,
         name: str,
-        level: Optional[CheckLevel],
+        level: CheckLevel,
         status: CheckStatus,
         failures: int = 0,
         threshold: int = 0,
@@ -1493,19 +1461,11 @@ class CheckInfo:
     def from_dict(cls, d: _CheckInfoDict) -> CheckInfo:
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
         d_level = d.get('level', '')  # CheckLevel('') -> CheckLevel.UNSET
-        if d_level is None:
-            # previously None would get a ValueError and end up with level = None
-            # the same way that we'd have handled 'my-weird-new-value-for-level'
-            # but it's documented as a valid argument for CheckInfo, indicating not set
-            # so we shouldn't turn it into CheckLevel.UNKNOWN
-            # TODO: look into turning it into CheckLevel.UNSET instead? Or forbid it?
-            level = None
-        else:
-            try:
-                level = CheckLevel(d_level)
-            except ValueError:
-                warnings.warn(f'Unknown CheckLevel value {d_level!r}')
-                level = CheckLevel.UNKNOWN
+        try:
+            level = CheckLevel(d_level)
+        except ValueError:
+            warnings.warn(f'Unknown CheckLevel value {d_level!r}')
+            level = CheckLevel.UNKNOWN
         try:
             status = CheckStatus(d['status'])
         except ValueError:
@@ -3100,9 +3060,6 @@ class Client:
         """
         query: Dict[str, Any] = {}
         if level is not None:
-            # is this bad now that value could be 'unknown'?
-            # should we explicitly avoid it here?
-            # if level is not None and level.value is not CheckLevel.UNKNOWN:
             query['level'] = level.value
         if names:
             query['names'] = list(names)
