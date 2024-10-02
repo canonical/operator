@@ -1112,9 +1112,6 @@ class Check:
         except ValueError:
             warnings.warn(f'Unknown CheckLevel value {level_raw!r}; do you need to update ops?')
             self.level = CheckLevel.UNKNOWN
-        #
-        # these are all Optional in CheckDict and here, why '' instead of None?
-        # note that all falsey values are filtered out in to_dict
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
