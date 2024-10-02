@@ -256,7 +256,7 @@ class CloudSpec(_max_posargs(1)):
     """A list of CA certificates."""
 
     skip_tls_verify: bool = False
-    """Whether to skip TLS verfication."""
+    """Whether to skip TLS verification."""
 
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
@@ -1958,13 +1958,13 @@ class _Event:
                 },
             )
             if not self.name.endswith(("_created", "_broken")):
-                snapshot_data[
-                    "unit_name"
-                ] = f"{remote_app}/{self.relation_remote_unit_id}"
+                snapshot_data["unit_name"] = (
+                    f"{remote_app}/{self.relation_remote_unit_id}"
+                )
             if self.name.endswith("_departed"):
-                snapshot_data[
-                    "departing_unit"
-                ] = f"{remote_app}/{self.relation_departed_unit_id}"
+                snapshot_data["departing_unit"] = (
+                    f"{remote_app}/{self.relation_departed_unit_id}"
+                )
 
         elif self._is_storage_event:
             # Enforced by the consistency checker, but for type checkers:

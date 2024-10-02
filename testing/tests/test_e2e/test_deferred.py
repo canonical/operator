@@ -1,5 +1,3 @@
-from dataclasses import asdict
-
 import pytest
 from ops.charm import (
     CharmBase,
@@ -12,7 +10,7 @@ from ops.charm import (
 from ops.framework import Framework
 
 from scenario import Context
-from scenario.state import Container, Notice, Relation, State, _Event
+from scenario.state import Container, Relation, State, _Event
 from tests.helpers import trigger
 
 CHARM_CALLED = 0

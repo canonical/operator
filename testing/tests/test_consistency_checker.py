@@ -12,7 +12,6 @@ from scenario.state import (
     CloudCredential,
     CloudSpec,
     Container,
-    Exec,
     Model,
     Network,
     Notice,
@@ -326,7 +325,7 @@ def test_secrets_jujuv_bad(bad_v):
 
 
 @pytest.mark.parametrize("good_v", ("3.0", "3.1", "3", "3.33", "4", "100"))
-def test_secrets_jujuv_bad(good_v):
+def test_secrets_jujuv_good(good_v):
     assert_consistent(
         State(secrets={Secret({"a": "b"})}),
         _Event("bar"),

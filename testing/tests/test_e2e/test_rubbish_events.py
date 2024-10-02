@@ -4,8 +4,7 @@ import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
-from scenario.ops_main_mock import NoObserverError
-from scenario.state import Container, State, _CharmSpec, _Event
+from scenario.state import State, _CharmSpec, _Event
 from tests.helpers import trigger
 
 

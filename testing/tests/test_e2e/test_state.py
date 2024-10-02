@@ -108,14 +108,12 @@ def test_status_setting(state, mycharm):
 
     # ignore stored state in the delta
     out_purged = replace(out, stored_states=state.stored_states)
-    assert jsonpatch_delta(out_purged, state) == sort_patch(
-        [
-            {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
-            {"op": "replace", "path": "/app_status/name", "value": "waiting"},
-            {"op": "replace", "path": "/unit_status/message", "value": "foo test"},
-            {"op": "replace", "path": "/unit_status/name", "value": "active"},
-        ]
-    )
+    assert jsonpatch_delta(out_purged, state) == sort_patch([
+        {"op": "replace", "path": "/app_status/message", "value": "foo barz"},
+        {"op": "replace", "path": "/app_status/name", "value": "waiting"},
+        {"op": "replace", "path": "/unit_status/message", "value": "foo test"},
+        {"op": "replace", "path": "/unit_status/name", "value": "active"},
+    ])
 
 
 @pytest.mark.parametrize("connect", (True, False))

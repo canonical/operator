@@ -1,12 +1,6 @@
 import datetime
 
 import pytest
-from ops import (
-    SecretChangedEvent,
-    SecretExpiredEvent,
-    SecretRemoveEvent,
-    SecretRotateEvent,
-)
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ModelError

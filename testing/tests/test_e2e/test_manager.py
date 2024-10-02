@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 from ops import ActiveStatus
 from ops.charm import CharmBase, CollectStatusEvent

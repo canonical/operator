@@ -304,7 +304,7 @@ def test_relation_data():
         ),
     }
 
-# which is very idiomatic and superbly explicit. Noice.
+# which is very idiomatic and superbly explicit.
 ```
 
 The only mandatory argument to `Relation` (and other relation types, see below) is `endpoint`. The `interface` will be
@@ -966,7 +966,7 @@ def test_backup_action_failed():
     # The state is also available if that's required:
     assert exc_info.value.state.get_container(...)
 
-    # You can still assert action results and logs that occured as well as the failure:
+    # You can still assert action results and logs that occurred as well as the failure:
     assert ctx.action_logs == ['baz', 'qux']
     assert ctx.action_results == {'foo': 'bar'}
 ```

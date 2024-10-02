@@ -250,9 +250,9 @@ class Runtime:
                 env["JUJU_REMOTE_UNIT"] = remote_unit
                 if event.name.endswith("_relation_departed"):
                     if event.relation_departed_unit_id:
-                        env[
-                            "JUJU_DEPARTING_UNIT"
-                        ] = f"{remote_app_name}/{event.relation_departed_unit_id}"
+                        env["JUJU_DEPARTING_UNIT"] = (
+                            f"{remote_app_name}/{event.relation_departed_unit_id}"
+                        )
                     else:
                         env["JUJU_DEPARTING_UNIT"] = remote_unit
 

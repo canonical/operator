@@ -1,6 +1,5 @@
 __pycache__
 /sandbox
-/ops.egg-info
 .idea
 *~
 .venv
@@ -18,9 +17,13 @@ coverage.xml
 .secrets
 
 # Build artifacts
+/ops.egg-info
 /dist
 /build
 /docs/_build
+/testing/ops_scenario.egg-info/
+/testing/build/
+/testing/dist/
 
 # Smoke test artifacts
 *.tar.gz

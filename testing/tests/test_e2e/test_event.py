@@ -1,6 +1,6 @@
 import ops
 import pytest
-from ops import CharmBase, StartEvent, UpdateStatusEvent
+from ops import CharmBase
 
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType

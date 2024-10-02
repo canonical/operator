@@ -73,6 +73,6 @@ def test_positional_arguments():
 def test_default_arguments():
     s = StoredState()
     assert s.name == "_stored"
-    assert s.owner_path == None
+    assert s.owner_path is None
     assert s.content == {}
     assert s._data_type_name == "StoredStateData"

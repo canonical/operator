@@ -29,11 +29,9 @@ def test_plugin_ctx_run(pytester):
     result = pytester.runpytest("-v")
 
     # fnmatch_lines does an assertion internally
-    result.stdout.fnmatch_lines(
-        [
-            "*::test_sth PASSED*",
-        ]
-    )
+    result.stdout.fnmatch_lines([
+        "*::test_sth PASSED*",
+    ])
 
     # make sure that we get a '0' exit code for the testsuite
     assert result.ret == 0

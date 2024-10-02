@@ -78,9 +78,9 @@ def test_config_in_not_mutated(mycharm, cfg_in):
 
         def _on_event(self, event):
             # access the config to trigger a config-get
-            foo_cfg = self.config["foo"]
-            baz_cfg = self.config["baz"]
-            qux_cfg = self.config["qux"]
+            foo_cfg = self.config["foo"]  # noqa: F841
+            baz_cfg = self.config["baz"]  # noqa: F841
+            qux_cfg = self.config["qux"]  # noqa: F841
 
     state_out = trigger(
         State(

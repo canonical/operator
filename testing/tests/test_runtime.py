@@ -1,10 +1,7 @@
 import os
-from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock
 
 import pytest
-import yaml
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase
 
@@ -35,7 +32,7 @@ def charm_type():
 
 
 def test_event_emission():
-    with TemporaryDirectory() as tempdir:
+    with TemporaryDirectory():
         meta = {
             "name": "foo",
             "requires": {"ingress-per-unit": {"interface": "ingress_per_unit"}},
@@ -59,7 +56,7 @@ def test_event_emission():
             state=State(),
             event=_Event("bar"),
             context=Context(my_charm_type, meta=meta),
-        ) as ops:
+        ):
             pass
 
         assert my_charm_type._event

@@ -89,33 +89,6 @@ def test_get_relation(mycharm):
 
 
 @pytest.mark.parametrize(
-    "evt_name", ("changed", "broken", "departed", "joined", "created")
-)
-def test_relation_events(mycharm, evt_name):
-    relation = Relation(endpoint="foo", interface="foo", remote_app_name="remote")
-
-    mycharm._call = lambda self, evt: None
-
-    trigger(
-        State(
-            relations={
-                relation,
-            },
-        ),
-        f"relation_{evt_name}",
-        mycharm,
-        meta={
-            "name": "local",
-            "requires": {
-                "foo": {"interface": "foo"},
-            },
-        },
-    )
-
-    assert mycharm.called
-
-
-@pytest.mark.parametrize(
     "evt_name",
     ("changed", "broken", "departed", "joined", "created"),
 )
@@ -324,15 +297,13 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
 def test_relation_unit_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):
-        relation = Relation(
-            endpoint="foo", interface="foo", remote_units_data={0: {"a": data}}
-        )
+        Relation(endpoint="foo", interface="foo", remote_units_data={0: {"a": data}})
 
 
 @pytest.mark.parametrize("data", (set(), {}, [], (), 1, 1.0, None, b""))
 def test_relation_app_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):
-        relation = Relation(endpoint="foo", interface="foo", local_app_data={"a": data})
+        Relation(endpoint="foo", interface="foo", local_app_data={"a": data})
 
 
 @pytest.mark.parametrize(
@@ -356,7 +327,7 @@ def test_relation_event_trigger(relation, evt_name, mycharm):
         },
         "peers": {"b": {"interface": "i2"}},
     }
-    state = trigger(
+    trigger(
         State(relations={relation}),
         f"relation_{evt_name}",
         mycharm,

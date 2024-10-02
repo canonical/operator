@@ -298,13 +298,11 @@ def test_pebble_plan(charm_cls, starting_service_status):
         name="foo",
         can_connect=True,
         layers={
-            "foo": pebble.Layer(
-                {
-                    "summary": "bla",
-                    "description": "deadbeef",
-                    "services": {"fooserv": {"startup": "enabled"}},
-                }
-            )
+            "foo": pebble.Layer({
+                "summary": "bla",
+                "description": "deadbeef",
+                "services": {"fooserv": {"startup": "enabled"}},
+            })
         },
         service_statuses={
             "fooserv": pebble.ServiceStatus.ACTIVE,
@@ -320,7 +318,9 @@ def test_pebble_plan(charm_cls, starting_service_status):
         event="pebble_ready",
     )
 
-    serv = lambda name, obj: pebble.Service(name, raw=obj)
+    def serv(name, obj):
+        return pebble.Service(name, raw=obj)
+
     container = out.get_container(container.name)
     assert container.plan.services == {
         "barserv": serv("barserv", {"startup": "disabled"}),
