@@ -1073,12 +1073,12 @@ class ServiceInfo:
         try:
             startup = ServiceStartup(d['startup'])
         except ValueError:
-            warnings.warn(f'Unknown ServiceStartup value {d["startup"]!r}')
+            warnings.warn(f'Unknown ServiceStartup value {d["startup"]!r}; do you need to update ops?')
             startup = ServiceStartup.UNKNOWN
         try:
             current = ServiceStatus(d['current'])
         except ValueError:
-            warnings.warn(f'Unknown ServiceStatus value {d["current"]!r}')
+            warnings.warn(f'Unknown ServiceStatus value {d["current"]!r}; do you need to update ops?')
             current = ServiceStatus.UNKNOWN
         return cls(
             name=d['name'],
@@ -1106,7 +1106,7 @@ class Check:
         try:
             self.level = CheckLevel(level_raw)  # CheckLevel('') -> CheckLevel.UNSET
         except ValueError:
-            warnings.warn(f'Unknown CheckLevel value {level_raw!r}')
+            warnings.warn(f'Unknown CheckLevel value {level_raw!r}; do you need to update ops?')
             self.level = CheckLevel.UNKNOWN
         #
         # these are all Optional in CheckDict and here, why '' instead of None?
@@ -1371,7 +1371,7 @@ class FileInfo:
         try:
             file_type = FileType(d['type'])
         except ValueError:
-            warnings.warn(f'Unknown FileType value {d["type"]!r}')
+            warnings.warn(f'Unknown FileType value {d["type"]!r}; do you need to update ops?')
             file_type = FileType.UNKNOWN
         return cls(
             path=d['path'],
@@ -1464,12 +1464,12 @@ class CheckInfo:
         try:
             level = CheckLevel(level_raw)
         except ValueError:
-            warnings.warn(f'Unknown CheckLevel value {level_raw!r}')
+            warnings.warn(f'Unknown CheckLevel value {level_raw!r}; do you need to update ops?')
             level = CheckLevel.UNKNOWN
         try:
             status = CheckStatus(d['status'])
         except ValueError:
-            warnings.warn(f'Unknown CheckStatus value {d["status"]!r}')
+            warnings.warn(f'Unknown CheckStatus value {d["status"]!r}; do you need to update ops?')
             status = CheckStatus.UNKNOWN
         return cls(
             name=d['name'],
@@ -1615,7 +1615,7 @@ class Notice:
         try:
             notice_type = NoticeType(d['type'])
         except ValueError:
-            warnings.warn(f'Unknown NoticeType value {d["type"]!r}')
+            warnings.warn(f'Unknown NoticeType value {d["type"]!r}; do you need to update ops?')
             notice_type = NoticeType.UNKNOWN
         return cls(
             id=d['id'],
