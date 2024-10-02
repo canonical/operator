@@ -3112,7 +3112,7 @@ class Client:
         *,
         users: Optional[NoticesUsers] = None,
         user_id: Optional[int] = None,
-        types: Optional[Iterable[NoticeType]] = None,
+        types: Optional[Iterable[Union[NoticeType, str]]] = None,
         keys: Optional[Iterable[str]] = None,
     ) -> List[Notice]:
         """Query for notices that match all of the provided filters.
