@@ -1102,11 +1102,11 @@ class Check:
         self.name = name
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
-        dct_level = dct.get('level', '')
+        level_raw = dct.get('level', '')
         try:
-            self.level = CheckLevel(dct_level)  # CheckLevel('') -> CheckLevel.UNSET
+            self.level = CheckLevel(level_raw)  # CheckLevel('') -> CheckLevel.UNSET
         except ValueError:
-            warnings.warn(f'Unknown CheckLevel value {dct_level!r}')
+            warnings.warn(f'Unknown CheckLevel value {level_raw!r}')
             self.level = CheckLevel.UNKNOWN
         #
         # these are all Optional in CheckDict and here, why '' instead of None?
@@ -1460,11 +1460,11 @@ class CheckInfo:
     @classmethod
     def from_dict(cls, d: _CheckInfoDict) -> CheckInfo:
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
-        d_level = d.get('level', '')  # CheckLevel('') -> CheckLevel.UNSET
+        level_raw = d.get('level', '')  # CheckLevel('') -> CheckLevel.UNSET
         try:
-            level = CheckLevel(d_level)
+            level = CheckLevel(level_raw)
         except ValueError:
-            warnings.warn(f'Unknown CheckLevel value {d_level!r}')
+            warnings.warn(f'Unknown CheckLevel value {level_raw!r}')
             level = CheckLevel.UNKNOWN
         try:
             status = CheckStatus(d['status'])
