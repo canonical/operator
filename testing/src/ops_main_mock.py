@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import inspect
 import os
 import pathlib
 import sys
-from typing import TYPE_CHECKING, Any, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Type, cast
 
 import ops.charm
 import ops.framework
@@ -28,9 +29,11 @@ from scenario.errors import BadOwnerPath, NoObserverError
 
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.context import Context
-    from scenario.state import State, _CharmSpec, _Event
+    from scenario.state import CharmType, State, _CharmSpec, _Event
 
 # pyright: reportPrivateUsage=false
+# TODO: Remove the line below after the ops compatibility code is removed.
+# pyright: reportUnnecessaryTypeIgnoreComment=false
 
 
 # TODO: Use ops.jujucontext's _JujuContext.charm_dir.
@@ -101,11 +104,11 @@ def _emit_charm_event(
 
 
 def setup_framework(
-    charm_dir,
+    charm_dir: pathlib.Path,
     state: "State",
     event: "_Event",
     context: "Context",
-    charm_spec: "_CharmSpec",
+    charm_spec: "_CharmSpec[CharmType]",
 ):
     from scenario.mocking import _MockModelBackend
 
@@ -165,7 +168,9 @@ def setup_framework(
     return framework
 
 
-def setup_charm(charm_class, framework, dispatcher):
+def setup_charm(
+    charm_class: Type[ops.CharmBase], framework: ops.Framework, dispatcher: _Dispatcher
+):
     sig = inspect.signature(charm_class)
     sig.bind(framework)  # signature check
 
@@ -178,7 +183,7 @@ def setup(
     state: "State",
     event: "_Event",
     context: "Context",
-    charm_spec: "_CharmSpec",
+    charm_spec: "_CharmSpec[CharmType]",
 ):
     """Setup dispatcher, framework and charm objects."""
     charm_class = charm_spec.charm_type
@@ -209,7 +214,7 @@ class Ops:
         state: "State",
         event: "_Event",
         context: "Context",
-        charm_spec: "_CharmSpec",
+        charm_spec: "_CharmSpec[CharmType]",
     ):
         self.state = state
         self.event = event

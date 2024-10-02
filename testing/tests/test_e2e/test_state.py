@@ -67,7 +67,13 @@ def state():
 
 
 def test_bare_event(state, mycharm):
-    out = trigger(state, "start", mycharm, meta={"name": "foo"})
+    out = trigger(
+        state,
+        "start",
+        mycharm,
+        meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
+    )
     out_purged = replace(out, stored_states=state.stored_states)
     assert jsonpatch_delta(state, out_purged) == []
 
@@ -81,6 +87,7 @@ def test_leader_get(state, mycharm):
         "start",
         mycharm,
         meta={"name": "foo"},
+        config={"options": {"foo": {"type": "string"}}},
         pre_event=pre_event,
     )
 

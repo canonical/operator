@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+
 import copy
 import dataclasses
 import marshal
@@ -10,7 +11,18 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Type, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import yaml
 from ops import CollectStatusEvent, pebble
@@ -24,12 +36,11 @@ from ops.framework import (
     _event_regex,
 )
 from ops.storage import NoSnapshotError, SQLiteStorage
+from ops._private.harness import ActionFailed
 
-from scenario.errors import UncaughtCharmError
+from scenario.errors import NoObserverError, UncaughtCharmError
 from scenario.logger import logger as scenario_logger
-from scenario.ops_main_mock import NoObserverError
 from scenario.state import (
-    ActionFailed,
     DeferredEvent,
     PeerRelation,
     Relation,
@@ -66,7 +77,7 @@ class UnitStateDB:
 
         db = self._open_db()
 
-        stored_states = set()
+        stored_states: Set[StoredState] = set()
         for handle_path in db.list_snapshots():
             if not EVENT_REGEX.match(handle_path) and (
                 match := STORED_STATE_REGEX.match(handle_path)
@@ -84,7 +95,7 @@ class UnitStateDB:
 
         db = self._open_db()
 
-        deferred = []
+        deferred: List[DeferredEvent] = []
         for handle_path in db.list_snapshots():
             if EVENT_REGEX.match(handle_path):
                 notices = db.notices(handle_path)
@@ -92,7 +103,7 @@ class UnitStateDB:
                     try:
                         snapshot_data = db.load_snapshot(handle)
                     except NoSnapshotError:
-                        snapshot_data = {}
+                        snapshot_data: Dict[str, Any] = {}
 
                     event = DeferredEvent(
                         handle_path=handle,
@@ -124,7 +135,7 @@ class UnitStateDB:
         db.close()
 
 
-class _OpsMainContext:
+class _OpsMainContext:  # type: ignore
     """Context manager representing ops.main execution context.
 
     When entered, ops.main sets up everything up until the charm.
@@ -141,7 +152,7 @@ class _OpsMainContext:
     def emit(self):
         self._has_emitted = True
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # noqa: U100
         if not self._has_emitted:
             self.emit()
 
@@ -154,7 +165,7 @@ class Runtime:
 
     def __init__(
         self,
-        charm_spec: "_CharmSpec",
+        charm_spec: "_CharmSpec[CharmType]",
         charm_root: Optional[Union[str, Path]] = None,
         juju_version: str = "3.0.0",
         app_name: Optional[str] = None,
@@ -172,7 +183,7 @@ class Runtime:
         self._unit_id = unit_id
 
     @staticmethod
-    def _cleanup_env(env):
+    def _cleanup_env(env: Dict[str, str]):
         # TODO consider cleaning up env on __delete__, but ideally you should be
         #  running this in a clean env or a container anyway.
         # cleanup the env, in case we'll be firing multiple events, we don't want to pollute it.
@@ -223,7 +234,7 @@ class Runtime:
             if remote_unit_id is None and not event.name.endswith(
                 ("_relation_created", "relation_broken"),
             ):
-                remote_unit_ids = relation._remote_unit_ids  # pyright: ignore
+                remote_unit_ids = relation._remote_unit_ids
 
                 if len(remote_unit_ids) == 1:
                     remote_unit_id = remote_unit_ids[0]
@@ -301,7 +312,7 @@ class Runtime:
 
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
 
-        class WrappedCharm(charm_type):  # type: ignore
+        class WrappedCharm(charm_type):
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
@@ -376,7 +387,7 @@ class Runtime:
 
         else:
             # charm_virtual_root is a tempdir
-            typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()
+            typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
 
     @staticmethod
     def _get_state_db(temporary_charm_root: Path):
@@ -494,8 +505,8 @@ _T = TypeVar("_T", bound=EventBase)
 @contextmanager
 def _capture_events(
     *types: Type[EventBase],
-    include_framework=False,
-    include_deferred=True,
+    include_framework: bool = False,
+    include_deferred: bool = True,
 ):
     """Capture all events of type `*types` (using instance checks).
 
@@ -517,11 +528,11 @@ def _capture_events(
     """
     allowed_types = types or (EventBase,)
 
-    captured = []
+    captured: List[EventBase] = []
     _real_emit = Framework._emit
     _real_reemit = Framework.reemit
 
-    def _wrapped_emit(self, evt):
+    def _wrapped_emit(self: Framework, evt: EventBase):
         if not include_framework and isinstance(
             evt,
             (PreCommitEvent, CommitEvent, CollectStatusEvent),
@@ -535,7 +546,7 @@ def _capture_events(
 
         return _real_emit(self, evt)
 
-    def _wrapped_reemit(self):
+    def _wrapped_reemit(self: Framework):
         # Framework calls reemit() before emitting the main juju event. We intercept that call
         # and capture all events in storage.
 
@@ -565,9 +576,9 @@ def _capture_events(
         return _real_reemit(self)
 
     Framework._emit = _wrapped_emit  # type: ignore
-    Framework.reemit = _wrapped_reemit  # type: ignore
+    Framework.reemit = _wrapped_reemit
 
     yield captured
 
-    Framework._emit = _real_emit  # type: ignore
-    Framework.reemit = _real_reemit  # type: ignore
+    Framework._emit = _real_emit
+    Framework.reemit = _real_reemit

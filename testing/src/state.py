@@ -114,14 +114,6 @@ _SECRET_EVENTS = {
 }
 
 
-class ActionFailed(Exception):
-    """Raised at the end of the hook if the charm has called ``event.fail()``."""
-
-    def __init__(self, message: str, *, state: "State"):
-        self.message = message
-        self.state = state
-
-
 # This can be replaced with the KW_ONLY dataclasses functionality in Python 3.10+.
 def _max_posargs(n: int):
     class _MaxPositionalArgs:
@@ -134,7 +126,7 @@ def _max_posargs(n: int):
 
         _max_positional_args = n
 
-        def __new__(cls, *args, **kwargs):
+        def __new__(cls, *args: Any, **kwargs: Any):
             # inspect.signature guarantees the order of parameters is as
             # declared, which aligns with dataclasses. Simpler ways of
             # getting the arguments (like __annotations__) do not have that
@@ -347,7 +339,7 @@ class Secret(_max_posargs(1)):
             # bypass frozen dataclass
             object.__setattr__(self, "latest_content", self.tracked_content)
 
-    def _set_label(self, label):
+    def _set_label(self, label: str):
         # bypass frozen dataclass
         object.__setattr__(self, "label", label)
 
@@ -407,7 +399,7 @@ class Address(_max_posargs(1)):
         return self.value
 
     @address.setter
-    def address(self, value):
+    def address(self, value: str):
         object.__setattr__(self, "value", value)
 
 
@@ -470,7 +462,7 @@ class Network(_max_posargs(2)):
 _next_relation_id_counter = 1
 
 
-def _next_relation_id(*, update=True):
+def _next_relation_id(*, update: bool = True):
     """Get the ID the next relation to be created will get.
 
     Pass update=False if you're only inspecting it.
@@ -543,7 +535,7 @@ class RelationBase(_max_posargs(2)):
     def __hash__(self) -> int:
         return hash(self.id)
 
-    def _validate_databag(self, databag: dict):
+    def _validate_databag(self, databag: Dict[str, str]):
         if not isinstance(databag, dict):
             raise StateValidationError(
                 f"all databags should be dicts, not {type(databag)}",
@@ -600,7 +592,7 @@ class Relation(RelationBase):
         return self.remote_units_data[unit_id]
 
     @property
-    def _databags(self):
+    def _databags(self):  # type: ignore
         """Yield all databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
@@ -669,7 +661,7 @@ class PeerRelation(RelationBase):
         return hash(self.id)
 
     @property
-    def _databags(self):
+    def _databags(self):  # type: ignore
         """Yield all databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
@@ -720,7 +712,7 @@ _CHANGE_IDS = 0
 
 def _generate_new_change_id():
     global _CHANGE_IDS
-    _CHANGE_IDS += 1
+    _CHANGE_IDS += 1  # type: ignore
     logger.info(
         f"change ID unset; automatically assigning {_CHANGE_IDS}. "
         f"If there are problems, pass one manually.",
@@ -782,7 +774,7 @@ def _now_utc():
 _next_notice_id_counter = 1
 
 
-def _next_notice_id(*, update=True):
+def _next_notice_id(*, update: bool = True):
     """Get the ID the next Pebble notice to be created will get.
 
     Pass update=False if you're only inspecting it.
@@ -909,7 +901,7 @@ class Container(_max_posargs(1)):
     # pebble or derive them from the resulting plan (which one CAN get from pebble).
     # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
     # will be unknown. all that we can know is the resulting plan (the 'computed plan').
-    _base_plan: dict = dataclasses.field(default_factory=dict)
+    _base_plan: Dict[str, Any] = dataclasses.field(default_factory=dict)
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
     layers: Dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
@@ -988,7 +980,7 @@ class Container(_max_posargs(1)):
 
     def _render_services(self):
         # copied over from ops.testing._TestingPebbleClient._render_services()
-        services = {}  # type: Dict[str, pebble.Service]
+        services: Dict[str, pebble.Service] = {}
         for key in sorted(self.layers.keys()):
             layer = self.layers[key]
             for name, service in layer.services.items():
@@ -1017,7 +1009,7 @@ class Container(_max_posargs(1)):
     def services(self) -> Dict[str, pebble.ServiceInfo]:
         """The Pebble services as rendered in the plan."""
         services = self._render_services()
-        infos = {}  # type: Dict[str, pebble.ServiceInfo]
+        infos: Dict[str, pebble.ServiceInfo] = {}
         names = sorted(services.keys())
         for name in names:
             try:
@@ -1071,7 +1063,7 @@ class _EntityStatus:
 
     _entity_statuses: ClassVar[Dict[str, Type["_EntityStatus"]]] = {}
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any):
         if isinstance(other, (StatusBase, _EntityStatus)):
             return (self.name, self.message) == (other.name, other.message)
         return super().__eq__(other)
@@ -1094,7 +1086,7 @@ class _EntityStatus:
 
     @classmethod
     def from_ops(cls, obj: StatusBase) -> "_EntityStatus":
-        return cls.from_status_name(cast(_RawStatusLiteral, obj.name), obj.message)
+        return cls.from_status_name(obj.name, obj.message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
@@ -1239,7 +1231,7 @@ class Port(_max_posargs(1)):
 class TCPPort(Port):
     """Represents a TCP port on the charm host."""
 
-    port: int
+    port: int  # type: ignore
     """The port to open."""
     protocol: _RawPortProtocolLiteral = "tcp"
     """The protocol that data transferred over the port will use.
@@ -1259,7 +1251,7 @@ class TCPPort(Port):
 class UDPPort(Port):
     """Represents a UDP port on the charm host."""
 
-    port: int
+    port: int  # type: ignore
     """The port to open."""
     protocol: _RawPortProtocolLiteral = "udp"
     """The protocol that data transferred over the port will use.
@@ -1303,7 +1295,7 @@ _port_cls_by_protocol = {
 _next_storage_index_counter = 0  # storage indices start at 0
 
 
-def _next_storage_index(*, update=True):
+def _next_storage_index(*, update: bool = True):
     """Get the index (used to be called ID) the next Storage to be created will get.
 
     Pass update=False if you're only inspecting it.
@@ -1614,7 +1606,9 @@ class _CharmSpec(Generic[CharmType]):
         # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
         # files for charm metadata.
         metadata_path = charm_root / "metadata.yaml"
-        meta = yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+        meta: Dict[str, Any] = (
+            yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+        )
 
         config_path = charm_root / "config.yaml"
         config = yaml.safe_load(config_path.open()) if config_path.exists() else None
@@ -1627,7 +1621,9 @@ class _CharmSpec(Generic[CharmType]):
     def _load_metadata(charm_root: Path):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
         metadata_path = charm_root / "charmcraft.yaml"
-        meta = yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+        meta: Dict[str, Any] = (
+            yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+        )
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
         config = meta.pop("config", None)
@@ -1694,7 +1690,7 @@ class DeferredEvent:
     observer: str
 
     # needs to be marshal.dumps-able.
-    snapshot_data: Dict = dataclasses.field(default_factory=dict)
+    snapshot_data: Dict[Any, Any] = dataclasses.field(default_factory=dict)
 
     # It would be nicer if people could do something like:
     #   `isinstance(state.deferred[0], ops.StartEvent)`
@@ -1727,7 +1723,7 @@ class _EventPath(str):
         is_custom: bool
         type: _EventType
 
-    def __new__(cls, string):
+    def __new__(cls, string: str):
         string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
@@ -1782,7 +1778,7 @@ class _EventPath(str):
 
 
 @dataclasses.dataclass(frozen=True)
-class _Event:
+class _Event:  # type: ignore
     """A Juju, ops, or custom event that can be run against a charm.
 
     Typically, for simple events, the string name (e.g. ``install``) can be used,
@@ -1879,7 +1875,7 @@ class _Event:
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.
-    def _is_builtin_event(self, charm_spec: "_CharmSpec"):
+    def _is_builtin_event(self, charm_spec: "_CharmSpec[CharmType]") -> bool:
         """Determine whether the event is a custom-defined one or a builtin one."""
         event_name = self.name
 
@@ -1898,7 +1894,7 @@ class _Event:
         # assuming it is owned by the charm, LOOKS LIKE that of a builtin event or not.
         return self._path.type is not _EventType.custom
 
-    def deferred(self, handler: Callable, event_id: int = 1) -> DeferredEvent:
+    def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""
         handler_repr = repr(handler)
         handler_re = re.compile(r"<function (.*) at .*>")
@@ -1913,7 +1909,7 @@ class _Event:
         # Many events have no snapshot data: install, start, stop, remove, config-changed,
         # upgrade-charm, pre-series-upgrade, post-series-upgrade, leader-elected,
         # leader-settings-changed, collect-metrics
-        snapshot_data = {}
+        snapshot_data: Dict[str, Any] = {}
 
         # fixme: at this stage we can't determine if the event is a builtin one or not; if it is
         #  not, then the coming checks are meaningless: the custom event could be named like a
@@ -2002,7 +1998,7 @@ class _Event:
 _next_action_id_counter = 1
 
 
-def _next_action_id(*, update=True):
+def _next_action_id(*, update: bool = True):
     """Get the ID the next action to be created will get.
 
     Pass update=False if you're only inspecting it.

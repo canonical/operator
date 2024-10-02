@@ -3,7 +3,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 
 from scenario.state import State
-from tests.helpers import trigger
+from ..helpers import trigger
 
 
 @pytest.fixture(scope="function")

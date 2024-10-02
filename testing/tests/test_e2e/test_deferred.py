@@ -11,7 +11,7 @@ from ops.framework import Framework
 
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
-from tests.helpers import trigger
+from ..helpers import trigger
 
 CHARM_CALLED = 0
 

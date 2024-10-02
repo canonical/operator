@@ -1,4 +1,4 @@
-name: Build
+name: Build ops-scenario wheels
 
 on:
   push:
@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
 
       - name: Install build
         run: pip install build
@@ -40,9 +40,6 @@ jobs:
 
         env:
           GITHUB_TOKEN: ${{ github.token }}
-
-      #      - name: Setup upterm session
-      #        uses: lhotari/action-upterm@v1
 
       - name: upload wheel
         uses: actions/upload-release-asset@v1

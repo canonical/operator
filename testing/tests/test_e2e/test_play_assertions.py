@@ -6,7 +6,7 @@ from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
 from scenario.state import Relation, State
-from tests.helpers import jsonpatch_delta, trigger
+from ..helpers import jsonpatch_delta, trigger
 
 
 @pytest.fixture(scope="function")

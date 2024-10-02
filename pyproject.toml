@@ -58,6 +58,9 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["ops"]
+
 [tool.setuptools.dynamic]
 version = {attr = "ops.version.version"}
 
@@ -218,7 +221,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
 pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

@@ -8,7 +8,7 @@ from ops.framework import Framework
 from ops.model import ActiveStatus
 
 from scenario import Context, State
-from tests.helpers import trigger
+from ..helpers import trigger
 
 
 class MyCharm(CharmBase):

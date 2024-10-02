@@ -6,18 +6,33 @@ import functools
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Type,
+    Union,
+    cast,
+)
 
 import ops
+from ops._private.harness import ActionFailed
 
-from scenario.errors import AlreadyEmittedError, ContextSetupError
+from scenario.errors import (
+    AlreadyEmittedError,
+    ContextSetupError,
+    MetadataNotFoundError,
+)
 from scenario.logger import logger as scenario_logger
 from scenario.runtime import Runtime
 from scenario.state import (
-    ActionFailed,
+    CharmType,
     CheckInfo,
     Container,
-    MetadataNotFoundError,
     Notice,
     Secret,
     Storage,
@@ -25,6 +40,9 @@ from scenario.state import (
     _CharmSpec,
     _Event,
 )
+
+# TODO: Remove the line below after the ops compatibility code is removed.
+# pyright: reportUnnecessaryTypeIgnoreComment=false
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -110,7 +128,7 @@ class Manager:
         assert self._ctx._output_state is not None
         return self._ctx._output_state
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # noqa: U100
         if not self._emitted:
             logger.debug(
                 "user didn't emit the event within the context manager scope. Doing so implicitly upon exit...",
@@ -118,12 +136,12 @@ class Manager:
             self.run()
 
 
-def _copy_doc(original_func):
+def _copy_doc(original_func: Callable[..., Any]):
     """Copy the docstring from `original_func` to the wrapped function."""
 
-    def decorator(wrapper_func):
+    def decorator(wrapper_func: Callable[..., Any]):
         @functools.wraps(wrapper_func)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: Any, **kwargs: Any):
             return wrapper_func(*args, **kwargs)
 
         wrapped.__doc__ = original_func.__doc__
@@ -339,7 +357,7 @@ class CharmEvents:
         params: Optional[Mapping[str, "AnyJson"]] = None,
         id: Optional[str] = None,
     ):
-        kwargs = {}
+        kwargs: Dict[str, Any] = {}
         if params:
             kwargs["params"] = params
         if id:
@@ -481,7 +499,7 @@ class Context:
         if not any((meta, actions, config)):
             logger.debug("Autoloading charmspec...")
             try:
-                spec = _CharmSpec.autoload(charm_type)
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f"Cannot setup scenario with `charm_type`={charm_type}. "
@@ -611,11 +629,11 @@ class Context:
                 "leader_elected",
                 "collect_app_status",
                 "collect_unit_status",
-            ):
+            ):  # type: ignore
                 suggested = f"{event}()"
-            elif event in ("secret_changed", "secret_rotate"):
+            elif event in ("secret_changed", "secret_rotate"):  # type: ignore
                 suggested = f"{event}(my_secret)"
-            elif event in ("secret_expired", "secret_remove"):
+            elif event in ("secret_expired", "secret_remove"):  # type: ignore
                 suggested = f"{event}(my_secret, revision=1)"
             elif event in (
                 "relation_created",
@@ -623,9 +641,9 @@ class Context:
                 "relation_changed",
                 "relation_departed",
                 "relation_broken",
-            ):
+            ):  # type: ignore
                 suggested = f"{event}(my_relation)"
-            elif event in ("storage_attached", "storage_detaching"):
+            elif event in ("storage_attached", "storage_detaching"):  # type: ignore
                 suggested = f"{event}(my_storage)"
             elif event == "pebble_ready":
                 suggested = f"{event}(my_container)"
@@ -657,7 +675,7 @@ class Context:
             if self._action_failure_message is not None:
                 raise ActionFailed(
                     self._action_failure_message,
-                    state=self._output_state,
+                    state=self._output_state,  # type: ignore
                 )
         return self._output_state
 
@@ -673,6 +691,6 @@ class Context:
         with runtime.exec(
             state=state,
             event=event,
-            context=self,
+            context=self,  # type: ignore
         ) as ops:
             yield ops

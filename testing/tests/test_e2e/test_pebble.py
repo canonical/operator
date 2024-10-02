@@ -12,7 +12,7 @@ from ops.pebble import ExecError, ServiceStartup, ServiceStatus
 
 from scenario import Context
 from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
-from tests.helpers import jsonpatch_delta, trigger
+from ..helpers import jsonpatch_delta, trigger
 
 
 @pytest.fixture(scope="function")

@@ -13,6 +13,7 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NoReturn,
     Optional,
     Set,
     TextIO,
@@ -23,6 +24,8 @@ from typing import (
 
 from ops import JujuVersion, pebble
 
+# TODO: Remove the line below after the ops compatibility code is removed.
+# pyright: reportUnnecessaryTypeIgnoreComment=false
 try:
     from ops._private.harness import ExecArgs, _TestingPebbleClient  # type: ignore
 except ImportError:
@@ -45,6 +48,7 @@ from ops.pebble import Client, ExecError
 from scenario.errors import ActionMissingFromContextError
 from scenario.logger import logger as scenario_logger
 from scenario.state import (
+    CharmType,
     JujuLogLine,
     Mount,
     Network,
@@ -114,7 +118,7 @@ class _MockExecProcess:
             )
         return stdout, stderr
 
-    def send_signal(self, sig: Union[int, str]):  # noqa: U100
+    def send_signal(self, sig: Union[int, str]) -> NoReturn:  # noqa: U100
         raise NotImplementedError()
 
 
@@ -122,12 +126,12 @@ _NOT_GIVEN = object()  # non-None default value sentinel
 
 
 # pyright: reportIncompatibleMethodOverride=false
-class _MockModelBackend(_ModelBackend):
+class _MockModelBackend(_ModelBackend):  # type: ignore
     def __init__(
         self,
         state: "State",
         event: "_Event",
-        charm_spec: "_CharmSpec",
+        charm_spec: "_CharmSpec[CharmType]",
         context: "Context",
     ):
         super().__init__()
@@ -149,7 +153,7 @@ class _MockModelBackend(_ModelBackend):
     ):
         # fixme: the charm will get hit with a StateValidationError
         #  here, not the expected ModelError...
-        port_ = _port_cls_by_protocol[protocol](port=port)
+        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
         if port_ not in ports:
             ports.add(port_)
@@ -161,7 +165,7 @@ class _MockModelBackend(_ModelBackend):
         protocol: "_RawPortProtocolLiteral",
         port: Optional[int] = None,
     ):
-        _port = _port_cls_by_protocol[protocol](port=port)
+        _port = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
         if _port in ports:
             ports.remove(_port)
@@ -193,13 +197,13 @@ class _MockModelBackend(_ModelBackend):
             ),
         )
 
-    def _get_relation_by_id(self, rel_id) -> "RelationBase":
+    def _get_relation_by_id(self, rel_id: int) -> "RelationBase":
         try:
             return self._state.get_relation(rel_id)
         except KeyError:
             raise RelationNotFoundError() from None
 
-    def _get_secret(self, id=None, label=None):
+    def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
         # FIXME: what error would a charm get IRL?
         # ops 2.0 supports secrets, but juju only supports it from 3.0.2
         if self._context.juju_version < "3.0.2":
@@ -281,7 +285,7 @@ class _MockModelBackend(_ModelBackend):
         status = self._state.app_status if is_app else self._state.unit_status
         return {"status": status.name, "message": status.message}
 
-    def relation_ids(self, relation_name):
+    def relation_ids(self, relation_name: str):
         return [
             rel.id for rel in self._state.relations if rel.endpoint == relation_name
         ]
@@ -441,7 +445,7 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
-            secret._set_label(label)
+            secret._set_label(label)  # type: ignore
         juju_version = self._context.juju_version
         if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # In this medieval Juju chapter,
@@ -467,7 +471,7 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
-            secret._set_label(label)
+            secret._set_label(label)  # type: ignore
 
         # only "manage"=write access level can read secret info
         self._check_can_manage_secret(secret)
@@ -571,9 +575,9 @@ class _MockModelBackend(_ModelBackend):
     def relation_remote_app_name(
         self,
         relation_id: int,
-        _raise_on_error=False,
+        _raise_on_error: bool = False,
     ) -> Optional[str]:
-        # ops catches relationnotfounderrors and returns None:
+        # ops catches RelationNotFoundErrors and returns None:
         try:
             relation = self._get_relation_by_id(relation_id)
         except RelationNotFoundError:
@@ -689,7 +693,7 @@ class _MockModelBackend(_ModelBackend):
         self,
         spec: Mapping[str, Any],  # noqa: U100
         k8s_resources: Optional[Mapping[str, Any]] = None,  # noqa: U100
-    ):
+    ) -> NoReturn:
         raise NotImplementedError(
             "pod-spec-set is not implemented in Scenario (and probably never will be: "
             "it's deprecated API)",
@@ -699,7 +703,7 @@ class _MockModelBackend(_ModelBackend):
         self,
         metrics: Mapping[str, Union[int, float]],  # noqa: U100
         labels: Optional[Mapping[str, str]] = None,  # noqa: U100
-    ) -> None:
+    ) -> NoReturn:
         raise NotImplementedError(
             "add-metrics is not implemented in Scenario (and probably never will be: "
             "it's deprecated API)",
@@ -741,7 +745,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         *,
         state: "State",
         event: "_Event",
-        charm_spec: "_CharmSpec",
+        charm_spec: "_CharmSpec[CharmType]",
         context: "Context",
         container_name: str,
     ):
@@ -810,7 +814,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         return self._container.service_statuses
 
     # Based on a method of the same name from Harness.
-    def _find_exec_handler(self, command) -> Optional["Exec"]:
+    def _find_exec_handler(self, command: List[str]) -> Optional["Exec"]:
         handlers = {exec.command_prefix: exec for exec in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last
         # element, until it matches one of the command prefixes in the execs.
@@ -840,7 +844,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         stderr: Optional[TextIO] = None,
         encoding: Optional[str] = "utf-8",
         combine_stderr: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
         handler = self._find_exec_handler(command)
         if not handler:
@@ -856,17 +860,17 @@ class _MockPebbleClient(_TestingPebbleClient):
             )
 
         if stdin is None:
-            proc_stdin = self._transform_exec_handler_output("", encoding)
+            proc_stdin = self._transform_exec_handler_output("", encoding)  # type: ignore
         else:
             proc_stdin = None
             stdin = stdin.read() if hasattr(stdin, "read") else stdin  # type: ignore
         if stdout is None:
-            proc_stdout = self._transform_exec_handler_output(handler.stdout, encoding)
+            proc_stdout = self._transform_exec_handler_output(handler.stdout, encoding)  # type: ignore
         else:
             proc_stdout = None
             stdout.write(handler.stdout)
         if stderr is None:
-            proc_stderr = self._transform_exec_handler_output(handler.stderr, encoding)
+            proc_stderr = self._transform_exec_handler_output(handler.stderr, encoding)  # type: ignore
         else:
             proc_stderr = None
             stderr.write(handler.stderr)
@@ -896,9 +900,9 @@ class _MockPebbleClient(_TestingPebbleClient):
                 change_id=change_id,
                 args=args,
                 return_code=handler.return_code,
-                stdin=proc_stdin,
-                stdout=proc_stdout,
-                stderr=proc_stderr,
+                stdin=proc_stdin,  # type: ignore
+                stdout=proc_stdout,  # type: ignore
+                stderr=proc_stderr,  # type: ignore
             ),
         )
 

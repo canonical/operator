@@ -4,7 +4,7 @@ from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 from scenario import State
 from scenario.runtime import _capture_events
 from scenario.state import _Event
-from tests.helpers import trigger
+from .helpers import trigger
 
 
 class Foo(EventBase):

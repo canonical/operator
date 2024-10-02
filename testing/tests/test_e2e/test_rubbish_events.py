@@ -5,7 +5,7 @@ from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
 from scenario.state import State, _CharmSpec, _Event
-from tests.helpers import trigger
+from ..helpers import trigger
 
 
 class QuxEvent(EventBase):

@@ -22,11 +22,11 @@ class MyCharm(CharmBase): pass
 def import_name(name: str, source: Path) -> Type[CharmType]:
     pkg_path = str(source.parent)
     sys.path.append(pkg_path)
-    charm = importlib.import_module("charm")
+    charm = importlib.import_module("mycharm")
     obj = getattr(charm, name)
     sys.path.remove(pkg_path)
     yield obj
-    del sys.modules["charm"]
+    del sys.modules["mycharm"]
 
 
 @contextmanager
@@ -41,7 +41,7 @@ def create_tempcharm(
 ):
     src = root / "src"
     src.mkdir(parents=True)
-    charmpy = src / "charm.py"
+    charmpy = src / "mycharm.py"
     charmpy.write_text(charm)
 
     # we add a charmcraft.yaml file to verify that _CharmSpec._load_metadata

@@ -101,10 +101,11 @@ def test_env_cleanup_on_charm_error():
         ),
     )
 
+    rel = Relation("box")
     with pytest.raises(UncaughtCharmError):
         with runtime.exec(
-            state=State(),
-            event=_Event("box_relation_changed", relation=Relation("box")),
+            state=State(relations={rel}),
+            event=_Event("box_relation_changed", relation=rel),
             context=Context(my_charm_type, meta=meta),
         ):
             assert os.getenv("JUJU_REMOTE_APP")

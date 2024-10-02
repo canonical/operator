@@ -13,7 +13,7 @@ from scenario.state import (
     UnknownStatus,
     WaitingStatus,
 )
-from tests.helpers import trigger
+from ..helpers import trigger
 
 
 @pytest.fixture(scope="function")
