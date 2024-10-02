@@ -1261,9 +1261,9 @@ class TestServiceInfo:
     def test_is_running(self):
         s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
         assert s.is_running()
-        for current in (
-            status for status in pebble.ServiceStatus if status is not pebble.ServiceStatus.ACTIVE
-        ):
+        for current in pebble.ServiceStatus:
+            if current == pebble.ServiceStatus.ACTIVE:
+                continue
             s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
             assert not s.is_running()
 
