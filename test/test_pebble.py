@@ -1273,8 +1273,7 @@ class TestServiceInfo:
             current='active',  # pyright: ignore[reportArgumentType]
         )
         assert pebble.ServiceStatus.ACTIVE != 'active'
-        with pytest.raises(ValueError):
-            s.is_running()
+        assert not s.is_running()  # silent failure
 
 
 class TestCheckInfo:
