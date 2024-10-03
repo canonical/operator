@@ -1,21 +1,21 @@
 # Ops Python style guide
 
-This is the Python style guide we use for the Ops project. However, it's also the style we're converging on for other projects maintained by the Charm Tech team.
+This is the Python style guide we use for the Ops project. It's also the style we're converging on for other projects maintained by the Charm Tech team.
 
 We use Ruff for formatting, and run our code through the Pyright type checker. We also try to follow [PEP 8](https://peps.python.org/pep-0008/), the official Python style guide. However, PEP 8 is fairly low-level, so in addition we've come up with the following style guidelines.
 
-New code should follow these guidelines, unless there's a good reason not to. Sometimes existing code doesn't follow these rules, but we're happy for it to be updated to do so (either all at once or as nearby code is changed).
+New code should follow these guidelines, unless there's a good reason not to. Sometimes existing code doesn't follow these, but we're happy for it to be updated to do so (either all at once, or as you change nearby code).
 
-Of course, this is just a start! We add to this list as things come up in code review and we make a team decision.
+Of course, this is just a start! We add to this list as things come up in code review; this list reflects our team decision.
 
 
 **Table of contents:**
 
-* [Specific decisions](#specific-decisions)
+* [Code decisions](#code-decisions)
 * [Docs and docstrings](#docs-and-docstrings)
 
 
-## Specific decisions
+## Code decisions
 
 ### Import modules, not objects
 
@@ -33,10 +33,10 @@ from ops import CharmBase, PebbleReadyEvent
 import typing
 
 class MyCharm(CharmBase):
-	counts: typing.Optional[typing.Tuple[str, int]]
+    counts: typing.Optional[typing.Tuple[str, int]]
 
-	def _pebble_ready(self, event: PebbleReadyEvent):
-		run(['echo', 'foo'])
+    def _pebble_ready(self, event: PebbleReadyEvent):
+        run(['echo', 'foo'])
 ```
 
 **Do:**
@@ -47,10 +47,10 @@ import ops
 from typing import Optional, Tuple
 
 class MyCharm(ops.CharmBase):
-	counts: Optional[Tuple[str, int]]
+    counts: Optional[Tuple[str, int]]
 
-	def _pebble_ready(self, event: ops.PebbleReadyEvent):
-		run(['echo', 'foo'])
+    def _pebble_ready(self, event: ops.PebbleReadyEvent):
+        run(['echo', 'foo'])
 ```
 
 
