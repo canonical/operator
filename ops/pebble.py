@@ -1322,7 +1322,7 @@ class FileInfo:
     """Type of the file."""
 
     size: Optional[int]
-    """Size of the file (will be 0 if :attr:`type` is not :attr:`FileType.FILE`)."""
+    """Size of the file (will be None if :attr:`type` is not :attr:`FileType.FILE`)."""
 
     permissions: int
     """Unix permissions of the file."""
