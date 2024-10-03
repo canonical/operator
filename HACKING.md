@@ -23,7 +23,7 @@ tox
 tox -e unit
 tox -e unit test/test_charm.py
 
-# Format the code using isort and autopep8
+# Format the code using Ruff
 tox -e fmt
 
 # Compile the requirements.txt file for docs
@@ -164,6 +164,8 @@ a bunch of charms that use the operator framework. The script can be run locally
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
+For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md).
+
 Pull requests should have a short title that follows the
 [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
 
@@ -293,12 +295,7 @@ Static type checking is done using [pyright](https://github.com/microsoft/pyrigh
 and extends the Python 3.8 type hinting support through the
 [typing_extensions](https://pypi.org/project/typing-extensions/) package.
 
-Formatting uses [isort](https://pypi.org/project/isort/) and
-[autopep8](https://pypi.org/project/autopep8/), with linting also using
-[flake8](https://github.com/PyCQA/flake8), including the
-[docstrings](https://pypi.org/project/flake8-docstrings/),
-[builtins](https://pypi.org/project/flake8-builtins/) and
-[pep8-naming](https://pypi.org/project/pep8-naming/) extensions.
+Formatting uses [Ruff](https://docs.astral.sh/ruff/).
 
 All tool configuration is kept in [project.toml](pyproject.toml). The list of
 dependencies can be found in the relevant `tox.ini` environment `deps` field.
