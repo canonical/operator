@@ -18,7 +18,7 @@ Of course, this is just a start! We add to this list as things come up in code r
 
 ## Simplicity
 
-### Avoid nested comprehensions and generators
+### Avoid nested comprehensions and generator expressions
 
 "Flat is better than nested."
 
