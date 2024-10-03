@@ -78,4 +78,4 @@ if status != pebble.ServiceStatus.ACTIVE:
 
 ### Spell out abbreviations
 
-Prefer spelling out abbreviations and acronymns in docstrings, for example, "for example" rather than "e.g.", "that is" rather than "i.e.", and "unit testing" rather than UT.
+Prefer spelling out abbreviations and acronyms in docstrings, for example, "for example" rather than "e.g.", "that is" rather than "i.e.", and "unit testing" rather than UT.
