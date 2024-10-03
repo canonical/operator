@@ -27,9 +27,9 @@ Of course, this is just a start! We add to this list as things come up in code r
 units = [units for app in model.apps for unit in app.units]
 
 for current in (
-	status for status in pebble.ServiceStatus if status is not pebble.ServiceStatus.ACTIVE
+    status for status in pebble.ServiceStatus if status is not pebble.ServiceStatus.ACTIVE
 ):
-	...
+    ...
 ```
 
 **Do:**
@@ -37,12 +37,12 @@ for current in (
 ```python
 units = []
 for app in model.apps:
-	for unit in app.units:
-		units.append(unit)
+    for unit in app.units:
+        units.append(unit)
 
 active_statuses = [status for status in pebble.ServiceStatus if status != pebble.ServiceStatus.ACTIVE]
 for current in active_statuses:
-	...
+    ...
 ```
 
 ## Specific decisions
@@ -57,20 +57,20 @@ Note that the [Enum HOWTO](https://docs.python.org/3/howto/enum.html#comparisons
 
 ```python
 if status is pebble.ServiceStatus.ACTIVE:
-	print('Running')
+    print('Running')
 
 if status is not pebble.ServiceStatus.ACTIVE:
-	print('Stopped')
+    print('Stopped')
 ```
 
 **Do:**
 
 ```python
 if status == pebble.ServiceStatus.ACTIVE:
-	print('Running')
+    print('Running')
 
 if status != pebble.ServiceStatus.ACTIVE:
-	print('Stopped')
+    print('Stopped')
 ```
 
 
