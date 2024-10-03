@@ -17,7 +17,7 @@ Of course, this is just a start! We add to this list as things come up in code r
 
 ## Simplicity
 
-### Avoid nested loops and comprehensions
+### Avoid nested comprehensions
 
 "Flat is better than nested."
 
@@ -51,6 +51,8 @@ for current in active_statuses:
 
 This is six of one, half a dozen of the other, but we've decided that saying `if color == Color.RED` is nicer than `if color is Color.RED` as `==` is more typical for integer- and string-like values, and if you do use an `IntEnum` or `StrEnum` you should use `==` anyway.
 
+Note that the [Enum HOWTO](https://docs.python.org/3/howto/enum.html#comparisons) first says they should be compared by identity, but then shows that equality is defined too, and so kind of adds to the confusion. See also this [StackOverflow question](https://stackoverflow.com/questions/25858497/should-enum-instances-be-compared-by-identity-or-equality) and [some discussion/disagreement](https://github.com/pylint-dev/pylint/issues/5356).
+
 **Don't:**
 
 ```python
@@ -70,8 +72,6 @@ if status == pebble.ServiceStatus.ACTIVE:
 if status != pebble.ServiceStatus.ACTIVE:
 	print('Stopped')
 ```
-
-The [Enum HOWTO](https://docs.python.org/3/howto/enum.html#comparisons) first says they should be compared by identity, but then shows that equality is defined too, and so kind of adds to the confusion. See also this [StackOverflow question](https://stackoverflow.com/questions/25858497/should-enum-instances-be-compared-by-identity-or-equality) and [some discussion/disagreement](https://github.com/pylint-dev/pylint/issues/5356).
 
 
 ## Docs and docstrings
