@@ -11,41 +11,9 @@ Of course, this is just a start! We add to this list as things come up in code r
 
 **Table of contents:**
 
-* [Simplicity](#simplicity)
 * [Specific decisions](#specific-decisions)
 * [Docs and docstrings](#docs-and-docstrings)
 
-
-## Simplicity
-
-### Avoid nested comprehensions and generator expressions
-
-"Flat is better than nested."
-
-**Don't:**
-
-```python
-units = [units for app in model.apps for unit in app.units]
-
-for current in (
-    status for status in pebble.ServiceStatus if status != pebble.ServiceStatus.ACTIVE
-):
-    ...
-```
-
-**Do:**
-
-```python
-units = []
-for app in model.apps:
-    for unit in app.units:
-        units.append(unit)
-
-for current in pebble.ServiceStatus:
-    if status == pebble.ServiceStatus.ACTIVE:
-        continue
-    ...
-```
 
 ## Specific decisions
 
@@ -83,6 +51,36 @@ class MyCharm(ops.CharmBase):
 
 	def _pebble_ready(self, event: ops.PebbleReadyEvent):
 		run(['echo', 'foo'])
+```
+
+
+### Avoid nested comprehensions and generator expressions
+
+"Flat is better than nested."
+
+**Don't:**
+
+```python
+units = [units for app in model.apps for unit in app.units]
+
+for current in (
+    status for status in pebble.ServiceStatus if status != pebble.ServiceStatus.ACTIVE
+):
+    ...
+```
+
+**Do:**
+
+```python
+units = []
+for app in model.apps:
+    for unit in app.units:
+        units.append(unit)
+
+for current in pebble.ServiceStatus:
+    if status == pebble.ServiceStatus.ACTIVE:
+        continue
+    ...
 ```
 
 
