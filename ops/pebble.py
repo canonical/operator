@@ -1319,10 +1319,10 @@ class FileInfo:
     """Base name of the file."""
 
     type: FileType
-    """Type of the file (FileType.FILE, FileType.DIRECTORY, FileType.SYMLINK, etc)."""
+    """Type of the file."""
 
     size: Optional[int]
-    """Size of the file (will be 0 if ``type`` is not "file")."""
+    """Size of the file (will be 0 if :attr:`type` is not :attr:`FileType.FILE`)."""
 
     permissions: int
     """Unix permissions of the file."""
@@ -1508,7 +1508,7 @@ class NoticeType(enum.Enum):
     """
 
     UNKNOWN = 'unknown'
-    """Used if we receive an unrecognised notice type (e.g. from future Pebble versions)."""
+    """Used if we receive an unrecognised notice type, for example from future Pebble versions."""
 
 
 class NoticesUsers(enum.Enum):
