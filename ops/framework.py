@@ -608,6 +608,7 @@ class Framework(Object):
         model: 'Model',
         event_name: Optional[str] = None,
         juju_debug_at: Optional[Set[str]] = None,
+        skip_duplicate_events: bool = True,
     ):
         super().__init__(self, None)
 
@@ -624,6 +625,7 @@ class Framework(Object):
         self._event_name = event_name
         self.meta = meta
         self.model = model
+        self.skip_duplicate_events = skip_duplicate_events
         # [(observer_path, method_name, parent_path, event_key)]
         self._observers: _ObserverPath = []
         # {observer_path: observing Object}
@@ -878,7 +880,9 @@ class Framework(Object):
                 continue
             if _event_kind and _event_kind != event_kind:
                 continue
-            if self._event_is_in_storage(observer_path, method_name, event_path, this_event_data):
+            if self.skip_duplicate_events and self._event_is_in_storage(
+                observer_path, method_name, event_path, this_event_data
+            ):
                 logger.info(
                     'Skipping notice (%s/%s/%s) - already in the queue.',
                     event_path,
