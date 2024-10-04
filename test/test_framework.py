@@ -469,7 +469,7 @@ class TestFramework:
 
         class MyNotifier(ops.Object):
             n = ops.EventSource(MyEvent)
-            nd = ops.EventSource(MyDataEvent)
+            d = ops.EventSource(MyDataEvent)
             r = ops.EventSource(ReleaseEvent)
 
         class MyObserver(ops.Object):
@@ -490,22 +490,22 @@ class TestFramework:
 
         framework.observe(pub.n, obs1.on_any)
         framework.observe(pub.n, obs2.on_any)
-        framework.observe(pub.nd, obs1.on_any)
-        framework.observe(pub.nd, obs2.on_any)
+        framework.observe(pub.d, obs1.on_any)
+        framework.observe(pub.d, obs2.on_any)
         framework.observe(pub.r, obs1.stop_deferring)
 
         # Emit an event, which will be deferred.
-        pub.nd.emit('foo')
+        pub.d.emit('foo')
         notices = tuple(framework._storage.notices())
         assert len(notices) == 2  # One per observer.
         assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
 
         # Emit the same event, and we'll still just have the single notice.
-        pub.nd.emit('foo')
+        pub.d.emit('foo')
         assert len(tuple(framework._storage.notices())) == 2
 
         # Emit the same event kind but with a different snapshot, and we'll get a new notice.
-        pub.nd.emit('bar')
+        pub.d.emit('bar')
         notices = tuple(framework._storage.notices())
         assert len(notices) == 4
         assert framework._storage.load_snapshot(notices[2][0]) == {'data': 'bar'}
@@ -519,8 +519,8 @@ class TestFramework:
 
         # Even though these events are far back in the queue, since they're
         # duplicates, they will get skipped.
-        pub.nd.emit('foo')
-        pub.nd.emit('bar')
+        pub.d.emit('foo')
+        pub.d.emit('bar')
         pub.n.emit()
         assert len(tuple(framework._storage.notices())) == 6
 
@@ -542,14 +542,14 @@ class TestFramework:
         # Without the defer active, the first observer always ends up with an
         # empty queue, while the second observer's queue continues to skip
         # duplicates and add new events.
-        pub.nd.emit('foo')
-        pub.nd.emit('foo')
-        pub.nd.emit('bar')
+        pub.d.emit('foo')
+        pub.d.emit('foo')
+        pub.d.emit('bar')
         pub.n.emit()
-        pub.nd.emit('foo')
-        pub.nd.emit('bar')
+        pub.d.emit('foo')
+        pub.d.emit('bar')
         pub.n.emit()
-        pub.nd.emit('baz')
+        pub.d.emit('baz')
         framework.reemit()
         assert len(notices_for_observer(1)) == 0
         assert len(notices_for_observer(2)) == 4
