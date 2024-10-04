@@ -313,6 +313,12 @@ class Harness(Generic[CharmType]):
             self._meta,
             self._model,
             juju_debug_at=self._juju_context.debug_at,
+            # Harness tests will often have defer() usage without 'purging' the
+            # deferred handler with reemit(), but still expect the next emit()
+            # to result in a call, so we can't safely skip duplicate events.
+            # When behaviour matching production is required, Scenario tests
+            # should be used instead.
+            skip_duplicate_events=False,
         )
 
         warnings.warn(
