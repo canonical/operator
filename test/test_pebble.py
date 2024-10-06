@@ -1321,8 +1321,7 @@ class TestCheckInfo:
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
-            'level': pebble.CheckLevel.UNSET,
-            'status': pebble.CheckStatus.DOWN,
+            'status': 'down',
             'failures': 3,
             'threshold': 3,
             'change-id': '42',
