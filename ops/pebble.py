@@ -134,7 +134,7 @@ CheckDict = typing.TypedDict(
     'CheckDict',
     {
         'override': str,
-        'level': str,
+        'level': Union['CheckLevel', str],
         'period': Optional[str],
         'timeout': Optional[str],
         'http': Optional[HttpDict],
@@ -1038,7 +1038,6 @@ class ServiceStartup(enum.Enum):
 
     ENABLED = 'enabled'
     DISABLED = 'disabled'
-    UNKNOWN = 'unknown'
 
 
 class ServiceStatus(enum.Enum):
@@ -1047,7 +1046,6 @@ class ServiceStatus(enum.Enum):
     ACTIVE = 'active'
     INACTIVE = 'inactive'
     ERROR = 'error'
-    UNKNOWN = 'unknown'
 
 
 class ServiceInfo:
@@ -1056,8 +1054,8 @@ class ServiceInfo:
     def __init__(
         self,
         name: str,
-        startup: ServiceStartup,
-        current: ServiceStatus,
+        startup: Union[ServiceStartup, str],
+        current: Union[ServiceStatus, str],
     ):
         self.name = name
         self.startup = startup
@@ -1073,17 +1071,11 @@ class ServiceInfo:
         try:
             startup = ServiceStartup(d['startup'])
         except ValueError:
-            warnings.warn(
-                f'Unknown ServiceStartup value {d["startup"]!r}; do you need to update ops?'
-            )
-            startup = ServiceStartup.UNKNOWN
+            startup = d['startup']
         try:
             current = ServiceStatus(d['current'])
         except ValueError:
-            warnings.warn(
-                f'Unknown ServiceStatus value {d["current"]!r}; do you need to update ops?'
-            )
-            current = ServiceStatus.UNKNOWN
+            current = d['current']
         return cls(
             name=d['name'],
             startup=startup,
@@ -1106,12 +1098,11 @@ class Check:
         self.name = name
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
-        level_raw = dct.get('level', '')
         try:
-            self.level = CheckLevel(level_raw)  # CheckLevel('') -> CheckLevel.UNSET
+            level: Union[CheckLevel, str] = CheckLevel(dct.get('level', ''))
         except ValueError:
-            warnings.warn(f'Unknown CheckLevel value {level_raw!r}; do you need to update ops?')
-            self.level = CheckLevel.UNKNOWN
+            level = dct.get('level', '')
+        self.level = level
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
@@ -1133,9 +1124,10 @@ class Check:
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
+        level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
         fields = [
             ('override', self.override),
-            ('level', self.level.value),
+            ('level', level),
             ('period', self.period),
             ('timeout', self.timeout),
             ('threshold', self.threshold),
@@ -1232,7 +1224,6 @@ class CheckLevel(enum.Enum):
     UNSET = ''
     ALIVE = 'alive'
     READY = 'ready'
-    UNKNOWN = 'unknown'
 
 
 class CheckStatus(enum.Enum):
@@ -1240,7 +1231,6 @@ class CheckStatus(enum.Enum):
 
     UP = 'up'
     DOWN = 'down'
-    UNKNOWN = 'unknown'
 
 
 class LogTarget:
@@ -1318,11 +1308,11 @@ class FileInfo:
     name: str
     """Base name of the file."""
 
-    type: FileType
-    """Type of the file."""
+    type: Union[FileType, str]
+    """Type of the file ("file", "directory", "symlink", etc)."""
 
     size: Optional[int]
-    """Size of the file (will be None if :attr:`type` is not :attr:`FileType.FILE`)."""
+    """Size of the file (will be 0 if ``type`` is not "file")."""
 
     permissions: int
     """Unix permissions of the file."""
@@ -1346,7 +1336,7 @@ class FileInfo:
         self,
         path: str,
         name: str,
-        type: FileType,
+        type: Union[FileType, str],
         size: Optional[int],
         permissions: int,
         last_modified: datetime.datetime,
@@ -1372,8 +1362,7 @@ class FileInfo:
         try:
             file_type = FileType(d['type'])
         except ValueError:
-            warnings.warn(f'Unknown FileType value {d["type"]!r}; do you need to update ops?')
-            file_type = FileType.UNKNOWN
+            file_type = d['type']
         return cls(
             path=d['path'],
             name=d['name'],
@@ -1412,10 +1401,13 @@ class CheckInfo:
     name: str
     """Name of the check."""
 
-    level: CheckLevel
-    """Check level."""
+    level: Optional[Union[CheckLevel, str]]
+    """Check level.
 
-    status: CheckStatus
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
+    """
+
+    status: Union[CheckStatus, str]
     """Status of the check.
 
     :attr:`CheckStatus.UP` means the check is healthy (the number of failures
@@ -1445,8 +1437,8 @@ class CheckInfo:
     def __init__(
         self,
         name: str,
-        level: CheckLevel,
-        status: CheckStatus,
+        level: Optional[Union[CheckLevel, str]],
+        status: Union[CheckStatus, str],
         failures: int = 0,
         threshold: int = 0,
         change_id: Optional[ChangeID] = None,
@@ -1461,17 +1453,14 @@ class CheckInfo:
     @classmethod
     def from_dict(cls, d: _CheckInfoDict) -> CheckInfo:
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
-        level_raw = d.get('level', '')  # CheckLevel('') -> CheckLevel.UNSET
         try:
-            level = CheckLevel(level_raw)
+            level = CheckLevel(d.get('level', ''))
         except ValueError:
-            warnings.warn(f'Unknown CheckLevel value {level_raw!r}; do you need to update ops?')
-            level = CheckLevel.UNKNOWN
+            level = d.get('level')
         try:
             status = CheckStatus(d['status'])
         except ValueError:
-            warnings.warn(f'Unknown CheckStatus value {d["status"]!r}; do you need to update ops?')
-            status = CheckStatus.UNKNOWN
+            status = d['status']
         return cls(
             name=d['name'],
             level=level,
@@ -1506,9 +1495,6 @@ class NoticeType(enum.Enum):
     """Recorded whenever a change's status is updated. The key for change-update
     notices is the change ID.
     """
-
-    UNKNOWN = 'unknown'
-    """Used if we receive an unrecognised notice type, for example from future Pebble versions."""
 
 
 class NoticesUsers(enum.Enum):
@@ -1576,7 +1562,7 @@ class Notice:
     user_id: Optional[int]
     """UID of the user who may view this notice (None means notice is public)."""
 
-    type: NoticeType
+    type: Union[NoticeType, str]
     """Type of the notice."""
 
     key: str
@@ -1616,8 +1602,7 @@ class Notice:
         try:
             notice_type = NoticeType(d['type'])
         except ValueError:
-            warnings.warn(f'Unknown NoticeType value {d["type"]!r}; do you need to update ops?')
-            notice_type = NoticeType.UNKNOWN
+            notice_type = d['type']
         return cls(
             id=d['id'],
             user_id=d.get('user-id'),

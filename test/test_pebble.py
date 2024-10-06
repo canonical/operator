@@ -443,9 +443,8 @@ single log
         d['user'] = 'bob'
         d['group-id'] = 34
         d['group'] = 'staff'
-        with pytest.warns(UserWarning):
-            info = pebble.FileInfo.from_dict(d)
-        assert info.type == pebble.FileType.UNKNOWN
+        info = pebble.FileInfo.from_dict(d)
+        assert info.type == 'foobar'
         assert info.size == 123
         assert info.user_id == 12
         assert info.user == 'bob'
@@ -480,20 +479,19 @@ single log
             expire_after=datetime.timedelta(hours=24),
         )
 
-        with pytest.warns(UserWarning):
-            notice = pebble.Notice.from_dict({
-                'id': '124',
-                'type': 'other',
-                'key': 'example.com/b',
-                'first-occurred': '2023-12-07T17:01:02.123456789Z',
-                'last-occurred': '2023-12-07T17:01:03.123456789Z',
-                'last-repeated': '2023-12-07T17:01:04.123456789Z',
-                'occurrences': 8,
-            })
+        notice = pebble.Notice.from_dict({
+            'id': '124',
+            'type': 'other',
+            'key': 'example.com/b',
+            'first-occurred': '2023-12-07T17:01:02.123456789Z',
+            'last-occurred': '2023-12-07T17:01:03.123456789Z',
+            'last-repeated': '2023-12-07T17:01:04.123456789Z',
+            'occurrences': 8,
+        })
         assert notice == pebble.Notice(
             id='124',
             user_id=None,
-            type=pebble.NoticeType.UNKNOWN,
+            type='other',
             key='example.com/b',
             first_occurred=datetime_utc(2023, 12, 7, 17, 1, 2, 123457),
             last_occurred=datetime_utc(2023, 12, 7, 17, 1, 3, 123457),
@@ -1120,9 +1118,8 @@ class TestCheck:
             'threshold': 5,
             'http': {'url': 'https://example.com/'},
         }
-        with pytest.warns(UserWarning):
-            check = pebble.Check('chk-http', d)
-        assert check.level == pebble.CheckLevel.UNKNOWN
+        check = pebble.Check('chk-http', d)
+        assert check.level == 'foobar!'  # remains a string
 
     def test_equality(self):
         d: pebble.CheckDict = {
@@ -1210,23 +1207,19 @@ class TestServiceInfo:
         assert list(pebble.ServiceStartup) == [
             pebble.ServiceStartup.ENABLED,
             pebble.ServiceStartup.DISABLED,
-            pebble.ServiceStartup.UNKNOWN,
         ]
         assert pebble.ServiceStartup.ENABLED.value == 'enabled'
         assert pebble.ServiceStartup.DISABLED.value == 'disabled'
-        assert pebble.ServiceStartup.UNKNOWN.value == 'unknown'
 
     def test_service_status(self):
         assert list(pebble.ServiceStatus) == [
             pebble.ServiceStatus.ACTIVE,
             pebble.ServiceStatus.INACTIVE,
             pebble.ServiceStatus.ERROR,
-            pebble.ServiceStatus.UNKNOWN,
         ]
         assert pebble.ServiceStatus.ACTIVE.value == 'active'
         assert pebble.ServiceStatus.INACTIVE.value == 'inactive'
         assert pebble.ServiceStatus.ERROR.value == 'error'
-        assert pebble.ServiceStatus.UNKNOWN.value == 'unknown'
 
     def test_service_info(self):
         s = pebble.ServiceInfo('svc1', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
@@ -1248,32 +1241,21 @@ class TestServiceInfo:
         assert s.startup == pebble.ServiceStartup.DISABLED
         assert s.current == pebble.ServiceStatus.INACTIVE
 
-        with pytest.warns(UserWarning):
-            s = pebble.ServiceInfo.from_dict({
-                'name': 'svc2',
-                'startup': 'thingy',
-                'current': 'bob',
-            })
+        s = pebble.ServiceInfo.from_dict({
+            'name': 'svc2',
+            'startup': 'thingy',
+            'current': 'bob',
+        })
         assert s.name == 'svc2'
-        assert s.startup == pebble.ServiceStartup.UNKNOWN
-        assert s.current == pebble.ServiceStatus.UNKNOWN
+        assert s.startup == 'thingy'
+        assert s.current == 'bob'
 
     def test_is_running(self):
         s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, pebble.ServiceStatus.ACTIVE)
         assert s.is_running()
-        for current in pebble.ServiceStatus:
-            if current == pebble.ServiceStatus.ACTIVE:
-                continue
+        for current in [pebble.ServiceStatus.INACTIVE, pebble.ServiceStatus.ERROR, 'other']:
             s = pebble.ServiceInfo('s', pebble.ServiceStartup.ENABLED, current)
             assert not s.is_running()
-
-        s = pebble.ServiceInfo(
-            name='s',
-            startup=pebble.ServiceStartup.ENABLED,
-            current='active',  # pyright: ignore[reportArgumentType]
-        )
-        assert pebble.ServiceStatus.ACTIVE != 'active'
-        assert not s.is_running()  # silent failure
 
 
 class TestCheckInfo:
@@ -1282,22 +1264,18 @@ class TestCheckInfo:
             pebble.CheckLevel.UNSET,
             pebble.CheckLevel.ALIVE,
             pebble.CheckLevel.READY,
-            pebble.CheckLevel.UNKNOWN,
         ]
         assert pebble.CheckLevel.UNSET.value == ''
         assert pebble.CheckLevel.ALIVE.value == 'alive'
         assert pebble.CheckLevel.READY.value == 'ready'
-        assert pebble.CheckLevel.UNKNOWN.value == 'unknown'
 
     def test_check_status(self):
         assert list(pebble.CheckStatus) == [
             pebble.CheckStatus.UP,
             pebble.CheckStatus.DOWN,
-            pebble.CheckStatus.UNKNOWN,
         ]
         assert pebble.CheckStatus.UP.value == 'up'
         assert pebble.CheckStatus.DOWN.value == 'down'
-        assert pebble.CheckStatus.UNKNOWN.value == 'unknown'
 
     def test_check_info(self):
         check = pebble.CheckInfo(
@@ -1343,8 +1321,8 @@ class TestCheckInfo:
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
-            'level': pebble.CheckLevel.UNSET.value,
-            'status': pebble.CheckStatus.DOWN.value,
+            'level': pebble.CheckLevel.UNSET,
+            'status': pebble.CheckStatus.DOWN,
             'failures': 3,
             'threshold': 3,
             'change-id': '42',
@@ -2979,39 +2957,11 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        with pytest.warns(UserWarning):
-            checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
+        checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
         assert len(checks) == 1
         assert checks[0].name == 'chk2'
-        assert checks[0].level == pebble.CheckLevel.UNKNOWN
+        assert checks[0].level == 'foobar!'  # stays a raw string
         assert checks[0].status == pebble.CheckStatus.UP
-        assert checks[0].failures == 0
-        assert checks[0].threshold == 3
-
-        assert client.requests == [
-            ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
-        ]
-
-    def test_checkstatus_conversion(self, client: MockClient):
-        client.responses.append({
-            'result': [
-                {
-                    'name': 'chk2',
-                    'level': 'ready',
-                    'status': 'foobar!!',
-                    'threshold': 3,
-                },
-            ],
-            'status': 'OK',
-            'status-code': 200,
-            'type': 'sync',
-        })
-        with pytest.warns(UserWarning):
-            checks = client.get_checks(level=pebble.CheckLevel.READY, names=['chk2'])
-        assert len(checks) == 1
-        assert checks[0].name == 'chk2'
-        assert checks[0].level == pebble.CheckLevel.READY
-        assert checks[0].status == pebble.CheckStatus.UNKNOWN
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
 
@@ -3143,13 +3093,10 @@ bad path\r
             'type': 'sync',
         })
 
-        with pytest.warns(UserWarning):
-            checks = client.get_notices()
+        checks = client.get_notices()
         assert len(checks) == 2
         assert checks[0].id == '123'
         assert checks[1].id == '124'
-        assert checks[0].type == pebble.NoticeType.CUSTOM
-        assert checks[1].type == pebble.NoticeType.UNKNOWN
 
         assert client.requests == [
             ('GET', '/v1/notices', {}, None),
@@ -3183,18 +3130,15 @@ bad path\r
             'type': 'sync',
         })
 
-        with pytest.warns(UserWarning):
-            notices = client.get_notices(
-                user_id=1000,
-                users=pebble.NoticesUsers.ALL,
-                types=[pebble.NoticeType.CUSTOM],
-                keys=['example.com/a', 'example.com/b'],
-            )
+        notices = client.get_notices(
+            user_id=1000,
+            users=pebble.NoticesUsers.ALL,
+            types=[pebble.NoticeType.CUSTOM],
+            keys=['example.com/a', 'example.com/b'],
+        )
         assert len(notices) == 2
         assert notices[0].id == '123'
         assert notices[1].id == '124'
-        assert notices[0].type == pebble.NoticeType.CUSTOM
-        assert notices[1].type == pebble.NoticeType.UNKNOWN
 
         query = {
             'user-id': '1000',

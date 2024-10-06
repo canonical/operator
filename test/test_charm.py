@@ -346,7 +346,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
         return [
             ops.pebble.CheckInfo.from_dict({
                 'name': names[0],
-                'status': ops.pebble.CheckStatus.DOWN.value,
+                'status': ops.pebble.CheckStatus.DOWN,
                 'failures': 3,
                 'threshold': 3,
             })

@@ -3899,21 +3899,6 @@ class TestTestingPebbleClient:
         testing_client_methods = get_public_methods(client)
         assert pebble_client_methods == testing_client_methods
 
-    def test_notice_matches_enum_member(self, client: _TestingPebbleClient):
-        d: pebble._NoticeDict = {
-            'id': 'id',
-            'type': 'custom',
-            'key': 'key',
-            'first-occurred': '1999-12-31T23:59:59+00:00',
-            'last-occurred': '1999-12-31T23:59:59+00:00',
-            'last-repeated': '1999-12-31T23:59:59+00:00',
-            'occurrences': 1,
-        }
-        notice = pebble.Notice.from_dict(d)
-        assert notice.type == pebble.NoticeType.CUSTOM
-        assert client._notice_matches(notice, types={'custom', 'unknown'})
-        assert not client._notice_matches(notice, types={'unknown'})
-
     def test_add_layer(self, client: _TestingPebbleClient):
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
