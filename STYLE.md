@@ -6,7 +6,7 @@ We use Ruff for formatting, and run our code through the Pyright type checker. W
 
 New code should follow these guidelines, unless there's a good reason not to. Sometimes existing code doesn't follow these, but we're happy for it to be updated to do so (either all at once, or as you change nearby code).
 
-Of course, this is just a start! We add to this list as things come up in code review; this list reflects our team decision.
+Of course, this is just a start! We add to this list as things come up in code review; this list reflects our team decisions.
 
 
 **Table of contents:**
@@ -28,13 +28,10 @@ An exception is names from `typing` -- type annotations get too verbose if these
 **Don't:**
 
 ```python
-from subprocess import run
 from ops import CharmBase, PebbleReadyEvent
-import typing
+from subprocess import run
 
 class MyCharm(CharmBase):
-    counts: typing.Optional[typing.Tuple[str, int]]
-
     def _pebble_ready(self, event: PebbleReadyEvent):
         run(['echo', 'foo'])
 ```
@@ -42,15 +39,16 @@ class MyCharm(CharmBase):
 **Do:**
 
 ```python
-import subprocess
 import ops
-from typing import Optional, Tuple
+import subprocess
 
 class MyCharm(ops.CharmBase):
-    counts: Optional[Tuple[str, int]]
-
     def _pebble_ready(self, event: ops.PebbleReadyEvent):
-        run(['echo', 'foo'])
+        subprocess.run(['echo', 'foo'])
+
+# However, "from typing import Foo" is okay to avoid verbosity
+from typing import Optional, Tuple
+counts: Optional[Tuple[str, int]]
 ```
 
 
