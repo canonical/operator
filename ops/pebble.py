@@ -197,7 +197,7 @@ _AuthDict = TypedDict(
 
 _ServiceInfoDict = TypedDict(
     '_ServiceInfoDict',
-    {'startup': Union['ServiceStartup', str], 'current': Union['ServiceStatus', str], 'name': str},
+    {'startup': str, 'current': str, 'name': str},
 )
 
 # Callback types for _MultiParser header and body handlers
@@ -242,8 +242,8 @@ if TYPE_CHECKING:
         '_CheckInfoDict',
         {
             'name': str,
-            'level': NotRequired[Optional[Union['CheckLevel', str]]],
-            'status': Union['CheckStatus', str],
+            'level': NotRequired[str],
+            'status': str,
             'failures': NotRequired[int],
             'threshold': int,
             'change-id': NotRequired[str],
@@ -261,7 +261,7 @@ if TYPE_CHECKING:
             'user': NotRequired[Optional[str]],
             'group-id': NotRequired[Optional[int]],
             'group': NotRequired[Optional[str]],
-            'type': Union['FileType', str],
+            'type': str,
         },
     )
 
