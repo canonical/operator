@@ -111,7 +111,7 @@ if status is not pebble.ServiceStatus.ACTIVE:
 
 ### Use British English
 
-[Canonical's documentation style](https://docs.ubuntu.com/styleguide/en/) is to use British spellings, and we try to follow that here. For example, "colour" rather than "color", "labelled" rather than "labeled", "serialise" rather than "serialize", and so on.
+[Canonical's documentation style](https://docs.ubuntu.com/styleguide/en/) uses British spelling, which we try to follow here. For example: "colour" rather than "color", "labelled" rather than "labeled", "serialise" rather than "serialize", and so on.
 
 It's a bit less clear when we're dealing with code and APIs, as those normally use US English, for example, `pytest.mark.parametrize`, and `color: #fff`.
 
