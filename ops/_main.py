@@ -481,14 +481,18 @@ class _Manager:
     def _make_framework(self, dispatcher: _Dispatcher):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
-
         if self._juju_context.dispatch_path.endswith('-relation-broken'):
             broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
-
+        # Similarly, if we are in a RelationBroken or RelationDeparted event, we
+        # need to provide access to the remote relation data, even though the
+        # relation will not be returned from the `relation-list` hook tool.
         model = ops.model.Model(
-            self._charm_meta, self._model_backend, broken_relation_id=broken_relation_id
+            self._charm_meta,
+            self._model_backend,
+            broken_relation_id=broken_relation_id,
+            remote_unit_name=self._juju_context.remote_unit_name,
         )
         store = self._make_storage(dispatcher)
         framework = ops.framework.Framework(
