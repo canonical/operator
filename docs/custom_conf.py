@@ -139,8 +139,8 @@ html_context = {
     'sequential_nav': 'none',
 }
 # Addons-by-default, see: https://about.readthedocs.com/blog/2024/07/addons-by-default/
-if os.environ.get('READTHEDOCS', '') == 'True':
-    html_context['READTHEDOCS'] = True
+# if os.environ.get('READTHEDOCS', '') == 'True':
+#     html_context['READTHEDOCS'] = True
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
