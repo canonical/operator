@@ -24,7 +24,6 @@ dynamic = ["version"]
 [project.optional-dependencies]
 docs = [
     "canonical-sphinx-extensions",
-    "furo",
     "linkify-it-py",
     "myst-parser",
     "pyspelling",
