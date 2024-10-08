@@ -139,8 +139,15 @@ html_context = {
     'sequential_nav': 'none',
 }
 # Addons-by-default, see: https://about.readthedocs.com/blog/2024/07/addons-by-default/
-# if os.environ.get('READTHEDOCS', '') == 'True':
-#     html_context['READTHEDOCS'] = True
+if os.environ.get('READTHEDOCS', '') == 'True':
+    html_context['READTHEDOCS'] = True
+    html_context["current_version"] = "latest"
+    html_context["conf_py_path"] = "/docs/"
+    html_context["display_github"] = True
+    html_context["github_user"] = "canonical"
+    html_context["github_repo"] = "operator"
+    html_context["github_version"] = "main"
+    html_context["slug"] = "operator"
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
