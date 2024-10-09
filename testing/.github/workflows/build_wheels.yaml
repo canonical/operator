@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_wheel:
+    name: Build wheel on ubuntu (where else???)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+
+      - name: Install build
+        run: pip install build
+
+      - name: Build wheel
+        run: python -m build
+
+      - uses: actions/upload-artifact@v3
+        with:
+          path: ./dist/*.whl
+
+      - name: Get the version
+        id: get_version
+        run: echo "VERSION=$(sed -n 's/^ *version.*=.*"\([^"]*\)".*/\1/p' pyproject.toml)" >> $GITHUB_OUTPUT
+
+      - name: release
+        uses: actions/create-release@v1
+        id: create_release
+        with:
+          draft: false
+          prerelease: false
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          release_name: ${{ steps.get_version.outputs.VERSION }}
+
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      #      - name: Setup upterm session
+      #        uses: lhotari/action-upterm@v1
+
+      - name: upload wheel
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/ops_scenario-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
+          asset_name: ops_scenario-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
+          asset_content_type: application/wheel
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}

@@ -1,0 +1,103 @@
+[build-system]
+requires = [
+    "setuptools >= 35.0.2",
+    "setuptools_scm >= 2.0.0, <3"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ops-scenario"
+
+version = "7.0.5"
+
+authors = [
+    { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
+]
+description = "Python library providing a state-transition testing API for Operator Framework charms."
+license.text = "Apache-2.0"
+keywords = ["juju", "test"]
+
+dependencies = [
+    "ops~=2.15",
+    "PyYAML>=6.0.1",
+]
+readme = "README.md"
+requires-python = ">=3.8"
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    'Framework :: Pytest',
+    'Intended Audience :: Developers',
+    'Topic :: Software Development :: Quality Assurance',
+    'Topic :: Software Development :: Testing',
+    'Topic :: Utilities',
+]
+
+[project.urls]
+"Homepage" = "https://github.com/canonical/ops-scenario"
+"Bug Tracker" = "https://github.com/canonical/ops-scenario/issues"
+
+[project.optional-dependencies]
+docs = [
+    "canonical-sphinx-extensions",
+    "furo",
+    "linkify-it-py",
+    "myst-parser",
+    "pyspelling",
+    "sphinx ~= 8.0.0",
+    "sphinx-autobuild",
+    "sphinx-copybutton",
+    "sphinx-design",
+    "sphinx-notfound-page",
+    "sphinx-tabs",
+    "sphinxcontrib-jquery",
+    "sphinxext-opengraph"
+]
+
+[tool.setuptools.package-dir]
+scenario = "scenario"
+
+
+[tool.black]
+include = '\.pyi?$'
+
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Assume Python 3.11
+target-version = "py311"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+[tool.isort]
+profile = "black"
+
+[bdist_wheel]
+universal = 1
