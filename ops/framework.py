@@ -1254,7 +1254,7 @@ class StoredDict(typing.MutableMapping[Hashable, Any]):
 
     Charms are not expected to use this class directly. Adding a
     :class:`StoredState` attribute to a charm class will automatically use this
-    class to store dictionary-like data.
+    class to store dictionaries.
     """
 
     def __init__(self, stored_data: StoredStateData, under: Dict[Hashable, Any]):
@@ -1294,7 +1294,7 @@ class StoredList(typing.MutableSequence[Any]):
 
     Charms are not expected to use this class directly. Adding a
     :class:`StoredState` attribute to a charm class will automatically use this
-    class to store list-like data.
+    class to store lists.
     """
 
     def __init__(self, stored_data: StoredStateData, under: List[Any]):
@@ -1373,7 +1373,7 @@ class StoredSet(typing.MutableSet[Any]):
 
     Charms are not expected to use this class directly. Adding a
     :class:`StoredState` attribute to a charm class will automatically use this
-    class to store set-like data.
+    class to store sets.
     """
 
     def __init__(self, stored_data: StoredStateData, under: Set[Any]):
