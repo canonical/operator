@@ -66,6 +66,7 @@ Things to note:
 ```python
 import ops
 
+
 class OpsExampleCharm(ops.CharmBase):
     """Charm the service."""
 
