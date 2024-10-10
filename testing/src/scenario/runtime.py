@@ -25,22 +25,23 @@ from typing import (
 )
 
 import yaml
-from ops import CollectStatusEvent, pebble
-from ops.framework import (
+from ops import (
+    CollectStatusEvent,
+    pebble,
     CommitEvent,
     EventBase,
     Framework,
     Handle,
     NoTypeError,
     PreCommitEvent,
-    _event_regex,
 )
 from ops.storage import NoSnapshotError, SQLiteStorage
+from ops.framework import _event_regex
 from ops._private.harness import ActionFailed
 
-from scenario.errors import NoObserverError, UncaughtCharmError
-from scenario.logger import logger as scenario_logger
-from scenario.state import (
+from .errors import NoObserverError, UncaughtCharmError
+from .logger import logger as scenario_logger
+from .state import (
     DeferredEvent,
     PeerRelation,
     Relation,
@@ -49,8 +50,8 @@ from scenario.state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from scenario.context import Context
-    from scenario.state import CharmType, State, _CharmSpec, _Event
+    from .context import Context
+    from .state import CharmType, State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild("runtime")
 STORED_STATE_REGEX = re.compile(
@@ -435,7 +436,7 @@ class Runtime:
         # todo consider forking out a real subprocess and do the mocking by
         #  mocking hook tool executables
 
-        from scenario._consistency_checker import check_consistency  # avoid cycles
+        from ._consistency_checker import check_consistency  # avoid cycles
 
         check_consistency(state, event, self._charm_spec, self._juju_version)
 
@@ -459,7 +460,7 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(" - Entering ops.main (mocked).")
-            from scenario.ops_main_mock import Ops  # noqa: F811
+            from .ops_main_mock import Ops  # noqa: F811
 
             try:
                 ops = Ops(
@@ -513,7 +514,7 @@ def _capture_events(
     Arguments exposed so that you can define your own fixtures if you want to.
 
     Example::
-    >>> from ops.charm import StartEvent
+    >>> from ops import StartEvent
     >>> from scenario import Event, State
     >>> from charm import MyCustomEvent, MyCharm  # noqa
     >>>

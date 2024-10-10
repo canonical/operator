@@ -60,10 +60,10 @@ status is `unknown`. With that, we can write the simplest possible test:
         assert out.unit_status == UnknownStatus()
 """
 
-from scenario.context import CharmEvents, Context, Manager
-from scenario.errors import StateValidationError  # For backwards compatibility.
+from .context import CharmEvents, Context, Manager
+from .errors import StateValidationError  # For backwards compatibility.
 from ops._private.harness import ActionFailed  # For backwards compatibility.
-from scenario.state import (
+from .state import (
     ActiveStatus,
     Address,
     AnyJson,

@@ -37,17 +37,15 @@ from uuid import uuid4
 
 import ops
 import yaml
-from ops import pebble
-from ops.charm import CharmBase, CharmEvents
-from ops.model import CloudCredential as CloudCredential_Ops
-from ops.model import CloudSpec as CloudSpec_Ops
-from ops.model import SecretRotate, StatusBase
+from ops import pebble, CharmBase, CharmEvents, SecretRotate, StatusBase
+from ops import CloudCredential as CloudCredential_Ops
+from ops import CloudSpec as CloudSpec_Ops
 
-from scenario.errors import MetadataNotFoundError, StateValidationError
-from scenario.logger import logger as scenario_logger
+from .errors import MetadataNotFoundError, StateValidationError
+from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
-    from scenario import Context
+    from . import Context
 
 AnyJson = Union[str, bool, Dict[str, "AnyJson"], int, float, List["AnyJson"]]
 RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
@@ -675,9 +673,6 @@ class PeerRelation(RelationBase):
 
 
 def _random_model_name():
-    import random
-    import string
-
     space = string.ascii_letters + string.digits
     return "".join(random.choice(space) for _ in range(20))
 

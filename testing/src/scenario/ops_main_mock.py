@@ -21,11 +21,11 @@ from ops._main import logger as ops_logger
 from ops.charm import CharmMeta
 from ops.log import setup_root_logging
 
-from scenario.errors import BadOwnerPath, NoObserverError
+from .errors import BadOwnerPath, NoObserverError
 
 if TYPE_CHECKING:  # pragma: no cover
-    from scenario.context import Context
-    from scenario.state import CharmType, State, _CharmSpec, _Event
+    from .context import Context
+    from .state import CharmType, State, _CharmSpec, _Event
 
 # pyright: reportPrivateUsage=false
 
@@ -98,7 +98,7 @@ def setup_framework(
     context: "Context",
     charm_spec: "_CharmSpec[CharmType]",
 ):
-    from scenario.mocking import _MockModelBackend
+    from .mocking import _MockModelBackend
 
     model_backend = _MockModelBackend(
         state=state,

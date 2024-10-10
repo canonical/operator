@@ -19,14 +19,14 @@ from typing import (
 import ops
 from ops._private.harness import ActionFailed
 
-from scenario.errors import (
+from .errors import (
     AlreadyEmittedError,
     ContextSetupError,
     MetadataNotFoundError,
 )
-from scenario.logger import logger as scenario_logger
-from scenario.runtime import Runtime
-from scenario.state import (
+from .logger import logger as scenario_logger
+from .runtime import Runtime
+from .state import (
     CharmType,
     CheckInfo,
     Container,
@@ -40,8 +40,8 @@ from scenario.state import (
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops._private.harness import ExecArgs
-    from scenario.ops_main_mock import Ops
-    from scenario.state import (
+    from .ops_main_mock import Ops
+    from .state import (
         AnyJson,
         CharmType,
         JujuLogLine,
