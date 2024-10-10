@@ -1148,9 +1148,9 @@ class StoredState:
                 self._stored.seen.add(event.uuid)
 
     Data is stored alongside the charm (in the charm container for Kubernetes
-    sidecar charms, and on the machine for machine charms), except for podspec
-    charms and charms explicitly passing `True` for `use_juju_for_storage` when
-    running :meth:`ops.main` (in those cases, the data is stored in Juju).
+    sidecar charms, and on the machine for machine charms). The exceptions are
+    two deprecated cases: Kubernetes podspec charms, and charms explicitly
+    passing `True` for `use_juju_for_storage` when running :meth:`ops.main`.
 
     For machine charms, charms are upgraded in-place on the machine, so the data
     is preserved. For Kubernetes sidecar charms, when the charm is upgraded, the
