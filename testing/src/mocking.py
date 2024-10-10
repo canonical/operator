@@ -376,7 +376,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if status not in get_args(_SettableStatusName):
             raise ModelError(
                 f'ERROR invalid status "{status}", expected one of '
-                f'[maintenance blocked waiting active]'
+                f"[maintenance blocked waiting active]"
             )
         self._context._record_status(self._state, is_app)
         status_obj = _EntityStatus.from_status_name(status, message)
