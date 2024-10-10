@@ -24,12 +24,7 @@ from typing import (
 
 from ops import JujuVersion, pebble
 
-# TODO: Remove the line below after the ops compatibility code is removed.
-# pyright: reportUnnecessaryTypeIgnoreComment=false
-try:
-    from ops._private.harness import ExecArgs, _TestingPebbleClient  # type: ignore
-except ImportError:
-    from ops.testing import ExecArgs, _TestingPebbleClient  # type: ignore
+from ops._private.harness import ExecArgs, _TestingPebbleClient
 
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import ModelError
@@ -148,7 +143,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def open_port(
         self,
-        protocol: "_RawPortProtocolLiteral",  # pyright: ignore[reportIncompatibleMethodOverride]
+        protocol: "_RawPortProtocolLiteral",
         port: Optional[int] = None,
     ):
         # fixme: the charm will get hit with a StateValidationError
@@ -218,20 +213,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             # in scenario, you can create Secret(id="foo"),
             # but ops.Secret will prepend a "secret:" prefix to that ID.
             # we allow getting secret by either version.
-            try:
-                secrets = [
-                    s
-                    for s in self._state.secrets
-                    if canonicalize_id(s.id, model_uuid=self._state.model.uuid)  # type: ignore
-                    == canonicalize_id(id, model_uuid=self._state.model.uuid)  # type: ignore
-                ]
-            except TypeError:
-                # ops 2.16
-                secrets = [
-                    s
-                    for s in self._state.secrets
-                    if canonicalize_id(s.id) == canonicalize_id(id)  # type: ignore
-                ]
+            secrets = [
+                s
+                for s in self._state.secrets
+                if canonicalize_id(s.id, model_uuid=self._state.model.uuid)
+                == canonicalize_id(id, model_uuid=self._state.model.uuid)
+            ]
             if not secrets:
                 raise SecretNotFoundError(id)
             return secrets[0]
@@ -445,7 +432,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
-            secret._set_label(label)  # type: ignore
+            secret._set_label(label)
         juju_version = self._context.juju_version
         if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # In this medieval Juju chapter,
@@ -471,7 +458,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
-            secret._set_label(label)  # type: ignore
+            secret._set_label(label)
 
         # only "manage"=write access level can read secret info
         self._check_can_manage_secret(secret)
@@ -860,17 +847,17 @@ class _MockPebbleClient(_TestingPebbleClient):
             )
 
         if stdin is None:
-            proc_stdin = self._transform_exec_handler_output("", encoding)  # type: ignore
+            proc_stdin = self._transform_exec_handler_output("", encoding)
         else:
             proc_stdin = None
             stdin = stdin.read() if hasattr(stdin, "read") else stdin  # type: ignore
         if stdout is None:
-            proc_stdout = self._transform_exec_handler_output(handler.stdout, encoding)  # type: ignore
+            proc_stdout = self._transform_exec_handler_output(handler.stdout, encoding)
         else:
             proc_stdout = None
             stdout.write(handler.stdout)
         if stderr is None:
-            proc_stderr = self._transform_exec_handler_output(handler.stderr, encoding)  # type: ignore
+            proc_stderr = self._transform_exec_handler_output(handler.stderr, encoding)
         else:
             proc_stderr = None
             stderr.write(handler.stderr)
@@ -900,9 +887,9 @@ class _MockPebbleClient(_TestingPebbleClient):
                 change_id=change_id,
                 args=args,
                 return_code=handler.return_code,
-                stdin=proc_stdin,  # type: ignore
-                stdout=proc_stdout,  # type: ignore
-                stderr=proc_stderr,  # type: ignore
+                stdin=proc_stdin,
+                stdout=proc_stdout,
+                stderr=proc_stderr,
             ),
         )
 
