@@ -43,7 +43,6 @@ from scenario.state import (
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops._private.harness import ExecArgs
-
     from scenario.ops_main_mock import Ops
     from scenario.state import (
         AnyJson,
