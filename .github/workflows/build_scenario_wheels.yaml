@@ -1,9 +1,13 @@
 name: Build ops-scenario wheels
 
+# TODO: adjust this workflow to properly build ops-scenario from the operator repo
+# and then this should be adjusted to run when appropriate (not on push to main
+# any more, but as part of the releasing workflow we agree on).
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch
+#  push:
+#    branches:
+#      - main
 
 jobs:
   build_wheel:
