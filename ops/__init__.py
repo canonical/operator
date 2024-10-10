@@ -371,7 +371,4 @@ Args:
         Podspec charms that haven't previously used local storage and that
         are running on a new enough Juju default to controller-side storage,
         and local storage otherwise.
-
-.. jujuremoved:: 4.0
-    The ``use_juju_for_storage`` argument is not available from Juju 4.0
 """

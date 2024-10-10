@@ -1132,14 +1132,9 @@ class BoundStoredState:
 class StoredState:
     """A class used to store data the charm needs, persisted across invocations.
 
-    Example::
-
-        class MyClass(ops.Object):
-            _stored = ops.StoredState()
-
     Instances of ``MyClass`` can transparently save state between invocations by
     setting attributes on ``_stored``. Initial state should be set with
-    ``set_default`` on the bound object, that is::
+    ``set_default`` on the bound object; for example::
 
         class MyClass(ops.Object):
             _stored = ops.StoredState()
@@ -1152,6 +1147,16 @@ class StoredState:
             def _on_seen(self, event):
                 self._stored.seen.add(event.uuid)
 
+    Data is stored alongside the charm (in the charm container for Kubernetes
+    sidecar charms, and on the machine for machine charms), except for podspec
+    charms and charms explicitly passing `True` for `use_juju_for_storage` when
+    running :meth:`ops.main` (in those cases, the data is stored in Juju).
+
+    For machine charms, charms are upgraded in-place on the machine, so the data
+    is preserved. For Kubernetes sidecar charms, when the charm is upgraded, the
+    pod is replaced, so any data is lost. When data should be preserved across
+    upgrades, Kubernetes sidecar charms should use a peer-relation for the data
+    instead of `StoredState`.
     """
 
     def __init__(self):
@@ -1245,7 +1250,12 @@ def _wrapped_repr(obj: '_StoredObject') -> str:
 
 
 class StoredDict(typing.MutableMapping[Hashable, Any]):
-    """A dict-like object that uses the StoredState as backend."""
+    """A dict-like object that uses the StoredState as backend.
+
+    Charms are not expected to use this class directly. Adding a
+    :class:`StoredState` attribute to a charm class will automatically use this
+    class to store dictionary-like data.
+    """
 
     def __init__(self, stored_data: StoredStateData, under: Dict[Hashable, Any]):
         self._stored_data = stored_data
@@ -1280,7 +1290,12 @@ class StoredDict(typing.MutableMapping[Hashable, Any]):
 
 
 class StoredList(typing.MutableSequence[Any]):
-    """A list-like object that uses the StoredState as backend."""
+    """A list-like object that uses the StoredState as backend.
+
+    Charms are not expected to use this class directly. Adding a
+    :class:`StoredState` attribute to a charm class will automatically use this
+    class to store list-like data.
+    """
 
     def __init__(self, stored_data: StoredStateData, under: List[Any]):
         self._stored_data = stored_data
@@ -1354,7 +1369,12 @@ class StoredList(typing.MutableSequence[Any]):
 
 
 class StoredSet(typing.MutableSet[Any]):
-    """A set-like object that uses the StoredState as backend."""
+    """A set-like object that uses the StoredState as backend.
+
+    Charms are not expected to use this class directly. Adding a
+    :class:`StoredState` attribute to a charm class will automatically use this
+    class to store set-like data.
+    """
 
     def __init__(self, stored_data: StoredStateData, under: Set[Any]):
         self._stored_data = stored_data
