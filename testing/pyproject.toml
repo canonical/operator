@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "7.0.5"
+version = "7.0.6.dev0"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -40,9 +40,6 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
-
-[tool.setuptools.package-dir]
-scenario = "src"
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
