@@ -181,7 +181,7 @@ def test_status_comparison(status):
         MaintenanceStatus("qux"),
     ),
 )
-def set_status_success(status: ops.StatusBase):
+def test_status_success(status: ops.StatusBase):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
