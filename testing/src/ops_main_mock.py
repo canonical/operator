@@ -10,18 +10,14 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Type, cast
 
 import ops.charm
 import ops.framework
+import ops.jujucontext
 import ops.model
 import ops.storage
 from ops import CharmBase
 
 # use logger from ops._main so that juju_log will be triggered
-try:
-    from ops._main import CHARM_STATE_FILE, _Dispatcher, _get_event_args  # type: ignore
-    from ops._main import logger as ops_logger  # type: ignore
-except ImportError:
-    # Ops 2.16
-    from ops.main import CHARM_STATE_FILE, _Dispatcher, _get_event_args  # type: ignore
-    from ops.main import logger as ops_logger  # type: ignore
+from ops._main import CHARM_STATE_FILE, _Dispatcher, _get_event_args
+from ops._main import logger as ops_logger
 from ops.charm import CharmMeta
 from ops.log import setup_root_logging
 
@@ -32,8 +28,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State, _CharmSpec, _Event
 
 # pyright: reportPrivateUsage=false
-# TODO: Remove the line below after the ops compatibility code is removed.
-# pyright: reportUnnecessaryTypeIgnoreComment=false
 
 
 # TODO: Use ops.jujucontext's _JujuContext.charm_dir.
@@ -88,17 +82,11 @@ def _emit_charm_event(
             f"invalid event (not on charm.on).",
         )
 
-    try:
-        args, kwargs = _get_event_args(charm, event_to_emit)  # type: ignore
-    except TypeError:
-        # ops 2.16+
-        import ops.jujucontext  # type: ignore
-
-        args, kwargs = _get_event_args(
-            charm,
-            event_to_emit,
-            ops.jujucontext._JujuContext.from_dict(os.environ),  # type: ignore
-        )
+    args, kwargs = _get_event_args(
+        charm,
+        event_to_emit,
+        ops.jujucontext._JujuContext.from_dict(os.environ),
+    )
     ops_logger.debug("Emitting Juju event %s.", event_name)
     event_to_emit.emit(*args, **kwargs)
 
@@ -126,7 +114,7 @@ def setup_framework(
     ops_logger.debug(
         "Operator Framework %s up and running.",
         ops.__version__,
-    )  # type:ignore
+    )
 
     metadata = (charm_dir / "metadata.yaml").read_text()
     actions_meta = charm_dir / "actions.yaml"
@@ -189,16 +177,10 @@ def setup(
     charm_class = charm_spec.charm_type
     charm_dir = _get_charm_dir()
 
-    try:
-        dispatcher = _Dispatcher(charm_dir)  # type: ignore
-    except TypeError:
-        # ops 2.16+
-        import ops.jujucontext  # type: ignore
-
-        dispatcher = _Dispatcher(
-            charm_dir,
-            ops.jujucontext._JujuContext.from_dict(os.environ),  # type: ignore
-        )
+    dispatcher = _Dispatcher(
+        charm_dir,
+        ops.jujucontext._JujuContext.from_dict(os.environ),
+    )
     dispatcher.run_any_legacy_hook()
 
     framework = setup_framework(charm_dir, state, event, context, charm_spec)
