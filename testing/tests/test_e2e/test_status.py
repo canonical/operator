@@ -13,6 +13,7 @@ from scenario.state import (
     UnknownStatus,
     WaitingStatus,
 )
+from scenario.errors import UncaughtCharmError
 from ..helpers import trigger
 
 
@@ -169,3 +170,48 @@ def test_status_comparison(status):
     assert isinstance(status, type(ops_status))
     # The repr of the scenario and ops classes should be identical.
     assert repr(status) == repr(ops_status)
+
+
+@pytest.mark.parametrize(
+    "status",
+    (
+        ActiveStatus("foo"),
+        WaitingStatus("bar"),
+        BlockedStatus("baz"),
+        MaintenanceStatus("qux"),
+    ),
+)
+def test_status_success(status: ops.StatusBase):
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._on_update_status)
+
+        def _on_update_status(self, _):
+            self.unit.status = status
+
+    ctx = Context(MyCharm, meta={"name": "foo"})
+    ctx.run(ctx.on.update_status(), State())
+
+
+@pytest.mark.parametrize(
+    "status",
+    (
+        ErrorStatus("fiz"),
+        UnknownStatus(),
+    ),
+)
+def test_status_error(status: ops.StatusBase):
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._on_update_status)
+
+        def _on_update_status(self, _):
+            self.unit.status = status
+
+    ctx = Context(MyCharm, meta={"name": "foo"})
+    with pytest.raises(UncaughtCharmError) as excinfo:
+        ctx.run(ctx.on.update_status(), State())
+    assert isinstance(excinfo.value.__cause__, ops.ModelError)
+    assert f'invalid status "{status.name}"' in str(excinfo.value.__cause__)
