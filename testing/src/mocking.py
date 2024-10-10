@@ -20,6 +20,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    get_args,
 )
 
 from ops import JujuVersion, pebble
@@ -42,6 +43,7 @@ from ops.model import (
     SecretRotate,
     _format_action_result_dict,
     _ModelBackend,
+    _SettableStatusName,
 )
 from ops.pebble import Client, ExecError
 
@@ -371,6 +373,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         *,
         is_app: bool = False,
     ):
+        if status not in get_args(_SettableStatusName):
+            raise ModelError(
+                f'ERROR invalid status "{status}", expected one of '
+                f'[maintenance blocked waiting active]'
+            )
         self._context._record_status(self._state, is_app)
         status_obj = _EntityStatus.from_status_name(status, message)
         self._state._update_status(status_obj, is_app)
