@@ -2,7 +2,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""The core Scenario State object, and the components inside it."""
+"""The core State object, and the components inside it."""
 
 import dataclasses
 import datetime
@@ -954,8 +954,8 @@ class Container(_max_posargs(1)):
         container = Container(
             name='foo',
             execs={
-                scenario.Exec(['whoami'], return_code=0, stdout='ubuntu'),
-                scenario.Exec(
+                Exec(['whoami'], return_code=0, stdout='ubuntu'),
+                Exec(
                     ['dig', '+short', 'canonical.com'],
                     return_code=0,
                     stdout='185.125.190.20\\n185.125.190.21',
@@ -2020,10 +2020,10 @@ class _Action(_max_posargs(1)):
     Used to simulate ``juju run``, passing in any parameters. For example::
 
         def test_backup_action():
-            ctx = scenario.Context(MyCharm)
+            ctx = Context(MyCharm)
             state = ctx.run(
                 ctx.on.action('do_backup', params={'filename': 'foo'}),
-                scenario.State()
+                State(),
             )
             assert ctx.action_results == ...
     """
