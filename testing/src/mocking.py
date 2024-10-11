@@ -62,7 +62,6 @@ from scenario.state import (
     _EntityStatus,
     _port_cls_by_protocol,
     _RawPortProtocolLiteral,
-    _RawStatusLiteral,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
