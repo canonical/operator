@@ -38,15 +38,8 @@ from scenario.state import (
     _Event,
 )
 
-# TODO: Remove the line below after the ops compatibility code is removed.
-# pyright: reportUnnecessaryTypeIgnoreComment=false
-
 if TYPE_CHECKING:  # pragma: no cover
-    try:
-        from ops._private.harness import ExecArgs  # type: ignore
-    except ImportError:
-        from ops.testing import ExecArgs  # type: ignore
-
+    from ops._private.harness import ExecArgs
     from scenario.ops_main_mock import Ops
     from scenario.state import (
         AnyJson,
