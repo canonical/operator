@@ -368,15 +368,15 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def status_set(
         self,
-        status: _RawStatusLiteral,
+        status: _SettableStatusName,
         message: str = "",
         *,
         is_app: bool = False,
     ):
-        if status not in get_args(_SettableStatusName):
+        valid_names = get_args(_SettableStatusName)
+        if status not in valid_names:
             raise ModelError(
-                f'ERROR invalid status "{status}", expected one of '
-                f"[maintenance blocked waiting active]"
+                f'ERROR invalid status "{status}", expected one of [{", ".join(valid_names)}]',
             )
         self._context._record_status(self._state, is_app)
         status_obj = _EntityStatus.from_status_name(status, message)
