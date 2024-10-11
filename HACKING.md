@@ -179,14 +179,17 @@ Pull requests should have a short title that follows the
 * revert
 * test
 
-If the PR is limited to changes in ops.testing (Harness), also include the scope
-`(harness)` in the title. At present, we do not add a scope in any other cases.
+At present, we only add a scope in these cases:
+
+* If the PR is limited to changes in ops/_private/harness.py, also include the scope `(harness)`
+* If the PR is limited to changes in testing/, also include the scope `(testing)`
 
 For example:
 
 * feat: add the ability to observe change-updated events
 * fix!: correct the type hinting for config data
 * docs(harness): clarify the types of exceptions that Harness.add_user_secret may raise
+* ci(testing): adjust the workflow that publishes ops-scenario
 
 Note that the commit messages to the PR's branch do not need to follow the
 conventional commit format, as these will be squashed into a single commit to `main`
@@ -202,10 +205,10 @@ The copyright information in existing files does not need to be updated when tho
 
 In general, new functionality
 should always be accompanied by user-focused documentation that is posted to
-https://juju.is/docs/sdk.  The content for this site is written and hosted on
-https://discourse.charmhub.io/c/doc.  New documentation should get a new
+https://juju.is/docs/sdk. The content for this site is written and hosted on
+https://discourse.charmhub.io/c/doc. New documentation should get a new
 topic/post on this Discourse forum and then should be linked into the main
-docs navigation page(s) as appropriate.  The ops library's SDK page
+docs navigation page(s) as appropriate. The ops library's SDK page
 content is pulled from
 [the corresponding Discourse topic](https://discourse.charmhub.io/t/the-charmed-operator-software-development-kit-sdk-docs/4449).
 Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
@@ -221,12 +224,20 @@ Currently we don't publish separate versions of documentation for separate relea
 next to the relevant content (e.g. headings, etc.).
 
 The ops library's API reference is automatically built and published to
-[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/).  Please be complete with
+[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/). Please be complete with
 docstrings and keep them informative for _users_. The published docs are always
 for the in-development (main branch) of ops, and do not include any notes
-indicating changes or additions across versions - we encourage all charmers to
+indicating changes or additions across ops versions - we encourage all charmers to
 promptly upgrade to the latest version of ops, and to refer to the release notes
 and changelog for learning about changes.
+
+We do note when features behave differently when using different Juju versions.
+Use the `.. jujuadded:: x.y` directive to indicate that the feature is only
+available when using version x.y (or higher) of Juju, `..jujuchanged:: x.y`
+when the feature's behaviour _in ops_ changes, and `..jujuremoved:: x.y` when
+the feature will be available in ops but not in that version (or later) of Juju.
+Unmarked features are assumed to work and be available in the current LTS
+version of Juju.
 
 During the release process, changes also get a new entry in [CHANGES.md](CHANGES.md).
 These are grouped into the same groupings as
@@ -311,43 +322,61 @@ To make a release of the ops library, do the following:
 
 1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
 2. Click "Draft a new release"
-3. The "Release Title" is simply the full version number, in the form `<major>.<minor>.<patch>`
-   and a brief summary of the main changes in the release
-   E.g. 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12
-4. Use the "Generate Release Notes" button to get a copy of the changes into the
+3. The "Release Title" is the full version numbers of ops and ops-scenario, in
+   the form `ops <major>.<minor>.<patch> & ops-scenario <major>.<minor>.<patch>`
+   and a brief summary of the main changes in the releases. If the release only
+   includes one of `ops` and `ops-scenario`, leave out the other one.
+   For example: `ops 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
+4. Have the release create a new tag, in the form `<major>.<minor>.<patch>`
+5. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field.
-5. Group the changes by the commit type (feat, fix, etc.) and use full names (e.g., "Features",
-   not "feat") for group headings. Strip the commit type prefix from the bullet point. Strip the
-   username (who did each commit) if the author is a member of the Charm Tech team.
-6. Where appropriate, collapse multiple tightly related bullet points into a
+6. Group the changes first by package (`ops` and `ops-scenario`) and then by
+   the commit type (feat, fix, etc.) and use full names (e.g., "Features",
+   not "feat") for group headings. Strip the commit type prefix from the bullet point,
+   and capitalise the first word. Strip the username (who did each commit) if the
+   author is a member of the Charm Tech team.
+   For example: the PR `docs: clarify where StoredState is stored`
+   becomes `* Clarify where StoredState is stored` in the "Documentation" section.
+7. Where appropriate, collapse multiple tightly related bullet points into a
    single point that refers to multiple commits.
-7. Create a new branch, and copy this text to the [CHANGES.md](CHANGES.md) file,
+8. Create a new branch, and copy this text to the [CHANGES.md](CHANGES.md) file,
    stripping out links, who did each commit, the new contributor list, and the
    link to the full changelog.
-8. Change [version.py](ops/version.py)'s `version` to the
+9. Change [version.py](ops/version.py)'s `version` to the
    [appropriate string](https://semver.org/).
-9. Check if there's a `chore: update charm pins` auto-generated PR in the queue. If it looks
+10. Check if there's a `chore: update charm pins` auto-generated PR in the queue. If it looks
    good, merge it and check that tests still pass. If needed, you can re-trigger the
    `Update Charm Pins` workflow manually to ensure latest charms and ops get tested.
-10. Add, commit, and push, and open a PR to get the changelog and version bump
+11. Add, commit, and push, and open a PR to get the changelog and version bump
    into main (and get it merged).
-11. Back in the GitHub releases page, tweak the release notes - for example,
+12. Back in the GitHub releases page, tweak the release notes - for example,
    you might want to have a short paragraph at the intro on particularly
    noteworthy changes.
-12. Have someone else in the Charm-Tech team proofread the release notes.
-13. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+13. Have someone else in the Charm-Tech team proofread the release notes.
+14. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
+15. If the release includes an `ops-scenario` package, then create a new tag in
+   the form `scenario-<major>.<minor>.<patch>`.
 
-This will trigger an automatic build for the Python package and publish it to
-[PyPI](https://pypi.org/project/ops/)) (authorisation is handled via a
+This will trigger automatic builds for the Python packages and publish them to
+PyPI ([ops](https://pypi.org/project/ops/) and
+[ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled via a
 [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
-Note that it sometimes take a bit of time for the new release to show up.
+Note that it sometimes take a bit of time for the new releases to show up.
 
-See [.github/workflows/publish.yml](.github/workflows/publish.yml) for details. (Note that the versions in publish.yml refer to versions of the GitHub actions, not the versions of the ops library.)
+To do a release that does not include an `ops-scenario` package, skip the
+step above where a `scenario-` tag is created. To do a release that does not
+include an `ops` package, create the `scenario-<major>.<minor>.<patch>` tag as
+part of the GitHub release process instead of the `<major>.<minor>.<patch>` one.
+
+See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
+[.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
+(Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops library.)
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-13. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
+16. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com). Mention both the `ops` and `ops-scenario` releases in the same posts, but avoid the word "Scenario", preferring "unit testing API" or "state transition testing".
 
-14. Open a PR to change [version.py](ops/version.py)'s `version` to the expected
+17. Open a PR to change [version.py](ops/version.py)'s `version` to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next expected version, use
-   `'3.14.1.dev0'`).
+   `'3.14.1.dev0'`) and [testing/pyproject.toml](testing/pyproject.toml)'s
+   `version` similarly.

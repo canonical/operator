@@ -9,7 +9,7 @@ jobs:
   hello-charm-tests:
     uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
-    name: Build and Publish to Test PyPI
+    name: Build and Publish ops-scenario to Test PyPI
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -24,10 +24,11 @@ jobs:
         run: pip install wheel build
       - name: Build
         run: python -m build
+        working-directory: ./testing
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v1.4.3
         with:
-          subject-path: 'dist/*'
+          subject-path: 'testing/dist/*'
       - name: Publish to test.pypi.org
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
