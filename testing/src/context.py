@@ -81,9 +81,9 @@ class Manager:
 
     def __init__(
         self,
-        ctx: "Context",
+        ctx: Context,
         arg: _Event,
-        state_in: "State",
+        state_in: State,
     ):
         self._ctx = ctx
         self._arg = arg
@@ -91,7 +91,7 @@ class Manager:
 
         self._emitted: bool = False
 
-        self.ops: Optional["Ops"] = None
+        self.ops: Ops | None = None
 
     @property
     def charm(self) -> ops.CharmBase:
@@ -115,7 +115,7 @@ class Manager:
         self.ops = ops
         return self
 
-    def run(self) -> "State":
+    def run(self) -> State:
         """Emit the event and proceed with charm execution.
 
         This can only be done once.
@@ -265,12 +265,12 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationCreatedEvent)
-    def relation_created(relation: "RelationBase"):
+    def relation_created(relation: RelationBase):
         return _Event(f"{relation.endpoint}_relation_created", relation=relation)
 
     @staticmethod
     @_copy_doc(ops.RelationJoinedEvent)
-    def relation_joined(relation: "RelationBase", *, remote_unit: Optional[int] = None):
+    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):
         return _Event(
             f"{relation.endpoint}_relation_joined",
             relation=relation,
@@ -280,9 +280,9 @@ class CharmEvents:
     @staticmethod
     @_copy_doc(ops.RelationChangedEvent)
     def relation_changed(
-        relation: "RelationBase",
+        relation: RelationBase,
         *,
-        remote_unit: Optional[int] = None,
+        remote_unit: int | None = None,
     ):
         return _Event(
             f"{relation.endpoint}_relation_changed",
@@ -293,10 +293,10 @@ class CharmEvents:
     @staticmethod
     @_copy_doc(ops.RelationDepartedEvent)
     def relation_departed(
-        relation: "RelationBase",
+        relation: RelationBase,
         *,
-        remote_unit: Optional[int] = None,
-        departing_unit: Optional[int] = None,
+        remote_unit: int | None = None,
+        departing_unit: int | None = None,
     ):
         return _Event(
             f"{relation.endpoint}_relation_departed",
@@ -307,7 +307,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationBrokenEvent)
-    def relation_broken(relation: "RelationBase"):
+    def relation_broken(relation: RelationBase):
         return _Event(f"{relation.endpoint}_relation_broken", relation=relation)
 
     @staticmethod
@@ -356,10 +356,10 @@ class CharmEvents:
     @_copy_doc(ops.ActionEvent)
     def action(
         name: str,
-        params: Optional[Mapping[str, "AnyJson"]] = None,
-        id: Optional[str] = None,
+        params: Mapping[str, AnyJson] | None = None,
+        id: str | None = None,
     ):
-        kwargs: Dict[str, Any] = {}
+        kwargs: dict[str, Any] = {}
         if params:
             kwargs["params"] = params
         if id:
@@ -425,26 +425,26 @@ class Context:
                 manager.run()
     """
 
-    juju_log: List["JujuLogLine"]
+    juju_log: list[JujuLogLine]
     """A record of what the charm has sent to juju-log"""
-    app_status_history: List["_EntityStatus"]
+    app_status_history: list[_EntityStatus]
     """A record of the app statuses the charm has set"""
-    unit_status_history: List["_EntityStatus"]
+    unit_status_history: list[_EntityStatus]
     """A record of the unit statuses the charm has set"""
-    workload_version_history: List[str]
+    workload_version_history: list[str]
     """A record of the workload versions the charm has set"""
-    removed_secret_revisions: List[int]
+    removed_secret_revisions: list[int]
     """A record of the secret revisions the charm has removed"""
-    emitted_events: List[ops.EventBase]
+    emitted_events: list[ops.EventBase]
     """A record of the events (including custom) that the charm has processed"""
-    requested_storages: Dict[str, int]
+    requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
-    action_logs: List[str]
+    action_logs: list[str]
     """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
 
     This will be empty when handling a non-action event.
     """
-    action_results: Optional[Dict[str, Any]]
+    action_results: dict[str, Any] | None
     """A key-value mapping assigned by the charm as a result of the action.
 
     This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
@@ -457,17 +457,17 @@ class Context:
 
     def __init__(
         self,
-        charm_type: Type["CharmType"],
-        meta: Optional[Dict[str, Any]] = None,
+        charm_type: type[CharmType],
+        meta: dict[str, Any] | None = None,
         *,
-        actions: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
-        charm_root: Optional[Union[str, Path]] = None,
+        actions: dict[str, Any] | None = None,
+        config: dict[str, Any] | None = None,
+        charm_root: str | Path | None = None,
         juju_version: str = _DEFAULT_JUJU_VERSION,
         capture_deferred_events: bool = False,
         capture_framework_events: bool = False,
-        app_name: Optional[str] = None,
-        unit_id: Optional[int] = 0,
+        app_name: str | None = None,
+        unit_id: int | None = 0,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
@@ -536,26 +536,26 @@ class Context:
         self.capture_framework_events = capture_framework_events
 
         # streaming side effects from running an event
-        self.juju_log: List["JujuLogLine"] = []
-        self.app_status_history: List["_EntityStatus"] = []
-        self.unit_status_history: List["_EntityStatus"] = []
-        self.exec_history: Dict[str, List["ExecArgs"]] = {}
-        self.workload_version_history: List[str] = []
-        self.removed_secret_revisions: List[int] = []
-        self.emitted_events: List[ops.EventBase] = []
-        self.requested_storages: Dict[str, int] = {}
+        self.juju_log: list[JujuLogLine] = []
+        self.app_status_history: list[_EntityStatus] = []
+        self.unit_status_history: list[_EntityStatus] = []
+        self.exec_history: dict[str, list[ExecArgs]] = {}
+        self.workload_version_history: list[str] = []
+        self.removed_secret_revisions: list[int] = []
+        self.emitted_events: list[ops.EventBase] = []
+        self.requested_storages: dict[str, int] = {}
 
         # set by Runtime.exec() in self._run()
-        self._output_state: Optional["State"] = None
+        self._output_state: State | None = None
 
         # operations (and embedded tasks) from running actions
-        self.action_logs: List[str] = []
-        self.action_results: Optional[Dict[str, Any]] = None
-        self._action_failure_message: Optional[str] = None
+        self.action_logs: list[str] = []
+        self.action_results: dict[str, Any] | None = None
+        self._action_failure_message: str | None = None
 
         self.on = CharmEvents()
 
-    def _set_output_state(self, output_state: "State"):
+    def _set_output_state(self, output_state: State):
         """Hook for Runtime to set the output state."""
         self._output_state = output_state
 
@@ -570,14 +570,14 @@ class Context:
         storage_root.mkdir(parents=True, exist_ok=True)
         return storage_root
 
-    def _record_status(self, state: "State", is_app: bool):
+    def _record_status(self, state: State, is_app: bool):
         """Record the previous status before a status change."""
         if is_app:
             self.app_status_history.append(state.app_status)
         else:
             self.unit_status_history.append(state.unit_status)
 
-    def __call__(self, event: "_Event", state: "State"):
+    def __call__(self, event: _Event, state: State):
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage::
@@ -594,7 +594,7 @@ class Context:
         """
         return Manager(self, event, state)
 
-    def run_action(self, action: str, state: "State"):
+    def run_action(self, action: str, state: State):
         """Use `run()` instead.
 
         :private:
@@ -604,7 +604,7 @@ class Context:
             "and find the results in `ctx.action_results`",
         )
 
-    def run(self, event: "_Event", state: "State") -> "State":
+    def run(self, event: _Event, state: State) -> State:
         """Trigger a charm execution with an event and a State.
 
         Calling this function will call ``ops.main`` and set up the context according to the
@@ -682,7 +682,7 @@ class Context:
         return self._output_state
 
     @contextmanager
-    def _run(self, event: "_Event", state: "State"):
+    def _run(self, event: _Event, state: State):
         runtime = Runtime(
             charm_spec=self.charm_spec,
             juju_version=self.juju_version,
