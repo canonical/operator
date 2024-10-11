@@ -20,6 +20,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    get_args,
 )
 
 from ops import JujuVersion, pebble
@@ -35,6 +36,7 @@ from ops.model import (
     SecretRotate,
     _format_action_result_dict,
     _ModelBackend,
+    _SettableStatusName,
 )
 from ops.pebble import Client, ExecError
 
@@ -53,7 +55,6 @@ from scenario.state import (
     _EntityStatus,
     _port_cls_by_protocol,
     _RawPortProtocolLiteral,
-    _RawStatusLiteral,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -351,11 +352,16 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def status_set(
         self,
-        status: _RawStatusLiteral,
+        status: _SettableStatusName,
         message: str = "",
         *,
         is_app: bool = False,
     ):
+        valid_names = get_args(_SettableStatusName)
+        if status not in valid_names:
+            raise ModelError(
+                f'ERROR invalid status "{status}", expected one of [{", ".join(valid_names)}]',
+            )
         self._context._record_status(self._state, is_app)
         status_obj = _EntityStatus.from_status_name(status, message)
         self._state._update_status(status_obj, is_app)
