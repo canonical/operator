@@ -23,26 +23,29 @@ from typing import (
     get_args,
 )
 
-from ops import JujuVersion, pebble
-from ops._private.harness import ExecArgs, _TestingPebbleClient
-from ops.model import CloudSpec as CloudSpec_Ops
-from ops.model import ModelError
-from ops.model import Port as Port_Ops
-from ops.model import RelationNotFoundError
-from ops.model import Secret as Secret_Ops  # lol
-from ops.model import (
+from ops import (
+    JujuVersion,
+    pebble,
     SecretInfo,
     SecretNotFoundError,
+    RelationNotFoundError,
     SecretRotate,
+    ModelError,
+)
+from ops._private.harness import ExecArgs, _TestingPebbleClient
+from ops.model import CloudSpec as CloudSpec_Ops
+from ops.model import Port as Port_Ops
+from ops.model import Secret as Secret_Ops  # lol
+from ops.model import (
     _format_action_result_dict,
     _ModelBackend,
     _SettableStatusName,
 )
 from ops.pebble import Client, ExecError
 
-from scenario.errors import ActionMissingFromContextError
-from scenario.logger import logger as scenario_logger
-from scenario.state import (
+from .errors import ActionMissingFromContextError
+from .logger import logger as scenario_logger
+from .state import (
     CharmType,
     JujuLogLine,
     Mount,
@@ -58,9 +61,9 @@ from scenario.state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from scenario.context import Context
-    from scenario.state import Container as ContainerSpec
-    from scenario.state import Exec, Secret, State, _CharmSpec, _Event
+    from .context import Context
+    from .state import Container as ContainerSpec
+    from .state import Exec, Secret, State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild("mocking")
 
@@ -393,7 +396,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         rotate: Optional[SecretRotate] = None,
         owner: Optional[Literal["unit", "app"]] = None,
     ) -> str:
-        from scenario.state import Secret
+        from .state import Secret
 
         secret = Secret(
             content,

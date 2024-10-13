@@ -21,7 +21,7 @@ coverage.xml
 /dist
 /build
 /docs/_build
-/testing/ops_scenario.egg-info/
+ops_scenario.egg-info
 /testing/build/
 /testing/dist/
 
