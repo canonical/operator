@@ -347,7 +347,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    team proofread the release notes.
 10. If the release includes both `ops` and `ops-scenario` packages, then push a
    new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
-   executing `git tag scenario-x.y.z`, then `git push upstream --tags` locally
+   executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
 11. When you are ready, click "Publish". GitHub will create the additional tag.
