@@ -318,55 +318,45 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-To make a release of the ops library, do the following:
+To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 
-1. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
-2. Click "Draft a new release"
-3. The "Release Title" is the full version numbers of ops and ops-scenario, in
-   the form `ops <major>.<minor>.<patch> & ops-scenario <major>.<minor>.<patch>`
-   and a brief summary of the main changes in the releases. If the release only
-   includes one of `ops` and `ops-scenario`, leave out the other one.
+1. Check if there's a `chore: update charm pins` auto-generated PR in the queue.
+   If it looks good, merge it and check that tests still pass. If needed, you
+   can re-trigger the `Update Charm Pins` workflow manually to ensure latest
+   charms and ops get tested.
+2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
+3. Click "Draft a new release"
+4. The "Release Title" is the full version numbers of ops and/or ops-scenario,
+   in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
+   and a brief summary of the main changes in the release.
    For example: `ops 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
-4. Have the release create a new tag, in the form `<major>.<minor>.<patch>`
-5. Use the "Generate Release Notes" button to get a copy of the changes into the
-   notes field.
-6. Group the changes first by package (`ops` and `ops-scenario`) and then by
-   the commit type (feat, fix, etc.) and use full names (e.g., "Features",
-   not "feat") for group headings. Strip the commit type prefix from the bullet point,
-   and capitalise the first word. Strip the username (who did each commit) if the
-   author is a member of the Charm Tech team.
-   For example: the PR `docs: clarify where StoredState is stored`
-   becomes `* Clarify where StoredState is stored` in the "Documentation" section.
-7. Where appropriate, collapse multiple tightly related bullet points into a
-   single point that refers to multiple commits.
-8. Create a new branch, and copy this text to the [CHANGES.md](CHANGES.md) file,
-   stripping out links, who did each commit, the new contributor list, and the
-   link to the full changelog.
-9. Change [version.py](ops/version.py)'s `version` to the
-   [appropriate string](https://semver.org/).
-10. Check if there's a `chore: update charm pins` auto-generated PR in the queue. If it looks
-   good, merge it and check that tests still pass. If needed, you can re-trigger the
-   `Update Charm Pins` workflow manually to ensure latest charms and ops get tested.
-11. Add, commit, and push, and open a PR to get the changelog and version bump
+5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
+   `ops` and `scenario-<major>.<minor>.<patch>` for `ops-scenario`. If releasing
+   both packages, use the ops tag.
+6. Use the "Generate Release Notes" button to get a copy of the changes into the
+   notes field. The 'Release Documentation' section below details the form that
+   the release notes and changelog should take.
+7. For `ops`, change [version.py](ops/version.py)'s `version` to the
+   appropriate string. For `ops-scenario`, change the version in
+   [testing/pyproject.toml](testing/pyproject.toml). Both packages use
+   [semantic versioning]](https://semver.org/), and adjust independently
+   (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
+8. Add, commit, and push, and open a PR to get the changelogs and version bumps
    into main (and get it merged).
-12. Back in the GitHub releases page, tweak the release notes - for example,
-   you might want to have a short paragraph at the intro on particularly
-   noteworthy changes.
-13. Have someone else in the Charm-Tech team proofread the release notes.
-14. When you are ready, click "Publish". (If you are not ready, click "Save as Draft".)
-15. If the release includes an `ops-scenario` package, then create a new tag in
-   the form `scenario-<major>.<minor>.<patch>`.
+9. Save the release notes as a draft, and have someone else in the Charm-Tech
+   team proofread the release notes.
+10. If the release includes both `ops` and `ops-scenario` packages, then push a
+   new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
+   executing `git tag scenario-x.y.z`, then `git push upstream --tags` locally
+   (assuming you have configured `canonical/operator` as a remote named
+   `upstream`).
+11. When you are ready, click "Publish". GitHub will create the additional tag.
 
-This will trigger automatic builds for the Python packages and publish them to
-PyPI ([ops](https://pypi.org/project/ops/) and
-[ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled via a
-[Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
+Pushing the tags will trigger automatic builds for the Python packages and
+publish them to PyPI ([ops](https://pypi.org/project/ops/) and
+[ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled
+via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
 Note that it sometimes take a bit of time for the new releases to show up.
-
-To do a release that does not include an `ops-scenario` package, skip the
-step above where a `scenario-` tag is created. To do a release that does not
-include an `ops` package, create the `scenario-<major>.<minor>.<patch>` tag as
-part of the GitHub release process instead of the `<major>.<minor>.<patch>` one.
 
 See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
 [.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
@@ -374,9 +364,106 @@ See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-16. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com). Mention both the `ops` and `ops-scenario` releases in the same posts, but avoid the word "Scenario", preferring "unit testing API" or "state transition testing".
+12. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-17. Open a PR to change [version.py](ops/version.py)'s `version` to the expected
-   next version, with ".dev0" appended (for example, if 3.14.1 is the next expected version, use
-   `'3.14.1.dev0'`) and [testing/pyproject.toml](testing/pyproject.toml)'s
-   `version` similarly.
+13. Open a PR to change the version strings to the expected
+   next version, with ".dev0" appended (for example, if 3.14.1 is the next
+   expected version, use `'3.14.1.dev0'`).
+
+## Release Documentation
+
+`ops` and `ops-scenario` releases have several documentation artifacts, each
+serving a separate purpose and covering a different level.
+
+Avoid using the word "Scenario", preferring "unit testing API" or "state
+transition testing". Users should install `ops-scenario` with
+`pip install ops[testing]` rather than using the `ops-scenario` package name
+directly.
+
+### `git log`
+
+`git log` is used to see every change since a previous release. Obviously, no
+special work needs to be done so that this is available. A link to the GitHub
+view of the log will be included at the end of the GitHub release notes when
+the "Generate Release Notes" button is used, in the form:
+
+```
+**Full Changelog**: https://github.com/canonical/operator/compare/2.17.0...2.18.0
+```
+
+These changes include both `ops` and `ops-scenario`. If someone needs to see
+changes only for one of the packages, then the `/testing/` folder can be
+filtered in/out.
+
+### CHANGES.md
+
+A changelog is kept in version control that simply lists the changes in each
+release, other than chores like bumping version numbers. The changelog for `ops`
+is at the top level, in [CHANGES.md](CHANGES.md), and the changelog for
+`ops-scenario` is in the `/testing` folder, [CHANGES.md](testing/CHANGES.md).
+There will be overlap between the two files, as many PRs will include changes to
+common infrastructure, or will adjust both `ops` and also the testing API in
+`ops-scenario`.
+
+Adding the changes is done in preparation for a release. Use the "Generate
+Release Notes" button in the GitHub releases page, and copy the text to the
+CHANGES.md files.
+
+* Group the changes by the commit type (feat, fix, and so on) and use full names
+  ("Features", not "feat", "Fixes", not "fix") for group headings.
+* Remove any bullets that do not apply to the package (`ops` only changes for
+  `ops-scenario`, and `ops-scenario` only changes for `ops`).
+* Strip the commit type prefix from the bullet point, and capitalise the first
+  word.
+* Strip the username (who did each commit) if the author is a member of the
+  Charm Tech team.
+* Replace the link to the pull request with the PR number in parentheses.
+* Where appropriate, collapse multiple tightly related bullet points into a
+  single point that refers to multiple commits.
+
+For example: the PR
+
+```
+* docs: clarify where StoredState is stored by @benhoyt in https://github.com/canonical/operator/pull/2006
+```
+
+is added to the "Documentation" section as:
+
+```
+* Clarify where StoredState is stored (#2006)
+```
+
+### GitHub Release Notes
+
+The GitHub release notes include the list of changes found in the changelogs,
+but:
+
+* If both `ops` and `ops-scenario` packages are being released, include all the
+  changes in the same set of release notes. If only one package is being
+  released, remove any bullets that apply only to the other package.
+* The links to the PRs are left in full.
+* Add a section above the list of changes that briefly outlines any key changes
+  in the release.
+
+### Discourse Release Announcement
+
+Post to the [framework category](https://discourse.charmhub.io/c/framework/42)
+with a subject matching the GitHub release title.
+
+The post should resemble this:
+
+```
+The Charm Tech team has just released version x.y.z of ops!
+
+It’s available from PyPI by using `pip install ops`, and `pip install ops[testing]`,
+which will pick up the latest version. Upgrade by running `pip install --upgrade ops`.
+
+The main improvements in this release are ...
+
+Read more in the [full release notes on GitHub](link to the GitHub release).
+```
+
+In the post, outline the key improvements both in `ops` and `ops-scenario` - 
+the point here is to encourage people to check out the full notes and to upgrade
+promptly, so ensure that you entice them with the best that the new versions
+have to offer.
