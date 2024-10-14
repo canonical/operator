@@ -38,7 +38,7 @@ class StateValidationError(RuntimeError):
 
 
 class MetadataNotFoundError(RuntimeError):
-    """Raised when Scenario can't find a metadata file in the provided charm root."""
+    """Raised when a metadata file can't be found in the provided charm root."""
 
 
 class ActionMissingFromContextError(Exception):

@@ -38,9 +38,9 @@ from typing import (
     Union,
 )
 
-from scenario.errors import InconsistentScenarioError
-from scenario.runtime import logger as scenario_logger
-from scenario.state import (
+from .errors import InconsistentScenarioError
+from .runtime import logger as scenario_logger
+from .state import (
     CharmType,
     PeerRelation,
     SubordinateRelation,
@@ -50,7 +50,7 @@ from scenario.state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from scenario.state import State, _Event
+    from .state import State, _Event
 
 logger = scenario_logger.getChild("consistency_checker")
 
