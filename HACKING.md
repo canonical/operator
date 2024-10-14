@@ -372,7 +372,7 @@ You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/op
 
 ## Release Documentation
 
-`ops` and `ops-scenario` releases have several documentation artifacts, each
+`ops` and `ops-scenario` releases have several documentation artefacts, each
 serving a separate purpose and covering a different level.
 
 Avoid using the word "Scenario", preferring "unit testing API" or "state
