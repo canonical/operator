@@ -330,27 +330,30 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
    For example: `ops 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
-5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
+5. If the last release was for both `ops` and `ops-scenario`, leave the previous
+   tag choice on `auto`. If the last release was for only one package, change
+   the previous tag to be the last time the same package(s) were being released.
+6. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
    `ops` and `scenario-<major>.<minor>.<patch>` for `ops-scenario`. If releasing
    both packages, use the ops tag.
-6. Use the "Generate Release Notes" button to get a copy of the changes into the
+7. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field. The 'Release Documentation' section below details the form that
    the release notes and changelog should take.
-7. For `ops`, change [version.py](ops/version.py)'s `version` to the
+8. For `ops`, change [version.py](ops/version.py)'s `version` to the
    appropriate string. For `ops-scenario`, change the version in
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
    [semantic versioning]](https://semver.org/), and adjust independently
    (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
-8. Add, commit, and push, and open a PR to get the changelogs and version bumps
+9. Add, commit, and push, and open a PR to get the changelogs and version bumps
    into main (and get it merged).
-9. Save the release notes as a draft, and have someone else in the Charm-Tech
+10. Save the release notes as a draft, and have someone else in the Charm-Tech
    team proofread the release notes.
-10. If the release includes both `ops` and `ops-scenario` packages, then push a
+11. If the release includes both `ops` and `ops-scenario` packages, then push a
    new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-11. When you are ready, click "Publish". GitHub will create the additional tag.
+12. When you are ready, click "Publish". GitHub will create the additional tag.
 
 Pushing the tags will trigger automatic builds for the Python packages and
 publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -364,16 +367,16 @@ See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
 
 You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-12. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+13. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-13. Open a PR to change the version strings to the expected
+14. Open a PR to change the version strings to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
    expected version, use `'3.14.1.dev0'`).
 
 ## Release Documentation
 
-`ops` and `ops-scenario` releases have several documentation artefacts, each
-serving a separate purpose and covering a different level.
+We produce several pieces of documentation for `ops` and `ops-scenario`
+releases, each serving a separate purpose and covering a different level.
 
 Avoid using the word "Scenario", preferring "unit testing API" or "state
 transition testing". Users should install `ops-scenario` with
