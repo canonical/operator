@@ -2,8 +2,8 @@ name: ops Smoke Tests
 
 on:
   workflow_dispatch:
-    schedule:
-      - cron:  '0 7 25 * *'
+  schedule:
+    - cron:  '0 7 25 * *'
 
 jobs:
   test:
