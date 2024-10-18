@@ -441,7 +441,9 @@ class TestJujuStateBackend:
         assert fake_script.calls(clear=True) == []
 
     def test_set_encodes_args(self, fake_script: FakeScript):
-        t = tempfile.NamedTemporaryFile()
+        # TODO: Remove noqa SIM115 when the following issue is fixed.
+        # https://github.com/astral-sh/ruff/issues/7313
+        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
         try:
             fake_script.write(
                 'state-set',
@@ -478,7 +480,9 @@ class TestJujuStateBackend:
         ]
 
     def test_set_and_get_complex_value(self, fake_script: FakeScript):
-        t = tempfile.NamedTemporaryFile()
+        # TODO: Remove noqa SIM115 when the following issue is fixed.
+        # https://github.com/astral-sh/ruff/issues/7313
+        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
         try:
             fake_script.write(
                 'state-set',

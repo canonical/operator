@@ -2808,7 +2808,9 @@ class TestModelBackend:
         version: str,
     ):
         # on 2.7.0+, things proceed as expected
-        t = tempfile.NamedTemporaryFile()
+        # TODO: Remove noqa SIM115 when the following issue is fixed.
+        # https://github.com/astral-sh/ruff/issues/7313
+        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
         try:
             fake_script.write(
                 'relation-set',
