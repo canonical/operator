@@ -3691,9 +3691,9 @@ class TestExec:
         assert io_ws.sends == []
 
     def test_wait_file_io(self, client: MockClient):
-        fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
-        out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
-        err = tempfile.TemporaryFile(mode='w+', encoding='utf-8')
+        fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # noqa: SIM115
+        out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # noqa: SIM115
+        err = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # noqa: SIM115
         try:
             fin.write('foo\n')
             fin.seek(0)
