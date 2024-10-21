@@ -1359,7 +1359,7 @@ class MockClient(pebble.Client):
             raise resp
         if callable(resp):
             resp = resp()
-        return resp
+        return resp  # type: ignore
 
     def _request_raw(
         self,
