@@ -30,6 +30,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up Python 3
         uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Install tox
         run: pip install tox~=4.2
@@ -79,6 +81,8 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          # To suppress the "Restore cache failed" error, since there is no go.sum file here.
+          cache: false
 
       - name: Install tox
         run: pip install tox~=4.2
