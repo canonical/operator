@@ -171,10 +171,10 @@ ignore = [
     "RUF015",
     # Mutable class attributes should be annotated with `typing.ClassVar`
     "RUF012",
-    # Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
-    "C420",
     # Unnecessary `tuple` call (rewrite as a literal)
     "C408",
+    # Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+    "C420",
 ]
 
 [tool.ruff.lint.pyupgrade]
