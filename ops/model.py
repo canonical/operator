@@ -39,6 +39,7 @@ from typing import (
     Any,
     BinaryIO,
     Callable,
+    ClassVar,
     Dict,
     Generator,
     Iterable,
@@ -1963,7 +1964,7 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: Dict[StatusName, Type['StatusBase']] = {}
+    _statuses: ClassVar[Dict[StatusName, Type['StatusBase']]] = {}
 
     # Subclasses must provide this attribute
     name: StatusName
@@ -2023,7 +2024,7 @@ class StatusBase:
             )
         cls._statuses[child.name] = child
 
-    _priorities = {
+    _priorities: ClassVar[Dict[str, Any]] = {
         'error': 5,
         'blocked': 4,
         'maintenance': 3,
@@ -3715,7 +3716,7 @@ class _ModelBackend:
             args.extend(['--label', label])
         result = self._run_for_secret('secret-info-get', *args, return_output=True, use_json=True)
         info_dicts = typing.cast(Dict[str, Any], result)
-        id = list(info_dicts)[0]  # Juju returns dict of {secret_id: {info}}
+        id = next(iter(info_dicts))  # Juju returns dict of {secret_id: {info}}
         return SecretInfo.from_dict(
             id, typing.cast(Dict[str, Any], info_dicts[id]), model_uuid=self.model_uuid
         )

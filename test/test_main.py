@@ -1231,7 +1231,7 @@ class _TestMainWithDispatch(_TestMain):
         request: pytest.FixtureRequest,
         fake_script: FakeScript,
     ):
-        self.stdout = self.stderr = tempfile.TemporaryFile()
+        self.stdout = self.stderr = tempfile.TemporaryFile()  # noqa: SIM115
         request.addfinalizer(self.stdout.close)
 
         fake_script_hooks = FakeScript(request, self.hooks_dir)
@@ -1383,7 +1383,7 @@ class TestMainWithDispatch(_TestMainWithDispatch):
     @pytest.mark.usefixtures('setup_charm')
     def test_crash_action(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         self._prepare_actions()
-        self.stderr = tempfile.TemporaryFile('w+t')
+        self.stderr = tempfile.TemporaryFile('w+t')  # noqa: SIM115
         request.addfinalizer(self.stderr.close)
         fake_script.write('action-get', "echo '{}'")
         with pytest.raises(subprocess.CalledProcessError):

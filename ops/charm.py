@@ -22,6 +22,7 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     List,
     Literal,
@@ -1678,7 +1679,7 @@ class RelationMeta:
     ``metadata.yaml`` and used by the charm code if appropriate.
     """
 
-    VALID_SCOPES = ['global', 'container']
+    VALID_SCOPES: ClassVar[List[str]] = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
         assert isinstance(

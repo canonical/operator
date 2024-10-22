@@ -136,8 +136,6 @@ ignore = [
 
     # Return condition directly, prefer readability.
     "SIM103",
-    # Use contextlib.suppress() instead of try/except: pass
-    "SIM105",
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "SIM117",
 
@@ -146,16 +144,8 @@ ignore = [
     # Missing docstring in `__init__`
     "D107",
 
-    # Manual list comprehension.
-    "PERF401",
     # Manual dict comprehension.
     "PERF403",
-
-    # Convert Dict[X] to dict[x], which we cannot do while we support Python 3.8
-    "UP006",
-
-    # Convert Union[X, Y] to X | Y, which we cannot do while we support Python 3.8
-    "UP007",
 
     # Convert {} from `TypedDict` functional to class syntax
     # Note that since we have some `TypedDict`s that cannot use the class
@@ -167,14 +157,6 @@ ignore = [
 
     # `subprocess` call: check for execution of untrusted input
     "S603",
-    # Prefer `next(iter(info_dicts))` over single element slice
-    "RUF015",
-    # Mutable class attributes should be annotated with `typing.ClassVar`
-    "RUF012",
-    # Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
-    "RUF025",
-    # Unnecessary `tuple` call (rewrite as a literal)
-    "C408",
 ]
 
 [tool.ruff.lint.pyupgrade]
@@ -211,6 +193,7 @@ keep-runtime-typing = true
     "E266",  # Too many leading `#` before block comment
     "I001",  # Import block is un-sorted or un-formatted
     "RUF003",  # Comment contains ambiguous unicode characters (EN DASH, RIGHT SINGLE QUOTATION MARK)
+    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
 ]
 

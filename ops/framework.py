@@ -716,7 +716,7 @@ class Framework(Object):
             parent_path = parent.path
 
         kind_: str = kind or cls.handle_kind
-        self._type_registry[(parent_path, kind_)] = cls
+        self._type_registry[parent_path, kind_] = cls
         self._type_known.add(cls)
 
     def save_snapshot(self, value: Union['StoredStateData', 'EventBase']):

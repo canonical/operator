@@ -14,6 +14,7 @@
 
 """Infrastructure to build unit tests for charms using the ops library."""
 
+import contextlib
 import dataclasses
 import datetime
 import fnmatch
@@ -39,6 +40,7 @@ from typing import (
     AnyStr,
     BinaryIO,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     Iterable,
@@ -2225,7 +2227,7 @@ def _copy_docstrings(source_cls: Any):
 class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
     """Represents the Juju Config."""
 
-    _supported_types = {
+    _supported_types: ClassVar[Dict[str, Any]] = {
         'string': str,
         'boolean': bool,
         'int': int,
@@ -2838,9 +2840,7 @@ class _TestingModelBackend:
         unit_secret = secret.owner_name == self.unit_name
         app_secret = secret.owner_name == self.app_name
 
-        if unit_secret or (app_secret and self.is_leader()):
-            return True
-        return False
+        return unit_secret or (app_secret and self.is_leader())
 
     def secret_info_get(
         self, *, id: Optional[str] = None, label: Optional[str] = None
@@ -3486,10 +3486,8 @@ class _TestingPebbleClient:
             raise self._api_error(404, f'stat {path}: no such file or directory')
         files = [file_path]
         if not itself:
-            try:
+            with contextlib.suppress(NotADirectoryError):
                 files = [file_path / file for file in os.listdir(file_path)]
-            except NotADirectoryError:
-                pass
 
         if pattern is not None:
             files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]

@@ -123,7 +123,7 @@ class TestRealPebble:
         # After two retries the "bad" check should go down
         for _ in range(5):
             checks = client.get_checks()
-            bad_check = [c for c in checks if c.name == 'bad'][0]
+            bad_check = next(c for c in checks if c.name == 'bad')
             if bad_check.status == pebble.CheckStatus.DOWN:
                 break
             time.sleep(0.06)
@@ -131,7 +131,7 @@ class TestRealPebble:
             assert False, 'timed out waiting for "bad" check to go down'
         assert bad_check.failures == 2
         assert bad_check.threshold == 2
-        good_check = [c for c in checks if c.name == 'good'][0]
+        good_check = next(c for c in checks if c.name == 'good')
         assert good_check.status == pebble.CheckStatus.UP
 
         # And /v1/health should return "unhealthy" (with status HTTP 502)

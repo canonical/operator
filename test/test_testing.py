@@ -5113,7 +5113,7 @@ class PebbleStorageAPIsTestMixin:
         }
 
         # Let's pull the first file again and check its details
-        file = [f for f in files if f.path == f'{pebble_dir}/file1'][0]
+        file = next(f for f in files if f.path == f'{pebble_dir}/file1')
         assert file.name == 'file1'
         assert file.type == pebble.FileType.FILE
         assert file.size == 4
@@ -5275,8 +5275,8 @@ class PebbleStorageAPIsTestMixin:
         client.make_dir(f'{pebble_dir}/dir2', permissions=0o777)
 
         files = client.list_files(f'{pebble_dir}/', pattern='dir*')
-        assert [f for f in files if f.path == f'{pebble_dir}/dir1'][0].permissions == 0o700
-        assert [f for f in files if f.path == f'{pebble_dir}/dir2'][0].permissions == 0o777
+        assert next(f for f in files if f.path == f'{pebble_dir}/dir1').permissions == 0o700
+        assert next(f for f in files if f.path == f'{pebble_dir}/dir2').permissions == 0o777
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -5432,8 +5432,8 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         assert not c1.exists(c1_fpath)
 
     def _select_testing_user_group(self):
-        user = [u for u in pwd.getpwall() if u.pw_uid != os.getuid()][0]
-        group = [g for g in grp.getgrall() if g.gr_gid != os.getgid()][0]
+        user = next(u for u in pwd.getpwall() if u.pw_uid != os.getuid())
+        group = next(g for g in grp.getgrall() if g.gr_gid != os.getgid())
         return user, group
 
     def test_push_with_ownership(
