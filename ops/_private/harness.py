@@ -14,7 +14,6 @@
 
 """Infrastructure to build unit tests for charms using the ops library."""
 
-import contextlib
 import dataclasses
 import datetime
 import fnmatch
