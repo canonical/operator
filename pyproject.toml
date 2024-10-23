@@ -136,6 +136,8 @@ ignore = [
 
     # Return condition directly, prefer readability.
     "SIM103",
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "SIM117",
 

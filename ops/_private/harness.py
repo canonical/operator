@@ -3486,8 +3486,10 @@ class _TestingPebbleClient:
             raise self._api_error(404, f'stat {path}: no such file or directory')
         files = [file_path]
         if not itself:
-            with contextlib.suppress(NotADirectoryError):
+            try:
                 files = [file_path / file for file in os.listdir(file_path)]
+            except NotADirectoryError:
+                pass
 
         if pattern is not None:
             files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
