@@ -3216,7 +3216,7 @@ class _FilesParser:
         self._parser.feed(data)
 
     def _prepare_tempfile(self, filename: str):
-        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
         self._files[filename] = tf  # type: ignore # we have a custom protocol for it
         self.current_filename = filename
 

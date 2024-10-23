@@ -2808,7 +2808,7 @@ class TestModelBackend:
         version: str,
     ):
         # on 2.7.0+, things proceed as expected
-        t = tempfile.NamedTemporaryFile()
+        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
         try:
             fake_script.write(
                 'relation-set',
