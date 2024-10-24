@@ -39,6 +39,7 @@ from typing import (
     AnyStr,
     BinaryIO,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     Iterable,
@@ -2225,7 +2226,7 @@ def _copy_docstrings(source_cls: Any):
 class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
     """Represents the Juju Config."""
 
-    _supported_types = {
+    _supported_types: ClassVar[Dict[str, Any]] = {
         'string': str,
         'boolean': bool,
         'int': int,
@@ -2838,9 +2839,7 @@ class _TestingModelBackend:
         unit_secret = secret.owner_name == self.unit_name
         app_secret = secret.owner_name == self.app_name
 
-        if unit_secret or (app_secret and self.is_leader()):
-            return True
-        return False
+        return unit_secret or (app_secret and self.is_leader())
 
     def secret_info_get(
         self, *, id: Optional[str] = None, label: Optional[str] = None
