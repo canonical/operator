@@ -33,6 +33,7 @@ from ops.jujucontext import _JujuContext
 from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
+CHARM_EVAL_EXPR_ENVVAR = 'CHARM_EVAL_EXPR'
 
 
 logger = logging.getLogger()
@@ -527,21 +528,24 @@ class _Manager:
     def _eval(self, expr: str):
         """Eval an expression in the context of the charm and print the result to stdout."""
         import json
+
+        globs = {'self': self.charm, 'ops': ops, 'json': json}
         try:
-            print(eval(expr, __globals={
-                "self": self.charm,
-                "ops": ops,
-                "json": json
-            }))
+            globs = {'self': self.charm, 'ops': ops, 'json': json}
+            out = eval(expr, globs)
         except Exception:
-            logger.exception("failure evaluating expression")
+            logger.exception(
+                f'failure evaluating expression {expr!r} ' f'given available globs ({globs})'
+            )
             return
+        logger.debug(f'expression {expr!r} evaluated to {out!r}')
+        print(out)
 
     def run(self):
         """Emit and then commit the framework."""
         try:
             if eval_expr := _is_eval_set():
-                self._eval(eval_expr)
+                return self._eval(eval_expr)
             self._emit()
             self._commit()
         finally:
@@ -549,7 +553,13 @@ class _Manager:
 
 
 def _is_eval_set() -> Optional[str]:
-    return os.getenv("CHARM_EVAL_EXPR")
+    """Return the value of the `CHARM_EVAL_EXPR_ENVVAR` envvar, if set.
+
+    This allows the admin to run, for example,
+    `CHARM_EVAL_EXPR="self.foo()" juju exec mycharm/0`
+     and see the result printed to stdout.
+    """
+    return os.getenv(CHARM_EVAL_EXPR_ENVVAR)
 
 
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):

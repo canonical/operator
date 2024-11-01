@@ -15,6 +15,7 @@
 import abc
 import importlib.util
 import io
+import json
 import logging
 import os
 import re
@@ -30,10 +31,9 @@ from unittest.mock import patch
 import pytest
 
 import ops
-from ops._main import _should_use_controller_storage
+from ops._main import _should_use_controller_storage, CHARM_EVAL_EXPR_ENVVAR
 from ops.jujucontext import _JujuContext
 from ops.storage import SQLiteStorage
-
 from .charms.test_main.src.charm import MyCharmEvents
 from .test_helpers import FakeScript
 
@@ -1491,3 +1491,57 @@ class TestStorageHeuristics:
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
             juju_context = _JujuContext.from_dict(os.environ)
             assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)
+
+
+class TestCharmEval:
+    def _check(
+        self,
+        charm_class: typing.Type[ops.CharmBase],
+        *,
+        extra_environ: typing.Optional[typing.Dict[str, str]] = None,
+        **kwargs: typing.Any,
+    ):
+        """Helper for below tests."""
+
+        fake_environ = {
+            'JUJU_UNIT_NAME': 'test_main/0',
+            'JUJU_MODEL_NAME': 'mymodel',
+            'JUJU_VERSION': '2.7.0',
+        }
+        if extra_environ is not None:
+            fake_environ.update(extra_environ)
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            fake_environ.update({'JUJU_CHARM_DIR': tmpdirname})
+            with patch.dict(os.environ, fake_environ):
+                tmpdirname = Path(tmpdirname)
+                fake_metadata = tmpdirname / 'metadata.yaml'
+                with fake_metadata.open('wb') as fh:
+                    fh.write(b'name: test')
+
+                ops.main(charm_class, **kwargs)
+
+    def test_eval_charm_stmt(self, fake_script: FakeScript):
+        fake_script.write('juju-log', 'exit 0')
+
+        for expr, expected_result in (
+            ('type(self).__name__', 'CharmBase'),
+            ('ops.StatusBase.__name__', 'StatusBase'),
+            ('json.dumps({1:2})', json.dumps({1:2})),
+            ('type(self.framework).__name__', 'Framework'),
+            ('2 + 2', 4),
+        ):
+            with patch.dict(os.environ, {CHARM_EVAL_EXPR_ENVVAR: expr}):
+                self._check(ops.CharmBase)
+
+            expected = [
+                    'juju-log',
+                    '--log-level',
+                    'DEBUG',
+                    '--',
+                    f"expression {expr!r} evaluated to {expected_result!r}",
+                ]
+
+
+            calls = fake_script.calls()
+            assert expected in calls
