@@ -1527,7 +1527,7 @@ class TestCharmEval:
         for expr, expected_result in (
             ('type(self).__name__', 'CharmBase'),
             ('ops.StatusBase.__name__', 'StatusBase'),
-            ('json.dumps({1:2})', json.dumps({1:2})),
+            ('json.dumps({1:2})', json.dumps({1: 2})),
             ('type(self.framework).__name__', 'Framework'),
             ('2 + 2', 4),
         ):
@@ -1535,13 +1535,12 @@ class TestCharmEval:
                 self._check(ops.CharmBase)
 
             expected = [
-                    'juju-log',
-                    '--log-level',
-                    'DEBUG',
-                    '--',
-                    f"expression {expr!r} evaluated to {expected_result!r}",
-                ]
-
+                'juju-log',
+                '--log-level',
+                'DEBUG',
+                '--',
+                f'expression {expr!r} evaluated to {expected_result!r}',
+            ]
 
             calls = fake_script.calls()
             assert expected in calls
