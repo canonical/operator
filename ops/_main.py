@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import warnings
+from optparse import Option
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
@@ -523,13 +524,32 @@ class _Manager:
         """Commit the framework and gracefully teardown."""
         self.framework.commit()
 
+    def _eval(self, expr: str):
+        """Eval an expression in the context of the charm and print the result to stdout."""
+        import json
+        try:
+            print(eval(expr, __globals={
+                "self": self.charm,
+                "ops": ops,
+                "json": json
+            }))
+        except Exception:
+            logger.exception("failure evaluating expression")
+            return
+
     def run(self):
         """Emit and then commit the framework."""
         try:
+            if eval_expr := _is_eval_set():
+                self._eval(eval_expr)
             self._emit()
             self._commit()
         finally:
             self.framework.close()
+
+
+def _is_eval_set() -> Optional[str]:
+    return os.getenv("CHARM_EVAL_EXPR")
 
 
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
