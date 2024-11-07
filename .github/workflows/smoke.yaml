@@ -24,7 +24,7 @@ jobs:
       # LXD is required for charmcraft to pack, even if it's not used as the
       # Juju cloud.
       - name: Set up LXD
-        uses: canonical/setup-lxd@8fb85546a934dfb994becf81341dd387ffe6aabb
+        uses: canonical/setup-lxd@54a5806e490d92e207b57183cf111ed54bbdeff4
         with:
           channel: 5.0/stable
 
