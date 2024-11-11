@@ -8,6 +8,7 @@ venv
 .vscode
 .coverage
 coverage.xml
+.coverage.data
 /.tox
 .*.swp
 
