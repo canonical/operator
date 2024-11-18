@@ -2,6 +2,8 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""Test framework logger"""
+
 import logging
 import os
 
