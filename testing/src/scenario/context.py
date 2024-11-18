@@ -2,6 +2,12 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""Test Context
+
+The test `Context` object provides the context of the wider Juju system that the
+specific `State` exists in, and the events that can be executed on that `State`.
+"""
+
 from __future__ import annotations
 
 import functools
@@ -43,7 +49,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from .ops_main_mock import Ops
     from .state import (
         AnyJson,
-        CharmType,
         JujuLogLine,
         RelationBase,
         State,
@@ -78,6 +83,7 @@ class Manager:
         self._state_in = state_in
 
         self._emitted: bool = False
+        self._wrapped_ctx = None
 
         self.ops: Ops | None = None
 
@@ -99,8 +105,7 @@ class Manager:
 
     def __enter__(self):
         self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
-        ops = wrapped_ctx.__enter__()
-        self.ops = ops
+        self.ops = wrapped_ctx.__enter__()
         return self
 
     def run(self) -> State:
@@ -113,6 +118,7 @@ class Manager:
         self._emitted = True
 
         # wrap up Runtime.exec() so that we can gather the output state
+        assert self._wrapped_ctx is not None
         self._wrapped_ctx.__exit__(None, None, None)
 
         assert self._ctx._output_state is not None
@@ -656,8 +662,8 @@ class Context:
             if self.action_results is not None:
                 self.action_results.clear()
             self._action_failure_message = None
-        with self._run(event=event, state=state) as ops:
-            ops.emit()
+        with self._run(event=event, state=state) as manager:
+            manager.emit()
         # We know that the output state will have been set by this point,
         # so let the type checkers know that too.
         assert self._output_state is not None
