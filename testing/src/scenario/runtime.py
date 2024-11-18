@@ -308,12 +308,14 @@ class Runtime:
         # this should only be needed if we call play multiple times on the same runtime.
         class WrappedEvents(charm_type.on.__class__):
             """The charm's event sources, but wrapped."""
+
             pass
 
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
 
         class WrappedCharm(charm_type):
             """The test charm's type, but with events wrapped."""
+
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__

@@ -9,34 +9,34 @@ from scenario.state import State, _CharmSpec, _Event, _EventType
 @pytest.mark.parametrize(
     "evt, expected_type",
     (
-        ("foo_relation_changed", _EventType.relation),
-        ("foo_relation_created", _EventType.relation),
-        ("foo_bar_baz_relation_created", _EventType.relation),
-        ("foo_storage_attached", _EventType.storage),
-        ("foo_storage_detaching", _EventType.storage),
-        ("foo_bar_baz_storage_detaching", _EventType.storage),
-        ("foo_pebble_ready", _EventType.workload),
-        ("foo_bar_baz_pebble_ready", _EventType.workload),
-        ("foo_pebble_custom_notice", _EventType.workload),
-        ("foo_bar_baz_pebble_custom_notice", _EventType.workload),
-        ("secret_remove", _EventType.secret),
-        ("pre_commit", _EventType.framework),
-        ("commit", _EventType.framework),
-        ("collect_unit_status", _EventType.framework),
-        ("collect_app_status", _EventType.framework),
-        ("foo", _EventType.custom),
-        ("kaboozle_bar_baz", _EventType.custom),
+        ("foo_relation_changed", _EventType.RELATION),
+        ("foo_relation_created", _EventType.RELATION),
+        ("foo_bar_baz_relation_created", _EventType.RELATION),
+        ("foo_storage_attached", _EventType.STORAGE),
+        ("foo_storage_detaching", _EventType.STORAGE),
+        ("foo_bar_baz_storage_detaching", _EventType.STORAGE),
+        ("foo_pebble_ready", _EventType.WORKLOAD),
+        ("foo_bar_baz_pebble_ready", _EventType.WORKLOAD),
+        ("foo_pebble_custom_notice", _EventType.WORKLOAD),
+        ("foo_bar_baz_pebble_custom_notice", _EventType.WORKLOAD),
+        ("secret_remove", _EventType.SECRET),
+        ("pre_commit", _EventType.FRAMEWORK),
+        ("commit", _EventType.FRAMEWORK),
+        ("collect_unit_status", _EventType.FRAMEWORK),
+        ("collect_app_status", _EventType.FRAMEWORK),
+        ("foo", _EventType.CUSTOM),
+        ("kaboozle_bar_baz", _EventType.CUSTOM),
     ),
 )
 def test_event_type(evt, expected_type):
     event = _Event(evt)
     assert event._path.type is expected_type
 
-    assert event._is_relation_event is (expected_type is _EventType.relation)
-    assert event._is_storage_event is (expected_type is _EventType.storage)
-    assert event._is_workload_event is (expected_type is _EventType.workload)
-    assert event._is_secret_event is (expected_type is _EventType.secret)
-    assert event._is_action_event is (expected_type is _EventType.action)
+    assert event._is_relation_event is (expected_type is _EventType.RELATION)
+    assert event._is_storage_event is (expected_type is _EventType.STORAGE)
+    assert event._is_workload_event is (expected_type is _EventType.WORKLOAD)
+    assert event._is_secret_event is (expected_type is _EventType.SECRET)
+    assert event._is_action_event is (expected_type is _EventType.ACTION)
 
     class MyCharm(CharmBase):
         pass
@@ -55,7 +55,7 @@ def test_event_type(evt, expected_type):
             "containers": {"foo": {}, "foo_bar_baz": {}},
         },
     )
-    assert event._is_builtin_event(spec) is (expected_type is not _EventType.custom)
+    assert event._is_builtin_event(spec) is (expected_type is not _EventType.CUSTOM)
 
 
 def test_emitted_framework():
