@@ -2173,7 +2173,7 @@ class Client:
         timeout: float = 30.0,
         delay: float = 0.1,
     ) -> ChangeID:
-        """Stop services by name and wait (poll) for them to be started.
+        """Stop services by name and wait (poll) for them to be stopped.
 
         Args:
             services: Non-empty list of services to stop.
