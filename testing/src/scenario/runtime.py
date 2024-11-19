@@ -5,7 +5,6 @@
 import copy
 import dataclasses
 import marshal
-import os
 import re
 import tempfile
 import typing
@@ -35,6 +34,7 @@ from ops import (
     NoTypeError,
     PreCommitEvent,
 )
+from ops.jujucontext import _JujuContext
 from ops.storage import NoSnapshotError, SQLiteStorage
 from ops.framework import _event_regex
 from ops._private.harness import ActionFailed
@@ -182,15 +182,6 @@ class Runtime:
 
         self._app_name = app_name
         self._unit_id = unit_id
-
-    @staticmethod
-    def _cleanup_env(env: Dict[str, str]):
-        # TODO consider cleaning up env on __delete__, but ideally you should be
-        #  running this in a clean env or a container anyway.
-        # cleanup the env, in case we'll be firing multiple events, we don't want to pollute it.
-        for key in env:
-            # os.unsetenv does not always seem to work !?
-            del os.environ[key]
 
     def _get_event_env(self, state: "State", event: "_Event", charm_root: Path):
         """Build the simulated environment the operator framework expects."""
@@ -430,7 +421,7 @@ class Runtime:
         Returns the 'output state', that is, the state as mutated by the charm during the
         event handling.
 
-        This will set the environment up and call ops.main.main().
+        This will set the environment up and call ops.main().
         After that it's up to ops.
         """
         # todo consider forking out a real subprocess and do the mocking by
@@ -457,7 +448,7 @@ class Runtime:
                 event=event,
                 charm_root=temporary_charm_root,
             )
-            os.environ.update(env)
+            juju_context = _JujuContext.from_dict(env)
 
             logger.info(" - Entering ops.main (mocked).")
             from .ops_main_mock import Ops  # noqa: F811
@@ -471,6 +462,7 @@ class Runtime:
                         self._charm_spec,
                         charm_type=self._wrap(charm_type),
                     ),
+                    juju_context=juju_context,
                 )
                 ops.setup()
 
@@ -488,9 +480,6 @@ class Runtime:
 
             finally:
                 logger.info(" - Exited ops.main.")
-
-                logger.info(" - Clearing env")
-                self._cleanup_env(env)
 
             logger.info(" - closing storage")
             output_state = self._close_storage(output_state, temporary_charm_root)

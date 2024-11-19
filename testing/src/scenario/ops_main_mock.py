@@ -88,17 +88,16 @@ def setup_framework(
 ):
     from .mocking import _MockModelBackend
 
+    if juju_context is None:
+        juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
     model_backend = _MockModelBackend(
         state=state,
         event=event,
         context=context,
         charm_spec=charm_spec,
-        juju_context=ops.jujucontext._JujuContext.from_dict(os.environ)
-        if juju_context is None
-        else juju_context,
+        juju_context=juju_context,
     )
-    debug = "JUJU_DEBUG" in os.environ
-    setup_root_logging(model_backend, debug=debug)
+    setup_root_logging(model_backend, debug=juju_context.debug)
     # ops sets sys.excepthook to go to Juju's debug-log, but that's not useful
     # in a testing context, so reset it.
     sys.excepthook = sys.__excepthook__
@@ -190,12 +189,17 @@ class Ops:
         event: "_Event",
         context: "Context",
         charm_spec: "_CharmSpec[CharmType]",
+        juju_context: Optional[ops.jujucontext._JujuContext] = None,
     ):
         self.state = state
         self.event = event
         self.context = context
         self.charm_spec = charm_spec
-        self.juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
+        self.juju_context = (
+            ops.jujucontext._JujuContext.from_dict(os.environ)
+            if juju_context is None
+            else juju_context
+        )
 
         # set by setup()
         self.dispatcher: Optional[_Dispatcher] = None
