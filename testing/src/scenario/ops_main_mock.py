@@ -30,17 +30,6 @@ if TYPE_CHECKING:  # pragma: no cover
 # pyright: reportPrivateUsage=false
 
 
-# TODO: Use ops.jujucontext's _JujuContext.charm_dir.
-def _get_charm_dir():
-    charm_dir = os.environ.get("JUJU_CHARM_DIR")
-    if charm_dir is None:
-        # Assume $JUJU_CHARM_DIR/lib/op/main.py structure.
-        charm_dir = pathlib.Path(f"{__file__}/../../..").resolve()
-    else:
-        charm_dir = pathlib.Path(charm_dir).resolve()
-    return charm_dir
-
-
 def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
     """Walk path on root to an ObjectEvents instance."""
     obj = root
@@ -62,6 +51,7 @@ def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
 def _emit_charm_event(
     charm: "CharmBase",
     event_name: str,
+    juju_context: ops.jujucontext._JujuContext,
     event: Optional["_Event"] = None,
 ):
     """Emits a charm event based on a Juju event name.
@@ -69,7 +59,8 @@ def _emit_charm_event(
     Args:
         charm: A charm instance to emit an event from.
         event_name: A Juju event name to emit on a charm.
-        event_owner_path: Event source lookup path.
+        event: Event to emit.
+        juju_context: Juju context to use for the event.
     """
     owner = _get_owner(charm, event.owner_path) if event else charm.on
 
@@ -82,11 +73,7 @@ def _emit_charm_event(
             f"invalid event (not on charm.on).",
         )
 
-    args, kwargs = _get_event_args(
-        charm,
-        event_to_emit,
-        ops.jujucontext._JujuContext.from_dict(os.environ),
-    )
+    args, kwargs = _get_event_args(charm, event_to_emit, juju_context)
     ops_logger.debug("Emitting Juju event %s.", event_name)
     event_to_emit.emit(*args, **kwargs)
 
@@ -97,6 +84,7 @@ def setup_framework(
     event: "_Event",
     context: "Context",
     charm_spec: "_CharmSpec[CharmType]",
+    juju_context: Optional[ops.jujucontext._JujuContext] = None,
 ):
     from .mocking import _MockModelBackend
 
@@ -105,6 +93,9 @@ def setup_framework(
         event=event,
         context=context,
         charm_spec=charm_spec,
+        juju_context=ops.jujucontext._JujuContext.from_dict(os.environ)
+        if juju_context is None
+        else juju_context,
     )
     debug = "JUJU_DEBUG" in os.environ
     setup_root_logging(model_backend, debug=debug)
@@ -172,18 +163,20 @@ def setup(
     event: "_Event",
     context: "Context",
     charm_spec: "_CharmSpec[CharmType]",
+    juju_context: Optional[ops.jujucontext._JujuContext] = None,
 ):
     """Setup dispatcher, framework and charm objects."""
     charm_class = charm_spec.charm_type
-    charm_dir = _get_charm_dir()
+    if juju_context is None:
+        juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
+    charm_dir = juju_context.charm_dir
 
-    dispatcher = _Dispatcher(
-        charm_dir,
-        ops.jujucontext._JujuContext.from_dict(os.environ),
-    )
+    dispatcher = _Dispatcher(charm_dir, juju_context)
     dispatcher.run_any_legacy_hook()
 
-    framework = setup_framework(charm_dir, state, event, context, charm_spec)
+    framework = setup_framework(
+        charm_dir, state, event, context, charm_spec, juju_context
+    )
     charm = setup_charm(charm_class, framework, dispatcher)
     return dispatcher, framework, charm
 
@@ -202,6 +195,7 @@ class Ops:
         self.event = event
         self.context = context
         self.charm_spec = charm_spec
+        self.juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
 
         # set by setup()
         self.dispatcher: Optional[_Dispatcher] = None
@@ -220,6 +214,7 @@ class Ops:
             self.event,
             self.context,
             self.charm_spec,
+            self.juju_context,
         )
 
     def emit(self):
@@ -236,7 +231,9 @@ class Ops:
             if not dispatcher.is_restricted_context():
                 framework.reemit()
 
-            _emit_charm_event(charm, dispatcher.event_name, self.event)
+            _emit_charm_event(
+                charm, dispatcher.event_name, self.juju_context, self.event
+            )
 
         except Exception:
             framework.close()
