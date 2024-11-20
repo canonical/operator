@@ -85,11 +85,11 @@ def test_unit_name(app_name, unit_id):
         state=State(),
         event=_Event("start"),
         context=Context(my_charm_type, meta=meta),
-    ) as ops:
-        assert ops.charm.unit.name == f"{app_name}/{unit_id}"
+    ) as manager:
+        assert manager.charm.unit.name == f"{app_name}/{unit_id}"
 
 
-def test_env_cleanup_on_charm_error():
+def test_env_clean_on_charm_error():
     meta = {"name": "frank", "requires": {"box": {"interface": "triangle"}}}
 
     my_charm_type = charm_type()
@@ -101,14 +101,19 @@ def test_env_cleanup_on_charm_error():
         ),
     )
 
-    rel = Relation("box")
-    with pytest.raises(UncaughtCharmError):
+    remote_name = "ava"
+    rel = Relation("box", remote_app_name=remote_name)
+    with pytest.raises(UncaughtCharmError) as exc:
         with runtime.exec(
             state=State(relations={rel}),
             event=_Event("box_relation_changed", relation=rel),
             context=Context(my_charm_type, meta=meta),
-        ):
-            assert os.getenv("JUJU_REMOTE_APP")
+        ) as manager:
+            assert manager.juju_context.remote_app_name == remote_name
+            assert "JUJU_REMOTE_APP" not in os.environ
             _ = 1 / 0  # raise some error
+    # Ensure that some other error didn't occur (like AssertionError!).
+    assert "ZeroDivisionError" in str(exc.value)
 
+    # Ensure that the Juju environment didn't leak into the outside one.
     assert os.getenv("JUJU_REMOTE_APP", None) is None
