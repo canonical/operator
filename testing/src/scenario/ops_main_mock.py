@@ -6,7 +6,7 @@ import inspect
 import os
 import pathlib
 import sys
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Type, cast
+from typing import TYPE_CHECKING, Any, Generic, Optional, Sequence, Type, cast
 
 import ops.charm
 import ops.framework
@@ -22,10 +22,11 @@ from ops.charm import CharmMeta
 from ops.log import setup_root_logging
 
 from .errors import BadOwnerPath, NoObserverError
+from .state import CharmType
 
 if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
-    from .state import CharmType, State, _CharmSpec, _Event
+    from .state import State, _CharmSpec, _Event
 
 # pyright: reportPrivateUsage=false
 
@@ -95,7 +96,7 @@ def setup_framework(
     charm_dir: pathlib.Path,
     state: "State",
     event: "_Event",
-    context: "Context",
+    context: "Context[CharmType]",
     charm_spec: "_CharmSpec[CharmType]",
 ):
     from .mocking import _MockModelBackend
@@ -170,7 +171,7 @@ def setup_charm(
 def setup(
     state: "State",
     event: "_Event",
-    context: "Context",
+    context: "Context[CharmType]",
     charm_spec: "_CharmSpec[CharmType]",
 ):
     """Setup dispatcher, framework and charm objects."""
@@ -188,14 +189,14 @@ def setup(
     return dispatcher, framework, charm
 
 
-class Ops:
+class Ops(Generic[CharmType]):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
     def __init__(
         self,
         state: "State",
         event: "_Event",
-        context: "Context",
+        context: "Context[CharmType]",
         charm_spec: "_CharmSpec[CharmType]",
     ):
         self.state = state
@@ -206,7 +207,7 @@ class Ops:
         # set by setup()
         self.dispatcher: Optional[_Dispatcher] = None
         self.framework: Optional[ops.Framework] = None
-        self.charm: Optional[ops.CharmBase] = None
+        self.charm: Optional["CharmType"] = None
 
         self._has_setup = False
         self._has_emitted = False

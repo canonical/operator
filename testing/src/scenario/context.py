@@ -14,7 +14,6 @@ from typing import (
     Any,
     Callable,
     Mapping,
-    cast,
 )
 
 import ops
@@ -79,7 +78,7 @@ class Manager(Generic[CharmType]):
 
         self._emitted: bool = False
 
-        self.ops: Ops | None = None
+        self.ops: Ops[CharmType] | None = None
 
     @property
     def charm(self) -> CharmType:
@@ -87,11 +86,11 @@ class Manager(Generic[CharmType]):
 
         The charm is only available during the context manager scope.
         """
-        if not self.ops:
+        if self.ops is None or self.ops.charm is None:
             raise RuntimeError(
                 "you should __enter__ this context manager before accessing this",
             )
-        return cast(CharmType, self.ops.charm)
+        return self.ops.charm
 
     @property
     def _runner(self):
@@ -565,7 +564,7 @@ class Context(Generic[CharmType]):
         else:
             self.unit_status_history.append(state.unit_status)
 
-    def __call__(self, event: _Event, state: State):
+    def __call__(self, event: _Event, state: State) -> Manager[CharmType]:
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage::
