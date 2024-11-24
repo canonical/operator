@@ -195,11 +195,9 @@ class Ops:
         self.event = event
         self.context = context
         self.charm_spec = charm_spec
-        self.juju_context = (
-            ops.jujucontext._JujuContext.from_dict(os.environ)
-            if juju_context is None
-            else juju_context
-        )
+        if juju_context is None:
+            juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
+        self.juju_context = juju_context
 
         # set by setup()
         self.dispatcher: Optional[_Dispatcher] = None
