@@ -153,7 +153,10 @@ class _OpsMainContext:  # type: ignore
         pass
 
     def emit(self):
-        """Emit the event."""
+        """Emit the event.
+
+        Within the test framework, this only requires recording that it was emitted.
+	"""
         self._has_emitted = True
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # noqa: U100

@@ -5,7 +5,8 @@
 """Juju and Pebble mocking
 
 This module contains mocks for the Juju and Pebble APIs that are used by ops
-to interact with the Juju controller and the Pebble service manager."""
+to interact with the Juju controller and the Pebble service manager.
+"""
 
 import datetime
 import io
