@@ -1,0 +1,39 @@
+name: Publish
+on:
+  push:
+    tags:
+      # TODO: When we come to ops v3.x we will need to reconsider what to do
+      # here (we might want to start prefixing with 'v' for one thing), and we
+      # will likely be publishing at least three packages: ops, ops-scenario,
+      # and ops-harness.
+      - '2.*'
+  
+jobs:
+  framework-tests:
+    uses: ./.github/workflows/framework-tests.yaml
+  observability-charm-tests:
+    uses: ./.github/workflows/observability-charm-tests.yaml
+  hello-charm-tests:
+    uses: ./.github/workflows/hello-charm-tests.yaml
+  build-n-publish:
+    name: Build and Publish ops to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+      - name: Install build dependencies
+        run: pip install wheel build
+      - name: Build
+        run: python -m build
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1.4.3
+        with:
+          subject-path: 'dist/*'
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
