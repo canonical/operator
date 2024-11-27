@@ -2,24 +2,19 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import inspect
-import os
-import pathlib
+import dataclasses
+import marshal
+import re
 import sys
 from typing import TYPE_CHECKING, Any, Generic, Optional, Sequence, Type, cast
 
-import ops.charm
-import ops.framework
+import ops
 import ops.jujucontext
-import ops.model
 import ops.storage
-from ops import CharmBase
 
-# use logger from ops._main so that juju_log will be triggered
-from ops._main import CHARM_STATE_FILE, _Dispatcher, _get_event_args
+from ops.framework import _event_regex
+from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
-from ops.charm import CharmMeta
-from ops.log import setup_root_logging
 
 from .errors import BadOwnerPath, NoObserverError
 from .state import CharmType
@@ -28,160 +23,78 @@ if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
     from .state import State, _CharmSpec, _Event
 
+EVENT_REGEX = re.compile(_event_regex)
+STORED_STATE_REGEX = re.compile(
+    r"((?P<owner_path>.*)\/)?(?P<_data_type_name>\D+)\[(?P<name>.*)\]",
+)
+
+logger = scenario_logger.getChild("ops_main_mock")
+
 # pyright: reportPrivateUsage=false
 
 
-def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
-    """Walk path on root to an ObjectEvents instance."""
-    obj = root
-    for step in path:
-        try:
-            obj = getattr(obj, step)
-        except AttributeError:
-            raise BadOwnerPath(
-                f"event_owner_path {path!r} invalid: {step!r} leads to nowhere.",
-            )
-    if not isinstance(obj, ops.ObjectEvents):
-        raise BadOwnerPath(
-            f"event_owner_path {path!r} invalid: does not lead to "
-            f"an ObjectEvents instance.",
-        )
-    return obj
+class UnitStateDB:
+    """Wraps the unit-state database with convenience methods for adjusting the state."""
+
+    def __init__(self, underlying_store: ops.storage.SQLiteStorage):
+        self._db = underlying_store
+
+    def get_stored_states(self) -> FrozenSet["StoredState"]:
+        """Load any StoredState data structures from the db."""
+        db = self._db
+        stored_states: Set[StoredState] = set()
+        for handle_path in db.list_snapshots():
+            if not EVENT_REGEX.match(handle_path) and (
+                match := STORED_STATE_REGEX.match(handle_path)
+            ):
+                stored_state_snapshot = db.load_snapshot(handle_path)
+                kwargs = match.groupdict()
+                sst = StoredState(content=stored_state_snapshot, **kwargs)
+                stored_states.add(sst)
+
+        return frozenset(stored_states)
+
+    def get_deferred_events(self) -> List["DeferredEvent"]:
+        """Load any DeferredEvent data structures from the db."""
+        db = self._db
+        deferred: List[DeferredEvent] = []
+        for handle_path in db.list_snapshots():
+            if EVENT_REGEX.match(handle_path):
+                notices = db.notices(handle_path)
+                for handle, owner, observer in notices:
+                    try:
+                        snapshot_data = db.load_snapshot(handle)
+                    except ops.storage.NoSnapshotError:
+                        snapshot_data: Dict[str, Any] = {}
+
+                    event = DeferredEvent(
+                        handle_path=handle,
+                        owner=owner,
+                        observer=observer,
+                        snapshot_data=snapshot_data,
+                    )
+                    deferred.append(event)
+
+        return deferred
+
+    def apply_state(self, state: "State"):
+        """Add DeferredEvent and StoredState from this State instance to the storage."""
+        db = self._db
+        for event in state.deferred:
+            db.save_notice(event.handle_path, event.owner, event.observer)
+            try:
+                marshal.dumps(event.snapshot_data)
+            except ValueError as e:
+                raise ValueError(
+                    f"unable to save the data for {event}, it must contain only simple types.",
+                ) from e
+            db.save_snapshot(event.handle_path, event.snapshot_data)
+
+        for stored_state in state.stored_states:
+            db.save_snapshot(stored_state._handle_path, stored_state.content)
 
 
-def _emit_charm_event(
-    charm: "CharmBase",
-    event_name: str,
-    juju_context: ops.jujucontext._JujuContext,
-    event: Optional["_Event"] = None,
-):
-    """Emits a charm event based on a Juju event name.
-
-    Args:
-        charm: A charm instance to emit an event from.
-        event_name: A Juju event name to emit on a charm.
-        event: Event to emit.
-        juju_context: Juju context to use for the event.
-    """
-    owner = _get_owner(charm, event.owner_path) if event else charm.on
-
-    try:
-        event_to_emit = getattr(owner, event_name)
-    except AttributeError:
-        ops_logger.debug("Event %s not defined for %s.", event_name, charm)
-        raise NoObserverError(
-            f"Cannot fire {event_name!r} on {owner}: "
-            f"invalid event (not on charm.on).",
-        )
-
-    args, kwargs = _get_event_args(charm, event_to_emit, juju_context)
-    ops_logger.debug("Emitting Juju event %s.", event_name)
-    event_to_emit.emit(*args, **kwargs)
-
-
-def setup_framework(
-    charm_dir: pathlib.Path,
-    state: "State",
-    event: "_Event",
-    context: "Context[CharmType]",
-    charm_spec: "_CharmSpec[CharmType]",
-    juju_context: Optional[ops.jujucontext._JujuContext] = None,
-):
-    from .mocking import _MockModelBackend
-
-    if juju_context is None:
-        juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
-    model_backend = _MockModelBackend(
-        state=state,
-        event=event,
-        context=context,
-        charm_spec=charm_spec,
-        juju_context=juju_context,
-    )
-    setup_root_logging(model_backend, debug=juju_context.debug)
-    # ops sets sys.excepthook to go to Juju's debug-log, but that's not useful
-    # in a testing context, so reset it.
-    sys.excepthook = sys.__excepthook__
-    ops_logger.debug(
-        "Operator Framework %s up and running.",
-        ops.__version__,
-    )
-
-    metadata = (charm_dir / "metadata.yaml").read_text()
-    actions_meta = charm_dir / "actions.yaml"
-    if actions_meta.exists():
-        actions_metadata = actions_meta.read_text()
-    else:
-        actions_metadata = None
-
-    meta = CharmMeta.from_yaml(metadata, actions_metadata)
-
-    # ops >= 2.10
-    if inspect.signature(ops.model.Model).parameters.get("broken_relation_id"):
-        # If we are in a RelationBroken event, we want to know which relation is
-        # broken within the model, not only in the event's `.relation` attribute.
-        broken_relation_id = (
-            event.relation.id  # type: ignore
-            if event.name.endswith("_relation_broken")
-            else None
-        )
-
-        model = ops.model.Model(
-            meta,
-            model_backend,
-            broken_relation_id=broken_relation_id,
-        )
-    else:
-        ops_logger.warning(
-            "It looks like this charm is using an older `ops` version. "
-            "You may experience weirdness. Please update ops.",
-        )
-        model = ops.model.Model(meta, model_backend)
-
-    charm_state_path = charm_dir / CHARM_STATE_FILE
-
-    # TODO: add use_juju_for_storage support
-    store = ops.storage.SQLiteStorage(charm_state_path)
-    framework = ops.Framework(store, charm_dir, meta, model)
-    framework.set_breakpointhook()
-    return framework
-
-
-def setup_charm(
-    charm_class: Type[ops.CharmBase], framework: ops.Framework, dispatcher: _Dispatcher
-):
-    sig = inspect.signature(charm_class)
-    sig.bind(framework)  # signature check
-
-    charm = charm_class(framework)
-    dispatcher.ensure_event_links(charm)
-    return charm
-
-
-def setup(
-    state: "State",
-    event: "_Event",
-    context: "Context[CharmType]",
-    charm_spec: "_CharmSpec[CharmType]",
-    juju_context: Optional[ops.jujucontext._JujuContext] = None,
-):
-    """Setup dispatcher, framework and charm objects."""
-    charm_class = charm_spec.charm_type
-    if juju_context is None:
-        juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
-    charm_dir = juju_context.charm_dir
-
-    dispatcher = _Dispatcher(charm_dir, juju_context)
-    dispatcher.run_any_legacy_hook()
-
-    framework = setup_framework(
-        charm_dir, state, event, context, charm_spec, juju_context
-    )
-    charm = setup_charm(charm_class, framework, dispatcher)
-    return dispatcher, framework, charm
-
-
-class Ops(Generic[CharmType]):
+class Ops(_Manager):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
     def __init__(
@@ -190,81 +103,93 @@ class Ops(Generic[CharmType]):
         event: "_Event",
         context: "Context[CharmType]",
         charm_spec: "_CharmSpec[CharmType]",
-        juju_context: Optional[ops.jujucontext._JujuContext] = None,
+        juju_context: ops.jujucontext._JujuContext,
     ):
         self.state = state
         self.event = event
         self.context = context
         self.charm_spec = charm_spec
-        if juju_context is None:
-            juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
-        self.juju_context = juju_context
+        self.store = None
 
-        # set by setup()
-        self.dispatcher: Optional[_Dispatcher] = None
-        self.framework: Optional[ops.Framework] = None
-        self.charm: Optional["CharmType"] = None
-
-        self._has_setup = False
-        self._has_emitted = False
-        self._has_committed = False
-
-    def setup(self):
-        """Setup framework, charm and dispatcher."""
-        self._has_setup = True
-        self.dispatcher, self.framework, self.charm = setup(
-            self.state,
-            self.event,
-            self.context,
-            self.charm_spec,
-            self.juju_context,
+        model_backend = _MockModelBackend(
+            state=state,
+            event=event,
+            context=context,
+            charm_spec=charm_spec,
+            juju_context=juju_context,
         )
 
-    def emit(self):
-        """Emit the event on the charm."""
-        if not self._has_setup:
-            raise RuntimeError("should .setup() before you .emit()")
-        self._has_emitted = True
+        super().__init__(
+            self.charm_spec.charm_type, model_backend, juju_context=juju_context
+        )
 
-        dispatcher = cast(_Dispatcher, self.dispatcher)
-        charm = cast(CharmBase, self.charm)
-        framework = cast(ops.Framework, self.framework)
+    def _load_charm_meta(self):
+        metadata = (self._charm_root / "metadata.yaml").read_text()
+        actions_meta = self._charm_root / "actions.yaml"
+        if actions_meta.exists():
+            actions_metadata = actions_meta.read_text()
+        else:
+            actions_metadata = None
+
+        return ops.CharmMeta.from_yaml(metadata, actions_metadata)
+
+    def _setup_root_logging(self):
+        # Ops sets sys.excepthook to go to Juju's debug-log, but that's not
+        # useful in a testing context, so we reset it here.
+        super()._setup_root_logging()
+        sys.excepthook = sys.__excepthook__
+
+    def _make_storage(self, _: _Dispatcher):
+        # TODO: add use_juju_for_storage support
+        # TODO: Pass a charm_state_path that is ':memory:' when appropriate.
+        charm_state_path = self._charm_root / self._charm_state_path
+        storage = ops.storage.SQLiteStorage(charm_state_path)
+        logger.info("Copying input state to storage.")
+        self.store = UnitStateDB(storage)
+        self.store.apply_state(self.state)
+        return storage
+
+    def _get_event_to_emit(self, event_name: str):
+        owner = (
+            self._get_owner(self.charm, self.event.owner_path)
+            if self.event
+            else self.charm.on
+        )
 
         try:
-            if not dispatcher.is_restricted_context():
-                framework.reemit()
-
-            _emit_charm_event(
-                charm, dispatcher.event_name, self.juju_context, self.event
+            event_to_emit = getattr(owner, event_name)
+        except AttributeError:
+            ops_logger.debug("Event %s not defined for %s.", event_name, self.charm)
+            raise NoObserverError(
+                f"Cannot fire {event_name!r} on {owner}: "
+                f"invalid event (not on charm.on).",
             )
+        return event_to_emit
 
-        except Exception:
-            framework.close()
-            raise
+    @staticmethod
+    def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
+        """Walk path on root to an ObjectEvents instance."""
+        obj = root
+        for step in path:
+            try:
+                obj = getattr(obj, step)
+            except AttributeError:
+                raise BadOwnerPath(
+                    f"event_owner_path {path!r} invalid: {step!r} leads to nowhere.",
+                )
+        if not isinstance(obj, ops.ObjectEvents):
+            raise BadOwnerPath(
+                f"event_owner_path {path!r} invalid: does not lead to "
+                f"an ObjectEvents instance.",
+            )
+        return obj
 
-    def commit(self):
-        """Commit the framework and teardown."""
-        if not self._has_emitted:
-            raise RuntimeError("should .emit() before you .commit()")
-
-        framework = cast(ops.Framework, self.framework)
-        charm = cast(CharmBase, self.charm)
-
-        # emit collect-status events
-        ops.charm._evaluate_status(charm)
-
-        self._has_committed = True
-
-        try:
-            framework.commit()
-        finally:
-            framework.close()
-
-    def finalize(self):
-        """Step through all non-manually-called procedures and run them."""
-        if not self._has_setup:
-            self.setup()
-        if not self._has_emitted:
-            self.emit()
-        if not self._has_committed:
-            self.commit()
+    def _close(self):
+        """Now that we're done processing this event, read the charm state and expose it."""
+        logger.info("Copying storage to output state.")
+        assert self.store is not None
+        deferred = self.store.get_deferred_events()
+        stored_state = self.store.get_stored_states()
+        self.state = dataclasses.replace(
+            self.state, deferred=deferred, stored_states=stored_state
+        )

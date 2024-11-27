@@ -2,12 +2,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Test Context
-
-The test `Context` object provides the context of the wider Juju system that the
-specific `State` exists in, and the events that can be executed on that `State`.
-"""
-
 from __future__ import annotations
 
 import functools
@@ -31,7 +25,6 @@ from .errors import (
     MetadataNotFoundError,
 )
 from .logger import logger as scenario_logger
-from .runtime import Runtime
 from .state import (
     CharmType,
     CheckInfo,
@@ -43,12 +36,14 @@ from .state import (
     _CharmSpec,
     _Event,
 )
+from ._runtime import Runtime
 
 if TYPE_CHECKING:  # pragma: no cover
     from ops._private.harness import ExecArgs
-    from .ops_main_mock import Ops
+    from ._ops_main_mock import Ops
     from .state import (
         AnyJson,
+        CharmType,
         JujuLogLine,
         RelationBase,
         State,
@@ -83,7 +78,6 @@ class Manager(Generic[CharmType]):
         self._state_in = state_in
 
         self._emitted: bool = False
-        self._wrapped_ctx = None
 
         self.ops: Ops[CharmType] | None = None
 
@@ -105,7 +99,8 @@ class Manager(Generic[CharmType]):
 
     def __enter__(self):
         self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
-        self.ops = wrapped_ctx.__enter__()
+        ops = wrapped_ctx.__enter__()
+        self.ops = ops
         return self
 
     def run(self) -> State:
@@ -115,10 +110,14 @@ class Manager(Generic[CharmType]):
         """
         if self._emitted:
             raise AlreadyEmittedError("Can only run once.")
+        if not self.ops:
+            raise RuntimeError(
+                "you should __enter__ this context manager before running it",
+            )
         self._emitted = True
+        self.ops.run()
 
         # wrap up Runtime.exec() so that we can gather the output state
-        assert self._wrapped_ctx is not None
         self._wrapped_ctx.__exit__(None, None, None)
 
         assert self._ctx._output_state is not None
@@ -127,7 +126,8 @@ class Manager(Generic[CharmType]):
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # noqa: U100
         if not self._emitted:
             logger.debug(
-                "user didn't emit the event within the context manager scope. Doing so implicitly upon exit...",
+                "user didn't emit the event within the context manager scope. "
+                "Doing so implicitly upon exit...",
             )
             self.run()
 
@@ -662,8 +662,8 @@ class Context(Generic[CharmType]):
             if self.action_results is not None:
                 self.action_results.clear()
             self._action_failure_message = None
-        with self._run(event=event, state=state) as manager:
-            manager.emit()
+        with self._run(event=event, state=state) as ops:
+            ops.run()
         # We know that the output state will have been set by this point,
         # so let the type checkers know that too.
         assert self._output_state is not None

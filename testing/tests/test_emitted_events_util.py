@@ -2,8 +2,8 @@ from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
 from scenario import State
-from scenario.runtime import _capture_events
 from scenario.state import _Event
+from scenario._runtime import capture_events
 from .helpers import trigger
 
 
@@ -32,7 +32,7 @@ class MyCharm(CharmBase):
 
 
 def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
-    with _capture_events(include_framework=True) as emitted:
+    with capture_events(include_framework=True) as emitted:
         trigger(State(), "start", MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 5
@@ -44,7 +44,7 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
 
 
 def test_capture_juju_evt():
-    with _capture_events() as emitted:
+    with capture_events() as emitted:
         trigger(State(), "start", MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 2
@@ -54,7 +54,7 @@ def test_capture_juju_evt():
 
 def test_capture_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
-    with _capture_events() as emitted:
+    with capture_events() as emitted:
         trigger(
             State(deferred=[_Event("foo").deferred(handler=MyCharm._on_foo)]),
             "start",
@@ -70,7 +70,7 @@ def test_capture_deferred_evt():
 
 def test_capture_no_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
-    with _capture_events(include_deferred=False) as emitted:
+    with capture_events(include_deferred=False) as emitted:
         trigger(
             State(deferred=[_Event("foo").deferred(handler=MyCharm._on_foo)]),
             "start",
