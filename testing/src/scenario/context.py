@@ -15,11 +15,11 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import (
+    Generic,
     TYPE_CHECKING,
     Any,
     Callable,
     Mapping,
-    cast,
 )
 
 import ops
@@ -60,7 +60,7 @@ logger = scenario_logger.getChild("runtime")
 _DEFAULT_JUJU_VERSION = "3.5"
 
 
-class Manager:
+class Manager(Generic[CharmType]):
     """Context manager to offer test code some runtime charm object introspection.
 
     This class should not be instantiated directly: use a :class:`Context`
@@ -74,7 +74,7 @@ class Manager:
 
     def __init__(
         self,
-        ctx: Context,
+        ctx: Context[CharmType],
         arg: _Event,
         state_in: State,
     ):
@@ -85,19 +85,19 @@ class Manager:
         self._emitted: bool = False
         self._wrapped_ctx = None
 
-        self.ops: Ops | None = None
+        self.ops: Ops[CharmType] | None = None
 
     @property
-    def charm(self) -> ops.CharmBase:
+    def charm(self) -> CharmType:
         """The charm object instantiated by ops to handle the event.
 
         The charm is only available during the context manager scope.
         """
-        if not self.ops:
+        if self.ops is None or self.ops.charm is None:
             raise RuntimeError(
                 "you should __enter__ this context manager before accessing this",
             )
-        return cast(ops.CharmBase, self.ops.charm)
+        return self.ops.charm
 
     @property
     def _runner(self):
@@ -361,7 +361,7 @@ class CharmEvents:
         return _Event(f"{name}_action", action=_Action(name, **kwargs))
 
 
-class Context:
+class Context(Generic[CharmType]):
     """Represents a simulated charm's execution context.
 
     The main entry point to running a test. It contains:
@@ -571,7 +571,7 @@ class Context:
         else:
             self.unit_status_history.append(state.unit_status)
 
-    def __call__(self, event: _Event, state: State):
+    def __call__(self, event: _Event, state: State) -> Manager[CharmType]:
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage::
