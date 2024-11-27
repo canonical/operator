@@ -214,9 +214,11 @@ def _check_relation_event(
                 f"relation event should start with relation endpoint name. {event.name} does "
                 f"not start with {event.relation.endpoint}.",
             )
-        if event.relation.id not in {rel.id for rel in state.relations}:
+        if event.relation not in state.relations:
             errors.append(
-                f"cannot emit {event.name} because relation {event.relation.id} is not in the state.",
+                f"cannot emit {event.name} because relation {event.relation.id} is not in the "
+                f"state (a relation with the same ID is not sufficient - you must "
+                f"pass the object in the state to the event).",
             )
 
 
@@ -241,7 +243,8 @@ def _check_workload_event(
             if event.container not in state.containers:
                 errors.append(
                     f"cannot emit {event.name} because container {event.container.name} "
-                    f"is not in the state.",
+                    f"is not in the state (a container with the same name is not "
+                    f"sufficient - you must pass the object in the state to the event).",
                 )
             if not event.container.can_connect:
                 warnings.append(
@@ -310,12 +313,11 @@ def _check_storage_event(
             f"storage event {event.name} refers to storage {storage.name} "
             f"which is not declared in the charm metadata (metadata.yaml) under 'storage'.",
         )
-    elif (storage.name, storage.index) not in {
-        (s.name, s.index) for s in state.storages
-    }:
+    elif storage not in state.storages:
         errors.append(
             f"cannot emit {event.name} because storage {storage.name} "
-            f"is not in the state.",
+            f"is not in the state (an object with the same name and index is not "
+            f"sufficient - you must pass the object in the state to the event).",
         )
 
 
@@ -479,10 +481,12 @@ def check_secrets_consistency(
         return Results(errors, [])
 
     assert event.secret is not None
-    if event.secret.id not in {s.id for s in state.secrets}:
+    if event.secret not in state.secrets:
         secret_key = event.secret.id if event.secret.id else event.secret.label
         errors.append(
-            f"cannot emit {event.name} because secret {secret_key} is not in the state.",
+            f"cannot emit {event.name} because secret {secret_key} is not in the state "
+            f"(a secret with the same ID is not sufficient - you must pass the object "
+            f"in the state to the event).",
         )
     elif juju_version < (3,):
         errors.append(
