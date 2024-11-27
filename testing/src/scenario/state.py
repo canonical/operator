@@ -9,12 +9,12 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import inspect
+import pathlib
 import random
 import re
 import string
 from enum import Enum
 from itertools import chain
-from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -747,9 +747,9 @@ class Exec(_max_posargs(1)):
 class Mount(_max_posargs(0)):
     """Maps local files to a :class:`Container` filesystem."""
 
-    location: str | PurePosixPath
+    location: str | pathlib.PurePosixPath
     """The location inside of the container."""
-    source: str | Path
+    source: str | pathlib.Path
     """The content to provide when the charm does :meth:`ops.Container.pull`."""
 
 
@@ -1017,7 +1017,7 @@ class Container(_max_posargs(1)):
             infos[name] = info
         return infos
 
-    def get_filesystem(self, ctx: Context) -> Path:
+    def get_filesystem(self, ctx: Context) -> pathlib.Path:
         """Simulated Pebble filesystem in this context.
 
         Returns:
@@ -1314,7 +1314,7 @@ class Storage(_max_posargs(1)):
             return (self.name, self.index) == (other.name, other.index)
         return False
 
-    def get_filesystem(self, ctx: Context) -> Path:
+    def get_filesystem(self, ctx: Context) -> pathlib.Path:
         """Simulated filesystem root in this context."""
         return ctx._get_storage_root(self.name, self.index)
 
@@ -1325,7 +1325,7 @@ class Resource(_max_posargs(0)):
 
     name: str
     """The name of the resource, as found in the charm metadata."""
-    path: str | Path
+    path: str | pathlib.Path
     """A local path that will be provided to the charm as the content of the resource."""
 
 
@@ -1589,7 +1589,7 @@ class _CharmSpec(Generic[CharmType]):
     is_autoloaded: bool = False
 
     @staticmethod
-    def _load_metadata_legacy(charm_root: Path):
+    def _load_metadata_legacy(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft < 2.5."""
         # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
         # files for charm metadata.
@@ -1606,7 +1606,7 @@ class _CharmSpec(Generic[CharmType]):
         return meta, config, actions
 
     @staticmethod
-    def _load_metadata(charm_root: Path):
+    def _load_metadata(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
         metadata_path = charm_root / "charmcraft.yaml"
         meta: dict[str, Any] = (
@@ -1624,7 +1624,7 @@ class _CharmSpec(Generic[CharmType]):
 
         Will attempt to load the metadata off the ``charmcraft.yaml`` file
         """
-        charm_source_path = Path(inspect.getfile(charm_type))
+        charm_source_path = pathlib.Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
 
         # attempt to load metadata from unified charmcraft.yaml
