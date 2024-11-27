@@ -191,12 +191,6 @@ class TestCharmInit:
         # here we patch juju_backend_available, so it gets set up and falls over when used
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
-            with pytest.raises(FileNotFoundError, match='state-get'):
-                self._check(ops.CharmBase, use_juju_for_storage=True)
-
-    def test_controller_storage_deprecated(self):
-        with patch('ops.storage.juju_backend_available') as juju_backend_available:
-            juju_backend_available.return_value = True
             with pytest.warns(DeprecationWarning, match='Controller storage'):
                 with pytest.raises(FileNotFoundError, match='state-get'):
                     self._check(ops.CharmBase, use_juju_for_storage=True)
