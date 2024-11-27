@@ -6,7 +6,7 @@ import dataclasses
 import marshal
 import re
 import sys
-from typing import TYPE_CHECKING, Any, Generic, Optional, Sequence, Type, cast
+from typing import TYPE_CHECKING, Any, Generic, Dict, FrozenSet, List, Sequence, Set
 
 import ops
 import ops.jujucontext
@@ -96,7 +96,7 @@ class UnitStateDB:
             db.save_snapshot(stored_state._handle_path, stored_state.content)
 
 
-class Ops(_Manager):
+class Ops(_Manager, Generic[CharmType]):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
     def __init__(
