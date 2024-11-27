@@ -7,6 +7,11 @@ python:
       extra_requirements:
         - docs
 
+python:
+  install:
+    - method: pip
+      path: testing/
+
 build:
   os: ubuntu-22.04
   tools:
