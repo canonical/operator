@@ -170,14 +170,16 @@ def check_event_consistency(
     errors: List[str] = []
     warnings: List[str] = []
 
-    # custom event: can't make assumptions about its name and its semantics
-    # todo: should we then just skip the other checks?
     if not event._is_builtin_event(charm_spec):
-        warnings.append(
-            "this is a custom event; if its name makes it look like a builtin one "
-            "(e.g. a relation event, or a workload event), you might get some false-negative "
-            "consistency checks.",
-        )
+        # This is a custom event - we can't make assumptions about its name and
+        # semantics. It doesn't really make sense to do checks that are designed
+        # for relations, workloads, and so on - most likely those will end up
+        # with false positives. Realistically, we can't know about what the
+        # requirements for the custom event are (in terms of the state), so we
+        # skip everything here. Perhaps in the future, custom events could
+        # optionally include some sort of state metadata that made testing
+        # consistency possible?
+        return Results(errors, warnings)
 
     if event._is_relation_event:
         _check_relation_event(charm_spec, event, state, errors, warnings)
