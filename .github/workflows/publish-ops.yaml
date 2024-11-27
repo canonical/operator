@@ -1,4 +1,4 @@
-name: Publish
+name: Publish (ops)
 on:
   push:
     tags:
@@ -7,7 +7,7 @@ on:
       # will likely be publishing at least three packages: ops, ops-scenario,
       # and ops-harness.
       - '2.*'
-  
+
 jobs:
   framework-tests:
     uses: ./.github/workflows/framework-tests.yaml

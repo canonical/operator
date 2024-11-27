@@ -1,4 +1,4 @@
-name: Test Publish
+name: Test Publish (ops-scenario)
 on: [workflow_dispatch, workflow_call]
 
 jobs:
