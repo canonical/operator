@@ -39,6 +39,7 @@ from ops import (
     ModelError,
 )
 from ops._private.harness import ExecArgs, _TestingPebbleClient
+from ops.jujucontext import _JujuContext
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import Port as Port_Ops
 from ops.model import Secret as Secret_Ops  # lol
@@ -139,8 +140,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         event: "_Event",
         charm_spec: "_CharmSpec[CharmType]",
         context: "Context",
+        juju_context: "_JujuContext",
     ):
-        super().__init__()
+        super().__init__(juju_context=juju_context)
         self._state = state
         self._event = event
         self._context = context

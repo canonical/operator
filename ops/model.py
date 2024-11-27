@@ -2662,7 +2662,7 @@ class Container:
                     if info.type is pebble.FileType.DIRECTORY:
                         self.make_dir(dstpath, make_parents=True)
                         continue
-                    with open(info.path) as src:
+                    with open(info.path, 'rb') as src:
                         self.push(
                             dstpath,
                             src,

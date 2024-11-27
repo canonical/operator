@@ -1369,8 +1369,8 @@ def test_recursive_push_and_pull(case: PushPullCase):
     for file in case.files:
         fpath = os.path.join(push_src.name, file[1:])
         os.makedirs(os.path.dirname(fpath), exist_ok=True)
-        with open(fpath, 'w') as f:
-            f.write('hello')
+        with open(fpath, 'wb') as f:
+            f.write(b'push \xc3\x28')  # invalid UTF-8 to ensure binary works
     if case.dirs:
         for directory in case.dirs:
             fpath = os.path.join(push_src.name, directory[1:])
@@ -1402,6 +1402,8 @@ def test_recursive_push_and_pull(case: PushPullCase):
     ), f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
     for fpath in case.want:
         assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
+        content = c.pull(fpath, encoding=None).read()
+        assert content == b'push \xc3\x28'
     for fdir in case.want_dirs:
         assert c.isdir(fdir), f'push_path failed: dir {fdir} missing at destination'
 
