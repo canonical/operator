@@ -17,7 +17,9 @@ from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
 
 from .errors import BadOwnerPath, NoObserverError
-from .state import CharmType
+from .logger import logger as scenario_logger
+from .mocking import _MockModelBackend
+from .state import CharmType, DeferredEvent, StoredState
 
 if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
