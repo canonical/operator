@@ -1,5 +1,4 @@
 import copy
-import warnings
 
 import ops
 import pytest
@@ -81,9 +80,7 @@ def test_simple_deprecated_events(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run(ctx.on.pre_series_upgrade(), state)
-    with warnings.catch_warnings(
-        record=False, action="ignore", category=DeprecationWarning
-    ):
+    with pytest.warns(DeprecationWarning):
         with ctx(getattr(ctx.on, event_name)(), scenario.State()) as mgr:
             mgr.run()
             assert len(mgr.charm.observed) == 2
