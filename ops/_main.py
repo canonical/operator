@@ -112,28 +112,6 @@ def _setup_event_links(charm_dir: Path, charm: 'ops.charm.CharmBase', juju_conte
             _create_event_link(charm, bound_event, link_to)
 
 
-def _emit_charm_event(charm: 'ops.charm.CharmBase', event_name: str, juju_context: _JujuContext):
-    """Emits a charm event based on a Juju event name.
-
-    Args:
-        charm: A charm instance to emit an event from.
-        event_name: A Juju event name to emit on a charm.
-        juju_context: An instance of the _JujuContext class.
-    """
-    event_to_emit = None
-    try:
-        event_to_emit = getattr(charm.on, event_name)
-    except AttributeError:
-        logger.debug('Event %s not defined for %s.', event_name, charm)
-
-    # If the event is not supported by the charm implementation, do
-    # not error out or try to emit it. This is to support rollbacks.
-    if event_to_emit is not None:
-        args, kwargs = _get_event_args(charm, event_to_emit, juju_context)
-        logger.debug('Emitting Juju event %s.', event_name)
-        event_to_emit.emit(*args, **kwargs)
-
-
 def _get_event_args(
     charm: 'ops.charm.CharmBase',
     bound_event: 'ops.framework.BoundEvent',
@@ -401,8 +379,11 @@ class _Manager:
         model_backend: Optional[ops.model._ModelBackend] = None,
         use_juju_for_storage: Optional[bool] = None,
         charm_state_path: str = CHARM_STATE_FILE,
+        juju_context: Optional[_JujuContext] = None,
     ):
-        self._juju_context = _JujuContext.from_dict(os.environ)
+        if juju_context is None:
+            juju_context = _JujuContext.from_dict(os.environ)
+        self._juju_context = juju_context
         self._charm_state_path = charm_state_path
         self._charm_class = charm_class
         if model_backend is None:
@@ -413,7 +394,7 @@ class _Manager:
         self._setup_root_logging()
 
         self._charm_root = self._juju_context.charm_dir
-        self._charm_meta = CharmMeta.from_charm_root(self._charm_root)
+        self._charm_meta = self._load_charm_meta()
         self._use_juju_for_storage = use_juju_for_storage
 
         # Set up dispatcher, framework and charm objects.
@@ -422,6 +403,9 @@ class _Manager:
 
         self.framework = self._make_framework(self.dispatcher)
         self.charm = self._make_charm(self.framework, self.dispatcher)
+
+    def _load_charm_meta(self):
+        return CharmMeta.from_charm_root(self._charm_root)
 
     def _make_charm(self, framework: 'ops.framework.Framework', dispatcher: _Dispatcher):
         charm = self._charm_class(framework)
@@ -482,7 +466,7 @@ class _Manager:
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
 
-        if self._juju_context.dispatch_path.endswith('-relation-broken'):
+        if self._juju_context.dispatch_path.endswith(('-relation-broken', '_relation_broken')):
             broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
@@ -515,19 +499,48 @@ class _Manager:
             self.framework.reemit()
 
         # Emit the Juju event.
-        _emit_charm_event(self.charm, self.dispatcher.event_name, self._juju_context)
+        self._emit_charm_event(self.dispatcher.event_name)
         # Emit collect-status events.
         ops.charm._evaluate_status(self.charm)
+
+    def _get_event_to_emit(self, event_name: str) -> Optional[ops.framework.BoundEvent]:
+        try:
+            return getattr(self.charm.on, event_name)
+        except AttributeError:
+            logger.debug('Event %s not defined for %s.', event_name, self.charm)
+        # If the event is not defined, return None.
+
+    def _emit_charm_event(self, event_name: str):
+        """Emits a charm event based on a Juju event name.
+
+        Args:
+            charm: A charm instance to emit an event from.
+            event_name: A Juju event name to emit on a charm.
+            juju_context: An instance of the _JujuContext class.
+        """
+        event_to_emit = self._get_event_to_emit(event_name)
+
+        # If the event is not supported by the charm implementation, do
+        # not error out or try to emit it. This is to support rollbacks.
+        if event_to_emit is not None:
+            args, kwargs = _get_event_args(self.charm, event_to_emit, self._juju_context)
+            logger.debug('Emitting Juju event %s.', event_name)
+            event_to_emit.emit(*args, **kwargs)
 
     def _commit(self):
         """Commit the framework and gracefully teardown."""
         self.framework.commit()
+
+    def _close(self):
+        """Perform any necessary cleanup before the framework is closed."""
+        # Provided for child classes - nothing needs to be done in the base.
 
     def run(self):
         """Emit and then commit the framework."""
         try:
             self._emit()
             self._commit()
+            self._close()
         finally:
             self.framework.close()
 
