@@ -24,7 +24,7 @@ import ops
 @pytest.fixture
 def charm_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setattr('sys.argv', ('hooks/install',))
-    monkeypatch.setattr('ops._main._emit_charm_event', Mock())
+    monkeypatch.setattr('ops._main._Manager._emit_charm_event', Mock())
     monkeypatch.setattr('ops._main._Manager._setup_root_logging', Mock())
     monkeypatch.setattr('ops.charm._evaluate_status', Mock())
     monkeypatch.setenv('JUJU_CHARM_DIR', str(tmp_path))

@@ -177,8 +177,8 @@ else:
         # monkeypatch it in, so that the ops.testing.ActionFailed object is the
         # one that we expect, even if people are mixing Harness and Scenario.
         # https://github.com/canonical/ops-scenario/issues/201
+        import scenario._runtime as _runtime
         import scenario.context as _context
-        import scenario.runtime as _runtime
 
         _context.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
         _runtime.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
