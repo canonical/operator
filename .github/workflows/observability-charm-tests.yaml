@@ -38,9 +38,9 @@ jobs:
         run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
-        if: ${{ not matrix.disabled }}
+        if: ${{ !matrix.disabled }}
         run: tox -vve unit
 
       - name: Run the charm's static analysis checks
-        if: ${{ not matrix.disabled }}
+        if: ${{ !matrix.disabled }}
         run: tox -vve static-charm
