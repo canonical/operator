@@ -1,3 +1,38 @@
+# 2.17.1 - 28 Nov 2024
+
+## Fixes
+
+* Make `push_path` open in binary mode so it works on non-text files (#1458)
+
+## Documentation
+
+* Use `MaintenanceStatus` for local issues (#1397)
+* Explicitly document that `collect-status` is is run on every hook (#1399)
+* Use our docs URL for the `ogp:url` properties Sphinx generates (#1411)
+* Set the `READTHEDOCS` context variable (#1410)
+* The very start of a team Python style guide (#1409)
+* Fix Read the Docs ad placement (#1414)
+* Clarify where `StoredState` is stored, and the upgrade behaviour (#1416)
+* Fix copy 'n' paste error in `stop_services` docstring (#1457)
+
+## Continuous Integration
+
+* Configure the labels for dependabot PRs (#1407)
+* Disable the automatic ops[testing] releasing (#1415)
+* Use the actual poetry command, rather than manually tweaking the file (#1443)
+* Fix broken GitHub variable expansion (#1446)
+* Coverage report generation should also include testing/src/scenario (#1453)
+* Fix PR title CI job concurrency (#1451)
+* Adjust the release process to handle publishing ops and ops[testing] (#1432)
+* A better way than commenting out external repos (#1463)
+* Use more descriptive names for the publish workflows (#1464)
+* Move the XML coverage report to .report (#1465)
+
+## Refactoring
+
+* Import the ops[testing] repository (#1406)
+* Update linting with the latest ruff (#1441)
+
 # 2.17.0 - 26 Sep 2024
 
 ## Features

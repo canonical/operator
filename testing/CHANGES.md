@@ -1,3 +1,19 @@
+# Next version - in preparation
+
+## Features
+
+* Make `Context` and `Manager` variadic types by @Batalex (#1445)
+
+## Fixes
+
+* Raise `ModelError` on unknown/error status set (#1417)
+* Require the same object to be in the testing state as in the event (#1468)
+
+## Refactoring
+
+* Fix the testing src-layout structure and use relative imports (#1431)
+* Use `_JujuContext` (#1459)
+
 # 7.0.5 - 20 Sep 2024
 
 ## Features
