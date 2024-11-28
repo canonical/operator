@@ -10,7 +10,6 @@
 * Explicitly document that `collect-status` is is run on every hook (#1399)
 * Use our docs URL for the `ogp:url` properties Sphinx generates (#1411)
 * Set the `READTHEDOCS` context variable (#1410)
-* The very start of a team Python style guide (#1409)
 * Fix Read the Docs ad placement (#1414)
 * Clarify where `StoredState` is stored, and the upgrade behaviour (#1416)
 * Fix copy 'n' paste error in `stop_services` docstring (#1457)
