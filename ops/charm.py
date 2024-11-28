@@ -1682,9 +1682,9 @@ class RelationMeta:
     VALID_SCOPES: ClassVar[List[str]] = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(
-            role, RelationRole
-        ), f'role should be one of {list(RelationRole)!r}, not {role!r}'
+        assert isinstance(role, RelationRole), (
+            f'role should be one of {list(RelationRole)!r}, not {role!r}'
+        )
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name

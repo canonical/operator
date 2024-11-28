@@ -70,8 +70,7 @@ def _emit_charm_event(
     except AttributeError:
         ops_logger.debug("Event %s not defined for %s.", event_name, charm)
         raise NoObserverError(
-            f"Cannot fire {event_name!r} on {owner}: "
-            f"invalid event (not on charm.on).",
+            f"Cannot fire {event_name!r} on {owner}: invalid event (not on charm.on).",
         )
 
     args, kwargs = _get_event_args(charm, event_to_emit, juju_context)

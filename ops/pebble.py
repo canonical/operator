@@ -661,12 +661,7 @@ class TaskProgress:
         )
 
     def __repr__(self):
-        return (
-            'TaskProgress('
-            f'label={self.label!r}, '
-            f'done={self.done!r}, '
-            f'total={self.total!r})'
-        )
+        return f'TaskProgress(label={self.label!r}, done={self.done!r}, total={self.total!r})'
 
 
 class TaskID(str):
@@ -1083,12 +1078,7 @@ class ServiceInfo:
         )
 
     def __repr__(self):
-        return (
-            'ServiceInfo('
-            f'name={self.name!r}, '
-            f'startup={self.startup}, '
-            f'current={self.current})'
-        )
+        return f'ServiceInfo(name={self.name!r}, startup={self.startup}, current={self.current})'
 
 
 class Check:
@@ -2547,7 +2537,7 @@ class Client:
             source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')
-        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""
+        content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([

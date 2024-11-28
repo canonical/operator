@@ -66,7 +66,7 @@ Comparing scenario tests with `Harness` tests:
 A scenario test consists of three broad steps:
 
 - **Arrange**:
-    - declare the context 
+    - declare the context
     - declare the input state
     - select an event to fire
 - **Act**:
@@ -173,7 +173,7 @@ def test_statuses():
         scenario.WaitingStatus('checking this is right...'),
     ]
     assert out.unit_status == scenario.ActiveStatus("I am ruled")
-    
+
     # similarly you can check the app status history:
     assert ctx.app_status_history == [
         scenario.UnknownStatus(),
@@ -241,7 +241,7 @@ def test_foo():
 
 You can configure what events will be captured by passing the following arguments to `Context`:
 -  `capture_deferred_events`: If you want to include re-emitted deferred events.
--  `capture_framework_events`: If you want to include framework events (`pre-commit`, `commit`, and `collect-status`). 
+-  `capture_framework_events`: If you want to include framework events (`pre-commit`, `commit`, and `collect-status`).
 
 For example:
 ```python
@@ -360,10 +360,10 @@ ctx.run(ctx.on.start(), state_in)  # invalid: this unit's id cannot be the ID of
 
 To declare a subordinate relation, you should use `scenario.SubordinateRelation`. The core difference with regular
 relations is that subordinate relations always have exactly one remote unit (there is always exactly one remote unit
-that this unit can see). 
+that this unit can see).
 Because of that, `SubordinateRelation`, compared to `Relation`, always talks in terms of `remote`:
 
-- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` taking a single `Dict[str:str]`. The remote unit ID can be provided as a separate argument. 
+- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` taking a single `Dict[str:str]`. The remote unit ID can be provided as a separate argument.
 - `Relation.remote_unit_ids` becomes `SubordinateRelation.remote_unit_id` (a single ID instead of a list of IDs)
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data` (a single databag instead of a mapping from unit IDs to databags)
 
@@ -414,10 +414,10 @@ remote_unit_2_is_joining_event = ctx.on.relation_joined(relation, remote_unit=2)
 
 ## Networks
 
-Simplifying a bit the Juju "spaces" model, each integration endpoint a charm defines in its metadata is associated with a network. Regardless of whether there is a living relation over that endpoint, that is.  
+Simplifying a bit the Juju "spaces" model, each integration endpoint a charm defines in its metadata is associated with a network. Regardless of whether there is a living relation over that endpoint, that is.
 
 If your charm has a relation `"foo"` (defined in its metadata), then the charm will be able at runtime to do `self.model.get_binding("foo").network`.
-The network you'll get by doing so is heavily defaulted (see `state.Network`) and good for most use-cases because the charm should typically not be concerned about what IP it gets. 
+The network you'll get by doing so is heavily defaulted (see `state.Network`) and good for most use-cases because the charm should typically not be concerned about what IP it gets.
 
 On top of the relation-provided network bindings, a charm can also define some `extra-bindings` in its metadata and access them at runtime. Note that this is a deprecated feature that should not be relied upon. For completeness, we support it in Scenario.
 
@@ -540,7 +540,7 @@ def test_pebble_push():
         MyCharm,
         meta={"name": "foo", "containers": {"foo": {}}}
     )
-    
+
     ctx.run(ctx.on.start(), state_in)
 
     # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
@@ -724,7 +724,7 @@ ctx.run(ctx.on.storage_attached(foo_1), scenario.State(storages={foo_0, foo_1}))
 
 ## Ports
 
-Since `ops 2.6.0`, charms can invoke the `open-port`, `close-port`, and `opened-ports` hook tools to manage the ports opened on the host VM/container. Using the `State.opened_ports` API, you can: 
+Since `ops 2.6.0`, charms can invoke the `open-port`, `close-port`, and `opened-ports` hook tools to manage the ports opened on the host VM/container. Using the `State.opened_ports` API, you can:
 
 - simulate a charm run with a port opened by some previous execution
 ctx = scenario.Context(MyCharm, meta=MyCharm.META)
@@ -941,7 +941,7 @@ How to test actions with scenario:
 def test_backup_action():
     ctx = scenario.Context(MyCharm)
 
-    # If you didn't declare do_backup in the charm's metadata, 
+    # If you didn't declare do_backup in the charm's metadata,
     # the `ConsistencyChecker` will slap you on the wrist and refuse to proceed.
     state = ctx.run(ctx.on.action("do_backup"), scenario.State())
 
@@ -979,7 +979,7 @@ If the action takes parameters, you can pass those in the call.
 def test_backup_action():
     ctx = scenario.Context(MyCharm)
 
-    # If the parameters (or their type) don't match what is declared in the metadata, 
+    # If the parameters (or their type) don't match what is declared in the metadata,
     # the `ConsistencyChecker` will slap you on the other wrist.
     state = ctx.run(
         ctx.on.action("do_backup", params={'a': 'b'}),
@@ -1052,7 +1052,7 @@ from charms.bar.lib_name.v1.charm_lib import CharmLib
 class MyCharm(ops.CharmBase):
     META = {"name": "mycharm"}
     _stored = ops.StoredState()
-    
+
     def __init__(self, framework):
         super().__init__(framework)
         self._stored.set_default(a="a")
@@ -1068,7 +1068,7 @@ def test_live_charm_introspection(mycharm):
     with ctx(ctx.on.start(), scenario.State()) as manager:
         # This is your charm instance, after ops has set it up:
         charm: MyCharm = manager.charm
-        
+
         # We can check attributes on nested Objects or the charm itself:
         assert charm.my_charm_lib.foo == "foo"
         # such as stored state:
@@ -1076,7 +1076,7 @@ def test_live_charm_introspection(mycharm):
 
         # This will tell ops.main to proceed with normal execution and emit the "start" event on the charm:
         state_out = manager.run()
-    
+
         # After that is done, we are handed back control, and we can again do some introspection:
         assert charm.my_charm_lib.foo == "bar"
         # and check that the charm's internal state is as we expect:
@@ -1181,6 +1181,6 @@ don't need that.
 # Jhack integrations
 
 Up until `v5.6.0`, Scenario shipped with a cli tool called `snapshot`, used to interact with a live charm's state.
-The functionality [has been moved over to `jhack`](https://github.com/PietroPasotti/jhack/pull/111), 
-to allow us to keep working on it independently, and to streamline 
+The functionality [has been moved over to `jhack`](https://github.com/PietroPasotti/jhack/pull/111),
+to allow us to keep working on it independently, and to streamline
 the profile of Scenario itself as it becomes more broadly adopted and ready for widespread usage.

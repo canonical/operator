@@ -805,7 +805,7 @@ class Framework(Object):
         method_name = observer.__name__
 
         assert isinstance(observer.__self__, Object), (
-            "can't register observers " "that aren't `Object`s"
+            "can't register observers that aren't `Object`s"
         )
         observer_obj = observer.__self__
 

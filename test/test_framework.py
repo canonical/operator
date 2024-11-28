@@ -1810,7 +1810,7 @@ class TestBreakpoint:
             '-',
             '...foo',
             'foo.bar',
-            'bar--' 'FOO',
+            'bar--FOO',
             'FooBar',
             'foo bar',
             'foo_bar',

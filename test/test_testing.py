@@ -1707,9 +1707,9 @@ class TestHarness:
 
         harness.add_storage('test')
         harness.begin()
-        assert (
-            len(harness.model.storages['test']) == 0
-        ), 'storage should start in detached state and be excluded from storage listing'
+        assert len(harness.model.storages['test']) == 0, (
+            'storage should start in detached state and be excluded from storage listing'
+        )
 
     def test_add_storage_without_metadata_key_fails(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -3781,9 +3781,9 @@ class TestTestingModelBackend:
         assert backend._resource_dir is None
         path = backend.resource_get('image')
         assert backend._resource_dir is not None
-        assert str(path).startswith(
-            str(backend._resource_dir.name)
-        ), f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        assert str(path).startswith(str(backend._resource_dir.name)), (
+            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        )
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -5167,7 +5167,7 @@ class PebbleStorageAPIsTestMixin:
             client.list_files('/not/existing/file/')
         assert excinfo.value.code == 404
         assert excinfo.value.status == 'Not Found'
-        assert excinfo.value.message == 'stat /not/existing/file/: no ' 'such file or directory'
+        assert excinfo.value.message == 'stat /not/existing/file/: no such file or directory'
 
     def test_list_directory_object_itself(
         self,

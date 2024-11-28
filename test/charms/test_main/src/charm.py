@@ -153,9 +153,9 @@ class Charm(ops.CharmBase):
         self._stored.db_relation_joined_data = event.snapshot()
 
     def _on_mon_relation_changed(self, event: ops.RelationChangedEvent):
-        assert (
-            event.app is not None
-        ), 'application name cannot be None for a relation-changed event'
+        assert event.app is not None, (
+            'application name cannot be None for a relation-changed event'
+        )
         if os.environ.get('JUJU_REMOTE_UNIT'):
             assert event.unit is not None, (
                 'a unit name cannot be None for a relation-changed event'
@@ -168,9 +168,9 @@ class Charm(ops.CharmBase):
         self._stored.mon_relation_changed_data = event.snapshot()
 
     def _on_mon_relation_departed(self, event: ops.RelationDepartedEvent):
-        assert (
-            event.app is not None
-        ), 'application name cannot be None for a relation-departed event'
+        assert event.app is not None, (
+            'application name cannot be None for a relation-departed event'
+        )
         assert event.relation.active, 'a departed relation is still active'
         assert self.model.relations['mon']
         self._stored.on_mon_relation_departed.append(type(event).__name__)
@@ -178,12 +178,12 @@ class Charm(ops.CharmBase):
         self._stored.mon_relation_departed_data = event.snapshot()
 
     def _on_ha_relation_broken(self, event: ops.RelationBrokenEvent):
-        assert (
-            event.app is None
-        ), 'relation-broken events cannot have a reference to a remote application'
-        assert (
-            event.unit is None
-        ), 'relation broken events cannot have a reference to a remote unit'
+        assert event.app is None, (
+            'relation-broken events cannot have a reference to a remote application'
+        )
+        assert event.unit is None, (
+            'relation broken events cannot have a reference to a remote unit'
+        )
         assert not event.relation.active, 'relation broken events always have a broken relation'
         assert not self.model.relations['ha']
         self._stored.on_ha_relation_broken.append(type(event).__name__)
@@ -218,17 +218,17 @@ class Charm(ops.CharmBase):
         self._stored.test_pebble_check_recovered_data = event.snapshot()
 
     def _on_start_action(self, event: ops.ActionEvent):
-        assert (
-            event.handle.kind == 'start_action'
-        ), 'event action name cannot be different from the one being handled'
+        assert event.handle.kind == 'start_action', (
+            'event action name cannot be different from the one being handled'
+        )
         self._stored.on_start_action.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent):
         # subprocess and isinstance don't mix well
-        assert (
-            type(event.secret).__name__ == 'Secret'
-        ), f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        assert type(event.secret).__name__ == 'Secret', (
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        )
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
@@ -236,9 +236,9 @@ class Charm(ops.CharmBase):
 
     def _on_secret_remove(self, event: ops.SecretRemoveEvent):
         # subprocess and isinstance don't mix well
-        assert (
-            type(event.secret).__name__ == 'Secret'
-        ), f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        assert type(event.secret).__name__ == 'Secret', (
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        )
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_remove.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
@@ -246,9 +246,9 @@ class Charm(ops.CharmBase):
 
     def _on_secret_rotate(self, event: ops.SecretRotateEvent):
         # subprocess and isinstance don't mix well
-        assert (
-            type(event.secret).__name__ == 'Secret'
-        ), f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        assert type(event.secret).__name__ == 'Secret', (
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        )
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_rotate.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
@@ -256,18 +256,18 @@ class Charm(ops.CharmBase):
 
     def _on_secret_expired(self, event: ops.SecretExpiredEvent):
         # subprocess and isinstance don't mix well
-        assert (
-            type(event.secret).__name__ == 'Secret'
-        ), f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        assert type(event.secret).__name__ == 'Secret', (
+            f'SecretEvent.secret must be a Secret instance, not {type(event.secret)}'
+        )
         assert event.secret.id, 'secret must have an ID'
         self._stored.on_secret_expired.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         self._stored.secret_expired_data = event.snapshot()
 
     def _on_foo_bar_action(self, event: ops.ActionEvent):
-        assert (
-            event.handle.kind == 'foo_bar_action'
-        ), 'event action name cannot be different from the one being handled'
+        assert event.handle.kind == 'foo_bar_action', (
+            'event action name cannot be different from the one being handled'
+        )
         self._stored.on_foo_bar_action.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
 

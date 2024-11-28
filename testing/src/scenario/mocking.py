@@ -426,8 +426,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             )
         if secret.owner == "app" and not self.is_leader():
             understandable_error = SecretNotFoundError(
-                f"App-owned secret {secret.id!r} can only be "
-                f"managed by the leader.",
+                f"App-owned secret {secret.id!r} can only be managed by the leader.",
             )
             # charm-facing side: respect ops error
             raise ModelError("ERROR permission denied") from understandable_error

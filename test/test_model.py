@@ -1397,9 +1397,9 @@ def test_recursive_push_and_pull(case: PushPullCase):
             raise
         errors = {src[len(push_src.name) :] for src, _ in err.errors}
 
-    assert (
-        case.errors == errors
-    ), f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    assert case.errors == errors, (
+        f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    )
     for fpath in case.want:
         assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
         content = c.pull(fpath, encoding=None).read()
@@ -1424,9 +1424,9 @@ def test_recursive_push_and_pull(case: PushPullCase):
             raise
         errors = {src for src, _ in err.errors}
 
-    assert (
-        case.errors == errors
-    ), f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    assert case.errors == errors, (
+        f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    )
     for fpath in case.want:
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
     for fdir in case.want_dirs:

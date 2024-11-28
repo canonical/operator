@@ -1046,7 +1046,7 @@ class TestMainWithNoDispatch(_TestMain):
     ):
         """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = [
-            f"hooks/{name.replace('_', '-')}"
+            f'hooks/{name.replace("_", "-")}'
             for name, event_source in self.charm_module.Charm.on.events().items()
             if issubclass(event_source.event_type, (ops.CommitEvent, ops.PreCommitEvent))
         ]
@@ -1138,7 +1138,7 @@ class _TestMainWithDispatch(_TestMain):
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = [
-            f"hooks/{e.replace('_', '-')}" for e in self.charm_module.Charm.on.events()
+            f'hooks/{e.replace("_", "-")}' for e in self.charm_module.Charm.on.events()
         ]
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
@@ -1150,9 +1150,9 @@ class _TestMainWithDispatch(_TestMain):
         def _assess_event_links(event_spec: EventSpec):
             assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
             for event_hook in all_event_hooks:
-                assert not (
-                    self.JUJU_CHARM_DIR / event_hook
-                ).exists(), f'Spurious hook: {event_hook}'
+                assert not (self.JUJU_CHARM_DIR / event_hook).exists(), (
+                    f'Spurious hook: {event_hook}'
+                )
 
         for initial_event in initial_events:
             self._setup_charm_dir(request)

@@ -1313,7 +1313,7 @@ class Secret:
             fields.append(f'id={self._id!r}')
         if self._label is not None:
             fields.append(f'label={self._label!r}')
-        return f"<Secret {' '.join(fields)}>"
+        return f'<Secret {" ".join(fields)}>'
 
     @staticmethod
     def _canonicalize_id(id: str, model_uuid: Optional[str]) -> str:
@@ -2218,7 +2218,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         """
         if storage_name not in self._storage_map:
             raise ModelError(
-                f'cannot add storage {storage_name!r}:' ' it is not present in the charm metadata'
+                f'cannot add storage {storage_name!r}: it is not present in the charm metadata'
             )
         self._backend.storage_add(storage_name, count)
 
@@ -3879,12 +3879,12 @@ class _ModelBackendValidator:
     def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):
             raise ModelError(
-                f'invalid metric value {value!r} provided:' ' must be a positive finite float'
+                f'invalid metric value {value!r} provided: must be a positive finite float'
             )
 
         if math.isnan(value) or math.isinf(value) or value < 0:
             raise ModelError(
-                f'invalid metric value {value!r} provided:' ' must be a positive finite float'
+                f'invalid metric value {value!r} provided: must be a positive finite float'
             )
         return str(value)
 
@@ -3895,7 +3895,7 @@ class _ModelBackendValidator:
         if not value:
             raise ModelError(f'metric label {label} has an empty value, which is not allowed')
         v = str(value)
-        if re.search('[,=]', v) is not None:
+        if re.search(r'[,=]', v) is not None:
             raise ModelError(f'metric label values must not contain "," or "=": {label}={value!r}')
 
 

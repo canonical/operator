@@ -39,7 +39,7 @@ To set up the dependencies you can run:
 
 We recommend using the provided `pre-commit` config. For how to set up git pre-commit: [see here](https://pre-commit.com/).
 If you dislike that, you can always manually remember to `tox -e lint` before you push.
- 
+
 ### Testing
 ```shell
 tox -e fmt           # auto-fix your code as much as possible, including formatting and linting
@@ -48,4 +48,3 @@ tox -e unit          # unit tests
 tox -e lint-tests    # lint testing code
 tox                  # runs 'lint', 'lint-tests' and 'unit' environments
 ```
-

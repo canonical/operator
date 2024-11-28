@@ -177,7 +177,10 @@ keep-runtime-typing = true
     "S106",
 
     # "Useless" expression.
-    "B018"
+    "B018",
+
+    # Ruff prefers regular expressions as raw strings.
+    "RUF039",
 ]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?

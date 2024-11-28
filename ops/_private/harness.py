@@ -159,7 +159,7 @@ class ExecResult:
     stderr: Union[str, bytes] = b''
 
 
-ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
+ExecHandler = Callable[[ExecArgs], Union[ExecResult, None]]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1789,8 +1789,7 @@ class Harness(Generic[CharmType]):
         # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(
-                f'Secret {secret_id!r} owned by the charm under test, "'
-                f"can't call revoke_secret"
+                f'Secret {secret_id!r} owned by the charm under test, "can\'t call revoke_secret'
             )
 
         relation_id = self._secret_relation_id_to(secret)
@@ -2113,7 +2112,7 @@ class Harness(Generic[CharmType]):
                         f'given {{"{key}":{params[key]!r}}}'
                     )
         action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
-        handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
+        handler = getattr(self.charm.on, f'{action_name.replace("-", "_")}_action')
         self._backend._running_action = action_under_test
         self._action_id_counter += 1
         handler.emit(str(self._action_id_counter))
