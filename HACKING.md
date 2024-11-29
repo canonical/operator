@@ -342,7 +342,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 8. For `ops`, change [version.py](ops/version.py)'s `version` to the
    appropriate string. For `ops-scenario`, change the version in
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
-   [semantic versioning]](https://semver.org/), and adjust independently
+   [semantic versioning](https://semver.org/), and adjust independently
    (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
 9. Add, commit, and push, and open a PR to get the changelogs and version bumps
    into main (and get it merged).
