@@ -401,7 +401,7 @@ filtered in/out.
 ### CHANGES.md
 
 A changelog is kept in version control that simply lists the changes in each
-release, other than chores like bumping version numbers. The changelog for `ops`
+release, other than chores. The changelog for `ops`
 is at the top level, in [CHANGES.md](CHANGES.md), and the changelog for
 `ops-scenario` is in the `/testing` folder, [CHANGES.md](testing/CHANGES.md).
 There will be overlap between the two files, as many PRs will include changes to
@@ -414,8 +414,12 @@ CHANGES.md files.
 
 * Group the changes by the commit type (feat, fix, and so on) and use full names
   ("Features", not "feat", "Fixes", not "fix") for group headings.
-* Remove any bullets that do not apply to the package (`ops` only changes for
-  `ops-scenario`, and `ops-scenario` only changes for `ops`).
+* Remove any chores.
+* Remove any bullets that do not apply to the package. For instance, if a bullet
+  only affects `ops[testing]`, don't include it in [CHANGES.md](CHANGES.md) when
+  doing an `ops` release. The bullet should go in [testing/CHANGES.md](testing/CHANGES.md)
+  instead. If `ops[testing]` is not being released yet, put the bullet in a placeholder
+  section at top of [testing/CHANGES.md](testing/CHANGES.md).
 * Strip the commit type prefix from the bullet point, and capitalise the first
   word.
 * Strip the username (who did each commit) if the author is a member of the
@@ -423,6 +427,7 @@ CHANGES.md files.
 * Replace the link to the pull request with the PR number in parentheses.
 * Where appropriate, collapse multiple tightly related bullet points into a
   single point that refers to multiple commits.
+* Where appropriate, add backticks for code formatting.
 
 For example: the PR
 
