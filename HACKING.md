@@ -330,12 +330,12 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    in the form `<major>.<minor>.<patch> and ops[testing] <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
    For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
-5. If the last release was for both `ops` and `ops-scenario`, leave the previous
-   tag choice on `auto`. If the last release was for only one package, change
-   the previous tag to be the last time the same package(s) were being released.
-6. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
+5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
    `ops` and `scenario-<major>.<minor>.<patch>` for `ops-scenario`. If releasing
    both packages, use the ops tag.
+6. If the last release was for both `ops` and `ops-scenario`, leave the previous
+   tag choice on `auto`. If the last release was for only one package, change
+   the previous tag to be the last time the same package(s) were being released.
 7. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field. The 'Release Documentation' section below details the form that
    the release notes and changelog should take.
