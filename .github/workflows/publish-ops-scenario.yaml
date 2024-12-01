@@ -29,8 +29,10 @@ jobs:
         run: python -m build
         working-directory: ./testing
       - name: Attest build provenance
+        working-directory: ./testing
         uses: actions/attest-build-provenance@v1.4.3
         with:
           subject-path: 'testing/dist/*'
       - name: Publish
+        working-directory: ./testing
         uses: pypa/gh-action-pypi-publish@release/v1
