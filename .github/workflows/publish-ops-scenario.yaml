@@ -30,7 +30,7 @@ jobs:
         working-directory: ./testing
       - name: Attest build provenance
         working-directory: ./testing
-        uses: actions/attest-build-provenance@v1.4.3
+        uses: actions/attest-build-provenance@v1.4.4
         with:
           subject-path: 'testing/dist/*'
       - name: Publish
