@@ -30,6 +30,7 @@ jobs:
         with:
           subject-path: 'testing/dist/*'
       - name: Publish to test.pypi.org
+        working-directory: ./testing
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
