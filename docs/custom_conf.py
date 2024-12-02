@@ -212,9 +212,7 @@ custom_extensions = [
 # pyspelling, sphinx, sphinx-autobuild, sphinx-copybutton, sphinx-design,
 # sphinx-notfound-page, sphinx-reredirects, sphinx-tabs, sphinxcontrib-jquery,
 # sphinxext-opengraph
-custom_required_modules = [
-    'ops-scenario>=7.0.5,<8',
-]
+custom_required_modules = []
 
 # Add files or directories that should be excluded from processing.
 custom_excludes = [
@@ -318,6 +316,7 @@ nitpick_ignore = [
     ('py:class', '_FileInfoDict'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
+    ('py:class', '_RawPortProtocolLiteral'),
     ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
@@ -347,6 +346,8 @@ nitpick_ignore = [
     ('py:class', 'ops.testing._ConfigOption'),
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
+    ('py:obj', 'scenario.state.CharmType'),
+    ('py:class', 'scenario.state.CharmType'),
     ('py:class', 'scenario.state._EntityStatus'),
     ('py:class', 'scenario.state._Event'),
     ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
