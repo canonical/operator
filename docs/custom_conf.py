@@ -25,6 +25,12 @@ from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
 
+# FIXME: temporarily disable missing xrefs in this branch, until the missing
+# links to Juju and Charmcraft are added.
+suppress_warnings = [
+    'myst.xref_missing',
+]
+
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
