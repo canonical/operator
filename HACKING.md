@@ -327,7 +327,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
 3. Click "Draft a new release"
 4. The "Release Title" is the full version numbers of ops and/or ops-scenario,
-   in the form `<major>.<minor>.<patch> and ops[testing] <major>.<minor>.<patch>`
+   in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
    For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
 5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
