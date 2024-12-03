@@ -481,6 +481,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             expires=secret.expire,
             rotation=secret.rotate,
             rotates=None,  # not implemented yet.
+            model_uuid=self._state.model.uuid,
         )
 
     def secret_set(
