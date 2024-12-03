@@ -23,7 +23,7 @@ def harness():
     # Set a name for the testing model created by Harness (optional).
     # Cannot be called after harness.begin()
     harness.set_model_name("testing")
-    # Instanciate an instance of the charm (harness.charm)
+    # Instantiate an instance of the charm (harness.charm)
     harness.begin()
     yield harness
     # Run Harness' cleanup method on teardown

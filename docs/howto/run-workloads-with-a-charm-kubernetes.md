@@ -849,7 +849,7 @@ pg_dump mydb >/tmp/mydb.sql
 
 The first argument to `pebble notify` is the key, which must be in the format `<domain>/<path>`. The caller can optionally provide map data arguments in `<name>=<value>` format; this example shows a single data argument named `path`.
 
-The `pebble notify` command has an optional `--repeat-after` flag, which tells Pebble to only allow the notice to repeat after the specified duration (the default is to repeat for every occurrence). If the caller says `--repeat-after=1h`, Pebble will prevent the notice with the same type and key from repeating within an hour -- useful to avoid the charm waking up too often when a notice occcurs frequently.
+The `pebble notify` command has an optional `--repeat-after` flag, which tells Pebble to only allow the notice to repeat after the specified duration (the default is to repeat for every occurrence). If the caller says `--repeat-after=1h`, Pebble will prevent the notice with the same type and key from repeating within an hour -- useful to avoid the charm waking up too often when a notice occurs frequently.
 
 > See more: [GitHub | Pebble > Notices > `pebble notify`](https://github.com/canonical/pebble#notices)
 
