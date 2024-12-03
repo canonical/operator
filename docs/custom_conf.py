@@ -24,6 +24,7 @@ import sphinx.ext.autodoc
 from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
+
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
