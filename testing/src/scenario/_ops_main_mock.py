@@ -6,7 +6,7 @@ import dataclasses
 import marshal
 import re
 import sys
-from typing import TYPE_CHECKING, Any, Generic, Optional, Sequence, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Sequence, Set
 
 import ops
 import ops.jujucontext
@@ -17,7 +17,9 @@ from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
 
 from .errors import BadOwnerPath, NoObserverError
-from .state import CharmType
+from .logger import logger as scenario_logger
+from .mocking import _MockModelBackend
+from .state import CharmType, StoredState, DeferredEvent
 
 if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
