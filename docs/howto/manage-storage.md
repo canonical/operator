@@ -127,7 +127,7 @@ has attached the new storage.
 
 ## Test the feature
 
-> See first: {ref}`get-started-with-charm-testing>`
+> See first: {ref}`get-started-with-charm-testing`
 
 You'll want to add three levels of tests:
 
@@ -161,7 +161,7 @@ def test_storage_detaching(harness):
     # Simulate the harness being detached (.remove_storage() would simulate it being removed
     # entirely).
     harness.remove_storage(storage_id)
-    # Asser that it was handled correctly.
+    # Assert that it was handled correctly.
     assert ...
 ```
 

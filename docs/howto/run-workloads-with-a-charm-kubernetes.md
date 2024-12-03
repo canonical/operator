@@ -5,7 +5,7 @@ The recommended way to create charms for Kubernetes is using the sidecar pattern
 
 Pebble is a lightweight, API-driven process supervisor designed for use with charms. If you specify the `containers` field in a charm's `charmcraft.yaml`, Juju will deploy the charm code in a sidecar container, with Pebble running as the workload container's `ENTRYPOINT`.
 
-When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/#ops.Framework.observe) as shown in {ref}`Framework Constructs under "Containers" <4554md>`. This gives the charm author access to `event.workload`, a [`Container`](https://ops.readthedocs.io/en/latest/#ops.Container) instance.
+When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/#ops.Framework.observe) as shown in [Framework Constructs under "Containers"](). This gives the charm author access to `event.workload`, a [`Container`](https://ops.readthedocs.io/en/latest/#ops.Container) instance.
 
 The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, read and write files, and run commands. These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
 
@@ -212,7 +212,7 @@ See the [layer specification](https://github.com/canonical/pebble#layer-specific
 
 To add a configuration layer, call [`Container.add_layer`](https://ops.readthedocs.io/en/latest/#ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](https://ops.readthedocs.io/en/latest/#ops.pebble.Layer) object.
 
-You can see an example of `add_layer` under the ["Replan" heading](#heading--replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
+You can see an example of `add_layer` under the ["Replan" heading](#replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
 
 Because `combine=True` combines the layer with an existing layer of the same name, it's normally used with `override: replace` in the YAML service configuration. This means replacing the entire service configuration with the fields in the new layer.
 
@@ -247,7 +247,7 @@ In the context of Juju sidecar charms, Pebble is run with the `--hold` argument,
 
 ### Replan
 
-After adding a configuration layer to the plan (details below), you need to call `replan` to make any changes to `services` take effect. When you execute replan, Pebble will automatically restart any services that have changed, respecting dependency order. If the services are already running, it will stop them first using the normal [stop sequence](#heading--start-and-stop).
+After adding a configuration layer to the plan (details below), you need to call `replan` to make any changes to `services` take effect. When you execute replan, Pebble will automatically restart any services that have changed, respecting dependency order. If the services are already running, it will stop them first using the normal [stop sequence](#start-and-stop).
 
 The reason for replan is so that you as a user have control over when the (potentially high-impact) action of stopping and restarting your services takes place.
 
@@ -822,7 +822,7 @@ Caution: it's easy to get threading wrong and cause deadlocks, so it's best to u
 To send a signal to the running process, use [`ExecProcess.send_signal`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess.send_signal) with a signal number or name. For example, the following will terminate the "sleep 10" process after one second:
 
 ```python
-process = container.exec({ref}`'sleep', '10'])
+process = container.exec(['sleep', '10'])
 time.sleep(1)
 process.send_signal(signal.SIGTERM)
 process.wait()
@@ -832,7 +832,7 @@ Note that because sleep will exit via a signal, `wait()` will raise an `ExecErro
 
 ```
 Traceback (most recent call last):
-  ..
+  ...
 ops.pebble.ExecError: non-zero exit code 143 executing ['sleep', '10']
 ```
 

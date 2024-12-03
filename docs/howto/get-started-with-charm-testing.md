@@ -6,7 +6,7 @@ Testing charm code is an essential part of charming. Here we will see how to get
 **What you'll need:**
 - knowledge of testing in general
 - knowledge of Juju and charms
-- knowledge of the Juju models and events, esp. the data involved in a charm's lifecycle (e.g. see {ref}`Talking to a workload control flow from A to Z <talking-to-a-workload-control-flow-from-a-to-z>`)
+- knowledge of the Juju models and events, esp. the data involved in a charm's lifecycle (e.g. see [Talking to a workload control flow from A to Z]())
 
 **What you will learn:**
 - What are the starting points for adding tests to a charm?
@@ -77,7 +77,7 @@ If the charm is a machine charm, workload operation calls can be done directly, 
 
 "Juju operations" are the most 'meta' of them all: they do not affect the workload in and of itself, but they share data which is meant to affect the operation of *other* charms that this charm is integrated with.
 
-> See more: {ref}`Talking to a workload: control flow from A to Z <talking-to-a-workload-control-flow-from-a-to-z>`, {ref}`Charm lifecycle <charm-lifecycle>` 
+> See more: [Talking to a workload: control flow from A to Z](), [Charm lifecycle]() 
 
 ### What we are testing when we unit-test
 
@@ -120,7 +120,7 @@ There are two ways to initialize a harnessed charm:
  * When a charm is deployed, it goes through the Setup phase, a fixed sequence of events. `Harness` has a method, `begin_with_initial_hooks()`, that runs this sequence.
  * Alternatively, you can initialise the charm by calling `begin()`. This will instantiate the charm without firing any Setup phase event.
 
-> See more: {ref}`A charm's life <charm-lifecycle>`, [`ops.testing.Harness.begin_with_initial_hooks()`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.begin_with_initial_hooks), [`ops.testing.Harness.begin()`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.begin)
+> See more: [A charm's life](), [`ops.testing.Harness.begin_with_initial_hooks()`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.begin_with_initial_hooks), [`ops.testing.Harness.begin()`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.begin)
 
 After the Setup phase, the charm goes into Operation. To test operation-phase-related events, the harness provides some methods to simulate the most common scenarios. For example: 
  
@@ -256,7 +256,7 @@ A good integration testing suite will check that the charm continues to operate 
 Some charms represent their workload by means of an object-oriented wrapper, which mediates between operator code and the implementation of operation logic. In such cases, it can be useful to add a third category of tests, namely functional tests, that black-box test that workload wrapper without worrying about the substrate it runs on (the charm, the cloud, the machine or pod...).
 For an example charm adopting this strategy, see [parca-operator](https://github.com/jnsgruk/parca-operator). Nowadays, the preferred tool to do functional testing is Scenario.
 
-> See more: [Scenario](https://github.com/canonical/ops-scenario), {ref}`Write a Scenario test for a charm <how-to-write-scenario-tests-for-a-charm>`
+> See more: [Scenario](https://github.com/canonical/ops-scenario), {ref}`Write a Scenario test for a charm <write-scenario-tests-for-a-charm>`
 
 ## Continuous integration
 

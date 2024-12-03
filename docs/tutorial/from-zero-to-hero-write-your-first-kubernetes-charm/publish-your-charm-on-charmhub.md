@@ -82,7 +82,7 @@ echo "Random 8-digit hash: $random_hash"
 ```
 ```{important}
 
-Naming your charm is usually less random than that; see {ref}`Charm naming guidelines <charm-naming-guidelines>`. However, here we are in a tutorial setting, so you just need to make sure to pick a unique name, any name.
+Naming your charm is usually less random than that; see [Charm naming guidelines](). However, here we are in a tutorial setting, so you just need to make sure to pick a unique name, any name.
 
 ```
 
@@ -161,7 +161,7 @@ Release your charm as below.
 ```{important}
 
 **Do not worry:**<br>
-While releasing a charm to Charmhub gives it a public URL, the charm will not appear in the Charmhub search results until it has passed formal review -- see {ref}`Requirements for public listing <12281md>`. 
+While releasing a charm to Charmhub gives it a public URL, the charm will not appear in the Charmhub search results until it has passed formal review -- see [Requirements for public listing](). 
 
 ```
 

@@ -36,7 +36,7 @@ Conceptually, a charm is code that instructs Juju to deploy and manage an applic
 All  subsequent workload management happens in the same way -- the Juju controller sends events to the charm and the charm responds to these events by managing the workload application in various ways via Pebble. The picture below illustrates all of this for a simple case where there is just one workload container.
 
 
-![Create a minimal Kubernetes charm](create_a_minimal_kubernetes_charm.png)
+![Create a minimal Kubernetes charm](../../resources/create_a_minimal_kubernetes_charm.jpg)
 
 
 As a charm developer, your first job is to use this knowledge to create the basic structure and content for your charm:
@@ -159,7 +159,7 @@ framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_
 
 ```{tip}
 
-**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event. See {ref}`Talking to a workload: Control flow from A to Z <talking-to-a-workload-control-flow-from-a-to-z>`.
+**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event. See [Talking to a workload: Control flow from A to Z]().
 
 ```
 
@@ -228,7 +228,7 @@ Finally, define  the `pebble_layer` function as below. The `command` variable re
 def _pebble_layer(self) -> ops.pebble.Layer:
     """A Pebble layer for the FastAPI demo services."""
     command = ' '.join(
-        {ref}`
+        [
             'uvicorn',
             'api_demo_server.app:app',
             '--host=0.0.0.0',

@@ -286,11 +286,11 @@ config:
 Then, in the `src/charm.py` file, update the `_on_install` function to make use of the new configuration option, as below:
 
 ```python
-def _on_install(self, event: ops.ConfigChangedEvent):
+def _on_install(self, event: ops.InstallEvent):
     """Handle install event."""
     self.unit.status = ops.MaintenanceStatus("Installing microsample snap")
     channel = self.config.get('channel')
-    if channel in {ref}`'beta', 'edge', 'candidate', 'stable']:
+    if channel in ('beta', 'edge', 'candidate', 'stable'):
         os.system(f"snap install microsample --{channel}")
         self.unit.status = ops.ActiveStatus("Ready")
     else:
@@ -345,7 +345,7 @@ Next, in the body of the charm definition, define the event handler, as below:
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
     channel = self.config.get('channel')
-    if channel in {ref}`'beta', 'edge', 'candidate', 'stable']:
+    if channel in ('beta', 'edge', 'candidate', 'stable'):
         os.system(f"snap refresh microsample --{channel}")
         self.unit.status = ops.ActiveStatus("Ready at '%s'" % channel)
     else:
@@ -437,7 +437,7 @@ class MicrosampleVmCharm(ops.CharmBase):
         """Handle install event."""
         self.unit.status = ops.MaintenanceStatus("Installing microsample snap")
         channel = self.config.get('channel')
-        if channel in {ref}`'beta', 'edge', 'candidate', 'stable']:
+        if channel in ('beta', 'edge', 'candidate', 'stable'):
             os.system(f"snap install microsample --{channel}")
             self.unit.status = ops.ActiveStatus("Ready")
         else:
@@ -445,7 +445,7 @@ class MicrosampleVmCharm(ops.CharmBase):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         channel = self.config.get('channel')
-        if channel in ['beta', 'edge', 'candidate', 'stable']:
+        if channel in ('beta', 'edge', 'candidate', 'stable'):
             os.system(f"snap refresh microsample --{channel}")
             workload_version = self._getWorkloadVersion()
             self.unit.set_workload_version(workload_version)
@@ -505,8 +505,6 @@ microsample/0*  active    idle   1        10.122.219.101         Ready at 'beta'
 
 Machine  State    Address         Inst id        Base          AZ  Message
 1        started  10.122.219.101  juju-f25b73-1  ubuntu@22.04      Running
-
-
 ```
 
 Congratulations, your charm user can view the version of the workload deployed from your charm!
@@ -523,7 +521,7 @@ By the end of this tutorial you will have built a machine charm and evolved it i
 
 | If you are wondering... | visit...             |
 |-------------------------|----------------------|
-| "How do I...?"          | {ref}`how-to-guides` |
+| "How do I...?"          | {ref}`howto-guides`  |
 | "What is...?"           | {ref}`reference`     |
 | "Why...?", "So what?"   | {ref}`explanation`   |
 

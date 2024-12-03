@@ -29,7 +29,7 @@ To have the leader notify other units about leadership changes, change data in a
 
 > See more: [Peer Relations](https://juju.is/docs/juju/relation#heading--peer)
 
-{ref}`note status="Use the peer relation rather than `leader-setting-changed`"]
+[note status="Use the peer relation rather than `leader-setting-changed`"]
 In the past, this was done by observing a `leader-setting-changed` event, which is now deprecated.
 [/note]
 

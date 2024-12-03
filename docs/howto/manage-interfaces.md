@@ -255,12 +255,12 @@ def test_nothing_happens_if_remote_empty():
     t = Tester(
         State(
             leader=True,
-            relations={ref}`
+            relations={
                 Relation(
                     endpoint="my-fancy-database",  # the name doesn't matter
                     interface="my_fancy_database",
                 )
-            ],
+            },
         )
     )
     # WHEN the database charm receives a relation-joined event
@@ -332,7 +332,7 @@ You should see:
 
 In particular, pay attention to the `provider` field. If it says `<no tests>` then there is something wrong with your setup, and the collector isn't able to find your test or identify it as a valid test.
 
-Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/v0/interface_tests/test_requirer.py`. Don't forget to edit the `interface.yaml` file in the "requirers" section to add the name of the charm and the URL. See the "Edit `interface.yaml`" section in the previous how-to guide {ref}`How to register an interface <12690md>` for more detail on editing `interface.yaml`. [Here](https://github.com/IronCore864/charm-relation-interfaces/tree/my-fancy-database/interfaces/my_fancy_database/v0) is an example of tests for requirers added.
+Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/v0/interface_tests/test_requirer.py`. Don't forget to edit the `interface.yaml` file in the "requirers" section to add the name of the charm and the URL. See the "Edit `interface.yaml`" section in the previous how-to guide [How to register an interface]() for more detail on editing `interface.yaml`. [Here](https://github.com/IronCore864/charm-relation-interfaces/tree/my-fancy-database/interfaces/my_fancy_database/v0) is an example of tests for requirers added.
 
 ### Merge in charm-relation-interfaces
 
@@ -451,7 +451,7 @@ INFO:root:Running tests for role: provider
 }
 ```
 
-For reference, [here](https://github.com/IronCore864/my-fancy-database-operator) is an example of a bare minimum `my-fancy-database-operator` charm to make the test pass. In the charm, application relation data and unit relation data are set according to our definition (see the beginning part of the previous how-to guide {ref}`How to register an interface <how-to-register-an-interface>`).
+For reference, [here](https://github.com/IronCore864/my-fancy-database-operator) is an example of a bare minimum `my-fancy-database-operator` charm to make the test pass. In the charm, application relation data and unit relation data are set according to our definition (see the beginning part of the previous how-to guide [How to register an interface]().
 
 ### Troubleshooting and debugging the tests
 

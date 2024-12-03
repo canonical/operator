@@ -245,14 +245,15 @@ def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
 
 The diagram below illustrates the workflow for the case where the database integration exists and for the case where it does not:
 
-![Integrate your charm with PostgreSQL](integrate_your_charm_with_postgresql.png) 
+![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png) 
 
 
 ## Update the unit status to reflect the integration state
 
 Now that the charm is getting more complex, there are many more cases where the unit status needs to be set. It's often convenient to do this in a more declarative fashion, which is where the collect-status event can be used.
 
-> Read more: {ref}`Events > Collect App Status and Collect Unit Status <events-collect-app-status-and-collect-unit-status>`
+<!-- TODO: this page doesn't belong in the Juju docs, it should be moved over to ops and this can be a local reference. -->
+> Read more: [Events > Collect App Status and Collect Unit Status](https://juju.is/docs/sdk/events-collect-app-status-and-collect-unit-status)
 
 In your charm's `__init__` add a new observer:
 

@@ -80,10 +80,11 @@ More detail below:
 #### Use action params
 
 To make use of action parameters, either ones that the user has explicitly passed, or default values, use the `params` attribute of the event object that is passed to the handler. This is a dictionary of parameter name (string) to parameter value. For example:
+
 ```python
 def _on_snapshot(self, event: ops.ActionEvent):
     filename = event.params["filename"]
-    …
+    ...
 ```
 > See more: [`ops.ActionEvent.params`](https://ops.readthedocs.io/en/latest/#ops.ActionEvent.params)
 
@@ -91,6 +92,7 @@ def _on_snapshot(self, event: ops.ActionEvent):
 #### Report that an action has failed
 
 To report that an action has failed, in the event handler definition, use the fail() method along with a message explaining the failure to be shown to the person running the action. Note that the `fail()` method doesn’t interrupt code execution, so you will usually want to immediately follow the call to `fail()` with a `return`, rather than continue with the event handler. For example:
+
 ```python
 def _on_snapshot(self, event: ops.ActionEvent):
     filename = event.params['filename']
@@ -102,9 +104,9 @@ def _on_snapshot(self, event: ops.ActionEvent):
         event.fail(
             f"Failed to run {' '.join(cmd)!r}. Output was:\n{granted.stderr.decode('utf-8')}"
         )
-   …
+   ...
 ```
-]
+
 > See more: [`ops.ActionEvent.fail`](https://ops.readthedocs.io/en/latest/#ops.ActionEvent.fail)
 
 #### Return the results of an action

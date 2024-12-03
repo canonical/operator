@@ -38,19 +38,17 @@ def test_charm_runs():
 ```
 
 > See more: 
->  - {ref}`State <state-scenario>`
->  - {ref}`Context <context-scenario>`
->  - {ref}`Event <event-scenario>`
+>  - [State](https://ops.readthedocs.io/en/latest/state-transition-testing.html#ops.testing.State)
+>  - [Context](https://ops.readthedocs.io/en/latest/state-transition-testing.html#ops.testing.Context)
 
 ```{note}
 
 If you like using unittest, you should rewrite this as a method of some TestCase subclass.
-
 ```
 
 ## Mocking beyond the State
 
-If you wish to use Scenario to test an existing charm type, you will probably need to mock out certain calls that are not covered by the {ref}`State <state-scenario>` data structure.
+If you wish to use Scenario to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure.
 In that case, you will have to manually mock, patch or otherwise simulate those calls on top of what Scenario does for you.
 
 For example, suppose that the charm we're testing uses the `KubernetesServicePatch`. To update the test above to mock that object, modify the test file to contain:

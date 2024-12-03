@@ -7,7 +7,7 @@ This document shows how to write integration tests for a charm.
 
 ```{important}
 
-Integration testing is only one part of a comprehensive testing strategy. See {ref}`How to test a charm <how-to-write-unit-tests-for-a-charm>` for unit testing and {ref}`How to write a functional test <how-to-write-scenario-tests-for-a-charm>`  for functional tests.
+Integration testing is only one part of a comprehensive testing strategy. See {ref}`How to test a charm <write-unit-tests-for-a-charm>` for unit testing and {ref}`How to write a functional test <write-scenario-tests-for-a-charm>`  for functional tests.
 
 ```
 
@@ -66,7 +66,8 @@ Use `pytest` custom markers to toggle which types of tests are being run so you 
 <a href="#heading--test-build-and-deploy"><h3 id="heading--test-build-and-deploy">Test build and deploy</h3></a>
 
 To build and deploy the current charm, in your integration test file, add the function below:
-```
+
+```python
 @pytest.mark.skip_if_deployed
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -78,7 +79,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that build and deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
 
-The decorator `@pytest.mark.abort_on_fail` abort all next tests if something goes wrong. With the decorator `@pytest.mark.skip_if_deployed` you can skip that test if a `--model` is passed as a command line parameter (see [Run your tests](#heading--run-tests) for more information).
+The decorator `@pytest.mark.abort_on_fail` abort all next tests if something goes wrong. With the decorator `@pytest.mark.skip_if_deployed` you can skip that test if a `--model` is passed as a command line parameter (see [Run your tests](#run-tests) for more information).
 
 `ops_test.build_charm` builds the charm with charmcraft. `ops_test.model` is an instance of `python-libjuju` 's [Model](https://pythonlibjuju.readthedocs.io/en/latest/api/juju.model.html#juju.model.Model) class that reference the active model tracked by `pytest-operator` for the current module.
 
@@ -97,11 +98,11 @@ As an alternative to `wait_for_idle`, you can explicitly block until the applica
 
 <a href="#heading--deploy-your-charm-with-resources"><h3 id="heading--deploy-your-charm-with-resources">Deploy your charm with resources</h3></a>
 
-> See also: {ref}`Resource <12734md>`
+> See also: [Resource (Charm)](https://juju.is/docs/juju/charm-resource)
 
 A charm can require `file` or `oci-image` `resources` to work, that can be provided to `ops_test.model.deploy`. In Charmhub, resources have revision numbers. For file resources already stored in Charmhub, you can use `ops_test.download_resources`:
 
-```
+```python
 async def test_build_and_deploy(ops_test: OpsTest):
     charm = await ops_test.build_charm(".")
     arch_resources = ops_test.arch_specific_resources(charm)
@@ -151,7 +152,7 @@ async def test_my_integration(ops_test: OpsTest):
 
 <a href="#heading--test-a-configuration"><h3 id="heading--test-a-configuration">Test a configuration</h3></a>
 
-> See also: {ref}`Configuration <12734md>`
+> See also: [Configuration]()
 
 You can set a configuration option in your application and check its results. 
 
@@ -172,7 +173,7 @@ async def test_config_changed(ops_test: OpsTest):
 
 <a href="#heading--test-an-action"><h3 id="heading--test-an-action">Test an action</h3></a>
 
-> See also: {ref}`Action <12734md>`
+> See also: [Action]()
 
 You can execute an action on a unit and get its results. 
 
@@ -210,8 +211,8 @@ How you can connect to a private or public address is dependent on your configur
 > Example implementations: [mongodb-k8s-operator](https://github.com/canonical/mongodb-k8s-operator/blob/8b9ebbee3f225ca98175c25781f1936dc4a62a7d/tests/integration/metrics_tests/test_metrics.py#L33), [tempo-k8s-operator](https://github.com/canonical/tempo-k8s-operator/blob/78a1143d99af99a1a56fe9ff82b1a3563e4fd2f7/tests/integration/test_integration.py#L69), [synapse](https://github.com/canonical/synapse-operator/blob/eb44f4959a00040f08b98470f8b17cae4cc616da/tests/integration/conftest.py#L170)
 
 > See more: 
-> - {ref}`Charm development best practices > Fetching network information <12734md>`
-> - {ref}``juju` CLI commands > juju expose <12734md>`
+> - [Charm development best practices > Fetching network information]()
+> - [`juju` CLI commands > juju expose]()
 
 <a href="#heading--run-a-subprocess-command-within-juju-context"><h3 id="heading--run-a-subprocess-command-within-juju-context">Run a subprocess command within Juju context</h3></a>
 
@@ -274,11 +275,11 @@ Using the new alias, you can switch context to the new created model, similar to
 > Example implementations: [`charm-kubernetes-autoscaler`](https://github.com/charmed-kubernetes/charm-kubernetes-autoscaler/blob/8f4ddf5d66802ade73ed3aab2bb8d09fd9e4d63a/tests/integration/test_kubernetes_autoscaler.py#L31)
 
 > See more: 
-> - {ref}`Juju offers <12734md>`
-> -  {ref}`How to manage clouds <12734md>`
-> -  [pytest-operator | track_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L720)
-> -  [pytest-operator | model_context](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L480)
-> -  [pytest-operator | forget_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L812)
+> - [Juju offers]()
+> - [How to manage clouds]()
+> - [pytest-operator | track_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L720)
+> - [pytest-operator | model_context](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L480)
+> - [pytest-operator | forget_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L812)
 
 
 
@@ -286,7 +287,7 @@ Using the new alias, you can switch context to the new created model, similar to
 
 ```{note}
 
-It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle` until this [issue](https://github.com/charmed-kubernetes/pytest-operator/issues/98) is closed, as it uses `juju-bundle` which is outdated. You can deploy bundles using `ops_test.model.deploy` or {ref}``ops_test.juju` <12734md>`.
+It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle` until this [issue](https://github.com/charmed-kubernetes/pytest-operator/issues/98) is closed, as it uses `juju-bundle` which is outdated. You can deploy bundles using `ops_test.model.deploy` or [`ops_test.juju`]().
 
 ```
 
@@ -340,8 +341,7 @@ firing rate with `fast_forward`. Inside the new async context you can put any co
 > Example implementations [`postgresql-k8s-operator`](https://github.com/canonical/postgresql-k8s-operator/blob/69b2c138fa6b974883aa6d3d15a3315189d321d8/tests/integration/ha_tests/test_upgrade.py#L58), [`synapse-operator`](https://github.com/canonical/synapse-operator/blob/05c00bb7666197d04f1c025c36d8339b10b64a1a/tests/integration/test_charm.py#L249)
 
  
-> See more: 
-> - {ref}`Event `update-status` <event-update-status>`
+> See more:
 > - [`pytest-operator` | `fast_forward`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1400)
 
 
@@ -370,7 +370,7 @@ There are different ways of specifying a subset of tests to run using `pytest`. 
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
 
-> Example implementations: {ref}``mysql-k8s-operator` <12734md>`
+> Example implementations: [`mysql-k8s-operator`]()
 
 > See more: 
 > - [`pytest-operator` | `skip_if_deployed`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L139)

@@ -78,7 +78,7 @@ provides:
     limit: 1
 ```
 
-> See more: {ref}`File `charmcraft.yaml` > `provides` <11012md>`
+> See more: [File `charmcraft.yaml` > `provides`]()
 
 7. Instrument your charm code:
 
@@ -91,8 +91,8 @@ from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
 class MyCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        # add a provider wrapper for the tracing endpoint
-        self.tracing = TracingEndpointRequirer(self, protocols={ref}`"otlp_http"])
+        # Add a provider wrapper for the tracing endpoint.
+        self.tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
 
     @property
     def tracing_endpoint(self) -> Optional[str]:

@@ -9,12 +9,12 @@ The library (`available on PyPI`_) provides:
 
 - :ref:`ops_module`, the API to respond to Juju events and manage the application;
 - :ref:`ops_main_entry_point`, used to initialise and run your charm;
-- :doc:`ops.pebble </pebble>`, the Pebble client, a low-level API for Kubernetes containers;
+- :doc:`ops.pebble <_ops_pebble>`, the Pebble client, a low-level API for Kubernetes containers;
 - the APIs for unit testing charms in a simulated environment:
 
-  - :doc:`State-transition testing </state-transition-testing>`. This is the
+  - :doc:`State-transition testing <_ops_testing>`. This is the
     recommended approach (it was previously known as 'Scenario').
-  - :doc:`Harness </harness>`. This is a deprecated framework, and has issues,
+  - :doc:`Harness <_ops_testing_harness>`. This is a deprecated framework, and has issues,
     particularly with resetting the charm state between Juju events.
 
 You can structure your charm however you like, but with the `ops` library, you
@@ -30,9 +30,9 @@ integrations with other services, and making the charm easier to test.
    :maxdepth: 2
 
    self
-   pebble
-   state-transition-testing
-   harness
+   _ops_pebble
+   _ops_testing
+   _ops_testing_harness
 
 .. _ops_module:
 

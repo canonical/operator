@@ -107,7 +107,7 @@ def test_workload_version_is_set():
         "webserver",
         exec_mock={("/bin/server", "--version"): scenario.ExecOutput(stdout="1.2\n")},
     )
-    out = ctx.run('start', scenario.State(containers={ref}`container]))
+    out = ctx.run('start', scenario.State(containers=[container]))
     assert out.workload_version == "1.2"
 ```
 

@@ -28,7 +28,7 @@ There are a  few strategies you can adopt here:
 
 First, you can use an Ops construct called `Stored State`. With this strategy you can store data on the local unit (at least, so long as your `main` function doesn't set `use_juju_for_storage` to `True`). However, if your Kubernetes pod dies, your unit also dies, and thus also the data. For this reason this strategy is generally not recommended.
 
-> Read more: {ref}`StoredState <7433md>`, {ref}`StoredState: Uses, Limitations <storedstate-uses-limitations>`
+> Read more: [StoredState](), {ref}`StoredState: Uses, Limitations <storedstate-uses-limitations>`
 
 Second, you can make use of the Juju notion of 'peer relations'  and 'data bags'  and set up a peer relation data bag. This will help you store the information in the Juju's database backend. 
 
@@ -49,7 +49,7 @@ peers:
   fastapi-peer:
     interface: fastapi_demo_peers
 ```
-> Read more: {ref}`File ‘charmcraft.yaml’ <7433md>`
+> Read more: [File ‘charmcraft.yaml`]()
 
 ## Set and get data from the peer relation databag
 
