@@ -1,7 +1,7 @@
 .. _ops_testing:
 
 `ops.testing` (was: Scenario)
-============================
+=============================
 
 Install ops with the ``testing`` extra to use this API; for example:
 ``pip install ops[testing]``
