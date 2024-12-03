@@ -508,7 +508,7 @@ class _Manager:
             return getattr(self.charm.on, event_name)
         except AttributeError:
             logger.debug('Event %s not defined for %s.', event_name, self.charm)
-        # If the event is not defined, return None.
+        return None
 
     def _emit_charm_event(self, event_name: str):
         """Emits a charm event based on a Juju event name.
@@ -522,10 +522,12 @@ class _Manager:
 
         # If the event is not supported by the charm implementation, do
         # not error out or try to emit it. This is to support rollbacks.
-        if event_to_emit is not None:
-            args, kwargs = _get_event_args(self.charm, event_to_emit, self._juju_context)
-            logger.debug('Emitting Juju event %s.', event_name)
-            event_to_emit.emit(*args, **kwargs)
+        if event_to_emit is None:
+            return
+
+        args, kwargs = _get_event_args(self.charm, event_to_emit, self._juju_context)
+        logger.debug('Emitting Juju event %s.', event_name)
+        event_to_emit.emit(*args, **kwargs)
 
     def _commit(self):
         """Commit the framework and gracefully teardown."""

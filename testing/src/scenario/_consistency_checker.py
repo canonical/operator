@@ -178,6 +178,7 @@ def check_event_consistency(
             "(e.g. a relation event, or a workload event), you might get some false-negative "
             "consistency checks.",
         )
+        return Results(errors, warnings)
 
     if event._is_relation_event:
         _check_relation_event(charm_spec, event, state, errors, warnings)
