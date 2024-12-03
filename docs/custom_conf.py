@@ -24,13 +24,6 @@ import sphinx.ext.autodoc
 from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
-
-# FIXME: temporarily disable missing xrefs in this branch, until the missing
-# links to Juju and Charmcraft are added.
-suppress_warnings = [
-    'myst.xref_missing',
-]
-
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
@@ -62,6 +55,12 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 # If you're not familiar with Sphinx and don't want to use advanced
 # features, it is sufficient to update the settings in the "Project
 # information" section.
+
+# FIXME: temporarily disable missing xrefs in this branch, until the missing
+# links to Juju and Charmcraft are added.
+suppress_warnings = [
+    'myst.xref_missing',
+]
 
 ############################################################
 ### Project information
