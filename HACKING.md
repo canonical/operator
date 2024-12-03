@@ -329,20 +329,20 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 4. The "Release Title" is the full version numbers of ops and/or ops-scenario,
    in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
-   For example: `ops 2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
-5. If the last release was for both `ops` and `ops-scenario`, leave the previous
-   tag choice on `auto`. If the last release was for only one package, change
-   the previous tag to be the last time the same package(s) were being released.
-6. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
+   For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
+5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
    `ops` and `scenario-<major>.<minor>.<patch>` for `ops-scenario`. If releasing
    both packages, use the ops tag.
+6. If the last release was for both `ops` and `ops-scenario`, leave the previous
+   tag choice on `auto`. If the last release was for only one package, change
+   the previous tag to be the last time the same package(s) were being released.
 7. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field. The 'Release Documentation' section below details the form that
    the release notes and changelog should take.
 8. For `ops`, change [version.py](ops/version.py)'s `version` to the
    appropriate string. For `ops-scenario`, change the version in
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
-   [semantic versioning]](https://semver.org/), and adjust independently
+   [semantic versioning](https://semver.org/), and adjust independently
    (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
 9. Add, commit, and push, and open a PR to get the changelogs and version bumps
    into main (and get it merged).
@@ -401,7 +401,7 @@ filtered in/out.
 ### CHANGES.md
 
 A changelog is kept in version control that simply lists the changes in each
-release, other than chores like bumping version numbers. The changelog for `ops`
+release, other than chores. The changelog for `ops`
 is at the top level, in [CHANGES.md](CHANGES.md), and the changelog for
 `ops-scenario` is in the `/testing` folder, [CHANGES.md](testing/CHANGES.md).
 There will be overlap between the two files, as many PRs will include changes to
@@ -414,8 +414,12 @@ CHANGES.md files.
 
 * Group the changes by the commit type (feat, fix, and so on) and use full names
   ("Features", not "feat", "Fixes", not "fix") for group headings.
-* Remove any bullets that do not apply to the package (`ops` only changes for
-  `ops-scenario`, and `ops-scenario` only changes for `ops`).
+* Remove any chores.
+* Remove any bullets that do not apply to the package. For instance, if a bullet
+  only affects `ops[testing]`, don't include it in [CHANGES.md](CHANGES.md) when
+  doing an `ops` release. The bullet should go in [testing/CHANGES.md](testing/CHANGES.md)
+  instead. If `ops[testing]` is not being released yet, put the bullet in a placeholder
+  section at top of [testing/CHANGES.md](testing/CHANGES.md).
 * Strip the commit type prefix from the bullet point, and capitalise the first
   word.
 * Strip the username (who did each commit) if the author is a member of the
@@ -423,6 +427,7 @@ CHANGES.md files.
 * Replace the link to the pull request with the PR number in parentheses.
 * Where appropriate, collapse multiple tightly related bullet points into a
   single point that refers to multiple commits.
+* Where appropriate, add backticks for code formatting.
 
 For example: the PR
 
