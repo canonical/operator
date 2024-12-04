@@ -84,13 +84,11 @@ class Runtime:
             "JUJU_MODEL_NAME": state.model.name,
             "JUJU_MODEL_UUID": state.model.uuid,
             "JUJU_CHARM_DIR": str(charm_root.absolute()),
-            # todo consider setting pwd, (python)path
         }
 
         if event._is_action_event and (action := event.action):
             env.update(
                 {
-                    # TODO: we should check we're doing the right thing here.
                     "JUJU_ACTION_NAME": action.name.replace("_", "-"),
                     "JUJU_ACTION_UUID": action.id,
                 },
@@ -136,7 +134,7 @@ class Runtime:
                 else:
                     logger.warning(
                         "remote unit ID unset; no remote unit data present. "
-                        "Is this a realistic scenario?",  # TODO: is it?
+                        "Is this a realistic scenario?",
                     )
 
             if remote_unit_id is not None:
@@ -188,14 +186,15 @@ class Runtime:
     @staticmethod
     def _wrap(charm_type: Type["CharmType"]) -> Type["CharmType"]:
         # dark sorcery to work around framework using class attrs to hold on to event sources
-        # todo this should only be needed if we call play multiple times on the same runtime.
-        #  can we avoid it?
+        # this should only be needed if we call play multiple times on the same runtime.
         class WrappedEvents(charm_type.on.__class__):
+            """The charm's event sources, but wrapped."""
             pass
 
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
 
         class WrappedCharm(charm_type):
+            """The test charm's type, but with events wrapped."""
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
@@ -276,7 +275,6 @@ class Runtime:
     def _exec_ctx(self, ctx: "Context"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
-            # TODO: allow customising capture_events
             with capture_events(
                 include_deferred=ctx.capture_deferred_events,
                 include_framework=ctx.capture_framework_events,
@@ -298,9 +296,6 @@ class Runtime:
         This will set the environment up and call ops.main().
         After that it's up to ops.
         """
-        # todo consider forking out a real subprocess and do the mocking by
-        #  mocking hook tool executables
-
         from ._consistency_checker import check_consistency  # avoid cycles
 
         check_consistency(state, event, self._charm_spec, self._juju_version)

@@ -2,6 +2,12 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""Test Context
+
+The test `Context` object provides the context of the wider Juju system that the
+specific `State` exists in, and the events that can be executed on that `State`.
+"""
+
 from __future__ import annotations
 
 import functools
