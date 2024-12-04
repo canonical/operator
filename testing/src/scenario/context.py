@@ -105,8 +105,7 @@ class Manager(Generic[CharmType]):
 
     def __enter__(self):
         self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
-        ops = wrapped_ctx.__enter__()
-        self.ops = ops
+        self.ops = wrapped_ctx.__enter__()
         return self
 
     def run(self) -> State:
