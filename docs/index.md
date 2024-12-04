@@ -20,7 +20,7 @@ The library ([available on PyPI](https://pypi.org/project/ops/)) provides:
 - {ref}`ops`, the API to respond to Juju events and manage the application;
 - {ref}`ops_pebble`, the Pebble client, a low-level API for Kubernetes containers;
 - {ref}`ops_testing`, the recommended API for unit testing charms; and
-- {ref}`ops_testing_harness`, the legacy (deprecated API for unit testing charms. 
+- {ref}`ops_testing_harness`, the legacy (deprecated) API for unit testing charms. 
 
 You can structure your charm however you like, but with the `ops` library, you get a framework that promotes consistency and readability by following best practices. It also helps you organise your code better by separating different aspects of the charm, such as managing the application's state, handling integrations with other services, and making the charm easier to test.
 
