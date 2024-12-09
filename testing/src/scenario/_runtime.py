@@ -6,20 +6,15 @@
 
 import copy
 import dataclasses
-import marshal
-import re
 import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
     Dict,
-    FrozenSet,
     List,
     Optional,
-    Set,
     Type,
     TypeVar,
     Union,
@@ -37,17 +32,13 @@ from ops import (
     PreCommitEvent,
 )
 from ops.jujucontext import _JujuContext
-from ops.storage import NoSnapshotError, SQLiteStorage
-from ops.framework import _event_regex
 from ops._private.harness import ActionFailed
 
 from .errors import NoObserverError, UncaughtCharmError
 from .logger import logger as scenario_logger
 from .state import (
-    DeferredEvent,
     PeerRelation,
     Relation,
-    StoredState,
     SubordinateRelation,
 )
 
@@ -56,112 +47,8 @@ if TYPE_CHECKING:  # pragma: no cover
     from .state import CharmType, State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild("runtime")
-STORED_STATE_REGEX = re.compile(
-    r"((?P<owner_path>.*)\/)?(?P<_data_type_name>\D+)\[(?P<name>.*)\]",
-)
-EVENT_REGEX = re.compile(_event_regex)
 
 RUNTIME_MODULE = Path(__file__).parent
-
-
-class UnitStateDB:
-    """Represents the unit-state.db."""
-
-    def __init__(self, db_path: Union[Path, str]):
-        self._db_path = db_path
-        self._state_file = Path(self._db_path)
-
-    def _open_db(self) -> SQLiteStorage:
-        """Open the db."""
-        return SQLiteStorage(self._state_file)
-
-    def get_stored_states(self) -> FrozenSet["StoredState"]:
-        """Load any StoredState data structures from the db."""
-
-        db = self._open_db()
-
-        stored_states: Set[StoredState] = set()
-        for handle_path in db.list_snapshots():
-            if not EVENT_REGEX.match(handle_path) and (
-                match := STORED_STATE_REGEX.match(handle_path)
-            ):
-                stored_state_snapshot = db.load_snapshot(handle_path)
-                kwargs = match.groupdict()
-                sst = StoredState(content=stored_state_snapshot, **kwargs)
-                stored_states.add(sst)
-
-        db.close()
-        return frozenset(stored_states)
-
-    def get_deferred_events(self) -> List["DeferredEvent"]:
-        """Load any DeferredEvent data structures from the db."""
-
-        db = self._open_db()
-
-        deferred: List[DeferredEvent] = []
-        for handle_path in db.list_snapshots():
-            if EVENT_REGEX.match(handle_path):
-                notices = db.notices(handle_path)
-                for handle, owner, observer in notices:
-                    try:
-                        snapshot_data = db.load_snapshot(handle)
-                    except NoSnapshotError:
-                        snapshot_data: Dict[str, Any] = {}
-
-                    event = DeferredEvent(
-                        handle_path=handle,
-                        owner=owner,
-                        observer=observer,
-                        snapshot_data=snapshot_data,
-                    )
-                    deferred.append(event)
-
-        db.close()
-        return deferred
-
-    def apply_state(self, state: "State"):
-        """Add DeferredEvent and StoredState from this State instance to the storage."""
-        db = self._open_db()
-        for event in state.deferred:
-            db.save_notice(event.handle_path, event.owner, event.observer)
-            try:
-                marshal.dumps(event.snapshot_data)
-            except ValueError as e:
-                raise ValueError(
-                    f"unable to save the data for {event}, it must contain only simple types.",
-                ) from e
-            db.save_snapshot(event.handle_path, event.snapshot_data)
-
-        for stored_state in state.stored_states:
-            db.save_snapshot(stored_state._handle_path, stored_state.content)
-
-        db.close()
-
-
-class _OpsMainContext:  # type: ignore
-    """Context manager representing ops.main execution context.
-
-    When entered, ops.main sets up everything up until the charm.
-    When .emit() is called, ops.main proceeds with emitting the event.
-    When exited, if .emit has not been called manually, it is called automatically.
-    """
-
-    def __init__(self):
-        self._has_emitted = False
-
-    def __enter__(self):
-        pass
-
-    def emit(self):
-        """Emit the event.
-
-        Within the test framework, this only requires recording that it was emitted.
-        """
-        self._has_emitted = True
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # noqa: U100
-        if not self._has_emitted:
-            self.emit()
 
 
 class Runtime:
@@ -305,8 +192,6 @@ class Runtime:
         class WrappedEvents(charm_type.on.__class__):
             """The charm's event sources, but wrapped."""
 
-            pass
-
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
 
         class WrappedCharm(charm_type):
@@ -388,28 +273,11 @@ class Runtime:
             # charm_virtual_root is a tempdir
             typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
 
-    @staticmethod
-    def _get_state_db(temporary_charm_root: Path):
-        charm_state_path = temporary_charm_root / ".unit-state.db"
-        return UnitStateDB(charm_state_path)
-
-    def _initialize_storage(self, state: "State", temporary_charm_root: Path):
-        """Before we start processing this event, store the relevant parts of State."""
-        store = self._get_state_db(temporary_charm_root)
-        store.apply_state(state)
-
-    def _close_storage(self, state: "State", temporary_charm_root: Path):
-        """Now that we're done processing this event, read the charm state and expose it."""
-        store = self._get_state_db(temporary_charm_root)
-        deferred = store.get_deferred_events()
-        stored_state = store.get_stored_states()
-        return dataclasses.replace(state, deferred=deferred, stored_states=stored_state)
-
     @contextmanager
     def _exec_ctx(self, ctx: "Context"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
-            with _capture_events(
+            with capture_events(
                 include_deferred=ctx.capture_deferred_events,
                 include_framework=ctx.capture_framework_events,
             ) as captured:
@@ -442,9 +310,6 @@ class Runtime:
 
         logger.info(" - generating virtual charm root")
         with self._exec_ctx(context) as (temporary_charm_root, captured):
-            logger.info(" - initializing storage")
-            self._initialize_storage(state, temporary_charm_root)
-
             logger.info(" - preparing env")
             env = self._get_event_env(
                 state=state,
@@ -453,8 +318,8 @@ class Runtime:
             )
             juju_context = _JujuContext.from_dict(env)
 
-            logger.info(" - Entering ops.main (mocked).")
-            from .ops_main_mock import Ops  # noqa: F811
+            logger.info(" - entering ops.main (mocked)")
+            from ._ops_main_mock import Ops  # noqa: F811
 
             try:
                 ops = Ops(
@@ -467,12 +332,8 @@ class Runtime:
                     ),
                     juju_context=juju_context,
                 )
-                ops.setup()
 
                 yield ops
-
-                # if the caller did not manually emit or commit: do that.
-                ops.finalize()
 
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
@@ -482,21 +343,18 @@ class Runtime:
                 ) from e
 
             finally:
-                logger.info(" - Exited ops.main.")
-
-            logger.info(" - closing storage")
-            output_state = self._close_storage(output_state, temporary_charm_root)
+                logger.info(" - exited ops.main")
 
         context.emitted_events.extend(captured)
         logger.info("event dispatched. done.")
-        context._set_output_state(output_state)
+        context._set_output_state(ops.state)
 
 
 _T = TypeVar("_T", bound=EventBase)
 
 
 @contextmanager
-def _capture_events(
+def capture_events(
     *types: Type[EventBase],
     include_framework: bool = False,
     include_deferred: bool = True,

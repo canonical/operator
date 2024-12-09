@@ -1,4 +1,5 @@
 import copy
+import typing
 
 import ops
 import pytest
@@ -35,13 +36,13 @@ ACTIONS = {
 
 
 class ContextCharm(ops.CharmBase):
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.observed = []
+        self.observed: typing.List[ops.EventBase] = []
         for event in self.on.events().values():
             framework.observe(event, self._on_event)
 
-    def _on_event(self, event):
+    def _on_event(self, event: ops.EventBase):
         self.observed.append(event)
 
 
@@ -60,7 +61,7 @@ class ContextCharm(ops.CharmBase):
         ("leader_elected", ops.LeaderElectedEvent),
     ],
 )
-def test_simple_events(event_name, event_kind):
+def test_simple_events(event_name: str, event_kind: typing.Type[ops.EventBase]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run(ctx.on.install(), state)

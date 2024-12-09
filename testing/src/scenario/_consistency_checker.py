@@ -39,7 +39,7 @@ from typing import (
 )
 
 from .errors import InconsistentScenarioError
-from .runtime import logger as scenario_logger
+from ._runtime import logger as scenario_logger
 from .state import (
     CharmType,
     PeerRelation,
@@ -179,6 +179,11 @@ def check_event_consistency(
         # skip everything here. Perhaps in the future, custom events could
         # optionally include some sort of state metadata that made testing
         # consistency possible?
+        warnings.append(
+            "this is a custom event; if its name makes it look like a builtin one "
+            "(for example, a relation event, or a workload event), you might get some false-negative "
+            "consistency checks.",
+        )
         return Results(errors, warnings)
 
     if event._is_relation_event:
