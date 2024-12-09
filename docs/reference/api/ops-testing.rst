@@ -1,7 +1,7 @@
-.. _state-transition-tests:
+.. _ops_testing:
 
-Unit testing (was: Scenario)
-============================
+`ops.testing` (was: Scenario)
+=============================
 
 Install ops with the ``testing`` extra to use this API; for example:
 ``pip install ops[testing]``
