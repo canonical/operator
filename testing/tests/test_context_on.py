@@ -56,8 +56,6 @@ class ContextCharm(ops.CharmBase):
         ("update_status", ops.UpdateStatusEvent),
         ("config_changed", ops.ConfigChangedEvent),
         ("upgrade_charm", ops.UpgradeCharmEvent),
-        ("pre_series_upgrade", ops.PreSeriesUpgradeEvent),
-        ("post_series_upgrade", ops.PostSeriesUpgradeEvent),
         ("leader_elected", ops.LeaderElectedEvent),
     ],
 )
@@ -70,6 +68,25 @@ def test_simple_events(event_name: str, event_kind: typing.Type[ops.EventBase]):
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
         assert isinstance(mgr.charm.observed[0], event_kind)
+
+
+@pytest.mark.parametrize(
+    "event_name, event_kind",
+    [
+        ("pre_series_upgrade", ops.PreSeriesUpgradeEvent),
+        ("post_series_upgrade", ops.PostSeriesUpgradeEvent),
+    ],
+)
+def test_simple_deprecated_events(event_name, event_kind):
+    ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
+    # These look like:
+    #   ctx.run(ctx.on.pre_series_upgrade(), state)
+    with pytest.warns(DeprecationWarning):
+        with ctx(getattr(ctx.on, event_name)(), scenario.State()) as mgr:
+            mgr.run()
+            assert len(mgr.charm.observed) == 2
+            assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+            assert isinstance(mgr.charm.observed[0], event_kind)
 
 
 @pytest.mark.parametrize("as_kwarg", [True, False])
