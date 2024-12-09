@@ -181,7 +181,7 @@ def _max_posargs(n: int):
 
 
 @dataclasses.dataclass(frozen=True)
-class JujuLogLine(_max_posargs(2)):
+class JujuLogLine:
     """An entry in the Juju debug-log."""
 
     level: str
