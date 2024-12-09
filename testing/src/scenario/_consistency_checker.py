@@ -181,7 +181,7 @@ def check_event_consistency(
         # consistency possible?
         warnings.append(
             "this is a custom event; if its name makes it look like a builtin one "
-            "(e.g. a relation event, or a workload event), you might get some false-negative "
+            "(for example, a relation event, or a workload event), you might get some false-negative "
             "consistency checks.",
         )
         return Results(errors, warnings)
