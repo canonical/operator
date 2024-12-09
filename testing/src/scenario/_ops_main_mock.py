@@ -143,9 +143,7 @@ class Ops(_Manager):
 
     def _make_storage(self, _: _Dispatcher):
         # TODO: add use_juju_for_storage support
-        # TODO: Pass a charm_state_path that is ':memory:' when appropriate.
-        charm_state_path = self._charm_root / self._charm_state_path
-        storage = ops.storage.SQLiteStorage(charm_state_path)
+        storage = ops.storage.SQLiteStorage(":memory:")
         logger.info("Copying input state to storage.")
         self.store = UnitStateDB(storage)
         self.store.apply_state(self.state)
