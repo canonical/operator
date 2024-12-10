@@ -23,7 +23,7 @@ from ops.model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
-    """A handler for sending logs and warnings to Juju via juju-log."""
+    """A handler for sending logs to Juju via juju-log."""
 
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
