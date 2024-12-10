@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import typing
+import warnings
 
 import ops
 
@@ -65,6 +66,7 @@ class Charm(ops.CharmBase):
             on_log_warning_action=[],
             on_log_info_action=[],
             on_log_debug_action=[],
+            on_warn_action=[],
             on_secret_changed=[],
             on_secret_remove=[],
             on_secret_rotate=[],
@@ -113,6 +115,7 @@ class Charm(ops.CharmBase):
             self.framework.observe(self.on.log_warning_action, self._on_log_warning_action)
             self.framework.observe(self.on.log_info_action, self._on_log_info_action)
             self.framework.observe(self.on.log_debug_action, self._on_log_debug_action)
+            self.framework.observe(self.on.warn_action, self._on_warn_action)
 
         self.framework.observe(self.on.collect_metrics, self._on_collect_metrics)
         self.framework.observe(self.on.custom, self._on_custom)
@@ -303,6 +306,9 @@ class Charm(ops.CharmBase):
 
     def _on_log_debug_action(self, event: ops.ActionEvent):
         logger.debug('insightful debug')
+
+    def _on_warn_action(self, event: ops.ActionEvent):
+        warnings.warn('feature x is deprecated, use feature y instead', DeprecationWarning)
 
     def _on_get_model_name_action(self, event: ops.ActionEvent):
         self._stored._on_get_model_name_action.append(self.model.name)

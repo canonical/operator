@@ -18,12 +18,18 @@ import logging
 import sys
 import types
 import typing
+import warnings
 
 from ops.model import _ModelBackend
 
 
+# We do this on module import because some warnings are issued before we set up
+# the framework, and we need to capture those as well.
+logging.captureWarnings(True)
+
+
 class JujuLogHandler(logging.Handler):
-    """A handler for sending logs to Juju via juju-log."""
+    """A handler for sending logs and warnings to Juju via juju-log."""
 
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
@@ -41,12 +47,15 @@ class JujuLogHandler(logging.Handler):
 def setup_root_logging(
     model_backend: _ModelBackend, debug: bool = False, exc_stderr: bool = False
 ):
-    """Setup python logging to forward messages to juju-log.
+    """Setup Python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
     Charmers can also set their own default log level with::
 
       logging.getLogger().setLevel(logging.INFO)
+
+    Warnings issued by the warnings module are redirected to the logging system
+    and forwarded to juju-log, too.
 
     Args:
         model_backend: a ModelBackend to use for juju-log
@@ -56,6 +65,19 @@ def setup_root_logging(
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
+
+    def custom_warning_formatter(
+        message: typing.Union[str, Warning],
+        category: typing.Type[Warning],
+        filename: str,
+        lineno: int,
+        _: typing.Optional[str] = None,
+    ) -> str:
+        """Like the default formatter, but don't include the code."""
+        return f'{filename}:{lineno}: {category.__name__}: {message}'
+
+    warnings.formatwarning = custom_warning_formatter
+
     if debug:
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')

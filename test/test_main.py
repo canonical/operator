@@ -895,6 +895,30 @@ class _TestMain(abc.ABC):
             self._simulate_event(fake_script, event_spec)
             assert calls in fake_script.calls(clear=True)
 
+        # Test warnings are captured and sent to the Juju debug-log,
+        event_spec = EventSpec(
+            ops.ActionEvent,
+            'warn_action',
+            env_var='JUJU_ACTION_NAME',
+            set_in_env={'JUJU_ACTION_UUID': '5'},
+        )
+        self._simulate_event(fake_script, event_spec)
+        calls = fake_script.calls(clear=True)
+
+        calls_without_message = [call[:-1] for call in calls]
+        expected_without_message = ['juju-log', '--log-level', 'WARNING', '--']
+        assert expected_without_message in calls_without_message
+
+        idx = calls_without_message.index(expected_without_message)
+        warning_message = calls[idx][-1]
+        pattern = (
+            r'^.*:(\d+):\s+DeprecationWarning:\s+'
+            + re.escape('feature x is deprecated, use feature y instead')
+            + '$'
+        )
+        if not re.match(pattern, warning_message):
+            pytest.fail(f'Warning was not sent to debug-log: {calls!r}')
+
     @pytest.mark.usefixtures('setup_charm')
     def test_excepthook(self, fake_script: FakeScript):
         with pytest.raises(subprocess.CalledProcessError):
