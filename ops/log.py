@@ -48,8 +48,8 @@ def setup_root_logging(
 
       logging.getLogger().setLevel(logging.INFO)
 
-    Warnings issued by the warnings module are redirected to the logging system
-    and forwarded to juju-log, too.
+    Warnings issued by the warnings module will be captured via stderr and also
+    end up in juju-log.
 
     Args:
         model_backend: a ModelBackend to use for juju-log
