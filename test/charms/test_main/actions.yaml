@@ -43,5 +43,3 @@ log-info:
   description: log a message at Info level
 log-debug:
   description: log a message at Debug level
-warn:
-  description: generate a deprecation warning

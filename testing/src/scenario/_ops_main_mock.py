@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import dataclasses
-import logging
 import marshal
 import re
 import sys
@@ -140,9 +139,6 @@ class Ops(_Manager):
         # Ops sets sys.excepthook to go to Juju's debug-log, but that's not
         # useful in a testing context, so we reset it here.
         super()._setup_root_logging()
-        # Ops also sets up logging to capture warnings, but we want the normal
-        # output.
-        logging.captureWarnings(False)
         sys.excepthook = sys.__excepthook__
 
     def _make_storage(self, _: _Dispatcher):
