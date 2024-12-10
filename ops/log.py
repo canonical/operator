@@ -59,7 +59,6 @@ def setup_root_logging(
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
-
     if debug:
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
