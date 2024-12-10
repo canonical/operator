@@ -13,6 +13,7 @@
 # limitations under the License.
 """Support legacy ops.main.main() import."""
 
+import inspect
 import warnings
 from typing import Optional, Type
 
@@ -29,6 +30,15 @@ from ._main import (  # noqa: F401
 )
 
 
+def _get_stack_level():
+    frame = inspect.currentframe()
+    stack_level = 0
+    while frame:
+        stack_level += 1
+        frame = frame.f_back
+    return stack_level
+
+
 def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
     """Legacy entrypoint to set up the charm and dispatch the observed event.
 
@@ -40,6 +50,9 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     warnings.warn(
         'Calling `ops.main.main()` is deprecated, call `ops.main()` instead',
         DeprecationWarning,
-        stacklevel=2,
+        # main(MyCharm) is a stack level of 2, but ops.main.main(MyCharm) is a
+        # stack level of 3. We know that this will be popping back to the top,
+        # in any reasonable usage, so just use the next-to-top level.
+        stacklevel=_get_stack_level() - 1,
     )
     return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
