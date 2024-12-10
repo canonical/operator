@@ -18,14 +18,8 @@ import logging
 import sys
 import types
 import typing
-import warnings
 
 from ops.model import _ModelBackend
-
-
-# We do this on module import because some warnings are issued before we set up
-# the framework, and we need to capture those as well.
-logging.captureWarnings(True)
 
 
 class JujuLogHandler(logging.Handler):
@@ -65,18 +59,6 @@ def setup_root_logging(
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
-
-    def custom_warning_formatter(
-        message: typing.Union[str, Warning],
-        category: typing.Type[Warning],
-        filename: str,
-        lineno: int,
-        _: typing.Optional[str] = None,
-    ) -> str:
-        """Like the default formatter, but don't include the code."""
-        return f'{filename}:{lineno}: {category.__name__}: {message}'
-
-    warnings.formatwarning = custom_warning_formatter
 
     if debug:
         handler = logging.StreamHandler()

@@ -49,11 +49,11 @@ def test_top_level_import(charm_env: None):
         ops.main()  # type: ignore
 
 
-def test_top_level_import_legacy_call(charm_env: None):
+def test_top_level_import_legacy_call(charm_env: None, caplog: pytest.LogCaptureFixture):
     import ops
 
-    with pytest.deprecated_call():
-        ops.main.main(ops.CharmBase)
+    ops.main.main(ops.CharmBase)
+    assert 'DeprecationWarning: Calling `ops.main()` is deprecated' in caplog.records[0].message
 
     with pytest.raises(TypeError):
         ops.main.main()  # type: ignore
@@ -68,11 +68,11 @@ def test_submodule_import(charm_env: None):
         ops.main()  # type: ignore
 
 
-def test_submodule_import_legacy_call(charm_env: None):
+def test_submodule_import_legacy_call(charm_env: None, caplog: pytest.LogCaptureFixture):
     import ops.main
 
-    with pytest.deprecated_call():
-        ops.main.main(ops.CharmBase)
+    ops.main.main(ops.CharmBase)
+    assert 'DeprecationWarning: Calling `ops.main()` is deprecated' in caplog.records[0].message
 
     with pytest.raises(TypeError):
         ops.main.main()  # type: ignore
@@ -87,21 +87,23 @@ def test_import_from_top_level_module(charm_env: None):
         main()  # type: ignore
 
 
-def test_import_from_top_level_module_legacy_call(charm_env: None):
+def test_import_from_top_level_module_legacy_call(
+    charm_env: None, caplog: pytest.LogCaptureFixture
+):
     from ops import main
 
-    with pytest.deprecated_call():
-        main.main(ops.CharmBase)
+    main.main(ops.CharmBase)
+    assert 'DeprecationWarning: Calling `ops.main()` is deprecated' in caplog.records[0].message
 
     with pytest.raises(TypeError):
         main.main()  # type: ignore
 
 
-def test_legacy_import_from_submodule(charm_env: None):
+def test_legacy_import_from_submodule(charm_env: None, caplog: pytest.LogCaptureFixture):
     from ops.main import main
 
-    with pytest.deprecated_call():
-        main(ops.CharmBase)
+    main(ops.CharmBase)
+    assert 'DeprecationWarning: Calling `ops.main()` is deprecated' in caplog.records[0].message
 
     with pytest.raises(TypeError):
         main()  # type: ignore
