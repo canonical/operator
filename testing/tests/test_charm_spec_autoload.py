@@ -127,6 +127,23 @@ def test_no_meta_raises(tmp_path, legacy):
 
 
 @pytest.mark.parametrize("legacy", (True, False))
+@pytest.mark.parametrize(
+    "params",
+    (
+        {"actions": {"foo": "bar"}},
+        {"config": {"foo": "bar"}},
+    ),
+)
+def test_partial_meta_raises(tmp_path, legacy, params):
+    with create_tempcharm(
+        tmp_path, legacy=legacy, meta={"type": "charm", "name": "sergio"}
+    ) as charm:
+        # metadata not found:
+        with pytest.raises(ContextSetupError):
+            Context(charm, **params)
+
+
+@pytest.mark.parametrize("legacy", (True, False))
 def test_relations_ok(tmp_path, legacy):
     with create_tempcharm(
         tmp_path,
