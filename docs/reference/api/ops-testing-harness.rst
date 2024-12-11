@@ -1,7 +1,7 @@
-.. _harness:
+.. _ops_testing_harness:
 
-Harness (legacy unit testing)
-=============================
+`ops.testing.Harness` (legacy unit testing)
+===========================================
 
 .. deprecated:: 2.17
     The Harness framework is deprecated and will be moved out of the base

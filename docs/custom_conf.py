@@ -57,6 +57,12 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 # features, it is sufficient to update the settings in the "Project
 # information" section.
 
+# FIXME: temporarily disable missing xrefs in this branch, until the missing
+# links to Juju and Charmcraft are added.
+suppress_warnings = [
+    'myst.xref_missing',
+]
+
 ############################################################
 ### Project information
 ############################################################
