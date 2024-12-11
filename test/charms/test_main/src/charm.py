@@ -309,4 +309,4 @@ class Charm(ops.CharmBase):
 
 
 if __name__ == '__main__':
-    ops.main(Charm)  # type: ignore
+    ops.main(Charm)

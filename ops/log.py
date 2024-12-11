@@ -41,12 +41,15 @@ class JujuLogHandler(logging.Handler):
 def setup_root_logging(
     model_backend: _ModelBackend, debug: bool = False, exc_stderr: bool = False
 ):
-    """Setup python logging to forward messages to juju-log.
+    """Setup Python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
     Charmers can also set their own default log level with::
 
       logging.getLogger().setLevel(logging.INFO)
+
+    Warnings issued by the warnings module will be captured via stderr and also
+    end up in juju-log.
 
     Args:
         model_backend: a ModelBackend to use for juju-log
