@@ -15,8 +15,9 @@
 """Support legacy ops.main.main() import."""
 
 import inspect
-import logging
-from typing import Any, Optional, Type
+import os
+import warnings
+from typing import Any, Optional, Type, Union
 
 import ops.charm
 
@@ -27,9 +28,8 @@ from ._main import (  # noqa: F401
     CHARM_STATE_FILE,  # type: ignore[reportUnusedImport]
     _Dispatcher,  # type: ignore[reportUnusedImport]
     _get_event_args,  # type: ignore[reportUnusedImport]
+    logger,  # type: ignore[reportUnusedImport]
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _top_frame():
@@ -56,13 +56,7 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     # This means that we need to delay emitting the warning until the framework
     # has been set up, so we wrap the charm and do it on instantiation. However,
     # this means that a regular warning call won't provide the correct filename
-    # and line number - we could wrap this in a custom formatter, but it's
-    # simpler to just use a logging.warning() call instead.
-    # Note that unit tests almost never call main(), so wouldn't show this
-    # warning, so we're relying on integration tests, which aren't going to be
-    # treating warning calls in any special way. That means that we can just
-    # output the warning directly as a log message, and the effect will be the
-    # same.
+    # and line number.
     # Note also that this will be logged with every event. Our assumption is
     # that this will be noticeable enough during integration testing that it
     # will get fixed before going into production.
@@ -72,12 +66,30 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     class DeprecatedMainCharmBase(charm_class):
         def __init__(self, *args: Any, **kwargs: Any):
             super().__init__(*args, **kwargs)
-            logger.warning(
-                '%s:%s: DeprecationWarning: Calling `ops.main()` is deprecated, '
-                'call `ops.main()` instead',
-                frame.f_code.co_filename,
-                frame.f_lineno,
-            )
+
+            _original_format = warnings.formatwarning
+
+            def custom_warning_formatter(
+                message: Union[str, Warning],
+                category: Type[Warning],
+                *args: Any,
+                **kwargs: Any,
+            ) -> str:
+                """Like the default formatter, but patch in the filename and line number."""
+                return (
+                    f'{frame.f_code.co_filename}:{frame.f_lineno}: '
+                    f'{category.__name__}: {message}'
+                )
+
+            try:
+                warnings.formatwarning = custom_warning_formatter
+                warnings.warn(
+                    'Calling `ops.main()` is deprecated, call `ops.main()` instead',
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            finally:
+                warnings.formatwarning = _original_format
 
     return _main.main(
         charm_class=DeprecatedMainCharmBase, use_juju_for_storage=use_juju_for_storage
