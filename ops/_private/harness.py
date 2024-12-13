@@ -2271,13 +2271,13 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         declared_type = option.get('type')
         if not declared_type:
             raise RuntimeError(
-                f'Incorrectly formatted `options.yaml`, option {key} '
+                f'Incorrectly formatted config in YAML, option {key} '
                 'is expected to declare a `type`.'
             )
 
         if declared_type not in self._supported_types:
             raise RuntimeError(
-                'Incorrectly formatted `options.yaml`: `type` needs to be one '
+                'Incorrectly formatted config in YAML: `type` needs to be one '
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type)
             )
 
