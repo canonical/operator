@@ -36,7 +36,7 @@ Conceptually, a charm is code that instructs Juju to deploy and manage an applic
 All  subsequent workload management happens in the same way -- the Juju controller sends events to the charm and the charm responds to these events by managing the workload application in various ways via Pebble. The picture below illustrates all of this for a simple case where there is just one workload container.
 
 
-![Create a minimal Kubernetes charm](../../resources/create_a_minimal_kubernetes_charm.jpg)
+![Create a minimal Kubernetes charm](../../resources/create_a_minimal_kubernetes_charm.png)
 
 
 As a charm developer, your first job is to use this knowledge to create the basic structure and content for your charm:
@@ -159,7 +159,7 @@ framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_
 
 ```{tip}
 
-**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event. See [Talking to a workload: Control flow from A to Z]().
+**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event.
 
 ```
 
@@ -338,7 +338,7 @@ This name might vary slightly, depending on your architecture. E.g., for an `arm
 
 Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` named after your application with one replica.
 
-```
+```text
 juju deploy ./demo-api-charm_ubuntu-22.04-amd64.charm --resource \
      demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
@@ -353,7 +353,7 @@ juju deploy ./demo-api-charm_ubuntu-22.04-amd64.charm --resource \
 
 Monitor your deployment:
 
-```
+```text
 juju status --watch 1s
 ```
 
@@ -382,25 +382,27 @@ You should see a JSON string with the version of the application:
 {"version":"1.0.0"}
 ```
 
-----
+
 ```{dropdown} Expand if you wish to inspect your deployment further
 
 
 1. Run:
- ```
+
+```text
 kubectl get namespaces
 ```
+
 You should see that Juju has created a namespace called `welcome-k8s`.
 
 2. Try:
 
-```
+```text
 kubectl -n welcome-k8s get pods
 ```
 
 You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
 
-```
+```text
 NAME                             READY   STATUS    RESTARTS        AGE
 modeloperator-5df6588d89-ghxtz   1/1     Running   3 (7d2h ago)    13d
 demo-api-charm-0                 2/2     Running   0               7d2h
@@ -408,16 +410,10 @@ demo-api-charm-0                 2/2     Running   0               7d2h
 
 3. Check also:
 
-```
+```text
 kubectl -n welcome-k8s describe pod demo-api-charm-0
 ```
 In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
-
-
-```
-
-------------
-
 
 **Congratulations, you've successfully created a minimal Kubernetes charm!** 
 

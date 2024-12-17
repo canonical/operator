@@ -1,7 +1,9 @@
 (manage-resources)=
 # How to manage resources
 
+<!-- UPDATE LINKS:
 > See also: [`juju` | Resource (charm)](https://juju.is/docs/juju/charm-resource), [`juju` | Manage resources](https://juju.is/docs/juju/manage-charm-resources), [`charmcraft` | Manage resources]()
+-->
 
 ## Implement the feature
 

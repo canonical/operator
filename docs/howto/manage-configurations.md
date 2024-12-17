@@ -1,7 +1,9 @@
 (manage-configurations)=
 # Manage configurations
 
+<!-- UPDATE LINKS:
 > See first: [`juju` | Application configuration](https://juju.is/docs/juju/configuration#heading--application-configuration), [`juju` | Manage application configurations](https://juju.is/docs/juju/manage-applications#heading--configure-an-application), [`charmcraft` | Manage configurations]()
+-->
 
 
 ## Implement the feature

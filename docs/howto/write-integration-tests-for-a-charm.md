@@ -19,7 +19,9 @@ The instructions all use the Juju `python-libjuju` client, either through the `p
 
 In order to run integrations tests you will need to have your environment set up with `tox` installed.
 
+<!-- UPDATE LINKS
 > See more: {ref}`How to set up your development environment <set-up-your-development-environment>`
+-->
 
 ## Prepare the `tox.ini` configuration file
 
@@ -42,7 +44,7 @@ commands =
            {[vars]tests_path}/integration
 ```
 
-<a href="#heading--create-test-file"><h2 id="heading--create-test-file">Create a test file</h2></a>
+## Create a test file
 
 By convention, integration tests are kept in the charm’s source tree, in a directory called `tests/integration`.
 
@@ -55,7 +57,7 @@ from pytest_operator.plugin import OpsTest
 
 The `ops_test` fixture is your entry point to the `pytest-operator` library, and the preferred way of interacting with Juju in integration tests. This fixture will create a model for each test file -- if you write two tests that should not share a model, make sure to place them in different files.
 
-<a href="#heading--build-tests"><h2 id="heading--build-tests">Build your tests</h2></a>
+## Build your tests
 
 ```{note}
 
@@ -63,7 +65,7 @@ Use `pytest` custom markers to toggle which types of tests are being run so you 
 
 ```
 
-<a href="#heading--test-build-and-deploy"><h3 id="heading--test-build-and-deploy">Test build and deploy</h3></a>
+### Test build and deploy
 
 To build and deploy the current charm, in your integration test file, add the function below:
 
@@ -79,7 +81,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that build and deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
 
-The decorator `@pytest.mark.abort_on_fail` abort all next tests if something goes wrong. With the decorator `@pytest.mark.skip_if_deployed` you can skip that test if a `--model` is passed as a command line parameter (see [Run your tests](#run-tests) for more information).
+The decorator `@pytest.mark.abort_on_fail` abort all next tests if something goes wrong. With the decorator `@pytest.mark.skip_if_deployed` you can skip that test if a `--model` is passed as a command line parameter (see {ref}`run-your-tests` for more information).
 
 `ops_test.build_charm` builds the charm with charmcraft. `ops_test.model` is an instance of `python-libjuju` 's [Model](https://pythonlibjuju.readthedocs.io/en/latest/api/juju.model.html#juju.model.Model) class that reference the active model tracked by `pytest-operator` for the current module.
 
@@ -96,9 +98,11 @@ As an alternative to `wait_for_idle`, you can explicitly block until the applica
 > - [`pytest-operator` | `ops_test.build_charm`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1020)
 > - [`python-libjuju` | `model.deploy `](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/model.py#L1658)
 
-<a href="#heading--deploy-your-charm-with-resources"><h3 id="heading--deploy-your-charm-with-resources">Deploy your charm with resources</h3></a>
+### Deploy your charm with resources
 
+<!-- UPDATE LINKS
 > See also: [Resource (Charm)](https://juju.is/docs/juju/charm-resource)
+-->
 
 A charm can require `file` or `oci-image` `resources` to work, that can be provided to `ops_test.model.deploy`. In Charmhub, resources have revision numbers. For file resources already stored in Charmhub, you can use `ops_test.download_resources`:
 
@@ -130,7 +134,7 @@ For `oci-images` you can reference an image registry.
 > - [`python-libjuju` | `model.deploy`](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/model.py#L1658)
 
 
-<a href="#heading--test-a-relation"><h3 id="heading--test-a-relation">Test a relation</h3></a>
+### Test a relation
 
 To test an integration between two applications, you can just integrate them through
 the model. Both applications have to be deployed beforehand.
@@ -150,9 +154,12 @@ async def test_my_integration(ops_test: OpsTest):
 
 > See more: [`python-libjuju` | `model.integrate`](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/model.py#L1476)
 
-<a href="#heading--test-a-configuration"><h3 id="heading--test-a-configuration">Test a configuration</h3></a>
+### Test a configuration
+
+<!-- UPDATE LINKS
 
 > See also: [Configuration]()
+-->
 
 You can set a configuration option in your application and check its results. 
 
@@ -171,13 +178,15 @@ async def test_config_changed(ops_test: OpsTest):
 
 
 
-<a href="#heading--test-an-action"><h3 id="heading--test-an-action">Test an action</h3></a>
+### Test an action
 
+<!-- UPDATE LINKS
 > See also: [Action]()
+-->
 
 You can execute an action on a unit and get its results. 
 
-```
+```text
 async def test_run_action(ops_test: OpsTest):
     action_register_user = await ops_test.model.applications["myapp"].units[0].run_action("register-user", username="ubuntu")
     await action_register_user.wait()
@@ -188,13 +197,13 @@ async def test_run_action(ops_test: OpsTest):
 
 > See also: [python-libjuju | unit.run_action](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/unit.py#L274)
 
-<a href="#heading--interact-with-the-workload"><h3 id="heading--interact-with-the-workload">Interact with the workload</h3></a>
+### Interact with the workload
 
 To interact with the workload, you need to have access to it. This is dependent on many aspects of your application, environment and network topology.
 
 You can get information from your application or unit addresses using `await ops_test.model.get_status`. That way, if your application exposes a public address you can reference it. You can also try to connect to a unit address or public address.
 
-```
+```text
 async def test_workload_connectivity(ops_test: OpsTest):
     status = await ops_test.model.get_status()
     address = status.applications['my_app'].public_address
@@ -210,15 +219,17 @@ How you can connect to a private or public address is dependent on your configur
 
 > Example implementations: [mongodb-k8s-operator](https://github.com/canonical/mongodb-k8s-operator/blob/8b9ebbee3f225ca98175c25781f1936dc4a62a7d/tests/integration/metrics_tests/test_metrics.py#L33), [tempo-k8s-operator](https://github.com/canonical/tempo-k8s-operator/blob/78a1143d99af99a1a56fe9ff82b1a3563e4fd2f7/tests/integration/test_integration.py#L69), [synapse](https://github.com/canonical/synapse-operator/blob/eb44f4959a00040f08b98470f8b17cae4cc616da/tests/integration/conftest.py#L170)
 
+<!-- UPDATE LINKS:
 > See more: 
 > - [Charm development best practices > Fetching network information]()
 > - [`juju` CLI commands > juju expose]()
+-->
 
-<a href="#heading--run-a-subprocess-command-within-juju-context"><h3 id="heading--run-a-subprocess-command-within-juju-context">Run a subprocess command within Juju context</h3></a>
+### Run a subprocess command within Juju context
 
 You can run a command within the Juju context with:
 
-```
+```text
     ...
     command = ["microk8s", "version"]
     returncode, stdout, stderr = await ops_test.run(*command, check=True)
@@ -242,7 +253,7 @@ so you don't need to include the `-m` parameter.
 > - [`pytest-operator` | `run`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L576)
 > - [`pytest-operator` | `juju`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L624)
 
-<a href="#heading--use-several-models"><h3 id="heading--use-several-models">Use several models</h3></a>
+### Use several models
 
 You can use `pytest-operator` with several models, in the same cloud or in 
 different clouds. This way you can, for example, integrate machine charms
@@ -274,25 +285,26 @@ Using the new alias, you can switch context to the new created model, similar to
 
 > Example implementations: [`charm-kubernetes-autoscaler`](https://github.com/charmed-kubernetes/charm-kubernetes-autoscaler/blob/8f4ddf5d66802ade73ed3aab2bb8d09fd9e4d63a/tests/integration/test_kubernetes_autoscaler.py#L31)
 
+<!-- UPDATE LINKS:
 > See more: 
 > - [Juju offers]()
 > - [How to manage clouds]()
 > - [pytest-operator | track_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L720)
 > - [pytest-operator | model_context](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L480)
 > - [pytest-operator | forget_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L812)
+-->
 
 
-
-<a href="#heading--deploy-a-bundle"><h3 id="heading--deploy-a-bundle">Deploy a bundle</h3></a>
+### Deploy a bundle
 
 ```{note}
 
-It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle` until this [issue](https://github.com/charmed-kubernetes/pytest-operator/issues/98) is closed, as it uses `juju-bundle` which is outdated. You can deploy bundles using `ops_test.model.deploy` or [`ops_test.juju`]().
+It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle` until this [issue](https://github.com/charmed-kubernetes/pytest-operator/issues/98) is closed, as it uses `juju-bundle` which is outdated. You can deploy bundles using `ops_test.model.deploy` or `ops_test.juju`.
 
 ```
 
 
-<a href="#heading--render"><h3 id="heading--render">Render bundles and charms</h3></a>
+### Render bundles and charms
 
 `pytest-operator` has utilities to template your charms and bundles using Jinja2.
 
@@ -324,7 +336,7 @@ async def test_build_and_deploy_bundle(ops_test: OpsTest):
 
 
 
-<a href="#heading--fast-forward"><h3 id="heading--fast-forward">Speed up `update_status`  with `fast_forward`</h3></a>
+### Speed up `update_status`  with `fast_forward`
 
 If your charm code depends on the `update_status` event, you can speed up its
 firing rate with `fast_forward`. Inside the new async context you can put any code that will benefit  from the new refresh rate so your test may execute faster.
@@ -344,8 +356,8 @@ firing rate with `fast_forward`. Inside the new async context you can put any co
 > See more:
 > - [`pytest-operator` | `fast_forward`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1400)
 
-
-<a href="#heading--run-tests"><h2 id="heading--run-tests">Run your tests</h2></a>
+(run-your-tests)=
+## Run your tests
 
 By default you can run all your tests with:
 
@@ -370,13 +382,15 @@ There are different ways of specifying a subset of tests to run using `pytest`. 
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
 
+<!-- UPDATE LINKS:
 > Example implementations: [`mysql-k8s-operator`]()
+-->
 
 > See more: 
 > - [`pytest-operator` | `skip_if_deployed`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L139)
 > - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
 
-<a href="#heading--crash-dumps"><h2 id="heading--crash-dumps">Generate crash dumps</h2></a>
+## Generate crash dumps
 
 To generate crash dumps, you need the `juju-crashdump` tool .
 
@@ -394,6 +408,3 @@ tox -e integration -- --crash-dump=always --crash-dump-output=/tmp
 > See more: 
 > - [`juju-crashdump`](https://github.com/juju/juju-crashdump)
 > - [`pytest-operator` | `--crash-dump`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L97)
-
-
-> <small>Contributors:  @natalia-nowakowska , @javierdelapuente </small>

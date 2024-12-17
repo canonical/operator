@@ -5,7 +5,7 @@ The recommended way to create charms for Kubernetes is using the sidecar pattern
 
 Pebble is a lightweight, API-driven process supervisor designed for use with charms. If you specify the `containers` field in a charm's `charmcraft.yaml`, Juju will deploy the charm code in a sidecar container, with Pebble running as the workload container's `ENTRYPOINT`.
 
-When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/#ops.Framework.observe) as shown in [Framework Constructs under "Containers"](). This gives the charm author access to `event.workload`, a [`Container`](https://ops.readthedocs.io/en/latest/#ops.Container) instance.
+When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/#ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](https://ops.readthedocs.io/en/latest/#ops.Container) instance.
 
 The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, read and write files, and run commands. These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
 

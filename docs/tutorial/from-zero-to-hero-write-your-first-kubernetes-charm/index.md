@@ -1,7 +1,7 @@
 (from-zero-to-hero-write-your-first-kubernetes-charm)=
 # From zero to hero: Write your first Kubernetes charm
 
-This tutorial will introduce you to the official way to write a Kubernetes charm --- that is, how to equip an application with all the operational logic that it needs so that you can manage it on any Kubernetes cloud with just a few commands, using [Juju](https://juju.is/docs/olm).
+This tutorial will introduce you to the official way to write a Kubernetes charm --- that is, how to equip an application with all the operational logic that it needs so that you can manage it on any Kubernetes cloud with just a few commands, using Juju. 
 
 ```{important}
 
@@ -23,9 +23,9 @@ The  application that we will charm in this tutorial is based on the Python Fast
 **What you'll need:** 
 
 - A working station, e.g., a laptop with amd64 architecture. 
-- Familiarity with [Juju](https://juju.is/docs/juju)
-- Familiarity with the Python programming language, Object-Oriented Programming, Event Handlers
-- Understanding of Kubernetes fundamentals
+- Familiarity with Juju.
+- Familiarity with the Python programming language, Object-Oriented Programming, event handlers.
+- Understanding of Kubernetes fundamentals.
 
 
 **What you'll do:**
@@ -77,13 +77,8 @@ By the end of this tutorial you will have built a machine charm and evolved it i
 
 | If you are wondering... | visit...             |
 |-------------------------|----------------------|
-| "How do I...?"          | {ref}`howto-guides` |
+| "How do I...?"          | {ref}`how-to-guides` |
 | "What is...?"           | {ref}`reference`     |
 | "Why...?", "So what?"   | {ref}`explanation`   |
 
 
-
-
-<br>
-
-> <small> **Contributors:** @beliaev-maksim </small>

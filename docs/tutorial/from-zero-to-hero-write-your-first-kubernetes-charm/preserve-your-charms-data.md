@@ -28,15 +28,21 @@ There are a  few strategies you can adopt here:
 
 First, you can use an Ops construct called `Stored State`. With this strategy you can store data on the local unit (at least, so long as your `main` function doesn't set `use_juju_for_storage` to `True`). However, if your Kubernetes pod dies, your unit also dies, and thus also the data. For this reason this strategy is generally not recommended.
 
-> Read more: [StoredState](), {ref}`StoredState: Uses, Limitations <storedstate-uses-limitations>`
+> Read more: [`ops.StoredState`](https://ops.readthedocs.io/en/latest/#ops.StoredState), {ref}`StoredState: Uses, Limitations <storedstate-uses-limitations>`
 
 Second, you can make use of the Juju notion of 'peer relations'  and 'data bags'  and set up a peer relation data bag. This will help you store the information in the Juju's database backend. 
 
-> Read more: [Peer integrations](https://juju.is/docs/juju/relation#heading--peer)
+
+<!-- UPDATE LINKS
+> Read more: [Peer relations](https://juju.is/docs/juju/relation#heading--peer)
+-->
 
 Third, when you have confidential data, you can use Juju secrets (from Juju 3.1 onwards).
 
+<!-- UPDATE LINKS
 > Read more: [Juju | Secret](https://juju.is/docs/juju/secret)
+-->
+
 
 In this chapter we will adopt the second strategy, that is, we will store charm data in a peer relation databag. (We will explore the third strategy in a different scenario in the next chapter.)  We will illustrate this strategy with an artificial example where we save the counter of how many times the application pod has been restarted.
 
@@ -49,7 +55,10 @@ peers:
   fastapi-peer:
     interface: fastapi_demo_peers
 ```
+
+<!-- UPDATE LINKS
 > Read more: [File ‘charmcraft.yaml`]()
+-->
 
 ## Set and get data from the peer relation databag
 

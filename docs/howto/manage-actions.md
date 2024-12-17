@@ -1,8 +1,9 @@
 (manage-actions)=
 # How to manage actions
 
+<!-- UPDATE LINKS
 > See first: [`juju` | Action](https://juju.is/docs/juju/action), [`juju` | Manage actions](https://juju.is/docs/juju/manage-actions), [`charmcraft` | Manage actions]()
-
+-->
 
 ## Implement the feature
 

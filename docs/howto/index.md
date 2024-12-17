@@ -1,4 +1,4 @@
-(howto-guides)=
+(how-to-guides)=
 # How-to guides
 
 ```{toctree}
@@ -22,7 +22,6 @@ Get started with charm testing <get-started-with-charm-testing>
 Write unit tests for a charm <write-unit-tests-for-a-charm>
 Write scenario tests for a charm <write-scenario-tests-for-a-charm>
 Write integration tests for a charm <write-integration-tests-for-a-charm>
-Instrument your charm with tracing telemetry <instrument-your-charm-with-tracing-telemetry>
 Turn a hooks-based charm into an ops charm <turn-a-hooks-based-charm-into-an-ops-charm>
 
 ```

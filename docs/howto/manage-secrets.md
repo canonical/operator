@@ -1,7 +1,9 @@
 (manage-secrets)=
 # How to manage secrets
 
+<!-- UPDATE LINKS:
 > See first: [`juju` | Secret](https://juju.is/docs/juju/secret), [`juju` | Manage secrets](https://juju.is/docs/juju/manage-secrets), [`charmcraft` | Manage secrets]()
+-->
 
 > Added in `ops 2.0.0`, `juju 3.0.2`
 

@@ -1,8 +1,9 @@
 (manage-leadership-changes)=
 # Manage leadership changes
 
+<!-- UPDATE LINKS:
 > See first: [`juju` | Leader](https://juju.is/docs/juju/leader)
-
+-->
 
 ## Implement response to leadership changes
 

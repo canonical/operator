@@ -449,7 +449,8 @@ In a while you should see the following data appearing on the dashboard:
 3. Logs from your application that were collected by Loki and forwarded to Grafana. Here you can see some INFO level logs and ERROR logs with traceback from Python when you were calling the `/error` path.
 
 
-![Observe your charm with COS Lite](../../resources/observe_your_charm_with_cos_lite.png) 
+![Observe your charm with COS Lite](../../resources/observe_your_charm_with_cos_lite.png)
+
 
 ```{important}
 

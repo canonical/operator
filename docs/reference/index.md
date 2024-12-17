@@ -2,13 +2,12 @@
 # Reference
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 
-charm-relation-interfaces
-api/index
-pytest-operator
-testing
-interface-tests
-
+ops-main-entrypoint
+ops
+pebble
+ops-testing
+ops-testing-harness
 ```
 

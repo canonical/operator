@@ -1,7 +1,9 @@
 (turn-a-hooks-based-charm-into-an-ops-charm)=
 # How to turn a hooks-based charm into an ops charm
 
+<!-- UPDATE LINKS:
 > See first: [`juju` | Charm taxonomy]()
+-->
 
 Suppose you have a hooks-based charm and you decide to rewrite it using the Ops framework in Python.
 
@@ -24,7 +26,7 @@ We start by looking at the charm we intend to translate; as an example, we will 
 
 From the charm root directory we see: 
 
-```bash
+```text
 $ tree .
 .
 ├── charmcraft.yaml

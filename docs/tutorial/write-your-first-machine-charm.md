@@ -1,18 +1,18 @@
 (write-your-first-machine-charm)=
 # Write your first machine charm
 
-In this tutorial you will write a [machine charm](https://juju.is/docs/juju/charmed-operator) for [`juju`](https://juju.is/docs/juju) using (`charmcraft` and) `ops`.
+In this tutorial you will write a [machine charm](https://juju.is/docs/juju/charmed-operator) for Juju using (Charmcraft and) Ops.
 
 
 **What you'll need:** 
 - A workstation, e.g., a laptop, with amd64 architecture and which has sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space
 - Familiarity with Linux
-- Familiarity with [Juju](https://juju.is/docs/juju)
+- Familiarity with Juju.
 - Familiarity with object-oriented programming in Python
 
 **What you'll do:**
 
-Study your application. Use `charmcraft` and `ops` to build a basic charm and test-deploy it with `juju` and a localhost LXD-based cloud. Repeat the steps to evolve the charm so it can become increasingly more sophisticated.
+Study your application. Use Charmcraft and Ops to build a basic charm and test-deploy it with Juju and a localhost LXD-based cloud. Repeat the steps to evolve the charm so it can become increasingly more sophisticated.
 
 
 
@@ -35,7 +35,8 @@ The application has other features that we can exploit, but for now this is enou
 
 ## Set up your development environment
 
-> See [`juju` | Set up your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#set-up-automatically) for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm. At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD. 
+<!-- UPDATE LINKS -->
+> See [Juju | Set up your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#set-up-automatically) for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm. At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD. 
 
 ```{important}
 
@@ -94,7 +95,9 @@ test_charm.py
 
 ```
 
+<!--UPDATE LINKS
 > See more: [`charmcraft` | Manage charms](), [`charmcraft` | List of files in a charm project]()
+-->
 
 In your local editor, open the `charmcraft.yaml` file and customise its contents as below (you only have to edit the `title`, `summary`, and `description`):
 
@@ -132,8 +135,9 @@ bases:
       channel: "22.04"
 
 ```
-
+<!-- UPDATE LINKS
 > See more: [`charmcraft` | File `charmcraft.yaml`]()
+-->
 
 Now open the `src/charm.py` file and update it as below (you'll have to add an import statement for `os` and an observer and handler for the `install` event -- in the definition of which you'll be using `os` and `ops`). 
 
@@ -167,7 +171,9 @@ if __name__ == "__main__":  # pragma: nocover
     ops.main(MicrosampleVmCharm)  # type: ignore
 ```
 
+<!-- UPDATE LINKS
 > See more: [`charmcraft` | File `src/charm.py`](),  {ref}`run-workloads-with-a-charm-machines`
+-->
 
 Next, in your Multipass VM shell, inside your project directory, run `charmcraft pack` to pack the charm. It may take a few minutes the first time around but, when it's done, your charm project should contain a `.charm` file. Sample session:
 
@@ -186,7 +192,9 @@ LICENSE          microsample-vm_ubuntu-22.04-amd64.charm  src
 README.md        pyproject.toml                           tests
 ```
 
+<!-- UPDATE LINKS
 > See more: [`charmcraft` | Manage charms > Pack]()
+-->
 
 Now, open a new shell into your Multipass VM and use it to configure the Juju log verbosity levels and to start a live debug session:
 
@@ -281,7 +289,9 @@ config:
       type: string
 ```
 
+<!-- UPDATE LINKS
 > See more: [`charmcraft` | File `charmcraft.yaml` > Key `config`]()
+-->
 
 Then, in the `src/charm.py` file, update the `_on_install` function to make use of the new configuration option, as below:
 
@@ -401,7 +411,9 @@ requests==2.28.1
 requests-unixsocket==0.3.0
 ```
 
-> See more: [`charmcraft` | File `requirements.txt` <file-requirementstxt>`](), [PyPI > Library `requests`](https://pypi.org/project/requests/), [PyPI > Library `requests-unixsocket`](https://pypi.org/project/requests-unixsocket/)
+<!--
+> See more: [Charmcraft | File `requirements.txt` <file-requirementstxt>`](), [PyPI > Library `requests`](https://pypi.org/project/requests/), [PyPI > Library `requests-unixsocket`](https://pypi.org/project/requests-unixsocket/)
+-->
 
 Then, in your `src/charm.py` file, import the `requests_unixsocket` package, update the `_on_config_changed` function to set the workload version to the output of a function `_getWorkloadVersion`, and define the function to retrieve the Microsample workload version from the `snapd` API via a Unix socket, as below:
 
@@ -510,9 +522,12 @@ Machine  State    Address         Inst id        Base          AZ  Message
 Congratulations, your charm user can view the version of the workload deployed from your charm!
 
 
+
 ## Tear things down
 
-> See [`juju` | Tear down your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#tear-down-automatically)
+> See [Juju | Tear down your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#tear-down-automatically)
+
+
 
 (tutorial-machines-next-steps)=
 ## Next steps
@@ -521,7 +536,7 @@ By the end of this tutorial you will have built a machine charm and evolved it i
 
 | If you are wondering... | visit...             |
 |-------------------------|----------------------|
-| "How do I...?"          | {ref}`howto-guides`  |
+| "How do I...?"          | {ref}`how-to-guides` |
 | "What is...?"           | {ref}`reference`     |
 | "Why...?", "So what?"   | {ref}`explanation`   |
 

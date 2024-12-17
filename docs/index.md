@@ -1,4 +1,4 @@
-# Ops (`ops`)
+# Ops documentation
 
 ```{toctree}
 :maxdepth: 2
@@ -12,19 +12,20 @@ explanation/index
 
 
 
-The Ops (`ops`) library is a Python framework for writing and testing Juju charms.
+The Ops library (`ops`) is a Python framework for writing and testing Juju charms.
 
-The library ([available on PyPI](https://pypi.org/project/ops/)) provides:
+> [See it on PyPI](https://pypi.org/project/ops/)
 
-- {ref}`ops_main_entry_point`, used to initialise and run your charm;
-- {ref}`ops`, the API to respond to Juju events and manage the application;
-- {ref}`ops_pebble`, the Pebble client, a low-level API for Kubernetes containers;
-- {ref}`ops_testing`, the recommended API for unit testing charms; and
-- {ref}`ops_testing_harness`, the legacy (deprecated) API for unit testing charms. 
+The library provides:
+
+- {ref}`ops_main_entry_point`, used to initialise and run your charm
+- {ref}`ops`, the API to respond to Juju events and manage the application
+- {ref}`ops_pebble`, the Pebble client, a low-level API for Kubernetes containers
+- {ref}`ops_testing`, the recommended API for unit testing charms
+- {ref}`ops_testing_harness`, the deprecated API for unit testing charms
 
 You can structure your charm however you like, but with the `ops` library, you get a framework that promotes consistency and readability by following best practices. It also helps you organise your code better by separating different aspects of the charm, such as managing the application's state, handling integrations with other services, and making the charm easier to test.
 
-If you're serious about charming, you *must* use `ops`!
 
 ---------
 
@@ -83,7 +84,7 @@ As a community we adhere to the Ubuntu code of conduct.
 Discourse is the go-to forum for all questions Ops.
 
 * **[Join our online chat](https://matrix.to/#/#charmhub-ops:ubuntu.com)**:
-Meet us in the `#ops` channel on Matrix.
+Meet us in the #charmhub-charmdev channel on Matrix.
 
 * **[Report bugs](https://github.com/canonical/operator/)**:
 We want to know about the problems so we can fix them.
