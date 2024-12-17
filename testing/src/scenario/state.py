@@ -122,26 +122,43 @@ def _max_posargs(n: int):
 
         _max_positional_args = n
 
-        def __new__(cls, *args: Any, **kwargs: Any):
+        @classmethod
+        def _annotate_class(cls):
+            """Record information about which parameters are positional vs. keyword-only."""
+            if hasattr(cls, "_init_parameters"):
+                # We don't support dynamically changing the signature of a
+                # class, so we assume here it's the same as previously.
+                # In addition, the class and the function that provides it
+                # are private, so we generally don't expect anyone to be
+                # doing anything radical with these.
+                return
             # inspect.signature guarantees the order of parameters is as
             # declared, which aligns with dataclasses. Simpler ways of
             # getting the arguments (like __annotations__) do not have that
             # guarantee, although in practice it is the case.
-            parameters = inspect.signature(cls.__init__).parameters
-            required_args = [
+            cls._init_parameters = parameters = inspect.signature(
+                cls.__init__
+            ).parameters
+            cls._init_kw_only = {
+                name
+                for name in tuple(parameters)[cls._max_positional_args :]
+                if not name.startswith("_")
+            }
+            cls._init_required_args = [
                 name
                 for name in tuple(parameters)
-                if parameters[name].default is inspect.Parameter.empty
-                and name not in kwargs
-                and name != "self"
+                if name != "self"
+                and parameters[name].default is inspect.Parameter.empty
+            ]
+
+        def __new__(cls, *args: Any, **kwargs: Any):
+            cls._annotate_class()
+            required_args = [
+                name for name in cls._init_required_args if name not in kwargs
             ]
             n_posargs = len(args)
             max_n_posargs = cls._max_positional_args
-            kw_only = {
-                name
-                for name in tuple(parameters)[max_n_posargs:]
-                if not name.startswith("_")
-            }
+            kw_only = cls._init_kw_only
             if n_posargs > max_n_posargs:
                 raise TypeError(
                     f"{cls.__name__} takes {max_n_posargs} positional "
@@ -180,6 +197,10 @@ def _max_posargs(n: int):
     return _MaxPositionalArgs
 
 
+# A lot of JujuLogLine objects are created, so we want them to be fast and light.
+# Dataclasses define __slots__, so are small, and a namedtuple is actually
+# slower to create than a dataclass. A plain dictionary (or TypedDict) would be
+# about twice as fast, but less convenient to use.
 @dataclasses.dataclass(frozen=True)
 class JujuLogLine:
     """An entry in the Juju debug-log."""

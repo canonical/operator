@@ -3643,11 +3643,13 @@ class TestSecretInfo:
         assert info.rotates is None
         assert info.description is None
 
-        info = ops.SecretInfo.from_dict('5', {'revision': 9})
+        with pytest.warns(DeprecationWarning, match='`model_uuid` should always be provided'):
+            info = ops.SecretInfo.from_dict('5', {'revision': 9})
         assert info.id == 'secret:5'
         assert info.revision == 9
 
-        info = ops.SecretInfo.from_dict('secret://abcd/6', {'revision': 9})
+        with pytest.warns(DeprecationWarning, match='`model_uuid` should always be provided'):
+            info = ops.SecretInfo.from_dict('secret://abcd/6', {'revision': 9})
         assert info.id == 'secret://abcd/6'
         assert info.revision == 9
 
