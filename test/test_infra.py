@@ -77,8 +77,8 @@ def test_ops_testing_doc():
 
     found_names: typing.Set[str] = set()
     for test_doc in (
-        'docs/reference/api/ops-testing-harness.rst',
-        'docs/reference/api/ops-testing.rst',
+        'docs/reference/ops-testing-harness.rst',
+        'docs/reference/ops-testing.rst',
     ):
         with open(test_doc) as testing_doc:
             found_names.update({
