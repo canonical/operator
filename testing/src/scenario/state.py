@@ -128,6 +128,9 @@ def _max_posargs(n: int):
             if hasattr(cls, "_init_parameters"):
                 # We don't support dynamically changing the signature of a
                 # class, so we assume here it's the same as previously.
+                # In addition, the class and the function that provides it
+                # are private, so we generally don't expect anyone to be
+                # doing anything radical with these.
                 return
             # inspect.signature guarantees the order of parameters is as
             # declared, which aligns with dataclasses. Simpler ways of
