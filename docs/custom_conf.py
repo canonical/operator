@@ -57,8 +57,6 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 # features, it is sufficient to update the settings in the "Project
 # information" section.
 
-suppress_warnings = []
-
 ############################################################
 ### Project information
 ############################################################
