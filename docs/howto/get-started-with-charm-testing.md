@@ -91,7 +91,7 @@ A 'live', deployed Juju application will have access to all the inputs we discus
  
 You will notice that the starting point is typically always an event. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is *always* an event context to be mocked. This has important consequences for the unit-testing framework, as we will see below.
 
-### The harness
+### The framework
 
 In the charming world, unit testing means state-transition testing.
 
