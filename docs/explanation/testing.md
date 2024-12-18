@@ -31,13 +31,7 @@ Unit tests are intended to be isolating and fast to complete. These are the test
 **Tools.** Unit testing a charm can be done using:
 
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- the {ref}`write-scenario-tests-for-a-charm`, the `ops` unit testing framework
-
-<!--
-Unit tests are written using the `unittest` library shipped with Python or [pytest](https://pypi.org/project/pytest/). To facilitate unit testing of charms, use the [testing harness](https://juju.is/docs/sdk/testing) specifically designed for charmed operators which is available in the [Charmed Operator SDK](https://operator-framework.readthedocs.io/en/latest/#module-ops.testing). 
--->
-
-
+- [state transition testing](https://ops.readthedocs.io/en/latest/reference/ops-testing.html), using the `ops` unit testing framework
 
 **Examples.**
 
