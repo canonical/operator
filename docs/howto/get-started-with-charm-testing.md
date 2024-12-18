@@ -97,14 +97,14 @@ In the charming world, unit testing means state-transition testing.
 
 > See more [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html)
 
-`State` is the 'mocker' for most inputs and outputs you will need. Where a live charm would gather its input through context variables and calls to the Juju api (by running the hook tools), a charm under unit test will gather data via a mocked backend managed by the testing framework. Where a live charm would produce output by writing files to a filesystem, `Context` and `Container` expose a mock filesystem the charm will be able to interact with without knowing the difference. More specific outputs, however, will need to be mocked individually.
+`State` is the 'mocker' for most inputs and outputs you will need. Where a live charm would gather its input through context variables and calls to the Juju API (by running the hook tools), a charm under unit test will gather data using a mocked backend managed by the testing framework. Where a live charm would produce output by writing files to a filesystem, `Context` and `Container` expose a mock filesystem the charm will be able to interact with without knowing the difference. More specific outputs, however, will need to be mocked individually.
 
 A typical test will look like this:
  
 - set things up:
   - set up the charm and its metadata
   - set up the context
-  - mock any 'output' callable that you know would misfire or break (e.g. a system call -- you don't want a unit test to reboot your laptop)
+  - mock any 'output' callable that you know would misfire or break (for example, a system call -- you don't want a unit test to reboot your laptop)
   - set up the Juju state in which the event will fire, including config and relation data
  - **mock an event**
  - get the output
