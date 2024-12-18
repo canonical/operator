@@ -79,7 +79,7 @@ class MyDatabaseCharm(ops.CharmBase):
 This will inform Juju that a new revision is available, and Juju will inform all observers tracking older revisions that a new one is available, by means of a `secret-changed` hook.
 
 ```{caution}
-If your charm creates new revisions, it **must** also add a handler for the `secret-remove` event, and call `remove_revision` in it. If not, old revisions will continually build up in the secret backend.
+If your charm creates new revisions, it **must** also add a handler for the `secret-remove` event, and call `remove_revision` in it. If not, old revisions will continually build up in the secret backend. See more: {ref}`howto-remove-a-secret`
 ```
 
 ### Change the rotation policy or the expiration date of a secret
@@ -143,6 +143,7 @@ class MyDatabaseCharm(ops.CharmBase):
             self._rotate_webserver_secret(event.secret)
 ```
 
+(howto-remove-a-secret)=
 ### Remove a secret
 
 To remove a secret (effectively destroying it for good), the owner needs to call `secret.remove_all_revisions`. Regardless of the logic leading to the decision of when to remove a secret, the code will look like some variation of the following:

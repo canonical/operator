@@ -159,10 +159,15 @@ def test_charm_runs_with_relations(context, endpoint, n_relations):
 def test_relation_changed_behaviour(context, endpoint, n_relations):
     """Verify that the charm lib does what it should on relation changed."""
     # Arrange:
-    relations = {Relation(
-        endpoint=endpoint, interface='my-interface', remote_app_name=f"remote_{n}",
-        remote_app_data={"foo": f"my-data-{n}"}
-    ) for n in range(n_relations)}
+    relations = {
+        Relation(
+            endpoint=endpoint,
+            interface='my-interface',
+            remote_app_name=f"remote_{n}",
+            remote_app_data={"foo": f"my-data-{n}"},
+        )
+        for n in range(n_relations)
+    }
     state_in = testing.State(relations=relations)
     # act
     state_out: testing.State = context.run(context.on.relation_changed(relations[0]), state_in)
@@ -188,10 +193,15 @@ from lib.charms.my_Charm.v0.my_lib import MyObject
 def test_my_object_data(context, endpoint, n_relations):
     """Verify that the charm lib does what it should on relation changed."""
     # Arrange:
-    relations = {Relation(
-        endpoint=endpoint, interface='my-interface', remote_app_name=f"remote_{n}",
-        remote_app_data={"foo": f"my-data-{n}"}
-    ) for n in range(n_relations)}
+    relations = {
+        Relation(
+            endpoint=endpoint,
+            interface='my-interface',
+            remote_app_name=f"remote_{n}",
+            remote_app_data={"foo": f"my-data-{n}"},
+        )
+        for n in range(n_relations)
+    }
     state_in = testing.State(relations=relations)
     
     with context(context.on.relation_changed(relations[0]), state_in) as mgr:
