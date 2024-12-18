@@ -93,58 +93,46 @@ You will notice that the starting point is typically always an event. A charm do
 
 ### The harness
 
-In the charming world, unit testing means using Harness.
+In the charming world, unit testing means state-transition testing.
 
-> See more [`ops.testing.Harness`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness)
+> See more [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html)
 
-Harness is the 'mocker' for most inputs and outputs you will need. Where a live charm would gather its input through context variables and calls to the Juju api (by running the hook tools), a charm under unit test will gather data via a mocked backend managed by Harness. Where a live charm would produce output by writing files to a filesystem, Harness exposes a mock filesystem the charm will be able to interact with without knowing the difference. More specific outputs, however, will need to be mocked individually.
+`State` is the 'mocker' for most inputs and outputs you will need. Where a live charm would gather its input through context variables and calls to the Juju api (by running the hook tools), a charm under unit test will gather data via a mocked backend managed by the testing framework. Where a live charm would produce output by writing files to a filesystem, `Context` and `Container` expose a mock filesystem the charm will be able to interact with without knowing the difference. More specific outputs, however, will need to be mocked individually.
 
-A typical test with Harness will look like this:
+A typical test will look like this:
  
 - set things up:
   - set up the charm and its metadata
-  - set up the harness
-  - mock any 'output' callable that you know would misfire or break (e.g. a system call -- you don't want a unittest to reboot your laptop)
-  - configure the charm
-  - mock any relation data
+  - set up the context
+  - mock any 'output' callable that you know would misfire or break (e.g. a system call -- you don't want a unit test to reboot your laptop)
+  - set up the Juju state in which the event will fire, including config and relation data
  - **mock an event**
  - get the output
  - run assertions on the output
 
 > Obviously, other flows are possible; for example, where you unit test individual charm methods without going through the whole event context setup, but this is the characteristic one.
 
-### Understanding Harness
+### Understanding the test framework
 
-When you instantiate a `Harness` object, the charm instance does not exist yet. Just like in a live charm, it is possible that when the charm is executed for the first time, the Juju model already has given it storage, relations, some config, or leadership. This delay is meant to give us a chance to simulate this in our test setup. You create a `Harness` object, then you prepare the 'initial state' of the model mock, then you finally initialise the charm and simulate one or more events.
+When you instantiate `Context` and `State` objects, the charm instance does not exist yet. Just like in a live charm, it is possible that when the charm is executed for the first time, the Juju model already has given it storage, relations, some config, or leadership. This delay is meant to give us a chance to simulate this in our test setup. You create a `State` object, then you prepare the 'initial state' of the model mock, then you finally initialise the charm and simulate one or more events.
 
-There are two ways to initialize a harnessed charm:
+The `Context` provides methods for all the Juju events. For example:
 
- * When a charm is deployed, it goes through the Setup phase, a fixed sequence of events. `Harness` has a method, `begin_with_initial_hooks()`, that runs this sequence.
- * Alternatively, you can initialise the charm by calling `begin()`. This will instantiate the charm without firing any Setup phase event.
-
-<!-- UPDATE LINKS:
-> See more: [A charm's life](), [`ops.testing.Harness.begin_with_initial_hooks()`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.begin_with_initial_hooks), [`ops.testing.Harness.begin()`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.begin)
--->
-
-After the Setup phase, the charm goes into Operation. To test operation-phase-related events, the harness provides some methods to simulate the most common scenarios. For example: 
- 
- - the cloud admin changes the charm config: `harness.update_config`
- - the cloud admin relates this charm to some other: `harness.add_relation`
- - a remote unit joins in a relation (e.g. because the cloud admin has scaled up a remote charm): `harness.add_relation_unit`
- - a remote unit touches its relation data: `harness.update_relation_data`
- - the cloud admin removes a relation: `harness.remove_relation`
- - a resource is attached/detached: `harness.attach_storage` / `harness.detach_storage`
- - a container becomes ready: `harness.container_pebble_ready`
-
-Therefore, one typically will not have to manually `.emit()` events, but can rely on the `Harness` utilities and focus on the higher level abstractions that they expose.
+ - the cloud admin changes the charm config: `ctx.on.config_changed()`
+ - the cloud admin relates this charm to some other: `ctx.on.relation_created(relation)`
+ - a remote unit joins in a relation (for example, because the cloud admin has scaled up a remote charm): `ctx.on.relation_joined(relation)`
+ - a remote unit touches its relation data: `ctx.on.relation_changed(relation)`
+ - a cloud admin removes a relation: `ctx.on.relation_departed(relation)`
+ - a storage is attached/detached: `ctx.on.storage_attach(storage)` / `ctx.on.storage_detached(storage)`
+ - a container becomes ready: `ctx.on.pebble_ready(container)`
 
 ### Writing a test
 
 The typical way in which we want to structure a test is:
- - configure the required inputs
+ - arrange the required inputs
  - mock any function or system call you need to
  - initialise the charm
- - fire some event OR use one of the harness methods to trigger a predefined event sequence
+ - act, by calling `ctx.run`
  - assert some output matches what is expected, or some function is called with the expected parameters, etc...
 
 A simple test might look like this:
@@ -155,37 +143,31 @@ from ops import testing
 
 def test_pebble_ready_writes_config_file():
     """Test that on pebble-ready, a config file is written"""
-    harness: testing.Harness[MyCharm] = testing.Harness(MyCharm)
+    ctx = testing.Context(MyCharm)
     # If you want to mock charm config:
-    harness.update_config({'foo': 'bar'})
+    config = {'foo': 'bar'}
     # If you want to mock charm leadership:
-    harness.set_leader(True)
+    leader = True
 
     # If you want to mock relation data:
-    relation_ID = harness.add_relation('relation-name', 'remote-app-name')
-    harness.add_relation_unit(relation_ID, 'remote-app-name/0')
-    harness.update_relation_data(relation_ID, 'remote-app-name/0', {'baz': 'qux'})
+    relation = testing.Relation(
+        'relation-name',
+        remote_app_name='remote-app-name',
+        remote_units_data={1: {'baz': 'qux'}},
+    )
     
     # We are done setting up the inputs.
+    state_in = testing.State(config=config, leader=leader, relations={relation})
 
-    harness.begin()
-    charm = harness.charm  # This is a MyCharm instance.
-    
     # This will fire a `<container-name>-pebble-ready` event.
-    harness.container_pebble_ready("workload")
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
     # Suppose that MyCharm has written a YAML config file via Pebble.push():
-    container = charm.unit.get_container("workload")
-    file = "/opt/workload/path_to_config_file.yaml"
-    config = yaml.safe_load(container.pull(file).read())
+    container = state_out.get_container(container.name)
+    file = "path_to_config_file.yaml"
+    config = yaml.safe_load((container.get_filesystem() / file).read())
     assert config[0]['foo']['bar'] == 'baz'  # or whatever
 ``` 
-
-```{note}
-
-An important difference between a harnessed charm and a 'live', deployed, charm is that `Harness` holds on to the charm instance between events, while a deployed charm garbage-collects the charm instance between hooks. So if your charm were to set some states in, say, instance attributes, and rely on it on subsequent event handling loops, the unit tests based on the harness would not be able to catch that mistake. An integration test would.
-
-```
 
 ## Integration testing
 
@@ -221,7 +203,6 @@ Once you have used `ops_test` to get a model in which to run your integration te
 ```{note}
 
 *Pro tip*: you can prevent `ops_test` from tearing down the model on exit by passing the `--keep-models` argument. This is useful when the tests fail and the logs don't provide a sufficient post-mortem and a real live autopsy is required.
-
 ```
 
 Detailed documentation of how to use `ops_test` and `pytest-operator` is out of scope for this document. However, this is an example of a typical integration test:
@@ -254,13 +235,6 @@ async def test_operation(ops_test: OpsTest):
 `python-libjuju` has, of course, an API for all inverse operations: remove an app, scale it down, remove a relation...
 
 A good integration testing suite will check that the charm continues to operate as expected whenever possible, by combining these simple elements.
-
-## Functional testing
-
-Some charms represent their workload by means of an object-oriented wrapper, which mediates between operator code and the implementation of operation logic. In such cases, it can be useful to add a third category of tests, namely functional tests, that black-box test that workload wrapper without worrying about the substrate it runs on (the charm, the cloud, the machine or pod...).
-For an example charm adopting this strategy, see [parca-operator](https://github.com/jnsgruk/parca-operator). Nowadays, the preferred tool to do functional testing is Scenario.
-
-> See more: [Scenario](https://github.com/canonical/ops-scenario), {ref}`Write a Scenario test for a charm <write-scenario-tests-for-a-charm>`
 
 ## Continuous integration
 
@@ -333,4 +307,3 @@ Integration tests are a bit more complex, because in order to run those tests, a
 ## Conclusion
 
 We have examined all angles one might take when testing a charm, and given a brief overview of the most popular frameworks for implementing unit and integration tests, all the way to how one would link them up with a CI system to make sure the repository remains clean and tested.
-
