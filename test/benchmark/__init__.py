@@ -14,7 +14,7 @@
 
 """Benchmark tests for ops.
 
-Optimising performance is not a current goal with ops or - any gains are
+Optimising performance is not a current goal with ops - any gains are
 unlikely to be significant compared with ones from Juju or the charm and
 its workload. However, we do want to ensure that we do not unknowingly
 regress in performance.
