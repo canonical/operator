@@ -2,8 +2,10 @@ name: TIOBE Quality Checks
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron:  '0 7 1 * *'
+# Disabled for upgrade, see:
+# https://discourse.canonical.com/t/end-of-the-year-update-for-tiobe-tics-required-action-to-disable-tics-cicd-pipelines/4890
+#  schedule:
+#    - cron:  '0 7 1 * *'
 
 jobs:
   TICS:
