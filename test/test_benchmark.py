@@ -35,6 +35,8 @@ sys.path.append(str(pathlib.Path(__file__).parent / 'charms' / 'test_benchmark' 
 from bcharm import BenchmarkCharm
 
 
+# Note: the 'benchmark' argument here is a fixture that pytest-benchmark
+# automatically makes available to all tests.
 def test_context_explicit_meta(benchmark):
     ctx = benchmark(testing.Context, ops.CharmBase, meta={'name': 'foo'})
     assert isinstance(ctx, testing.Context)
