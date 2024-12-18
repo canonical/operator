@@ -60,7 +60,6 @@ def setup_root_logging(
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
-    logging.captureWarnings(True)
 
     def custom_showwarning(
         message: typing.Union[str, Warning],
@@ -68,9 +67,10 @@ def setup_root_logging(
         filename: str,
         lineno: int,
         *_: typing.Any,
-    ) -> str:
-        """Like the default showwarning, but don't include the code."""
-        return f'{filename}:{lineno}: {category.__name__}: {message}'
+        **__: typing.Any,
+    ):
+        """Direct the warning to Juju's debug-log, and don't include the code."""
+        logger.warning('%s:%s: %s: %s', filename, lineno, category.__name__, message)
 
     warnings.showwarning = custom_showwarning
 
