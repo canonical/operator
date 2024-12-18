@@ -106,7 +106,7 @@ A typical test will look like this:
   - set up the context
   - mock any 'output' callable that you know would misfire or break (for example, a system call -- you don't want a unit test to reboot your laptop)
   - set up the Juju state in which the event will fire, including config and relation data
- - **mock an event**
+ - **simulate an event via `Context.run`**
  - get the output
  - run assertions on the output
 
@@ -144,20 +144,19 @@ from ops import testing
 def test_pebble_ready_writes_config_file():
     """Test that on pebble-ready, a config file is written"""
     ctx = testing.Context(MyCharm)
-    # If you want to mock charm config:
-    config = {'foo': 'bar'}
-    # If you want to mock charm leadership:
-    leader = True
 
-    # If you want to mock relation data:
     relation = testing.Relation(
         'relation-name',
         remote_app_name='remote-app-name',
         remote_units_data={1: {'baz': 'qux'}},
     )
     
-    # We are done setting up the inputs.
-    state_in = testing.State(config=config, leader=leader, relations={relation})
+    # We are done setting up the inputs:
+    state_in = testing.State(
+      config={'foo': 'bar'},  # Mock the current charm config.
+      leader=True,  # Mock the charm leadership.
+      relations={relation},  # Mock relation data.
+    )
 
     # This will fire a `<container-name>-pebble-ready` event.
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)

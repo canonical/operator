@@ -48,7 +48,7 @@ def test_charm_runs():
     #  Create a Context to specify what code we will be running,
     ctx = testing.Context(MyCharm)
     #  and create a State to specify what simulated data the charm being run will access.
-    state_in = testing.State()
+    state_in = testing.State(leader=True)
 
     # Act:
     #  Ask the context to run an event, e.g. 'start', with the state we have previously created.
