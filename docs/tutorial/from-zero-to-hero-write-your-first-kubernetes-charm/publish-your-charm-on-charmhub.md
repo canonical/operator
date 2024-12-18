@@ -1,7 +1,7 @@
 (publish-your-charm-on-charmhub)=
 # Publish your charm on Charmhub
 
-> <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Pushing your charm to charmhub</small>
+> <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Pushing your charm to Charmhub</small>
 > 
 > **See previous: {ref}`Open a Kubernetes port in your charm  <open-a-kubernetes-port-in-your-charm>`**
 
@@ -9,7 +9,7 @@
 
 This document is part of a series, and we recommend you follow it in sequence. However, you can also jump straight in by checking out the code from the previous branches:
 
-```bash
+```text
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
 git checkout 11_open_port_k8s_service

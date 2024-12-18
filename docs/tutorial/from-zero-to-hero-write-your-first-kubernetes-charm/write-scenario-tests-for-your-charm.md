@@ -1,55 +1,73 @@
-(write-scenario-tests-for-your-charm)=
-# Write scenario tests for your charm
+(write-unit-tests-for-your-charm)=
+# Write unit tests for your charm
 
-> <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Write scenario tests for your charm</small>
+> <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Write unit tests for your charm</small>
 > 
-> **See previous: {ref}`Write unit tests for your charm <write-unit-tests-for-your-charm>`**
+> **See previous: {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>`**
 
 ````{important}
 
 This document is part of a series, and we recommend you follow it in sequence. However, you can also jump straight in by checking out the code from the previous branches:
 
-```
+```text
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
-git checkout 08_unit_testing
-git checkout -b 09_scenario_testing
+git checkout 05_cos_integration
+git checkout -b 06_unit_testing
 ```
 
 ````
 
-In the previous chapter we checked the basic functionality of our charm by writing unit tests.
+When you're writing a charm, you will want to ensure that it will behave reliably as intended.
 
-However, there is one more type of test to cover, namely: state transition tests. 
+For example, that the various components -- relation data, Pebble services, or configuration files -- all behave as expected in response to an event.
 
-In the charming world the current recommendation is to write state transition tests with the 'scenario' model popularised by the {ref}``ops-scenario` <scenario>` library.
+You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially `ops` built-in testing library -- [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
 
-```{note}
- Scenario is a state-transition testing SDK for operator framework charms. 
-```
+<!-- TODO
+
+This chapter and the next should be removed and the content spread throughout
+each of the previous chapters. Each time a feature is added, a unit and
+integration test should also be added. At the end of each chapter, before
+manually checking the feature works, the user should run the tests to make sure
+that they pass.
+
+-->
 
 In this chapter you will write a scenario test to check that the `get_db_info` action that you defined in an earlier chapter behaves as expected.
 
-
 ## Prepare your test environment
 
-Install `ops-scenario`:
-
-```bash
-pip install ops-scenario
-```
-In your project root's existing `tox.ini` file, add the following:
+Create a file called `tox.ini` in your charm project's root directory and add the following to configure your test environment:
 
 ```
-...
+[tox]
+no_package = True
+skip_missing_interpreters = True
+min_version = 4.0.0
+env_list = unit
 
-[testenv:scenario]
-description = Run scenario tests
+[vars]
+src_path = {tox_root}/src
+tests_path = {tox_root}/tests
+
+[testenv]
+set_env =
+    PYTHONPATH = {tox_root}/lib:{[vars]src_path}
+    PYTHONBREAKPOINT=pdb.set_trace
+    PY_COLORS=1
+pass_env =
+    PYTHONPATH
+    CHARM_BUILD_DIR
+    MODEL_SETTINGS
+
+[testenv:unit]
+description = Run unit tests
 deps =
     pytest
     cosl
-    ops-scenario ~= 7.0
     coverage[toml]
+    ops[testing]
     -r {tox_root}/requirements.txt
 commands =
     coverage run --source={[vars]src_path} \
@@ -58,35 +76,28 @@ commands =
                  -v \
                  -s \
                  {posargs} \
-                 {[vars]tests_path}/scenario
+                 {[vars]tests_path}/unit
     coverage report
 ```
-
-And adjust the `env_list` so that the Scenario tests will run with a plain `tox` command:
-
-```
-env_list = unit, scenario
-```
+> Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
 
 ## Prepare your test directory
 
-By convention, scenario tests are kept in a separate directory, `tests/scenario`. Create it as below:
+In your project root, create a `tests/unit` directory:
 
+```text
+mkdir -p tests/unit
 ```
-mkdir -p tests/scenario
-cd tests/scenario
-```
 
+## Write your test
 
-## Write your scenario test
-
-In your `tests/scenario` directory, create a new file `test_charm.py` and add the test below. This test will check the behaviour of the `get_db_info` action that you set up in a previous chapter. It will first set up the test context by setting the appropriate metadata, then define the input state, then run the action and, finally, check if the results match the expected values.
+In your `tests/unit` directory, create a new file `test_charm.py` and add the test below. This test will check the behaviour of the `get_db_info` action that you set up in a previous chapter. It will first set up the test context by setting the appropriate metadata, then define the input state, then run the action and, finally, check if the results match the expected values.
 
 ```python
 from unittest.mock import Mock
-
-import scenario
 from pytest import MonkeyPatch
+
+from ops import testing
 
 from charm import FastAPIDemoCharm
 
@@ -96,12 +107,12 @@ def test_get_db_info_action(monkeypatch: MonkeyPatch):
     monkeypatch.setattr('charm.MetricsEndpointProvider', Mock())
     monkeypatch.setattr('charm.GrafanaDashboardProvider', Mock())
 
-    # Use scenario.Context to declare what charm we are testing.
-    # Note that Scenario will automatically pick up the metadata from
+    # Use testing.Context to declare what charm we are testing.
+    # Note that the test framework will automatically pick up the metadata from
     # your charmcraft.yaml file, so you typically could just do
-    # `ctx = scenario.Context(FastAPIDemoCharm)` here, but the full
+    # `ctx = testing.Context(FastAPIDemoCharm)` here, but the full
     # version is included here as an example.
-    ctx = scenario.Context(
+    ctx = testing.Context(
         FastAPIDemoCharm,
         meta={
             'name': 'demo-api-charm',
@@ -126,10 +137,10 @@ def test_get_db_info_action(monkeypatch: MonkeyPatch):
     )
 
     # Declare the input state.
-    state_in = scenario.State(
+    state_in = testing.State(
         leader=True,
         relations={
-            scenario.Relation(
+            testing.Relation(
                 endpoint='database',
                 interface='postgresql_client',
                 remote_app_name='postgresql-k8s',
@@ -142,7 +153,7 @@ def test_get_db_info_action(monkeypatch: MonkeyPatch):
             ),
         },
         containers={
-            scenario.Container('demo-server', can_connect=True),
+            testing.Container('demo-server', can_connect=True),
         },
     )
 
@@ -157,48 +168,49 @@ def test_get_db_info_action(monkeypatch: MonkeyPatch):
     }
 ```
 
-
 ## Run the test
 
-In your Multipass Ubuntu VM shell, run your scenario test as below:
+In your Multipass Ubuntu VM shell, run your test as below:
 
-```bash
-ubuntu@charm-dev:~/juju-sdk-tutorial-k8s$ tox -e scenario     
+```text
+ubuntu@charm-dev:~/juju-sdk-tutorial-k8s$ tox -e unit     
 ```
 
 You should get an output similar to the one below:
 
-```bash                                             
-scenario: commands[0]> coverage run --source=/home/tameyer/code/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/tameyer/code/juju-sdk-tutorial-k8s/tests/scenario
+```text                                             
+unit: commands[0]> coverage run --source=/home/ubuntu/code/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/ubuntu/code/juju-sdk-tutorial-k8s/tests/unit
 ======================================= test session starts ========================================
-platform linux -- Python 3.11.9, pytest-8.3.3, pluggy-1.5.0 -- /home/tameyer/code/juju-sdk-tutorial-k8s/.tox/scenario/bin/python
-cachedir: .tox/scenario/.pytest_cache
-rootdir: /home/tameyer/code/juju-sdk-tutorial-k8s
+platform linux -- Python 3.11.9, pytest-8.3.3, pluggy-1.5.0 -- /home/ubuntu/code/juju-sdk-tutorial-k8s/.tox/unit/bin/python
+cachedir: .tox/unit/.pytest_cache
+rootdir: /home/ubuntu/code/juju-sdk-tutorial-k8s
 plugins: anyio-4.6.0
 collected 1 item                                                                                   
 
-tests/scenario/test_charm.py::test_get_db_info_action PASSED
+tests/unit/test_charm.py::test_get_db_info_action PASSED
 
 ======================================== 1 passed in 0.19s =========================================
-scenario: commands[1]> coverage report
+unit: commands[1]> coverage report
 Name           Stmts   Miss  Cover
 ----------------------------------
 src/charm.py     129     57    56%
 ----------------------------------
 TOTAL            129     57    56%
-  scenario: OK (6.89=setup[6.39]+cmd[0.44,0.06] seconds)
+  unit: OK (6.89=setup[6.39]+cmd[0.44,0.06] seconds)
   congratulations :) (6.94 seconds)
 ```
 
-Congratulations, you have written your first scenario test!
+Congratulations, you have written your first unit test!
+
+```{caution}
+
+As you can see in the output, the current tests cover 56% of the charm code. In a real-life scenario make sure to cover much more!
+```
 
 ## Review the final code
 
+For the full code see: [06_unit_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/06_unit_testing)
 
-For the full code see: [09_scenario_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/09_scenario_test)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/08_unit_testing...09_scenario_test)
+For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/05_cos_integration...06_unit_testing)
 
 > **See next: {ref}`Write integration tests for your charm <write-integration-tests-for-your-charm>`**
-
-

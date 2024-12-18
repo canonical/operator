@@ -27,7 +27,6 @@ The  application that we will charm in this tutorial is based on the Python Fast
 - Familiarity with the Python programming language, Object-Oriented Programming, event handlers.
 - Understanding of Kubernetes fundamentals.
 
-
 **What you'll do:**
 
 <!--
@@ -36,15 +35,11 @@ The  application that we will charm in this tutorial is based on the Python Fast
 - Develop your charm:
     1. {ref}`Create a minimal Kubernetes charm <create-a-minimal-kubernetes-charm>`
     1. {ref}`Make your charm configurable <make-your-charm-configurable>`
-    1. {ref}`Expose the version of the application behind your charm <expose-the-version-of-the-application-behind-your-charm>`
     1. {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`
-    1. {ref}`Preserve your charm's data <preserve-your-charms-data>`
     1. {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`
     1. {ref}`Observe your charm with COS Lite and set up cross-model integrations <observe-your-charm-with-cos-lite>`
     1. {ref}`Write unit tests for your charm <write-unit-tests-for-your-charm>`
-    1. {ref}`Write scenario tests for your charm <write-scenario-tests-for-your-charm>`
     1. {ref}`Write integration tests for your charm <write-integration-tests-for-your-charm>`
-    1. {ref}`Open a Kubernetes port in your charm <open-a-kubernetes-port-in-your-charm>`
     1. {ref}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`
 -->
 
@@ -56,19 +51,13 @@ set-up-your-development-environment
 study-your-application
 create-a-minimal-kubernetes-charm
 make-your-charm-configurable
-expose-the-version-of-the-application-behind-your-charm
 integrate-your-charm-with-postgresql
-preserve-your-charms-data
 expose-operational-tasks-via-actions
 observe-your-charm-with-cos-lite
 write-unit-tests-for-your-charm
-write-scenario-tests-for-your-charm
 write-integration-tests-for-your-charm
-open-a-kubernetes-port-in-your-charm
 publish-your-charm-on-charmhub
 ```
-
-
 
 (tutorial-kubernetes-next-steps)=
 ## Next steps
@@ -80,5 +69,3 @@ By the end of this tutorial you will have built a machine charm and evolved it i
 | "How do I...?"          | {ref}`how-to-guides` |
 | "What is...?"           | {ref}`reference`     |
 | "Why...?", "So what?"   | {ref}`explanation`   |
-
-
