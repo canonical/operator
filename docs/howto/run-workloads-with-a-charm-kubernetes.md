@@ -300,7 +300,7 @@ class MyCharm(ops.CharmBase):
 
 It's not an error to start a service that's already started, or stop one that's already stopped. These actions are *idempotent*, meaning they can safely be performed more than once, and the service will remain in the same state.
 
-When Pebble starts a service, Pebble waits one second to ensure the process doesn't exit too quickly -- if the process exits within one second, the start operation raises an error and the service remains stopped.
+When Pebble starts a service, it waits one second to ensure the process doesn't exit too quickly. In Juju 3.6.0 and earlier, if the process exits within one second, the start operation raises an error and the service remains stopped. In Juju 3.6.1 and later, the operation will still raise an error, but Pebble will continue to try starting the service.
 
 To stop a service, Pebble first sends `SIGTERM` to the service's process group to try to stop the service gracefully. If the process has not exited after 5 seconds, Pebble sends `SIGKILL` to the process group. If the process still doesn't exit after another 5 seconds, the stop operation raises an error. If the process exits any time before the 10 seconds have elapsed, the stop operation succeeds.
 
