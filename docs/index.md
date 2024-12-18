@@ -37,7 +37,7 @@ You can structure your charm however you like, but with the `ops` library, you g
 :link: tutorial/index
 :link-type: doc
 
-**Start here**: a hands-on introduction to Example Product for new users
+**Start here**: a hands-on introduction to `ops` for new users
 ```
 
 ```{grid-item-card} [How-to guides](/index)
