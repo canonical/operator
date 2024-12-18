@@ -32,9 +32,9 @@ class DatabaseRequirer(ops.framework.Object):
 ```
 
 
-## Write tests for a library with Scenario
+## Write tests for a library
 
-In this guide we will go through how to write Scenario tests for a charm library we are developing:
+In this guide we will go through how to write tests for a charm library we are developing:
 
 `<charm root>/lib/charms/my_charm/v0/my_lib.py`
 
@@ -45,16 +45,15 @@ The requirer side library does not interact with any lifecycle event; it only li
 
 Assuming you have a library file already set up and ready to go (see `charmcraft create-lib` otherwise), you now need to
 
-`pip install ops-scenario` and create a test file in `<charm root>/tests/scenario/test_my_lib.py`
-
+`pip install ops[testing]` and create a test file in `<charm root>/tests/unit/test_my_lib.py`
 
 ### Base test
 
 ```python
-#  `<charm root>/tests/scenario/test_my_lib.py`
+#  `<charm root>/tests/unit/test_my_lib.py`
 import pytest
 import ops
-from scenario import Context, State
+from ops import testing
 from lib.charms.my_Charm.v0.my_lib import MyObject
 
 class MyTestCharm(ops.CharmBase):
@@ -72,31 +71,30 @@ class MyTestCharm(ops.CharmBase):
     
 @pytest.fixture
 def context():
-    return Context(MyTestCharm, meta=MyTestCharm.META)
+    return testing.Context(MyTestCharm, meta=MyTestCharm.META)
 
 @pytest.mark.parametrize('event', (
     'start', 'install', 'stop', 'remove', 'update-status', #...
 ))
 def test_charm_runs(context, event):
-    """Verify that MyObject can initialize and process any event except relation events."""
-    # arrange
-    state_in = State()
-    # act
-    context.run(event, state_in)
+    """Verify that MyObject can initialise and process any event except relation events."""
+    # Arrange:
+    state_in = testing.State()
+    # Act:
+    context.run(getattr(context.on, event), state_in)
 ```
 
 ### Simple use cases
 
 #### Relation endpoint wrapper lib
 
-If `MyObject` is a relation endpoint wrapper such as [`traefik's ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib, 
-a frequent pattern is to allow customizing the name of the endpoint that the object is wrapping. We can write a scenario test like so:
+If `MyObject` is a relation endpoint wrapper such as [`traefik's ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib, a frequent pattern is to allow customizing the name of the endpoint that the object is wrapping. We can write a test like so:
 
 ```python
-#  `<charm root>/tests/scenario/test_my_lib.py`
+#  `<charm root>/tests/unit/test_my_lib.py`
 import pytest
 import ops
-from scenario import Context, State, Relation
+from ops import testing
 from lib.charms.my_Charm.v0.my_lib import MyObject
 
 
@@ -127,27 +125,32 @@ def my_charm_type(endpoint):
 
 @pytest.fixture
 def context(my_charm_type):
-    return Context(my_charm_type, meta=my_charm_type.META)
+    return testing.Context(my_charm_type, meta=my_charm_type.META)
 
 
 def test_charm_runs(context):
     """Verify that the charm executes regardless of how we name the requirer endpoint."""
-    # arrange
-    state_in = State()
-    # act
-    context.run('start', state_in)
+    # Arrange:
+    state_in = testing.State()
+    # Act:
+    context.run(context.on.start(), state_in)
 
 
 @pytest.mark.parametrize('n_relations', (1, 2, 7))
 def test_charm_runs_with_relations(context, endpoint, n_relations):
     """Verify that the charm executes when there are one or more relations on the endpoint."""
-    # arrange
-    state_in = State(relations=[
-        Relation(endpoint=endpoint, interface='my-interface', remote_app_name=f"remote_{n}") for n in range(n_relations)
-    ])
-    # act
-    state_out = context.run('start', state_in)
-    # assert
+    # Arrange:
+    state_in = testing.State(relations={
+        testing.Relation(
+            endpoint=endpoint,
+            interface='my-interface',
+            remote_app_name=f"remote_{n}",
+        )
+        for n in range(n_relations
+    })
+    # Act:
+    state_out = context.run(context.on.start(), state_in)
+    # Assert:
     for relation in state_out.relations:
         assert not relation.local_app_data  # remote side didn't publish any data.
 
@@ -155,14 +158,14 @@ def test_charm_runs_with_relations(context, endpoint, n_relations):
 @pytest.mark.parametrize('n_relations', (1, 2, 7))
 def test_relation_changed_behaviour(context, endpoint, n_relations):
     """Verify that the charm lib does what it should on relation changed."""
-    # arrange
-    relations = [Relation(
+    # Arrange:
+    relations = {Relation(
         endpoint=endpoint, interface='my-interface', remote_app_name=f"remote_{n}",
         remote_app_data={"foo": f"my-data-{n}"}
-    ) for n in range(n_relations)]
-    state_in = State(relations=relations)
+    ) for n in range(n_relations)}
+    state_in = testing.State(relations=relations)
     # act
-    state_out: State = context.run(relations[0].changed_event, state_in)
+    state_out: testing.State = context.run(context.on.relation_changed(relations[0]), state_in)
     # assert
     for relation in state_out.relations:
         assert relation.local_app_data == {"collation": ';'.join(f"my-data-{n}" for n in range(n_relations))}
@@ -173,30 +176,30 @@ def test_relation_changed_behaviour(context, endpoint, n_relations):
 #### Testing internal (charm-facing) library APIs
 
 Suppose that `MyObject` has a `data` method that exposes to the charm a list containing the remote databag contents (the `my-data-N` we have seen above).
-We can use `scenario.Context.manager` to run code within the lifetime of the Context like so:
+We can use `Context` as a context manager to run code within the lifetime of the Context like so:
 
 ```python
 import pytest
 import ops
-from scenario import Context, State, Relation
+from ops import testing
 from lib.charms.my_Charm.v0.my_lib import MyObject
 
 @pytest.mark.parametrize('n_relations', (1, 2, 7))
 def test_my_object_data(context, endpoint, n_relations):
     """Verify that the charm lib does what it should on relation changed."""
-    # arrange
-    relations = [Relation(
+    # Arrange:
+    relations = {Relation(
         endpoint=endpoint, interface='my-interface', remote_app_name=f"remote_{n}",
         remote_app_data={"foo": f"my-data-{n}"}
-    ) for n in range(n_relations)]
-    state_in = State(relations=relations)
+    ) for n in range(n_relations)}
+    state_in = testing.State(relations=relations)
     
-    with context.manager(relations[0].changed_event, state_in) as mgr:
-        # act
+    with context(context.on.relation_changed(relations[0]), state_in) as mgr:
+        # Act:
         state_out = mgr.run()  # this will emit the event on the charm 
-        # control is handed back to us before ops is torn down
+        # Control is handed back to us before ops is torn down.
 
-        # assert
+        # Assert:
         charm = mgr.charm  # the MyTestCharm instance ops is working with
         obj: MyObject = charm.obj
         assert obj.data == [
@@ -204,9 +207,7 @@ def test_my_object_data(context, endpoint, n_relations):
         ]
 ```
 
-
 ## Use a library
-
 
 Fetch the library.
 
@@ -224,5 +225,3 @@ class MyCharm(CharmBase):
         self.db_requirer = DatabaseRequirer(self)
         self.framework.observe(self.db_requirer.on.ready, self._on_db_ready)
 ```
-
-

@@ -5,17 +5,16 @@ The recommended way to create charms for Kubernetes is using the sidecar pattern
 
 Pebble is a lightweight, API-driven process supervisor designed for use with charms. If you specify the `containers` field in a charm's `charmcraft.yaml`, Juju will deploy the charm code in a sidecar container, with Pebble running as the workload container's `ENTRYPOINT`.
 
-When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/#ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](https://ops.readthedocs.io/en/latest/#ops.Container) instance.
+When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container) instance.
 
 The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, read and write files, and run commands. These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
 
-The rest of this document provides details of how a charm interacts with the workload container via Pebble, using the Python Operator Framework [`Container`](https://ops.readthedocs.io/en/latest/#ops.Container) methods.
+The rest of this document provides details of how a charm interacts with the workload container via Pebble, using `ops` [`Container`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container) methods.
 
 
 ```{note}
 
-The [`Container.pebble`](https://ops.readthedocs.io/en/latest/#ops.Container.pebble) property returns the [`pebble.Client`](https://ops.readthedocs.io/en/latest/#ops.pebble.Client) instance for the given container.
-
+The [`Container.pebble`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.pebble) property returns the [`pebble.Client`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Client) instance for the given container.
 ```
 
 ## Set up the workload container
@@ -24,12 +23,11 @@ The [`Container.pebble`](https://ops.readthedocs.io/en/latest/#ops.Container.peb
 
 <!--Juju already sets it up when it provisions the container-->
 
-The preferred way to run workloads on Kubernetes with charms is to start your workload with [Pebble](https://github.com/canonical/pebble). You do not need to modify upstream container images to make use of Pebble for managing your workload. The Juju controller automatically injects Pebble into workload containers using an [Init Container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) and [Volume Mount](https://kubernetes.io/docs/concepts/storage/volumes/). The entrypoint of the container is overridden so that Pebble starts first and is able to manage running services. Charms communicate with the Pebble API using a UNIX socket, which is mounted into both the charm and workload containers.
+The preferred way to run workloads on Kubernetes with charms is to start your workload with [Pebble](https://canonical-pebble.readthedocs-hosted.com/). You do not need to modify upstream container images to make use of Pebble for managing your workload. The Juju controller automatically injects Pebble into workload containers using an [Init Container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) and [Volume Mount](https://kubernetes.io/docs/concepts/storage/volumes/). The entrypoint of the container is overridden so that Pebble starts first and is able to manage running services. Charms communicate with the Pebble API using a UNIX socket, which is mounted into both the charm and workload containers.
 
 ```{note}
 
 By default, you'll find the Pebble socket at `/var/lib/pebble/default/pebble.sock` in the workload container, and `/charm/<container>/pebble.sock` in the charm container.
-
 ```
 
 Most Kubernetes charms will need to define a `containers` map in their `charmcraft.yaml` in order to start a workload with a known OCI image:
@@ -55,7 +53,6 @@ resources:
 ```{note}
 
 In some cases, you may wish not to specify a `containers` map, which will result in an "operator-only" charm. These can be useful when writing "integrator charms" (sometimes known as "proxy charms"), which are used to represent some external service in the Juju model.
-
 ```
 
 For each container, a resource of type `oci-image` must also be specified. The resource is used to inform the Juju controller how to find the correct OCI-compliant container image for your workload on Charmhub.
@@ -66,11 +63,10 @@ If multiple containers are specified in `charmcraft.yaml` (as above), each Pod w
 - a container running the `redis-image`
 - a container running the charm code
 
-The Juju controller emits [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent)s to charms when Pebble has initialised its API in a container. These events are named `<container_name>_pebble_ready`. Using the example above, the charm would receive two Pebble related events (assuming the Pebble API starts correctly in each workload):
+The Juju controller emits [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent)s to charms when Pebble has initialised its API in a container. These events are named `<container_name>_pebble_ready`. Using the example above, the charm would receive two Pebble related events (assuming the Pebble API starts correctly in each workload):
 
 - `myapp_pebble_ready`
 - `redis_pebble_ready`.
-
 
 Consider the following example snippet from a `charmcraft.yaml`:
 
@@ -87,7 +83,7 @@ resources:
 # ...
 ```
 
-Once the containers are initialised, the charm needs to tell Pebble how to start the workload. Pebble uses a series of "layers" for its configuration. Layers contain a description of the processes to run, along with the path and arguments to the executable, any environment variables to be specified for the running process and any relevant process ordering (more information available in the Pebble [README](https://github.com/canonical/pebble)).
+Once the containers are initialised, the charm needs to tell Pebble how to start the workload. Pebble uses a series of "layers" for its configuration. Layers contain a description of the processes to run, along with the path and arguments to the executable, any environment variables to be specified for the running process and any relevant process ordering (more information available in the [Pebble documentation](https://canonical-pebble.readthedocs-hosted.com)).
 
 ```{note}
 
@@ -95,10 +91,9 @@ In many cases, using the container's specified entrypoint may be desired. You ca
 
 `$ docker pull <image>`
 `$ docker inspect <image>`
-
 ```
 
-When using an OCI-image that is not built specifically for use with Pebble, layers are defined at runtime using Pebble’s API. Recall that when Pebble has initialised in a container (and the API is ready), the Juju controller emits a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/#ops.PebbleReadyEvent) event to the charm. Often it is in the callback bound to this event that layers are defined, and services started:
+When using an OCI-image that is not built specifically for use with Pebble, layers are defined at runtime using Pebble’s API. Recall that when Pebble has initialised in a container (and the API is ready), the Juju controller emits a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent) event to the charm. Often it is in the callback bound to this event that layers are defined, and services started:
 
 ```python
 # ...
@@ -199,30 +194,31 @@ In this example, each time a `config-changed` event is fired, a new overlay laye
 
 ### Configure a Pebble layer
 
-Pebble services are [configured by means of layers](https://github.com/canonical/pebble#layer-specification), with higher layers adding to or overriding lower layers, forming the effective Pebble configuration, or "plan".
+Pebble services are [configured by means of layers](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/), with higher layers adding to or overriding lower layers, forming the effective Pebble configuration, or "plan".
 
 When a workload container is created and Pebble starts up, it looks in `/var/lib/pebble/default/layers` (if that exists) for configuration layers already present in the container image, such as `001-layer.yaml`. If there are existing layers there, that becomes the starting configuration, otherwise Pebble is happy to start with an empty configuration, meaning no services.
 
 In the latter case, Pebble is configured dynamically via the API by adding layers at runtime.
 
-See the [layer specification](https://github.com/canonical/pebble#layer-specification) for more details.
-
+See the [layer specification](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/) for more details.
 
 #### Add a configuration layer
 
-To add a configuration layer, call [`Container.add_layer`](https://ops.readthedocs.io/en/latest/#ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](https://ops.readthedocs.io/en/latest/#ops.pebble.Layer) object.
+To add a configuration layer, call [`Container.add_layer`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Layer) object.
 
 You can see an example of `add_layer` under the ["Replan" heading](#replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
 
 Because `combine=True` combines the layer with an existing layer of the same name, it's normally used with `override: replace` in the YAML service configuration. This means replacing the entire service configuration with the fields in the new layer.
 
-If you're adding a single layer with `combine=False` (default option) on top of an existing base layer, you may want to use `override: merge` in the service configuration. This will merge the fields specified with the service by that name in the base layer. [See an example of overriding a layer.](https://github.com/canonical/pebble#layer-override-example)
+If you're adding a single layer with `combine=False` (default option) on top of an existing base layer, you may want to use `override: merge` in the service configuration. This will merge the fields specified with the service by that name in the base layer. [See an example of overriding a layer.](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layers/#layer-override)
 
 #### Fetch the effective plan
 
-Charm authors can also introspect the current plan using [`Container.get_plan`](https://ops.readthedocs.io/en/latest/#ops.Container.get_plan). It returns a [`pebble.Plan`](https://ops.readthedocs.io/en/latest/#ops.pebble.Plan) object whose `services` attribute maps service names to [`pebble.Service`](https://ops.readthedocs.io/en/latest/#ops.pebble.Service) instances.
+Charm authors can also introspect the current plan using [`Container.get_plan`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_plan). It returns a [`pebble.Plan`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Plan) object whose `services` attribute maps service names to [`pebble.Service`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Service) instances.
 
-Below is an example of how you might use `get_plan` to introspect the current configuration, and only add the layer with its services if they haven't been added already:
+It is not necessary to use `get_plan` to determine whether the plan has changed and start services accordingly. If you call [`replan`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.replan), then Pebble will take care of this for you.
+
+Below is an example of how you might use `get_plan` to introspect the current configuration, and log the active services:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -230,14 +226,12 @@ class MyCharm(ops.CharmBase):
 
     def _on_config_changed(self, event):
         container = self.unit.get_container("main")
+        container.replan()
         plan = container.get_plan()
-        if not plan.services:
-            layer = {"services": ...}
-            container.add_layer("layer", layer)
-            container.start("svc")
+        for service in plan.services:
+            logger.info('Service: %s', service)
         ...
 ```
-
 
 ## Control and monitor services in the workload container
 
@@ -253,7 +247,7 @@ The reason for replan is so that you as a user have control over when the (poten
 
 Replan also starts the services that are marked as `startup: enabled` in the configuration plan, if they're not running already.
 
-Call [`Container.replan`](https://ops.readthedocs.io/en/latest/#ops.Container.replan) to execute the replan procedure. For example:
+Call [`Container.replan`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.replan) to execute the replan procedure. For example:
 
 ```python
 class SnappassTestCharm(ops.CharmBase):
@@ -278,13 +272,13 @@ class SnappassTestCharm(ops.CharmBase):
 
 ### Check container health
 
-The Ops library provides a way to ensure that your container is healthy. In the `Container` class, `Container.can_connect()` can be used if you only need to know that Pebble is responding at a specific point in time - for example to update a status message. This should *not* be used to guard against later Pebble operations, because that introduces a race condition where Pebble might be responsive when `can_connect()` is called, but is not when the later operation is executed. Instead, charms should always include `try`/`except` statements around Pebble operations, to avoid the unit going into error state.
+`ops` provides a way to ensure that your container is healthy. In the `Container` class, `Container.can_connect()` can be used if you only need to know that Pebble is responding at a specific point in time - for example to update a status message. This should *not* be used to guard against later Pebble operations, because that introduces a race condition where Pebble might be responsive when `can_connect()` is called, but is not when the later operation is executed. Instead, charms should always include `try`/`except` statements around Pebble operations, to avoid the unit going into error state.
 
-> See more: [`ops.Container`](https://ops.readthedocs.io/en/latest/#ops.Container)
+> See more: [`ops.Container`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container)
 
 ### Start and stop
 
-To start (or stop) one or more services by name, use the [`start`](https://ops.readthedocs.io/en/latest/#ops.Container.start) and [`stop`](https://ops.readthedocs.io/en/latest/#ops.Container.stop) methods. Here's an example of how you might stop and start a database service during a backup action:
+To start (or stop) one or more services by name, use the [`start`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.start) and [`stop`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.stop) methods. Here's an example of how you might stop and start a database service during a backup action:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -312,7 +306,7 @@ To stop a service, Pebble first sends `SIGTERM` to the service's process group t
 
 ### Fetch service status
 
-You can use the [`get_service`](https://ops.readthedocs.io/en/latest/#ops.Container.get_service) and [`get_services`](https://ops.readthedocs.io/en/latest/#ops.Container.get_services) methods to fetch the current status of one service or multiple services, respectively. The returned [`ServiceInfo`](https://ops.readthedocs.io/en/latest/#ops.pebble.ServiceInfo) objects provide a `status` attribute with various states, or you can use the [`ServiceInfo.is_running`](https://ops.readthedocs.io/en/latest/#ops.pebble.ServiceInfo.is_running) method.
+You can use the [`get_service`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_service) and [`get_services`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_services) methods to fetch the current status of one service or multiple services, respectively. The returned [`ServiceInfo`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ServiceInfo) objects provide a `status` attribute with various states, or you can use the [`ServiceInfo.is_running`](https://ops.readthedocs.io/en/latest/#ops.pebble.ServiceInfo.is_running) method.
 
 Here is a modification to the start/stop example that checks whether the service is running before stopping it:
 
@@ -332,7 +326,7 @@ class MyCharm(ops.CharmBase):
 
 ### Send signals to services
 
-From Juju version 2.9.22, you can use the [`Container.send_signal`](https://ops.readthedocs.io/en/latest/#ops.Container.send_signal) method to send a signal to one or more services. For example, to send `SIGHUP` to the hypothetical "nginx" and "redis" services:
+You can use the [`Container.send_signal`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.send_signal) method to send a signal to one or more services. For example, to send `SIGHUP` to the hypothetical "nginx" and "redis" services:
 
 ```python
 container.send_signal('SIGHUP', 'nginx', 'redis')
@@ -354,7 +348,7 @@ In the command line above, "snappass" is the namespace (Juju model name), "snapp
 
 ### Configure service auto-restart
 
-From Juju version 2.9.22, Pebble automatically restarts services when they exit unexpectedly.
+Pebble automatically restarts services when they exit unexpectedly.
 
 By default, Pebble will automatically restart a service when it exits (with either a zero or nonzero exit code). In addition, Pebble implements an exponential backoff delay and a small random jitter time between restarts.
 
@@ -388,14 +382,13 @@ Just before delaying, a small random time jitter of 0-10% of the delay is added 
 
 ## Perform health checks on the workload container
 
-From Juju version 2.9.26, Pebble supports adding custom health checks: first, to allow Pebble itself to restart services when certain checks fail, and second, to allow Kubernetes to restart containers when specified checks fail.
+Pebble supports adding custom health checks: first, to allow Pebble itself to restart services when certain checks fail, and second, to allow Kubernetes to restart containers when specified checks fail.
 
 Each check can be one of three types. The types and their success criteria are:
 
 * `http`: an HTTP `GET` request to the URL specified must return an HTTP 2xx status code.
 * `tcp`: opening the given TCP port must be successful.
 * `exec`: executing the specified command must yield a zero exit code.
-
 
 ### Check configuration
 
@@ -428,12 +421,11 @@ Each check is performed with the specified `period` (the default is 10 seconds a
 
 A check is considered healthy until it's had `threshold` errors in a row (the default is 3). At that point, the `on-check-failure` action will be triggered, and the health endpoint will return an error response (both are discussed below). When the check succeeds again, the failure count is reset.
 
-See the [layer specification](https://github.com/canonical/pebble#layer-specification) for more details about the fields and options for different types of checks.
+See the [layer specification](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/) for more details about the fields and options for different types of checks.
 
 ### Respond to a check failing or recovering
 
 > Added in `ops 2.15` and `juju 3.6`
-
 
 To have the charm respond to a check reaching the failure threshold, or passing again afterwards, observe the `pebble_check_failed` and `pebble_check_recovered` events and switch on the info's `name`:
 
@@ -484,7 +476,7 @@ class PostgresCharm(ops.CharmBase):
 
 ### Fetch check status
 
-You can use the [`get_check`](https://ops.readthedocs.io/en/latest/#ops.Container.get_check) and [`get_checks`](https://ops.readthedocs.io/en/latest/#ops.Container.get_checks) methods to fetch the current status of one check or multiple checks, respectively. The returned [`CheckInfo`](https://ops.readthedocs.io/en/latest/#ops.pebble.CheckInfo) objects provide various attributes, most importantly a `status` attribute which will be either `UP` or `DOWN`.
+You can use the [`get_check`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_check) and [`get_checks`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_checks) methods to fetch the current status of one check or multiple checks, respectively. The returned [`CheckInfo`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.CheckInfo) objects provide various attributes, most importantly a `status` attribute which will be either `UP` or `DOWN`.
 
 Here is a code example that checks whether the `uptime` check is healthy, and writes an error log if not:
 
@@ -509,7 +501,7 @@ services:
 
 ### Check health endpoint and probes
 
-As of Juju version 2.9.26, Pebble includes an HTTP `/v1/health` endpoint that allows a user to query the health of configured checks, optionally filtered by check level with the query string `?level=<level>` This endpoint returns an HTTP 200 status if the checks are healthy, HTTP 502 otherwise.
+Pebble includes an HTTP `/v1/health` endpoint that allows a user to query the health of configured checks, optionally filtered by check level with the query string `?level=<level>` This endpoint returns an HTTP 200 status if the checks are healthy, HTTP 502 otherwise.
 
 Each check can optionally specify a `level` of "alive" or "ready". These have semantic meaning: "alive" means the check or the service it's connected to is up and running; "ready" means it's properly accepting network traffic. These correspond to Kubernetes ["liveness" and "readiness" probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/).
 
@@ -523,16 +515,19 @@ Consider the K8s liveness success (`level=alive` check) to mean "Pebble is alive
 
 ### Test checks
 
-> Added in Scenario 7.0
+> Added in ops 2.17
 
-To test charms that use Pebble check events, use the Scenario `CheckInfo` class and the emit the appropriate event. For example, to simulate the "http-test" check failing, the charm test could do the following:
+To test charms that use Pebble check events, use the `CheckInfo` class and the emit the appropriate event. For example, to simulate the "http-test" check failing, the charm test could do the following:
 
 ```python
+import ops
+from ops import testing
+
 def test_http_check_failing():
-    ctx = scenario.Context(PostgresCharm)
-    check_info = scenario.CheckInfo("http-test", failures=3, status=ops.pebble.CheckStatus.DOWN)
-    container = scenario.Container("db", check_infos={check_info})
-    state_in = scenario.State(containers={container})
+    ctx = testing.Context(PostgresCharm)
+    check_info = testing.CheckInfo("http-test", failures=3, status=ops.pebble.CheckStatus.DOWN)
+    container = testing.Container("db", check_infos={check_info})
+    state_in = testing.State(containers={container})
 
     state_out = ctx.run(ctx.on.pebble_check_failed(container, check_info), state_in)
 
@@ -543,10 +538,9 @@ def test_http_check_failing():
 
 Pebble's files API allows charm authors to read and write files on the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
 
-
 ### Push
 
-Probably the most useful operation is [`Container.push`](https://ops.readthedocs.io/en/latest/#ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
+Probably the most useful operation is [`Container.push`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
 
 ```python
 config = """
@@ -558,11 +552,11 @@ container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
 
 The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
 
-There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](https://ops.readthedocs.io/en/latest/#ops.Container.push) for details.
+There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.push) for details.
 
 ### Pull
 
-To read a file from the workload, use [`Container.pull`](https://ops.readthedocs.io/en/latest/#ops.Container.pull), which returns a file-like object that you can `read()`.
+To read a file from the workload, use [`Container.pull`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.pull), which returns a file-like object that you can `read()`.
 
 The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
 
@@ -579,9 +573,7 @@ If you specify the keyword argument `encoding=None` on the `pull()` call, reads 
 
 ### Push recursive
 
-> Added in 1.5
-
-To copy several files to the workload, use [`Container.push_path`](https://ops.readthedocs.io/en/latest/#ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files to the workload, use [`Container.push_path`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -595,9 +587,7 @@ A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ### Pull recursive
 
-> Added in 1.5
-
-To copy several files to the workload, use [`Container.pull_path`](https://ops.readthedocs.io/en/latest/#ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files to the workload, use [`Container.pull_path`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -611,7 +601,7 @@ A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ### List files
 
-To list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](https://ops.readthedocs.io/en/latest/#ops.Container.list_files). It returns a list of [`pebble.FileInfo`](https://ops.readthedocs.io/en/latest/#ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
+To list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.list_files). It returns a list of [`pebble.FileInfo`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
 
 ```python
 infos = container.list_files('/etc', pattern='*.conf')
@@ -626,7 +616,7 @@ If you want information about the directory itself (instead of its contents), ca
 
 ### Create directory
 
-To create a directory, use [`Container.make_dir`](https://ops.readthedocs.io/en/latest/#ops.Container.make_dir). It takes an optional `make_parents=True` argument (like `mkdir -p`), as well as optional permissions and user/group arguments. Some examples:
+To create a directory, use [`Container.make_dir`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.make_dir). It takes an optional `make_parents=True` argument (like `mkdir -p`), as well as optional permissions and user/group arguments. Some examples:
 
 ```python
 container.make_dir('/etc/pg', user='postgres', group='postgres')
@@ -635,7 +625,7 @@ container.make_dir('/some/other/nested/dir', make_parents=True)
 
 ### Remove path
 
-To delete a file or directory, use [`Container.remove_path`](https://ops.readthedocs.io/en/latest/#ops.Container.remove_path). If a directory is specified, it must be empty unless `recursive=True` is specified, in which case the entire directory tree is deleted, recursively (like `rm -r`). For example:
+To delete a file or directory, use [`Container.remove_path`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.remove_path). If a directory is specified, it must be empty unless `recursive=True` is specified, in which case the entire directory tree is deleted, recursively (like `rm -r`). For example:
 
 ```python
 # Delete Apache access log
@@ -646,9 +636,7 @@ container.remove_path('/tmp/mysubdir', recursive=True)
 
 ### Check file and directory existence
 
-> Added in 1.4
-
-To check if a paths exists you can use [`Container.exists`](https://ops.readthedocs.io/en/latest/#ops.Container.exists) for directories or files and [`Container.isdir`](https://ops.readthedocs.io/en/latest/#ops.Container.isdir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
+To check if a paths exists you can use [`Container.exists`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.exists) for directories or files and [`Container.isdir`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.is_dir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
 
 ```python
 # if /tmp/myfile exists
@@ -662,9 +650,9 @@ container.isdir('/tmp/mydir') # True
 
 ## Run commands on the workload container
 
-From Juju 2.9.17, Pebble includes an API for executing arbitrary commands on the workload container: the [`Container.exec`](https://ops.readthedocs.io/en/latest/#ops.Container.exec) method. It supports sending stdin to the process and receiving stdout and stderr, as well as more advanced options.
+Pebble includes an API for executing arbitrary commands on the workload container: the [`Container.exec`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.exec) method. It supports sending stdin to the process and receiving stdout and stderr, as well as more advanced options.
 
-To run simple commands and receive their output, call `Container.exec` to start the command, and then use the returned [`Process`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess) object's [`wait_output`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess.wait_output) method to wait for it to finish and collect its output.
+To run simple commands and receive their output, call `Container.exec` to start the command, and then use the returned [`Process`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecProcess) object's [`wait_output`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecProcess.wait_output) method to wait for it to finish and collect its output.
 
 For example, to back up a PostgreSQL database, you might use `pg_dump`:
 
@@ -677,12 +665,11 @@ if warnings:
 # do something with "sql"
 ```
 
-
 ### Handle errors
 
-The `exec` method raises a [`pebble.APIError`](https://ops.readthedocs.io/en/latest/#ops.pebble.APIError) if basic checks fail and the command can't be executed at all, for example, if the executable is not found.
+The `exec` method raises a [`pebble.APIError`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.APIError) if basic checks fail and the command can't be executed at all, for example, if the executable is not found.
 
-The [`ExecProcess.wait`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess.wait) and [`ExecProcess.wait_output`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess.wait_output) methods raise [`pebble.ChangeError`](https://ops.readthedocs.io/en/latest/#ops.pebble.ChangeError) if there was an error starting or running the process, and [`pebble.ExecError`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecError) if the process exits with a non-zero exit code.
+The [`ExecProcess.wait`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecProcess.wait) and [`ExecProcess.wait_output`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecProcess.wait_output) methods raise [`pebble.ChangeError`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ChangeError) if there was an error starting or running the process, and [`pebble.ExecError`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecError) if the process exits with a non-zero exit code.
 
 In the case where the process exits via a signal (such as SIGTERM or SIGKILL), the exit code will be 128 plus the signal number. SIGTERM's signal number is 15, so a process terminated via SIGTERM would give exit code 143 (128+15).
 
@@ -709,7 +696,7 @@ Exited with code 1. Stderr:
 
 ### Use command options
 
-The `Container.exec` method has various options (see [full API documentation](https://ops.readthedocs.io/en/latest/#ops.pebble.Client.exec)), including:
+The `Container.exec` method has various options (see [full API documentation](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Client.exec)), including:
 
 * `environment`: a dict of environment variables to pass to the process
 * `working_dir`: working directory to run the command in
@@ -746,7 +733,7 @@ process.wait_output()
 
 ### Use input/output options
 
-The simplest way of receiving standard output and standard error is by using the [`ExecProcess.wait_output`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess.wait_output) method as shown below. The simplest way of sending standard input to the program is as a string, using the `stdin` parameter to `exec`. For example:
+The simplest way of receiving standard output and standard error is by using the [`ExecProcess.wait_output`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecProcess.wait_output) method as shown below. The simplest way of sending standard input to the program is as a string, using the `stdin` parameter to `exec`. For example:
 
 ```python
 process = container.exec(['tr', 'a-z', 'A-Z'],
@@ -819,7 +806,7 @@ Caution: it's easy to get threading wrong and cause deadlocks, so it's best to u
 
 ### Send signals to a running command
 
-To send a signal to the running process, use [`ExecProcess.send_signal`](https://ops.readthedocs.io/en/latest/#ops.pebble.ExecProcess.send_signal) with a signal number or name. For example, the following will terminate the "sleep 10" process after one second:
+To send a signal to the running process, use [`ExecProcess.send_signal`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ExecProcess.send_signal) with a signal number or name. For example, the following will terminate the "sleep 10" process after one second:
 
 ```python
 process = container.exec(['sleep', '10'])
@@ -851,7 +838,7 @@ The first argument to `pebble notify` is the key, which must be in the format `<
 
 The `pebble notify` command has an optional `--repeat-after` flag, which tells Pebble to only allow the notice to repeat after the specified duration (the default is to repeat for every occurrence). If the caller says `--repeat-after=1h`, Pebble will prevent the notice with the same type and key from repeating within an hour -- useful to avoid the charm waking up too often when a notice occurs frequently.
 
-> See more: [GitHub | Pebble > Notices > `pebble notify`](https://github.com/canonical/pebble#notices)
+> See more: [GitHub | Pebble > Notices > `pebble notify`](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/cli-commands/#reference-pebble-notify-command)
 
 ### Respond to a notice
 
@@ -875,52 +862,53 @@ class PostgresCharm(ops.CharmBase):
             logger.info("Handling other thing")
 ```
 
-All notice events have a [`notice`](https://ops.readthedocs.io/en/latest/#ops.PebbleNoticeEvent.notice) property with the details of the notice recorded. That is used in the example above to switch on the notice `key` and look at its `last_data` (to determine the backup's path).
+All notice events have a [`notice`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleNoticeEvent.notice) property with the details of the notice recorded. That is used in the example above to switch on the notice `key` and look at its `last_data` (to determine the backup's path).
 
 ### Fetch notices
 
 A charm can also query for notices using the following two `Container` methods:
 
-* [`get_notice`](https://ops.readthedocs.io/en/latest/#ops.Container.get_notice), which gets a single notice by unique ID (the value of `notice.id`).
-* [`get_notices`](https://ops.readthedocs.io/en/latest/#ops.Container.get_notices), which returns all notices by default, and allows filtering notices by specific attributes such as `key`.
+* [`get_notice`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_notice), which gets a single notice by unique ID (the value of `notice.id`).
+* [`get_notices`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_notices), which returns all notices by default, and allows filtering notices by specific attributes such as `key`.
 
 ### Test notices
 
-To test charms that use Pebble Notices, use the [`Harness.pebble_notify`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness.pebble_notify) method to simulate recording a notice with the given details. For example, to simulate the "backup-done" notice handled above, the charm tests could do the following:
+To test charms that use Pebble Notices, use the [`pebble_custom_notice`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.CharmEvents.pebble_custom_notice) method to simulate recording a notice with the given details. For example, to simulate the "backup-done" notice handled above, the charm tests could do the following:
 
 ```python
-class TestCharm(unittest.TestCase):
-    @patch("charm.s3_bucket.upload_fileobj")
-    def test_backup_done(self, upload_fileobj):
-        harness = ops.testing.Harness(PostgresCharm)
-        self.addCleanup(harness.cleanup)
-        harness.begin()
-        harness.set_can_connect("db", True)
+from ops import testing
 
-        # Pretend backup file has been written
-        root = harness.get_filesystem_root("db")
-        (root / "tmp").mkdir()
-        (root / "tmp" / "mydb.sql").write_text("BACKUP")
+@patch('charm.s3_bucket.upload_fileobj')
+def test_backup_done(upload_fileobj):
+    # Arrange:
+    ctx = testing.Context(PostgresCharm)
 
-        # Notify to record the notice and fire the event
-        harness.pebble_notify(
-            "db", "canonical.com/postgresql/backup-done", data={"path": "/tmp/mydb.sql"}
-        )
+    notice = testing.Notice(
+        'canonical.com/postgresql/backup-done',
+        last_data={'path': '/tmp/mydb.sql'},
+    )
+    container = testing.Container('db', can_connect=True, notices=[notice])
+    root = container.get_filesystem()
+    (root / "tmp").mkdir()
+    (root / "tmp" / "mydb.sql").write_text("BACKUP")
+    state_in = testing.State(containers={container})
 
-        # Ensure backup content was "uploaded" to S3
-        upload_fileobj.assert_called_once()
-        upload_f, upload_key = upload_fileobj.call_args.args
-        self.assertEqual(upload_f.read(), b"BACKUP")
-        self.assertEqual(upload_key, "db-backup.sql")
+    # Act:
+    state_out = ctx.run(ctx.on.pebble_custom_notice(container, notice), state_in)
+
+    # Assert:
+    upload_fileobj.assert_called_once()
+    upload_f, upload_key = upload_fileobj.call_args.args
+    self.assertEqual(upload_f.read(), b"BACKUP")
+    self.assertEqual(upload_key, "db-backup.sql")
 ```
 
 <!--
  <a href="#heading--access-the-pebble-client-directly"><h2 id="heading--access-the-pebble-client-directly">Access the Pebble client directly</h2></a>
 
+Occasionally charm code may want to access the lower-level Pebble API directly: the [`Container.pebble`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.pebble) property returns the [`pebble.Client`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Client) instance for the given container.
 
-Occasionally charm code may want to access the lower-level Pebble API directly: the [`Container.pebble`](https://ops.readthedocs.io/en/latest/#ops.Container.pebble) property returns the [`pebble.Client`](https://ops.readthedocs.io/en/latest/#ops.pebble.Client) instance for the given container.
-
-Below is a (contrived) example of an action that uses the Pebble client directly to call [`pebble.Client.get_changes`](https://ops.readthedocs.io/en/latest/#ops.pebble.Client.get_changes):
+Below is a (contrived) example of an action that uses the Pebble client directly to call [`pebble.Client.get_changes`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.Client.get_changes):
 
 ```python
 import ops
