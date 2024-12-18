@@ -12,16 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Benchmark tests for ops and ops-scenario.
-
-Optimising performance is not a current goal with either ops or
-ops-scenario - any gains are unlikely to be significant compared with ones
-from Juju or the charm and its workload. However, we do want to ensure that
-we do not unknowingly regress in performance.
-
-This module contains a small set of tests that cover core functionality,
-to be used for performance benchmarking.
-"""
+"""Benchmark tests for ops-scenario."""
 
 import dataclasses
 import pathlib
@@ -30,7 +21,15 @@ import sys
 import ops
 from ops import testing
 
-sys.path.append(str(pathlib.Path(__file__).parent / 'charms' / 'test_benchmark' / 'src'))
+sys.path.append(
+    str(
+        pathlib.Path(__file__).parent.parent.parent.parent
+        / "test"
+        / "charms"
+        / "test_benchmark"
+        / "src"
+    )
+)
 
 from bcharm import BenchmarkCharm
 
@@ -38,7 +37,7 @@ from bcharm import BenchmarkCharm
 # Note: the 'benchmark' argument here is a fixture that pytest-benchmark
 # automatically makes available to all tests.
 def test_context_explicit_meta(benchmark):
-    ctx = benchmark(testing.Context, ops.CharmBase, meta={'name': 'foo'})
+    ctx = benchmark(testing.Context, ops.CharmBase, meta={"name": "foo"})
     assert isinstance(ctx, testing.Context)
 
 
@@ -58,11 +57,11 @@ def test_context_explicit_meta_config_actions(benchmark):
     ctx = benchmark(
         testing.Context,
         ops.CharmBase,
-        meta={'name': 'foo'},
-        actions={'act': {'description': 'foo'}},
-        config={'options': {'conf': {'type': 'int', 'description': 'bar'}}},
+        meta={"name": "foo"},
+        actions={"act": {"description": "foo"}},
+        config={"options": {"conf": {"type": "int", "description": "bar"}}},
     )
-    ctx.run(ctx.on.action('act'), testing.State(config={'conf': 10}))
+    ctx.run(ctx.on.action("act"), testing.State(config={"conf": 10}))
     assert len({e.handle.kind for e in ctx.emitted_events}) == 1
 
 
@@ -74,9 +73,9 @@ def test_context_autoload_meta(benchmark):
 def test_many_tests_explicit_meta(benchmark):
     def mock_pytest():
         """Simulate running multiple tests against the same charm."""
-        for event in ('install', 'start', 'stop', 'remove'):
+        for event in ("install", "start", "stop", "remove"):
             for _ in range(5):
-                ctx = testing.Context(ops.CharmBase, meta={'name': 'foo'})
+                ctx = testing.Context(ops.CharmBase, meta={"name": "foo"})
                 ctx.run(getattr(ctx.on, event)(), testing.State())
                 assert len({e.handle.kind for e in ctx.emitted_events}) == 1
 
@@ -86,7 +85,7 @@ def test_many_tests_explicit_meta(benchmark):
 def test_many_tests_autoload_meta(benchmark):
     def mock_pytest():
         """Simulate running multiple tests against the same charm."""
-        for event in ('install', 'start', 'stop', 'remove'):
+        for event in ("install", "start", "stop", "remove"):
             for _ in range(5):
                 ctx = testing.Context(BenchmarkCharm)
                 ctx.run(getattr(ctx.on, event)(), testing.State())
@@ -103,16 +102,16 @@ def test_lots_of_logs(benchmark):
 
 def ditest_full_state(benchmark):
     def fill_state():
-        rel = testing.Relation('rel')
-        peer = testing.PeerRelation('peer')
-        network = testing.Network('MySpace')
-        container = testing.Container('foo')
-        storage = testing.Storage('bar')
+        rel = testing.Relation("rel")
+        peer = testing.PeerRelation("peer")
+        network = testing.Network("MySpace")
+        container = testing.Container("foo")
+        storage = testing.Storage("bar")
         tcp = testing.TCPPort(22)
         icmp = testing.ICMPPort()
         udp = testing.UDPPort(8000)
-        secret = testing.Secret({'password': 'admin'})
-        resource = testing.Resource(name='baz', path='.')
+        secret = testing.Secret({"password": "admin"})
+        resource = testing.Resource(name="baz", path=".")
         stored_state = testing.StoredState()
         state = testing.State(
             relations={rel, peer},
