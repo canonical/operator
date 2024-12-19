@@ -3,9 +3,11 @@
 # See LICENSE file for licensing details.
 
 import dataclasses
+import logging
 import marshal
 import re
 import sys
+import warnings
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Sequence, Set
 
 import ops
@@ -136,9 +138,17 @@ class Ops(_Manager):
         return ops.CharmMeta.from_yaml(metadata, actions_metadata)
 
     def _setup_root_logging(self):
+        # The warnings module captures this in _showwarning_orig, but we
+        # shouldn't really be using a private method, so capture it ourselves as
+        # well.
+        original_showwarning = warnings.showwarning
+        super()._setup_root_logging()
+        # Ops also sets up logging to capture warnings, but we want the normal
+        # output.
+        logging.captureWarnings(False)
+        warnings.showwarning = original_showwarning
         # Ops sets sys.excepthook to go to Juju's debug-log, but that's not
         # useful in a testing context, so we reset it here.
-        super()._setup_root_logging()
         sys.excepthook = sys.__excepthook__
 
     def _make_storage(self, _: _Dispatcher):
