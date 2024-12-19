@@ -83,7 +83,7 @@ As a community we adhere to the Ubuntu code of conduct.
 * **[Get support](https://discourse.charmhub.io/)**:
 Discourse is the go-to forum for all questions Ops.
 
-* **[Join our online chat](https://matrix.to/#/#charmhub-ops:ubuntu.com)**:
+* **[Join our online chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)**:
 Meet us in the #charmhub-charmdev channel on Matrix.
 
 * **[Report bugs](https://github.com/canonical/operator/)**:
