@@ -1,17 +1,18 @@
 (write-unit-tests-for-a-charm)=
-# How to write unit tests for a charm
+# How to write legacy unit tests for a charm
 
-The Ops library provides a testing harness, so you can check your charm does the right thing in different scenarios without having to create a full deployment. When you run `charmcraft init`, the template charm it creates includes some sample tests, along with a `tox.ini` file; use `tox` to run the tests and to get a short report of unit test coverage.
+`ops` provides a legacy testing harness that was previously used to check your charm does the right thing in different scenarios without having to create a full deployment.
 
 ## Testing basics
 
 Here’s a minimal example, taken from the `charmcraft init` template with some additional comments:
 
 ```python
-# Import Ops library's testing harness
+# Import Ops library's legacy testing harness
 import ops
 import ops.testing
 import pytest
+
 # Import your charm class
 from charm import TestCharmCharm
 
@@ -192,4 +193,3 @@ harness.update_config(key_values={'the-answer': 42}) # can_connect is False
 harness.container_pebble_ready('foo') # set can_connect to True
 assert 42 == harness.charm.config_value
 ```
-
