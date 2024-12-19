@@ -1,9 +1,9 @@
 (write-scenario-tests-for-a-charm)=
 # How to write unit tests for a charm
 
-First of all, install the testing framework. To do this in a virtual environment
-while you are developing, you can do this with `pip` or any other package
-manager; for example:
+First of all, install the Ops testing framework. To do this in a virtual environment
+while you are developing, use `pip` or another package
+manager. For example:
 
 ```
 pip install ops[testing]

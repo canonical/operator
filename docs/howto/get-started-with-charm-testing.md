@@ -91,7 +91,7 @@ A 'live', deployed Juju application will have access to all the inputs we discus
  
 You will notice that the starting point is typically always an event. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is *always* an event context to be mocked. This has important consequences for the unit-testing framework, as we will see below.
 
-### The framework
+### The testing framework
 
 In the charming world, unit testing means state-transition testing.
 
@@ -112,7 +112,7 @@ A typical test will look like this:
 
 > Obviously, other flows are possible; for example, where you unit test individual charm methods without going through the whole event context setup, but this is the characteristic one.
 
-### Understanding the test framework
+### Understanding the testing framework
 
 When you instantiate `Context` and `State` objects, the charm instance does not exist yet. Just like in a live charm, it is possible that when the charm is executed for the first time, the Juju model already has given it storage, relations, some config, or leadership. This delay is meant to give us a chance to simulate this in our test setup. You create a `State` object, then you prepare the 'initial state' of the model mock, then you finally initialise the charm and simulate one or more events.
 
