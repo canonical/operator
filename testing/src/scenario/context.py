@@ -454,6 +454,10 @@ class Context(Generic[CharmType]):
     Use this when calling :meth:`run` to specify the event to emit.
     """
 
+    # def test_foo():
+    #     ctx = Context(MyCharm, config={"foo": "bar"})
+    #     ctx.run(..., State())
+
     def __init__(
         self,
         charm_type: type[CharmType],
@@ -503,13 +507,18 @@ class Context(Generic[CharmType]):
                 spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
-                    f"Cannot setup scenario with `charm_type`={charm_type}. "
-                    f"Did you forget to pass `meta` to this Context?",
+                    f"Cannot automatically setup scenario with `charm_type`={charm_type}. "
+                    "This is likely because this charm has some nonstandard repository setup and Scenario "
+                    "can't find the charmcraft|(metadata|config|actions) yamls in their usual location. "
+                    "Please parse and provide their contents manually via the `meta`, `config` "
+                    "and `actions` Context parameters.",
                 ) from e
 
         else:
             if not meta:
-                meta = {"name": str(charm_type.__name__)}
+                raise ContextSetupError(
+                    "Scenario doesn't support overriding `actions|config` without overriding `meta` too."
+                )
             spec = _CharmSpec(
                 charm_type=charm_type,
                 meta=meta,

@@ -1643,7 +1643,8 @@ class _CharmSpec(Generic[CharmType]):
     def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmType]:
         """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
 
-        Will attempt to load the metadata off the ``charmcraft.yaml`` file
+        Will attempt to load the metadata off the ``charmcraft.yaml`` file.
+        On failure, will fall back to the legacy ``metadata.yaml/actions.yaml/config.yaml`` files.
         """
         charm_source_path = pathlib.Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
