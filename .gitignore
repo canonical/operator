@@ -33,3 +33,6 @@ test/charms/test_smoke/.charmcraft_output_packages.txt
 test/charms/test_smoke/requirements.txt
 test/charms/test_smoke/charmcraft.yaml
 juju-crashdump*.tar.xz
+
+# Benchmark test artifacts
+.benchmarks
