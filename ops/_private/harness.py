@@ -316,7 +316,7 @@ class Harness(Generic[CharmType]):
         )
 
         warnings.warn(
-            'Harness is deprecated. See more: "
+            'Harness is deprecated. See more: '
             'https://ops.readthedocs.io/en/latest/howto/write-unit-tests-for-a-charm.html',
             PendingDeprecationWarning,
             stacklevel=2,
