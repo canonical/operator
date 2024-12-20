@@ -613,7 +613,7 @@ Pebble can generate notices, which Juju will detect, and wake up the charm to
 let it know that something has happened in the container. The most common
 use-case is Pebble custom notices, which is a mechanism for the workload
 application to trigger a charm event.
--
+
 When the charm is notified, there might be a queue of existing notices, or just
 the one that has triggered the event:
 
