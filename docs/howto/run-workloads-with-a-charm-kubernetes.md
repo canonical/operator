@@ -873,7 +873,7 @@ A charm can also query for notices using the following two `Container` methods:
 
 ### Test notices
 
-To test charms that use Pebble Notices, use the [`pebble_custom_notice`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.CharmEvents.pebble_custom_notice) method to simulate recording a notice with the given details. For example, to simulate the "backup-done" notice handled above, the charm tests could do the following:
+To test charms that use Pebble Notices, use the [`pebble_custom_notice`](ops.testing.CharmEvents.pebble_custom_notice) method to simulate recording a notice with the given details. For example, to simulate the "backup-done" notice handled above, the charm tests could do the following:
 
 ```python
 from ops import testing

@@ -273,7 +273,7 @@ state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit_id=1), state=st
 assert 'smtp_credentials' in state_out.get_relation(relation.id).remote_units_data[1]
 ```
 
-> See more: [Scenario Relations](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.RelationBase)
+> See more: [Scenario Relations](ops.testing.RelationBase)
 
 ### Write integration tests
 

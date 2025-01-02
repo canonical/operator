@@ -191,7 +191,7 @@ foo_1 = testing.Storage('foo')
 ctx.run(ctx.on.storage_attached(foo_1), testing.State(storages={foo_0, foo_1}))
 ```
 
-> See more: [`ops.testing.Storage`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.Storage)
+> See more: [](ops.testing.Storage)
 
 ### Write integration tests
 

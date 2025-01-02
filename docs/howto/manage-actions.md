@@ -172,7 +172,7 @@ def test_backup_action():
     assert 'snapshot-size' in ctx.action_results
 ```
 
-> See more: [`Context.action_logs`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.Context.action_logs), [`Context.action_results`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.Context.action_results), [`ActionFailed`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.ActionFailed)
+> See more: [](ops.testing.Context.action_logs), [](ops.testing.Context.action_results), [](ops.testing.ActionFailed)
 
 
 ### Write integration tests
