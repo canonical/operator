@@ -42,7 +42,7 @@ def test_config_changed(harness: ops.testing.Harness[TestCharmCharm]):
 
 ```
 
-We use [`pytest` unit testing framework](https://docs.pytest.org) (Python’s standard [unit testing framework](https://docs.python.org/3/library/unittest.html) is a valid alternative), augmenting it with [`Harness`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness), the Ops library's testing harness. [`Harness`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness) provides some convenient mechanisms for mocking charm events and processes.
+We use [`pytest` unit testing framework](https://docs.pytest.org) (Python’s standard [unit testing framework](https://docs.python.org/3/library/unittest.html) is a valid alternative), augmenting it with [](ops_testing_harness). `Harness` provides some convenient mechanisms for mocking charm events and processes.
 
 A common pattern is to specify some minimal `metadata.yaml` content for testing like this:
 
@@ -98,7 +98,7 @@ harness.charm.unit.status = BlockedStatus("Testing")
 
 Any of your charm’s properties and methods (including event callbacks) can be accessed using
 `harness.charm`.  You can check out the [harness API
-docs](https://ops.readthedocs.io/en/latest/index.html#ops.testing.Harness) for more ways to use the
+docs](ops_testing_harness) for more ways to use the
 harness to trigger other events and to test your charm (e.g. triggering leadership-related events,
 testing pebble events and sidecar container interactions, etc.).
 
@@ -138,9 +138,9 @@ In `ops` 1.4, functionality was added to the Harness to more accurately track co
 Containers normally start in a disconnected state, and any interaction with the remote container (push, pull, add_layer, and so on) will raise an `ops.pebble.ConnectionError`. 
 
 To mark a container as connected,
-you can either call [`harness.set_can_connect(container, True)`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness.set_can_connect), or you can call [`harness.container_pebble_ready(container)`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness.container_pebble_ready) if you want to mark the container as connected *and* trigger its pebble-ready event.
+you can either call [`harness.set_can_connect(container, True)`](ops.testing.Harness.set_can_connect), or you can call [`harness.container_pebble_ready(container)`](ops.testing.Harness.container_pebble_ready) if you want to mark the container as connected *and* trigger its pebble-ready event.
 
-However, if you're using [`harness.begin_with_initial_hooks()`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness.begin_with_initial_hooks) in your tests, that will automatically call `container_pebble_ready()` for all containers in the charm's metadata, so you don't have to do it manually.
+However, if you're using [`harness.begin_with_initial_hooks()`](ops.testing.Harness.begin_with_initial_hooks) in your tests, that will automatically call `container_pebble_ready()` for all containers in the charm's metadata, so you don't have to do it manually.
 
 If you have a hook that pushes a file to the container, like this:
 
