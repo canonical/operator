@@ -306,7 +306,7 @@ To stop a service, Pebble first sends `SIGTERM` to the service's process group t
 
 ### Fetch service status
 
-You can use the [`get_service`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_service) and [`get_services`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_services) methods to fetch the current status of one service or multiple services, respectively. The returned [`ServiceInfo`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ServiceInfo) objects provide a `status` attribute with various states, or you can use the [`ServiceInfo.is_running`](https://ops.readthedocs.io/en/latest/#ops.pebble.ServiceInfo.is_running) method.
+You can use the [`get_service`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_service) and [`get_services`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Container.get_services) methods to fetch the current status of one service or multiple services, respectively. The returned [`ServiceInfo`](https://ops.readthedocs.io/en/latest/reference/pebble.html#ops.pebble.ServiceInfo) objects provide a `status` attribute with various states, or you can use the [`ServiceInfo.is_running`](ops.pebble.ServiceInfo.is_running) method.
 
 Here is a modification to the start/stop example that checks whether the service is running before stopping it:
 

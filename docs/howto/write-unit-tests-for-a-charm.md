@@ -173,7 +173,7 @@ def test_something(harness):
     harness.update_config(key_values={'the-answer': 42})
 ```
 
-Which suggests that your `_config_changed` hook should probably use [`Container.can_connect()`](https://ops.readthedocs.io/en/latest/#ops.Container.can_connect):
+Which suggests that your `_config_changed` hook should probably use [`Container.can_connect()`](ops.Container.can_connect):
 
 ```python
 def _config_changed(event):

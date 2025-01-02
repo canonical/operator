@@ -49,7 +49,7 @@ def _handle_ports(self) -> None:
     self.unit.set_ports(port)
 ```
 
-> See more: [`ops.Unit.set_ports`](https://ops.readthedocs.io/en/latest/#ops.Unit.set_ports)
+> See more: [](ops.Unit.set_ports)
 
 
 ## Test the new feature
