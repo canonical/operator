@@ -31,7 +31,7 @@ Unit tests are intended to be isolating and fast to complete. These are the test
 **Tools.** Unit testing a charm can be done using:
 
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [state transition testing](https://ops.readthedocs.io/en/latest/reference/ops-testing.html), using the `ops` unit testing framework
+- [state transition testing](ops_testing), using the `ops` unit testing framework
 
 **Examples.**
 
