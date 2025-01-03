@@ -126,7 +126,7 @@ To use data received through the relation, have your charm observe the `relation
 framework.observe(self.on.replicas_relation_changed, self._update_configuration)
 ```
 
-> See more: [](ops.RelationChangedevent), [`juju` | Relation (integration)](https://juju.is/docs/juju/relation#heading--permissions-around-relation-databags)
+> See more: [](ops.RelationChangedEvent), [`juju` | Relation (integration)](https://juju.is/docs/juju/relation#heading--permissions-around-relation-databags)
 
 Most of the time, you should use the same holistic handler as when receiving other data, such as `secret-changed` and `config-changed`. To access the relation(s) in your holistic handler, use the [](ops.Model.get_relation) method or [](ops.Model.relations) attribute.
 
