@@ -33,7 +33,7 @@ observer for the `start` event and pair that with an event handler. For example:
 self.framework.observe(self.on.start, self._on_start)
 ```
 
-> See more: [`ops.StartEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.StartEvent)
+> See more: [](ops.StartEvent)
 
 Now, in the body of the charm definition, define the event handler. Typically,
 the workload version is retrieved from the workload itself, with a subprocess
@@ -47,7 +47,7 @@ def _on_start(self, event: ops.StartEvent):
     self.unit.set_workload_version(version)
 ```
 
-> See more: [`ops.Unit.set_workload_version`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Unit.set_workload_version)
+> See more: [](ops.Unit.set_workload_version)
 
 > Examples: [`jenkins-k8s` sets the workload version after getting it from the Jenkins package](https://github.com/canonical/jenkins-k8s-operator/blob/29e9b652714bd8314198965c41a60f5755dd381c/src/charm.py#L115), [`discourse-k8s` sets the workload version after getting it via an exec call](https://github.com/canonical/discourse-k8s-operator/blob/f523b29f909c69da7b9510b581dfcc2309698222/src/charm.py#L581), [`synapse` sets the workload version after getting it via an API call](https://github.com/canonical/synapse-operator/blob/778bcd414644c922373d542a304be14866835516/src/charm.py#L265)
 

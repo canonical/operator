@@ -51,7 +51,7 @@ In the `src/charm.py` file, in the `__init__` function of your charm, set up an 
 self.framework.observe(self.on.cache_storage_attached, self._update_configuration)
 ```
 
-> See more: [`ops.StorageAttachedEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.StorageAttachedEvent), [Juju SDK | Holistic vs delta charms](https://juju.is/docs/sdk/holistic-vs-delta-charms)
+> See more: [](ops.StorageAttachedEvent), [Juju SDK | Holistic vs delta charms](https://juju.is/docs/sdk/holistic-vs-delta-charms)
 
 Storage volumes will be automatically mounted into the charm container at either the path specified in the `location` field in the metadata, or the default location `/var/lib/juju/storage/<storage-name>`. However, your charm code should not hard-code the location, and should instead use the `.location` property of the storage object.
 
@@ -83,7 +83,7 @@ In the `src/charm.py` file, in the `__init__` function of your charm, set up an 
 self.framework.observe(self.on.cache_storage_detaching, self._on_storage_detaching)
 ```
 
-> See more: [`ops.StorageDetachingEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.StorageDetachingEvent)
+> See more: [](ops.StorageDetachingEvent)
 
 Now, in the body of the charm definition, define the event handler, or adjust an existing holistic one. For example, to warn users that data won't be cached:
 

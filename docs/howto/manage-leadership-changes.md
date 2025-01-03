@@ -15,7 +15,7 @@ In the `src/charm.py` file, in the `__init__` function of your charm, set up an 
 self.framework.observe(self.on.leader_elected, self._on_leader_elected)
 ```
 
-> See more: [`ops.LeaderElectedEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.LeaderElectedEvent)
+> See more: [](ops.LeaderElectedEvent)
 
 Now, in the body of the charm definition, define the event handler. For example, the handler below will update a configuration file:
 

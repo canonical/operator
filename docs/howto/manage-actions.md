@@ -85,7 +85,7 @@ def _on_snapshot(self, event: ops.ActionEvent):
     ...
 ```
 
-> See more: [`ops.ActionEvent.params`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.ActionEvent.params)
+> See more: [](ops.ActionEvent.params)
 
 #### Report that an action has failed
 
@@ -105,7 +105,7 @@ def _on_snapshot(self, event: ops.ActionEvent):
    ...
 ```
 
-> See more: [`ops.ActionEvent.fail`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.ActionEvent.fail)
+> See more: [](ops.ActionEvent.fail)
 
 #### Return the results of an action
 
@@ -117,7 +117,7 @@ def _on_snapshot(self, event: ops.ActionEvent):
     event.set_results({'snapshot-size': size})
 ```
 
-> See more: [`ops.ActionEvent.set_results`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.ActionEvent.set_results)
+> See more: [](ops.ActionEvent.set_results)
 
 #### Log the progress of an action
 
@@ -133,7 +133,7 @@ def _on_snapshot(self, event: ops.ActionEvent):
     self.snapshot_table3()
 ```
 
-> See more: [`ops.ActionEvent.log`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.ActionEvent.log))
+> See more: [](ops.ActionEvent.log)
 
 #### Record the ID of an action task
 
@@ -146,7 +146,7 @@ def _on_snapshot(self, event: ops.ActionEvent):
     self.create_backup(temp_filename)
     ... 
 ```
-> See more: [`ops.ActionEvent.id`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.ActionEvent.id)
+> See more: [](ops.ActionEvent.id)
 
 ## Test the feature
 

@@ -5,7 +5,7 @@ The recommended way to create charms for Kubernetes is using the sidecar pattern
 
 Pebble is a lightweight, API-driven process supervisor designed for use with charms. If you specify the `containers` field in a charm's `charmcraft.yaml`, Juju will deploy the charm code in a sidecar container, with Pebble running as the workload container's `ENTRYPOINT`.
 
-When the workload container starts up, Juju fires a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](ops.Container) instance.
+When the workload container starts up, Juju fires a [`PebbleReadyEvent`](ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](ops.Container) instance.
 
 The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, read and write files, and run commands. These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
 
@@ -63,7 +63,7 @@ If multiple containers are specified in `charmcraft.yaml` (as above), each Pod w
 - a container running the `redis-image`
 - a container running the charm code
 
-The Juju controller emits [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent)s to charms when Pebble has initialised its API in a container. These events are named `<container_name>_pebble_ready`. Using the example above, the charm would receive two Pebble related events (assuming the Pebble API starts correctly in each workload):
+The Juju controller emits [`PebbleReadyEvent`](ops.PebbleReadyEvent)s to charms when Pebble has initialised its API in a container. These events are named `<container_name>_pebble_ready`. Using the example above, the charm would receive two Pebble related events (assuming the Pebble API starts correctly in each workload):
 
 - `myapp_pebble_ready`
 - `redis_pebble_ready`.
@@ -93,7 +93,7 @@ In many cases, using the container's specified entrypoint may be desired. You ca
 `$ docker inspect <image>`
 ```
 
-When using an OCI-image that is not built specifically for use with Pebble, layers are defined at runtime using Pebble’s API. Recall that when Pebble has initialised in a container (and the API is ready), the Juju controller emits a [`PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent) event to the charm. Often it is in the callback bound to this event that layers are defined, and services started:
+When using an OCI-image that is not built specifically for use with Pebble, layers are defined at runtime using Pebble’s API. Recall that when Pebble has initialised in a container (and the API is ready), the Juju controller emits a [`PebbleReadyEvent`](ops.PebbleReadyEvent) event to the charm. Often it is in the callback bound to this event that layers are defined, and services started:
 
 ```python
 # ...
@@ -862,7 +862,7 @@ class PostgresCharm(ops.CharmBase):
             logger.info("Handling other thing")
 ```
 
-All notice events have a [`notice`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleNoticeEvent.notice) property with the details of the notice recorded. That is used in the example above to switch on the notice `key` and look at its `last_data` (to determine the backup's path).
+All notice events have a [`notice`](ops.PebbleNoticeEvent.notice) property with the details of the notice recorded. That is used in the example above to switch on the notice `key` and look at its `last_data` (to determine the backup's path).
 
 ### Fetch notices
 

@@ -24,7 +24,7 @@ Make sure to consult [the `charm-relations-interfaces` repository](https://githu
 Make sure to add your interface to [the `charm-relations-interfaces` repository](https://github.com/canonical/charm-relation-interfaces).
 ```
 
-To exchange data with other units of the same charm, define one or more `peers` endpoints including an interface name for each. Each peer relation must have an endpoint, which your charm will use to refer to the relation (as [`ops.Relation.name`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Relation.name)).
+To exchange data with other units of the same charm, define one or more `peers` endpoints including an interface name for each. Each peer relation must have an endpoint, which your charm will use to refer to the relation (as [](ops.Relation.name)).
 
 ```yaml
 peers:
@@ -32,7 +32,7 @@ peers:
     interface: charm_gossip
 ```
 
-To exchange data with another charm, define a `provides` or `requires` endpoint including an interface name. By convention, the interface name should be unique in the ecosystem. Each relation must have an endpoint, which your charm will use to refer to the relation (as [`ops.Relation.name`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Relation.name)).
+To exchange data with another charm, define a `provides` or `requires` endpoint including an interface name. By convention, the interface name should be unique in the ecosystem. Each relation must have an endpoint, which your charm will use to refer to the relation (as [](ops.Relation.name)).
 
 ```yaml
 provides:
@@ -98,9 +98,9 @@ def _on_db_relation_created(self, event: ops.RelationCreatedEvent):
     event.relation.data[event.app].update(credentials)
 ```
 
-The event object that is passed to the handler has a `relation` property, which contains an [`ops.Relation`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Relation) object. Your charm uses this object to find out about the relation (such as which units are included, in the [`.units` attribute](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Relation.units), or whether the relation is broken, in the [`.active` attribute](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Relation.active)) and to get and set data in the relation databag.
+The event object that is passed to the handler has a `relation` property, which contains an [](ops.Relation) object. Your charm uses this object to find out about the relation (such as which units are included, in the [`.units` attribute](ops.Relation.units), or whether the relation is broken, in the [`.active` attribute](ops.Relation.active)) and to get and set data in the relation databag.
 
-> See more: [`ops.RelationCreatedEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.RelationCreatedEvent)
+> See more: [](ops.RelationCreatedEvent)
 
 To do additional setup work when each unit joins the relation (both when the charms are first integrated and when additional units are added to the charm), your charm will need to observe the `relation-joined` event. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-joined` event observers for the relevant relations and pair those with an event handler. For example:
 
@@ -116,7 +116,7 @@ def _on_smtp_relation_joined(self, event: ops.RelationJoinedEvent):
     event.relation.data[event.unit]["smtp_credentials"] = smtp_credentials_secret_id
 ```
 
-> See more: [`ops.RelationJoinedEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.RelationJoinedEvent)
+> See more: [](ops.RelationJoinedEvent)
 
 ##### Exchange data with other units
 
@@ -126,9 +126,9 @@ To use data received through the relation, have your charm observe the `relation
 framework.observe(self.on.replicas_relation_changed, self._update_configuration)
 ```
 
-> See more: [`ops.RelationChangedEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.RelationChangedevent), [`juju` | Relation (integration)](https://juju.is/docs/juju/relation#heading--permissions-around-relation-databags)
+> See more: [](ops.RelationChangedevent), [`juju` | Relation (integration)](https://juju.is/docs/juju/relation#heading--permissions-around-relation-databags)
 
-Most of the time, you should use the same holistic handler as when receiving other data, such as `secret-changed` and `config-changed`. To access the relation(s) in your holistic handler, use the [`ops.Model.get_relation`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Model.get_relation) method or [`ops.Model.relations`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Model.relations) attribute.
+Most of the time, you should use the same holistic handler as when receiving other data, such as `secret-changed` and `config-changed`. To access the relation(s) in your holistic handler, use the [](ops.Model.get_relation) method or [](ops.Model.relations) attribute.
 
 > See also: {ref}`holistic-vs-delta-charms`
 
@@ -171,7 +171,7 @@ def _update_configuration(self, _: ops.Eventbase):
 
 ##### Exchange data across the various relations
 
-To add data to the relation databag, use the [`.data` attribute](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Relation.data) much as you would a dictionary, after selecting whether to write to the app databag (leaders only) or unit databag. For example, to copy a value from the charm config to the relation data:
+To add data to the relation databag, use the [`.data` attribute](ops.Relation.data) much as you would a dictionary, after selecting whether to write to the app databag (leaders only) or unit databag. For example, to copy a value from the charm config to the relation data:
 
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
@@ -238,7 +238,7 @@ def _on_smtp_relation_departed(self, event: ops.RelationDepartedEvent):
         self.remove_smtp_user(event.unit.name)
 ```
 
-> See more: [ops.RelationDepartedEvent](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.RelationDepartedEvent)
+> See more: [](ops.RelationDepartedEvent)
 
 To clean up after a relation is entirely removed, have your charm observe the `relation-broken` event. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-broken` events for the relevant relations and pair those with an event handler. For example:
 
@@ -255,7 +255,7 @@ def _on_db_relation_broken(self, event: ops.RelationBrokenEvent):
     self.drop_database(event.app.name)
 ```
 
-> See more: [ops.RelationBrokenEvent](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.RelationBrokenEvent)
+> See more: [](ops.RelationBrokenEvent)
 
 ## Test the feature
 
