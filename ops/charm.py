@@ -1137,8 +1137,8 @@ class CollectStatusEvent(LifecycleEvent):
     requires a "port" config option set before it can proceed::
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
-                super().__init__(*args)
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
                 self.webapp = Webapp(self)
                 # initialize other components
 
@@ -1182,7 +1182,7 @@ class CharmEvents(ObjectEvents):
     By default, the events listed as attributes of this class will be
     provided via the :attr:`CharmBase.on` attribute. For example::
 
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        framework.observe(self.on.config_changed, self._on_config_changed)
 
     In addition to the events listed as attributes of this class,
     dynamically-named events will also be defined based on the charm's
@@ -1191,8 +1191,8 @@ class CharmEvents(ObjectEvents):
     ``self.on[<name>].<event>`` or using a prefix like
     ``self.on.<name>_<event>``, for example::
 
-        self.framework.observe(self.on["db"].relation_created, self._on_db_relation_created)
-        self.framework.observe(self.on.workload_pebble_ready, self._on_workload_pebble_ready)
+        framework.observe(self.on["db"].relation_created, self._on_db_relation_created)
+        framework.observe(self.on.workload_pebble_ready, self._on_workload_pebble_ready)
     """
 
     # NOTE: The one-line docstrings below are copied from the first line of
@@ -1302,10 +1302,10 @@ class CharmBase(Object):
         import ops
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
-                super().__init__(*args)
-                self.framework.observe(self.on.config_changed, self._on_config_changed)
-                self.framework.observe(self.on.stop, self._on_stop)
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.config_changed, self._on_config_changed)
+                framework.observe(self.on.stop, self._on_stop)
                 # ...
 
         if __name__ == "__main__":

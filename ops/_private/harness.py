@@ -1915,10 +1915,9 @@ class Harness(Generic[CharmType]):
 
             # charm.py
             class ExampleCharm(ops.CharmBase):
-                def __init__(self, *args):
-                    super().__init__(*args)
-                    self.framework.observe(self.on["mycontainer"].pebble_ready,
-                                           self._on_pebble_ready)
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on["mycontainer"].pebble_ready, self._on_pebble_ready)
 
                 def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
                     self.hostname = event.workload.pull("/etc/hostname").read()
