@@ -31,7 +31,7 @@ sys.path.append(
     )
 )
 
-from bcharm import BenchmarkCharm
+from benchmark_charm import BenchmarkCharm
 
 
 # Note: the 'benchmark' argument here is a fixture that pytest-benchmark
@@ -100,7 +100,7 @@ def test_lots_of_logs(benchmark):
     assert len(ctx.juju_log) > 200
 
 
-def ditest_full_state(benchmark):
+def test_full_state(benchmark):
     def fill_state():
         rel = testing.Relation("rel")
         peer = testing.PeerRelation("peer")
@@ -112,7 +112,7 @@ def ditest_full_state(benchmark):
         udp = testing.UDPPort(8000)
         secret = testing.Secret({"password": "admin"})
         resource = testing.Resource(name="baz", path=".")
-        stored_state = testing.StoredState()
+        stored_state = testing.StoredState(owner_path="BenchMarkCharm")
         state = testing.State(
             relations={rel, peer},
             networks={network},
@@ -130,7 +130,17 @@ def ditest_full_state(benchmark):
     ctx = testing.Context(BenchmarkCharm)
     state_in = benchmark(fill_state)
     state_out = ctx.run(ctx.on.start(), state_in)
-    assert dataclasses.asdict(state_in) == dataclasses.asdict(state_out)
+    # stored_states is complicated: it will contain a stored state the
+    # framework itself added (counting the number of events), so the
+    # input and output state doesn't naively match. We strip that out and
+    # compare it separately.
+    state_in_dict = dataclasses.asdict(state_in)
+    state_out_dict = dataclasses.asdict(state_out)
+    # An owner_path of None means that it's owned by the framework.
+    assert state_in_dict["stored_states"] == {ss for ss in state_out_dict['stored_states'] if ss.owner_path is not None}
+    del state_in_dict["stored_states"]
+    del state_out_dict["stored_states"]
+    assert state_in_dict == state_out_dict
 
 
 def test_deferred_events(benchmark):
