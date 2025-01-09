@@ -23,7 +23,7 @@ resources:
     description: test resource
 ```
 
-In your charm's `src/charm.py` you can now use [`Model.resources.fetch(<resource_name>)`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Resources.fetch) to get the path to the resource, then manipulate it as needed. For example:
+In your charm's `src/charm.py` you can now use [`Model.resources.fetch(<resource_name>)`](ops.Resources.fetch) to get the path to the resource, then manipulate it as needed. For example:
 
 ```python
 # ...
@@ -59,7 +59,7 @@ def _on_config_changed(self, event):
     # do something
 ```
 
-The [`fetch()`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Resources.fetch) method will raise a [`NameError`](https://docs.python.org/3/library/exceptions.html#NameError) if the resource does not exist, and returns a Python [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) object to the resource if it does.
+The [`fetch()`](ops.Resources.fetch) method will raise a [`NameError`](https://docs.python.org/3/library/exceptions.html#NameError) if the resource does not exist, and returns a Python [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) object to the resource if it does.
 
 Note: During development, it may be useful to specify the resource at deploy time to facilitate faster testing without the need to publish a new charm/resource in between minor fixes. In the below snippet, we create a simple file with some text content, and pass it to the Juju controller to use in place of any published `my-resource` resource:
 

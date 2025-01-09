@@ -57,7 +57,7 @@ Note that:
 - The only data shared in plain text is the secret ID (a locator URI). The secret ID can be publicly shared. Juju will ensure that only remote apps/units to which the secret has explicitly been granted by the owner will be able to fetch the actual secret payload from that ID.
 - The secret needs to be granted to a remote entity (app or unit), and that always goes via a relation instance. By passing a relation to `grant` (in this case the event's relation), we are explicitly declaring the scope of the secret -- its lifetime will be bound to that of this relation instance.
 
-> See more: [`ops.Application.add_secret()`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Application.add_secret)
+> See more: [](ops.Application.add_secret)
 
 ### Create a new secret revision
 
@@ -249,7 +249,7 @@ Note that:
 - The observer charm gets a secret via the model (not its app/unit). Because it's the owner who decides who the secret is granted to, the ownership of a secret is not an observer concern. The observer code can rightfully assume that, so long as a secret ID is  shared with it, the owner has taken care to grant and scope the secret in such a way that the observer has the rights to inspect its contents.
 - The charm first gets the secret object from the model, then gets the secret's content (a dict) and accesses individual attributes via the dict's items.
 
-> See more: [`ops.Secret.get_content()`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Secret.get_content)
+> See more: [](ops.Secret.get_content)
 
 ### Label the secrets you're observing
 
@@ -310,7 +310,7 @@ So, having labelled the secret on creation, the database charm could add a new r
         secret.set_content(...)  # pass a new revision payload, as before
 ```
 
-> See more: [`ops.Model.get_secret()`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Model.get_secret)
+> See more: [](ops.Model.get_secret)
 
 #### When to use labels
 
@@ -318,9 +318,9 @@ When should you use labels? A label is basically the secret's *name* (local to t
 
 Most charms that use secrets have a fixed number of secrets each with a specific meaning, so the charm author should give them meaningful labels like `database-credential`, `tls-cert`, and so on. Think of these as "pets" with names.
 
-In rare cases, however, a charm will have a set of secrets all with the same meaning: for example, a set of TLS certificates that are all equally valid. In this case it doesn't make sense to label them -- think of them as "cattle". To distinguish between secrets of this kind, you can use the [`Secret.unique_identifier`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Secret.unique_identifier) property.
+In rare cases, however, a charm will have a set of secrets all with the same meaning: for example, a set of TLS certificates that are all equally valid. In this case it doesn't make sense to label them -- think of them as "cattle". To distinguish between secrets of this kind, you can use the [`Secret.unique_identifier`](ops.Secret.unique_identifier) property.
 
-Note that [`Secret.id`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Secret.id), despite the name, is not really a unique ID, but a locator URI. We call this the "secret ID" throughout Juju and in the original secrets specification -- it probably should have been called "uri", but the name stuck.
+Note that [`Secret.id`](ops.Secret.id), despite the name, is not really a unique ID, but a locator URI. We call this the "secret ID" throughout Juju and in the original secrets specification -- it probably should have been called "uri", but the name stuck.
 
 ### Peek at a new secret revision
 
@@ -336,7 +336,7 @@ Sometimes, before reconfiguring to use a new credential revision, the observer c
         ...
 ```
 
-> See more: [`ops.Secret.peek_content()`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Secret.peek_content)
+> See more: [](ops.Secret.peek_content)
 
 ### Start tracking a different secret revision
 
@@ -356,7 +356,7 @@ class MyWebserverCharm(ops.CharmBase):
         self._configure_db_credentials(content['username'], content['password'])
 ```
 
-> See more: [`ops.Secret.get_content()`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.Secret.get_content)
+> See more: [](ops.Secret.get_content)
 
 <br>
 

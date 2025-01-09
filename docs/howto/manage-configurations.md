@@ -47,7 +47,7 @@ def _on_config_changed(self, event):
     self._update_layer_and_restart(None)
 ```
 
-> See more: [`ops.CharmBase.config`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.CharmBase.config)
+> See more: [](ops.CharmBase.config)
 
 ```{caution}
 

@@ -60,8 +60,8 @@ def test_charm_runs():
 ```
 
 > See more: 
->  - [State](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.State)
->  - [Context](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops.testing.Context)
+>  - [`State`](ops.testing.State)
+>  - [`Context`](ops.testing.Context)
 
 ```{note}
 
