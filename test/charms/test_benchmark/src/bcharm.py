@@ -2,7 +2,11 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Basic benchmarking charm."""
+"""Basic benchmarking charm.
+
+Note that this is named benchmark_charm rather than charm as is typical to
+avoid conflicts with ops.charm in the testing runs.
+"""
 
 import logging
 
@@ -29,7 +33,7 @@ class BenchmarkCharm(ops.CharmBase):
                 getattr(logger, level)('This is message %s', i)
 
     def _on_stop(self, _: ops.StopEvent):
-        pass
+        """Do nothing - this exists to benchmark having an observer."""
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         event.defer()
