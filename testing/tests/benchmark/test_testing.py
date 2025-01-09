@@ -137,7 +137,9 @@ def test_full_state(benchmark):
     state_in_dict = dataclasses.asdict(state_in)
     state_out_dict = dataclasses.asdict(state_out)
     # An owner_path of None means that it's owned by the framework.
-    assert state_in_dict["stored_states"] == {ss for ss in state_out_dict['stored_states'] if ss.owner_path is not None}
+    assert state_in_dict["stored_states"] == {
+        ss for ss in state_out_dict["stored_states"] if ss.owner_path is not None
+    }
     del state_in_dict["stored_states"]
     del state_out_dict["stored_states"]
     assert state_in_dict == state_out_dict
