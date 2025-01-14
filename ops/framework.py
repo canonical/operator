@@ -47,7 +47,10 @@ from typing import (
     Union,
 )
 
-from . import charm
+import opentelemetry.trace
+
+from . import _tracing, charm
+from ._tracing import tracer
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
@@ -871,6 +874,11 @@ class Framework(Object):
         saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
+        ops_event = event.__class__.__module__.startswith('ops.')
+        opentelemetry.trace.get_current_span().add_event(
+            f'{"ops." if ops_event else ""}{event.__class__.__name__}',
+            attributes={'deferred': event.deferred, 'kind': event_kind},
+        )
         parent = event.handle.parent
         assert isinstance(parent, Handle), 'event handle must have a parent'
         parent_path = parent.path
@@ -979,21 +987,40 @@ class Framework(Object):
                     # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
                     logger.debug('Emitting custom event %s.', event)
+                else:
+                    # The Juju event that we called to process
+                    # FIXME: this logic seems to miss the case where:
+                    # The unit agent called us to process e.g. relation-changed
+                    # There's also a deferred relation-changed event
+                    # The two events are collapsed... which is actually run?
+                    _tracing.mark_observed()
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with self._event_context(event_handle.kind):
-                        if (
-                            event_is_from_juju or event_is_action
-                        ) and self._juju_debug_at.intersection({'all', 'hook'}):
-                            # Present the welcome message and run under PDB.
-                            self._show_debug_code_message()
-                            pdb.runcall(custom_handler, event)
-                        else:
-                            # Regular call to the registered method.
-                            custom_handler(event)
+                    synthetic = not event_is_from_juju and not event_is_action
+                    event_module = event.__class__.__module__
+                    if event_module.startswith('ops.'):
+                        # ops.charm.Events are re-exported through ops
+                        event_module = 'ops'
+                    event_class = f'{event_module}.{event.__class__.__qualname__}'
+                    invocation = f'{event_handle.kind}: {observer_path}.{method_name}'
+                    with tracer.start_as_current_span(invocation) as span:
+                        span.set_attribute('deferred', single_event_path is None)
+                        span.set_attribute('synthetic', synthetic)
+                        span.set_attribute('event', repr(event))
+                        span.set_attribute('event_class', event_class)
+                        span.set_attribute('event_name', event_handle.kind)
+                        span.set_attribute('handler', f'{observer_path}.{method_name}')
+                        with self._event_context(event_handle.kind):
+                            if not synthetic and self._juju_debug_at.intersection({'all', 'hook'}):
+                                # Present the welcome message and run under PDB.
+                                self._show_debug_code_message()
+                                pdb.runcall(custom_handler, event)
+                            else:
+                                # Regular call to the registered method.
+                                custom_handler(event)
 
             else:
                 logger.warning(

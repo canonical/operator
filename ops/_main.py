@@ -23,16 +23,17 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
+from . import _tracing
 from . import charm as _charm
 from . import framework as _framework
 from . import model as _model
 from . import storage as _storage
 from . import version as _version
+from ._tracing import tracer
 from .jujucontext import _JujuContext
 from .log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
-
 
 logger = logging.getLogger()
 
@@ -211,6 +212,8 @@ class _Dispatcher:
             dispatch binary, and is that binary present?
 
     """
+
+    event_name: str
 
     def __init__(self, charm_dir: Path, juju_context: _JujuContext):
         self._juju_context = juju_context
@@ -488,6 +491,7 @@ class _Manager:
 
     def _emit(self):
         """Emit the event on the charm."""
+        _charm._setup_tracing(self.charm)
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made. Also adjust the docstring on
         #       EventBase.defer().
@@ -552,9 +556,14 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    try:
-        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+    _tracing.setup_tracing(charm_class.__name__)
 
-        manager.run()
+    try:
+        with tracer.start_as_current_span('ops.main'):
+            manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+
+            manager.run()
     except _Abort as e:
         sys.exit(e.exit_code)
+    finally:
+        _tracing.shutdown_tracing()

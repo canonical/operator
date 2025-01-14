@@ -37,7 +37,7 @@ def test_action_event(mycharm, baz_value):
     state = ctx.run(ctx.on.action("foo", params={"baz": baz_value, "bar": 10}), State())
 
     assert isinstance(state, State)
-    evt = ctx.emitted_events[0]
+    _setup, evt = ctx.emitted_events
     assert evt.params["bar"] == 10
     assert evt.params["baz"] is baz_value
 

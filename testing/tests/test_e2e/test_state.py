@@ -4,8 +4,8 @@ from typing import Optional, Type
 
 import ops
 import pytest
-from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
-from ops.framework import EventBase, Framework
+from ops.charm import CharmBase, CharmEvents
+from ops.framework import EventBase, Framework, LifecycleEvent
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
@@ -96,7 +96,7 @@ def test_leader_get(state, mycharm):
 
 def test_status_setting(state, mycharm):
     def call(charm: CharmBase, e):
-        if isinstance(e, CollectStatusEvent):
+        if isinstance(e, LifecycleEvent):
             return
 
         assert isinstance(charm.unit.status, UnknownStatus)
