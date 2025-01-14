@@ -79,6 +79,7 @@ from typing import (
     Union,
 )
 
+import opentelemetry.trace
 import websocket
 
 from ops._private import timeconv, yaml
@@ -345,6 +346,7 @@ class _WebSocket(Protocol):
 
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 class _NotProvidedFlag:
@@ -1728,6 +1730,7 @@ class ExecProcess(Generic[AnyStr]):
             msg = 'ExecProcess instance garbage collected without call to wait() or wait_output()'
             warnings.warn(msg, ResourceWarning)
 
+    @tracer.start_as_current_span('ops.pebble.ExecProcess.wait')
     def wait(self):
         """Wait for the process to finish.
 
@@ -1777,6 +1780,7 @@ class ExecProcess(Generic[AnyStr]):
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
+    @tracer.start_as_current_span('ops.pebble.ExecProcess.wait_output')
     def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
@@ -1818,6 +1822,7 @@ class ExecProcess(Generic[AnyStr]):
 
         return (out_value, err_value)
 
+    @tracer.start_as_current_span('ops.pebble.ExecProcess.send_signal')
     def send_signal(self, sig: Union[int, str]):
         """Send the given signal to the running process.
 
@@ -1827,6 +1832,7 @@ class ExecProcess(Generic[AnyStr]):
         """
         if isinstance(sig, int):
             sig = signal.Signals(sig).name
+        opentelemetry.trace.get_current_span().set_attribute('signal', sig)
         payload = {
             'command': 'signal',
             'signal': {'name': sig},
@@ -2099,23 +2105,27 @@ class Client:
 
         return response
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_system_info')
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
         resp = self._request('GET', '/v1/system-info')
         return SystemInfo.from_dict(resp['result'])
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_warnings')
     def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
         """Get list of warnings in given state (pending or all)."""
         query = {'select': select.value}
         resp = self._request('GET', '/v1/warnings', query)
         return [Warning.from_dict(w) for w in resp['result']]
 
+    @tracer.start_as_current_span('ops.pebble.Client.ack_warnings')
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
         """Acknowledge warnings up to given timestamp, return number acknowledged."""
         body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
         resp = self._request('POST', '/v1/warnings', body=body)
         return resp['result']
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_changes')
     def get_changes(
         self,
         select: ChangeState = ChangeState.IN_PROGRESS,
@@ -2128,17 +2138,20 @@ class Client:
         resp = self._request('GET', '/v1/changes', query)
         return [Change.from_dict(c) for c in resp['result']]
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_change')
     def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
         resp = self._request('GET', f'/v1/changes/{change_id}')
         return Change.from_dict(resp['result'])
 
+    @tracer.start_as_current_span('ops.pebble.Client.abort_change')
     def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
         body = {'action': 'abort'}
         resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
         return Change.from_dict(resp['result'])
 
+    @tracer.start_as_current_span('ops.pebble.Client.autostart_services')
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the startup-enabled services and wait (poll) for them to be started.
 
@@ -2156,6 +2169,7 @@ class Client:
         """
         return self._services_action('autostart', [], timeout, delay)
 
+    @tracer.start_as_current_span('ops.pebble.Client.replan_services')
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Replan by (re)starting changed and startup-enabled services and checks.
 
@@ -2176,6 +2190,7 @@ class Client:
         """
         return self._services_action('replan', [], timeout, delay)
 
+    @tracer.start_as_current_span('ops.pebble.Client.start_services')
     def start_services(
         self,
         services: Iterable[str],
@@ -2200,6 +2215,7 @@ class Client:
         """
         return self._services_action('start', services, timeout, delay)
 
+    @tracer.start_as_current_span('ops.pebble.Client.stop_services')
     def stop_services(
         self,
         services: Iterable[str],
@@ -2224,6 +2240,7 @@ class Client:
         """
         return self._services_action('stop', services, timeout, delay)
 
+    @tracer.start_as_current_span('ops.pebble.Client.restart_services')
     def restart_services(
         self,
         services: Iterable[str],
@@ -2264,6 +2281,7 @@ class Client:
             )
 
         services = list(services)
+        opentelemetry.trace.get_current_span().set_attribute('services', services)
         for s in services:
             if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
@@ -2277,6 +2295,7 @@ class Client:
                 raise ChangeError(change.err, change)
         return change_id
 
+    @tracer.start_as_current_span('ops.pebble.Client.wait_change')
     def wait_change(
         self,
         change_id: ChangeID,
@@ -2377,10 +2396,12 @@ class Client:
             if not isinstance(chk, str):
                 raise TypeError(f'check names must be str, not {type(chk).__name__}')
 
+        opentelemetry.trace.get_current_span().set_attribute('checks', checks)
         body = {'action': action, 'checks': checks}
         resp = self._request('POST', '/v1/checks', body=body)
         return resp['result']['changed']
 
+    @tracer.start_as_current_span('ops.pebble.Client.add_layer')
     def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
@@ -2391,6 +2412,7 @@ class Client:
         """
         if not isinstance(label, str):
             raise TypeError(f'label must be a str, not {type(label).__name__}')
+        opentelemetry.trace.get_current_span().set_attribute('label', label)
 
         if isinstance(layer, str):
             layer_yaml = layer
@@ -2412,11 +2434,13 @@ class Client:
         }
         self._request('POST', '/v1/layers', body=body)
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_plan')
     def get_plan(self) -> Plan:
         """Get the Pebble plan (contains combined layer configuration)."""
         resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
         return Plan(resp['result'])
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_services')
     def get_services(self, names: Optional[Iterable[str]] = None) -> List[ServiceInfo]:
         """Get the service status for the configured services.
 
@@ -2435,6 +2459,7 @@ class Client:
     @typing.overload
     def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO: ...
 
+    @tracer.start_as_current_span('ops.pebble.Client.pull')
     def pull(self, path: str, *, encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
         """Read a file's content from the remote system.
 
@@ -2502,6 +2527,7 @@ class Client:
         if error:
             raise PathError(error['kind'], error['message'])
 
+    @tracer.start_as_current_span('ops.pebble.Client.push')
     def push(
         self,
         path: str,
@@ -2631,6 +2657,7 @@ class Client:
 
         return generator(), content_type
 
+    @tracer.start_as_current_span('ops.pebble.Client.list_files')
     def list_files(
         self, path: str, *, pattern: Optional[str] = None, itself: bool = False
     ) -> List[FileInfo]:
@@ -2663,6 +2690,7 @@ class Client:
         result: List[_FileInfoDict] = resp['result'] or []  # in case it's null instead of []
         return [FileInfo.from_dict(d) for d in result]
 
+    @tracer.start_as_current_span('ops.pebble.Client.make_dir')
     def make_dir(
         self,
         path: str,
@@ -2703,6 +2731,7 @@ class Client:
         resp = self._request('POST', '/v1/files', None, body)
         self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
+    @tracer.start_as_current_span('ops.pebble.Client.remove_path')
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
@@ -2769,6 +2798,10 @@ class Client:
         combine_stderr: bool = False,
     ) -> ExecProcess[bytes]: ...
 
+    # FIXME: would be kinda nice to log the command
+    # but what if the command contains some password?
+    # maybe log the first element of command?
+    @tracer.start_as_current_span('ops.pebble.Client.exec')
     def exec(
         self,
         command: List[str],
@@ -3048,6 +3081,7 @@ class Client:
         url = f'{base_url}/v1/tasks/{task_id}/websocket/{websocket_id}'
         return url
 
+    @tracer.start_as_current_span('ops.pebble.Client.send_signal')
     def send_signal(self, sig: Union[int, str], services: Iterable[str]):
         """Send the given signal to the list of services named.
 
@@ -3064,18 +3098,23 @@ class Client:
             raise TypeError(
                 f'services must be of type Iterable[str], not {type(services).__name__}'
             )
+        services = list(services)
         for s in services:
             if not isinstance(s, str):
                 raise TypeError(f'service names must be str, not {type(s).__name__}')
 
         if isinstance(sig, int):
             sig = signal.Signals(sig).name
+
+        opentelemetry.trace.get_current_span().set_attribute('signal', sig)
+        opentelemetry.trace.get_current_span().set_attribute('services', services)
         body = {
             'signal': sig,
             'services': services,
         }
         self._request('POST', '/v1/signals', body=body)
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_checks')
     def get_checks(
         self, level: Optional[CheckLevel] = None, names: Optional[Iterable[str]] = None
     ) -> List[CheckInfo]:
@@ -3098,6 +3137,7 @@ class Client:
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
 
+    @tracer.start_as_current_span('ops.pebble.Client.start_checks')
     def start_checks(self, checks: Iterable[str]) -> List[str]:
         """Start checks by name.
 
@@ -3110,6 +3150,7 @@ class Client:
         """
         return self._checks_action('start', checks)
 
+    @tracer.start_as_current_span('ops.pebble.Client.stop_checks')
     def stop_checks(self, checks: Iterable[str]) -> List[str]:
         """Stop checks by name.
 
@@ -3122,6 +3163,7 @@ class Client:
         """
         return self._checks_action('stop', checks)
 
+    @tracer.start_as_current_span('ops.pebble.Client.notify')
     def notify(
         self,
         type: NoticeType,
@@ -3154,6 +3196,7 @@ class Client:
         resp = self._request('POST', '/v1/notices', body=body)
         return resp['result']['id']
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_notice')
     def get_notice(self, id: str) -> Notice:
         """Get details about a single notice by ID.
 
@@ -3163,6 +3206,7 @@ class Client:
         resp = self._request('GET', f'/v1/notices/{id}')
         return Notice.from_dict(resp['result'])
 
+    @tracer.start_as_current_span('ops.pebble.Client.get_notices')
     def get_notices(
         self,
         *,

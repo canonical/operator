@@ -23,6 +23,9 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
+import opentelemetry.trace
+
+import ops._tracing
 import ops.charm
 import ops.framework
 import ops.model
@@ -35,6 +38,7 @@ CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -212,6 +216,8 @@ class _Dispatcher:
 
     """
 
+    event_name: str
+
     def __init__(self, charm_dir: Path, juju_context: _JujuContext):
         self._juju_context = juju_context
         self._charm_dir = charm_dir
@@ -268,7 +274,9 @@ class _Dispatcher:
         argv[0] = str(dispatch_path)
         logger.info('Running legacy %s.', self._dispatch_path)
         try:
-            subprocess.run(argv, check=True)
+            with tracer.start_as_current_span('ops._main::subprocess.run') as span:
+                span.set_attribute('argv', ' '.join(argv))
+                subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
             logger.warning('Legacy %s exited with status %d.', self._dispatch_path, e.returncode)
             raise _Abort(e.returncode) from e
@@ -488,6 +496,7 @@ class _Manager:
 
     def _emit(self):
         """Emit the event on the charm."""
+        ops.charm._setup_tracing(self.charm)
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made. Also adjust the docstring on
         #       EventBase.defer().
@@ -552,9 +561,14 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    try:
-        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+    ops._tracing.setup_tracing(charm_class.__name__)
 
-        manager.run()
+    try:
+        with tracer.start_as_current_span('ops.main'):
+            manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+
+            manager.run()
     except _Abort as e:
         sys.exit(e.exit_code)
+    finally:
+        ops._tracing.shutdown_tracing()

@@ -57,6 +57,8 @@ from typing import (
     get_args,
 )
 
+import opentelemetry.trace
+
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
@@ -111,6 +113,7 @@ _NetworkDict = TypedDict(
 
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
@@ -866,6 +869,7 @@ class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
     _lazy_data: Optional[Dict[str, _LazyValueType]] = None
 
     @abstractmethod
+    # FIXME instrument here, or individual access?
     def _load(self) -> Dict[str, _LazyValueType]:
         raise NotImplementedError()
 
@@ -1001,6 +1005,7 @@ class BindingMapping(Mapping[str, 'Binding']):
         self._backend = backend
         self._data: _BindingDictType = {}
 
+    # FIXME check
     def get(self, binding_key: Union[str, 'Relation']) -> 'Binding':
         """Get a specific Binding for an endpoint/relation.
 
@@ -1049,6 +1054,7 @@ class Binding:
         return Network(self._backend.network_get(name, relation_id))
 
     @property
+    # FIXME check
     def network(self) -> 'Network':
         """The network information for this binding."""
         if self._network is None:
@@ -1763,6 +1769,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     :attr:`Relation.data`
     """
 
+    # FIXME check
     def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
         self._data: Dict[Union[Unit, Application], RelationDataContent] = {
@@ -1814,6 +1821,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # unrestricted, allowing test code to read/write databags at will.
         return bool(self._backend._hook_is_running)
 
+    # FIXME instrument this or LazyMapping?
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:
@@ -3347,7 +3355,9 @@ class _ModelBackend:
         # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
         #                been fighting with Pyright for half an hour now...
         try:
-            result = subprocess.run(args, **kwargs)  # type: ignore
+            with tracer.start_as_current_span('ops.model::subprocess.run') as span:
+                span.set_attribute('argv', args)
+                result = subprocess.run(args, **kwargs)  # type: ignore
         except subprocess.CalledProcessError as e:
             raise ModelError(e.stderr) from e
         if return_output:
