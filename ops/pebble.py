@@ -82,6 +82,7 @@ from typing import (
 import websocket
 
 from ._private import timeconv, yaml
+from .version import tracer
 
 # Public as these are used in the Container.add_layer signature
 ServiceDict = typing.TypedDict(
@@ -1749,9 +1750,10 @@ class ExecProcess(Generic[AnyStr]):
             ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
         """
-        exit_code = self._wait()
-        if exit_code != 0:
-            raise ExecError(self._command, exit_code, None, None)
+        with tracer.start_as_current_span('pebble wait'):
+            exit_code = self._wait()
+            if exit_code != 0:
+                raise ExecError(self._command, exit_code, None, None)
 
     def _wait(self) -> int:
         self._waited = True
@@ -1800,34 +1802,35 @@ class ExecProcess(Generic[AnyStr]):
             ExecError: if the process exits with a non-zero exit code.
             TypeError: if :meth:`Client.exec` was called with the ``stdout`` argument.
         """
-        if self.stdout is None:
-            raise TypeError(
-                "can't use wait_output() when exec was called with the stdout argument; "
-                'use wait() instead'
-            )
+        with tracer.start_as_current_span('pebble wait_output'):
+            if self.stdout is None:
+                raise TypeError(
+                    "can't use wait_output() when exec was called with the stdout argument; "
+                    'use wait() instead'
+                )
 
-        if self._encoding is not None:
-            out = io.StringIO()
-            err = io.StringIO() if self.stderr is not None else None
-        else:
-            out = io.BytesIO()
-            err = io.BytesIO() if self.stderr is not None else None
+            if self._encoding is not None:
+                out = io.StringIO()
+                err = io.StringIO() if self.stderr is not None else None
+            else:
+                out = io.BytesIO()
+                err = io.BytesIO() if self.stderr is not None else None
 
-        t = _start_thread(shutil.copyfileobj, self.stdout, out)
-        self._threads.append(t)
-
-        if self.stderr is not None:
-            t = _start_thread(shutil.copyfileobj, self.stderr, err)
+            t = _start_thread(shutil.copyfileobj, self.stdout, out)
             self._threads.append(t)
 
-        exit_code: int = self._wait()
+            if self.stderr is not None:
+                t = _start_thread(shutil.copyfileobj, self.stderr, err)
+                self._threads.append(t)
 
-        out_value = typing.cast(AnyStr, out.getvalue())
-        err_value = typing.cast(AnyStr, err.getvalue()) if err is not None else None
-        if exit_code != 0:
-            raise ExecError[AnyStr](self._command, exit_code, out_value, err_value)
+            exit_code: int = self._wait()
 
-        return (out_value, err_value)
+            out_value = typing.cast(AnyStr, out.getvalue())
+            err_value = typing.cast(AnyStr, err.getvalue()) if err is not None else None
+            if exit_code != 0:
+                raise ExecError[AnyStr](self._command, exit_code, out_value, err_value)
+
+            return (out_value, err_value)
 
     def send_signal(self, sig: Union[int, str]):
         """Send the given signal to the running process.
@@ -1836,14 +1839,16 @@ class ExecProcess(Generic[AnyStr]):
             sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
                 signal.SIGHUP.
         """
-        if isinstance(sig, int):
-            sig = signal.Signals(sig).name
-        payload = {
-            'command': 'signal',
-            'signal': {'name': sig},
-        }
-        msg = json.dumps(payload, sort_keys=True)
-        self._control_ws.send(msg)
+        with tracer.start_as_current_span('pebble send_signal') as span:
+            if isinstance(sig, int):
+                sig = signal.Signals(sig).name
+            span.set_attribute('signal', sig)
+            payload = {
+                'command': 'signal',
+                'signal': {'name': sig},
+            }
+            msg = json.dumps(payload, sort_keys=True)
+            self._control_ws.send(msg)
 
 
 def _has_fileno(f: Any) -> bool:
@@ -2112,20 +2117,24 @@ class Client:
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
-        resp = self._request('GET', '/v1/system-info')
-        return SystemInfo.from_dict(resp['result'])
+        with tracer.start_as_current_span('pebble get_system_info'):
+            resp = self._request('GET', '/v1/system-info')
+            return SystemInfo.from_dict(resp['result'])
 
     def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
         """Get list of warnings in given state (pending or all)."""
-        query = {'select': select.value}
-        resp = self._request('GET', '/v1/warnings', query)
-        return [Warning.from_dict(w) for w in resp['result']]
+        with tracer.start_as_current_span('pebble get_warnings') as span:
+            query = {'select': select.value}
+            span.set_attributes(query)
+            resp = self._request('GET', '/v1/warnings', query)
+            return [Warning.from_dict(w) for w in resp['result']]
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
         """Acknowledge warnings up to given timestamp, return number acknowledged."""
-        body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
-        resp = self._request('POST', '/v1/warnings', body=body)
-        return resp['result']
+        with tracer.start_as_current_span('pebble ack_warnings'):
+            body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
+            resp = self._request('POST', '/v1/warnings', body=body)
+            return resp['result']
 
     def get_changes(
         self,
@@ -2133,22 +2142,26 @@ class Client:
         service: Optional[str] = None,
     ) -> List[Change]:
         """Get list of changes in given state, filter by service name if given."""
-        query: Dict[str, Union[str, int]] = {'select': select.value}
-        if service is not None:
-            query['for'] = service
-        resp = self._request('GET', '/v1/changes', query)
-        return [Change.from_dict(c) for c in resp['result']]
+        with tracer.start_as_current_span('pebble get_changes') as span:
+            query: Dict[str, Union[str, int]] = {'select': select.value}
+            if service is not None:
+                query['for'] = service
+            span.set_attributes(query)
+            resp = self._request('GET', '/v1/changes', query)
+            return [Change.from_dict(c) for c in resp['result']]
 
     def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
-        resp = self._request('GET', f'/v1/changes/{change_id}')
-        return Change.from_dict(resp['result'])
+        with tracer.start_as_current_span('pebble get_change'):
+            resp = self._request('GET', f'/v1/changes/{change_id}')
+            return Change.from_dict(resp['result'])
 
     def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
-        body = {'action': 'abort'}
-        resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
-        return Change.from_dict(resp['result'])
+        with tracer.start_as_current_span('pebble abort_change'):
+            body = {'action': 'abort'}
+            resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
+            return Change.from_dict(resp['result'])
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
         """Start the startup-enabled services and wait (poll) for them to be started.
@@ -2269,24 +2282,26 @@ class Client:
         timeout: Optional[float],
         delay: float,
     ) -> ChangeID:
-        if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
-            raise TypeError(
-                f'services must be of type Iterable[str], not {type(services).__name__}'
-            )
+        with tracer.start_as_current_span(f'pebble {action}_services') as span:
+            if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
+                raise TypeError(
+                    f'services must be of type Iterable[str], not {type(services).__name__}'
+                )
 
-        services = list(services)
-        for s in services:
-            if not isinstance(s, str):
-                raise TypeError(f'service names must be str, not {type(s).__name__}')
+            services = list(services)
+            for s in services:
+                if not isinstance(s, str):
+                    raise TypeError(f'service names must be str, not {type(s).__name__}')
 
-        body = {'action': action, 'services': services}
-        resp = self._request('POST', '/v1/services', body=body)
-        change_id = ChangeID(resp['change'])
-        if timeout:
-            change = self.wait_change(change_id, timeout=timeout, delay=delay)
-            if change.err:
-                raise ChangeError(change.err, change)
-        return change_id
+            body = {'action': action, 'services': services}
+            span.set_attributes(body)
+            resp = self._request('POST', '/v1/services', body=body)
+            change_id = ChangeID(resp['change'])
+            if timeout:
+                change = self.wait_change(change_id, timeout=timeout, delay=delay)
+                if change.err:
+                    raise ChangeError(change.err, change)
+            return change_id
 
     def wait_change(
         self,
@@ -2312,11 +2327,12 @@ class Client:
         Raises:
             TimeoutError: If the maximum timeout is reached.
         """
-        try:
-            return self._wait_change_using_wait(change_id, timeout)
-        except NotImplementedError:
-            # Pebble server doesn't support wait endpoint, fall back to polling
-            return self._wait_change_using_polling(change_id, timeout, delay)
+        with tracer.start_as_current_span('pebble wait_change'):
+            try:
+                return self._wait_change_using_wait(change_id, timeout)
+            except NotImplementedError:
+                # Pebble server doesn't support wait endpoint, fall back to polling
+                return self._wait_change_using_polling(change_id, timeout, delay)
 
     def _wait_change_using_wait(self, change_id: ChangeID, timeout: Optional[float]):
         """Wait for a change to be ready using the wait-change API."""
@@ -2380,17 +2396,21 @@ class Client:
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def _checks_action(self, action: str, checks: Iterable[str]) -> List[str]:
-        if isinstance(checks, str) or not hasattr(checks, '__iter__'):
-            raise TypeError(f'checks must be of type Iterable[str], not {type(checks).__name__}')
+        with tracer.start_as_current_span(f'pebble {action}_checks') as span:
+            if isinstance(checks, str) or not hasattr(checks, '__iter__'):
+                raise TypeError(
+                    f'checks must be of type Iterable[str], not {type(checks).__name__}',
+                )
 
-        checks = tuple(checks)
-        for chk in checks:
-            if not isinstance(chk, str):
-                raise TypeError(f'check names must be str, not {type(chk).__name__}')
+            checks = tuple(checks)
+            for chk in checks:
+                if not isinstance(chk, str):
+                    raise TypeError(f'check names must be str, not {type(chk).__name__}')
 
-        body = {'action': action, 'checks': checks}
-        resp = self._request('POST', '/v1/checks', body=body)
-        return resp['result']['changed']
+            span.set_attribute('checks', checks)
+            body = {'action': action, 'checks': checks}
+            resp = self._request('POST', '/v1/checks', body=body)
+            return resp['result']['changed']
 
     def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -2400,33 +2420,37 @@ class Client:
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
-        if not isinstance(label, str):
-            raise TypeError(f'label must be a str, not {type(label).__name__}')
+        with tracer.start_as_current_span('pebble add_layer') as span:
+            if not isinstance(label, str):
+                raise TypeError(f'label must be a str, not {type(label).__name__}')
+            span.set_attribute('label', label)
+            span.set_attribute('combine', combine)
 
-        if isinstance(layer, str):
-            layer_yaml = layer
-        elif isinstance(layer, dict):
-            layer_yaml = Layer(layer).to_yaml()
-        elif isinstance(layer, Layer):
-            layer_yaml = layer.to_yaml()
-        else:
-            raise TypeError(
-                f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}'
-            )
+            if isinstance(layer, str):
+                layer_yaml = layer
+            elif isinstance(layer, dict):
+                layer_yaml = Layer(layer).to_yaml()
+            elif isinstance(layer, Layer):
+                layer_yaml = layer.to_yaml()
+            else:
+                raise TypeError(
+                    f'layer must be str, dict, or pebble.Layer, not {type(layer).__name__}'
+                )
 
-        body = {
-            'action': 'add',
-            'combine': combine,
-            'label': label,
-            'format': 'yaml',
-            'layer': layer_yaml,
-        }
-        self._request('POST', '/v1/layers', body=body)
+            body = {
+                'action': 'add',
+                'combine': combine,
+                'label': label,
+                'format': 'yaml',
+                'layer': layer_yaml,
+            }
+            self._request('POST', '/v1/layers', body=body)
 
     def get_plan(self) -> Plan:
         """Get the Pebble plan (contains combined layer configuration)."""
-        resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
-        return Plan(resp['result'])
+        with tracer.start_as_current_span('pebble get_plan'):
+            resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
+            return Plan(resp['result'])
 
     def get_services(self, names: Optional[Iterable[str]] = None) -> List[ServiceInfo]:
         """Get the service status for the configured services.
@@ -2434,11 +2458,14 @@ class Client:
         If names is specified, only fetch the service status for the services
         named.
         """
-        query = None
-        if names is not None:
-            query = {'names': ','.join(names)}
-        resp = self._request('GET', '/v1/services', query)
-        return [ServiceInfo.from_dict(info) for info in resp['result']]
+        with tracer.start_as_current_span('pebble get_services') as span:
+            query = None
+            if names is not None:
+                names = list(names)
+                query = {'names': ','.join(names)}
+                span.set_attribute('names', names)
+            resp = self._request('GET', '/v1/services', query)
+            return [ServiceInfo.from_dict(info) for info in resp['result']]
 
     @typing.overload
     def pull(self, path: str, *, encoding: None) -> BinaryIO: ...
@@ -2463,45 +2490,47 @@ class Client:
             PathError: If there was an error reading the file at path, for
                 example, if the file doesn't exist or is a directory.
         """
-        query = {
-            'action': 'read',
-            'path': path,
-        }
-        headers = {'Accept': 'multipart/form-data'}
-        response = self._request_raw('GET', '/v1/files', query, headers)
+        with tracer.start_as_current_span('pebble pull') as span:
+            query = {
+                'action': 'read',
+                'path': path,
+            }
+            span.set_attribute('path', path)
+            headers = {'Accept': 'multipart/form-data'}
+            response = self._request_raw('GET', '/v1/files', query, headers)
 
-        options = self._ensure_content_type(response.headers, 'multipart/form-data')
-        boundary = options.get('boundary', '')
-        if not boundary:
-            raise ProtocolError(f'invalid boundary {boundary!r}')
+            options = self._ensure_content_type(response.headers, 'multipart/form-data')
+            boundary = options.get('boundary', '')
+            if not boundary:
+                raise ProtocolError(f'invalid boundary {boundary!r}')
 
-        parser = _FilesParser(boundary)
+            parser = _FilesParser(boundary)
 
-        while True:
-            chunk = response.read(self._chunk_size)
-            if not chunk:
-                break
-            parser.feed(chunk)
+            while True:
+                chunk = response.read(self._chunk_size)
+                if not chunk:
+                    break
+                parser.feed(chunk)
 
-        resp = parser.get_response()
-        if resp is None:
-            raise ProtocolError('no "response" field in multipart body')
-        self._raise_on_path_error(resp, path)
+            resp = parser.get_response()
+            if resp is None:
+                raise ProtocolError('no "response" field in multipart body')
+            self._raise_on_path_error(resp, path)
 
-        filenames = parser.filenames()
-        if not filenames:
-            raise ProtocolError('no file content in multipart response')
-        elif len(filenames) > 1:
-            raise ProtocolError('single file request resulted in a multi-file response')
+            filenames = parser.filenames()
+            if not filenames:
+                raise ProtocolError('no file content in multipart response')
+            elif len(filenames) > 1:
+                raise ProtocolError('single file request resulted in a multi-file response')
 
-        filename = filenames[0]
-        if filename != path:
-            raise ProtocolError(f'path not expected: {filename!r}')
+            filename = filenames[0]
+            if filename != path:
+                raise ProtocolError(f'path not expected: {filename!r}')
 
-        f = parser.get_file(path, encoding)
+            f = parser.get_file(path, encoding)
 
-        parser.remove_files()
-        return f
+            parser.remove_files()
+            return f
 
     @staticmethod
     def _raise_on_path_error(resp: _FilesResponse, path: str):
@@ -2549,26 +2578,28 @@ class Client:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
         """
-        info = self._make_auth_dict(permissions, user_id, user, group_id, group)
-        info['path'] = path
-        if make_dirs:
-            info['make-dirs'] = True
-        metadata = {
-            'action': 'write',
-            'files': [info],
-        }
+        with tracer.start_as_current_span('pebble push') as span:
+            info = self._make_auth_dict(permissions, user_id, user, group_id, group)
+            info['path'] = path
+            if make_dirs:
+                info['make-dirs'] = True
+            span.set_attributes(info)  # type: ignore
+            metadata = {
+                'action': 'write',
+                'files': [info],
+            }
 
-        data, content_type = self._encode_multipart(metadata, path, source, encoding)
+            data, content_type = self._encode_multipart(metadata, path, source, encoding)
 
-        headers = {
-            'Accept': 'application/json',
-            'Content-Type': content_type,
-        }
-        response = self._request_raw('POST', '/v1/files', None, headers, data)
-        self._ensure_content_type(response.headers, 'application/json')
-        resp = json.loads(response.read())
-        # we need to cast the Dict[Any, Any] to _FilesResponse
-        self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
+            headers = {
+                'Accept': 'application/json',
+                'Content-Type': content_type,
+            }
+            response = self._request_raw('POST', '/v1/files', None, headers, data)
+            self._ensure_content_type(response.headers, 'application/json')
+            resp = json.loads(response.read())
+            # we need to cast the Dict[Any, Any] to _FilesResponse
+            self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
     @staticmethod
     def _make_auth_dict(
@@ -2662,17 +2693,17 @@ class Client:
             PathError: if there was an error listing the directory; for example, if the directory
                 does not exist.
         """
-        query = {
-            'action': 'list',
-            'path': path,
-        }
-        if pattern:
-            query['pattern'] = pattern
-        if itself:
-            query['itself'] = 'true'
-        resp = self._request('GET', '/v1/files', query)
-        result: List[_FileInfoDict] = resp['result'] or []  # in case it's null instead of []
-        return [FileInfo.from_dict(d) for d in result]
+        with tracer.start_as_current_span('pebble list_files') as span:
+            query = {'path': path}
+            if pattern:
+                query['pattern'] = pattern
+            if itself:
+                query['itself'] = 'true'
+            span.set_attributes(query)
+            query['action'] = 'list'
+            resp = self._request('GET', '/v1/files', query)
+            result: List[_FileInfoDict] = resp['result'] or []  # in case it's null instead of []
+            return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
         self,
@@ -2703,16 +2734,18 @@ class Client:
             PathError: if there was an error making the directory; for example, if the parent path
                 does not exist, and ``make_parents`` is not used.
         """
-        info = self._make_auth_dict(permissions, user_id, user, group_id, group)
-        info['path'] = path
-        if make_parents:
-            info['make-parents'] = True
-        body = {
-            'action': 'make-dirs',
-            'dirs': [info],
-        }
-        resp = self._request('POST', '/v1/files', None, body)
-        self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
+        with tracer.start_as_current_span('pebble make_dir') as span:
+            info = self._make_auth_dict(permissions, user_id, user, group_id, group)
+            info['path'] = path
+            if make_parents:
+                info['make-parents'] = True
+            span.set_attributes(info)  # type: ignore
+            body = {
+                'action': 'make-dirs',
+                'dirs': [info],
+            }
+            resp = self._request('POST', '/v1/files', None, body)
+            self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
     def remove_path(self, path: str, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
@@ -2728,15 +2761,17 @@ class Client:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
-        info: Dict[str, Any] = {'path': path}
-        if recursive:
-            info['recursive'] = True
-        body = {
-            'action': 'remove',
-            'paths': [info],
-        }
-        resp = self._request('POST', '/v1/files', None, body)
-        self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
+        with tracer.start_as_current_span('pebble remove_path') as span:
+            info: Dict[str, Any] = {'path': path}
+            if recursive:
+                info['recursive'] = True
+            span.set_attributes(info)
+            body = {
+                'action': 'remove',
+                'paths': [info],
+            }
+            resp = self._request('POST', '/v1/files', None, body)
+            self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
@@ -2922,122 +2957,128 @@ class Client:
                 found.
             ExecError: if the command exits with a non-zero exit code.
         """
-        if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
-            raise TypeError(f'command must be a list of str, not {type(command).__name__}')
-        if len(command) < 1:
-            raise ValueError('command must contain at least one item')
+        with tracer.start_as_current_span('pebble exec') as span:
+            if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
+                raise TypeError(f'command must be a list of str, not {type(command).__name__}')
+            if len(command) < 1:
+                raise ValueError('command must contain at least one item')
+            span.set_attribute('executable', command[0])
 
-        if stdin is not None:
-            if isinstance(stdin, str):
-                if encoding is None:
-                    raise ValueError('encoding must be set if stdin is str')
-                stdin = io.BytesIO(stdin.encode(encoding))
-            elif isinstance(stdin, bytes):
-                if encoding is not None:
-                    raise ValueError('encoding must be None if stdin is bytes')
-                stdin = io.BytesIO(stdin)
-            elif not hasattr(stdin, 'read'):
-                raise TypeError('stdin must be str, bytes, or a readable file-like object')
+            if stdin is not None:
+                if isinstance(stdin, str):
+                    if encoding is None:
+                        raise ValueError('encoding must be set if stdin is str')
+                    stdin = io.BytesIO(stdin.encode(encoding))
+                elif isinstance(stdin, bytes):
+                    if encoding is not None:
+                        raise ValueError('encoding must be None if stdin is bytes')
+                    stdin = io.BytesIO(stdin)
+                elif not hasattr(stdin, 'read'):
+                    raise TypeError('stdin must be str, bytes, or a readable file-like object')
 
-        if combine_stderr and stderr is not None:
-            raise ValueError('stderr must be None if combine_stderr is True')
+            if combine_stderr and stderr is not None:
+                raise ValueError('stderr must be None if combine_stderr is True')
 
-        body = {
-            'command': command,
-            'service-context': service_context,
-            'environment': environment or {},
-            'working-dir': working_dir,
-            'timeout': _format_timeout(timeout) if timeout is not None else None,
-            'user-id': user_id,
-            'user': user,
-            'group-id': group_id,
-            'group': group,
-            'split-stderr': not combine_stderr,
-        }
-        resp = self._request('POST', '/v1/exec', body=body)
-        change_id = resp['change']
-        task_id = resp['result']['task-id']
+            body = {
+                'command': command,
+                'service-context': service_context,
+                'environment': environment or {},
+                'working-dir': working_dir,
+                'timeout': _format_timeout(timeout) if timeout is not None else None,
+                'user-id': user_id,
+                'user': user,
+                'group-id': group_id,
+                'group': group,
+                'split-stderr': not combine_stderr,
+            }
+            resp = self._request('POST', '/v1/exec', body=body)
+            change_id = resp['change']
+            task_id = resp['result']['task-id']
 
-        stderr_ws: Optional[_WebSocket] = None
-        try:
-            control_ws = self._connect_websocket(task_id, 'control')
-            stdio_ws = self._connect_websocket(task_id, 'stdio')
-            if not combine_stderr:
-                stderr_ws = self._connect_websocket(task_id, 'stderr')
-        except websocket.WebSocketException as e:
-            # Error connecting to websockets, probably due to the exec/change
-            # finishing early with an error. Call wait_change to pick that up.
-            change = self.wait_change(ChangeID(change_id))
-            if change.err:
-                raise ChangeError(change.err, change) from e
-            raise ConnectionError(f'unexpected error connecting to websockets: {e}') from e
+            stderr_ws: Optional[_WebSocket] = None
+            try:
+                control_ws = self._connect_websocket(task_id, 'control')
+                stdio_ws = self._connect_websocket(task_id, 'stdio')
+                if not combine_stderr:
+                    stderr_ws = self._connect_websocket(task_id, 'stderr')
+            except websocket.WebSocketException as e:
+                # Error connecting to websockets, probably due to the exec/change
+                # finishing early with an error. Call wait_change to pick that up.
+                change = self.wait_change(ChangeID(change_id))
+                if change.err:
+                    raise ChangeError(change.err, change) from e
+                raise ConnectionError(f'unexpected error connecting to websockets: {e}') from e
 
-        cancel_stdin: Optional[Callable[[], None]] = None
-        cancel_reader: Optional[int] = None
-        threads: List[threading.Thread] = []
+            cancel_stdin: Optional[Callable[[], None]] = None
+            cancel_reader: Optional[int] = None
+            threads: List[threading.Thread] = []
 
-        if stdin is not None:
-            if _has_fileno(stdin):
-                # Create a pipe so _reader_to_websocket can select() on the
-                # reader as well as this cancel_reader; when we write anything
-                # to cancel_writer it'll trigger the select and end the thread.
-                cancel_reader, cancel_writer = os.pipe()
+            if stdin is not None:
+                if _has_fileno(stdin):
+                    # Create a pipe so _reader_to_websocket can select() on the
+                    # reader as well as this cancel_reader; when we write anything
+                    # to cancel_writer it'll trigger the select and end the thread.
+                    cancel_reader, cancel_writer = os.pipe()
 
-                def _cancel_stdin():
-                    os.write(cancel_writer, b'x')  # doesn't matter what we write
-                    os.close(cancel_writer)
+                    def _cancel_stdin():
+                        os.write(cancel_writer, b'x')  # doesn't matter what we write
+                        os.close(cancel_writer)
 
-                cancel_stdin = _cancel_stdin
+                    cancel_stdin = _cancel_stdin
 
-            t = _start_thread(_reader_to_websocket, stdin, stdio_ws, encoding, cancel_reader)
-            threads.append(t)
-            process_stdin = None
-        else:
-            process_stdin = _WebsocketWriter(stdio_ws)
-            if encoding is not None:
-                process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding, newline='')  # type: ignore
-
-        if stdout is not None:
-            t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
-            threads.append(t)
-            process_stdout = None
-        else:
-            process_stdout = _WebsocketReader(stdio_ws)
-            if encoding is not None:
-                process_stdout = io.TextIOWrapper(process_stdout, encoding=encoding, newline='')  # type: ignore
-
-        process_stderr = None
-        if not combine_stderr:
-            if stderr is not None:
-                t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
+                t = _start_thread(_reader_to_websocket, stdin, stdio_ws, encoding, cancel_reader)
                 threads.append(t)
+                process_stdin = None
             else:
-                ws = typing.cast('_WebSocket', stderr_ws)
-                process_stderr = _WebsocketReader(ws)
+                process_stdin = _WebsocketWriter(stdio_ws)
                 if encoding is not None:
-                    process_stderr = io.TextIOWrapper(
-                        process_stderr,  # type: ignore
+                    process_stdin = io.TextIOWrapper(process_stdin, encoding=encoding, newline='')  # type: ignore
+
+            if stdout is not None:
+                t = _start_thread(_websocket_to_writer, stdio_ws, stdout, encoding)
+                threads.append(t)
+                process_stdout = None
+            else:
+                process_stdout = _WebsocketReader(stdio_ws)
+                if encoding is not None:
+                    process_stdout = io.TextIOWrapper(
+                        process_stdout,  # type: ignore
                         encoding=encoding,
                         newline='',
                     )
 
-        process: ExecProcess[Any] = ExecProcess(
-            stdin=process_stdin,  # type: ignore
-            stdout=process_stdout,  # type: ignore
-            stderr=process_stderr,  # type: ignore
-            client=self,
-            timeout=timeout,
-            stdio_ws=stdio_ws,
-            stderr_ws=stderr_ws,
-            control_ws=control_ws,
-            command=command,
-            encoding=encoding,
-            change_id=ChangeID(change_id),
-            cancel_stdin=cancel_stdin,
-            cancel_reader=cancel_reader,
-            threads=threads,
-        )
-        return process
+            process_stderr = None
+            if not combine_stderr:
+                if stderr is not None:
+                    t = _start_thread(_websocket_to_writer, stderr_ws, stderr, encoding)
+                    threads.append(t)
+                else:
+                    ws = typing.cast('_WebSocket', stderr_ws)
+                    process_stderr = _WebsocketReader(ws)
+                    if encoding is not None:
+                        process_stderr = io.TextIOWrapper(
+                            process_stderr,  # type: ignore
+                            encoding=encoding,
+                            newline='',
+                        )
+
+            process: ExecProcess[Any] = ExecProcess(
+                stdin=process_stdin,  # type: ignore
+                stdout=process_stdout,  # type: ignore
+                stderr=process_stderr,  # type: ignore
+                client=self,
+                timeout=timeout,
+                stdio_ws=stdio_ws,
+                stderr_ws=stderr_ws,
+                control_ws=control_ws,
+                command=command,
+                encoding=encoding,
+                change_id=ChangeID(change_id),
+                cancel_stdin=cancel_stdin,
+                cancel_reader=cancel_reader,
+                threads=threads,
+            )
+            return process
 
     def _connect_websocket(self, task_id: str, websocket_id: str) -> _WebSocket:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -3071,21 +3112,25 @@ class Client:
             APIError: If any of the services are not in the plan or are not
                 currently running.
         """
-        if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
-            raise TypeError(
-                f'services must be of type Iterable[str], not {type(services).__name__}'
-            )
-        for s in services:
-            if not isinstance(s, str):
-                raise TypeError(f'service names must be str, not {type(s).__name__}')
+        with tracer.start_as_current_span('pebble send_signal') as span:
+            if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
+                raise TypeError(
+                    f'services must be of type Iterable[str], not {type(services).__name__}'
+                )
+            services = list(services)
+            for s in services:
+                if not isinstance(s, str):
+                    raise TypeError(f'service names must be str, not {type(s).__name__}')
 
-        if isinstance(sig, int):
-            sig = signal.Signals(sig).name
-        body = {
-            'signal': sig,
-            'services': services,
-        }
-        self._request('POST', '/v1/signals', body=body)
+            if isinstance(sig, int):
+                sig = signal.Signals(sig).name
+
+            body = {
+                'signal': sig,
+                'services': services,
+            }
+            span.set_attributes(body)
+            self._request('POST', '/v1/signals', body=body)
 
     def get_checks(
         self, level: Optional[CheckLevel] = None, names: Optional[Iterable[str]] = None
@@ -3101,13 +3146,15 @@ class Client:
         Returns:
             List of :class:`CheckInfo` objects.
         """
-        query: Dict[str, Any] = {}
-        if level is not None:
-            query['level'] = level.value
-        if names:
-            query['names'] = list(names)
-        resp = self._request('GET', '/v1/checks', query)
-        return [CheckInfo.from_dict(info) for info in resp['result']]
+        with tracer.start_as_current_span('pebble get_checks') as span:
+            query: Dict[str, Any] = {}
+            if level is not None:
+                query['level'] = level.value
+            if names:
+                query['names'] = list(names)
+            span.set_attributes(query)
+            resp = self._request('GET', '/v1/checks', query)
+            return [CheckInfo.from_dict(info) for info in resp['result']]
 
     def start_checks(self, checks: Iterable[str]) -> List[str]:
         """Start checks by name.
@@ -3157,17 +3204,18 @@ class Client:
         Returns:
             The notice's ID.
         """
-        body: Dict[str, Any] = {
-            'action': 'add',
-            'type': type.value,
-            'key': key,
-        }
-        if data is not None:
-            body['data'] = data
-        if repeat_after is not None:
-            body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
-        resp = self._request('POST', '/v1/notices', body=body)
-        return resp['result']['id']
+        with tracer.start_as_current_span('pebble notify'):
+            body: Dict[str, Any] = {
+                'action': 'add',
+                'type': type.value,
+                'key': key,
+            }
+            if data is not None:
+                body['data'] = data
+            if repeat_after is not None:
+                body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
+            resp = self._request('POST', '/v1/notices', body=body)
+            return resp['result']['id']
 
     def get_notice(self, id: str) -> Notice:
         """Get details about a single notice by ID.
@@ -3175,8 +3223,9 @@ class Client:
         Raises:
             APIError: if a notice with the given ID is not found (``code`` 404)
         """
-        resp = self._request('GET', f'/v1/notices/{id}')
-        return Notice.from_dict(resp['result'])
+        with tracer.start_as_current_span('pebble get_notice'):
+            resp = self._request('GET', f'/v1/notices/{id}')
+            return Notice.from_dict(resp['result'])
 
     def get_notices(
         self,
@@ -3209,17 +3258,18 @@ class Client:
             types: Filter for notices with any of the specified types.
             keys: Filter for notices with any of the specified keys.
         """
-        query: Dict[str, Union[str, List[str]]] = {}
-        if users is not None:
-            query['users'] = users.value
-        if user_id is not None:
-            query['user-id'] = str(user_id)
-        if types is not None:
-            query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
-        if keys is not None:
-            query['keys'] = list(keys)
-        resp = self._request('GET', '/v1/notices', query)
-        return [Notice.from_dict(info) for info in resp['result']]
+        with tracer.start_as_current_span('pebble get_notices'):
+            query: Dict[str, Union[str, List[str]]] = {}
+            if users is not None:
+                query['users'] = users.value
+            if user_id is not None:
+                query['user-id'] = str(user_id)
+            if types is not None:
+                query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
+            if keys is not None:
+                query['keys'] = list(keys)
+            resp = self._request('GET', '/v1/notices', query)
+            return [Notice.from_dict(info) for info in resp['result']]
 
 
 class _FilesParser:

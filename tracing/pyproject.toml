@@ -1,0 +1,70 @@
+[project]
+name = "ops-tracing"
+version = "0.9.3"  # FIXME
+description = "The tracing facility for the Ops framework."
+requires-python = ">=3.8"
+readme = "readme.md"
+authors = [
+    {name="The Charm Tech team at Canonical Ltd.", email="charm-tech@lists.launchpad.net"},
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries",
+    "Framework :: OpenTelemetry",
+]
+dependencies = [
+    "otlp-json>=0.9.7",
+    "opentelemetry-sdk~=1.30",
+    "pydantic",
+]
+
+[project.urls]
+"Repository" = "https://github.com/canonical/operator"
+"Issues" = "https://github.com/canonical/operator/issues"
+"Documentation" = "https://ops.readthedocs.io"
+"Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
+
+
+[dependency-groups]
+dev = [
+    "pyright ~= 1.1",
+    "ruff ~= 0.9",
+]
+testing = [
+    "pytest ~= 8.3.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 99
+target-version = "py38"
+
+[tool.ruff.format]
+quote-style = "single"
+exclude = ["ops_tracing/vendor/*"]
+
+[tool.ruff.lint.per-file-ignores]
+"test/*" = [
+    "D"
+]

@@ -34,6 +34,7 @@ import typing
 import warnings
 import weakref
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from pathlib import Path, PurePath
 from typing import (
     Any,
@@ -62,6 +63,7 @@ from . import pebble
 from ._private import timeconv, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
+from .version import tracer
 
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
@@ -866,6 +868,7 @@ class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
     _lazy_data: Optional[Dict[str, _LazyValueType]] = None
 
     @abstractmethod
+    # FIXME instrument here, or individual access?
     def _load(self) -> Dict[str, _LazyValueType]:
         raise NotImplementedError()
 
@@ -1001,6 +1004,7 @@ class BindingMapping(Mapping[str, 'Binding']):
         self._backend = backend
         self._data: _BindingDictType = {}
 
+    # FIXME check
     def get(self, binding_key: Union[str, 'Relation']) -> 'Binding':
         """Get a specific Binding for an endpoint/relation.
 
@@ -1049,6 +1053,7 @@ class Binding:
         return Network(self._backend.network_get(name, relation_id))
 
     @property
+    # FIXME check
     def network(self) -> 'Network':
         """The network information for this binding."""
         if self._network is None:
@@ -1763,6 +1768,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     :attr:`Relation.data`
     """
 
+    # FIXME check
     def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
         self._data: Dict[Union[Unit, Application], RelationDataContent] = {
@@ -2280,6 +2286,8 @@ class Storage:
         the actual details are gone from Juju by the time of a dynamic lookup.
         """
         self._location = Path(location)
+
+    # FIXME add __repr__
 
 
 class MultiPushPullError(Exception):
@@ -3105,6 +3113,8 @@ class Container:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
+    # FIXME add __repr__
+
 
 class ContainerMapping(Mapping[str, Container]):
     """Map of container names to Container objects.
@@ -3334,35 +3344,44 @@ class _ModelBackend:
         use_json: bool = False,
         input_stream: Optional[str] = None,
     ) -> Union[str, Any, None]:
-        kwargs = {
-            'stdout': subprocess.PIPE,
-            'stderr': subprocess.PIPE,
-            'check': True,
-            'encoding': 'utf-8',
-        }
-        if input_stream:
-            kwargs.update({'input': input_stream})
-        which_cmd = shutil.which(args[0])
-        if which_cmd is None:
-            raise RuntimeError(f'command not found: {args[0]}')
-        args = (which_cmd,) + args[1:]
-        if use_json:
-            args += ('--format=json',)
-        # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
-        #                been fighting with Pyright for half an hour now...
-        try:
-            result = subprocess.run(args, **kwargs)  # type: ignore
-        except subprocess.CalledProcessError as e:
-            raise ModelError(e.stderr) from e
-        if return_output:
-            if result.stdout is None:  # type: ignore
-                return ''
-            else:
-                text: str = result.stdout  # type: ignore
-                if use_json:
-                    return json.loads(text)  # type: ignore
+        # Logs are collected via log integration, omit the subprocess calls that push
+        # the same content to juju.
+        mgr = nullcontext() if args[0] == 'juju-log' else tracer.start_as_current_span(args[0])
+        with mgr as span:
+            if span:
+                span.set_attribute('call', 'subprocess.run')
+                # Some hook tool command line arguments may include sensitive data
+                truncate = args[0] in ['action-set']
+                span.set_attribute('argv', [args[0], '...'] if truncate else args)
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+                'check': True,
+                'encoding': 'utf-8',
+            }
+            if input_stream:
+                kwargs.update({'input': input_stream})
+            which_cmd = shutil.which(args[0])
+            if which_cmd is None:
+                raise RuntimeError(f'command not found: {args[0]}')
+            args = (which_cmd,) + args[1:]
+            if use_json:
+                args += ('--format=json',)
+            # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
+            #                been fighting with Pyright for half an hour now...
+            try:
+                result = subprocess.run(args, **kwargs)  # type: ignore
+            except subprocess.CalledProcessError as e:
+                raise ModelError(e.stderr) from e
+            if return_output:
+                if result.stdout is None:  # type: ignore
+                    return ''
                 else:
-                    return text  # type: ignore
+                    text: str = result.stdout  # type: ignore
+                    if use_json:
+                        return json.loads(text)  # type: ignore
+                    else:
+                        return text  # type: ignore
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:

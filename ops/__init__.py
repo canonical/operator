@@ -55,6 +55,7 @@ This API provides core features to your charm, including:
 __all__ = [  # noqa: RUF022 `__all__` is not sorted
     '__version__',
     'main',
+    'tracing',
     'pebble',
     # From charm.py
     'ActionEvent',
@@ -186,6 +187,9 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # just skip it for this file.
 # isort:skip_file
 from typing import Optional, Type
+
+# FIXME: need to decide on this at a stand-up
+from . import _aaa_venv_workaround as _aaa_venv_workaround
 
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble
@@ -334,6 +338,11 @@ from .model import (
 # rather than a runtime concern.
 
 from .version import version as __version__
+
+try:
+    import ops_tracing as tracing
+except ImportError:
+    tracing = None
 
 
 class _Main:

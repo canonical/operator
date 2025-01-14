@@ -1,0 +1,54 @@
+on:
+  push:
+    branches: [feat-otel-ops-tracing-lib]
+  #pull_request:
+    #branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8, 3.9, "3.10", 3.11, 3.12, 3.13, 3.13t, 3.14]
+        dep-versions: [--frozen, "--resolution lowest", "--resolution highest"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          cd tracing
+          uv python install ${{ matrix.python-version }}
+          uv sync --all-groups ${{ matrix.dep-versions }}
+          uv pip install .
+          uv pip freeze
+          uv run pytest
+          uv run pyright
+          uv run ruff check
+          uv build
+
+  release:
+    # needs: ci
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          cd tracing
+          uv build --sdist --wheel
+          rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          verbose: true
+      - run: rm -f tracing/dist/*.attestation  # should I parametrise release instead?
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          skip-existing: true
+          verbose: true

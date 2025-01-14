@@ -18,6 +18,9 @@ classifiers = [
 dependencies = [
     "PyYAML==6.*",
     "websocket-client==1.*",
+    # Wide version range to preempt conflicts when charms pin a version.
+    "opentelemetry-api~=1.0",
+    "importlib-metadata",
 ]
 dynamic = ["version"]
 
@@ -39,6 +42,10 @@ docs = [
 ]
 testing = [
     "ops-scenario>=7.0.5,<8",
+]
+tracing = [
+    # FIXME pin exact version, like ops-scenario
+    "ops-tracing",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -159,6 +166,7 @@ ignore = [
     # `subprocess` call: check for execution of untrusted input
     "S603",
 ]
+exclude = ["tracing/ops_tracing/vendor/*"]
 
 [tool.ruff.lint.pyupgrade]
 # Preserve types, even if a file imports `from __future__ import annotations`.
