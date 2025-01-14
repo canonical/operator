@@ -40,6 +40,15 @@ docs = [
 testing = [
     "ops-scenario>=7.0.5,<8",
 ]
+tracing = [
+    "opentelemetry-exporter-otlp-proto-http~=1.21",
+    # TODO: the above already brings in -api, -sdk, etc.
+    # Should we be more explicit?
+    # E.g. require packages that provide APIs we use explicitly,
+    # as in, could the exporter suddenly no longer require -sdk and
+    # we'd be left without the transient dep we need?
+    # https://github.com/open-telemetry/opentelemetry-python/blob/032784d3c230312e8fa74d95a41a0253a719a843/exporter/opentelemetry-exporter-otlp-proto-http/pyproject.toml#L29-L37
+]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
 harness = []
