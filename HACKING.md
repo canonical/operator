@@ -471,7 +471,7 @@ The main improvements in this release are ...
 Read more in the [full release notes on GitHub](link to the GitHub release).
 ```
 
-In the post, outline the key improvements both in `ops` and `ops-scenario` - 
+In the post, outline the key improvements both in `ops` and `ops-scenario` -
 the point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.

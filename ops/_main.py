@@ -23,6 +23,8 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
+import opentelemetry.trace
+
 import ops.charm
 import ops.framework
 import ops.model
@@ -30,11 +32,13 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujucontext import _JujuContext
 from ops.log import setup_root_logging
+from ops.tracing import setup_tracing
 
 CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
+tracer = opentelemetry.trace.get_tracer("ops")
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -552,9 +556,11 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    try:
-        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+    setup_tracing(charm_class.__name__)
+    with tracer.start_as_current_span("ops.main"):
+        try:
+            manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
 
-        manager.run()
-    except _Abort as e:
-        sys.exit(e.exit_code)
+            manager.run()
+        except _Abort as e:
+            sys.exit(e.exit_code)

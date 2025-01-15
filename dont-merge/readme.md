@@ -28,3 +28,23 @@ Prepared 18 packages in 72ms
 (.ahh-venv) dima@colima-ahh /c/operator (feat-otel)> python dont-merge/send-traces.py
 Span created and exported to the collector!
 ```
+
+### Hacking
+
+Or, trying to run code outside of a charm.
+
+Somehow I'm not getting anything, because the `juju-log` hook tool is missing.
+
+Let's fix that.
+
+```command
+> ln -s (which echo) juju-log
+```
+
+And run ops like this:
+
+```command
+> JUJU_CHARM_DIR=dont-merge/ PATH=$PATH:. JUJU_VERSION=3.5.4 python -c 'import ops; ops.main(ops.CharmBase)'
+```
+
+Now, the backtrace ends up being sent to the OTEL collector.
