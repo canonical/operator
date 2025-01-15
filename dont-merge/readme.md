@@ -48,3 +48,9 @@ And run ops like this:
 ```
 
 Now, the backtrace ends up being sent to the OTEL collector.
+
+Even fancier:
+
+```command
+(.ahh-venv) dima@colima-ahh /c/operator (feat-otel) [1]> JUJU_UNIT_NAME=testapp/42 JUJU_CHARM_DIR=dont-merge/ PATH=$PATH:. JUJU_VERSION=3.5.4 python -c 'import ops; ops.main(ops.CharmBase)'
+```
