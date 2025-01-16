@@ -520,7 +520,8 @@ class _Buffer:
 
 class _OTLPSpanExporter(OTLPSpanExporter):
     """Subclass of OTLPSpanExporter to configure the max retry timeout, so that
-    it fails a bit faster."""
+    it fails a bit faster.
+    """
 
     # The issue we're trying to solve is that the model takes AGES to settle if e.g. tls is misconfigured,
     # as every hook of a charm_tracing-instrumented charm takes about a minute to exit, as the charm can't
@@ -587,7 +588,8 @@ def _get_tracer_from_context(ctx: Context) -> Optional[ContextVar]:
 
 def _get_tracer() -> Optional[Tracer]:
     """Find tracer in context variable and as a fallback locate it in the full
-    context."""
+    context.
+    """
     try:
         return tracer.get()
     except LookupError:
@@ -630,7 +632,8 @@ class TracingError(RuntimeError):
 
 class UntraceableObjectError(TracingError):
     """Raised when an object you're attempting to instrument cannot be
-    autoinstrumented."""
+    autoinstrumented.
+    """
 
 
 def _get_tracing_endpoint(
