@@ -1002,11 +1002,12 @@ def _autoinstrument(
     >>> main(MyCharm)
 
     :param charm_type: the CharmBase subclass to autoinstrument.
-    :param tracing_endpoint_attr: name of a method, property or attribute  on the charm type that returns an
-        optional (fully resolvable) tempo url to which the charm traces will be pushed.
+    :param tracing_endpoint_attr: name of a method, property or attribute  on the charm type that
+        returns an optional (fully resolvable) tempo url to which the charm traces will be pushed.
         If None, tracing will be effectively disabled.
     :param server_cert_attr: name of a method, property or attribute on the charm type that returns an
-        optional absolute path to a CA certificate file to be used when sending traces to a remote server.
+        optional absolute path to a CA certificate file to be used when sending traces to a remote
+        server.
         If it returns None, an _insecure_ connection will be used. To avoid errors in transient
         situations where the endpoint is already https but there is no certificate on disk yet, it
         is recommended to disable tracing (by returning None from the tracing_endpoint) altogether
@@ -1015,7 +1016,7 @@ def _autoinstrument(
         Defaults to the juju application name this charm is deployed under.
     :param extra_types: pass any number of types that you also wish to autoinstrument.
         For example, charm libs, relation endpoint wrappers, workload abstractions, ...
-    :param buffer_max_events: max number of events to save in the buffer. Set to 0 to disable buffering.
+    :param buffer_max_events: max number of events to save in the buffer. Set to 0 to disable.
     :param buffer_max_size_mib: max size of the buffer file. When exceeded, spans will be dropped.
         Minimum 10MiB.
     :param buffer_path: path to buffer file to use for saving buffered spans.
@@ -1062,9 +1063,10 @@ def trace_type(cls: _T) -> _T:
             qualname_c0 = method.__qualname__.split('.')[0]
             if not hasattr(cls, method.__name__):
                 # if the callable doesn't have a __name__ (probably a decorated method),
-                # it probably has a bad qualname too (such as my_decorator.<locals>.wrapper) which is not
-                # great for finding out what the trace is about. So we use the method name instead and
-                # add a reference to the decorator name. Result:
+                # it probably has a bad qualname too (such as my_decorator.<locals>.wrapper)
+                # which is not great for finding out what the trace is about.
+                # So we use the method name instead and add a reference to the decorator name.
+                # Result:
                 #   method call: @my_decorator(MyCharmWrappedMethods.b)
                 trace_method_name = f'@{qualname_c0}({cls.__name__}.{name})'
         except Exception:  # noqa: S110
