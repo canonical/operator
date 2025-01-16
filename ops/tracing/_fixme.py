@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+
 import os
+
 from ops.jujucontext import _JujuContext
 
 """FIXME docstring"""
@@ -292,7 +294,6 @@ _remove_stale_otel_sdk_packages()
 import functools
 import inspect
 import logging
-import os
 from contextlib import contextmanager
 from contextvars import Context, ContextVar, copy_context
 from pathlib import Path
@@ -311,7 +312,6 @@ from typing import (
 
 import opentelemetry
 import opentelemetry.trace
-import ops
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
@@ -320,14 +320,17 @@ from opentelemetry.sdk.trace.export import (
     SpanExporter,
     SpanExportResult,
 )
-from opentelemetry.trace import INVALID_SPAN, Tracer
-from opentelemetry.trace import get_current_span as otlp_get_current_span
 from opentelemetry.trace import (
+    INVALID_SPAN,
+    Tracer,
     get_tracer,
     get_tracer_provider,
     set_span_in_context,
     set_tracer_provider,
 )
+from opentelemetry.trace import get_current_span as otlp_get_current_span
+
+import ops
 from ops.charm import CharmBase
 from ops.framework import Framework
 
@@ -414,7 +417,7 @@ class _Buffer:
         try:
             # if the buffer exceeds the size limit, we start dropping old spans until it does
 
-            while len((new + self._SPANSEP.join(old))) > (self._max_buffer_size_mib * _MiB_TO_B):
+            while len(new + self._SPANSEP.join(old)) > (self._max_buffer_size_mib * _MiB_TO_B):
                 if not old:
                     # if we've already dropped all spans and still we can't get under the
                     # size limit, we can't save this span
@@ -623,10 +626,7 @@ def _get_tracing_endpoint(
     charm_type: type,
 ):
     _tracing_endpoint = getattr(charm_instance, tracing_endpoint_attr)
-    if callable(_tracing_endpoint):
-        tracing_endpoint = _tracing_endpoint()
-    else:
-        tracing_endpoint = _tracing_endpoint
+    tracing_endpoint = _tracing_endpoint() if callable(_tracing_endpoint) else _tracing_endpoint
 
     if tracing_endpoint is None:
         return
@@ -647,10 +647,7 @@ def _get_server_cert(
     charm_type: Type[ops.CharmBase],
 ):
     _server_cert = getattr(charm_instance, server_cert_attr)
-    if callable(_server_cert):
-        server_cert = _server_cert()
-    else:
-        server_cert = _server_cert
+    server_cert = _server_cert() if callable(_server_cert) else _server_cert
 
     if server_cert is None:
         logger.warning(
@@ -685,7 +682,6 @@ def setup_tracing(charm_name: str) -> None:
     provider = TracerProvider(resource=resource)
 
     buffer = _Buffer(db_file=Path('/tmp/fixme'))  # FIXME use an unlinked file instead
-    previous_spans_buffered = not buffer.is_empty
     exporters = [_BufferedExporter(buffer)]
 
     # real exporter, hardcoded for now
@@ -1082,6 +1078,7 @@ def trace_function(function: _F, name: Optional[str] = None) -> _F:
     return _trace_callable(function, 'function', name=name)
 
 
+# callable is a builtin
 def _trace_callable(callable: _F, qualifier: str, name: Optional[str] = None) -> _F:
     dev_logger.debug(f'instrumenting {callable}')
 
@@ -1117,4 +1114,4 @@ def trace(obj: Union[Type, Callable]):
         except Exception:
             raise UntraceableObjectError(
                 f'cannot create span from {type(obj)}; instrument {obj} manually.'
-            )
+            ) from None
