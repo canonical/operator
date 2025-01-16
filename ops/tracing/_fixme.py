@@ -689,7 +689,7 @@ def setup_tracing(charm_name: str) -> None:
     exporters = [_BufferedExporter(buffer)]
 
     # real exporter, hardcoded for now
-    otlp_exporter = OTLPSpanExporter( endpoint='http://localhost:4318/v1/traces')
+    otlp_exporter = OTLPSpanExporter(endpoint='http://localhost:4318/v1/traces')
     exporters.append(otlp_exporter)
     span_processor = BatchSpanProcessor(otlp_exporter)
     provider.add_span_processor(span_processor)
