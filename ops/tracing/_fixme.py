@@ -9,12 +9,14 @@
 # the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
+"""FIXME Docstring."""
 from __future__ import annotations
 
 import functools
 import inspect
 import logging
 import os
+import typing
 from contextlib import contextmanager
 from contextvars import Context, ContextVar, copy_context
 from pathlib import Path
@@ -33,6 +35,9 @@ from typing import (
 
 import opentelemetry
 import opentelemetry.trace
+from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import (
+    encode_spans,
+)
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
@@ -41,6 +46,7 @@ from opentelemetry.sdk.trace.export import (
     SpanExporter,
     SpanExportResult,
 )
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import (
     INVALID_SPAN,
     Tracer,
@@ -56,9 +62,7 @@ from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.jujucontext import _JujuContext
 
-"""FIXME docstring"""
-
-"""Old doc string.
+"""FIXME Old doc string.
 
 ```python
 # import the necessary charm libs
@@ -75,15 +79,17 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing
 class MyCharm(CharmBase):
     _path_to_cert = "/path/to/cert.crt"
     # path to cert file **in the charm container**. Its presence will be used to determine whether
-    # the charm is ready to use tls for encrypting charm traces. If your charm does not support tls,
-    # you can ignore this and pass None to charm_tracing_config.
-    # If you do support TLS, you'll need to make sure that the server cert is copied to this location
-    # and kept up to date so the instrumentor can use it.
+    # the charm is ready to use tls for encrypting charm traces. If your charm does not support
+    # tls, you can ignore this and pass None to charm_tracing_config.
+    # If you do support TLS, you'll need to make sure that the server cert is copied to this
+    # location and kept up to date so the instrumentor can use it.
 
     def __init__(self, ...):
         ...
         self.tracing = TracingEndpointRequirer(self, ...)
-        self.tracing_endpoint, self.server_cert = charm_tracing_config(self.tracing, self._path_to_cert)
+        (
+            self.tracing_endpoint, self.server_cert
+        ) = charm_tracing_config(self.tracing, self._path_to_cert)
 ```
 
 # Detailed usage
@@ -112,13 +118,15 @@ At this point your charm will be automatically instrumented so that:
     - every event as a span (including custom events)
     - every charm method call (except dunders) as a span
 
-We recommend that you scale up your tracing provider and relate it to an ingress so that your tracing requests
-go through the ingress and get load balanced across all units. Otherwise, if the provider's leader goes down, your tracing goes down.
+We recommend that you scale up your tracing provider and relate it to an ingress so that your
+tracing requests go through the ingress and get load balanced across all units. Otherwise, if
+the provider's leader goes down, your tracing goes down.
 
 
 ## TLS support
-If your charm integrates with a TLS provider which is also trusted by the tracing provider (the Tempo charm),
-you can configure ``charm_tracing`` to use TLS by passing a ``server_cert`` parameter to the decorator.
+If your charm integrates with a TLS provider which is also trusted by the tracing provider
+(the Tempo charm), you can configure ``charm_tracing`` to use TLS by passing a ``server_cert``
+parameter to the decorator.
 
 If your charm is not trusting the same CA as the Tempo endpoint it is sending traces to,
 you'll need to implement a cert-transfer relation to obtain the CA certificate from the same
@@ -189,8 +197,8 @@ class MyCharm(CharmBase):
 Note that setting `buffer_max_events` to 0 will effectively disable the buffer.
 
 The path of the buffer file is by default in the charm's execution root, which for k8s charms means
-that in case of pod churn, the cache will be lost. The recommended solution is to use an existing storage
-(or add a new one) such as:
+that in case of pod churn, the cache will be lost. The recommended solution is to use an existing
+storage (or add a new one) such as:
 
 ```yaml
 storage:
@@ -213,8 +221,8 @@ class MyCharm(CharmBase):
 
 ## Upgrading from `v0`
 
-If you are upgrading from `charm_tracing` v0, you need to take the following steps (assuming you already
-have the newest version of the library in your charm):
+If you are upgrading from `charm_tracing` v0, you need to take the following steps (assuming you
+already have the newest version of the library in your charm):
 1) If you need the dependency for your tests, add the following dependency to your charm project
 (or, if your project had a dependency on `opentelemetry-exporter-otlp-proto-grpc` only because
 of `charm_tracing` v0, you can replace it with):
@@ -268,25 +276,15 @@ needs to be replaced with:
 3) If you were passing a certificate (str) using `server_cert`, you need to change it to
 provide an *absolute* path to the certificate file instead.
 """
-import typing
-
-from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import (
-    encode_spans,
-)
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 
 def _remove_stale_otel_sdk_packages():
-    """Hack to remove stale opentelemetry sdk packages from the charm's python
-    venv.
+    """Remove stale opentelemetry sdk packages from the charm's Python venv.
 
     See
     https://github.com/canonical/grafana-agent-operator/issues/146
     and
-    https://bugs.launchpad.net/juju/+bug/2058335 for more context. This patch can be removed after
-    this juju issue is resolved and sufficient time has passed to expect most users of this library
-    have migrated to the patched version of juju.  When this patch is removed, un-ignore rule E402 for this file in the pyproject.toml (see setting
-    [tool.ruff.lint.per-file-ignores] in pyproject.toml).
+    https://bugs.launchpad.net/juju/+bug/2058335, resolved in Juju 3.5.4.
 
     This only has an effect if executed on an upgrade-charm event.
     """
