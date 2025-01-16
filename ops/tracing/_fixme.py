@@ -11,8 +11,49 @@
 # governing permissions and limitations under the License.
 from __future__ import annotations
 
+import functools
+import inspect
+import logging
 import os
+from contextlib import contextmanager
+from contextvars import Context, ContextVar, copy_context
+from pathlib import Path
+from typing import (
+    Any,
+    Callable,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
+import opentelemetry
+import opentelemetry.trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    SpanExporter,
+    SpanExportResult,
+)
+from opentelemetry.trace import (
+    INVALID_SPAN,
+    Tracer,
+    get_tracer,
+    get_tracer_provider,
+    set_span_in_context,
+    set_tracer_provider,
+)
+from opentelemetry.trace import get_current_span as otlp_get_current_span
+
+import ops
+from ops.charm import CharmBase
+from ops.framework import Framework
 from ops.jujucontext import _JujuContext
 
 """FIXME docstring"""
@@ -294,49 +335,6 @@ def _remove_stale_otel_sdk_packages():
 # ours and before the charm has inited. We assume they won't.
 _remove_stale_otel_sdk_packages()
 
-import functools
-import inspect
-import logging
-from contextlib import contextmanager
-from contextvars import Context, ContextVar, copy_context
-from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Generator,
-    List,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
-
-import opentelemetry
-import opentelemetry.trace
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-    SpanExporter,
-    SpanExportResult,
-)
-from opentelemetry.trace import (
-    INVALID_SPAN,
-    Tracer,
-    get_tracer,
-    get_tracer_provider,
-    set_span_in_context,
-    set_tracer_provider,
-)
-from opentelemetry.trace import get_current_span as otlp_get_current_span
-
-import ops
-from ops.charm import CharmBase
-from ops.framework import Framework
-
 logger = logging.getLogger(__name__)
 # FIXME remove dev logger before merging this file
 dev_logger = logging.getLogger('tracing-dev')
@@ -366,8 +364,7 @@ BUFFER_SAFETY_LIMIT = 67_108_864
 
 
 class _Buffer:
-    """Handles buffering for spans emitted while no tracing backend is
-    configured or available.
+    """Handles buffering while no tracing backend is configured or available.
 
     Use the max_event_history_length_buffering param of @trace_charm to
     tune the amount of memory that this will hog on your units.
@@ -379,7 +376,10 @@ class _Buffer:
     """
 
     _SPANSEP = b'__CHARM_TRACING_BUFFER_SPAN_SEP__'
-    """FIXME: must remain verbatim this if we aim to pick up data from charm lib instrumentation."""
+    """FIXME: the value must remain verbatim same.
+
+    That is if we aim to pick up data from charm lib instrumentation.
+    """
 
     # FIXME remove max event count, keep a fixed MB limit
     def __init__(
@@ -437,7 +437,8 @@ class _Buffer:
                 old = old[1:]
                 logger.warning(
                     f'buffer size exceeds {self._max_buffer_size_mib}MiB; dropping older spans... '
-                    f'Please increase the buffer size, disable buffering, or ensure the spans can be flushed.'
+                    f'Please increase the buffer size, disable buffering, '
+                    'or ensure the spans can be flushed.'
                 )
 
             self._db_file.write_bytes(new + self._SPANSEP.join(old))
@@ -472,9 +473,9 @@ class _Buffer:
         self._db_file.write_bytes(self._SPANSEP.join(new))
 
     def flush(self) -> Optional[bool]:
-        """Export all buffered spans to the given exporter, then clear the
-        buffer.
+        """Export all buffered spans to the given exporter.
 
+        Then clear the buffer.
         Returns whether the flush was successful, and None if there was
         nothing to flush.
         """
@@ -488,20 +489,25 @@ class _Buffer:
             return None
 
         errors = False
+        # FIXME this logic was buggy, intermittent errors were
+        # not handled properly
         for span in buffered_spans:
             try:
                 out = self.exporter._export(span)  # type: ignore
                 if not (200 <= out.status_code < 300):
                     # take any 2xx status code as a success
                     errors = True
+                    break
             except ConnectionError:
                 dev_logger.debug(
                     'failed exporting buffered span; backend might be down or still starting'
                 )
                 errors = True
+                break
             except Exception:
                 logger.exception('unexpected error while flushing span batch from buffer')
                 errors = True
+                break
 
         if not errors:
             self.drop()
@@ -520,8 +526,9 @@ class _Buffer:
 
 
 class _OTLPSpanExporter(OTLPSpanExporter):
-    """Subclass of OTLPSpanExporter to configure the max retry timeout, so that
-    it fails a bit faster.
+    """Subclass of OTLPSpanExporter to configure the max retry timeout.
+
+    Done this way, so that it fails a bit faster.
     """
 
     # The issue we're trying to solve is that the model takes AGES to settle if e.g. tls
@@ -591,9 +598,7 @@ def _get_tracer_from_context(ctx: Context) -> Optional[ContextVar]:
 
 
 def _get_tracer() -> Optional[Tracer]:
-    """Find tracer in context variable and as a fallback locate it in the full
-    context.
-    """
+    """Find tracer in context variable. As a fallback locate it in the full context."""
     try:
         return tracer.get()
     except LookupError:
@@ -605,7 +610,8 @@ def _get_tracer() -> Optional[Tracer]:
             if context_tracer := _get_tracer_from_context(ctx):
                 logger.warning(
                     'Tracer not found in `tracer` context var. '
-                    "Verify that you're importing all `charm_tracing` symbols from the same module path. \n"
+                    "Verify that you're importing all `charm_tracing` symbols "
+                    "from the same module path. \n"
                     'For example, DO'
                     ': `from charms.lib...charm_tracing import foo, bar`. \n'
                     'DONT: \n'
@@ -636,9 +642,7 @@ class TracingError(RuntimeError):
 
 
 class UntraceableObjectError(TracingError):
-    """Raised when an object you're attempting to instrument cannot be
-    autoinstrumented.
-    """
+    """Raised when an object cannot be autoinstrumented."""
 
 
 def _get_tracing_endpoint(
@@ -654,7 +658,8 @@ def _get_tracing_endpoint(
 
     elif not isinstance(tracing_endpoint, str):
         raise TypeError(
-            f'{charm_type.__name__}.{tracing_endpoint_attr} should resolve to a tempo endpoint (string); '
+            f'{charm_type.__name__}.{tracing_endpoint_attr} should resolve to '
+            f'a tempo endpoint (string); '
             f'got {tracing_endpoint} instead.'
         )
 
@@ -677,7 +682,8 @@ def _get_server_cert(
         return
     elif not Path(server_cert).is_absolute():
         raise ValueError(
-            f'{charm_type}.{server_cert_attr} should resolve to a valid tls cert absolute path (string | Path)); '
+            f'{charm_type}.{server_cert_attr} should resolve to a valid '
+            f'tls cert absolute path (string | Path)); '
             f'got {server_cert} instead.'
         )
     return server_cert
@@ -702,7 +708,7 @@ def setup_tracing(charm_name: str) -> None:
     )
     provider = TracerProvider(resource=resource)
 
-    buffer = _Buffer(db_file=Path('/tmp/fixme'))  # FIXME use an unlinked file instead
+    buffer = _Buffer(db_file=Path('/tmp/fixme'))  # noqa: S108  # FIXME use an unlinked file instead
     exporters = [_BufferedExporter(buffer)]
 
     # real exporter, hardcoded for now
@@ -810,7 +816,7 @@ def _setup_root_span_initializer(
             otlp_exporter = _OTLPSpanExporter(
                 endpoint=tracing_endpoint,
                 certificate_file=str(Path(server_cert).absolute()) if server_cert else None,
-                timeout=_OTLP_SPAN_EXPORTER_TIMEOUT,  # give individual requests 1 second to succeed
+                timeout=_OTLP_SPAN_EXPORTER_TIMEOUT,  # give individual requests 1 second
             )
             exporters.append(otlp_exporter)
             exporters.append(_BufferedExporter(buffer))
@@ -948,11 +954,12 @@ def trace_charm(
     >>>             return None
     >>>
 
-    :param tracing_endpoint: name of a method, property or attribute  on the charm type that returns an
-        optional (fully resolvable) tempo url to which the charm traces will be pushed.
+    :param tracing_endpoint: name of a method, property or attribute  on the charm type that
+        returns an optional (fully resolvable) tempo url to which the charm traces will be pushed.
         If None, tracing will be effectively disabled.
     :param server_cert: name of a method, property or attribute on the charm type that returns an
-        optional absolute path to a CA certificate file to be used when sending traces to a remote server.
+        optional absolute path to a CA certificate file to be used when sending traces to a remote
+        server.
         If it returns None, an _insecure_ connection will be used. To avoid errors in transient
         situations where the endpoint is already https but there is no certificate on disk yet, it
         is recommended to disable tracing (by returning None from the tracing_endpoint) altogether
@@ -961,7 +968,8 @@ def trace_charm(
         Defaults to the juju application name this charm is deployed under.
     :param extra_types: pass any number of types that you also wish to autoinstrument.
         For example, charm libs, relation endpoint wrappers, workload abstractions, ...
-    :param buffer_max_events: max number of events to save in the buffer. Set to 0 to disable buffering.
+    :param buffer_max_events: max number of events to save in the buffer.
+        Set to 0 to disable buffering.
     :param buffer_max_size_mib: max size of the buffer file. When exceeded, spans will be dropped.
         Minimum 10MiB.
     :param buffer_path: path to buffer file to use for saving buffered spans.
@@ -1015,9 +1023,9 @@ def _autoinstrument(
     :param tracing_endpoint_attr: name of a method, property or attribute  on the charm type that
         returns an optional (fully resolvable) tempo url to which the charm traces will be pushed.
         If None, tracing will be effectively disabled.
-    :param server_cert_attr: name of a method, property or attribute on the charm type that returns an
-        optional absolute path to a CA certificate file to be used when sending traces to a remote
-        server.
+    :param server_cert_attr: name of a method, property or attribute on the charm type that returns
+        an optional absolute path to a CA certificate file to be used when sending traces to a
+        remote server.
         If it returns None, an _insecure_ connection will be used. To avoid errors in transient
         situations where the endpoint is already https but there is no certificate on disk yet, it
         is recommended to disable tracing (by returning None from the tracing_endpoint) altogether
@@ -1109,8 +1117,10 @@ def trace_function(function: _F, name: Optional[str] = None) -> _F:
     return _trace_callable(function, 'function', name=name)
 
 
-# callable is a builtin
-def _trace_callable(callable: _F, qualifier: str, name: Optional[str] = None) -> _F:
+def _trace_callable(callable: _F,  # noqa: A002  # FIXME callable is a builtin
+                    qualifier: str,
+                    name: Optional[str] = None,
+                    ) -> _F:
     dev_logger.debug(f'instrumenting {callable}')
 
     # sig = inspect.signature(callable)
