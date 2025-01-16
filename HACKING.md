@@ -262,7 +262,7 @@ before generating docs to recompile the `requirements.txt` file used for docs:
 tox -e docs-deps
 ```
 
-## How to write a great doc
+## How to write great documentation
 
 - Use short sentences, ideally with one or two clauses.
 - Use headings to split the doc into sections. Make sure that the purpose of each section is clear from its heading.
