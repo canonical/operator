@@ -16,6 +16,7 @@
 If OTEL guts are installed, real implementation.
 If OTEL deps are missing, ProxyTracer pointing to NoOpTracer, doing nothing.
 """
+
 from __future__ import annotations
 
 import logging

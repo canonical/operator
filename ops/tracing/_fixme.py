@@ -10,6 +10,7 @@
 # ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
 """FIXME Docstring."""
+
 from __future__ import annotations
 
 import functools
@@ -609,7 +610,7 @@ def _get_tracer() -> Optional[Tracer]:
                 logger.warning(
                     'Tracer not found in `tracer` context var. '
                     "Verify that you're importing all `charm_tracing` symbols "
-                    "from the same module path. \n"
+                    'from the same module path. \n'
                     'For example, DO'
                     ': `from charms.lib...charm_tracing import foo, bar`. \n'
                     'DONT: \n'
@@ -1115,10 +1116,11 @@ def trace_function(function: _F, name: Optional[str] = None) -> _F:
     return _trace_callable(function, 'function', name=name)
 
 
-def _trace_callable(callable: _F,  # noqa: A002  # FIXME callable is a builtin
-                    qualifier: str,
-                    name: Optional[str] = None,
-                    ) -> _F:
+def _trace_callable(
+    callable: _F,  # noqa: A002  # FIXME callable is a builtin
+    qualifier: str,
+    name: Optional[str] = None,
+) -> _F:
     dev_logger.debug(f'instrumenting {callable}')
 
     # sig = inspect.signature(callable)

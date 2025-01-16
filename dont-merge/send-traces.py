@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """FIXME dummy docstring."""
+
 from __future__ import annotations
 
 import logging
@@ -52,5 +53,5 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level="INFO")
+    logging.basicConfig(level='INFO')
     main()
