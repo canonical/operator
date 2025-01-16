@@ -238,9 +238,12 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 
 def _remove_stale_otel_sdk_packages():
-    """Hack to remove stale opentelemetry sdk packages from the charm's python venv.
+    """Hack to remove stale opentelemetry sdk packages from the charm's python
+    venv.
 
-    See https://github.com/canonical/grafana-agent-operator/issues/146 and
+    See
+    https://github.com/canonical/grafana-agent-operator/issues/146
+    and
     https://bugs.launchpad.net/juju/+bug/2058335 for more context. This patch can be removed after
     this juju issue is resolved and sufficient time has passed to expect most users of this library
     have migrated to the patched version of juju.  When this patch is removed, un-ignore rule E402 for this file in the pyproject.toml (see setting
@@ -357,19 +360,22 @@ _BUFFER_CACHE_FILE_SIZE_LIMIT_MiB_MIN = 10
 BUFFER_DEFAULT_MAX_EVENT_HISTORY_LENGTH = 100
 _MiB_TO_B = 2**20  # megabyte to byte conversion rate
 _OTLP_SPAN_EXPORTER_TIMEOUT = 1
-"""Timeout in seconds that the OTLP span exporter has to push traces to the backend."""
+"""Timeout in seconds that the OTLP span exporter has to push traces to the
+backend."""
 BUFFER_SAFETY_LIMIT = 67_108_864
 
 
 class _Buffer:
-    """Handles buffering for spans emitted while no tracing backend is configured or available.
+    """Handles buffering for spans emitted while no tracing backend is
+    configured or available.
 
-    Use the max_event_history_length_buffering param of @trace_charm to tune
-    the amount of memory that this will hog on your units.
+    Use the max_event_history_length_buffering param of @trace_charm to
+    tune the amount of memory that this will hog on your units.
 
-    The buffer is formatted as a bespoke byte dump (protobuf limitation).
-    We cannot store them as json because that is not well-supported by the sdk
-    (see https://github.com/open-telemetry/opentelemetry-python/issues/3364).
+    The buffer is formatted as a bespoke byte dump (protobuf
+    limitation). We cannot store them as json because that is not well-
+    supported by the sdk (see
+    https://github.com/open-telemetry/opentelemetry-python/issues/3364).
     """
 
     _SPANSEP = b'__CHARM_TRACING_BUFFER_SPAN_SEP__'
@@ -465,9 +471,11 @@ class _Buffer:
         self._db_file.write_bytes(self._SPANSEP.join(new))
 
     def flush(self) -> Optional[bool]:
-        """Export all buffered spans to the given exporter, then clear the buffer.
+        """Export all buffered spans to the given exporter, then clear the
+        buffer.
 
-        Returns whether the flush was successful, and None if there was nothing to flush.
+        Returns whether the flush was successful, and None if there was
+        nothing to flush.
         """
         if not self.exporter:
             dev_logger.debug('no exporter set; skipping buffer flush')
@@ -504,13 +512,15 @@ class _Buffer:
     def is_empty(self):
         """Utility to check whether the buffer has any stored spans.
 
-        This is more efficient than attempting a load() given how large the buffer might be.
+        This is more efficient than attempting a load() given how large
+        the buffer might be.
         """
         return (not self._db_file.exists()) or (self._db_file.stat().st_size == 0)
 
 
 class _OTLPSpanExporter(OTLPSpanExporter):
-    """Subclass of OTLPSpanExporter to configure the max retry timeout, so that it fails a bit faster."""
+    """Subclass of OTLPSpanExporter to configure the max retry timeout, so that
+    it fails a bit faster."""
 
     # The issue we're trying to solve is that the model takes AGES to settle if e.g. tls is misconfigured,
     # as every hook of a charm_tracing-instrumented charm takes about a minute to exit, as the charm can't
@@ -558,8 +568,9 @@ def charm_tracing_disabled():
 def get_current_span() -> Union[Span, None]:
     """Return the currently active Span, if there is one, else None.
 
-    If you'd rather keep your logic unconditional, you can use opentelemetry.trace.get_current_span,
-    which will return an object that behaves like a span but records no data.
+    If you'd rather keep your logic unconditional, you can use
+    opentelemetry.trace.get_current_span, which will return an object
+    that behaves like a span but records no data.
     """
     span = otlp_get_current_span()
     if span is INVALID_SPAN:
@@ -575,7 +586,8 @@ def _get_tracer_from_context(ctx: Context) -> Optional[ContextVar]:
 
 
 def _get_tracer() -> Optional[Tracer]:
-    """Find tracer in context variable and as a fallback locate it in the full context."""
+    """Find tracer in context variable and as a fallback locate it in the full
+    context."""
     try:
         return tracer.get()
     except LookupError:
@@ -617,7 +629,8 @@ class TracingError(RuntimeError):
 
 
 class UntraceableObjectError(TracingError):
-    """Raised when an object you're attempting to instrument cannot be autoinstrumented."""
+    """Raised when an object you're attempting to instrument cannot be
+    autoinstrumented."""
 
 
 def _get_tracing_endpoint(
@@ -1024,9 +1037,10 @@ def _autoinstrument(
 def trace_type(cls: _T) -> _T:
     """Set up tracing on this class.
 
-    Use this decorator to get out-of-the-box traces for all method calls on instances of this class.
-    It assumes that this class is only instantiated after a charm type decorated with `@trace_charm`
-    has been instantiated.
+    Use this decorator to get out-of-the-box traces for all method calls
+    on instances of this class. It assumes that this class is only
+    instantiated after a charm type decorated with `@trace_charm` has
+    been instantiated.
     """
     dev_logger.debug(f'instrumenting {cls}')
     for name, method in inspect.getmembers(cls, predicate=inspect.isfunction):
@@ -1065,7 +1079,8 @@ def trace_type(cls: _T) -> _T:
 def trace_method(method: _F, name: Optional[str] = None) -> _F:
     """Trace this method.
 
-    A span will be opened when this method is called and closed when it returns.
+    A span will be opened when this method is called and closed when it
+    returns.
     """
     return _trace_callable(method, 'method', name=name)
 
@@ -1073,7 +1088,8 @@ def trace_method(method: _F, name: Optional[str] = None) -> _F:
 def trace_function(function: _F, name: Optional[str] = None) -> _F:
     """Trace this function.
 
-    A span will be opened when this function is called and closed when it returns.
+    A span will be opened when this function is called and closed when
+    it returns.
     """
     return _trace_callable(function, 'function', name=name)
 
