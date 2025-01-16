@@ -28,11 +28,11 @@ except ImportError:
     _fixme = None
 
 
-def setup_tracing(charm_name: str):
+def setup_tracing(charm_class_name: str):
     """Setup tracing for this "dispatch" of the charm code."""
     if not _fixme:
         return
-    _fixme.setup_tracing(charm_name)
+    _fixme.setup_tracing(charm_class_name)
 
 
 def reset_tracing():

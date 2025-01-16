@@ -17,16 +17,14 @@ import functools
 import inspect
 import logging
 import os
+import tempfile
 import typing
 from contextlib import contextmanager
-from contextvars import Context, ContextVar, copy_context
+from contextvars import ContextVar
 from pathlib import Path
 from typing import (
-    Any,
     Callable,
-    Generator,
-    List,
-    Optional,
+    IO,
     Sequence,
     Type,
     TypeVar,
@@ -106,7 +104,7 @@ If you are using the ``charms.tempo_coordinator_k8s.v0.tracing.TracingEndpointRe
 
 ```
     @property
-    def my_tracing_endpoint(self) -> Optional[str]:
+    def my_tracing_endpoint(self) -> str|None:
         '''Tempo endpoint for charm tracing'''
         if self.tracing.is_ready():
             return self.tracing.get_endpoint("otlp_http")
@@ -144,11 +142,11 @@ class MyCharm(CharmBase):
     self._server_cert = "/path/to/server.crt"
     ...
 
-    def on_tls_changed(self, e) -> Optional[str]:
+    def on_tls_changed(self, e) -> str|None:
         # update the server cert on the charm container for charm tracing
         Path(self._server_cert).write_text(self.get_server_cert())
 
-    def on_tls_broken(self, e) -> Optional[str]:
+    def on_tls_broken(self, e) -> str|None:
         # remove the server cert so charm_tracing won't try to use tls anymore
         Path(self._server_cert).unlink()
 ```
@@ -186,16 +184,10 @@ You can configure this by, for example:
 @trace_charm(
     tracing_endpoint="my_tracing_endpoint",
     server_cert="_server_cert",
-    # only cache up to 42 events
-    buffer_max_events=42,
-    # only cache up to 42 MiB
-    buffer_max_size_mib=42,  # minimum 10!
 )
 class MyCharm(CharmBase):
     ...
 ```
-
-Note that setting `buffer_max_events` to 0 will effectively disable the buffer.
 
 The path of the buffer file is by default in the charm's execution root, which for k8s charms means
 that in case of pod churn, the cache will be lost. The recommended solution is to use an existing
@@ -245,7 +237,7 @@ For example:
     ...
 
         @property
-        def my_tracing_endpoint(self) -> Optional[str]:
+        def my_tracing_endpoint(self) -> str|None:
             '''Tempo endpoint for charm tracing'''
             if self.tracing.is_ready():
                 return self.tracing.otlp_grpc_endpoint() #  OLD API, DEPRECATED.
@@ -266,7 +258,7 @@ needs to be replaced with:
     ...
 
         @property
-        def my_tracing_endpoint(self) -> Optional[str]:
+        def my_tracing_endpoint(self) -> str|None:
             '''Tempo endpoint for charm tracing'''
             if self.tracing.is_ready():
                 return self.tracing.get_endpoint("otlp_http")  # NEW API, use this.
@@ -344,7 +336,7 @@ _C = TypeVar('_C', bound=_CharmType)
 _T = TypeVar('_T', bound=type)
 _F = TypeVar('_F', bound=Type[Callable])
 tracer: ContextVar[Tracer] = ContextVar('tracer')
-_GetterType = Union[Callable[[_CharmType], Optional[str]], property]
+_GetterType = Callable[[_CharmType], str|None]|property
 
 CHARM_TRACING_ENABLED = 'CHARM_TRACING_ENABLED'
 BUFFER_DEFAULT_CACHE_FILE_NAME = '.charm_tracing_buffer.raw'
@@ -352,17 +344,13 @@ BUFFER_DEFAULT_CACHE_FILE_NAME = '.charm_tracing_buffer.raw'
 # serialize/deserialize it in any portable format. Json dumping is supported, but
 # loading isn't. cfr: https://github.com/open-telemetry/opentelemetry-python/issues/1003
 
-BUFFER_DEFAULT_CACHE_FILE_SIZE_LIMIT_MiB = 10
-_BUFFER_CACHE_FILE_SIZE_LIMIT_MiB_MIN = 10
-BUFFER_DEFAULT_MAX_EVENT_HISTORY_LENGTH = 100
-_MiB_TO_B = 2**20  # megabyte to byte conversion rate
-_OTLP_SPAN_EXPORTER_TIMEOUT = 1
+_OTLP_SPAN_EXPORTER_TIMEOUT = 1  # seconds
 """Timeout in seconds that the OTLP span exporter has to push traces to the
 backend."""
-BUFFER_SAFETY_LIMIT = 67_108_864
+BUFFER_SAFETY_LIMIT = 64 * 1024 ** 2
 
 
-class _Buffer:
+class Buffer:
     """Handles buffering while no tracing backend is configured or available.
 
     Use the max_event_history_length_buffering param of @trace_charm to
@@ -374,104 +362,73 @@ class _Buffer:
     https://github.com/open-telemetry/opentelemetry-python/issues/3364).
     """
 
-    _SPANSEP = b'__CHARM_TRACING_BUFFER_SPAN_SEP__'
+    file: IO[bytes]
+    exporter: OTLPSpanExporter|None = None
+    """A Python file.
+
+    Holds an open file descriptor to a file-system file in which the data is stored.
+    The file offset points to one-past-last-byte of data.
+    """
+
+    SEPARATOR = b'__CHARM_TRACING_BUFFER_SPAN_SEP__'
     """FIXME: the value must remain verbatim same.
 
     That is if we aim to pick up data from charm lib instrumentation.
     """
 
-    # FIXME remove max event count, keep a fixed MB limit
-    def __init__(
-        self,
-        db_file: Path,
-        *,
-        max_event_history_length: int = 9999,
-        max_buffer_size_mib: int = BUFFER_SAFETY_LIMIT,
-    ):
-        self._db_file = db_file
-        self._max_event_history_length = max_event_history_length
-        self._max_buffer_size_mib = max(max_buffer_size_mib, _BUFFER_CACHE_FILE_SIZE_LIMIT_MiB_MIN)
+    def __init__(self):
+        self.file = tempfile.TemporaryFile(mode='wb+')
 
-        # set by caller
-        self.exporter: Optional[OTLPSpanExporter] = None
+    def pivot(self, buffer_path: Path) -> None:
+        """Pivot fron anonymous temporary file to a named buffer file."""
+        self.file.seek(0)
+        data = self.file.read()
 
-    def save(self, spans: typing.Sequence[ReadableSpan]):
-        """Save the spans collected by this exporter to the cache file.
+        self.file = os.fdopen(os.open(buffer_path, os.O_RDWR | os.O_CREAT), 'rb+')
+        self.file.seek(0, os.SEEK_END)
+        self.append(data)
 
-        This method should be as fail-safe as possible.
-        """
-        if self._max_event_history_length < 1:
-            dev_logger.debug('buffer disabled: max history length < 1')
+    def append(self, data: bytes) -> None:
+        load = self.file.tell()
+        # FIXME maybe some protection against double pivot.
+        # or against doubling by pivot to the very same path.
+
+        if load and data:
+            if load + len(self.SEPARATOR) + len(data) > BUFFER_SAFETY_LIMIT:
+                logger.warning("Buffer full, dropping old data")
+                self.file.seek(0)
+                self.file.truncate(0)
+                load = 0
+
+        if load and data:
+            self.file.write(self.SEPARATOR + data)
+        elif data:
+            self.file.write(data)
+
+    def save(self, spans: typing.Sequence[ReadableSpan]) -> None:
+        """Buffer a bunch of spans."""
+        # FIXME check if this is even needed
+        if not spans:
             return
 
-        current_history_length = len(self.load())
-        new_history_length = current_history_length + len(spans)
-        if (diff := self._max_event_history_length - new_history_length) < 0:
-            self.drop(diff)
-        self._save(spans)
+        self.append(encode_spans(spans).SerializeToString())
+        # FIXME ensure that batch span processor breaks up large sequences
+        # of data, or break series of spans up to fit the default
+        # OTEL/OTLP protobuf-over-HTTP request size limit of 20MB
 
-    def _serialize(self, spans: Sequence[ReadableSpan]) -> bytes:
-        # encode because otherwise we can't json-dump them
-        return encode_spans(spans).SerializeToString()
-
-    def _save(self, spans: Sequence[ReadableSpan], replace: bool = False):
-        dev_logger.debug(f'saving {len(spans)} new spans to buffer')
-        old = [] if replace else self.load()
-        new = self._serialize(spans)
-
-        try:
-            # if the buffer exceeds the size limit, we start dropping old spans until it
-            # does
-
-            while len(new + self._SPANSEP.join(old)) > (self._max_buffer_size_mib * _MiB_TO_B):
-                if not old:
-                    # if we've already dropped all spans and still we can't get under
-                    # the size limit, we can't save this span
-                    logger.error(
-                        f'span exceeds total buffer size limit ({self._max_buffer_size_mib}MiB); '
-                        f'buffering FAILED'
-                    )
-                    return
-
-                old = old[1:]
-                logger.warning(
-                    f'buffer size exceeds {self._max_buffer_size_mib}MiB; dropping older spans... '
-                    f'Please increase the buffer size, disable buffering, '
-                    'or ensure the spans can be flushed.'
-                )
-
-            self._db_file.write_bytes(new + self._SPANSEP.join(old))
-        except Exception:
-            logger.exception('error buffering spans')
-
-    def load(self) -> List[bytes]:
+    def load(self) -> list[bytes]:
         """Load currently buffered spans from the cache file.
 
         This method should be as fail-safe as possible.
         """
-        if not self._db_file.exists():
-            dev_logger.debug('buffer file not found. buffer empty.')
-            return []
-        try:
-            spans = self._db_file.read_bytes().split(self._SPANSEP)
-        except Exception:
-            logger.exception(f'error parsing {self._db_file}')
-            return []
-        return spans
+        self.file.seek(0)
+        return self.file.read().split(self.SEPARATOR)
 
-    def drop(self, n_spans: Optional[int] = None):
-        """Drop some currently buffered spans from the cache file."""
-        current = self.load()
-        if n_spans:
-            dev_logger.debug(f'dropping {n_spans} spans from buffer')
-            new = current[n_spans:]
-        else:
-            dev_logger.debug('emptying buffer')
-            new = []
+    def drop(self) -> None:
+        self.file.seek(0)
+        self.file.truncate(0)
 
-        self._db_file.write_bytes(self._SPANSEP.join(new))
-
-    def flush(self) -> Optional[bool]:
+    def flush(self) -> None:
         """Export all buffered spans to the given exporter.
 
         Then clear the buffer.
@@ -511,6 +468,7 @@ class _Buffer:
         if not errors:
             self.drop()
         else:
+            # FIXME this logic is a little fishy
             logger.error('failed flushing spans; buffer preserved')
         return not errors
 
@@ -521,7 +479,7 @@ class _Buffer:
         This is more efficient than attempting a load() given how large
         the buffer might be.
         """
-        return (not self._db_file.exists()) or (self._db_file.stat().st_size == 0)
+        return (not self.file.exists()) or (self.file.stat().st_size == 0)
 
 
 class _OTLPSpanExporter(OTLPSpanExporter):
@@ -543,7 +501,7 @@ class _OTLPSpanExporter(OTLPSpanExporter):
 
 
 class _BufferedExporter(InMemorySpanExporter):
-    def __init__(self, buffer: _Buffer) -> None:
+    def __init__(self, buffer: Buffer) -> None:
         super().__init__()
         self._buffer = buffer
 
@@ -589,57 +547,12 @@ def get_current_span() -> Union[Span, None]:
     return cast(Span, span)
 
 
-def _get_tracer_from_context(ctx: Context) -> Optional[ContextVar]:
-    tracers = [v for v in ctx if v is not None and v.name == 'tracer']
-    if tracers:
-        return tracers[0]
-    return None
-
-
-def _get_tracer() -> Optional[Tracer]:
-    """Find tracer in context variable. As a fallback locate it in the full context."""
-    try:
-        return tracer.get()
-    except LookupError:
-        # fallback: this course-corrects for a user error where charm_tracing symbols
-        # are imported from different paths (typically charms.tempo_coordinator_k8s...
-        # and lib.charms.tempo_coordinator_k8s...)
-        try:
-            ctx: Context = copy_context()
-            if context_tracer := _get_tracer_from_context(ctx):
-                logger.warning(
-                    'Tracer not found in `tracer` context var. '
-                    "Verify that you're importing all `charm_tracing` symbols "
-                    'from the same module path. \n'
-                    'For example, DO'
-                    ': `from charms.lib...charm_tracing import foo, bar`. \n'
-                    'DONT: \n'
-                    ' \t - `from charms.lib...charm_tracing import foo` \n'
-                    ' \t - `from lib...charm_tracing import bar` \n'
-                    'For more info: https://python-notes.curiousefficiency.org/en/latest/python'
-                    '_concepts/import_traps.html#the-double-import-trap'
-                )
-                return context_tracer.get()
-            else:
-                return None
-        except LookupError:
-            return None
-
-
-@contextmanager
-def _span(name: str) -> Generator[Optional[Span], Any, Any]:
-    """Context to create a span if there is a tracer, otherwise do nothing."""
-    if tracer := _get_tracer():
-        with tracer.start_as_current_span(name) as span:
-            yield cast(Span, span)
-    else:
-        yield None
-
-
+# FIXME remove this deep exception hierarchy
 class TracingError(RuntimeError):
     """Base class for errors raised by this module."""
 
 
+# FIXME remove this deep exception hierarchy
 class UntraceableObjectError(TracingError):
     """Raised when an object cannot be autoinstrumented."""
 
@@ -688,7 +601,8 @@ def _get_server_cert(
     return server_cert
 
 
-def setup_tracing(charm_name: str) -> None:
+def setup_tracing(charm_class_name: str) -> None:
+    # FIXME would it be better to pass Juju context explicitly?
     juju_context = _JujuContext.from_dict(os.environ)
     app_name = None if juju_context.unit_name is None else juju_context.unit_name.split('/')[0]
     service_name = f'{app_name}-charm'  # only one COS charm sets custom value
@@ -707,11 +621,12 @@ def setup_tracing(charm_name: str) -> None:
     )
     provider = TracerProvider(resource=resource)
 
-    buffer = _Buffer(db_file=Path('/tmp/fixme'))  # noqa: S108  # FIXME use an unlinked file instead
+    buffer = Buffer()
     exporters = [_BufferedExporter(buffer)]
 
     # real exporter, hardcoded for now
     otlp_exporter = OTLPSpanExporter(endpoint='http://localhost:4318/v1/traces')
+    # FIXME figure this out
     exporters.append(otlp_exporter)
     span_processor = BatchSpanProcessor(otlp_exporter)
     provider.add_span_processor(span_processor)
@@ -721,11 +636,9 @@ def setup_tracing(charm_name: str) -> None:
 def _setup_root_span_initializer(
     charm_type: _CharmType,
     tracing_endpoint_attr: str,
-    server_cert_attr: Optional[str],
-    service_name: Optional[str],  # Only ever set by grafana operator, call it COS internal
-    buffer_path: Optional[Path],
-    buffer_max_events: int,
-    buffer_max_size_mib: int,
+    server_cert_attr: str|None,
+    service_name: str|None,  # Only ever set by grafana operator, call it COS internal
+    buffer_path: Path|None,
 ):
     """Patch the charm's initializer."""
     original_init = charm_type.__init__
@@ -794,14 +707,11 @@ def _setup_root_span_initializer(
             )
             buffer_only = True
 
-        buffer = _Buffer(
-            db_file=buffer_path or Path() / BUFFER_DEFAULT_CACHE_FILE_NAME,
-            max_event_history_length=buffer_max_events,
-            max_buffer_size_mib=buffer_max_size_mib,
-        )
+        buffer = Buffer()
+        buffer.pivot(buffer_path=buffer_path or Path() / BUFFER_DEFAULT_CACHE_FILE_NAME)
         previous_spans_buffered = not buffer.is_empty
 
-        exporters: List[SpanExporter] = []
+        exporters: list[SpanExporter] = []
         if buffer_only:
             # we have to buffer because we're missing necessary backend configuration
             dev_logger.debug('buffering mode: ON')
@@ -851,7 +761,7 @@ def _setup_root_span_initializer(
         def wrap_event_context(event_name: str):
             dev_logger.debug(f'entering event context: {event_name}')
             # when the framework enters an event context, we create a span.
-            with _span('event: ' + event_name) as event_context_span:
+            with event_tracer.start_as_current_span('event: ' + event_name) as event_context_span:
                 if event_context_span:
                     # todo: figure out how to inject event attrs in here
                     event_context_span.add_event(event_name)
@@ -866,6 +776,7 @@ def _setup_root_span_initializer(
             dev_logger.debug('tearing down tracer and flushing traces')
             span.end()
             opentelemetry.context.detach(span_token)  # type: ignore
+            # FIXME no more context vars
             tracer.reset(_tracer_token)
             tp = cast(TracerProvider, get_tracer_provider())
             flush_successful = tp.force_flush(timeout_millis=1000)  # don't block for too long
@@ -895,18 +806,7 @@ def _setup_root_span_initializer(
                     else:
                         # if the buffer was nonempty, we can attempt to flush it
                         dev_logger.debug('attempting buffer flush...')
-                        buffer_flush_successful = buffer.flush()
-                        if buffer_flush_successful:
-                            dev_logger.debug('buffer flush OK')
-                        elif buffer_flush_successful is None:
-                            # TODO is this even possible?
-                            dev_logger.debug('buffer flush OK; empty: nothing to flush')
-                        else:
-                            # this situation is pretty weird, I'm not even sure it can
-                            # happen, because it would mean that we did manage to push
-                            # traces directly to the tempo exporter (flush_successful),
-                            # but the buffer flush failed to push to the same exporter!
-                            logger.error('buffer flush FAILED')
+                        buffer.flush()
 
             tp.shutdown()
             original_close()
@@ -922,8 +822,6 @@ def trace_charm(
     server_cert: Optional[str] = None,
     service_name: Optional[str] = None,
     extra_types: Sequence[type] = (),
-    buffer_max_events: int = BUFFER_DEFAULT_MAX_EVENT_HISTORY_LENGTH,
-    buffer_max_size_mib: int = BUFFER_DEFAULT_CACHE_FILE_SIZE_LIMIT_MiB,
     buffer_path: Optional[Union[str, Path]] = None,
 ) -> Callable[[_T], _T]:
     """Autoinstrument the decorated charm with tracing telemetry.
@@ -967,10 +865,6 @@ def trace_charm(
         Defaults to the juju application name this charm is deployed under.
     :param extra_types: pass any number of types that you also wish to autoinstrument.
         For example, charm libs, relation endpoint wrappers, workload abstractions, ...
-    :param buffer_max_events: max number of events to save in the buffer.
-        Set to 0 to disable buffering.
-    :param buffer_max_size_mib: max size of the buffer file. When exceeded, spans will be dropped.
-        Minimum 10MiB.
     :param buffer_path: path to buffer file to use for saving buffered spans.
     """
 
@@ -983,8 +877,6 @@ def trace_charm(
             service_name=service_name,
             extra_types=extra_types,
             buffer_path=Path(buffer_path) if buffer_path else None,
-            buffer_max_size_mib=buffer_max_size_mib,
-            buffer_max_events=buffer_max_events,
         )
         return charm_type
 
@@ -997,8 +889,6 @@ def _autoinstrument(
     server_cert_attr: Optional[str] = None,
     service_name: Optional[str] = None,
     extra_types: Sequence[type] = (),
-    buffer_max_events: int = BUFFER_DEFAULT_MAX_EVENT_HISTORY_LENGTH,
-    buffer_max_size_mib: int = BUFFER_DEFAULT_CACHE_FILE_SIZE_LIMIT_MiB,
     buffer_path: Optional[Path] = None,
 ) -> _T:
     """Set up tracing on this charm class.
@@ -1033,9 +923,6 @@ def _autoinstrument(
         Defaults to the juju application name this charm is deployed under.
     :param extra_types: pass any number of types that you also wish to autoinstrument.
         For example, charm libs, relation endpoint wrappers, workload abstractions, ...
-    :param buffer_max_events: max number of events to save in the buffer. Set to 0 to disable.
-    :param buffer_max_size_mib: max size of the buffer file. When exceeded, spans will be dropped.
-        Minimum 10MiB.
     :param buffer_path: path to buffer file to use for saving buffered spans.
     """
     dev_logger.debug(f'instrumenting {charm_type}')
@@ -1045,8 +932,6 @@ def _autoinstrument(
         server_cert_attr=server_cert_attr,
         service_name=service_name,
         buffer_path=buffer_path,
-        buffer_max_events=buffer_max_events,
-        buffer_max_size_mib=buffer_max_size_mib,
     )
     trace_type(charm_type)
     for type_ in extra_types:
@@ -1098,7 +983,7 @@ def trace_type(cls: _T) -> _T:
     return cls
 
 
-def trace_method(method: _F, name: Optional[str] = None) -> _F:
+def trace_method(method: _F, name: str|None = None) -> _F:
     """Trace this method.
 
     A span will be opened when this method is called and closed when it
@@ -1107,7 +992,7 @@ def trace_method(method: _F, name: Optional[str] = None) -> _F:
     return _trace_callable(method, 'method', name=name)
 
 
-def trace_function(function: _F, name: Optional[str] = None) -> _F:
+def trace_function(function: _F, name: str|None = None) -> _F:
     """Trace this function.
 
     A span will be opened when this function is called and closed when
@@ -1116,10 +1001,13 @@ def trace_function(function: _F, name: Optional[str] = None) -> _F:
     return _trace_callable(function, 'function', name=name)
 
 
+autoinstrument_tracer = opentelemetry.trace.get_tracer('ops.tracing.autoinstrument')
+event_tracer = opentelemetry.trace.get_tracer('ops.tracing.FIXME')  # FIXME move usage to ops
+
 def _trace_callable(
     callable: _F,  # noqa: A002  # FIXME callable is a builtin
     qualifier: str,
-    name: Optional[str] = None,
+    name: str|None = None,
 ) -> _F:
     dev_logger.debug(f'instrumenting {callable}')
 
@@ -1129,7 +1017,8 @@ def _trace_callable(
         name_ = name or getattr(
             callable, '__qualname__', getattr(callable, '__name__', str(callable))
         )
-        with _span(f'{qualifier} call: {name_}'):  # type: ignore
+        # FIXME do we want this magical auto-instrumentation at all?
+        with autoinstrument_traces.start_as_current_span(f'{qualifier} call: {name_}'):
             return callable(*args, **kwargs)  # type: ignore
 
     # wrapped_function.__signature__ = sig
