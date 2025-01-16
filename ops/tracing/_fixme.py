@@ -1054,7 +1054,7 @@ def trace_type(cls: _T) -> _T:
                 # add a reference to the decorator name. Result:
                 #   method call: @my_decorator(MyCharmWrappedMethods.b)
                 trace_method_name = f'@{qualname_c0}({cls.__name__}.{name})'
-        except Exception:  # noqa: failsafe
+        except Exception:  # noqa: S110
             pass
 
         new_method = trace_method(method, name=trace_method_name)
