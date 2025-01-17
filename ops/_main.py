@@ -38,7 +38,7 @@ CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
-tracer = opentelemetry.trace.get_tracer('ops')
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -557,7 +557,9 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
     setup_tracing(charm_class.__name__)
-    with tracer.start_as_current_span('ops.main'):
+    # opentelemetry-api types are broken
+    # https://github.com/open-telemetry/opentelemetry-python/issues/3836
+    with tracer.start_as_current_span('ops.main'):  # type: ignore
         try:
             manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
 

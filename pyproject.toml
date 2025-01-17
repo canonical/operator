@@ -19,6 +19,7 @@ dependencies = [
     "PyYAML==6.*",
     "websocket-client==1.*",
     "opentelemetry-api~=1.21",  # TODO: I've no idea what the lowest version may be
+    "importlib-metadata",
 ]
 dynamic = ["version"]
 

@@ -17,14 +17,12 @@ import functools
 import inspect
 import logging
 import os
-import tempfile
 import typing
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import (
     Callable,
-    IO,
     Sequence,
     Type,
     TypeVar,
@@ -60,283 +58,22 @@ import ops
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.jujucontext import _JujuContext
+from ops.tracing._buffer import Buffer
 
-"""FIXME Old doc string.
-
-```python
-# import the necessary charm libs
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
-from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing
-
-# decorate your charm class with charm_tracing:
-@charm_tracing(
-    # forward-declare the instance attributes that the instrumentor will look up to obtain the
-    # tempo endpoint and server certificate
-    tracing_endpoint="tracing_endpoint",
-    server_cert="server_cert"
-)
-class MyCharm(CharmBase):
-    _path_to_cert = "/path/to/cert.crt"
-    # path to cert file **in the charm container**. Its presence will be used to determine whether
-    # the charm is ready to use tls for encrypting charm traces. If your charm does not support
-    # tls, you can ignore this and pass None to charm_tracing_config.
-    # If you do support TLS, you'll need to make sure that the server cert is copied to this
-    # location and kept up to date so the instrumentor can use it.
-
-    def __init__(self, ...):
-        ...
-        self.tracing = TracingEndpointRequirer(self, ...)
-        (
-            self.tracing_endpoint, self.server_cert
-        ) = charm_tracing_config(self.tracing, self._path_to_cert)
-```
-
-# Detailed usage
-To use this library, you need to do two things:
-1) decorate your charm class with
-
-`@trace_charm(tracing_endpoint="my_tracing_endpoint")`
-
-2) add to your charm a "my_tracing_endpoint" (you can name this attribute whatever you like)
-**property**, **method** or **instance attribute** that returns an otlp http/https endpoint url.
-If you are using the ``charms.tempo_coordinator_k8s.v0.tracing.TracingEndpointRequirer`` as
-``self.tracing = TracingEndpointRequirer(self)``, the implementation could be:
-
-```
-    @property
-    def my_tracing_endpoint(self) -> str|None:
-        '''Tempo endpoint for charm tracing'''
-        if self.tracing.is_ready():
-            return self.tracing.get_endpoint("otlp_http")
-        else:
-            return None
-```
-
-At this point your charm will be automatically instrumented so that:
-- charm execution starts a trace, containing
-    - every event as a span (including custom events)
-    - every charm method call (except dunders) as a span
-
-We recommend that you scale up your tracing provider and relate it to an ingress so that your
-tracing requests go through the ingress and get load balanced across all units. Otherwise, if
-the provider's leader goes down, your tracing goes down.
-
-
-## TLS support
-If your charm integrates with a TLS provider which is also trusted by the tracing provider
-(the Tempo charm), you can configure ``charm_tracing`` to use TLS by passing a ``server_cert``
-parameter to the decorator.
-
-If your charm is not trusting the same CA as the Tempo endpoint it is sending traces to,
-you'll need to implement a cert-transfer relation to obtain the CA certificate from the same
-CA that Tempo is using.
-
-For example:
-```
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-@trace_charm(
-    tracing_endpoint="my_tracing_endpoint",
-    server_cert="_server_cert"
-)
-class MyCharm(CharmBase):
-    self._server_cert = "/path/to/server.crt"
-    ...
-
-    def on_tls_changed(self, e) -> str|None:
-        # update the server cert on the charm container for charm tracing
-        Path(self._server_cert).write_text(self.get_server_cert())
-
-    def on_tls_broken(self, e) -> str|None:
-        # remove the server cert so charm_tracing won't try to use tls anymore
-        Path(self._server_cert).unlink()
-```
-
-
-## More fine-grained manual instrumentation
-if you wish to add more spans to the trace, you can do so by getting a hold of the tracer like so:
-```
-import opentelemetry
-...
-def get_tracer(self) -> opentelemetry.trace.Tracer:
-    return opentelemetry.trace.get_tracer(type(self).__name__)
-```
-
-By default, the tracer is named after the charm type. If you wish to override that, you can pass
-a different ``service_name`` argument to ``trace_charm``.
-
-See the official opentelemetry Python SDK documentation for usage:
-https://opentelemetry-python.readthedocs.io/en/latest/
-
-
-## Caching traces
-The `trace_charm` machinery will buffer any traces collected during charm execution and store them
-to a file on the charm container until a tracing backend becomes available. At that point, it will
-flush them to the tracing receiver.
-
-By default, the buffer is configured to start dropping old traces if any of these conditions apply:
-
-- the storage size exceeds 10 MiB
-- the number of buffered events exceeds 100
-
-You can configure this by, for example:
-
-```python
-@trace_charm(
-    tracing_endpoint="my_tracing_endpoint",
-    server_cert="_server_cert",
-)
-class MyCharm(CharmBase):
-    ...
-```
-
-The path of the buffer file is by default in the charm's execution root, which for k8s charms means
-that in case of pod churn, the cache will be lost. The recommended solution is to use an existing
-storage (or add a new one) such as:
-
-```yaml
-storage:
-  data:
-    type: filesystem
-    location: /charm-traces
-```
-
-and then configure the `@trace_charm` decorator to use it as path for storing the buffer:
-```python
-@trace_charm(
-    tracing_endpoint="my_tracing_endpoint",
-    server_cert="_server_cert",
-    # store traces to a PVC so they're not lost on pod restart.
-    buffer_path="/charm-traces/buffer.file",
-)
-class MyCharm(CharmBase):
-    ...
-```
-
-## Upgrading from `v0`
-
-If you are upgrading from `charm_tracing` v0, you need to take the following steps (assuming you
-already have the newest version of the library in your charm):
-1) If you need the dependency for your tests, add the following dependency to your charm project
-(or, if your project had a dependency on `opentelemetry-exporter-otlp-proto-grpc` only because
-of `charm_tracing` v0, you can replace it with):
-
-`opentelemetry-exporter-otlp-proto-http>=1.21.0`.
-
-2) Update the charm method referenced to from ``@trace`` and ``@trace_charm``,
-to return from ``TracingEndpointRequirer.get_endpoint("otlp_http")`` instead of ``grpc_http``.
-For example:
-
-```
-    from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-
-    @trace_charm(
-        tracing_endpoint="my_tracing_endpoint",
-    )
-    class MyCharm(CharmBase):
-
-    ...
-
-        @property
-        def my_tracing_endpoint(self) -> str|None:
-            '''Tempo endpoint for charm tracing'''
-            if self.tracing.is_ready():
-                return self.tracing.otlp_grpc_endpoint() #  OLD API, DEPRECATED.
-            else:
-                return None
-```
-
-needs to be replaced with:
-
-```
-    from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-
-    @trace_charm(
-        tracing_endpoint="my_tracing_endpoint",
-    )
-    class MyCharm(CharmBase):
-
-    ...
-
-        @property
-        def my_tracing_endpoint(self) -> str|None:
-            '''Tempo endpoint for charm tracing'''
-            if self.tracing.is_ready():
-                return self.tracing.get_endpoint("otlp_http")  # NEW API, use this.
-            else:
-                return None
-```
-
-3) If you were passing a certificate (str) using `server_cert`, you need to change it to
-provide an *absolute* path to the certificate file instead.
-"""
-
-
-def _remove_stale_otel_sdk_packages():
-    """Remove stale opentelemetry sdk packages from the charm's Python venv.
-
-    See
-    https://github.com/canonical/grafana-agent-operator/issues/146
-    and
-    https://bugs.launchpad.net/juju/+bug/2058335, resolved in Juju 3.5.4.
-
-    This only has an effect if executed on an upgrade-charm event.
-    """
-    # all imports are local to keep this function standalone, side-effect-free, and easy
-    # to revert later
-    import os
-
-    if os.getenv('JUJU_DISPATCH_PATH') != 'hooks/upgrade-charm':
-        return
-
-    import logging
-    import shutil
-    from collections import defaultdict
-
-    from importlib_metadata import distributions
-
-    otel_logger = logging.getLogger('charm_tracing_otel_patcher')
-    otel_logger.debug('Applying _remove_stale_otel_sdk_packages patch on charm upgrade')
-    # group by name all distributions starting with "opentelemetry_"
-    otel_distributions = defaultdict(list)
-    for distribution in distributions():
-        name = distribution._normalized_name  # type: ignore
-        if name.startswith('opentelemetry_'):
-            otel_distributions[name].append(distribution)
-
-    otel_logger.debug(f'Found {len(otel_distributions)} opentelemetry distributions')
-
-    # If we have multiple distributions with the same name, remove any that have 0
-    # associated files
-    for name, distributions_ in otel_distributions.items():
-        if len(distributions_) <= 1:
-            continue
-
-        otel_logger.debug(f'Package {name} has multiple ({len(distributions_)}) distributions.')
-        for distribution in distributions_:
-            if not distribution.files:  # Not None or empty list
-                path = distribution._path  # type: ignore
-                otel_logger.info(f'Removing empty distribution of {name} at {path}.')
-                shutil.rmtree(path)
-
-    otel_logger.debug('Successfully applied _remove_stale_otel_sdk_packages patch. ')
-
-
-# apply hacky patch to remove stale opentelemetry sdk packages on upgrade-charm. it
-# could be trouble if someone ever decides to implement their own tracer parallel to
-# ours and before the charm has inited. We assume they won't.
-_remove_stale_otel_sdk_packages()
 
 logger = logging.getLogger(__name__)
-# FIXME remove dev logger before merging this file
-dev_logger = logging.getLogger('tracing-dev')
+dev_logger = logging.getLogger('tracing-dev')  # FIXME remove before merge
 dev_logger.setLevel('DEBUG')
+
+autoinstrument_tracer = opentelemetry.trace.get_tracer('ops.tracing.autoinstrument')
+event_tracer = opentelemetry.trace.get_tracer('ops.tracing.FIXME')  # FIXME move usage to ops
 
 _CharmType = Type[CharmBase]  # the type CharmBase and any subclass thereof
 _C = TypeVar('_C', bound=_CharmType)
 _T = TypeVar('_T', bound=type)
 _F = TypeVar('_F', bound=Type[Callable])
 tracer: ContextVar[Tracer] = ContextVar('tracer')
-_GetterType = Callable[[_CharmType], str|None]|property
+_GetterType = Callable[[_CharmType], str | None] | property
 
 CHARM_TRACING_ENABLED = 'CHARM_TRACING_ENABLED'
 BUFFER_DEFAULT_CACHE_FILE_NAME = '.charm_tracing_buffer.raw'
@@ -347,87 +84,8 @@ BUFFER_DEFAULT_CACHE_FILE_NAME = '.charm_tracing_buffer.raw'
 _OTLP_SPAN_EXPORTER_TIMEOUT = 1  # seconds
 """Timeout in seconds that the OTLP span exporter has to push traces to the
 backend."""
-BUFFER_SAFETY_LIMIT = 64 * 1024 ** 2
 
-
-class Buffer:
-    """Handles buffering while no tracing backend is configured or available.
-
-    Use the max_event_history_length_buffering param of @trace_charm to
-    tune the amount of memory that this will hog on your units.
-
-    The buffer is formatted as a bespoke byte dump (protobuf
-    limitation). We cannot store them as json because that is not well-
-    supported by the sdk (see
-    https://github.com/open-telemetry/opentelemetry-python/issues/3364).
-    """
-
-    file: IO[bytes]
-    exporter: OTLPSpanExporter|None = None
-    """A Python file.
-
-    Holds an open file descriptor to a file-system file in which the data is stored.
-    The file offset points to one-past-last-byte of data.
-    """
-
-    SEPARATOR = b'__CHARM_TRACING_BUFFER_SPAN_SEP__'
-    """FIXME: the value must remain verbatim same.
-
-    That is if we aim to pick up data from charm lib instrumentation.
-    """
-
-    def __init__(self):
-        self.file = tempfile.TemporaryFile(mode='wb+')
-
-    def pivot(self, buffer_path: Path) -> None:
-        """Pivot fron anonymous temporary file to a named buffer file."""
-        self.file.seek(0)
-        data = self.file.read()
-
-        self.file = os.fdopen(os.open(buffer_path, os.O_RDWR | os.O_CREAT), 'rb+')
-        self.file.seek(0, os.SEEK_END)
-        self.append(data)
-
-    def append(self, data: bytes) -> None:
-        load = self.file.tell()
-        # FIXME maybe some protection against double pivot.
-        # or against doubling by pivot to the very same path.
-
-        if load and data:
-            if load + len(self.SEPARATOR) + len(data) > BUFFER_SAFETY_LIMIT:
-                logger.warning("Buffer full, dropping old data")
-                self.file.seek(0)
-                self.file.truncate(0)
-                load = 0
-
-        if load and data:
-            self.file.write(self.SEPARATOR + data)
-        elif data:
-            self.file.write(data)
-
-    def save(self, spans: typing.Sequence[ReadableSpan]) -> None:
-        """Buffer a bunch of spans."""
-        # FIXME check if this is even needed
-        if not spans:
-            return
-
-        self.append(encode_spans(spans).SerializeToString())
-        # FIXME ensure that batch span processor breaks up large sequences
-        # of data, or break series of spans up to fit the default
-        # OTEL/OTLP protobuf-over-HTTP request size limit of 20MB
-
-    def load(self) -> list[bytes]:
-        """Load currently buffered spans from the cache file.
-
-        This method should be as fail-safe as possible.
-        """
-        self.file.seek(0)
-        return self.file.read().split(self.SEPARATOR)
-
-    def drop(self) -> None:
-        self.file.seek(0)
-        self.file.truncate(0)
-
+class SomethingLater:
     def flush(self) -> None:
         """Export all buffered spans to the given exporter.
 
@@ -472,14 +130,37 @@ class Buffer:
             logger.error('failed flushing spans; buffer preserved')
         return not errors
 
-    @property
-    def is_empty(self):
-        """Utility to check whether the buffer has any stored spans.
 
-        This is more efficient than attempting a load() given how large
-        the buffer might be.
-        """
-        return (not self.file.exists()) or (self.file.stat().st_size == 0)
+class ProxySpanExporter(SpanExporter):
+    real_exporter: SpanExporter|None
+    buffer: Buffer
+
+    def __init__(self):
+        self.real_exporter = None
+        self.buffer = Buffer()
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """Export a batch of telemetry data."""
+        # FIXME check if ever called with empty sequence
+        data: bytes = encode_spans(spans).SerializePartialToString()
+        self.buffer.append(data)
+        return SpanExportResult.SUCCESS
+
+    def shutdown(self) -> None:
+        """Shut down the exporter."""
+        if self.real_exporter:
+            self.real_exporter.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Export any spans received before this call."""
+        return True
+
+    def set_real_exporter(self, exporter: SpanExporter) -> None:
+        self.real_exporter = exporter
+        # FIXME decide on the export timing policy:
+        # export everything buffered right away?
+        # or export with a timeout?
+        # or defer until the end of dispatch?
 
 
 class _OTLPSpanExporter(OTLPSpanExporter):
@@ -500,7 +181,8 @@ class _OTLPSpanExporter(OTLPSpanExporter):
     # implementation) and up to ~7 seconds total wait
 
 
-class _BufferedExporter(InMemorySpanExporter):
+# FIXME not needed
+class DeleteMeBufferedExporter(InMemorySpanExporter):
     def __init__(self, buffer: Buffer) -> None:
         super().__init__()
         self._buffer = buffer
@@ -583,8 +265,8 @@ def _get_server_cert(
     server_cert_attr: str,
     charm_instance: ops.CharmBase,
     charm_type: Type[ops.CharmBase],
-):
-    _server_cert = getattr(charm_instance, server_cert_attr)
+) -> str|Path|None:
+    _server_cert: str|Path|None|Callable[[], str|Path|None] = getattr(charm_instance, server_cert_attr)
     server_cert = _server_cert() if callable(_server_cert) else _server_cert
 
     if server_cert is None:
@@ -611,7 +293,7 @@ def setup_tracing(charm_class_name: str) -> None:
         attributes={
             'service.name': service_name,
             'compose_service': service_name,  # why is this copy needed?
-            'charm_type': charm_name,
+            'charm_type': charm_class_name,
             # juju topology
             'juju_unit': juju_context.unit_name,
             'juju_application': app_name,
@@ -622,12 +304,12 @@ def setup_tracing(charm_class_name: str) -> None:
     provider = TracerProvider(resource=resource)
 
     buffer = Buffer()
-    exporters = [_BufferedExporter(buffer)]
+    # exporters = [BufferedExporter(buffer)]
 
     # real exporter, hardcoded for now
     otlp_exporter = OTLPSpanExporter(endpoint='http://localhost:4318/v1/traces')
     # FIXME figure this out
-    exporters.append(otlp_exporter)
+    # exporters.append(otlp_exporter)
     span_processor = BatchSpanProcessor(otlp_exporter)
     provider.add_span_processor(span_processor)
     set_tracer_provider(provider)
@@ -636,9 +318,9 @@ def setup_tracing(charm_class_name: str) -> None:
 def _setup_root_span_initializer(
     charm_type: _CharmType,
     tracing_endpoint_attr: str,
-    server_cert_attr: str|None,
-    service_name: str|None,  # Only ever set by grafana operator, call it COS internal
-    buffer_path: Path|None,
+    server_cert_attr: str | None,
+    service_name: str | None,  # Only ever set by grafana operator, call it COS internal
+    buffer_path: Path | None,
 ):
     """Patch the charm's initializer."""
     original_init = charm_type.__init__
@@ -692,7 +374,7 @@ def _setup_root_span_initializer(
             # until tracing comes online
             buffer_only = True
 
-        server_cert: Optional[Union[str, Path]] = (
+        server_cert: str|Path|None = (
             _get_server_cert(server_cert_attr, self, charm_type) if server_cert_attr else None
         )
 
@@ -709,13 +391,13 @@ def _setup_root_span_initializer(
 
         buffer = Buffer()
         buffer.pivot(buffer_path=buffer_path or Path() / BUFFER_DEFAULT_CACHE_FILE_NAME)
-        previous_spans_buffered = not buffer.is_empty
 
+        # FIXME rework the exporter configuration
         exporters: list[SpanExporter] = []
         if buffer_only:
             # we have to buffer because we're missing necessary backend configuration
             dev_logger.debug('buffering mode: ON')
-            exporters.append(_BufferedExporter(buffer))
+            exporters.append(BufferedExporter(buffer))
 
         else:
             dev_logger.debug('buffering mode: FALLBACK')
@@ -728,7 +410,7 @@ def _setup_root_span_initializer(
                 timeout=_OTLP_SPAN_EXPORTER_TIMEOUT,  # give individual requests 1 second
             )
             exporters.append(otlp_exporter)
-            exporters.append(_BufferedExporter(buffer))
+            exporters.append(BufferedExporter(buffer))
             buffer.exporter = otlp_exporter
 
         for exporter in exporters:
@@ -736,7 +418,7 @@ def _setup_root_span_initializer(
             provider.add_span_processor(processor)
 
         set_tracer_provider(provider)
-        _tracer = get_tracer(_service_name)  # type: ignore
+        _tracer = get_tracer(_service_name)
         _tracer_token = tracer.set(_tracer)
 
         dispatch_path = os.getenv('JUJU_DISPATCH_PATH', '')  # something like hooks/install
@@ -797,16 +479,9 @@ def _setup_root_span_initializer(
                 else:
                     dev_logger.debug('flush succeeded.')
 
-                    # the backend has accepted the spans generated during this event,
-                    if not previous_spans_buffered:
-                        # if the buffer was empty to begin with, any spans we collected
-                        # now can be discarded
-                        buffer.drop()
-                        dev_logger.debug('buffer dropped: this trace has been sent already')
-                    else:
-                        # if the buffer was nonempty, we can attempt to flush it
-                        dev_logger.debug('attempting buffer flush...')
-                        buffer.flush()
+                # FIXME why so much micro-management?
+                # the backend has accepted the spans generated during this event,
+                buffer.flush()
 
             tp.shutdown()
             original_close()
@@ -983,7 +658,7 @@ def trace_type(cls: _T) -> _T:
     return cls
 
 
-def trace_method(method: _F, name: str|None = None) -> _F:
+def trace_method(method: _F, name: str | None = None) -> _F:
     """Trace this method.
 
     A span will be opened when this method is called and closed when it
@@ -992,7 +667,7 @@ def trace_method(method: _F, name: str|None = None) -> _F:
     return _trace_callable(method, 'method', name=name)
 
 
-def trace_function(function: _F, name: str|None = None) -> _F:
+def trace_function(function: _F, name: str | None = None) -> _F:
     """Trace this function.
 
     A span will be opened when this function is called and closed when
@@ -1001,24 +676,24 @@ def trace_function(function: _F, name: str|None = None) -> _F:
     return _trace_callable(function, 'function', name=name)
 
 
-autoinstrument_tracer = opentelemetry.trace.get_tracer('ops.tracing.autoinstrument')
-event_tracer = opentelemetry.trace.get_tracer('ops.tracing.FIXME')  # FIXME move usage to ops
 
 def _trace_callable(
-    callable: _F,  # noqa: A002  # FIXME callable is a builtin
+    callable_: _F,
     qualifier: str,
-    name: str|None = None,
+    name: str | None = None,
 ) -> _F:
     dev_logger.debug(f'instrumenting {callable}')
 
     # sig = inspect.signature(callable)
-    @functools.wraps(callable)
+    @functools.wraps(callable_)
     def wrapped_function(*args, **kwargs):  # type: ignore
         name_ = name or getattr(
-            callable, '__qualname__', getattr(callable, '__name__', str(callable))
+            callable_, '__qualname__', getattr(callable, '__name__', str(callable))
         )
         # FIXME do we want this magical auto-instrumentation at all?
-        with autoinstrument_traces.start_as_current_span(f'{qualifier} call: {name_}'):
+        import typing_extensions
+        typing_extensions.reveal_type(autoinstrument_tracer.start_as_current_span)
+        with autoinstrument_tracer.start_as_current_span(f'{qualifier} call: {name_}'):
             return callable(*args, **kwargs)  # type: ignore
 
     # wrapped_function.__signature__ = sig

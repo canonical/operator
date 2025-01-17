@@ -41,17 +41,24 @@ otlp_exporter = OTLPSpanExporter(
 
 # 3. Create a span processor (BatchSpanProcessor recommended for production)
 span_processor = BatchSpanProcessor(otlp_exporter)
-opentelemetry.trace.get_tracer_provider().add_span_processor(span_processor)
+opentelemetry.trace.get_tracer_provider().add_span_processor(span_processor)  # type: ignore
 
 
-def main():
-    """Start a span, do something, then end the span."""
-    with tracer.start_as_current_span('example_span') as span:
-        span.set_attribute('foo', 'bar')
-        span.add_event('sample_event', {'event_attr': 123})
-        logger.info('Span created and will be exported to the collector soon!')
+@tracer.start_as_current_span("some label")  # type: ignore
+def main(foo: int = 42):
+    """Do something."""
+    # can't add attributes to a decorator, if needed use the below instead
+    # 
+    # with tracer.start_as_current_span("some label") as span:
+    #     span.set_attribute('foo', 'bar')
+    #     span.add_event('sample_event', {'event_attr': 123})
+
+    logger.info('Span created and will be exported to the collector soon!')
 
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
     main()
+    # from typing_extensions import reveal_type
+    # reveal_type(main)
+

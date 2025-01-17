@@ -21,6 +21,13 @@ from __future__ import annotations
 
 import logging
 
+from ops.tracing._hacks import remove_stale_otel_sdk_packages
+
+
+# FIXME must this hack be run before OTEL packages are imported?
+remove_stale_otel_sdk_packages()
+
+
 try:
     from . import _fixme as _fixme
 except ImportError:
