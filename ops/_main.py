@@ -32,7 +32,7 @@ import ops.storage
 from ops.charm import CharmMeta
 from ops.jujucontext import _JujuContext
 from ops.log import setup_root_logging
-from ops.tracing import setup_tracing
+from ops.tracing import setup_tracing, shutdown_tracing
 
 CHARM_STATE_FILE = '.unit-state.db'
 
@@ -559,10 +559,17 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     setup_tracing(charm_class.__name__)
     # opentelemetry-api types are broken
     # https://github.com/open-telemetry/opentelemetry-python/issues/3836
+    for i in range(999):
+        with tracer.start_as_current_span('test only'): ...
+
     with tracer.start_as_current_span('ops.main'):  # type: ignore
         try:
             manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
 
             manager.run()
         except _Abort as e:
+            shutdown_tracing() 
             sys.exit(e.exit_code)
+        finally:
+            print("X"*99)
+            shutdown_tracing() 

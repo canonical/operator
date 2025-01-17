@@ -69,9 +69,8 @@ class Buffer:
         This method should be as fail-safe as possible.
         """
         self.file.seek(0)
-        return self.file.read().split(SEPARATOR)
+        return [chunk for chunk in self.file.read().split(SEPARATOR) if chunk]
 
     def drop(self) -> None:
         self.file.seek(0)
         self.file.truncate(0)
-

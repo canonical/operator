@@ -35,12 +35,21 @@ except ImportError:
     _fixme = None
 
 
-def setup_tracing(charm_class_name: str):
+def setup_tracing(charm_class_name: str) -> None:
     """Setup tracing for this "dispatch" of the charm code."""
     if not _fixme:
         return
     _fixme.setup_tracing(charm_class_name)
 
+
+def shutdown_tracing() -> None:
+    """Send out as much as possible, if possible."""
+    if not _fixme:
+        return
+    try:
+        _fixme.shutdown_tracing()
+    except Exception:
+        logging.exception("failed to flush tracing")
 
 def reset_tracing():
     """FIXME: decide if this should be public, maybe it's oinly for testing?"""
