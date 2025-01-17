@@ -557,19 +557,23 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
     setup_tracing(charm_class.__name__)
+
+    # FIXME temp testing
+    for _ in range(9999):
+        import time
+
+        time.sleep(0.0001)
+        with tracer.start_as_current_span('test only'):
+            ...
+
     # opentelemetry-api types are broken
     # https://github.com/open-telemetry/opentelemetry-python/issues/3836
-    for i in range(999):
-        with tracer.start_as_current_span('test only'): ...
-
     with tracer.start_as_current_span('ops.main'):  # type: ignore
         try:
             manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
 
             manager.run()
         except _Abort as e:
-            shutdown_tracing() 
             sys.exit(e.exit_code)
         finally:
-            print("X"*99)
-            shutdown_tracing() 
+            shutdown_tracing()

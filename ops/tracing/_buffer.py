@@ -10,6 +10,7 @@
 # ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
 """FIXME Docstring."""
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,7 @@ import pathlib
 import tempfile
 from typing import IO
 
-BUFFER_SAFETY_LIMIT = 64 * 1024 ** 2
+BUFFER_SAFETY_LIMIT = 64 * 1024**2
 SEPARATOR = b'__CHARM_TRACING_BUFFER_SPAN_SEP__'
 """Exact, verbatim value that separates buffered chunks."""
 
@@ -36,10 +37,10 @@ class Buffer:
     """
 
     def __init__(self):
-        self.file = tempfile.TemporaryFile(mode='wb+')
+        self.file = tempfile.TemporaryFile(mode='wb+')  # noqa: SIM115
 
     def pivot(self, buffer_path: pathlib.Path) -> None:
-        """Pivot fron anonymous temporary file to a named buffer file."""
+        """Pivot from anonymous temporary file to a named buffer file."""
         self.file.seek(0)
         data = self.file.read()
 
@@ -53,7 +54,7 @@ class Buffer:
         # or against doubling by pivot to the very same path.
 
         if load and data and load + len(SEPARATOR) + len(data) > BUFFER_SAFETY_LIMIT:
-            logger.warning("Buffer full, dropping old data")
+            logger.warning('Buffer full, dropping old data')
             self.file.seek(0)
             self.file.truncate(0)
             load = 0

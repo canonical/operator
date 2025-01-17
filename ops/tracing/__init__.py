@@ -23,7 +23,6 @@ import logging
 
 from ops.tracing._hacks import remove_stale_otel_sdk_packages
 
-
 # FIXME must this hack be run before OTEL packages are imported?
 remove_stale_otel_sdk_packages()
 
@@ -49,7 +48,8 @@ def shutdown_tracing() -> None:
     try:
         _fixme.shutdown_tracing()
     except Exception:
-        logging.exception("failed to flush tracing")
+        logging.exception('failed to flush tracing')
+
 
 def reset_tracing():
     """FIXME: decide if this should be public, maybe it's oinly for testing?"""

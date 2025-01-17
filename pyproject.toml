@@ -208,6 +208,12 @@ keep-runtime-typing = true
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
 ]
+# FIXME don't merge this, remove the file instead
+"ops/tracing/_leftovers.py" = [
+    "F821",
+    "E303",
+    "E227",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -10,10 +10,11 @@
 # ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
 """Workarounds for various Juju bugs."""
+
 from __future__ import annotations
 
-import os
 import logging
+import os
 import shutil
 from collections import defaultdict
 from typing import Any
@@ -37,7 +38,6 @@ def remove_stale_otel_sdk_packages() -> None:
 
     This only has an effect if executed on an upgrade-charm event.
     """
-
     if os.getenv('JUJU_DISPATCH_PATH') != 'hooks/upgrade-charm':
         return
 
@@ -65,4 +65,3 @@ def remove_stale_otel_sdk_packages() -> None:
                 shutil.rmtree(path)
 
     logger.debug('Successfully applied _remove_stale_otel_sdk_packages patch. ')
-

@@ -44,11 +44,11 @@ span_processor = BatchSpanProcessor(otlp_exporter)
 opentelemetry.trace.get_tracer_provider().add_span_processor(span_processor)  # type: ignore
 
 
-@tracer.start_as_current_span("some label")  # type: ignore
+@tracer.start_as_current_span('some label')  # type: ignore
 def main(foo: int = 42):
     """Do something."""
     # can't add attributes to a decorator, if needed use the below instead
-    # 
+    #
     # with tracer.start_as_current_span("some label") as span:
     #     span.set_attribute('foo', 'bar')
     #     span.add_event('sample_event', {'event_attr': 123})
@@ -61,4 +61,3 @@ if __name__ == '__main__':
     main()
     # from typing_extensions import reveal_type
     # reveal_type(main)
-

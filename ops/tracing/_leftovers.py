@@ -1,3 +1,16 @@
+# Copyright 2022 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
+# file except in compliance with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under
+# the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
+# ANY KIND, either express or implied. See the License for the specific language
+# governing permissions and limitations under the License.
+"""FIXME Docstring."""
+
 
 class SomethingLater:
     def flush(self) -> None:
@@ -126,7 +139,7 @@ def _setup_root_span_initializer(
             # until tracing comes online
             buffer_only = True
 
-        server_cert: str|Path|None = (
+        server_cert: str | Path | None = (
             _get_server_cert(server_cert_attr, self, charm_type) if server_cert_attr else None
         )
 
@@ -410,7 +423,6 @@ def trace_type(cls: _T) -> _T:
     return cls
 
 
-
 def trace_method(method: _F, name: str | None = None) -> _F:
     """Trace this method.
 
@@ -429,7 +441,6 @@ def trace_function(function: _F, name: str | None = None) -> _F:
     return _trace_callable(function, 'function', name=name)
 
 
-
 def _trace_callable(
     callable_: _F,
     qualifier: str,
@@ -445,6 +456,7 @@ def _trace_callable(
         )
         # FIXME do we want this magical auto-instrumentation at all?
         import typing_extensions
+
         typing_extensions.reveal_type(autoinstrument_tracer.start_as_current_span)
         with autoinstrument_tracer.start_as_current_span(f'{qualifier} call: {name_}'):
             return callable(*args, **kwargs)  # type: ignore
