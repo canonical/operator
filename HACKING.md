@@ -164,7 +164,7 @@ a bunch of charms that use the operator framework. The script can be run locally
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
-For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md).
+For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). For advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
 Pull requests should have a short title that follows the
 [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
@@ -200,6 +200,8 @@ using the PR title as the commit message.
 The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt).
 New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)).
 The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
+
+# Contributing documentation
 
 # Documentation
 
@@ -273,6 +275,8 @@ Recommended tone:
 - Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
 - Use "we" to include the reader in what you're explaining.
 - Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
+
+# Maintaining the documentation
 
 ## How to Pull in Style Changes
 
