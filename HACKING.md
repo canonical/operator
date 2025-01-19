@@ -164,7 +164,11 @@ a bunch of charms that use the operator framework. The script can be run locally
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
-For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). For advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
+For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_,
+as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html)
+is automatically generated with documentation coming from the docstrings.
+
+For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
 Pull requests should have a short title that follows the
 [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
@@ -203,8 +207,6 @@ The copyright information in existing files does not need to be updated when tho
 
 # Contributing documentation
 
-# Documentation
-
 In general, new functionality
 should always be accompanied by user-focused documentation that is posted to
 https://juju.is/docs/sdk. The content for this site is written and hosted on
@@ -217,40 +219,7 @@ Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
 takes you to the corresponding Discourse page where docs can be commented on
 and edited (if you have earned those privileges).
 
-Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted (for example, as done for [File and directory existence in 1.4](https://juju.is/docs/sdk/interact-with-pebble#heading--file-exists)) with Markdown like this:
-
-```markdown
-[note status="version"]1.4[/note]
-```
-
-next to the relevant content (e.g. headings, etc.).
-
-The ops library's API reference is automatically built and published to
-[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/). Please be complete with
-docstrings and keep them informative for _users_. The published docs are always
-for the in-development (main branch) of ops, and do not include any notes
-indicating changes or additions across ops versions - we encourage all charmers to
-promptly upgrade to the latest version of ops, and to refer to the release notes
-and changelog for learning about changes.
-
-We do note when features behave differently when using different Juju versions.
-Use the `.. jujuadded:: x.y` directive to indicate that the feature is only
-available when using version x.y (or higher) of Juju, `..jujuchanged:: x.y`
-when the feature's behaviour _in ops_ changes, and `..jujuremoved:: x.y` when
-the feature will be available in ops but not in that version (or later) of Juju.
-Unmarked features are assumed to work and be available in the current LTS
-version of Juju.
-
-During the release process, changes also get a new entry in [CHANGES.md](CHANGES.md).
-These are grouped into the same groupings as
-[commit messages](https://www.conventionalcommits.org/en/)
-(feature, fix, documentation, performance, etc). The only exceptions are changes
-that are not visible to the built releases, such as CI workflow changes, or are
-implicit, such as bumping the ops version number. Each entry should be a short,
-single line, bullet point, and should reference the GitHub PR that introduced
-the change (as plain text, not a link).
-
-As noted above, you can generate a local copy of the API reference docs with tox:
+You can generate a local copy of the API reference docs with tox:
 
 ```sh
 tox -e docs
@@ -264,6 +233,15 @@ before generating docs to recompile the `requirements.txt` file used for docs:
 tox -e docs-deps
 ```
 
+During the release process, changes get a new entry in [CHANGES.md](CHANGES.md).
+These are grouped into the same groupings as
+[commit messages](https://www.conventionalcommits.org/en/)
+(feature, fix, documentation, performance, etc). The only exceptions are changes
+that are not visible to the built releases, such as CI workflow changes, or are
+implicit, such as bumping the ops version number. Each entry should be a short,
+single line, bullet point, and should reference the GitHub PR that introduced
+the change (as plain text, not a link).
+
 ## How to write great documentation
 
 - Use short sentences, ideally with one or two clauses.
@@ -275,6 +253,23 @@ Recommended tone:
 - Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
 - Use "we" to include the reader in what you're explaining.
 - Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
+
+## How to document version dependencies
+
+We don't publish separate documentation for separate versions of ops.
+The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
+are always for the in-development (main branch) of ops, and do not include
+any notes indicating changes or additions across ops versions.
+We encourage all charmers to promptly upgrade to the latest version of ops,
+and to refer to the release notes and changelog for learning about changes.
+
+We do note when features behave differently when using different versions of Juju.
+Use the `.. jujuadded:: x.y` directive to indicate that the feature is only
+available when using version x.y (or higher) of Juju, `..jujuchanged:: x.y`
+when the feature's behaviour _in ops_ changes, and `..jujuremoved:: x.y` when
+the feature will be available in ops but not in that version (or later) of Juju.
+Unmarked features are assumed to work and be available in the current LTS
+version of Juju.
 
 # Maintaining the documentation
 
