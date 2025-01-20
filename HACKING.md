@@ -166,7 +166,7 @@ Changes are proposed as [pull requests on GitHub](https://github.com/canonical/o
 
 For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_,
 as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html)
-is automatically generated with documentation coming from docstrings.
+is automatically generated from Python docstrings.
 
 For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
@@ -216,7 +216,7 @@ To contribute docs:
 1. Fork this repo and edit the relevant source files:
    * Tutorials - [`/docs/tutorial`](./docs/tutorial)
    * How-to guides - [`/docs/howto`](./docs/howto)
-   * Reference - Automatically generated with documentation coming from docstrings
+   * Reference - Automatically generated from Python docstrings
    * Explanation - [`/docs/explanation`](./docs/explanation)
 2. [Build the documentation locally](#how-to-build-the-documentation-locally),
    to check that everything looks right
