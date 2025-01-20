@@ -89,5 +89,5 @@ Meet us in the #charmhub-charmdev channel on Matrix.
 * **[Report bugs](https://github.com/canonical/operator/issues)**:
 We want to know about the problems so we can fix them.
 
-* **[Contribute docs](https://github.com/canonical/operator/tree/main/docs)**:
-The documentation sources on GitHub.
+* **[Contribute docs](https://github.com/canonical/operator/blob/main/HACKING.md#contributing-documentation)**:
+Get started on GitHub.
