@@ -73,9 +73,7 @@ def _on_install(self, event: ops.InstallEvent):
 
 > See first: {ref}`get-started-with-charm-testing`
 
-You'll want to add unit tests:
-
-- [Write unit tests](#heading--write-unit-tests)
+You'll want to add unit tests.
 
 For integration tests: stored state isn't a feature, it's functionality that
 enables features, so your integration tests that make use of the stored state
@@ -159,9 +157,7 @@ to wait until later events, like `start`, to store and retrieve data.
 
 > See first: {ref}`get-started-with-charm-testing`
 
-You'll want to add unit tests:
-
-- [Write unit tests](#heading--write-unit-tests)
+You'll want to add unit tests.
 
 For integration tests: stored state isn't a feature, it's functionality that
 enables features, so your integration tests that make use of the stored state
