@@ -166,7 +166,7 @@ Changes are proposed as [pull requests on GitHub](https://github.com/canonical/o
 
 For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_,
 as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html)
-is automatically generated with documentation coming from the docstrings.
+is automatically generated with documentation coming from docstrings.
 
 For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
@@ -207,40 +207,20 @@ The copyright information in existing files does not need to be updated when tho
 
 # Contributing documentation
 
-In general, new functionality
-should always be accompanied by user-focused documentation that is posted to
-https://juju.is/docs/sdk. The content for this site is written and hosted on
-https://discourse.charmhub.io/c/doc. New documentation should get a new
-topic/post on this Discourse forum and then should be linked into the main
-docs navigation page(s) as appropriate. The ops library's SDK page
-content is pulled from
-[the corresponding Discourse topic](https://discourse.charmhub.io/t/the-charmed-operator-software-development-kit-sdk-docs/4449).
-Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
-takes you to the corresponding Discourse page where docs can be commented on
-and edited (if you have earned those privileges).
+The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
+are built automatically from [`docs`](./docs). We use [MyST Markdown](https://mystmd.org/)
+for most pages and organize the pages according to [Diátaxis](https://diataxis.fr/).
 
-You can generate a local copy of the API reference docs with tox:
+To contribute docs, the high-level process is:
 
-```sh
-tox -e docs
-open docs/_build/html/index.html
-```
-
-If dependencies are updated in `pyproject.toml`, you can run the following command
-before generating docs to recompile the `requirements.txt` file used for docs:
-
-```sh
-tox -e docs-deps
-```
-
-During the release process, changes get a new entry in [CHANGES.md](CHANGES.md).
-These are grouped into the same groupings as
-[commit messages](https://www.conventionalcommits.org/en/)
-(feature, fix, documentation, performance, etc). The only exceptions are changes
-that are not visible to the built releases, such as CI workflow changes, or are
-implicit, such as bumping the ops version number. Each entry should be a short,
-single line, bullet point, and should reference the GitHub PR that introduced
-the change (as plain text, not a link).
+1. Fork this repo and edit the relevant source files:
+   * Tutorials - [`/docs/tutorial`](./docs/tutorial)
+   * How-to guides - [`/docs/howto`](./docs/howto)
+   * Reference - Automatically generated with documentation coming from docstrings
+   * Explanation - [`/docs/explanation`](./docs/explanation)
+2. [Build the documentation locally](#how-to-build-the-documentation-locally),
+   to check that everything looks right
+3. [Propose your changes using a pull request](#contributing)
 
 ## How to write great documentation
 
@@ -253,6 +233,23 @@ Recommended tone:
 - Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
 - Use "we" to include the reader in what you're explaining.
 - Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
+
+## How to build the documentation locally
+
+<!-- TODO -->
+
+To build the docs and open them in your browser:
+
+```sh
+tox -e docs
+open docs/_build/html/index.html
+```
+
+Alternatively, to serve the docs locally and automatically refresh them whenever you edit a file:
+
+```sh
+tox -e docs-live
+```
 
 ## How to document version dependencies
 
