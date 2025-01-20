@@ -75,7 +75,7 @@ def _on_install(self, event: ops.InstallEvent):
 
 You'll want to add unit tests:
 
-- [Write unit tests](#heading--write-scenario-tests)
+- [Write unit tests](#heading--write-unit-tests)
 
 For integration tests: stored state isn't a feature, it's functionality that
 enables features, so your integration tests that make use of the stored state
@@ -161,7 +161,7 @@ to wait until later events, like `start`, to store and retrieve data.
 
 You'll want to add unit tests:
 
-- [Write unit tests](#heading--write-scenario-tests)
+- [Write unit tests](#heading--write-unit-tests)
 
 For integration tests: stored state isn't a feature, it's functionality that
 enables features, so your integration tests that make use of the stored state

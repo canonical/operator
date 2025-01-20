@@ -5,7 +5,7 @@
 
 ## Purpose of this doc
 
-This is an explanatory doc covering how charm authors might track local state in a Juju unit. We'll cover the `ops` concept of [](ops.StoredState), along with some differences in how it works between machine charms and Kubernetes charms. We'll talk about [Peer Relations]() as an alternative for storing some kinds of information, and also talk about how charm authors probably should avoid recording state when they can avoid doing so.
+This is an explanatory doc covering how charm authors might track local state in a Juju unit. We'll cover the `ops` concept of [](ops.StoredState), along with some differences in how it works between machine charms and Kubernetes charms. We'll talk about Peer Relations as an alternative for storing some kinds of information, and also talk about how charm authors probably should avoid recording state when they can avoid doing so.
 
 <!-- UPDATE LINKS
 "Peer Relations", above
@@ -105,7 +105,7 @@ def some_event_handler(event):
         return
 ```
 
-In the other cases where state is needed, authors ideally want to relate a charm to a database, attach storage (see [Juju storage]()), or simply be opinionated, and hard code the single "correct" state into the charm. (Perhaps `ExampleBlog` should always be run in `production` mode when deployed as a charm?)
+In the other cases where state is needed, authors ideally want to relate a charm to a database, attach storage (see Juju storage), or simply be opinionated, and hard code the single "correct" state into the charm. (Perhaps `ExampleBlog` should always be run in `production` mode when deployed as a charm?)
 
 <!-- UPDATE LINKS
 "Juju Storage", above
