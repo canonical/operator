@@ -62,12 +62,12 @@ def setup_root_logging(
     logger.addHandler(JujuLogHandler(model_backend))
 
     def custom_showwarning(
-        message: typing.Union[str, Warning],
+        message: typing.Union[Warning, str],
         category: typing.Type[Warning],
         filename: str,
         lineno: int,
-        *_: typing.Any,
-        **__: typing.Any,
+        file: typing.Optional[typing.TextIO] = None,
+        line: typing.Optional[str] = None,
     ):
         """Direct the warning to Juju's debug-log, and don't include the code."""
         logger.warning('%s:%s: %s: %s', filename, lineno, category.__name__, message)
