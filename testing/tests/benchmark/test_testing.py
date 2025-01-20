@@ -44,6 +44,11 @@ def test_context_explicit_meta(benchmark):
 def test_run_no_observer(benchmark):
     ctx = testing.Context(BenchmarkCharm)
     benchmark(ctx.run, ctx.on.start(), testing.State())
+    # As with all these tests, we're interested in how long the
+    # test took to run. However, we also verify that we did emit
+    # an event (of a single kind across all the benchmark
+    # repetitions) so that we are confident that something did
+    # happen.
     assert len({e.handle.kind for e in ctx.emitted_events}) == 1
 
 
@@ -71,13 +76,31 @@ def test_context_autoload_meta(benchmark):
 
 
 def test_many_tests_explicit_meta(benchmark):
+    # Calling benchmark(ctx.run, ...) benchmarks a test that looks like:
+    # def test_x():
+    #     ...
+    #     ctx.run(ctx.on...)
+    #     assert ...
+    # In this test, we benchmark a test that looks like this instead:
+    # def test_x():
+    #     ...
+    #     state = testing.State(...)
+    #     state = ctx.run(ctx.on..., state)  # Event 1
+    #     assert ...
+    #     state = ctx.run(ctx.on..., state)  # Event 2
+    #     assert ...
+    # We generally recommend using a fresh context and having a single
+    # run in each test function. However, there are times when it makes
+    # sense to simulate multiple events in a row, and we want to make
+    # sure that we are timing test that take this form as well, where the
+    # cost of creating the Context object is amortised across many runs.
+    ctx = testing.Context(ops.CharmBase, meta={"name": "foo"})
+
     def mock_pytest():
         """Simulate running multiple tests against the same charm."""
+        state = testing.State()
         for event in ("install", "start", "stop", "remove"):
-            for _ in range(5):
-                ctx = testing.Context(ops.CharmBase, meta={"name": "foo"})
-                ctx.run(getattr(ctx.on, event)(), testing.State())
-                assert len({e.handle.kind for e in ctx.emitted_events}) == 1
+            state = ctx.run(getattr(ctx.on, event)(), state)
 
     benchmark(mock_pytest)
 
@@ -89,7 +112,6 @@ def test_many_tests_autoload_meta(benchmark):
             for _ in range(5):
                 ctx = testing.Context(BenchmarkCharm)
                 ctx.run(getattr(ctx.on, event)(), testing.State())
-                assert len({e.handle.kind for e in ctx.emitted_events}) == 1
 
     benchmark(mock_pytest)
 
