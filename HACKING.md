@@ -208,7 +208,7 @@ The copyright information in existing files does not need to be updated when tho
 # Contributing documentation
 
 The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
-are built automatically from [`docs`](./docs). We use [MyST Markdown](https://mystmd.org/)
+are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/)
 for most pages and organize the pages according to [Diátaxis](https://diataxis.fr/).
 
 To contribute docs:
