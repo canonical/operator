@@ -52,9 +52,6 @@ def test_top_level_import(charm_env: None):
 def test_top_level_import_legacy_call(charm_env: None):
     import ops
 
-    with pytest.deprecated_call():
-        ops.main.main(ops.CharmBase)
-
     with pytest.raises(TypeError):
         ops.main.main()  # type: ignore
 
@@ -70,9 +67,6 @@ def test_submodule_import(charm_env: None):
 
 def test_submodule_import_legacy_call(charm_env: None):
     import ops.main
-
-    with pytest.deprecated_call():
-        ops.main.main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         ops.main.main()  # type: ignore
@@ -90,18 +84,12 @@ def test_import_from_top_level_module(charm_env: None):
 def test_import_from_top_level_module_legacy_call(charm_env: None):
     from ops import main
 
-    with pytest.deprecated_call():
-        main.main(ops.CharmBase)
-
     with pytest.raises(TypeError):
         main.main()  # type: ignore
 
 
 def test_legacy_import_from_submodule(charm_env: None):
     from ops.main import main
-
-    with pytest.deprecated_call():
-        main(ops.CharmBase)
 
     with pytest.raises(TypeError):
         main()  # type: ignore
