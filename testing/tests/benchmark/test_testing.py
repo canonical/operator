@@ -26,9 +26,12 @@ from ops import testing
 
 @pytest.fixture
 def benchmark_charm():
-    charm_path = str(pathlib.Path(__file__).parent / "charms" / "benchmark_charm" / "src")
+    charm_path = str(
+        pathlib.Path(__file__).parent / "charms" / "benchmark_charm" / "src"
+    )
     sys.path.append(charm_path)
     from benchmark_charm import BenchmarkCharm
+
     yield BenchmarkCharm
     sys.path.remove(charm_path)
 
