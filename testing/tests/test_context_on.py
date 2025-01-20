@@ -97,9 +97,9 @@ def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.secret.id == secret.id
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.secret.id == secret.id
 
 
 @pytest.mark.parametrize(
@@ -125,10 +125,10 @@ def test_revision_secret_events(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.secret.id == secret.id
-        assert mgr.revision == 42
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.secret.id == secret.id
+        assert evt.revision == 42
 
 
 @pytest.mark.parametrize("event_name", ["secret_expired", "secret_remove"])
@@ -161,10 +161,10 @@ def test_storage_events(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.storage.name == storage.name
-        assert mgr.storage.index == storage.index
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.storage.name == storage.name
+        assert evt.storage.index == storage.index
 
 
 def test_action_event_no_params():
@@ -175,8 +175,8 @@ def test_action_event_no_params():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.ActionEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.ActionEvent)
 
 
 def test_action_event_with_params():
@@ -189,10 +189,10 @@ def test_action_event_with_params():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.ActionEvent)
-        assert mgr.id == call_event.action.id
-        assert mgr.params["param"] == call_event.action.params["param"]
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.ActionEvent)
+        assert evt.id == call_event.action.id
+        assert evt.params["param"] == call_event.action.params["param"]
 
 
 def test_pebble_ready_event():
@@ -205,9 +205,9 @@ def test_pebble_ready_event():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.PebbleReadyEvent)
-        assert mgr.workload.name == container.name
+        evt = evt.charm.observed[0]
+        assert isinstance(evt, ops.PebbleReadyEvent)
+        assert evt.workload.name == container.name
 
 
 @pytest.mark.parametrize("as_kwarg", [True, False])
@@ -234,11 +234,11 @@ def test_relation_app_events(as_kwarg, event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit is None
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit is None
 
 
 def test_relation_complex_name():
@@ -250,11 +250,11 @@ def test_relation_complex_name():
     with ctx(ctx.on.relation_created(relation), state_in) as mgr:
         mgr.run()
         assert len(mgr.charm.observed) == 2
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.RelationCreatedEvent)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit is None
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.RelationCreatedEvent)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit is None
 
 
 @pytest.mark.parametrize("event_name", ["relation_created", "relation_broken"])
@@ -284,11 +284,11 @@ def test_relation_unit_events_default_unit(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit.name == "remote/1"
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit.name == "remote/1"
 
 
 @pytest.mark.parametrize(
@@ -310,11 +310,11 @@ def test_relation_unit_events(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit.name == "remote/2"
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit.name == "remote/2"
 
 
 def test_relation_departed_event():
@@ -329,9 +329,104 @@ def test_relation_departed_event():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.RelationDepartedEvent)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit.name == "remote/2"
-        assert mgr.departing_unit.name == "remote/1"
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.RelationDepartedEvent)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit.name == "remote/2"
+        assert evt.departing_unit.name == "remote/1"
+
+
+class CustomEvent(ops.EventBase):
+    pass
+
+
+class CustomEventWithArgs(CustomEvent):
+    arg0: str
+    arg1: int
+
+    def __init__(self, handle, arg0='', arg1=0):
+        super().__init__(handle)
+        self.arg0 = arg0
+        self.arg1 = arg1
+
+    def snapshot(self):
+        base = super().snapshot()
+        base.update({"arg0": self.arg0, "arg1": self.arg1})
+        return base
+
+    def restore(self, snapshot):
+        super().restore(snapshot)
+        self.arg0 = snapshot["arg0"]
+        self.arg1 = snapshot["arg1"]
+
+
+@pytest.mark.parametrize("event_class,args,kwargs", [
+    (CustomEvent, (), {}),
+    (CustomEventWithArgs, ("foo"), {"arg1": 1}),
+])
+def test_custom_event(event_class, args, kwargs):
+    ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
+    # These look like:
+    #   ctx.run(ctx.on.custom(EventBaseSubclass, *args, **kwargs), state)
+    with ctx(ctx.on.custom(event_class, *args, **kwargs), scenario.State()) as mgr:
+        mgr.run()
+        assert len(mgr.charm.observed) == 2
+        assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_class)
+        for i, arg in enumerate(args):
+            assert getattr(evt, f"arg{i}") == arg
+        for k, v in kwargs.items():
+            assert getattr(evt, k) == v
+
+
+# Provide an _Event:
+#  ctx.run(_Event(), state)
+# Pros:
+# Cons:
+
+# Completely different than using ctx.on:
+#  ctx.run(GrafanaSourcesChanged(*args, **kwargs), state)
+# Pros: suggestions for the args for the event, simple
+# Cons: inconsistent (maybe this is a pro?), no autocomplete for the event class
+
+# Just provide the event class itself - simple but inconsistent:
+#   ctx.run(ctx.on.custom(GrafanaSourcesChanged, *args, **kwargs), state)
+# Pros: somewhat consistent, simple, "custom" will be autocompleted, and the
+# event class will be checked for EventBase compatibility.
+# Cons: no autocomplete for the event class, and no suggestions for the args for
+# the event.
+
+# Just provide the event class itself - simple but inconsistent:
+#   ctx.run(ctx.on.custom(GrafanaSourcesChanged(*args, **kwargs)), state)
+# Pros: somewhat consistent, simple, "custom" will be autocompleted, and the
+# event object will be checked for EventBase compatibility.
+# Cons: no autocomplete for the event class.
+
+# Closest to what is used: provide the event path:
+#  ctx.run(ctx.on.custom("grafana_source.on.sources_changed", *args, **kwargs), state)
+# Cons: stringly-typed.
+
+# Register each of the event sources, and then mimic the self.grafana_source_consumer.on:
+#  testing.Context.add_event_source("grafana_source_consumer", GrafanaSourceEvents)
+#  ...
+#  ctx.run(ctx.grafana_source_consumer.on.sources_changed(*args, **kwargs), state)
+#
+# Pros: most consistent with the non-custom events, and with what is done in the
+# charm code itself.
+# Cons: wiring up typing is probably possible but won't be simple, there will
+# be no autocomplete for the event source (and probably not for on. either, or
+# the required arguments).
+
+
+
+
+# framework.observe(self.on.install, self._on_install)
+# ->
+# ctx.run(ctx.on.install(), state)
+
+# self.grafana_source_consumer = GrafanaSourceConsumer(self)
+# self.framework.observe(self.grafana_source_consumer.on.sources_changed, self._on_sources_changed)
+# ->
+# ctx.run(ctx.grafana_source_consumer.on.sources_changed(), state)
