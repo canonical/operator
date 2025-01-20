@@ -211,7 +211,7 @@ The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/
 are built automatically from [`docs`](./docs). We use [MyST Markdown](https://mystmd.org/)
 for most pages and organize the pages according to [Diátaxis](https://diataxis.fr/).
 
-To contribute docs, the high-level process is:
+To contribute docs:
 
 1. Fork this repo and edit the relevant source files:
    * Tutorials - [`/docs/tutorial`](./docs/tutorial)
