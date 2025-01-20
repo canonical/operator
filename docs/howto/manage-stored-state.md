@@ -33,8 +33,7 @@ Avoid using `StoredState` objects in these situations.
 
 A `StoredState` object is capable of persisting simple data types, such as
 integers, strings, or floats, and lists, sets, and dictionaries containing those
-types. For more complex data, you will need to serialise the data first, for
-example to JSON.
+types. For more complex data, serialise the data first, for example to JSON.
 
 ### Implement the feature
 
@@ -65,112 +64,70 @@ def _on_start(self, event: ops.StartEvent):
 def _on_install(self, event: ops.InstallEvent):
     # We can use self._stored.expensive_value here, and it will have the value
     # set in the start event.
+    logger.info("Current value: %s", self._stored.expensive_value)
 ```
 
-> Examples: [Tempo reconfiguring ingress on leadership change](https://github.com/canonical/tempo-k8s-operator/blob/3f94027b6173f436968a4736a1f2d89a1f17b2e1/src/charm.py#L263), [Kubeflow Dashboard using a holistic handler to configure on leadership change and other events](https://github.com/canonical/kubeflow-dashboard-operator/blob/02caa736a6ea8986b8cba23b63c08a12aaedb86c/src/charm.py#L82)
+> Examples: [Kubernetes-Dashboard stores core settings](https://github.com/charmed-kubernetes/kubernetes-dashboard-operator/blob/03bf0f64d943e39176c804cd796a7a9838bf13ab/src/charm.py#L42)
 
 ### Test the feature
 
 > See first: {ref}`get-started-with-charm-testing`
 
-You'll want to add two levels of tests:
+You'll want to add unit tests:
 
 - [Write unit tests](#heading--write-scenario-tests)
-- [Write integration tests](#heading--write-integration-tests)
+
+For integration tests: stored state isn't a feature, it's functionality that
+enables features, so your integration tests that make use of the stored state
+will verify that it works correctly. There are no special constructs to use in
+an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
 > See first: {ref}`write-scenario-tests-for-a-charm`
 
 Add `StoredState` objects to the `State` with any content that you want to mock
-having persisted from a previous event. For example, to have a `_stored`
-attribute that has 'foo' and 'baz' keys:
+having persisted from a previous event. For example, in your
+`tests/unit/test_charm.py` file provide a `_stored` attribute that has a
+'expensive_value' key:
 
 ```python
-import ops
-from ops import testing
-
-class MyCharm(ops.CharmBase):
-    _stored = ops.StoredState()
-
-    def __init__(self, framework):
-        super().__init__(framework)
-        self._stored.setdefault("foo", {})
-        framework.observe(self.on.start, self._on_start)
-        framework.observe(self.on.update_status, self._on_update_status)
-
-    def _on_start(self, event):
-        self._stored["foo"] = 42
-
-    def _on_update_status(self, event):
-        logger.info("Current foo: %s", self._stored["foo"])
-
-
-def test_setting_stored_state():
-    ctx = testing.Context(MyCharm, meta={"name": "mycharm"})
+def test_charm_sets_stored_state():
+    ctx = testing.Context(MyCharm)
     state_in = testing.State()
     state_out = ctx.run(ctx.on.start(), state_in)
-    assert state_out.get_stored_state("_stored", owner_path="mycharm").content["foo"] == 42
+    ss = state_out.get_stored_state("_stored", owner_path="mycharm")
+    assert ss.content["expensive_value"] == 42
 
-def test_logging_stored_state():
-    ctx = testing.Context(MyCharm, meta={"name": "mycharm"})
+def test_charm_logs_stored_state():
+    ctx = testing.Context(MyCharm)
     state_in = testing.State(stored_states={
         testing.StoredState(
             "_stored",
             owner_path="MyCharm",
             content={
-                'foo': 'bar',
+                'expensive_value': 42,
             })
     })
-    state_out = ctx.run(ctx.on.update_status(), state_in)
-    assert ctx.juju_log[0].message == "Current foo: bar"
+    state_out = ctx.run(ctx.on.install(), state_in)
+    assert ctx.juju_log[0].message == "Current value: 42"
 ```
-
-#### Write integration tests
-
-> See first: [How to write integration tests for a charm](/t/12734)
-
-Juju is in sole control over which unit is the leader, so leadership changes are
-not usually tested with integration tests. If this is required, then the test
-needs to remove the leader unit (machine charms) or run `juju_stop_unit` in the
-charm container (Kubernetes charms). The test then needs to wait up to 60 seconds
-for Juju to elect a new leader.
-
-More commonly, an integration test might want to verify that leader and non-leader behaviour is
-as expected. For example:
-
-```python
-async def get_leader_unit(ops_test, app, model=None):
-    """Utility method to get the current leader unit."""
-    leader_unit = None
-    if model is None:
-        model = ops_test.model
-    for unit in model.applications[app].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
-            break
-
-    return leader_unit
-```
-
-> Examples: [Zookeeper testing upgrades](https://github.com/canonical/zookeeper-operator/blob/106f9c2cd9408a172b0e93f741d8c9f860c4c38e/tests/integration/test_upgrade.py#L22), [postgresql testing password rotation action](https://github.com/canonical/postgresql-k8s-operator/blob/62645caa89fd499c8de9ac3e5e9598b2ed22d619/tests/integration/test_password_rotation.py#L38)
-
-> See more: [`juju.unit.Unit.is_leader_from_status`](https://pythonlibjuju.readthedocs.io/en/latest/api/juju.unit.html#juju.unit.Unit.is_leader_from_status)
 
 ## Storing state for the lifetime of the application
 
-In this chapter we will adopt the second strategy, that is, we will store charm data in a peer relation databag. (We will explore the third strategy in a different scenario in the next chapter.)  We will illustrate this strategy with an artificial example where we save the counter of how many times the application pod has been restarted.
+To store state for the lifetime of the application, add a peer relation and
+store the data in the relation databag.
 
 ### Implement the feature
 
 #### Define a peer relation
 
-The first thing you need to do is define a peer relation. Update the `charmcraft.yaml` file to add a `peers` block before the `requires` block, as below (where `fastapi-peer` is a custom name for the peer relation and `fastapi_demo_peers` is a custom name for the peer relation interface): 
+Update the `charmcraft.yaml` file to add a `peers` block, as below:
 
 ```yaml
 peers:
-  fastapi-peer:
-    interface: fastapi_demo_peers
+  charm-peer:
+    interface: my_charm_peers
 ```
 
 <!-- UPDATE LINKS
@@ -179,75 +136,51 @@ peers:
 
 #### Set and get data from the peer relation databag
 
-Now, you need a way to set and get data from the peer relation databag. For that you need to update the `src/charm.py` file as follows:
-
-First, define some helper methods that will allow you to read and write from the peer relation databag:
-
-```python
-@property
-def peers(self) -> Optional[ops.Relation]:
-    """Fetch the peer relation."""
-    return self.model.get_relation(PEER_NAME)
-
-def set_peer_data(self, key: str, data: JSONData) -> None:
-    """Put information into the peer data bucket instead of `StoredState`."""
-    peers = cast(ops.Relation, self.peers)
-    peers.data[self.app][key] = json.dumps(data)
-
-def get_peer_data(self, key: str) -> Dict[str, JSONData]:
-    """Retrieve information from the peer data bucket instead of `StoredState`."""
-    if not self.peers:
-        return {}
-    data = self.peers.data[self.app].get(key, '')
-    if not data:
-        return {}
-    return json.loads(data)
-```
-
-This block uses the built-in `json` module of Python, so you need to import that as well. You also need to define a global variable called `PEER_NAME = "fastapi-peer"`, to match the name of the peer relation defined in `charmcraft.yaml` file. We'll also need to import some additional types from `typing`, and define a type alias for JSON data. Update your imports to include the following:
+In your `src/charm.py` file, set and get the data from the peer relation
+databag. For example, to store an expensive calculation:
 
 ```python
-import json
-from typing import Dict, List, Optional, Union, cast
-```
-Then define our global and type alias as follows:
+def _on_start(self, event: ops.StartEvent):
+    peer = self.model.get_relation('charm-peer')
+    peer.data[self.app]['expensive-value'] = self._calculate_expensive_value()
 
-```python
-PEER_NAME = 'fastapi-peer'
-
-JSONData = Union[
-    Dict[str, 'JSONData'],
-    List['JSONData'],
-    str,
-    int,
-    float,
-    bool,
-    None,
-]
+def _on_stop(self, event: ops.StopEvent):
+    peer = self.model.get_relation('charm-peer')
+    logger.info('Value at stop is: %s', peer.data[self.app]['expensive-value'])
 ```
 
-Next, you need to add a method that updates a counter for the number of times a Kubernetes pod has been started. Let's make it retrieve the current count of pod starts from the 'unit_stats' peer relation data, increment the count, and then update the 'unit_stats' data with the new count, as below:
+[caution]
+Peer relations are not available early in the Charm lifecycle, so you'll need
+to wait until later events, like `start`, to store and retrieve data.
+[/caution]
 
-```python
-def _count(self, event: ops.StartEvent) -> None:
-    """This function updates a counter for the number of times a K8s pod has been started.
-
-    It retrieves the current count of pod starts from the 'unit_stats' peer relation data,
-    increments the count, and then updates the 'unit_stats' data with the new count.
-    """
-    unit_stats = self.get_peer_data('unit_stats')
-    counter = cast(str, unit_stats.get('started_counter', '0'))
-    self.set_peer_data('unit_stats', {'started_counter': int(counter) + 1})
-```
-
-Finally, you need to call this method and update the peer relation data every time the pod is started. For that, define another event observer in the `__init__` method, as below:
-
-```python
-framework.observe(self.on.start, self._count)
-```
 
 ### Test the feature
 
-<br>
+> See first: {ref}`get-started-with-charm-testing`
 
-> <small>**Contributors:**@tmihoc, @tony-meyer</small>
+You'll want to add unit tests:
+
+- [Write unit tests](#heading--write-scenario-tests)
+
+For integration tests: stored state isn't a feature, it's functionality that
+enables features, so your integration tests that make use of the stored state
+will verify that it works correctly. There are no special constructs to use in
+an integration test: just trigger multiple Juju events.
+
+#### Write unit tests
+
+> See first: {ref}`write-scenario-tests-for-a-charm`
+
+In your `tests/unit/test_charm.py` file, add tests that have an initial state
+that includes a [](ops.testing.PeerRelation) object.
+
+```python
+def test_charm_sets_stored_state():
+    ctx = testing.Context(MyCharm)
+    peer = testing.PeerRelation('charm-peer')
+    state_in = testing.State(relations={peer})
+    state_out = ctx.run(ctx.on.start(), state_in)
+    rel = state_out.get_relation(peer.id)
+    assert rel.local_app_data["expensive_value"] == "42"
+```

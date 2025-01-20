@@ -15,7 +15,7 @@ This is an explanatory doc covering how charm authors might track local state in
 
 We'll begin by setting up a simple scenario. A charm author would like to charm up a (made up) service called `ExampleBlog`. The ideal cloud service is stateless and immutable, but `ExampleBlog` has some state: it can run in either a `production` mode or a `test` mode. 
 
-The standard way to set ExampleBlog's mode is to write either the string `test` or `production` to `/etc/example_blog/mode`, then restart the service. Leaving aside whether this is *advisable* behavior, this is how `ExampleBlog` works, and an `ExampleBlog` veteran user would expect a `ExampleBlog` charm to allow them to toggle modes by writing to that config file. (I sense a patch to upstream brewing, but let's assume, for our example, that we can't dynamically load the config.)
+The standard way to set ExampleBlog's mode is to write either the string `test` or `production` to `/etc/example_blog/mode`, then restart the service. Leaving aside whether this is *advisable* behavior, this is how `ExampleBlog` works, and an `ExampleBlog` veteran user would expect a `ExampleBlog` charm to allow them to toggle modes by writing to that config file. (I sense a patch to upstream brewing, but let's assume, for our example, that we can't dynamically load the config).
 
 Here's a simplified charm code snippet that will allow us to toggle the state of an already running instance of `ExampleBlog`.
 
@@ -68,10 +68,6 @@ Let's say the charm is running on Kubernetes, and the container it is running in
 
 Do you see the bug in our example code? We could fix it by setting the initial value in our `StoredState` to something other than `test` or `production`. E.g., `self._stored.set_default(current_mode="unset")`. This will never match the actual intended state, and we'll thus always invoke the codepath that loads the operator's intended state after a pod restart, and write that to the new local disk.
 
-What if we are tracking some piece of information that *should* survive a pod restart?
-
-In this case, charm authors can pass `use_juju_for_storage=True` to the charm's `main` routine ([example](https://github.com/canonical/alertmanager-k8s-operator/blob/8371a1424c0a73d62d249ca085edf693c8084279/src/charm.py#L454)). This will allocate some space on the controller to store per unit data, and that data will persist through events that could kill and recreate the underlying pod. Keep in mind that this can cause trouble! In the case of `ExampleBlog`, we clearly would not want the `StoredState` record for "mode" to survive a pod restart -- the correct state is already appropriately stored in Juju's config, and stale state in the controller's storage might result in the charm skipping a necessary config write and restart cycle.
-
 ## Practical suggestions and solutions
 
 _Most of the time, charm authors should not track state in a charm._
@@ -116,5 +112,9 @@ In the other cases where state is needed, authors ideally want to relate a charm
 -->
 
 In the cases where it is important to share some lightweight configuration data between units of an application, charm author's should look into [peer relations](https://juju.is/docs/sdk/integration#heading--peer-integrations). And in the cases where data must be written to a container's local file system (Canonical's Kubeflow bundle, for example, must do this, because the sheer number of services mean that we run into limitations on attached storage in the underlying cloud), authors should do so mindfully, with an understanding of the pitfalls involved.
+
+<!-- UPDATE LINKS
+"peer relations", above
+-->
 
 In sum: use state mindfully, with well chosen tools, only when necessary.
