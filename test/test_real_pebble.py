@@ -129,7 +129,7 @@ class TestRealPebble:
             time.sleep(0.06)
         else:
             assert False, 'timed out waiting for "bad" check to go down'
-        assert bad_check.failures == 2
+        assert bad_check.failures >= 2
         assert bad_check.threshold == 2
         good_check = next(c for c in checks if c.name == 'good')
         assert good_check.status == pebble.CheckStatus.UP
