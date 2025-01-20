@@ -236,8 +236,6 @@ Recommended tone:
 
 ## How to build the documentation locally
 
-<!-- TODO -->
-
 To build the docs and open them in your browser:
 
 ```sh
