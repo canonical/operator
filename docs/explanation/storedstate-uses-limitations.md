@@ -108,10 +108,10 @@ def some_event_handler(event):
 In the other cases where state is needed, authors ideally want to relate a charm to a database, attach storage (see Juju storage), or simply be opinionated, and hard code the single "correct" state into the charm. (Perhaps `ExampleBlog` should always be run in `production` mode when deployed as a charm?)
 
 <!-- UPDATE LINKS
-"Juju Storage", above
+"Juju Storage" above
 -->
 
-In the cases where it is important to share some lightweight configuration data between units of an application, charm author's should look into [peer relations](https://juju.is/docs/sdk/integration#heading--peer-integrations). And in the cases where data must be written to a container's local file system (Canonical's Kubeflow bundle, for example, must do this, because the sheer number of services mean that we run into limitations on attached storage in the underlying cloud), authors should do so mindfully, with an understanding of the pitfalls involved.
+In the cases where it is important to share some lightweight configuration data between units of an application, charm author's should look into peer relations. And in the cases where data must be written to a container's local file system (Canonical's Kubeflow bundle, for example, must do this, because the sheer number of services mean that we run into limitations on attached storage in the underlying cloud), authors should do so mindfully, with an understanding of the pitfalls involved.
 
 <!-- UPDATE LINKS
 "peer relations", above
