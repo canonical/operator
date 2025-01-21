@@ -40,7 +40,6 @@ The  application that we will charm in this tutorial is based on the Python Fast
     1. {ref}`Observe your charm with COS Lite and set up cross-model integrations <observe-your-charm-with-cos-lite>`
     1. {ref}`Write unit tests for your charm <write-unit-tests-for-your-charm>`
     1. {ref}`Write integration tests for your charm <write-integration-tests-for-your-charm>`
-    1. {ref}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`
 -->
 
 
@@ -56,7 +55,6 @@ expose-operational-tasks-via-actions
 observe-your-charm-with-cos-lite
 write-unit-tests-for-your-charm
 write-integration-tests-for-your-charm
-publish-your-charm-on-charmhub
 ```
 
 (tutorial-kubernetes-next-steps)=

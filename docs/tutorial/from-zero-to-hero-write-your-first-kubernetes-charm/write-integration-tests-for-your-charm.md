@@ -192,5 +192,3 @@ Congratulations, with this integration test you have verified that your charms r
 For the full code see: [07_integration_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/07_integration_testing)
 
 For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/06_unit_testing...07_integration_testing)
-
-> **See next: {ref}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`**
