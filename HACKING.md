@@ -222,6 +222,11 @@ To contribute docs:
    to check that everything looks right
 3. [Propose your changes using a pull request](#contributing)
 
+When you create the pull request, GitHub automatically builds a preview of the docs.
+To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of
+the pull request page, then click **Details**. You can use the preview to double check
+that everything looks right.
+
 ## How to write great documentation
 
 - Use short sentences, ideally with one or two clauses.
