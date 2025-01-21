@@ -21,7 +21,7 @@ jobs:
             commit: 62cd2d9b8c3a528910ce12c553209817e1b7a889 # rev226 2024-12-19T16:01:25Z
             disabled: true # Waiting for an upstream PR: https://github.com/canonical/prometheus-k8s-operator/pull/639
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 807317c9f0943287c3650d5ef0f072fd06780387  # rev128 2024-12-19T07:48:09Z
+            commit: 802a566dd0c801ffa6703ea2c350491bd09d94d8
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
