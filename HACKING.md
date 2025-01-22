@@ -355,16 +355,18 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
    [semantic versioning](https://semver.org/), and adjust independently
    (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
-9. Add, commit, and push, and open a PR to get the changelogs and version bumps
-   into main (and get it merged).
-10. Save the release notes as a draft, and have someone else in the Charm-Tech
+9. Run `tox -e docs-deps` to recompile the `requirements.txt` file used for docs
+   (in case dependencies have been updated in `pyproject.toml`).
+10. Add, commit, and push, and open a PR to get the changelogs, version bumps,
+   and doc requirement bumps into main (and get it merged).
+11. Save the release notes as a draft, and have someone else in the Charm-Tech
    team proofread the release notes.
-11. If the release includes both `ops` and `ops-scenario` packages, then push a
+12. If the release includes both `ops` and `ops-scenario` packages, then push a
    new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-12. When you are ready, click "Publish". GitHub will create the additional tag.
+13. When you are ready, click "Publish". GitHub will create the additional tag.
 
 Pushing the tags will trigger automatic builds for the Python packages and
 publish them to PyPI ([ops](https://pypi.org/project/ops/) and
