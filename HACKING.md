@@ -264,12 +264,24 @@ We encourage all charmers to promptly upgrade to the latest version of ops,
 and to refer to the release notes and changelog for learning about changes.
 
 We do note when features behave differently when using different versions of Juju.
-Use the `.. jujuadded:: x.y` directive to indicate that the feature is only
-available when using version x.y (or higher) of Juju, `..jujuchanged:: x.y`
-when the feature's behaviour _in ops_ changes, and `..jujuremoved:: x.y` when
-the feature will be available in ops but not in that version (or later) of Juju.
-Unmarked features are assumed to work and be available in the current LTS
-version of Juju.
+
+In docstrings:
+
+* Use `.. jujuadded:: x.y` to indicate that the feature is only available
+  when using version x.y (or higher) of Juju.
+* Use `..jujuchanged:: x.y` when the feature's behaviour _in ops_ changes.
+* Use `..jujuremoved:: x.y` when the feature will be available in ops
+  but not in that version (or later) of Juju.
+
+Similar directives also work in MyST Markdown. For example:
+
+````markdown
+```{jujuadded} x.y
+Summary
+```
+````
+
+Unmarked features are assumed to work and be available in the current LTS version of Juju.
 
 # Maintaining the documentation
 
