@@ -164,7 +164,11 @@ a bunch of charms that use the operator framework. The script can be run locally
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
-For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md).
+For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_,
+as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html)
+is automatically generated from Python docstrings.
+
+For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
 Pull requests should have a short title that follows the
 [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
@@ -201,66 +205,27 @@ The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt)
 New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)).
 The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
 
-# Documentation
+# Contributing documentation
 
-In general, new functionality
-should always be accompanied by user-focused documentation that is posted to
-https://juju.is/docs/sdk. The content for this site is written and hosted on
-https://discourse.charmhub.io/c/doc. New documentation should get a new
-topic/post on this Discourse forum and then should be linked into the main
-docs navigation page(s) as appropriate. The ops library's SDK page
-content is pulled from
-[the corresponding Discourse topic](https://discourse.charmhub.io/t/the-charmed-operator-software-development-kit-sdk-docs/4449).
-Each page on [juju.is](https://juju.is/docs/sdk) has a link at the bottom that
-takes you to the corresponding Discourse page where docs can be commented on
-and edited (if you have earned those privileges).
+The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
+are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/)
+for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
 
-Currently we don't publish separate versions of documentation for separate releases.  Instead, new features should be sign-posted (for example, as done for [File and directory existence in 1.4](https://juju.is/docs/sdk/interact-with-pebble#heading--file-exists)) with Markdown like this:
+To contribute docs:
 
-```markdown
-[note status="version"]1.4[/note]
-```
+1. Fork this repo and edit the relevant source files:
+   * Tutorials - [`/docs/tutorial`](./docs/tutorial)
+   * How-to guides - [`/docs/howto`](./docs/howto)
+   * Reference - Automatically generated from Python docstrings
+   * Explanation - [`/docs/explanation`](./docs/explanation)
+2. [Build the documentation locally](#how-to-build-the-documentation-locally),
+   to check that everything looks right
+3. [Propose your changes using a pull request](#contributing)
 
-next to the relevant content (e.g. headings, etc.).
-
-The ops library's API reference is automatically built and published to
-[ops.readthedocs.io](https://ops.readthedocs.io/en/latest/). Please be complete with
-docstrings and keep them informative for _users_. The published docs are always
-for the in-development (main branch) of ops, and do not include any notes
-indicating changes or additions across ops versions - we encourage all charmers to
-promptly upgrade to the latest version of ops, and to refer to the release notes
-and changelog for learning about changes.
-
-We do note when features behave differently when using different Juju versions.
-Use the `.. jujuadded:: x.y` directive to indicate that the feature is only
-available when using version x.y (or higher) of Juju, `..jujuchanged:: x.y`
-when the feature's behaviour _in ops_ changes, and `..jujuremoved:: x.y` when
-the feature will be available in ops but not in that version (or later) of Juju.
-Unmarked features are assumed to work and be available in the current LTS
-version of Juju.
-
-During the release process, changes also get a new entry in [CHANGES.md](CHANGES.md).
-These are grouped into the same groupings as
-[commit messages](https://www.conventionalcommits.org/en/)
-(feature, fix, documentation, performance, etc). The only exceptions are changes
-that are not visible to the built releases, such as CI workflow changes, or are
-implicit, such as bumping the ops version number. Each entry should be a short,
-single line, bullet point, and should reference the GitHub PR that introduced
-the change (as plain text, not a link).
-
-As noted above, you can generate a local copy of the API reference docs with tox:
-
-```sh
-tox -e docs
-open docs/_build/html/index.html
-```
-
-If dependencies are updated in `pyproject.toml`, you can run the following command
-before generating docs to recompile the `requirements.txt` file used for docs:
-
-```sh
-tox -e docs-deps
-```
+When you create the pull request, GitHub automatically builds a preview of the docs.
+To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of
+the pull request page, then click **Details**. You can use the preview to double check
+that everything looks right.
 
 ## How to write great documentation
 
@@ -273,6 +238,52 @@ Recommended tone:
 - Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
 - Use "we" to include the reader in what you're explaining.
 - Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
+
+## How to build the documentation locally
+
+To build the docs and open them in your browser:
+
+```sh
+tox -e docs
+open docs/_build/html/index.html
+```
+
+Alternatively, to serve the docs locally and automatically refresh them whenever you edit a file:
+
+```sh
+tox -e docs-live
+```
+
+## How to document version dependencies
+
+We don't publish separate documentation for separate versions of ops.
+The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
+are always for the in-development (main branch) of ops, and do not include
+any notes indicating changes or additions across ops versions.
+We encourage all charmers to promptly upgrade to the latest version of ops,
+and to refer to the release notes and changelog for learning about changes.
+
+We do note when features behave differently when using different versions of Juju.
+
+In docstrings:
+
+* Use `.. jujuadded:: x.y` to indicate that the feature is only available
+  when using version x.y (or higher) of Juju.
+* Use `..jujuchanged:: x.y` when the feature's behaviour _in ops_ changes.
+* Use `..jujuremoved:: x.y` when the feature will be available in ops
+  but not in that version (or later) of Juju.
+
+Similar directives also work in MyST Markdown. For example:
+
+````markdown
+```{jujuadded} x.y
+Summary
+```
+````
+
+Unmarked features are assumed to work and be available in the current LTS version of Juju.
+
+# Maintaining the documentation
 
 ## How to Pull in Style Changes
 
@@ -356,16 +367,18 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
    [semantic versioning](https://semver.org/), and adjust independently
    (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
-9. Add, commit, and push, and open a PR to get the changelogs and version bumps
-   into main (and get it merged).
-10. Save the release notes as a draft, and have someone else in the Charm-Tech
+9. Run `tox -e docs-deps` to recompile the `requirements.txt` file used for docs
+   (in case dependencies have been updated in `pyproject.toml`).
+10. Add, commit, and push, and open a PR to get the changelogs, version bumps,
+   and doc requirement bumps into main (and get it merged).
+11. Save the release notes as a draft, and have someone else in the Charm-Tech
    team proofread the release notes.
-11. If the release includes both `ops` and `ops-scenario` packages, then push a
+12. If the release includes both `ops` and `ops-scenario` packages, then push a
    new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-12. When you are ready, click "Publish". GitHub will create the additional tag.
+13. When you are ready, click "Publish". GitHub will create the additional tag.
 
 Pushing the tags will trigger automatic builds for the Python packages and
 publish them to PyPI ([ops](https://pypi.org/project/ops/) and
