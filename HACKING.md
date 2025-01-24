@@ -392,9 +392,9 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-13. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-14. Open a PR to change the version strings to the expected
+15. Open a PR to change the version strings to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
    expected version, use `'3.14.1.dev0'`).
 
