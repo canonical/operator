@@ -54,6 +54,7 @@ class StoragePermutations(abc.ABC):
             None,  # type: ignore
             None,  # type: ignore
             None,  # type: ignore
+            '',
             juju_debug_at=set(),
         )
 

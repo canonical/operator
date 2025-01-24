@@ -112,6 +112,7 @@ def create_framework(
         tmpdir,
         meta,
         model,
+        'foo_event',
         juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
     )
 

@@ -73,6 +73,7 @@ def create_framework(
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
         model=model,  # type: ignore
+        event_name='',
         juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
     )
     request.addfinalizer(framework.close)
@@ -94,6 +95,7 @@ class TestFramework:
                 None,  # type: ignore
                 None,  # type: ignore
                 None,  # type: ignore
+                '',
                 juju_debug_at=set(),
             )
         assert 'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path' in [
