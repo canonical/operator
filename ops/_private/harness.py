@@ -312,6 +312,7 @@ class Harness(Generic[CharmType]):
             self._charm_dir,
             self._meta,
             self._model,
+            '',
             juju_debug_at=self._juju_context.debug_at,
             # Harness tests will often have defer() usage without 'purging' the
             # deferred handler with reemit(), but still expect the next emit()

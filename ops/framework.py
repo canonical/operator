@@ -606,7 +606,7 @@ class Framework(Object):
         charm_dir: Union[str, pathlib.Path],
         meta: 'charm.CharmMeta',
         model: 'Model',
-        event_name: Optional[str] = None,
+        event_name: str,
         juju_debug_at: Optional[Set[str]] = None,
         skip_duplicate_events: bool = True,
     ):
