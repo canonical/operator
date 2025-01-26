@@ -380,21 +380,21 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    `upstream`).
 13. When you are ready, click "Publish". GitHub will create the additional tag.
 
-Pushing the tags will trigger automatic builds for the Python packages and
-publish them to PyPI ([ops](https://pypi.org/project/ops/) and
-[ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled
-via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
-Note that it sometimes take a bit of time for the new releases to show up.
+    Pushing the tags will trigger automatic builds for the Python packages and
+    publish them to PyPI ([ops](https://pypi.org/project/ops/) and
+    [ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled
+    via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
+    Note that it sometimes take a bit of time for the new releases to show up.
 
-See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
-[.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
-(Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops library.)
+    See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
+    [.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
+    (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
 
-You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+    You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-13. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-14. Open a PR to change the version strings to the expected
+15. Open a PR to change the version strings to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
    expected version, use `'3.14.1.dev0'`).
 
@@ -496,7 +496,7 @@ The main improvements in this release are ...
 Read more in the [full release notes on GitHub](link to the GitHub release).
 ```
 
-In the post, outline the key improvements both in `ops` and `ops-scenario` - 
-the point here is to encourage people to check out the full notes and to upgrade
+In the post, outline the key improvements both in `ops` and `ops-scenario`.
+The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
