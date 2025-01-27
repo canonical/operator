@@ -13,7 +13,7 @@ jobs:
       matrix:
         # pylibjuju does not currently support Juju 4.x
         # The smoke tests do not yet work on Juju 2.9.
-        juju-version: ['3.5']
+        juju-version: ['3.6']
         charmcraft-version: ['2.x', '3.x']
         cloud: ['lxd', 'microk8s']
 
@@ -46,7 +46,7 @@ jobs:
 
       - name: Bootstrap Juju controller (k8s)
         if: matrix.cloud == 'microk8s'
-        run: sg snap_microk8s -c 'juju bootstrap microk8s'
+        run: sudo juju bootstrap microk8s
 
       - name: Bootstrap Juju controller (lxd)
         if: matrix.cloud == 'lxd'
