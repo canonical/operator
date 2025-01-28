@@ -35,7 +35,7 @@ jobs:
           path: myops
 
       - name: Install patch dependencies
-        run: pip install poetry~=1.6
+        run: pip install poetry~=2.0
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
@@ -44,7 +44,7 @@ jobs:
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
             sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock --no-update
+            poetry lock
           fi
 
       - name: Install dependencies
