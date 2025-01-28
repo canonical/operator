@@ -13,47 +13,20 @@ jobs:
       matrix:
         # pylibjuju does not currently support Juju 4.x
         # The smoke tests do not yet work on Juju 2.9.
-        juju-version: ['3.6']
-        charmcraft-version: ['2.x', '3.x']
-        cloud: ['lxd', 'microk8s']
+        juju-channel: ['3/stable']
+        charmcraft-channel: ['2.x/stable', '3.x/stable']
+        preset: ['machine', 'microk8s']
 
     env:
-      JUJU_VERSION: "${{ matrix.juju-version }}"
+      CONCIERGE_JUJU_CHANNEL: "${{ matrix.juju-channel }}"
+      CONCIERGE_CHARMCRAFT_CHANNEL: "${{ matrix.charmcraft-channel }}"
 
     steps:
-      # LXD is required for charmcraft to pack, even if it's not used as the
-      # Juju cloud.
-      - name: Set up LXD
-        uses: canonical/setup-lxd@54a5806e490d92e207b57183cf111ed54bbdeff4
-        with:
-          channel: 5.0/stable
+      - name: Install concierge
+        run: sudo snap install --classic concierge
 
-      - name: Set up Microk8s
-        if: matrix.cloud == 'microk8s'
-        uses: balchua/microk8s-actions@v0.4.3
-        with:
-          channel: '1.26-strict/stable'
-          devMode: 'true'
-          addons: '["dns", "hostpath-storage"]'
-
-      - name: Set up Juju (classic)
-        if: matrix.juju-version == '2.9'
-        run: sudo snap install juju --classic --channel=${{ matrix.juju-version }}
-
-      - name: Set up Juju
-        if: matrix.juju-version != '2.9'
-        run: sudo snap install juju --channel=${{ matrix.juju-version }}
-
-      - name: Bootstrap Juju controller (k8s)
-        if: matrix.cloud == 'microk8s'
-        run: sudo juju bootstrap microk8s
-
-      - name: Bootstrap Juju controller (lxd)
-        if: matrix.cloud == 'lxd'
-        run: juju bootstrap localhost
-
-      - name: Install charmcraft
-        run: sudo snap install charmcraft --channel=${{ matrix.charmcraft-version }} --classic
+      - name: Install Juju and tools
+        run: sudo concierge prepare -p "${{ matrix.preset }}"
 
       - name: Checkout the repository
         uses: actions/checkout@v4
