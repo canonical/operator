@@ -17,16 +17,12 @@ jobs:
         charmcraft-channel: ['2.x/stable', '3.x/stable']
         preset: ['machine', 'microk8s']
 
-    env:
-      CONCIERGE_JUJU_CHANNEL: "${{ matrix.juju-channel }}"
-      CONCIERGE_CHARMCRAFT_CHANNEL: "${{ matrix.charmcraft-channel }}"
-
     steps:
       - name: Install concierge
         run: sudo snap install --classic concierge
 
       - name: Install Juju and tools
-        run: sudo concierge prepare -p "${{ matrix.preset }}"
+        run: sudo concierge prepare --juju-channel=${{ matrix.juju-channel }} --charmcraft-channel=${{ matrix.charmcraft-channel }} -p "${{ matrix.preset }}"
 
       - name: Checkout the repository
         uses: actions/checkout@v4
