@@ -125,7 +125,7 @@ class Model:
     as ``self.model`` from any class that derives from :class:`Object`.
     """
 
-    @tracer.start_as_current_span('Model')  # type: ignore
+    @tracer.start_as_current_span('ops.Model')  # type: ignore
     def __init__(
         self,
         meta: 'ops.charm.CharmMeta',
@@ -222,7 +222,7 @@ class Model:
         """
         return self._backend.model_uuid
 
-    @tracer.start_as_current_span('Model.get_unit')  # type: ignore
+    @tracer.start_as_current_span('ops.Model.get_unit')  # type: ignore
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -233,7 +233,7 @@ class Model:
         """
         return self._cache.get(Unit, unit_name)
 
-    @tracer.start_as_current_span('Model.get_app')  # type: ignore
+    @tracer.start_as_current_span('ops.Model.get_app')  # type: ignore
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
 
@@ -244,7 +244,7 @@ class Model:
         """
         return self._cache.get(Application, app_name)
 
-    @tracer.start_as_current_span('Model.get_relation')  # type: ignore
+    @tracer.start_as_current_span('ops.Model.get_relation')  # type: ignore
     def get_relation(
         self, relation_name: str, relation_id: Optional[int] = None
     ) -> Optional['Relation']:
@@ -265,7 +265,7 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    @tracer.start_as_current_span('Model.get_binding')  # type: ignore
+    @tracer.start_as_current_span('ops.Model.get_binding')  # type: ignore
     def get_binding(self, binding_key: Union[str, 'Relation']) -> Optional['Binding']:
         """Get a network space binding.
 
@@ -280,7 +280,7 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
-    @tracer.start_as_current_span('Model.get_secret')  # type: ignore
+    @tracer.start_as_current_span('ops.Model.get_secret')  # type: ignore
     def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> 'Secret':
         """Get the :class:`Secret` with the given ID or label.
 
@@ -323,7 +323,7 @@ class Model:
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
-    @tracer.start_as_current_span('Model.get_cloud_spec')  # type: ignore
+    @tracer.start_as_current_span('ops.Model.get_cloud_spec')  # type: ignore
     def get_cloud_spec(self) -> 'CloudSpec':
         """Get details of the cloud in which the model is deployed.
 
@@ -401,7 +401,7 @@ class Application:
         self._status = None
 
     @property
-    @tracer.start_as_current_span('Application.status')  # type: ignore
+    @tracer.start_as_current_span('ops.Application.status')  # type: ignore
     def status(self) -> 'StatusBase':
         """Used to report or read the status of the overall application.
 
@@ -440,7 +440,7 @@ class Application:
         return self._status
 
     @status.setter
-    @tracer.start_as_current_span('Application.status = ...')  # type: ignore
+    @tracer.start_as_current_span('ops.Application.status = ...')  # type: ignore
     def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
@@ -461,7 +461,7 @@ class Application:
 
         self._status = value
 
-    @tracer.start_as_current_span('Application.planned_units')  # type: ignore
+    @tracer.start_as_current_span('ops.Application.planned_units')  # type: ignore
     def planned_units(self) -> int:
         """Get the number of units that Juju has "planned" for this application.
 
@@ -487,7 +487,7 @@ class Application:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
-    @tracer.start_as_current_span('Application.add_secret')  # type: ignore
+    @tracer.start_as_current_span('ops.Application.add_secret')  # type: ignore
     def add_secret(
         self,
         content: Dict[str, str],
@@ -591,7 +591,7 @@ class Unit:
         self._status = None
 
     @property
-    @tracer.start_as_current_span('Unit.status')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.status')  # type: ignore
     def status(self) -> 'StatusBase':
         """Used to report or read the status of a specific unit.
 
@@ -624,7 +624,7 @@ class Unit:
         return self._status
 
     @status.setter
-    @tracer.start_as_current_span('Unit.status = ...')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.status = ...')  # type: ignore
     def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
@@ -642,7 +642,7 @@ class Unit:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
-    @tracer.start_as_current_span('Unit.is_leader')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.is_leader')  # type: ignore
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
 
@@ -660,7 +660,7 @@ class Unit:
                 f'leadership status of remote units ({self}) is not visible to other applications'
             )
 
-    @tracer.start_as_current_span('Unit.set_workload_version')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.set_workload_version')  # type: ignore
     def set_workload_version(self, version: str) -> None:
         """Record the version of the software running as the workload.
 
@@ -695,7 +695,7 @@ class Unit:
         except KeyError:
             raise ModelError(f'container {container_name!r} not found') from None
 
-    @tracer.start_as_current_span('Unit.add_secret')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.add_secret')  # type: ignore
     def add_secret(
         self,
         content: Dict[str, str],
@@ -729,7 +729,7 @@ class Unit:
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
-    @tracer.start_as_current_span('Unit.open_port')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.open_port')  # type: ignore
     def open_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: Optional[int] = None
     ) -> None:
@@ -758,7 +758,7 @@ class Unit:
         """
         self._backend.open_port(protocol.lower(), port)
 
-    @tracer.start_as_current_span('Unit.close_port')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.close_port')  # type: ignore
     def close_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: Optional[int] = None
     ) -> None:
@@ -788,12 +788,12 @@ class Unit:
         """
         self._backend.close_port(protocol.lower(), port)
 
-    @tracer.start_as_current_span('Unit.opened_ports')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.opened_ports')  # type: ignore
     def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
-    @tracer.start_as_current_span('Unit.set_ports')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.set_ports')  # type: ignore
     def set_ports(self, *ports: Union[int, 'Port']) -> None:
         """Set the open ports for this unit, closing any others that are open.
 
@@ -826,7 +826,7 @@ class Unit:
         for protocol, port in desired - existing:
             self._backend.open_port(protocol, port)
 
-    @tracer.start_as_current_span('Unit.reboot')  # type: ignore
+    @tracer.start_as_current_span('ops.Unit.reboot')  # type: ignore
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
 

@@ -697,7 +697,7 @@ class Framework(Object):
         """Stop tracking the given object. See also _track."""
         self._objects.pop(obj.handle.path, None)
 
-    @tracer.start_as_current_span('Framework.commit')  # type: ignore
+    @tracer.start_as_current_span('ops.Framework.commit')  # type: ignore
     def commit(self) -> None:
         """Save changes to the underlying backends."""
         # Give a chance for objects to persist data they want to before a commit is made.
@@ -871,7 +871,7 @@ class Framework(Object):
                 return True
         return False
 
-    @tracer.start_as_current_span('Framework._emit')  # type: ignore
+    @tracer.start_as_current_span('ops.Framework._emit')  # type: ignore
     def _emit(self, event: EventBase):
         """See BoundEvent.emit for the public way to call this."""
         saved = False
@@ -913,7 +913,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    @tracer.start_as_current_span('reemit')  # type: ignore
+    @tracer.start_as_current_span('ops.Framework.reemit')  # type: ignore
     def reemit(self) -> None:
         """Reemit previously deferred events to the observers that deferred them.
 

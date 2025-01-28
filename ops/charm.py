@@ -1335,7 +1335,7 @@ class CharmBase(Object):
 
     # FIXME not sure if this is needed
     # may help to exclude `super().__init__(...)` from `UserCharm.__init__`
-    @tracer.start_as_current_span('CharmBase')  # type: ignore
+    @tracer.start_as_current_span('ops.CharmBase')  # type: ignore
     def __init__(self, framework: Framework):
         super().__init__(framework, None)
 
