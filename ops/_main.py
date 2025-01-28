@@ -23,10 +23,13 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
+import opentelemetry.trace
+
 import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
+import ops.tracing
 from ops.charm import CharmMeta
 from ops.jujucontext import _JujuContext
 from ops.log import setup_root_logging
@@ -35,6 +38,7 @@ CHARM_STATE_FILE = '.unit-state.db'
 
 
 logger = logging.getLogger()
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -212,6 +216,8 @@ class _Dispatcher:
 
     """
 
+    event_name: str
+
     def __init__(self, charm_dir: Path, juju_context: _JujuContext):
         self._juju_context = juju_context
         self._charm_dir = charm_dir
@@ -268,7 +274,9 @@ class _Dispatcher:
         argv[0] = str(dispatch_path)
         logger.info('Running legacy %s.', self._dispatch_path)
         try:
-            subprocess.run(argv, check=True)
+            with tracer.start_as_current_span('ops.run_legacy_hook') as span:  # type: ignore
+                span.set_attribute('argv', ' '.join(argv))  # type: ignore
+                subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
             logger.warning('Legacy %s exited with status %d.', self._dispatch_path, e.returncode)
             raise _Abort(e.returncode) from e
@@ -552,9 +560,16 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    try:
-        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+    ops.tracing.setup_tracing(charm_class.__name__)
 
-        manager.run()
+    # opentelemetry-api types are broken
+    # https://github.com/open-telemetry/opentelemetry-python/issues/3836
+    try:
+        with tracer.start_as_current_span('ops.main'):  # type: ignore
+            manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+
+            manager.run()
     except _Abort as e:
         sys.exit(e.exit_code)
+    finally:
+        ops.tracing.shutdown_tracing()

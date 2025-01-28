@@ -57,6 +57,8 @@ from typing import (
     get_args,
 )
 
+import opentelemetry.trace
+
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
@@ -111,6 +113,7 @@ _NetworkDict = TypedDict(
 
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
@@ -122,6 +125,7 @@ class Model:
     as ``self.model`` from any class that derives from :class:`Object`.
     """
 
+    @tracer.start_as_current_span('ops.Model')  # type: ignore
     def __init__(
         self,
         meta: 'ops.charm.CharmMeta',
@@ -218,6 +222,7 @@ class Model:
         """
         return self._backend.model_uuid
 
+    @tracer.start_as_current_span('ops.Model.get_unit')  # type: ignore
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -228,6 +233,7 @@ class Model:
         """
         return self._cache.get(Unit, unit_name)
 
+    @tracer.start_as_current_span('ops.Model.get_app')  # type: ignore
     def get_app(self, app_name: str) -> 'Application':
         """Get an application by name.
 
@@ -238,6 +244,7 @@ class Model:
         """
         return self._cache.get(Application, app_name)
 
+    @tracer.start_as_current_span('ops.Model.get_relation')  # type: ignore
     def get_relation(
         self, relation_name: str, relation_id: Optional[int] = None
     ) -> Optional['Relation']:
@@ -258,6 +265,7 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
+    @tracer.start_as_current_span('ops.Model.get_binding')  # type: ignore
     def get_binding(self, binding_key: Union[str, 'Relation']) -> Optional['Binding']:
         """Get a network space binding.
 
@@ -272,6 +280,7 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
+    @tracer.start_as_current_span('ops.Model.get_secret')  # type: ignore
     def get_secret(self, *, id: Optional[str] = None, label: Optional[str] = None) -> 'Secret':
         """Get the :class:`Secret` with the given ID or label.
 
@@ -314,6 +323,7 @@ class Model:
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
+    @tracer.start_as_current_span('ops.Model.get_cloud_spec')  # type: ignore
     def get_cloud_spec(self) -> 'CloudSpec':
         """Get details of the cloud in which the model is deployed.
 
@@ -391,6 +401,7 @@ class Application:
         self._status = None
 
     @property
+    @tracer.start_as_current_span('ops.Application.status')  # type: ignore
     def status(self) -> 'StatusBase':
         """Used to report or read the status of the overall application.
 
@@ -429,6 +440,7 @@ class Application:
         return self._status
 
     @status.setter
+    @tracer.start_as_current_span('ops.Application.status = ...')  # type: ignore
     def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
@@ -449,6 +461,7 @@ class Application:
 
         self._status = value
 
+    @tracer.start_as_current_span('ops.Application.planned_units')  # type: ignore
     def planned_units(self) -> int:
         """Get the number of units that Juju has "planned" for this application.
 
@@ -474,6 +487,7 @@ class Application:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
+    @tracer.start_as_current_span('ops.Application.add_secret')  # type: ignore
     def add_secret(
         self,
         content: Dict[str, str],
@@ -577,6 +591,7 @@ class Unit:
         self._status = None
 
     @property
+    @tracer.start_as_current_span('ops.Unit.status')  # type: ignore
     def status(self) -> 'StatusBase':
         """Used to report or read the status of a specific unit.
 
@@ -609,6 +624,7 @@ class Unit:
         return self._status
 
     @status.setter
+    @tracer.start_as_current_span('ops.Unit.status = ...')  # type: ignore
     def status(self, value: 'StatusBase'):
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
@@ -626,6 +642,7 @@ class Unit:
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}>'
 
+    @tracer.start_as_current_span('ops.Unit.is_leader')  # type: ignore
     def is_leader(self) -> bool:
         """Return whether this unit is the leader of its application.
 
@@ -643,6 +660,7 @@ class Unit:
                 f'leadership status of remote units ({self}) is not visible to other applications'
             )
 
+    @tracer.start_as_current_span('ops.Unit.set_workload_version')  # type: ignore
     def set_workload_version(self, version: str) -> None:
         """Record the version of the software running as the workload.
 
@@ -677,6 +695,7 @@ class Unit:
         except KeyError:
             raise ModelError(f'container {container_name!r} not found') from None
 
+    @tracer.start_as_current_span('ops.Unit.add_secret')  # type: ignore
     def add_secret(
         self,
         content: Dict[str, str],
@@ -710,6 +729,7 @@ class Unit:
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
+    @tracer.start_as_current_span('ops.Unit.open_port')  # type: ignore
     def open_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: Optional[int] = None
     ) -> None:
@@ -738,6 +758,7 @@ class Unit:
         """
         self._backend.open_port(protocol.lower(), port)
 
+    @tracer.start_as_current_span('ops.Unit.close_port')  # type: ignore
     def close_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: Optional[int] = None
     ) -> None:
@@ -767,10 +788,12 @@ class Unit:
         """
         self._backend.close_port(protocol.lower(), port)
 
+    @tracer.start_as_current_span('ops.Unit.opened_ports')  # type: ignore
     def opened_ports(self) -> Set['Port']:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
+    @tracer.start_as_current_span('ops.Unit.set_ports')  # type: ignore
     def set_ports(self, *ports: Union[int, 'Port']) -> None:
         """Set the open ports for this unit, closing any others that are open.
 
@@ -803,6 +826,7 @@ class Unit:
         for protocol, port in desired - existing:
             self._backend.open_port(protocol, port)
 
+    @tracer.start_as_current_span('ops.Unit.reboot')  # type: ignore
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
 
@@ -2339,6 +2363,7 @@ class Container:
             pebble_client = backend.get_pebble(socket_path)
         self._pebble: pebble.Client = pebble_client
 
+    @tracer.start_as_current_span('ops.Container.can_connect')  # type: ignore
     def can_connect(self) -> bool:
         """Report whether the Pebble API is reachable in the container.
 
@@ -2372,14 +2397,17 @@ class Container:
             return False
         return True
 
+    @tracer.start_as_current_span('ops.Container.autostart')  # type: ignore
     def autostart(self) -> None:
         """Autostart all services marked as ``startup: enabled``."""
         self._pebble.autostart_services()
 
+    @tracer.start_as_current_span('ops.Container.replan')  # type: ignore
     def replan(self) -> None:
         """Replan all services: restart changed services and start startup-enabled services."""
         self._pebble.replan_services()
 
+    @tracer.start_as_current_span('ops.Container.start')  # type: ignore
     def start(self, *service_names: str):
         """Start given service(s) by name."""
         if not service_names:
@@ -2387,6 +2415,7 @@ class Container:
 
         self._pebble.start_services(service_names)
 
+    @tracer.start_as_current_span('ops.Container.restart')  # type: ignore
     def restart(self, *service_names: str):
         """Restart the given service(s) by name.
 
@@ -2409,6 +2438,7 @@ class Container:
                 self._pebble.stop_services(stop)
             self._pebble.start_services(service_names)
 
+    @tracer.start_as_current_span('ops.Container.stop')  # type: ignore
     def stop(self, *service_names: str):
         """Stop given service(s) by name."""
         if not service_names:
@@ -2416,6 +2446,7 @@ class Container:
 
         self._pebble.stop_services(service_names)
 
+    @tracer.start_as_current_span('ops.Container.add_layer')  # type: ignore
     def add_layer(
         self,
         label: str,
@@ -2438,6 +2469,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
+    @tracer.start_as_current_span('ops.Container.get_plan')  # type: ignore
     def get_plan(self) -> pebble.Plan:
         """Get the combined Pebble configuration.
 
@@ -2447,6 +2479,7 @@ class Container:
         """
         return self._pebble.get_plan()
 
+    @tracer.start_as_current_span('ops.Container.service_name')  # type: ignore
     def get_services(self, *service_names: str) -> Mapping[str, 'pebble.ServiceInfo']:
         """Fetch and return a mapping of status information indexed by service name.
 
@@ -2457,6 +2490,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
+    @tracer.start_as_current_span('ops.Container.get_service')  # type: ignore
     def get_service(self, service_name: str) -> pebble.ServiceInfo:
         """Get status information for a single named service.
 
@@ -2470,6 +2504,7 @@ class Container:
             raise RuntimeError(f'expected 1 service, got {len(services)}')
         return services[service_name]
 
+    @tracer.start_as_current_span('ops.Container.get_checks')  # type: ignore
     def get_checks(
         self, *check_names: str, level: Optional[pebble.CheckLevel] = None
     ) -> 'CheckInfoMapping':
@@ -2484,6 +2519,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
+    @tracer.start_as_current_span('ops.Container.get_check')  # type: ignore
     def get_check(self, check_name: str) -> pebble.CheckInfo:
         """Get check information for a single named check.
 
@@ -2503,6 +2539,7 @@ class Container:
     @typing.overload
     def pull(self, path: Union[str, PurePath], *, encoding: str = 'utf-8') -> TextIO: ...
 
+    @tracer.start_as_current_span('ops.Container.pull')  # type: ignore
     def pull(
         self, path: Union[str, PurePath], *, encoding: Optional[str] = 'utf-8'
     ) -> Union[BinaryIO, TextIO]:
@@ -2524,6 +2561,7 @@ class Container:
         """
         return self._pebble.pull(str(path), encoding=encoding)
 
+    @tracer.start_as_current_span('ops.Container.push')  # type: ignore
     def push(
         self,
         path: Union[str, PurePath],
@@ -2573,6 +2611,7 @@ class Container:
             group=group,
         )
 
+    @tracer.start_as_current_span('ops.Container.list_files')  # type: ignore
     def list_files(
         self, path: Union[str, PurePath], *, pattern: Optional[str] = None, itself: bool = False
     ) -> List[pebble.FileInfo]:
@@ -2591,6 +2630,7 @@ class Container:
         """
         return self._pebble.list_files(str(path), pattern=pattern, itself=itself)
 
+    @tracer.start_as_current_span('ops.Container.push_path')  # type: ignore
     def push_path(
         self,
         source_path: Union[str, Path, Iterable[Union[str, Path]]],
@@ -2678,6 +2718,7 @@ class Container:
         if errors:
             raise MultiPushPullError('failed to push one or more files', errors)
 
+    @tracer.start_as_current_span('ops.Container.pull_path')  # type: ignore
     def pull_path(
         self,
         source_path: Union[str, PurePath, Iterable[Union[str, PurePath]]],
@@ -2748,7 +2789,9 @@ class Container:
                     dstpath.parent.mkdir(parents=True, exist_ok=True)
                     with self.pull(info.path, encoding=None) as src:
                         with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(src, dst)
+                            with tracer.start_as_current_span('shutil.copyfileobj') as span:  # type: ignore
+                                span.set_attribute('dstpath', str(dstpath))  # type: ignore
+                                shutil.copyfileobj(src, dst)
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
@@ -2846,6 +2889,7 @@ class Container:
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
+    @tracer.start_as_current_span('ops.Container.exists')  # type: ignore
     def exists(self, path: Union[str, PurePath]) -> bool:
         """Report whether a path exists on the container filesystem."""
         try:
@@ -2856,6 +2900,7 @@ class Container:
             raise err
         return True
 
+    @tracer.start_as_current_span('ops.Container.isdir')  # type: ignore
     def isdir(self, path: Union[str, PurePath]) -> bool:
         """Report whether a directory exists at the given path on the container filesystem."""
         try:
@@ -2866,6 +2911,7 @@ class Container:
             raise err
         return files[0].type == pebble.FileType.DIRECTORY
 
+    @tracer.start_as_current_span('ops.Container.make_dir')  # type: ignore
     def make_dir(
         self,
         path: Union[str, PurePath],
@@ -2901,6 +2947,7 @@ class Container:
             group=group,
         )
 
+    @tracer.start_as_current_span('ops.Container.remove_path')  # type: ignore
     def remove_path(self, path: Union[str, PurePath], *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
@@ -2959,6 +3006,7 @@ class Container:
         combine_stderr: bool = False,
     ) -> pebble.ExecProcess[bytes]: ...
 
+    @tracer.start_as_current_span('ops.Container.exec')  # type: ignore
     def exec(
         self,
         command: List[str],
@@ -3011,6 +3059,7 @@ class Container:
             combine_stderr=combine_stderr,
         )
 
+    @tracer.start_as_current_span('ops.Container.send_signal')  # type: ignore
     def send_signal(self, sig: Union[int, str], *service_names: str):
         """Send the given signal to one or more services.
 
@@ -3028,6 +3077,7 @@ class Container:
 
         self._pebble.send_signal(sig, service_names)
 
+    @tracer.start_as_current_span('ops.Container.get_notice')  # type: ignore
     def get_notice(self, id: str) -> pebble.Notice:
         """Get details about a single notice by ID.
 
@@ -3043,6 +3093,7 @@ class Container:
                 raise ModelError(f'notice {id!r} not found') from e
             raise
 
+    @tracer.start_as_current_span('ops.Container.get_notices')  # type: ignore
     def get_notices(
         self,
         *,
@@ -3471,7 +3522,9 @@ class _ModelBackend:
                 args.extend(['--k8s-resources', str(k8s_res_path)])
             self._run('pod-spec-set', *args)
         finally:
-            shutil.rmtree(str(tmpdir))
+            with tracer.start_as_current_span('shutil.rmtree') as span:  # type: ignore
+                span.set_attribute('tmpdir', str(tmpdir))  # type: ignore
+                shutil.rmtree(str(tmpdir))
 
     def status_get(self, *, is_app: bool = False) -> '_StatusDict':
         """Get a status of a unit or an application.

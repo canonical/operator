@@ -36,6 +36,8 @@ from typing import (
     cast,
 )
 
+import opentelemetry.trace
+
 from ops import model
 from ops._private import yaml
 from ops.framework import (
@@ -90,6 +92,7 @@ class _ContainerBaseDict(TypedDict):
 
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 class HookEvent(EventBase):
@@ -1330,6 +1333,9 @@ class CharmBase(Object):
         @property
         def on(self) -> CharmEvents: ...  # noqa
 
+    # FIXME not sure if this is needed
+    # may help to exclude `super().__init__(...)` from `UserCharm.__init__`
+    @tracer.start_as_current_span('ops.CharmBase')  # type: ignore
     def __init__(self, framework: Framework):
         super().__init__(framework, None)
 
@@ -1385,6 +1391,8 @@ class CharmBase(Object):
         return self.model.config
 
 
+# FIXME may or may not be useful
+@tracer.start_as_current_span('ops.charm._evaluate_status')  # type: ignore
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
 
@@ -1557,6 +1565,7 @@ class CharmMeta:
         }
 
     @staticmethod
+    @tracer.start_as_current_span('ops.CharmMeta.from_charm_root')  # type: ignore
     def from_charm_root(charm_root: Union[pathlib.Path, str]):
         """Initialise CharmMeta from the path to a charm repository root folder."""
         _charm_root = pathlib.Path(charm_root)
@@ -1916,6 +1925,8 @@ class ContainerMeta:
     resource is specified.
     """
 
+    # FIXME is this ever needed? maybe if there are really many mounts?
+    @tracer.start_as_current_span('ops.ContainerMeta')  # type: ignore
     def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
         self._mounts: Dict[str, ContainerStorageMeta] = {}

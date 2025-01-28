@@ -47,6 +47,8 @@ from typing import (
     Union,
 )
 
+import opentelemetry.trace
+
 from ops import charm
 from ops.model import Model, _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
@@ -83,6 +85,7 @@ _EventType = TypeVar('_EventType', bound='EventBase')
 _ObjectType = TypeVar('_ObjectType', bound='Object')
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 class Handle:
@@ -600,6 +603,7 @@ class Framework(Object):
         @property
         def on(self) -> 'FrameworkEvents': ...  # noqa
 
+    @tracer.start_as_current_span('ops.Framework')  # type: ignore
     def __init__(
         self,
         storage: Union[SQLiteStorage, JujuStorage],
@@ -693,6 +697,7 @@ class Framework(Object):
         """Stop tracking the given object. See also _track."""
         self._objects.pop(obj.handle.path, None)
 
+    @tracer.start_as_current_span('ops.Framework.commit')  # type: ignore
     def commit(self) -> None:
         """Save changes to the underlying backends."""
         # Give a chance for objects to persist data they want to before a commit is made.
@@ -866,6 +871,7 @@ class Framework(Object):
                 return True
         return False
 
+    @tracer.start_as_current_span('ops.Framework._emit')  # type: ignore
     def _emit(self, event: EventBase):
         """See BoundEvent.emit for the public way to call this."""
         saved = False
@@ -907,6 +913,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
+    @tracer.start_as_current_span('ops.Framework.reemit')  # type: ignore
     def reemit(self) -> None:
         """Reemit previously deferred events to the observers that deferred them.
 
@@ -986,16 +993,42 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with self._event_context(event_handle.kind):
-                        if (
-                            event_is_from_juju or event_is_action
-                        ) and self._juju_debug_at.intersection({'all', 'hook'}):
-                            # Present the welcome message and run under PDB.
-                            self._show_debug_code_message()
-                            pdb.runcall(custom_handler, event)
-                        else:
-                            # Regular call to the registered method.
-                            custom_handler(event)
+                    synthetic = not event_is_from_juju and not event_is_action
+                    event_module = event.__class__.__module__
+                    if event_module.startswith('ops.'):
+                        # ops.charm.Events are re-exported through ops
+                        event_module = 'ops'
+                    event_class = f'{event_module}.{event.__class__.__qualname__}'
+                    # verbatim_name for ops and custom events, and kebab-hook-names for Juju events
+                    # NOTE: this is not the whole story, consider:
+                    # * some_relation-relation-broken
+                    # * workload_container_one-pebble-check-recovered
+                    event_name = (
+                        event_handle.kind if synthetic else event_handle.kind.replace('_', '-')
+                    )
+                    invocation = f'{event_name}: {observer_path}.{method_name}({event_class})'
+                    with tracer.start_as_current_span(invocation) as span:  # type: ignore
+                        span.set_attribute('deferred', single_event_path is None)  # type: ignore
+                        span.set_attribute('synthetic', synthetic)  # type: ignore
+                        span.set_attribute('event_class', event_class)  # type: ignore
+                        # FIXME: perhaps name is superfluous given the event class?
+                        span.set_attribute('event_name', event_name)  # type: ignore
+                        span.set_attribute('handler', f'{observer_path}.{method_name}')  # type: ignore
+                        # I don't think this exposes event attributes
+                        # Example: <StartEvent via FakeCharm/on/start[1]>
+                        # FIXME: for interesting events, may want to add interesting attributes:
+                        # e.g. relation joined: endpoint name?
+                        # or secret blah: secret uuid?
+                        # FIXME: consider if it makes sense to move the span ctx manager
+                        # inside self._event_context...
+                        with self._event_context(event_handle.kind):
+                            if not synthetic and self._juju_debug_at.intersection({'all', 'hook'}):
+                                # Present the welcome message and run under PDB.
+                                self._show_debug_code_message()
+                                pdb.runcall(custom_handler, event)
+                            else:
+                                # Regular call to the registered method.
+                                custom_handler(event)
 
             else:
                 logger.warning(

@@ -90,6 +90,7 @@ class SQLiteStorage:
         # not until the transaction ends.
         self._db.execute('PRAGMA locking_mode=EXCLUSIVE')
         c = self._db.execute('BEGIN')
+        # FIXME why don't I see this in sqlite3 instrumentation?
         c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='snapshot'")
         if c.fetchone()[0] == 0:
             # Keep in mind what might happen if the process dies somewhere below.
