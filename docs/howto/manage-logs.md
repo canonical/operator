@@ -1,9 +1,7 @@
 (how-to-log-a-message-in-a-charm)=
 # How to log a message in a charm
 
-<!-- UPDATE LINKS:
-> See first: [`juju` | Log](https://juju.is/docs/juju/log), [`juju` | How to manage logs > Manage the logging configuration](https://juju.is/docs/juju/manage-logs#heading--manage-the-logging-configuration)
--->
+> See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | Manage logs <manage-logs>`
 
 <!--
 > 

@@ -13,7 +13,7 @@ Integration testing is only one part of a comprehensive testing strategy. See {r
 
 The instructions all use the Juju `python-libjuju` client, either through the `pytest-operator` library or directly.
 
-> See more: [`python-libjuju`](https://github.com/charmed-kubernetes/pytest-operator), {ref}`pytest-operator`
+> See more: [`python-libjuju`](https://pythonlibjuju.readthedocs.io/en/latest/), {ref}`pytest-operator`
 
 ## Prepare your environment
 
@@ -100,9 +100,7 @@ As an alternative to `wait_for_idle`, you can explicitly block until the applica
 
 ### Deploy your charm with resources
 
-<!-- UPDATE LINKS
-> See also: [Resource (Charm)](https://juju.is/docs/juju/charm-resource)
--->
+> See first: `manage-resources`
 
 A charm can require `file` or `oci-image` `resources` to work, that can be provided to `ops_test.model.deploy`. In Charmhub, resources have revision numbers. For file resources already stored in Charmhub, you can use `ops_test.download_resources`:
 
@@ -156,10 +154,7 @@ async def test_my_integration(ops_test: OpsTest):
 
 ### Test a configuration
 
-<!-- UPDATE LINKS
-
-> See also: [Configuration]()
--->
+> See first: {ref}`manage-configurations`
 
 You can set a configuration option in your application and check its results. 
 

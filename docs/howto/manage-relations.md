@@ -1,11 +1,8 @@
 (manage-relations)=
 # How to manage relations
+> See first: {external+juju:ref}`Juju | Relation <relation>`, {external+juju:ref}`Juju | Manage relations <manage-relations>`, {external+charmcraft:ref}`Charmcraft | Manage relations <manage-relations>`
 
 To add integration capabilities to a charm, you’ll have to define the relation in your charm’s charmcraft.yaml file and then add relation event handlers in your charm’s `src/charm.py` file.
-
-<!-- UPDATE LINKS
-> See first: [`juju` | Relation (integration)](https://juju.is/docs/juju/relation), [`juju` | Manage relations](https://juju.is/docs/juju/manage-relations), [`charmcraft` | Manage relations]()
--->
 
 ## Implement the feature
 

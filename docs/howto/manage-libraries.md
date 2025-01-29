@@ -1,9 +1,8 @@
 (manage-libraries)=
 # Manage libraries
+> See first: {external+charmcraft:ref}`Charmcraft | Manage libraries <manage-libraries>`
 
-<!-- UPDATE LINKS:
-> See first: [`juju` | Library](), [`charmcraft` | Manage libraries]()
--->
+
 ## Write a library
 
 When you're writing libraries, instead of callbacks, you can use custom events; that'll result in a more `ops`-native-feeling API. A custom event is, from a technical standpoint, an EventBase subclass that can be emitted at any point throughout the charm's lifecycle. These events are therefore totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the toplevel Juju event so it can be observed independently.
@@ -220,10 +219,6 @@ def test_my_object_data(context, endpoint, n_relations):
 ## Use a library
 
 Fetch the library.
-
-<!-- UPDATE LINKS:
-> See more: [`charmcraft` | Manage libraries]()
--->
 
 In your `src/charm.py`, observe the custom events it puts at your disposal. For example, a database library may have provided a  `database_relation_ready` event -- a high-level wrapper around the relevant `juju` relation events -- so you use it to manage the database integration in your charm as below:
 
