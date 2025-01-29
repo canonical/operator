@@ -13,7 +13,7 @@ jobs:
       matrix:
         # pylibjuju does not currently support Juju 4.x
         # The smoke tests do not yet work on Juju 2.9.
-        juju-channel: ['3/stable']
+        juju-channel: ['2/stable', '3/stable']
         charmcraft-channel: ['2.x/stable', '3.x/stable']
         preset: ['machine', 'microk8s']
 
