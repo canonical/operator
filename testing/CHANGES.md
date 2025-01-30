@@ -1,3 +1,9 @@
+# 7.1.1 - 30 Jan 2025
+
+## Fixes
+
+* require ops 2.18.0 or better as a hot-fix against accidentally introduced incompatibility (#1551)
+
 # 7.1.0 - 30 Jan 2025
 
 ## Features
