@@ -1,18 +1,32 @@
-# Next version - in preparation
+# 7.1.0 - 30 Jan 2025
 
 ## Features
 
-* Make `Context` and `Manager` variadic types by @Batalex (#1445)
+* Use :memory: as the unit state storage location for ops.testing (#1494)
+* Make Context and Manager variadic types in testing by @Batalex (#1445)
 
 ## Fixes
-
-* Raise `ModelError` on unknown/error status set (#1417)
 * Require the same object to be in the testing state as in the event (#1468)
+* Raise ModelError on unknown/error status set in Scenario (#1417)
+
+## Documentation
+* Use the right ops-scenario for building the docs (#1470)
+* Clearly deprecate Harness in the testing how-tos (#1508)
+* Fix Markdown syntax in ops.testing readme (#1502)
+
+## Continuous Integration
+* All the ops-scenario publish actions need to be done in testing/ (#1479)
+* Correctly point PyPI publishing to the ops-scenario packages (#1514)
+
+## Testing
+* Add a small set of ops.testing benchmark tests (#1504)
 
 ## Refactoring
-
+* Use ops._main._Manager in Scenario (#1491)
+* Don't use the max-positional-args parent class for JujuLogLine (#1495)
+* Cache signature structure in ops.testing state classes (#1499)
+* Use _JujuContext in Scenario (#1459)
 * Fix the testing src-layout structure and use relative imports (#1431)
-* Use `_JujuContext` (#1459)
 
 # 7.0.5 - 20 Sep 2024
 
