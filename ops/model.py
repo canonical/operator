@@ -2497,6 +2497,20 @@ class Container:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
 
+    def start_checks(self, *check_names: str):
+        """Start given check(s) by name."""
+        if not check_names:
+            raise TypeError('start-checks expected at least 1 argument, got 0')
+
+        self._pebble.start_checks(check_names)
+
+    def stop(self, *check_names: str):
+        """Stop given check(s) by name."""
+        if not check_names:
+            raise TypeError('stop-checks expected at least 1 argument, got 0')
+
+        self._pebble.stop_checks(check_names)
+
     @typing.overload
     def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO: ...
 
