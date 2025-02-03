@@ -865,6 +865,9 @@ class CheckInfo(_max_posargs(1)):
     level: pebble.CheckLevel | None = None
     """Level of the check."""
 
+    startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED
+    """Startup mode of the check."""
+
     status: pebble.CheckStatus = pebble.CheckStatus.UP
     """Status of the check.
 
@@ -887,6 +890,7 @@ class CheckInfo(_max_posargs(1)):
         return pebble.CheckInfo(
             name=self.name,
             level=self.level,
+            startup=self.startup,
             status=self.status,
             failures=self.failures,
             threshold=self.threshold,

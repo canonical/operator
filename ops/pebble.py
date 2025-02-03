@@ -135,6 +135,7 @@ CheckDict = typing.TypedDict(
     {
         'override': str,
         'level': Union['CheckLevel', str],
+        'startup': Literal['enabled', 'disabled'],
         'period': Optional[str],
         'timeout': Optional[str],
         'http': Optional[HttpDict],
@@ -243,6 +244,7 @@ if TYPE_CHECKING:
         {
             'name': str,
             'level': NotRequired[str],
+            'startup': NotRequired[Literal['enabled', 'disabled']],
             'status': str,
             'failures': NotRequired[int],
             'threshold': int,
@@ -1103,6 +1105,11 @@ class Check:
         except ValueError:
             level = dct.get('level', '')
         self.level = level
+        try:
+            startup: Union[CheckStartup, str] = CheckStartup(dct.get('startup', 'enabled'))
+        except ValueError:
+            startup = dct.get('startup', 'enabled')
+        self.startup = startup
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
@@ -1125,9 +1132,13 @@ class Check:
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
         level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
+        startup: str = (
+            self.startup.value if isinstance(self.startup, CheckStartup) else self.startup
+        )
         fields = [
             ('override', self.override),
             ('level', level),
+            ('startup', startup),
             ('period', self.period),
             ('timeout', self.timeout),
             ('threshold', self.threshold),
@@ -1231,6 +1242,14 @@ class CheckStatus(enum.Enum):
 
     UP = 'up'
     DOWN = 'down'
+    INACTIVE = 'inactive'
+
+
+class CheckStartup(enum.Enum):
+    """Enum of check startup options."""
+
+    ENABLED = 'enabled'
+    DISABLED = 'disabled'
 
 
 class LogTarget:
@@ -1407,12 +1426,21 @@ class CheckInfo:
     This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
     """
 
+    startup: Union[CheckStartup, str]
+    """Startup mode.
+    
+    :attr:`CheckStartup.ENABLED` means the check will be started when added, and
+    in a replan. :attr:`CheckStartup.DISABLED` means the check must be manually
+    started.
+    """
+
     status: Union[CheckStatus, str]
     """Status of the check.
 
     :attr:`CheckStatus.UP` means the check is healthy (the number of failures
     is less than the threshold), :attr:`CheckStatus.DOWN` means the check is
-    unhealthy (the number of failures has reached the threshold).
+    unhealthy (the number of failures has reached the threshold), and
+    :attr:`CheckStatus.INACTIVE` means the check is not running.
     """
 
     failures: int
@@ -1442,10 +1470,17 @@ class CheckInfo:
         failures: int = 0,
         threshold: int = 0,
         change_id: Optional[ChangeID] = None,
+        startup: Union[CheckStartup, str] = CheckStartup.ENABLED,
     ):
         self.name = name
         self.level = level
-        self.status = status
+        self.startup = startup
+        if change_id:
+            self.status = status
+        else:
+            # No change ID means the check is inactive, or that the user has an
+            # old version of Pebble. We assume the former.
+            self.status = CheckStatus.INACTIVE
         self.failures = failures
         self.threshold = threshold
         self.change_id = change_id
@@ -1458,12 +1493,17 @@ class CheckInfo:
         except ValueError:
             level = d.get('level')
         try:
+            startup = CheckStartup(d.get('startup', 'enabled'))
+        except ValueError:
+            startup = d.get('startup', 'enabled')
+        try:
             status = CheckStatus(d['status'])
         except ValueError:
             status = d['status']
         return cls(
             name=d['name'],
             level=level,
+            startup=startup,
             status=status,
             failures=d.get('failures', 0),
             threshold=d['threshold'],
@@ -1475,6 +1515,7 @@ class CheckInfo:
             'CheckInfo('
             f'name={self.name!r}, '
             f'level={self.level}, '
+            f'startup={self.startup}, '
             f'status={self.status}, '
             f'failures={self.failures}, '
             f'threshold={self.threshold!r}, '
@@ -2126,7 +2167,8 @@ class Client:
         return self._services_action('autostart', [], timeout, delay)
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
-        """Replan by (re)starting changed and startup-enabled services and wait for them to start.
+        """Replan by (re)starting changed and startup-enabled services and checks and wait for them
+        to start.
 
         Args:
             timeout: Seconds before replan change is considered timed out (float). If
@@ -2334,6 +2376,19 @@ class Client:
             time.sleep(delay)
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
+
+    def _checks_action(self, action: str, checks: Iterable[str]) -> List[str]:
+        if isinstance(checks, (str, bytes)) or not hasattr(checks, '__iter__'):
+            raise TypeError(f'checks must be of type Iterable[str], not {type(checks).__name__}')
+
+        checks = tuple(checks)
+        for chk in checks:
+            if not isinstance(chk, str):
+                raise TypeError(f'check names must be str, not {type(chk).__name__}')
+
+        body = {'action': action, 'checks': checks}
+        resp = self._request('POST', '/v1/checks', body=body)
+        return resp['result']['changed']
 
     def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -3051,6 +3106,22 @@ class Client:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def start_checks(self, checks: Iterable[str]) -> List[str]:
+        """Start checks by name.
+
+        Args:
+            checks: Non-empty list of checks to start.
+        """
+        return self._checks_action('start', checks)
+
+    def stop_checks(self, checks: Iterable[str]) -> List[str]:
+        """Stop checks by name.
+
+        Args:
+            checks: Non-empty list of checks to stop.
+        """
+        return self._checks_action('stop', checks)
 
     def notify(
         self,

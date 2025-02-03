@@ -3176,6 +3176,13 @@ class _TestingPebbleClient:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
+        for name, check in self._render_checks().items():
+            if check.startup != pebble.CheckStartup.DISABLED:
+                info = self._check_infos[name]
+                if not info.change_id:
+                    info.status = pebble.CheckStatus.UP
+                    info.failures = 0
+                    info.change_id = pebble.ChangeID("replanned")
         return self.autostart_services(timeout, delay)
 
     def start_services(
@@ -3742,6 +3749,26 @@ class _TestingPebbleClient:
             for info in self._check_infos.values()
             if (level is None or level == info.level) and (names is None or info.name in names)
         ]
+
+    def start_checks(self, names: List[str]):
+        self._check_connection()
+        for name in names:
+            if name not in self._check_infos:
+                raise self._api_error(404, f'cannot find check with name "{name}"')
+            info = self._check_infos[name]
+            if not info.change_id:
+                info.status = pebble.CheckStatus.UP
+                info.failures = 0
+                info.change_id = pebble.ChangeID("started")
+
+    def stop_checks(self, names: List[str]):
+        self._check_connection()
+        for name in names:
+            if name not in self._check_infos:
+                raise self._api_error(404, f'cannot find check with name "{name}"')
+            info = self._check_infos[name]
+            if info.change_id:
+                info.change_id = pebble.ChangeID("")
 
     def notify(
         self,
