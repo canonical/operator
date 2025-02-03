@@ -102,7 +102,6 @@ class SQLiteStorage:
                   observer_path TEXT,
                   method_name TEXT)
                 """)
-            self._db.commit()
 
     def close(self) -> None:
         """Part of the Storage API, close the storage backend."""
