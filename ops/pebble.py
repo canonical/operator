@@ -135,7 +135,7 @@ CheckDict = typing.TypedDict(
     {
         'override': str,
         'level': Union['CheckLevel', str],
-        'startup': Literal['enabled', 'disabled'],
+        'startup': Literal['', 'enabled', 'disabled'],
         'period': Optional[str],
         'timeout': Optional[str],
         'http': Optional[HttpDict],
@@ -1106,9 +1106,9 @@ class Check:
             level = dct.get('level', '')
         self.level = level
         try:
-            startup: Union[CheckStartup, str] = CheckStartup(dct.get('startup', 'enabled'))
+            startup: Union[CheckStartup, str] = CheckStartup(dct.get('startup', ''))
         except ValueError:
-            startup = dct.get('startup', 'enabled')
+            startup = dct.get('startup', '')
         self.startup = startup
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
