@@ -128,8 +128,7 @@ def test_juju_version_is_set_in_environ():
             framework.observe(self.on.start, self._on_start)
 
         def _on_start(self, _: ops.StartEvent):
-            juju_version = ops.JujuVersion.from_environ()
-            assert juju_version == version
+            assert ops.JujuVersion.from_environ() == version
 
     ctx = Context(MyCharm, meta={"name": "foo"}, juju_version=version)
     ctx.run(ctx.on.start(), State())
