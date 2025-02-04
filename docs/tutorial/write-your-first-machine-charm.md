@@ -1,8 +1,15 @@
 (write-your-first-machine-charm)=
 # Write your first machine charm
 
-In this tutorial you will write a {external+juju:ref}`machine charm <machine-charm>` for Juju using ([Charmcraft](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) and) Ops.
+In this tutorial you will write a machine charm for Juju using ([Charmcraft](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) and) Ops.
 
+<!-- TOOO (tam)
+Add this link above:
+
+{external+juju:ref}`machine charm <machine-charm>` for Juju 
+
+When it's available in Juju.
+-->
 
 **What you'll need:**
 - A workstation, e.g., a laptop, with amd64 architecture and which has sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space
