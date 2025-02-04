@@ -85,6 +85,18 @@ def fake_script(request: pytest.FixtureRequest) -> FakeScript:
     return FakeScript(request)
 
 
+class SimpleEventWithData(ops.EventBase):
+    def __init__(self, handle: ops.Handle, data: str):
+        super().__init__(handle)
+        self.data: str = data
+
+    def restore(self, snapshot: typing.Dict[str, typing.Any]):
+        self.data = typing.cast(str, snapshot['data'])
+
+    def snapshot(self) -> typing.Dict[str, typing.Any]:
+        return {'data': self.data}
+
+
 class TestFramework:
     def test_deprecated_init(self, caplog: pytest.LogCaptureFixture):
         # For 0.7, this still works, but it is deprecated.
@@ -372,23 +384,12 @@ class TestFramework:
     def test_defer_and_reemit(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
-        class MyEvent(ops.EventBase):
-            def __init__(self, handle: ops.Handle, data: str):
-                super().__init__(handle)
-                self.data: str = data
-
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
-                self.data = typing.cast(str, snapshot['data'])
-
-            def snapshot(self) -> typing.Dict[str, typing.Any]:
-                return {'data': self.data}
-
         class MyNotifier1(ops.Object):
-            a = ops.EventSource(MyEvent)
-            b = ops.EventSource(MyEvent)
+            a = ops.EventSource(SimpleEventWithData)
+            b = ops.EventSource(SimpleEventWithData)
 
         class MyNotifier2(ops.Object):
-            c = ops.EventSource(MyEvent)
+            c = ops.EventSource(SimpleEventWithData)
 
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
@@ -453,23 +454,12 @@ class TestFramework:
         class MyEvent(ops.EventBase):
             data: typing.Optional[str] = None
 
-        class MyDataEvent(MyEvent):
-            def __init__(self, handle: ops.Handle, data: str):
-                super().__init__(handle)
-                self.data: typing.Optional[str] = data
-
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
-                self.data = typing.cast(typing.Optional[str], snapshot['data'])
-
-            def snapshot(self) -> typing.Dict[str, typing.Any]:
-                return {'data': self.data}
-
         class ReleaseEvent(ops.EventBase):
             pass
 
         class MyNotifier(ops.Object):
             n = ops.EventSource(MyEvent)
-            d = ops.EventSource(MyDataEvent)
+            d = ops.EventSource(SimpleEventWithData)
             r = ops.EventSource(ReleaseEvent)
 
         class MyObserver(ops.Object):
@@ -553,6 +543,62 @@ class TestFramework:
         framework.reemit()
         assert len(notices_for_observer(1)) == 0
         assert len(notices_for_observer(2)) == 4
+
+    def test_two_observers_one_deferring(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
+
+        class MyNotifier(ops.Object):
+            my_event = ops.EventSource(SimpleEventWithData)
+
+        class Observer1(ops.Object):
+            events: typing.List[SimpleEventWithData] = []
+            defer = True
+
+            def on_event(self, event: SimpleEventWithData):
+                self.events.append(event)
+                if self.defer:
+                    event.defer()
+
+        class Observer2(ops.Object):
+            events: typing.List[SimpleEventWithData] = []
+
+            def on_event(self, event: SimpleEventWithData):
+                self.events.append(event)
+
+        pub = MyNotifier(framework, 'my_event')
+        obs1 = Observer1(framework, '1')
+        obs2 = Observer2(framework, '2')
+
+        framework.observe(pub.my_event, obs1.on_event)
+        framework.observe(pub.my_event, obs2.on_event)
+
+        # Emit an event, which will be deferred by one observer, and not by the other.
+        pub.my_event.emit('foo')
+
+        # We should have a single notice with a corresponding snapshot, which is
+        # the deferred event, and each observer will have seen the event once.
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 1
+        assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
+        assert len(obs1.events) == len(obs2.events) == 1
+
+        # If we emit the event another time, we'll still have one notice and
+        # snapshot, and each observer will have seen the event twice.
+        pub.my_event.emit('foo')
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 1
+        assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
+        assert len(obs1.events) == len(obs2.events) == 2
+
+        # If we emit the event with neither observer deferring, we'll have no
+        # remaining notice or snapshot, and each observer will have seen the
+        # event three times.
+        obs1.defer = False
+        pub.my_event.emit('foo')
+        assert len(obs1.events) == len(obs2.events) == 3
+        notices = tuple(framework._storage.notices())
+        pytest.raises(NoSnapshotError, framework._storage.load_snapshot, notices[0][0])
+        assert len(notices) == 0
 
     def test_custom_event_data(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
