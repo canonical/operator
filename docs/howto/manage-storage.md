@@ -1,9 +1,6 @@
 (manage-storage)=
 # How to manage storage
-
-<!-- UPDATE LINKS:
-> See first: [`juju` | Storage](https://juju.is/docs/juju/storage), [`juju` | Manage storage](https://juju.is/docs/juju/manage-storage), [`charmcraft | Manage storage]()
--->
+> See first: {external+juju:ref}`Juju | Storage <storage>`, {external+juju:ref}`Juju | Manage storage <manage-storage>`, {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
 
 ## Implement the feature
 

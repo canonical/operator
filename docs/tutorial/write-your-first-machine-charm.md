@@ -1,10 +1,17 @@
 (write-your-first-machine-charm)=
 # Write your first machine charm
 
-In this tutorial you will write a [machine charm](https://juju.is/docs/juju/charmed-operator) for Juju using (Charmcraft and) Ops.
+In this tutorial you will write a machine charm for Juju using ([Charmcraft](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) and) Ops.
 
+<!-- TODO (tam)
+Add this link above:
 
-**What you'll need:** 
+{external+juju:ref}`machine charm <machine-charm>` for Juju 
+
+When it's available in Juju.
+-->
+
+**What you'll need:**
 - A workstation, e.g., a laptop, with amd64 architecture and which has sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space
 - Familiarity with Linux
 - Familiarity with Juju.
@@ -24,7 +31,7 @@ Should you get stuck at any point: Don't hesitate to get in touch on [Matrix](ht
 
 ## Study your application
 
-In this tutorial we will be writing a charm for Microsample (`microsample`) -- a small educational application that delivers a Flask microservice. 
+In this tutorial we will be writing a charm for Microsample (`microsample`) -- a small educational application that delivers a Flask microservice.
 
 The application has been packaged and published as a snap ([https://snapcraft.io/microsample](https://snapcraft.io/microsample)). We will write our charm such that `juju deploy` will install it from this snap. This will make workload installation straightforward and upgrades automatic (as they will happen automatically through `snapd`).
 
@@ -35,20 +42,19 @@ The application has other features that we can exploit, but for now this is enou
 
 ## Set up your development environment
 
-<!-- UPDATE LINKS -->
-> See [Juju | Set up your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#set-up-automatically) for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm. At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD. 
+> See more: {external+juju:ref}`Juju | Manage your deployment environment > Automatically <manage-your-deployment-environment>` for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm. At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD.
 
 ```{important}
 
 -  Going forward:
     - Use your host machine (on Linux, `cd ~/microsample-vm`) to create and edit your charm files. This will allow you to use your favorite local editor.
-    - Use the Multipass VM shell (on Linux, `ubuntu@charm-dev:~$ cd ~/microsample-vm`) to run Charmcraft and Juju commands. 
+    - Use the Multipass VM shell (on Linux, `ubuntu@charm-dev:~$ cd ~/microsample-vm`) to run Charmcraft and Juju commands.
 
 
 - At any point:
-    - To exit the shell, press `mod key + C` or type `exit`. 
-    - To stop the VM after exiting the VM shell, run `multipass stop charm-dev`. 
-    - To restart the VM and re-open a shell into it, type `multipass shell charm-dev`. 
+    - To exit the shell, press `mod key + C` or type `exit`.
+    - To stop the VM after exiting the VM shell, run `multipass stop charm-dev`.
+    - To restart the VM and re-open a shell into it, type `multipass shell charm-dev`.
 
 ```
 
@@ -66,16 +72,16 @@ ubuntu@charm-dev:~$ cd microsample-vm/
 
 # Initialise the charm tree structure:
 ubuntu@charm-dev:~/microsample-vm$ charmcraft init --profile machine
-Charmed operator package file and directory tree initialised.                              
-                                                                                           
-Now edit the following package files to provide fundamental charm metadata                 
-and other information:                                                                     
-                                                                                           
-charmcraft.yaml                                                                            
-src/charm.py                                                                               
-README.md                                                                                  
-                                                                       
-# Inspect the result:                    
+Charmed operator package file and directory tree initialised.
+
+Now edit the following package files to provide fundamental charm metadata
+and other information:
+
+charmcraft.yaml
+src/charm.py
+README.md
+
+# Inspect the result:
 ubuntu@charm-dev:~/microsample-vm$ ls -R
 .:
 CONTRIBUTING.md  README.md        pyproject.toml    src    tox.ini
@@ -95,16 +101,14 @@ test_charm.py
 
 ```
 
-<!--UPDATE LINKS
-> See more: [`charmcraft` | Manage charms](), [`charmcraft` | List of files in a charm project]()
--->
+> See more: {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`, {external+charmcraft:ref}`Charmcraft | Files <files>`
 
 In your local editor, open the `charmcraft.yaml` file and customise its contents as below (you only have to edit the `title`, `summary`, and `description`):
 
 ```yaml
 # (Required)
 name: microsample-vm
- 
+
 # (Required)
 type: charm
 
@@ -118,12 +122,12 @@ summary: A charm that deploys the microsample snap and allows for a configuratio
 description: |
   A machine charm for the Microsample application, built on top of the `microsample` snap.
 
-  The charm allows you to deploy the application via `juju deploy`. 
+  The charm allows you to deploy the application via `juju deploy`.
   It also defines a channel config that allows you to choose which snap channel to install from during deployment.
 
   This charm makes it easy to deploy the Microsample application on any machine cloud.
 
-  The primary value of this charm is educational -- beginner machine charms can study it to learn how to build a machine charm.   
+  The primary value of this charm is educational -- beginner machine charms can study it to learn how to build a machine charm.
 
 # (Required for 'charm' type)
 bases:
@@ -135,11 +139,9 @@ bases:
       channel: "22.04"
 
 ```
-<!-- UPDATE LINKS
-> See more: [`charmcraft` | File `charmcraft.yaml`]()
--->
+> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml <charmcraft-yaml-file>`
 
-Now open the `src/charm.py` file and update it as below (you'll have to add an import statement for `os` and an observer and handler for the `install` event -- in the definition of which you'll be using `os` and `ops`). 
+Now open the `src/charm.py` file and update it as below (you'll have to add an import statement for `os` and an observer and handler for the `install` event -- in the definition of which you'll be using `os` and `ops`).
 
 ```python
 #!/usr/bin/env python3
@@ -164,16 +166,14 @@ class MicrosampleVmCharm(ops.CharmBase):
         """Handle install event."""
         self.unit.status = ops.MaintenanceStatus("Installing microsample snap")
         os.system(f"snap install microsample --channel edge")
-        self.unit.status = ops.ActiveStatus("Ready")  
+        self.unit.status = ops.ActiveStatus("Ready")
 
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(MicrosampleVmCharm)  # type: ignore
 ```
 
-<!-- UPDATE LINKS
-> See more: [`charmcraft` | File `src/charm.py`](),  {ref}`run-workloads-with-a-charm-machines`
--->
+> See more: {external+charmcraft:ref}`Charmcraft | File src/charm.py <src-charm-py-file>`,  {ref}`run-workloads-with-a-charm-machines`
 
 Next, in your Multipass VM shell, inside your project directory, run `charmcraft pack` to pack the charm. It may take a few minutes the first time around but, when it's done, your charm project should contain a `.charm` file. Sample session:
 
@@ -181,9 +181,9 @@ Next, in your Multipass VM shell, inside your project directory, run `charmcraft
 ```text
 # Pack the charm into a '.charm' file:
 ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.                                         
-Charms packed:                                                                             
-    microsample-vm_ubuntu-22.04-amd64.charm                                                      
+Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
+Charms packed:
+    microsample-vm_ubuntu-22.04-amd64.charm
 
 # Inspect the results -- your charm's root directory should contain a .charm file:
 ubuntu@charm-dev:~/microsample-vm$ ls
@@ -192,9 +192,7 @@ LICENSE          microsample-vm_ubuntu-22.04-amd64.charm  src
 README.md        pyproject.toml                           tests
 ```
 
-<!-- UPDATE LINKS
-> See more: [`charmcraft` | Manage charms > Pack]()
--->
+> See more: {external+charmcraft:ref}`Charmcraft | Manage charms > Pack <pack-a-charm>`
 
 Now, open a new shell into your Multipass VM and use it to configure the Juju log verbosity levels and to start a live debug session:
 
@@ -214,17 +212,17 @@ ubuntu@charm-dev:~/microsample-vm$ juju deploy ./microsample-vm_ubuntu-22.04-amd
 Located local charm "microsample-vm", revision 0
 Deploying "microsample" from local charm "microsample-vm", revision 0 on ubuntu@22.04/stable
 
-# Check the deployment status 
+# Check the deployment status
 # (use --watch 1s to update it automatically at 1s intervals):
 ubuntu@charm-dev:~/microsample-vm$ juju status
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
 welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  12:49:26+01:00
 
 App          Version  Status  Scale  Charm           Channel  Rev  Exposed  Message
-microsample           active      1  microsample-vm             0  no       
+microsample           active      1  microsample-vm             0  no
 
 Unit            Workload  Agent  Machine  Public address  Ports  Message
-microsample/0*  active    idle   1        10.122.219.101         
+microsample/0*  active    idle   1        10.122.219.101
 
 Machine  State    Address         Inst id        Base          AZ  Message
 1        started  10.122.219.101  juju-f25b73-1  ubuntu@22.04      Running
@@ -260,7 +258,7 @@ LICENSE  README.md  dispatch  hooks  manifest.yaml  metadata.yaml  revision  src
 root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm# cd hooks
 root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks# ls
 install  start  upgrade-charm
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks# 
+root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks#
 ```
 -->
 
@@ -289,9 +287,8 @@ config:
       type: string
 ```
 
-<!-- UPDATE LINKS
-> See more: [`charmcraft` | File `charmcraft.yaml` > Key `config`]()
--->
+
+> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml | Key config <recipe-key-config>`
 
 Then, in the `src/charm.py` file, update the `_on_install` function to make use of the new configuration option, as below:
 
@@ -313,9 +310,9 @@ Now, in your Multipass VM shell, inside your project directory, pack the charm, 
 
 # Pack the charm:
 ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.                                        
-Charms packed:                                                                            
-    microsample-vm_ubuntu-22.04-amd64.charm                                               
+Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
+Charms packed:
+    microsample-vm_ubuntu-22.04-amd64.charm
 
 # Refresh the application from the repacked charm:
 ubuntu@charm-dev:~/microsample-vm$ juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm
@@ -324,16 +321,16 @@ Added local charm "microsample-vm", revision 1, to the model
 # Verify that the new configuration option is available:
 ubuntu@charm-dev:~/microsample-vm$ juju config microsample
 application: microsample
-application-config: 
-  trust: 
+application-config:
+  trust:
     default: false
     description: Does this application have access to trusted credentials
     source: default
     type: bool
     value: false
 charm: microsample-vm
-settings: 
-  channel: 
+settings:
+  channel:
     default: edge
     description: |
       Channel for the microsample snap.
@@ -367,11 +364,11 @@ Now, in your Multipass VM shell, inside your project directory, pack the charm, 
 ```text
 # Pack the charm:
 ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.                                        
-Charms packed:                                                                            
-    microsample-vm_ubuntu-22.04-amd64.charm              
+Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
+Charms packed:
+    microsample-vm_ubuntu-22.04-amd64.charm
 
-# Refresh the application:                                 
+# Refresh the application:
 ubuntu@charm-dev:~/microsample-vm$ juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm
 Added local charm "microsample-vm", revision 2, to the model
 
@@ -379,7 +376,7 @@ Added local charm "microsample-vm", revision 2, to the model
 ubuntu@charm-dev:~/microsample-vm$ juju config microsample channel=beta
 
 # Inspect the Message column
-# ('Ready at beta' is what we expect to see if the snap channel has been changed to 'beta'): 
+# ('Ready at beta' is what we expect to see if the snap channel has been changed to 'beta'):
 ubuntu@charm-dev:~/microsample-vm$ juju status
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
 welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  13:54:53+01:00
@@ -496,9 +493,9 @@ Finally, in your Multipass VM shell, pack the charm, refresh it in Juju, and che
 ```text
 # Pack the charm:
 ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.                                        
-Charms packed:                                                                            
-    microsample-vm_ubuntu-22.04-amd64.charm                                               
+Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
+Charms packed:
+    microsample-vm_ubuntu-22.04-amd64.charm
 
 # Refresh the application:
 ubuntu@charm-dev:~/microsample-vm$ juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm

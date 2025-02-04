@@ -1,7 +1,7 @@
 (manage-stored-state)=
 # How to manage stored state
 
-> See first: [](storedstate-uses-limitations)
+> See first: {ref}`storedstate-uses-limitations`
 
 Data stored on a charm instance will not persist beyond the current Juju event,
 because a new charm instance is created to handle each event. In general, charms

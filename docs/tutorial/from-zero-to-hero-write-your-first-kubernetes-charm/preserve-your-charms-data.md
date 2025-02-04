@@ -3,7 +3,7 @@
 
 > <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Preserve your charm's data </small>
 >
-> **See previous: {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`** 
+> **See previous: {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`**
 
 
 ````{important}
@@ -20,7 +20,7 @@ git checkout -b  05_preserve_charm_data
 ````
 
 
-Charms are stateless applications. That is, they are reinitialised for every event and do not retain information from previous executions. This means that, if an accident occurs and the Kubernetes pod dies, you will also lose any information you may have collected. 
+Charms are stateless applications. That is, they are reinitialised for every event and do not retain information from previous executions. This means that, if an accident occurs and the Kubernetes pod dies, you will also lose any information you may have collected.
 
 In many cases that is not a problem. However, there are situations where it may be necessary to maintain information from previous runs and to retain the state of the application. As a charm author you should thus know how to preserve state.
 
@@ -30,25 +30,21 @@ First, you can use an Ops construct called `Stored State`. With this strategy yo
 
 > Read more: [](ops.StoredState), {ref}`StoredState: Uses, Limitations <storedstate-uses-limitations>`
 
-Second, you can make use of the Juju notion of 'peer relations'  and 'data bags'  and set up a peer relation data bag. This will help you store the information in the Juju's database backend. 
+Second, you can make use of the Juju notion of 'peer relations'  and 'data bags'  and set up a peer relation data bag. This will help you store the information in the Juju's database backend.
 
 
-<!-- UPDATE LINKS
-> Read more: [Peer relations](https://juju.is/docs/juju/relation#heading--peer)
--->
+> See more: {external+juju:ref}`Juju | Peer relation <peer-relation>`
 
 Third, when you have confidential data, you can use Juju secrets (from Juju 3.1 onwards).
 
-<!-- UPDATE LINKS
-> Read more: [Juju | Secret](https://juju.is/docs/juju/secret)
--->
+> See more: {external+juju:ref}`Juju | Secret <secret>`
 
 
 In this chapter we will adopt the second strategy, that is, we will store charm data in a peer relation databag. (We will explore the third strategy in a different scenario in the next chapter.)  We will illustrate this strategy with an artificial example where we save the counter of how many times the application pod has been restarted.
 
 ## Define a peer relation
 
-The first thing you need to do is define a peer relation. Update the `charmcraft.yaml` file to add a `peers` block before the `requires` block, as below (where `fastapi-peer` is a custom name for the peer relation and `fastapi_demo_peers` is a custom name for the peer relation interface): 
+The first thing you need to do is define a peer relation. Update the `charmcraft.yaml` file to add a `peers` block before the `requires` block, as below (where `fastapi-peer` is a custom name for the peer relation and `fastapi_demo_peers` is a custom name for the peer relation interface):
 
 ```yaml
 peers:
@@ -56,9 +52,8 @@ peers:
     interface: fastapi_demo_peers
 ```
 
-<!-- UPDATE LINKS
-> Read more: [File ‘charmcraft.yaml`]()
--->
+
+> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml <charmcraft-yaml-file>`
 
 ## Set and get data from the peer relation databag
 
