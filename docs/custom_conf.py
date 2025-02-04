@@ -299,7 +299,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://canonical-juju.readthedocs-hosted.com/en/latest/', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest/', None),
-    }
+}
 
 # -- General configuration ---------------------------------------------------
 
