@@ -3178,7 +3178,18 @@ class _TestingPebbleClient:
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
         for name, check in self._render_checks().items():
             if check.startup != pebble.CheckStartup.DISABLED:
-                info = self._check_infos[name]
+                info = self._check_infos.get(name)
+                if info is None:
+                    info = pebble.CheckInfo(
+                        name=name,
+                        level=check.level,
+                        status=pebble.CheckStatus.UP,
+                        failures=0,
+                        threshold=3 if check.threshold is None else check.threshold,
+                        startup=check.startup,
+                        change_id=pebble.ChangeID(str(uuid.uuid4())),
+                    )
+                    self._check_infos[name] = info
                 if not info.change_id:
                     info.status = pebble.CheckStatus.UP
                     info.failures = 0
@@ -3403,7 +3414,6 @@ class _TestingPebbleClient:
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # TODO: merge existing services https://github.com/canonical/operator/issues/1112
                 services[name] = service
         return services
 
