@@ -117,3 +117,18 @@ def test_env_clean_on_charm_error():
 
     # Ensure that the Juju environment didn't leak into the outside one.
     assert os.getenv("JUJU_REMOTE_APP", None) is None
+
+
+def test_juju_version_is_set_in_environ():
+    version = "2.9"
+
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: ops.StartEvent):
+            assert ops.JujuVersion.from_environ() == version
+
+    ctx = Context(MyCharm, meta={"name": "foo"}, juju_version=version)
+    ctx.run(ctx.on.start(), State())
