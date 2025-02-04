@@ -892,10 +892,8 @@ class Framework(Object):
                     observer_path,
                     method_name,
                 )
-                # We don't need to save a new notice and snapshot, but we do
-                # want the event to run, because it has been saved previously
-                # and not completed.
-                saved = True
+                # Note that there may be other (event+observer) pairs that are
+                # not in the queue, and so may need to save the snapshot.
                 continue
             if not saved:
                 # Save the event for all known observers before the first notification
