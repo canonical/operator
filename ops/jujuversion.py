@@ -103,7 +103,7 @@ class JujuVersion:
     def from_environ(cls) -> 'JujuVersion':
         """Build a version from the ``JUJU_VERSION`` environment variable.
 
-        .. deprecated:: 2.19.0 Use self.model.juju_version instead.
+        .. deprecated:: 2.19.0 Use :meth:`Model.juju_version` instead.
         """
         warnings.warn(
             'JujuVersion.from_environ() is deprecated, use self.model.juju_version instead',
