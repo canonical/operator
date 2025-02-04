@@ -275,7 +275,7 @@ Using the new alias, you can switch context to the new created model, similar to
 > Example implementations: [`charm-kubernetes-autoscaler`](https://github.com/charmed-kubernetes/charm-kubernetes-autoscaler/blob/8f4ddf5d66802ade73ed3aab2bb8d09fd9e4d63a/tests/integration/test_kubernetes_autoscaler.py#L31)
 
 > See more: 
-- {external+juju:ref}`Juju offers <manage-offers>`
+> - {external+juju:ref}`Juju offers <manage-offers>`
 > - {external+juju:ref}`How to manage clouds <manage-clouds>`
 > - [pytest-operator | track_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L720)
 > - [pytest-operator | model_context](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L480)
