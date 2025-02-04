@@ -16,6 +16,7 @@
 
 import os
 import re
+import warnings
 from functools import total_ordering
 from typing import Union
 
@@ -100,7 +101,15 @@ class JujuVersion:
 
     @classmethod
     def from_environ(cls) -> 'JujuVersion':
-        """Build a version from the ``JUJU_VERSION`` environment variable."""
+        """Build a version from the ``JUJU_VERSION`` environment variable.
+
+        .. deprecated:: 2.19.0 Use self.model.juju_version instead.
+        """
+        warnings.warn(
+            'JujuVersion.from_environ() is deprecated, use self.model.juju_version instead',
+            DeprecationWarning,
+            stacklevel=2,
+        )
         v = os.environ.get('JUJU_VERSION')
         if v is None:
             v = '0.0.0'
