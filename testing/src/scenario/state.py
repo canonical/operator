@@ -887,6 +887,18 @@ class CheckInfo(_max_posargs(1)):
     This is how many consecutive failures for the check to be considered 'down'.
     """
 
+    change_id: pebble.ChangeID | None = None
+    """The ID of the Pebble Change associated with this check.
+
+    Passing ``None`` will automatically assign a new Change ID.
+    """
+
+    def __post_init__(self):
+        if self.change_id is None:
+            object.__setattr__(
+                self, "change_id", pebble.ChangeID(_generate_new_change_id())
+            )
+
     def _to_ops(self) -> pebble.CheckInfo:
         return pebble.CheckInfo(
             name=self.name,
@@ -895,6 +907,7 @@ class CheckInfo(_max_posargs(1)):
             status=self.status,
             failures=self.failures,
             threshold=self.threshold,
+            change_id=self.change_id,
         )
 
 
