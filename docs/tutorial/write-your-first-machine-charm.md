@@ -3,7 +3,7 @@
 
 In this tutorial you will write a machine charm for Juju using ([Charmcraft](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) and) Ops.
 
-<!-- TOOO (tam)
+<!-- TODO (tam)
 Add this link above:
 
 {external+juju:ref}`machine charm <machine-charm>` for Juju 
