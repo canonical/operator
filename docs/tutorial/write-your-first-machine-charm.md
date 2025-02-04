@@ -132,7 +132,7 @@ bases:
       channel: "22.04"
 
 ```
-> See more: {external+charmcraft:ref}`Charmcraft | File `charmcraft.yaml <charmcraft-yaml-file>`
+> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml <charmcraft-yaml-file>`
 
 Now open the `src/charm.py` file and update it as below (you'll have to add an import statement for `os` and an observer and handler for the `install` event -- in the definition of which you'll be using `os` and `ops`).
 
@@ -166,7 +166,7 @@ if __name__ == "__main__":  # pragma: nocover
     ops.main(MicrosampleVmCharm)  # type: ignore
 ```
 
-> See more: {external+charmcraft:ref}`Charmcraft | File src/charm.py <src-charm-py-file`,  {ref}`run-workloads-with-a-charm-machines`
+> See more: {external+charmcraft:ref}`Charmcraft | File src/charm.py <src-charm-py-file>`,  {ref}`run-workloads-with-a-charm-machines`
 
 Next, in your Multipass VM shell, inside your project directory, run `charmcraft pack` to pack the charm. It may take a few minutes the first time around but, when it's done, your charm project should contain a `.charm` file. Sample session:
 
