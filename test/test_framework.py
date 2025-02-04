@@ -551,19 +551,19 @@ class TestFramework:
             my_event = ops.EventSource(SimpleEventWithData)
 
         class Observer1(ops.Object):
-            events: typing.List[SimpleEventWithData] = []
+            events: typing.List[str] = []
             defer = True
 
             def on_event(self, event: SimpleEventWithData):
-                self.events.append(event)
+                self.events.append(self.__class__.__name__)
                 if self.defer:
                     event.defer()
 
         class Observer2(ops.Object):
-            events: typing.List[SimpleEventWithData] = []
+            events: typing.List[str] = []
 
-            def on_event(self, event: SimpleEventWithData):
-                self.events.append(event)
+            def on_event(self, _: SimpleEventWithData):
+                self.events.append(self.__class__.__name__)
 
         pub = MyNotifier(framework, 'my_event')
         obs1 = Observer1(framework, '1')
@@ -572,8 +572,15 @@ class TestFramework:
         framework.observe(pub.my_event, obs1.on_event)
         framework.observe(pub.my_event, obs2.on_event)
 
-        # Emit an event, which will be deferred by one observer, and not by the other.
-        pub.my_event.emit('foo')
+        # We always reemit() to handle the deferred events and then do the
+        # actual emit().
+        def emit():
+            framework.reemit()
+            pub.my_event.emit('foo')
+
+        # Emit an event, which will be deferred by one observer, and not by the
+        # other.
+        emit()
 
         # We should have a single notice with a corresponding snapshot, which is
         # the deferred event, and each observer will have seen the event once.
@@ -584,7 +591,7 @@ class TestFramework:
 
         # If we emit the event another time, we'll still have one notice and
         # snapshot, and each observer will have seen the event twice.
-        pub.my_event.emit('foo')
+        emit()
         notices = tuple(framework._storage.notices())
         assert len(notices) == 1
         assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
@@ -594,11 +601,11 @@ class TestFramework:
         # remaining notice or snapshot, and each observer will have seen the
         # event three times.
         obs1.defer = False
-        pub.my_event.emit('foo')
+        emit()
         assert len(obs1.events) == len(obs2.events) == 3
         notices = tuple(framework._storage.notices())
-        pytest.raises(NoSnapshotError, framework._storage.load_snapshot, notices[0][0])
         assert len(notices) == 0
+        assert len(tuple(framework._storage.list_snapshots())) == 0
 
     def test_custom_event_data(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
