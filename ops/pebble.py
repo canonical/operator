@@ -1429,7 +1429,7 @@ class CheckInfo:
 
     startup: Union[CheckStartup, str]
     """Startup mode.
-    
+
     :attr:`CheckStartup.ENABLED` means the check will be started when added, and
     in a replan. :attr:`CheckStartup.DISABLED` means the check must be manually
     started.
@@ -2168,8 +2168,9 @@ class Client:
         return self._services_action('autostart', [], timeout, delay)
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
-        """Replan by (re)starting changed and startup-enabled services and checks and wait for them
-        to start.
+        """Replan by (re)starting changed and startup-enabled services and checks.
+
+        After requesting the replan, also wait for any impacted services to start.
 
         Args:
             timeout: Seconds before replan change is considered timed out (float). If
