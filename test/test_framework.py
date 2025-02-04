@@ -550,40 +550,40 @@ class TestFramework:
         class MyNotifier(ops.Object):
             my_event = ops.EventSource(SimpleEventWithData)
 
-        class Observer1(ops.Object):
-            events: typing.List[str] = []
-            defer = True
-
-            def on_event(self, event: SimpleEventWithData):
-                self.events.append(self.__class__.__name__)
-                if self.defer:
-                    event.defer()
-
-        class Observer2(ops.Object):
-            events: typing.List[str] = []
+        class RecordingObserver(ops.Object):
+            def __init__(self, parent: ops.Object, key: str):
+                super().__init__(parent, key)
+                self.events: typing.List[str] = []
 
             def on_event(self, _: SimpleEventWithData):
                 self.events.append(self.__class__.__name__)
 
+        class DeferringObserver(RecordingObserver):
+            defer = True
+
+            def on_event(self, event: SimpleEventWithData):
+                super().on_event(event)
+                if self.defer:
+                    event.defer()
+
         pub = MyNotifier(framework, 'my_event')
-        obs1 = Observer1(framework, '1')
-        obs2 = Observer2(framework, '2')
+        obs1 = DeferringObserver(framework, '1')
+        obs2 = RecordingObserver(framework, '2')
 
         framework.observe(pub.my_event, obs1.on_event)
         framework.observe(pub.my_event, obs2.on_event)
 
         # We always reemit() to handle the deferred events and then do the
-        # actual emit().
+        # actual emit(). Create a helper function to do this.
         def emit():
             framework.reemit()
             pub.my_event.emit('foo')
 
         # Emit an event, which will be deferred by one observer, and not by the
-        # other.
+        # other. We should have a single notice with a corresponding snapshot,
+        # which is the deferred event, and each observer will have seen the
+        # event once.
         emit()
-
-        # We should have a single notice with a corresponding snapshot, which is
-        # the deferred event, and each observer will have seen the event once.
         notices = tuple(framework._storage.notices())
         assert len(notices) == 1
         assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
@@ -598,11 +598,15 @@ class TestFramework:
         assert len(obs1.events) == len(obs2.events) == 2
 
         # If we emit the event with neither observer deferring, we'll have no
-        # remaining notice or snapshot, and each observer will have seen the
-        # event three times.
+        # remaining notice or snapshot. The observer that didn't defer will have
+        # seen the event a straightforward 3 times. The observer that did defer
+        # will have seen it once more - in this final case, it runs the deferred
+        # event, which clears the queue, and then it runs the actual event
+        # (not skipping because the queue is empty at that point).
         obs1.defer = False
         emit()
-        assert len(obs1.events) == len(obs2.events) == 3
+        assert len(obs1.events) == 4
+        assert len(obs2.events) == 3
         notices = tuple(framework._storage.notices())
         assert len(notices) == 0
         assert len(tuple(framework._storage.list_snapshots())) == 0
