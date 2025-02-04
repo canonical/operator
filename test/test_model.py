@@ -1875,6 +1875,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
+                'change-id': '1',
             }),
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
@@ -1882,6 +1883,7 @@ containers:
                 'status': 'down',
                 'failures': 2,
                 'threshold': 2,
+                'change-id': '2',
             }),
         ]
 
@@ -1921,6 +1923,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
+                'change-id': '1',
             })
         ])
         c = container.get_check('c1')
@@ -1944,6 +1947,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
+                'change-id': '1',
             }),
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
@@ -1951,6 +1955,7 @@ containers:
                 'status': 'down',
                 'failures': 2,
                 'threshold': 2,
+                'change-id': '2',
             }),
         ])
         with pytest.raises(RuntimeError):
