@@ -120,17 +120,13 @@ store the data in the relation databag.
 
 #### Define a peer relation
 
-Update the `charmcraft.yaml` file to add a `peers` block, as below:
+Update the {external+charmcraft:ref}`charmcraft.yaml file <charmcraft-yaml-file>` to add a `peers` block, as below:
 
 ```yaml
 peers:
   charm-peer:
     interface: my_charm_peers
 ```
-
-<!-- UPDATE LINKS
-> Read more: [File ‘charmcraft.yaml`]()
--->
 
 #### Set and get data from the peer relation databag
 
