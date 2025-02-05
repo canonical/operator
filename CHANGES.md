@@ -1,3 +1,14 @@
+# 2.18.1 - 5 Feb 2025
+
+## Fixes
+
+* Ensure that the event snapshot is available when one observer defers and another does not (#1562)
+* Maintain transaction integrity on first run (#1558)
+
+## Documentation
+
+* Set up intersphinx and add links (#1546)
+
 # 2.18.0 - 30 Jan 2025
 
 ## Features

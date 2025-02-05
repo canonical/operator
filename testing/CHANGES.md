@@ -1,3 +1,9 @@
+# 7.1.2 - 5 Feb 2025
+
+## Fixes
+
+* Put the Juju version in the environment as well as the JujuContext in (#1559)
+
 # 7.1.1 - 30 Jan 2025
 
 ## Fixes
