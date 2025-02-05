@@ -2,7 +2,7 @@
 
 ## Fixes
 
-* Put the Juju version in the environment as well as the JujuContext in (#1559)
+* Put the Juju version in the environment as well as the JujuContext (#1559)
 
 # 7.1.1 - 30 Jan 2025
 
