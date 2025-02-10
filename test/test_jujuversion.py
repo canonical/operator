@@ -46,15 +46,18 @@ def test_parsing(vs: str, major: int, minor: int, tag: str, patch: int, build: i
 @unittest.mock.patch('os.environ', new={})
 def test_from_environ():
     # JUJU_VERSION is not set
-    v = ops.JujuVersion.from_environ()
+    with pytest.deprecated_call():
+        v = ops.JujuVersion.from_environ()
     assert v == ops.JujuVersion('0.0.0')
 
     os.environ['JUJU_VERSION'] = 'no'
     with pytest.raises(RuntimeError, match='not a valid Juju version'):
-        ops.JujuVersion.from_environ()
+        with pytest.deprecated_call():
+            ops.JujuVersion.from_environ()
 
     os.environ['JUJU_VERSION'] = '2.8.0'
-    v = ops.JujuVersion.from_environ()
+    with pytest.deprecated_call():
+        v = ops.JujuVersion.from_environ()
     assert v == ops.JujuVersion('2.8.0')
 
 

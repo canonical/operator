@@ -218,6 +218,11 @@ class Model:
         """
         return self._backend.model_uuid
 
+    @property
+    def juju_version(self) -> 'ops.JujuVersion':
+        """Return the version of Juju that is running the model."""
+        return self._backend._juju_context.version
+
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
