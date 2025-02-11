@@ -7,9 +7,7 @@
 
 This is an explanatory doc covering how charm authors might track local state in a Juju unit. We'll cover the `ops` concept of [](ops.StoredState), along with some differences in how it works between machine charms and Kubernetes charms. We'll talk about Peer Relations as an alternative for storing some kinds of information, and also talk about how charm authors probably should avoid recording state when they can avoid doing so.
 
-<!-- UPDATE LINKS
-"Peer Relations", above
--->
+> See more: {external+juju:ref}`Peer Relations <manage-relations>`
 
 ## A trivial example
 
@@ -107,14 +105,10 @@ def some_event_handler(event):
 
 In the other cases where state is needed, authors ideally want to relate a charm to a database, attach storage (see Juju storage), or simply be opinionated, and hard code the single "correct" state into the charm. (Perhaps `ExampleBlog` should always be run in `production` mode when deployed as a charm?)
 
-<!-- UPDATE LINKS
-"Juju Storage" above
--->
+> See more: {external+juju:ref}`Juju Storage <manage-storage>`
 
 In the cases where it is important to share some lightweight configuration data between units of an application, charm author's should look into peer relations. And in the cases where data must be written to a container's local file system (Canonical's Kubeflow bundle, for example, must do this, because the sheer number of services mean that we run into limitations on attached storage in the underlying cloud), authors should do so mindfully, with an understanding of the pitfalls involved.
 
-<!-- UPDATE LINKS
-"peer relations", above
--->
+> See more: {external+juju:ref}`Peer Relations <manage-relations>`
 
 In sum: use state mindfully, with well chosen tools, only when necessary.

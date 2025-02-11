@@ -77,10 +77,6 @@ If the charm is a machine charm, workload operation calls can be done directly, 
 
 "Juju operations" are the most 'meta' of them all: they do not affect the workload in and of itself, but they share data which is meant to affect the operation of *other* charms that this charm is integrated with.
 
-<!-- UPDATE LINKS:
-> See more: [Talking to a workload: control flow from A to Z](), [Charm lifecycle]() 
--->
-
 ### What we are testing when we unit-test
 
 A 'live', deployed Juju application will have access to all the inputs we discussed above, including environment variables, host system access, and more. Unit tests will typically want to mock all that and focus on mapping inputs to expected outputs. Any combination of the input sources we mentioned above can result in any combination of operations. A few examples of increasing complexity of scenarios we may want to unit test:

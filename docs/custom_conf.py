@@ -109,7 +109,7 @@ html_context = {
     # For example: "ubuntu.com/lxd" or "microcloud.is"
     # If there is no product website, edit the header template to remove the
     # link (see the readme for instructions).
-    'product_page': 'juju.is/docs/sdk',
+    'product_page': 'juju.is',
     # Add your product tag (the orange part of your logo, will be used in the
     # header) to ".sphinx/_static" and change the path here (start with "_static")
     # (default is the circle of friends)
@@ -298,8 +298,8 @@ autodoc_default_options = {
 # that should be linked to in this documentation.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'juju': ('https://canonical-juju.readthedocs-hosted.com/en/latest/', None),
-    'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest/', None),
+    'juju': ('https://canonical-juju.readthedocs-hosted.com/en/latest', None),
+    'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
 }
 
 # -- General configuration ---------------------------------------------------
