@@ -320,6 +320,12 @@ If packing failed - perhaps you forgot to make the charm.py executable earlier -
 
 ```{important}
 
+If packing fails with a `PermissionError(13, 'Permission denied')`, you may need to `multipass mount -g 1000:1000 -u 1000:1000 -g 0:0 -u 0:0`
+
+```
+
+```{important}
+
 **Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents. 
 
 ```
