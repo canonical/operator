@@ -682,7 +682,7 @@ class RelationBrokenEvent(RelationEvent):
 
 
 class StorageEvent(HookEvent):
-    """Base class representing storage related events.
+    """Base class representing events to do with storage.
 
     Juju can provide a variety of storage types to a charms. The
     charms can define several different types of storage that are

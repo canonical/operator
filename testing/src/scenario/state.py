@@ -490,7 +490,7 @@ def _next_relation_id(*, update: bool = True):
 
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_max_posargs(2)):
-    """Base class for the various types of relation (integration)."""
+    """Base class for the various types of relation."""
 
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in the metadata."""

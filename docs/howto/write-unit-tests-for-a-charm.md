@@ -99,7 +99,7 @@ harness.charm.unit.status = BlockedStatus("Testing")
 Any of your charm’s properties and methods (including event callbacks) can be accessed using
 `harness.charm`.  You can check out the [harness API
 docs](ops_testing_harness) for more ways to use the
-harness to trigger other events and to test your charm (e.g. triggering leadership related events,
+harness to trigger other events and to test your charm (e.g. triggering events regarding leadership,
 testing pebble events and sidecar container interactions, etc.).
 
 
