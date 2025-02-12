@@ -890,14 +890,17 @@ class CheckInfo(_max_posargs(1)):
     change_id: pebble.ChangeID | None = None
     """The ID of the Pebble Change associated with this check.
 
-    Passing ``None`` will automatically assign a new Change ID.
+    Passing ``None`` will automatically assign a new Change ID if the status is
+    :attr:`ops.pebble.CheckStatus.UP` or :attr:`ops.pebble.CheckStatus.DOWN`.
     """
 
     def __post_init__(self):
         if self.change_id is None:
-            object.__setattr__(
-                self, "change_id", pebble.ChangeID(_generate_new_change_id())
-            )
+            if self.status == pebble.CheckStatus.INACTIVE:
+                change_id = ""
+            else:
+                change_id = pebble.ChangeID(_generate_new_change_id())
+            object.__setattr__(self, "change_id", change_id)
 
     def _to_ops(self) -> pebble.CheckInfo:
         return pebble.CheckInfo(
@@ -992,6 +995,8 @@ class Container(_max_posargs(1)):
     notices: list[Notice] = dataclasses.field(default_factory=list)
     """Any Pebble notices that already exist in the container."""
 
+    # NOTE: this probably should have been a dictionary (with the check name as
+    # the key) - we should look into changing that in version 8.
     check_infos: frozenset[CheckInfo] = frozenset()
     """All Pebble health checks that have been added to the container."""
 
@@ -1028,6 +1033,7 @@ class Container(_max_posargs(1)):
             return plan
         for name in sorted(services.keys()):
             plan.services[name] = services[name]
+        # TODO: This should presumably also have checks and log targets.
         return plan
 
     @property
@@ -1064,6 +1070,13 @@ class Container(_max_posargs(1)):
             charm pushed to the container.
         """
         return ctx._get_container_root(self.name)
+
+    def get_check_info(self, name: str) -> CheckInfo:
+        """Get the check info for a check by name."""
+        for check_info in self.check_infos:
+            if check_info.name == name:
+                return check_info
+        raise KeyError(f"check-info: {name} not found in the Container")
 
 
 _RawStatusLiteral = Literal[

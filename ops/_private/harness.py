@@ -3187,7 +3187,6 @@ class _TestingPebbleClient:
                         failures=0,
                         threshold=3 if check.threshold is None else check.threshold,
                         startup=check.startup,
-                        change_id=pebble.ChangeID(str(uuid.uuid4())),
                     )
                     self._check_infos[name] = info
                 if not info.change_id:
@@ -3389,6 +3388,7 @@ class _TestingPebbleClient:
                     failures=0,
                     change_id=pebble.ChangeID(''),
                 )
+                self._check_infos[name] = info
             info.level = check.level
             info.threshold = 3 if check.threshold is None else check.threshold
             info.startup = check.startup
@@ -3837,6 +3837,7 @@ class _TestingPebbleClient:
             if info.change_id:
                 change = self._changes[info.change_id]
                 change.status = pebble.ChangeStatus.ABORT.value
+                info.status = pebble.CheckStatus.INACTIVE
                 info.change_id = pebble.ChangeID('')
 
     def notify(
