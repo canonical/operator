@@ -92,6 +92,21 @@ class _ContainerBaseDict(TypedDict):
 logger = logging.getLogger(__name__)
 
 
+class AnyEvent(EventBase):
+    """Event always emitted on the charm."""
+
+    def defer(self) -> NoReturn:
+        """The `any` event is not deferrable.
+
+        This is because these events are run alongside each event invocation,
+        so deferring would always end up simply doubling the work.
+
+        Raises:
+            RuntimeError: always.
+        """
+        raise RuntimeError('cannot defer `any` event')
+
+
 class HookEvent(EventBase):
     """Events raised by Juju to progress a charm's lifecycle.
 
@@ -1197,6 +1212,9 @@ class CharmEvents(ObjectEvents):
 
     # NOTE: The one-line docstrings below are copied from the first line of
     #       each event class's docstring. Please keep in sync.
+
+    any = EventSource(AnyEvent)
+    """Always triggered on the charm, regardless of the juju event being processed (see :class:`~ops.AnyEvent`)."""
 
     install = EventSource(InstallEvent)
     """Triggered when a charm is installed (see :class:`~ops.InstallEvent`)."""

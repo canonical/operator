@@ -488,6 +488,9 @@ class _Manager:
 
     def _emit(self):
         """Emit the event on the charm."""
+        # emit the 'any' event onto the charm
+        self._emit_charm_event("any")
+
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made. Also adjust the docstring on
         #       EventBase.defer().
