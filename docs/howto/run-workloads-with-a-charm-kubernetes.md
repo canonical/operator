@@ -204,7 +204,7 @@ See the [layer specification](https://canonical-pebble.readthedocs-hosted.com/en
 
 #### Add a configuration layer
 
-To add a configuration layer, call [`Container.add_layer`](ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](#ops.pebble.Layer) object.
+To add a configuration layer, call [`Container.add_layer`](ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](ops.pebble.Layer) object.
 
 You can see an example of `add_layer` under the ["Replan" heading](#replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
 
@@ -823,6 +823,7 @@ Traceback (most recent call last):
 ops.pebble.ExecError: non-zero exit code 143 executing ['sleep', '10']
 ```
 
+(use-custom-notices-from-the-workload-container)=
 ## Use custom notices from the workload container
 
 ### Record a notice
