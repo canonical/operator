@@ -11,7 +11,7 @@ Juju state all at once, define the Juju context against which to test the charm,
 and fire a single event on the charm to execute its logic. The tests can then
 assert that the Juju state has changed as expected.
 
-A very simple test, where the charm has no config, no integrations, the unit
+A very simple test, where the charm has no config, no relations, the unit
 is the leader, and has a `start` handler that sets the status to active might
 look like this:
 
@@ -38,8 +38,8 @@ Writing these tests should nudge you into thinking of a charm as a black-box
 'input to output' function. The inputs are:
 
 - Event: why am I, the charm, being executed
-- State: am I the leader? what is my integration data? what is my config?
-- Context: what integrations can I have? what containers can I have?
+- State: am I the leader? what is my relation data? what is my config?
+- Context: what relations can I have? what containers can I have?
 
 The output is another `State`: the state after
 the charm has interacted with the mocked Juju model.

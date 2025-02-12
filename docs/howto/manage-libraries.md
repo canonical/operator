@@ -220,7 +220,7 @@ def test_my_object_data(context, endpoint, n_relations):
 
 Fetch the library.
 
-In your `src/charm.py`, observe the custom events it puts at your disposal. For example, a database library may have provided a  `database_relation_ready` event -- a high-level wrapper around the relevant `juju` relation events -- so you use it to manage the database integration in your charm as below:
+In your `src/charm.py`, observe the custom events it puts at your disposal. For example, a database library may have provided a  `database_relation_ready` event -- a high-level wrapper around the relevant `juju` relation events -- so you use it to manage the database relation in your charm as below:
 
 ```python
 

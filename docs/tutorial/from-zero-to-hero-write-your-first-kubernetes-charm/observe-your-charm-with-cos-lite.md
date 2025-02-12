@@ -67,7 +67,7 @@ Note: When you rebuild your charm with `charmcraft pack`, Charmcraft will copy t
 
 ### Define the Prometheus relation interface
 
-In your `charmcraft.yaml` file, before the `peers` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrations with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
+In your `charmcraft.yaml` file, before the `peers` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrating with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
 
 ```yaml
 provides:
@@ -139,7 +139,7 @@ Note: When you rebuild your charm with `charmcraft pack`, Charmcraft will copy t
 
 ### Define the Loki relation interface
 
-In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrations with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
+In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
 
 
 ```yaml
@@ -203,7 +203,7 @@ Note: The `grafana_dashboard` library also depends on the  [`juju_topology`](htt
 
 ### Define the Grafana relation interface
 
-In your `charmcraft.yaml` file, add another `provides` endpoint with relation name `grafana-dashboard` and interface name `grafana_dashboard`,  as below. This declares that your charm can offer services to other charms over the `grafana-dashboard` interface. In short, that your charm is open to integrations with, for example, the official Grafana charm. (Note: Here `grafana-dashboard` endpoint is the default relation name recommended by the `grafana_dashboard` library.)
+In your `charmcraft.yaml` file, add another `provides` endpoint with relation name `grafana-dashboard` and interface name `grafana_dashboard`,  as below. This declares that your charm can offer services to other charms over the `grafana-dashboard` interface. In short, that your charm is open to integrating with, for example, the official Grafana charm. (Note: Here `grafana-dashboard` endpoint is the default relation name recommended by the `grafana_dashboard` library.)
 
 ```yaml
 provides:
@@ -287,9 +287,9 @@ juju deploy cos-lite --trust
 ```
 
 
-### Expose the application integration endpoints
+### Expose the application relation endpoints
 
-Once all the COS Lite applications are deployed and settled down (you can monitor this by using `juju status --watch 2s`),  expose the integration points you are interested in for your charm -- `loki:logging`, `grafana-dashboard`, and `metrics-endpoint` -- as below. 
+Once all the COS Lite applications are deployed and settled down (you can monitor this by using `juju status --watch 2s`),  expose the relation points you are interested in for your charm -- `loki:logging`, `grafana-dashboard`, and `metrics-endpoint` -- as below. 
 
 ```text
 juju offer prometheus:metrics-endpoint

@@ -490,7 +490,7 @@ def _next_relation_id(*, update: bool = True):
 
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_max_posargs(2)):
-    """Base class for the various types of integration (relation)."""
+    """Base class for the various types of relation (integration)."""
 
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in the metadata."""
@@ -573,14 +573,14 @@ _DEFAULT_JUJU_DATABAG = {
 
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
-    """An integration between the charm and another application."""
+    """A relation between the charm and another application."""
 
     remote_app_name: str = "remote"
     """The name of the remote application, as in the charm's metadata."""
 
     # local limit
     limit: int = 1
-    """The maximum number of integrations on this endpoint."""
+    """The maximum number of relations on this endpoint."""
 
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
     """The current content of the application databag."""

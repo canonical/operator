@@ -58,7 +58,7 @@ Integration tests typically take significantly longer to run than unit tests.
 **Coverage.**
 
 * Charm actions
-* Charm integrations
+* Charm relations
 * Charm configurations
 * That the workload is up and running, and responsive
 * Upgrade sequence
