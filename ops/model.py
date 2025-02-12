@@ -253,7 +253,7 @@ class Model:
                 given application has more than one relation on a given endpoint.
 
         Raises:
-            TooManyRelatedAppsError: is raised if there is more than one integration with the
+            TooManyRelatedAppsError: is raised if there is more than one relation with the
                 supplied relation_name and no relation_id was supplied
         """
         return self.relations._get_unique(relation_name, relation_id)

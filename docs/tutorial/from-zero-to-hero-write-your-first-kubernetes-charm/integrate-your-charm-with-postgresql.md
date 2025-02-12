@@ -47,7 +47,7 @@ Well done, you've got everything you need to set up a database relation!
 ## Define the charm relation interface
 
 <!--
-Charm integration interfaces are described in the `charmcraft.yaml` file. To connect to the PostgreSQL charm, we will need to find out the name of the interface that PostgreSQL exposes so other charms can connect to it and then update our `charmcraft.yaml` file.
+Charm relation interfaces are described in the `charmcraft.yaml` file. To connect to the PostgreSQL charm, we will need to find out the name of the interface that PostgreSQL exposes so other charms can connect to it and then update our `charmcraft.yaml` file.
 -->
 
 Now, time to define the charm relation interface.
@@ -243,12 +243,12 @@ def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
     self._update_layer_and_restart()
 ```
 
-The diagram below illustrates the workflow for the case where the database integration exists and for the case where it does not:
+The diagram below illustrates the workflow for the case where the database relation exists and for the case where it does not:
 
 ![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png) 
 
 
-## Update the unit status to reflect the integration state
+## Update the unit status to reflect the relation state
 
 Now that the charm is getting more complex, there are many more cases where the unit status needs to be set. It's often convenient to do this in a more declarative fashion, which is where the collect-status event can be used.
 
@@ -322,7 +322,7 @@ Now,  integrate our charm with the newly deployed `postgresql-k8s` charm:
 juju integrate postgresql-k8s demo-api-charm
 ```
 
-> Read more: [Integration](https://juju.is/docs/olm/integration), [`juju integrate`](https://juju.is/docs/olm/juju-integrate) 
+> Read more: [Relation (integration)](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/relation/), [`juju integrate`](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/integrate/) 
 
 
 Finally, run:
@@ -379,7 +379,7 @@ This should produce something similar to the output below (of course, with the n
 {"names":{"1":"maksim","2":"simon"}}
 ```
 
-Congratulations, your integration with PostgreSQL is functional!
+Congratulations, your relation with PostgreSQL is functional!
 
 ## Review the final code
 

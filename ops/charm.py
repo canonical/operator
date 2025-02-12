@@ -550,7 +550,7 @@ class RelationEvent(HookEvent):
 class RelationCreatedEvent(RelationEvent):
     """Event triggered when a new relation is created.
 
-    This is triggered when a new integration with another app is added in Juju. This
+    This is triggered when a new relation with another app is added in Juju. This
     can occur before units for those applications have started. All existing
     relations will trigger `RelationCreatedEvent` before :class:`~ops.StartEvent` is
     emitted.

@@ -64,7 +64,7 @@ The "inputs" of a charm run are therefore:
  - integration (relation) data
  - stored state
 
-Only the event context is guaranteed to be present. The other input sources are optional, but typically a charm will have at least some config and a few integrations adding to its inputs.
+Only the event context is guaranteed to be present. The other input sources are optional, but typically a charm will have at least some config and a few relations adding to its inputs.
 
 The charm code executes and typically produces side-effects aimed at its workload (for example: it writes files to a disk, runs commands on a system, or reconfigures a process) or at other charms it integrates with (for example: it writes relation data). We call this 'operating' a workload, and that is what a charm is meant to do. The ways in which a charm operates can be roughly categorised as:
  
