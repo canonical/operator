@@ -205,7 +205,7 @@ That allows us to fetch the Relation wherever we need it and access its contents
         )
 ```
 
-Note how `relation.data` provides an interface to the relation databag (see [](#ops.Relation.data)) and we need to select which part of that bag to access by passing an `ops.model.Unit` instance.
+Note how `relation.data` provides an interface to the relation databag (see [](ops.Relation.data)) and we need to select which part of that bag to access by passing an `ops.model.Unit` instance.
 
 #### Logging
 
