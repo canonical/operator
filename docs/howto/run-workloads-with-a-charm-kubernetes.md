@@ -823,6 +823,7 @@ Traceback (most recent call last):
 ops.pebble.ExecError: non-zero exit code 143 executing ['sleep', '10']
 ```
 
+(use-custom-notices-from-the-workload-container)=
 ## Use custom notices from the workload container
 
 ### Record a notice
