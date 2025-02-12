@@ -774,7 +774,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         self._last_notice_id = 0
         self._changes: Dict[str, pebble.Change] = {}
 
-        # load any existing notices and check-infos from the state
+        # load any existing notices and check information from the state
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         self._check_infos: Dict[str, pebble.CheckInfo] = {}
         try:

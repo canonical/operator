@@ -995,8 +995,6 @@ class Container(_max_posargs(1)):
     notices: list[Notice] = dataclasses.field(default_factory=list)
     """Any Pebble notices that already exist in the container."""
 
-    # NOTE: this probably should have been a dictionary (with the check name as
-    # the key) - we should look into changing that in version 8.
     check_infos: frozenset[CheckInfo] = frozenset()
     """All Pebble health checks that have been added to the container."""
 
