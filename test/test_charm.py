@@ -349,6 +349,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
                 'status': 'down',
                 'failures': 3,
                 'threshold': 3,
+                'change-id': '1',
             })
         ]
 

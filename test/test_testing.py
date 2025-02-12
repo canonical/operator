@@ -7027,6 +7027,79 @@ class TestCloudSpec:
             harness.model.get_cloud_spec()
 
 
+class TestChecks:
+    def __init__(self):
+        self.layer = pebble.Layer({
+            'checks': {
+                'chk1': {
+                    'override': 'replace',
+                    'exec': {'command': 'foo'},
+                },
+                'chk2': {
+                    'override': 'replace',
+                    'startup': 'enabled',
+                    'exec': {'command': 'foo'},
+                },
+                'chk3': {
+                    'override': 'replace',
+                    'startup': 'disabled',
+                    'exec': {'command': 'foo'},
+                },
+            },
+        })
+
+    def test_add_layer_with_checks(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer('mylayer', self.layer)
+        chk1 = container.get_checks('chk1')['chk1']
+        assert chk1.startup == pebble.CheckStartup.ENABLED
+        assert chk1.failures == 0
+        assert chk1.status == pebble.CheckStatus.UP
+        chk2 = container.get_checks('chk2')['chk2']
+        assert chk2.startup == pebble.CheckStartup.ENABLED
+        assert chk2.failures == 0
+        assert chk2.status == pebble.CheckStatus.UP
+        chk3 = container.get_checks('chk3')['chk3']
+        assert chk3.startup == pebble.CheckStartup.DISABLED
+        assert chk3.failures == 0
+        assert chk3.status == pebble.CheckStatus.INACTIVE
+
+    def test_start_checks(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer('mylayer', self.layer)
+        changed = container.start_checks('chk1', 'chk2', 'chk3')
+        assert changed == {'chk3'}
+
+    def test_stop_checks(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer('mylayer', self.layer)
+        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        assert changed == {'chk1', 'chk2'}
+
+    def test_stop_then_start(self):
+        harness = ops.testing.Harness(ops.CharmBase)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer('mylayer', self.layer)
+        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        assert changed == {'chk1', 'chk2'}
+        changed = container.start_checks('chk1', 'chk2', 'chk3')
+        assert changed == {'chk1', 'chk2', 'chk3'}
+        for info in container.get_checks('chk1').values():
+            assert info.status == pebble.CheckStatus.UP
+            assert info.change_id, 'Change ID should not be None or the empty string'
+
+
 @pytest.mark.skipif(
     not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
 )
