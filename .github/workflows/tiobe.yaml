@@ -19,10 +19,6 @@ jobs:
       - name: Generate coverage report
         run: |
           tox -e coverage
-          # Annoyingly, the coverage.xml file needs to be in a .coverage folder.
-          rm .coverage
-          mkdir .coverage
-          mv coverage.xml .coverage/
 
       - name: TICS GitHub Action
         uses: tiobe/tics-github-action@v3

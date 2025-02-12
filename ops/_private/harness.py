@@ -313,6 +313,12 @@ class Harness(Generic[CharmType]):
             self._meta,
             self._model,
             juju_debug_at=self._juju_context.debug_at,
+            # Harness tests will often have defer() usage without 'purging' the
+            # deferred handler with reemit(), but still expect the next emit()
+            # to result in a call, so we can't safely skip duplicate events.
+            # When behaviour matching production is required, Scenario tests
+            # should be used instead.
+            skip_duplicate_events=False,
         )
 
         warnings.warn(
@@ -1915,10 +1921,9 @@ class Harness(Generic[CharmType]):
 
             # charm.py
             class ExampleCharm(ops.CharmBase):
-                def __init__(self, *args):
-                    super().__init__(*args)
-                    self.framework.observe(self.on["mycontainer"].pebble_ready,
-                                           self._on_pebble_ready)
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on["mycontainer"].pebble_ready, self._on_pebble_ready)
 
                 def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
                     self.hostname = event.workload.pull("/etc/hostname").read()
@@ -2271,13 +2276,13 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         declared_type = option.get('type')
         if not declared_type:
             raise RuntimeError(
-                f'Incorrectly formatted `options.yaml`, option {key} '
+                f'Incorrectly formatted config in YAML, option {key} '
                 'is expected to declare a `type`.'
             )
 
         if declared_type not in self._supported_types:
             raise RuntimeError(
-                'Incorrectly formatted `options.yaml`: `type` needs to be one '
+                'Incorrectly formatted config in YAML: `type` needs to be one '
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type)
             )
 

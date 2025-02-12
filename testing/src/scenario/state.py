@@ -9,12 +9,12 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import inspect
+import pathlib
 import random
 import re
 import string
 from enum import Enum
 from itertools import chain
-from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,8 +35,9 @@ from typing import (
 )
 from uuid import uuid4
 
-import ops
 import yaml
+
+import ops
 from ops import pebble, CharmBase, CharmEvents, SecretRotate, StatusBase
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
@@ -121,26 +122,43 @@ def _max_posargs(n: int):
 
         _max_positional_args = n
 
-        def __new__(cls, *args: Any, **kwargs: Any):
+        @classmethod
+        def _annotate_class(cls):
+            """Record information about which parameters are positional vs. keyword-only."""
+            if hasattr(cls, "_init_parameters"):
+                # We don't support dynamically changing the signature of a
+                # class, so we assume here it's the same as previously.
+                # In addition, the class and the function that provides it
+                # are private, so we generally don't expect anyone to be
+                # doing anything radical with these.
+                return
             # inspect.signature guarantees the order of parameters is as
             # declared, which aligns with dataclasses. Simpler ways of
             # getting the arguments (like __annotations__) do not have that
             # guarantee, although in practice it is the case.
-            parameters = inspect.signature(cls.__init__).parameters
-            required_args = [
+            cls._init_parameters = parameters = inspect.signature(
+                cls.__init__
+            ).parameters
+            cls._init_kw_only = {
+                name
+                for name in tuple(parameters)[cls._max_positional_args :]
+                if not name.startswith("_")
+            }
+            cls._init_required_args = [
                 name
                 for name in tuple(parameters)
-                if parameters[name].default is inspect.Parameter.empty
-                and name not in kwargs
-                and name != "self"
+                if name != "self"
+                and parameters[name].default is inspect.Parameter.empty
+            ]
+
+        def __new__(cls, *args: Any, **kwargs: Any):
+            cls._annotate_class()
+            required_args = [
+                name for name in cls._init_required_args if name not in kwargs
             ]
             n_posargs = len(args)
             max_n_posargs = cls._max_positional_args
-            kw_only = {
-                name
-                for name in tuple(parameters)[max_n_posargs:]
-                if not name.startswith("_")
-            }
+            kw_only = cls._init_kw_only
             if n_posargs > max_n_posargs:
                 raise TypeError(
                     f"{cls.__name__} takes {max_n_posargs} positional "
@@ -152,7 +170,7 @@ def _max_posargs(n: int):
             # Also check if there are just not enough arguments at all, because
             # the default TypeError message will incorrectly describe some of
             # the arguments as positional.
-            elif n_posargs < len(required_args):
+            if n_posargs < len(required_args):
                 required_pos = [
                     f"'{arg}'"
                     for arg in required_args[n_posargs:]
@@ -179,8 +197,12 @@ def _max_posargs(n: int):
     return _MaxPositionalArgs
 
 
+# A lot of JujuLogLine objects are created, so we want them to be fast and light.
+# Dataclasses define __slots__, so are small, and a namedtuple is actually
+# slower to create than a dataclass. A plain dictionary (or TypedDict) would be
+# about twice as fast, but less convenient to use.
 @dataclasses.dataclass(frozen=True)
-class JujuLogLine(_max_posargs(2)):
+class JujuLogLine:
     """An entry in the Juju debug-log."""
 
     level: str
@@ -355,9 +377,6 @@ class Secret(_max_posargs(1)):
         """Update the metadata."""
         # bypass frozen dataclass
         object.__setattr__(self, "_latest_revision", self._latest_revision + 1)
-        # TODO: if this is done twice in the same hook, then Juju ignores the
-        # first call, it doesn't continue to update like this does.
-        # Fix when https://github.com/canonical/operator/issues/1288 is resolved.
         if content:
             object.__setattr__(self, "latest_content", content)
         if label:
@@ -410,8 +429,7 @@ class BindAddress(_max_posargs(1)):
     """The MAC address of the interface."""
 
     def _hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
-        # todo support for legacy (deprecated) `interfacename` and `macaddress` fields?
+        """Dumps itself to dict in the same format the hook tool would."""
         dct = {
             "interface-name": self.interface_name,
             "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
@@ -472,6 +490,8 @@ def _next_relation_id(*, update: bool = True):
 
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_max_posargs(2)):
+    """Base class for the various types of integration (relation)."""
+
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in the metadata."""
 
@@ -687,16 +707,11 @@ class Model(_max_posargs(1)):
     """A unique identifier for the model, typically generated by Juju."""
 
     # whatever juju models --format=json | jq '.models[<current-model-index>].type' gives back.
-    # TODO: make this exhaustive.
     type: Literal["kubernetes", "lxd"] = "kubernetes"
     """The type of Juju model."""
 
     cloud_spec: CloudSpec | None = None
     """Cloud specification information (metadata) including credentials."""
-
-
-# for now, proc mock allows you to map one command to one mocked output.
-# todo extend: one input -> multiple outputs, at different times
 
 
 _CHANGE_IDS = 0
@@ -753,9 +768,9 @@ class Exec(_max_posargs(1)):
 class Mount(_max_posargs(0)):
     """Maps local files to a :class:`Container` filesystem."""
 
-    location: str | PurePosixPath
+    location: str | pathlib.PurePosixPath
     """The location inside of the container."""
-    source: str | Path
+    source: str | pathlib.Path
     """The content to provide when the charm does :meth:`ops.Container.pull`."""
 
 
@@ -1023,7 +1038,7 @@ class Container(_max_posargs(1)):
             infos[name] = info
         return infos
 
-    def get_filesystem(self, ctx: Context) -> Path:
+    def get_filesystem(self, ctx: Context) -> pathlib.Path:
         """Simulated Pebble filesystem in this context.
 
         Returns:
@@ -1072,12 +1087,14 @@ class _EntityStatus:
         name: _RawStatusLiteral,
         message: str = "",
     ) -> _EntityStatus:
+        """Convert the status name, such as 'active', to the class, such as ActiveStatus."""
         # Note that this won't work for UnknownStatus.
         # All subclasses have a default 'name' attribute, but the type checker can't tell that.
         return cls._entity_statuses[name](message=message)  # type:ignore
 
     @classmethod
     def from_ops(cls, obj: StatusBase) -> _EntityStatus:
+        """Convert from the ops.StatusBase object to the matching _EntityStatus object."""
         return cls.from_status_name(obj.name, obj.message)
 
 
@@ -1318,7 +1335,7 @@ class Storage(_max_posargs(1)):
             return (self.name, self.index) == (other.name, other.index)
         return False
 
-    def get_filesystem(self, ctx: Context) -> Path:
+    def get_filesystem(self, ctx: Context) -> pathlib.Path:
         """Simulated filesystem root in this context."""
         return ctx._get_storage_root(self.name, self.index)
 
@@ -1329,7 +1346,7 @@ class Resource(_max_posargs(0)):
 
     name: str
     """The name of the resource, as found in the charm metadata."""
-    path: str | Path
+    path: str | pathlib.Path
     """A local path that will be provided to the charm as the content of the resource."""
 
 
@@ -1593,7 +1610,7 @@ class _CharmSpec(Generic[CharmType]):
     is_autoloaded: bool = False
 
     @staticmethod
-    def _load_metadata_legacy(charm_root: Path):
+    def _load_metadata_legacy(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft < 2.5."""
         # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
         # files for charm metadata.
@@ -1610,7 +1627,7 @@ class _CharmSpec(Generic[CharmType]):
         return meta, config, actions
 
     @staticmethod
-    def _load_metadata(charm_root: Path):
+    def _load_metadata(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
         metadata_path = charm_root / "charmcraft.yaml"
         meta: dict[str, Any] = (
@@ -1628,7 +1645,7 @@ class _CharmSpec(Generic[CharmType]):
 
         Will attempt to load the metadata off the ``charmcraft.yaml`` file
         """
-        charm_source_path = Path(inspect.getfile(charm_type))
+        charm_source_path = pathlib.Path(inspect.getfile(charm_type))
         charm_root = charm_source_path.parent.parent
 
         # attempt to load metadata from unified charmcraft.yaml
@@ -1692,18 +1709,19 @@ class DeferredEvent:
     # them because they need a Handle.
     @property
     def name(self):
+        """A comparable name for the event."""
         return self.handle_path.split("/")[-1].split("[")[0]
 
 
 class _EventType(str, Enum):
-    framework = "framework"
-    builtin = "builtin"
-    relation = "relation"
-    action = "action"
-    secret = "secret"
-    storage = "storage"
-    workload = "workload"
-    custom = "custom"
+    FRAMEWORK = "framework"
+    BUILTIN = "builtin"
+    RELATION = "relation"
+    ACTION = "action"
+    SECRET = "secret"
+    STORAGE = "storage"
+    WORKLOAD = "workload"
+    CUSTOM = "custom"
 
 
 class _EventPath(str):
@@ -1737,36 +1755,36 @@ class _EventPath(str):
     def _get_suffix_and_type(s: str) -> tuple[str, _EventType]:
         for suffix in _RELATION_EVENTS_SUFFIX:
             if s.endswith(suffix):
-                return suffix, _EventType.relation
+                return suffix, _EventType.RELATION
 
         if s.endswith(_ACTION_EVENT_SUFFIX):
-            return _ACTION_EVENT_SUFFIX, _EventType.action
+            return _ACTION_EVENT_SUFFIX, _EventType.ACTION
 
         if s in _SECRET_EVENTS:
-            return s, _EventType.secret
+            return s, _EventType.SECRET
 
         if s in _FRAMEWORK_EVENTS:
-            return s, _EventType.framework
+            return s, _EventType.FRAMEWORK
 
         # Whether the event name indicates that this is a storage event.
         for suffix in _STORAGE_EVENTS_SUFFIX:
             if s.endswith(suffix):
-                return suffix, _EventType.storage
+                return suffix, _EventType.STORAGE
 
         # Whether the event name indicates that this is a workload event.
         if s.endswith(_PEBBLE_READY_EVENT_SUFFIX):
-            return _PEBBLE_READY_EVENT_SUFFIX, _EventType.workload
+            return _PEBBLE_READY_EVENT_SUFFIX, _EventType.WORKLOAD
         if s.endswith(_PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX):
-            return _PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.workload
+            return _PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX, _EventType.WORKLOAD
         if s.endswith(_PEBBLE_CHECK_FAILED_EVENT_SUFFIX):
-            return _PEBBLE_CHECK_FAILED_EVENT_SUFFIX, _EventType.workload
+            return _PEBBLE_CHECK_FAILED_EVENT_SUFFIX, _EventType.WORKLOAD
         if s.endswith(_PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX):
-            return _PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.workload
+            return _PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.WORKLOAD
 
         if s in _BUILTIN_EVENTS:
-            return "", _EventType.builtin
+            return "", _EventType.BUILTIN
 
-        return "", _EventType.custom
+        return "", _EventType.CUSTOM
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1843,27 +1861,27 @@ class _Event:  # type: ignore
     @property
     def _is_relation_event(self) -> bool:
         """Whether the event name indicates that this is a relation event."""
-        return self._path.type is _EventType.relation
+        return self._path.type is _EventType.RELATION
 
     @property
     def _is_action_event(self) -> bool:
         """Whether the event name indicates that this is a relation event."""
-        return self._path.type is _EventType.action
+        return self._path.type is _EventType.ACTION
 
     @property
     def _is_secret_event(self) -> bool:
         """Whether the event name indicates that this is a secret event."""
-        return self._path.type is _EventType.secret
+        return self._path.type is _EventType.SECRET
 
     @property
     def _is_storage_event(self) -> bool:
         """Whether the event name indicates that this is a storage event."""
-        return self._path.type is _EventType.storage
+        return self._path.type is _EventType.STORAGE
 
     @property
     def _is_workload_event(self) -> bool:
         """Whether the event name indicates that this is a workload event."""
-        return self._path.type is _EventType.workload
+        return self._path.type is _EventType.WORKLOAD
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.
@@ -1884,7 +1902,7 @@ class _Event:  # type: ignore
         # However, our Event data structure ATM has no knowledge of which Object/Handle it is
         # owned by. So the only thing we can do right now is: check whether the event name,
         # assuming it is owned by the charm, LOOKS LIKE that of a builtin event or not.
-        return self._path.type is not _EventType.custom
+        return self._path.type is not _EventType.CUSTOM
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
         """Construct a DeferredEvent from this Event."""

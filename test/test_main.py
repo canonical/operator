@@ -97,7 +97,7 @@ class EventSpec:
 
 
 @patch('ops._main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
-@patch('ops._main._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
+@patch('ops._main._Manager._emit_charm_event', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestCharmInit:
     @patch('sys.stderr', new_callable=io.StringIO)
@@ -191,12 +191,6 @@ class TestCharmInit:
         # here we patch juju_backend_available, so it gets set up and falls over when used
         with patch('ops.storage.juju_backend_available') as juju_backend_available:
             juju_backend_available.return_value = True
-            with pytest.raises(FileNotFoundError, match='state-get'):
-                self._check(ops.CharmBase, use_juju_for_storage=True)
-
-    def test_controller_storage_deprecated(self):
-        with patch('ops.storage.juju_backend_available') as juju_backend_available:
-            juju_backend_available.return_value = True
             with pytest.warns(DeprecationWarning, match='Controller storage'):
                 with pytest.raises(FileNotFoundError, match='state-get'):
                     self._check(ops.CharmBase, use_juju_for_storage=True)
@@ -235,11 +229,11 @@ class TestDispatch:
                 dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
-                with patch('ops._main._emit_charm_event') as mock_charm_event:
+                with patch('ops._main._Manager._emit_charm_event') as mock_charm_event:
                     ops.main(MyCharm)
 
         assert mock_charm_event.call_count == 1
-        return mock_charm_event.call_args[0][1]
+        return mock_charm_event.call_args[0][0]
 
     def test_most_legacy(self):
         """Without dispatch, sys.argv[0] is used."""
@@ -900,6 +894,30 @@ class _TestMain(abc.ABC):
         for event_spec, calls in test_cases:
             self._simulate_event(fake_script, event_spec)
             assert calls in fake_script.calls(clear=True)
+
+        # Test warnings are captured and sent to the Juju debug-log,
+        event_spec = EventSpec(
+            ops.ActionEvent,
+            'warn_action',
+            env_var='JUJU_ACTION_NAME',
+            set_in_env={'JUJU_ACTION_UUID': '5'},
+        )
+        self._simulate_event(fake_script, event_spec)
+        calls = fake_script.calls(clear=True)
+
+        calls_without_message = [call[:-1] for call in calls]
+        expected_without_message = ['juju-log', '--log-level', 'WARNING', '--']
+        assert expected_without_message in calls_without_message
+
+        idx = calls_without_message.index(expected_without_message)
+        warning_message = calls[idx][-1]
+        pattern = (
+            r'^.*:(\d+):\s+DeprecationWarning:\s+'
+            + re.escape('feature x is deprecated, use feature y instead')
+            + '$'
+        )
+        if not re.match(pattern, warning_message):
+            pytest.fail(f'Warning was not sent to debug-log: {calls!r}')
 
     @pytest.mark.usefixtures('setup_charm')
     def test_excepthook(self, fake_script: FakeScript):

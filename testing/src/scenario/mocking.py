@@ -2,6 +2,12 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""Juju and Pebble mocking
+
+This module contains mocks for the Juju and Pebble APIs that are used by ops
+to interact with the Juju controller and the Pebble service manager.
+"""
+
 import datetime
 import io
 import shutil
@@ -33,6 +39,7 @@ from ops import (
     ModelError,
 )
 from ops._private.harness import ExecArgs, _TestingPebbleClient
+from ops.jujucontext import _JujuContext
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import Port as Port_Ops
 from ops.model import Secret as Secret_Ops  # lol
@@ -96,12 +103,14 @@ class _MockExecProcess:
             self._args.stdin = self.stdin.read()
 
     def wait(self):
+        """Wait for the (mock) process to finish."""
         self._close_stdin()
         self._waited = True
         if self._return_code != 0:
             raise ExecError(list(self._args.command), self._return_code, None, None)
 
     def wait_output(self):
+        """Wait for the (mock) process to finish and return tuple of (stdout, stderr)."""
         self._close_stdin()
         self._waited = True
         stdout = self.stdout.read() if self.stdout is not None else None
@@ -116,6 +125,7 @@ class _MockExecProcess:
         return stdout, stderr
 
     def send_signal(self, sig: Union[int, str]) -> NoReturn:  # noqa: U100
+        """Send the given signal to the (mock) process."""
         raise NotImplementedError()
 
 
@@ -130,8 +140,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         event: "_Event",
         charm_spec: "_CharmSpec[CharmType]",
         context: "Context",
+        juju_context: "_JujuContext",
     ):
-        super().__init__()
+        super().__init__(juju_context=juju_context)
         self._state = state
         self._event = event
         self._context = context
@@ -148,8 +159,6 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         protocol: "_RawPortProtocolLiteral",
         port: Optional[int] = None,
     ):
-        # fixme: the charm will get hit with a StateValidationError
-        #  here, not the expected ModelError...
         port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
         if port_ not in ports:
@@ -201,10 +210,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise RelationNotFoundError() from None
 
     def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
-        # FIXME: what error would a charm get IRL?
-        # ops 2.0 supports secrets, but juju only supports it from 3.0.2
         if self._context.juju_version < "3.0.2":
-            raise RuntimeError(
+            raise ModelError(
                 "secrets are only available in juju >= 3.0.2."
                 "Set ``Context.juju_version`` to 3.0.2+ to use them.",
             )
@@ -225,16 +232,15 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 raise SecretNotFoundError(id)
             return secrets[0]
 
-        elif label:
+        if label:
             try:
                 return self._state.get_secret(label=label)
             except KeyError:
                 raise SecretNotFoundError(label) from None
 
-        else:
-            # if all goes well, this should never be reached. ops.model.Secret will check upon
-            # instantiation that either an id or a label are set, and raise a TypeError if not.
-            raise RuntimeError("need id or label.")
+        # if all goes well, this should never be reached. ops.model.Secret will check upon
+        # instantiation that either an id or a label are set, and raise a TypeError if not.
+        raise RuntimeError("need id or label.")
 
     def _check_app_data_access(self, is_app: bool):
         if not isinstance(is_app, bool):
@@ -254,14 +260,13 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         relation = self._get_relation_by_id(relation_id)
         if is_app and member_name == self.app_name:
             return relation.local_app_data
-        elif is_app:
+        if is_app:
             if isinstance(relation, PeerRelation):
                 return relation.local_app_data
-            elif isinstance(relation, (Relation, SubordinateRelation)):
+            if isinstance(relation, (Relation, SubordinateRelation)):
                 return relation.remote_app_data
-            else:
-                raise TypeError("relation_get: unknown relation type")
-        elif member_name == self.unit_name:
+            raise TypeError("relation_get: unknown relation type")
+        if member_name == self.unit_name:
             return relation.local_unit_data
 
         unit_id = int(member_name.split("/")[-1])
@@ -384,7 +389,6 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         else:
             tgt = relation.local_unit_data
         tgt[key] = value
-        return None
 
     def secret_add(
         self,
@@ -477,6 +481,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             expires=secret.expire,
             rotation=secret.rotate,
             rotates=None,  # not implemented yet.
+            model_uuid=self._state.model.uuid,
         )
 
     def secret_set(
@@ -581,10 +586,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         if isinstance(relation, PeerRelation):
             return self.app_name
-        elif isinstance(relation, (Relation, SubordinateRelation)):
+        if isinstance(relation, (Relation, SubordinateRelation)):
             return relation.remote_app_name
-        else:
-            raise TypeError("relation_remote_app_name: unknown relation type")
+        raise TypeError("relation_remote_app_name: unknown relation type")
 
     def action_set(self, results: Dict[str, Any]):
         if not self._event.action:
@@ -703,7 +707,6 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             "it's deprecated API)",
         )
 
-    # TODO: It seems like this method has no tests.
     def resource_get(self, resource_name: str) -> str:
         # We assume that there are few enough resources that a linear search
         # will perform well enough.

@@ -1,8 +1,8 @@
-name: Publish
+name: Publish (ops-scenario)
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - 'scenario-7.*'
 
 jobs:
   framework-tests:
@@ -12,7 +12,7 @@ jobs:
   hello-charm-tests:
     uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
-    name: Build and Publish to PyPI
+    name: Build and Publish ops-scenario to PyPI
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -27,9 +27,12 @@ jobs:
         run: pip install wheel build
       - name: Build
         run: python -m build
+        working-directory: ./testing
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1.4.3
+        uses: actions/attest-build-provenance@v2.2.0
         with:
-          subject-path: 'dist/*'
+          subject-path: 'testing/dist/*'
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+            packages-dir: ./testing/dist/

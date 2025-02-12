@@ -2,28 +2,28 @@ import os
 from tempfile import TemporaryDirectory
 
 import pytest
-from ops.charm import CharmBase, CharmEvents
-from ops.framework import EventBase
+
+import ops
 
 from scenario import Context
-from scenario.runtime import Runtime, UncaughtCharmError
 from scenario.state import Relation, State, _CharmSpec, _Event
+from scenario._runtime import Runtime, UncaughtCharmError
 
 
 def charm_type():
-    class _CharmEvents(CharmEvents):
+    class _CharmEvents(ops.CharmEvents):
         pass
 
-    class MyCharm(CharmBase):
-        on = _CharmEvents()
+    class MyCharm(ops.CharmBase):
+        on = _CharmEvents()  # type: ignore
         _event = None
 
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._catchall)
 
-        def _catchall(self, e):
+        def _catchall(self, e: ops.EventBase):
             if self._event:
                 return
             MyCharm._event = e
@@ -40,7 +40,7 @@ def test_event_emission():
 
         my_charm_type = charm_type()
 
-        class MyEvt(EventBase):
+        class MyEvt(ops.EventBase):
             pass
 
         my_charm_type.on.define_event("bar", MyEvt)
@@ -56,8 +56,8 @@ def test_event_emission():
             state=State(),
             event=_Event("bar"),
             context=Context(my_charm_type, meta=meta),
-        ):
-            pass
+        ) as manager:
+            manager.run()
 
         assert my_charm_type._event
         assert isinstance(my_charm_type._event, MyEvt)
@@ -85,11 +85,11 @@ def test_unit_name(app_name, unit_id):
         state=State(),
         event=_Event("start"),
         context=Context(my_charm_type, meta=meta),
-    ) as ops:
-        assert ops.charm.unit.name == f"{app_name}/{unit_id}"
+    ) as manager:
+        assert manager.charm.unit.name == f"{app_name}/{unit_id}"
 
 
-def test_env_cleanup_on_charm_error():
+def test_env_clean_on_charm_error():
     meta = {"name": "frank", "requires": {"box": {"interface": "triangle"}}}
 
     my_charm_type = charm_type()
@@ -101,14 +101,34 @@ def test_env_cleanup_on_charm_error():
         ),
     )
 
-    rel = Relation("box")
-    with pytest.raises(UncaughtCharmError):
+    remote_name = "ava"
+    rel = Relation("box", remote_app_name=remote_name)
+    with pytest.raises(UncaughtCharmError) as exc:
         with runtime.exec(
             state=State(relations={rel}),
             event=_Event("box_relation_changed", relation=rel),
             context=Context(my_charm_type, meta=meta),
-        ):
-            assert os.getenv("JUJU_REMOTE_APP")
+        ) as manager:
+            assert manager._juju_context.remote_app_name == remote_name
+            assert "JUJU_REMOTE_APP" not in os.environ
             _ = 1 / 0  # raise some error
+    # Ensure that some other error didn't occur (like AssertionError!).
+    assert "ZeroDivisionError" in str(exc.value)
 
+    # Ensure that the Juju environment didn't leak into the outside one.
     assert os.getenv("JUJU_REMOTE_APP", None) is None
+
+
+def test_juju_version_is_set_in_environ():
+    version = "2.9"
+
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: ops.StartEvent):
+            assert ops.JujuVersion.from_environ() == version
+
+    ctx = Context(MyCharm, meta={"name": "foo"}, juju_version=version)
+    ctx.run(ctx.on.start(), State())

@@ -36,7 +36,6 @@ docs = [
     "sphinx-tabs",
     "sphinxcontrib-jquery",
     "sphinxext-opengraph",
-    "ops-scenario>=7.0.5,<8",
 ]
 testing = [
     "ops-scenario>=7.0.5,<8",

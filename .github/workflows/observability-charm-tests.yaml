@@ -16,15 +16,11 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 7518ec8343941ca91248614fd8f2d50fdd9e068c  # rev135 2024-09-06T12:10:02Z
-          # Waiting for an upstream PR:
-          # https://github.com/canonical/prometheus-k8s-operator/pull/639
-          #- charm-repo: canonical/prometheus-k8s-operator
-          #  commit: 7518ec8343941ca91248614fd8f2d50fdd9e068c  # rev135 2024-09-06T12:10:02Z
-          # Waiting for an upstream PR:
-          # https://github.com/canonical/grafana-k8s-operator/pull/347
-          #- charm-repo: canonical/grafana-k8s-operator
-          #  commit: 1bd9e7fd96a9f5a91443e5932667c58a92c1ce5e  # 2024-09-03T14:57:42Z
+            commit: 76a98ac2e8eb94d2ef714039c2b8f365f937dedc  # rev149 2025-01-25T12:09:32Z
+          - charm-repo: canonical/prometheus-k8s-operator
+            commit: 62cd2d9b8c3a528910ce12c553209817e1b7a889 # rev226 2024-12-19T16:01:25Z
+          - charm-repo: canonical/grafana-k8s-operator
+            commit: 3c8db2d5ca7106bb39b5745de44732053888e190  # rev135 2025-01-28T15:24:39Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
@@ -41,7 +37,9 @@ jobs:
         run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
+        if: ${{ !(matrix.disabled) }}
         run: tox -vve unit
 
       - name: Run the charm's static analysis checks
+        if: ${{ !(matrix.disabled) }}
         run: tox -vve static-charm

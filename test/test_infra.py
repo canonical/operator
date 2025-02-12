@@ -76,7 +76,10 @@ def test_ops_testing_doc():
     expected_names.add('Container')
 
     found_names: typing.Set[str] = set()
-    for test_doc in ('docs/harness.rst', 'docs/state-transition-testing.rst'):
+    for test_doc in (
+        'docs/reference/ops-testing-harness.rst',
+        'docs/reference/ops-testing.rst',
+    ):
         with open(test_doc) as testing_doc:
             found_names.update({
                 line.split(prefix, 1)[1].strip()

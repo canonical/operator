@@ -39,7 +39,7 @@ from typing import (
 )
 
 from .errors import InconsistentScenarioError
-from .runtime import logger as scenario_logger
+from ._runtime import logger as scenario_logger
 from .state import (
     CharmType,
     PeerRelation,
@@ -170,14 +170,21 @@ def check_event_consistency(
     errors: List[str] = []
     warnings: List[str] = []
 
-    # custom event: can't make assumptions about its name and its semantics
-    # todo: should we then just skip the other checks?
     if not event._is_builtin_event(charm_spec):
+        # This is a custom event - we can't make assumptions about its name and
+        # semantics. It doesn't really make sense to do checks that are designed
+        # for relations, workloads, and so on - most likely those will end up
+        # with false positives. Realistically, we can't know about what the
+        # requirements for the custom event are (in terms of the state), so we
+        # skip everything here. Perhaps in the future, custom events could
+        # optionally include some sort of state metadata that made testing
+        # consistency possible?
         warnings.append(
             "this is a custom event; if its name makes it look like a builtin one "
-            "(e.g. a relation event, or a workload event), you might get some false-negative "
+            "(for example, a relation event, or a workload event), you might get some false-negative "
             "consistency checks.",
         )
+        return Results(errors, warnings)
 
     if event._is_relation_event:
         _check_relation_event(charm_spec, event, state, errors, warnings)
@@ -212,9 +219,11 @@ def _check_relation_event(
                 f"relation event should start with relation endpoint name. {event.name} does "
                 f"not start with {event.relation.endpoint}.",
             )
-        if event.relation.id not in {rel.id for rel in state.relations}:
+        if event.relation not in state.relations:
             errors.append(
-                f"cannot emit {event.name} because relation {event.relation.id} is not in the state.",
+                f"cannot emit {event.name} because relation {event.relation.id} is not in the "
+                f"state (a relation with the same ID is not sufficient - you must "
+                f"pass the object in the state to the event).",
             )
 
 
@@ -239,7 +248,8 @@ def _check_workload_event(
             if event.container not in state.containers:
                 errors.append(
                     f"cannot emit {event.name} because container {event.container.name} "
-                    f"is not in the state.",
+                    f"is not in the state (a container with the same name is not "
+                    f"sufficient - you must pass the object in the state to the event).",
                 )
             if not event.container.can_connect:
                 warnings.append(
@@ -308,12 +318,11 @@ def _check_storage_event(
             f"storage event {event.name} refers to storage {storage.name} "
             f"which is not declared in the charm metadata (metadata.yaml) under 'storage'.",
         )
-    elif (storage.name, storage.index) not in {
-        (s.name, s.index) for s in state.storages
-    }:
+    elif storage not in state.storages:
         errors.append(
             f"cannot emit {event.name} because storage {storage.name} "
-            f"is not in the state.",
+            f"is not in the state (an object with the same name and index is not "
+            f"sufficient - you must pass the object in the state to the event).",
         )
 
 
@@ -477,10 +486,12 @@ def check_secrets_consistency(
         return Results(errors, [])
 
     assert event.secret is not None
-    if event.secret.id not in {s.id for s in state.secrets}:
+    if event.secret not in state.secrets:
         secret_key = event.secret.id if event.secret.id else event.secret.label
         errors.append(
-            f"cannot emit {event.name} because secret {secret_key} is not in the state.",
+            f"cannot emit {event.name} because secret {secret_key} is not in the state "
+            f"(a secret with the same ID is not sufficient - you must pass the object "
+            f"in the state to the event).",
         )
     elif juju_version < (3,):
         errors.append(
