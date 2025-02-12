@@ -53,7 +53,7 @@ def _on_start(self, event: ops.StartEvent):
 
 ## Test the feature
 
-> See first: [](#get-started-with-charm-testing)
+> See first: {ref}`get-started-with-charm-testing`
 
 You'll want to add unit and integration tests.
 

@@ -1,3 +1,4 @@
+(get-started-with-charm-testing)=
 # Get started with charm testing
 
 Testing charm code is an essential part of charming. Here we will see how to get started with it. We will look at the templates we have available and the frameworks we can use to write good unit, integration, and functional tests.
