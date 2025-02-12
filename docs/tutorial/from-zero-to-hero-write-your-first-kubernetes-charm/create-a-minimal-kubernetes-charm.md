@@ -59,7 +59,7 @@ title: |
   demo-fastapi-k8s
 description: |
   This is a demo charm built on top of a small Python FastAPI server.
-  This charm could be related to PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
+  This charm could be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
 summary: |
   FastAPI Demo charm for Kubernetes
 ```

@@ -2107,7 +2107,7 @@ class MaintenanceStatus(StatusBase):
     ``apt install``, or is waiting for something under its control, such as
     ``pebble-ready`` or an exec operation in the workload container. In
     contrast to :class:`WaitingStatus`, "maintenance" reflects activity on
-    this unit or charm, not on peers or related units.
+    this unit (for unit status), or this app (for app status).
     """
 
     name = 'maintenance'
@@ -2120,7 +2120,7 @@ class WaitingStatus(StatusBase):
     example, a web app charm would set "waiting" status when it is integrated
     with a database charm that is not ready yet (it might be creating a
     database). In contrast to :class:`MaintenanceStatus`, "waiting" reflects
-    activity on related units, not on this unit or charm.
+    activity on other units, whether in this app or an integrated app.
     """
 
     name = 'waiting'

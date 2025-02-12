@@ -563,7 +563,7 @@ class RelationCreatedEvent(RelationEvent):
 class RelationJoinedEvent(RelationEvent):
     """Event triggered when a new unit joins a relation.
 
-    This event is triggered whenever a new unit of a related
+    This event is triggered whenever a new unit of an integrated 
     application joins the relation.  The event fires only when that
     remote unit is first observed by the unit. Callback methods bound
     to this event may set any local unit data that can be
@@ -579,8 +579,8 @@ class RelationJoinedEvent(RelationEvent):
 class RelationChangedEvent(RelationEvent):
     """Event triggered when relation data changes.
 
-    This event is triggered whenever there is a change to the data bucket for a
-    related application or unit. Look at ``event.relation.data[event.unit/app]``
+    This event is triggered whenever there is a change to the data bucket for an
+    integrated application or unit. Look at ``event.relation.data[event.unit/app]``
     to see the new information, where ``event`` is the event object passed to
     the callback method bound to this event.
 
@@ -682,7 +682,7 @@ class RelationBrokenEvent(RelationEvent):
 
 
 class StorageEvent(HookEvent):
-    """Base class representing storage-related events.
+    """Base class representing storage related events.
 
     Juju can provide a variety of storage types to a charms. The
     charms can define several different types of storage that are
@@ -766,7 +766,7 @@ class StorageDetachingEvent(StorageEvent):
 
 
 class WorkloadEvent(HookEvent):
-    """Base class representing workload-related events.
+    """Base class representing workload related events.
 
     Workload events are generated for all containers that the charm
     expects in metadata.
