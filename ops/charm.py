@@ -563,7 +563,7 @@ class RelationCreatedEvent(RelationEvent):
 class RelationJoinedEvent(RelationEvent):
     """Event triggered when a new unit joins a relation.
 
-    This event is triggered whenever a new unit of an integrated 
+    This event is triggered whenever a new unit of an integrated
     application joins the relation.  The event fires only when that
     remote unit is first observed by the unit. Callback methods bound
     to this event may set any local unit data that can be

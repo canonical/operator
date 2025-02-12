@@ -537,7 +537,7 @@ class Harness(Generic[CharmType]):
             # Note: Juju *does* fire relation events for a given relation in the sorted order of
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
-            # Juju only fires relation-changed (app) if there is data for the integrated application
+            # Juju only fires relation-changed (app) if there is data for the integrated app
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
