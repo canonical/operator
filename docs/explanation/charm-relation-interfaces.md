@@ -37,7 +37,6 @@ For each interface, the charm-relation-interfaces repository hosts:
 
 
 ## Charm relation interfaces in Charmhub
-In the future, Charmhub will have a searchable collection of relation interfaces. 
 Charmhub will, for all charms using the interface, verify that they implement it correctly (regardless of whether they use the 'official' implementation or they roll their own) in order to give the charm a happy checkmark on `charmhub.io`. In order to do that it will need to fetch the specification (from `charm-relation-interfaces`) *and* the charm repo, because we can't know what implementation they are using: we need the source code.
 
 
