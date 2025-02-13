@@ -65,7 +65,6 @@ from typing import (
     BinaryIO,
     Callable,
     Dict,
-    FrozenSet,
     Generator,
     Generic,
     Iterable,
@@ -2370,7 +2369,7 @@ class Client:
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
-    def _checks_action(self, action: str, checks: Iterable[str]) -> FrozenSet[str]:
+    def _checks_action(self, action: str, checks: Iterable[str]) -> List[str]:
         if isinstance(checks, (str, bytes)) or not hasattr(checks, '__iter__'):
             raise TypeError(f'checks must be of type Iterable[str], not {type(checks).__name__}')
 
@@ -2381,7 +2380,7 @@ class Client:
 
         body = {'action': action, 'checks': checks}
         resp = self._request('POST', '/v1/checks', body=body)
-        return frozenset(resp['result']['changed'])
+        return resp['result']['changed']
 
     def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -3100,7 +3099,7 @@ class Client:
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
 
-    def start_checks(self, checks: Iterable[str]) -> FrozenSet[str]:
+    def start_checks(self, checks: Iterable[str]) -> List[str]:
         """Start checks by name.
 
         Args:
@@ -3112,7 +3111,7 @@ class Client:
         """
         return self._checks_action('start', checks)
 
-    def stop_checks(self, checks: Iterable[str]) -> FrozenSet[str]:
+    def stop_checks(self, checks: Iterable[str]) -> List[str]:
         """Stop checks by name.
 
         Args:

@@ -817,19 +817,27 @@ class _MockPebbleClient(_TestingPebbleClient):
 
     def _update_state_check_infos(self):
         """Copy any new or changed check infos into the state."""
-        infos = frozenset({
-            CheckInfo(
+        infos: set[CheckInfo] = set()
+        for info in self._check_infos.values():
+            if isinstance(info.level, str):
+                level = pebble.CheckLevel(info.level)
+            else:
+                level = info.level
+            if isinstance(info.status, str):
+                status = pebble.CheckStatus(info.status)
+            else:
+                status = info.status
+            check_info = CheckInfo(
                 name=info.name,
-                level=info.level,
+                level=level,
                 startup=info.startup,
-                status=info.status,
+                status=status,
                 failures=info.failures,
                 threshold=info.threshold,
                 change_id=info.change_id,
             )
-            for info in self._check_infos.values()
-        })
-        object.__setattr__(self._container, "check_infos", infos)
+            infos.add(check_info)
+        object.__setattr__(self._container, "check_infos", frozenset(infos))
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
         super().replan_services(timeout=timeout, delay=delay)
@@ -845,13 +853,15 @@ class _MockPebbleClient(_TestingPebbleClient):
         super().add_layer(label, layer, combine=combine)
         self._update_state_check_infos()
 
-    def start_checks(self, names: List[str]):
-        super().start_checks(names)
+    def start_checks(self, names: List[str]) -> List[str]:
+        started = super().start_checks(names)
         self._update_state_check_infos()
+        return started
 
-    def stop_checks(self, names: List[str]):
-        super().stop_checks(names)
+    def stop_checks(self, names: List[str]) -> List[str]:
+        stopped = super().stop_checks(names)
         self._update_state_check_infos()
+        return stopped
 
     @property
     def _container(self) -> "ContainerSpec":

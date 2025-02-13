@@ -3386,10 +3386,15 @@ class _TestingPebbleClient:
             try:
                 info = self._check_infos[name]
             except KeyError:
+                status = (
+                    pebble.CheckStatus.INACTIVE
+                    if check.startup == pebble.CheckStartup.DISABLED
+                    else pebble.CheckStatus.UP
+                )
                 info = pebble.CheckInfo(
                     name,
                     level=check.level,
-                    status=pebble.CheckStatus.UP,
+                    status=status,
                     failures=0,
                     change_id=pebble.ChangeID(''),
                 )
@@ -3796,17 +3801,21 @@ class _TestingPebbleClient:
             if (level is None or level == info.level) and (names is None or info.name in names)
         ]
 
-    def start_checks(self, names: List[str]):
+    def start_checks(self, names: List[str]) -> List[str]:
         self._check_connection()
+        started: List[str] = []
         for name in names:
             if name not in self._check_infos:
                 raise self._api_error(404, f'cannot find check with name "{name}"')
             info = self._check_infos[name]
             if not info.change_id:
                 self._new_perform_check(info)
+                started.append(name)
+        return started
 
-    def stop_checks(self, names: List[str]):
+    def stop_checks(self, names: List[str]) -> List[str]:
         self._check_connection()
+        stopped: List[str] = []
         for name in names:
             if name not in self._check_infos:
                 raise self._api_error(404, f'cannot find check with name "{name}"')
@@ -3816,6 +3825,8 @@ class _TestingPebbleClient:
                 change.status = pebble.ChangeStatus.ABORT.value
                 info.status = pebble.CheckStatus.INACTIVE
                 info.change_id = pebble.ChangeID('')
+                stopped.append(name)
+        return stopped
 
     def notify(
         self,

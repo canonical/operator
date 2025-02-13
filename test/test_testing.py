@@ -7028,8 +7028,9 @@ class TestCloudSpec:
 
 
 class TestChecks:
-    def __init__(self):
-        self.layer = pebble.Layer({
+    @staticmethod
+    def _container_with_layer(request: pytest.FixtureRequest):
+        layer = pebble.Layer({
             'checks': {
                 'chk1': {
                     'override': 'replace',
@@ -7047,15 +7048,21 @@ class TestChecks:
                 },
             },
         })
-
-    def test_add_layer_with_checks(self):
-        harness = ops.testing.Harness(ops.CharmBase)
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta='name: mycharm\ncontainers:\n  mycontainer:',
+        )
+        request.addfinalizer(harness.cleanup)
         harness.set_can_connect('mycontainer', True)
         harness.begin()
         container = harness.charm.unit.get_container('mycontainer')
-        container.add_layer('mylayer', self.layer)
+        container.add_layer('mylayer', layer)
+        return container
+
+    def test_add_layer_with_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
         chk1 = container.get_checks('chk1')['chk1']
-        assert chk1.startup == pebble.CheckStartup.ENABLED
+        assert chk1.startup == pebble.CheckStartup.UNSET
         assert chk1.failures == 0
         assert chk1.status == pebble.CheckStatus.UP
         chk2 = container.get_checks('chk2')['chk2']
@@ -7067,30 +7074,18 @@ class TestChecks:
         assert chk3.failures == 0
         assert chk3.status == pebble.CheckStatus.INACTIVE
 
-    def test_start_checks(self):
-        harness = ops.testing.Harness(ops.CharmBase)
-        harness.set_can_connect('mycontainer', True)
-        harness.begin()
-        container = harness.charm.unit.get_container('mycontainer')
-        container.add_layer('mylayer', self.layer)
+    def test_start_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
         changed = container.start_checks('chk1', 'chk2', 'chk3')
         assert changed == {'chk3'}
 
-    def test_stop_checks(self):
-        harness = ops.testing.Harness(ops.CharmBase)
-        harness.set_can_connect('mycontainer', True)
-        harness.begin()
-        container = harness.charm.unit.get_container('mycontainer')
-        container.add_layer('mylayer', self.layer)
+    def test_stop_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
         changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == {'chk1', 'chk2'}
 
-    def test_stop_then_start(self):
-        harness = ops.testing.Harness(ops.CharmBase)
-        harness.set_can_connect('mycontainer', True)
-        harness.begin()
-        container = harness.charm.unit.get_container('mycontainer')
-        container.add_layer('mylayer', self.layer)
+    def test_stop_then_start(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
         changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == {'chk1', 'chk2'}
         changed = container.start_checks('chk1', 'chk2', 'chk3')
