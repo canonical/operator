@@ -59,12 +59,12 @@ title: |
   demo-fastapi-k8s
 description: |
   This is a demo charm built on top of a small Python FastAPI server.
-  This charm can be related to PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
+  This charm can be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
 summary: |
   FastAPI Demo charm for Kubernetes
 ```
 
-Second, add an environment constraint assuming the Juju version with the desired features and a Kubernetes-type cloud:
+Second, add a constraint assuming a Juju version with the required features and a Kubernetes-type cloud:
 
 ```text
 assumes:
