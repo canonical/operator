@@ -766,7 +766,7 @@ class StorageDetachingEvent(StorageEvent):
 
 
 class WorkloadEvent(HookEvent):
-    """Base class representing workload related events.
+    """Base class representing events to do with the workload.
 
     Workload events are generated for all containers that the charm
     expects in metadata.
