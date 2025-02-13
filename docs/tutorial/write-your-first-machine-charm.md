@@ -522,7 +522,7 @@ Congratulations, your charm user can view the version of the workload deployed f
 
 ## Tear things down
 
-> See [Juju | Tear down your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#tear-down-automatically)
+> See the automatic teardown instructions in {external+juju:ref}`Juju | Manage your deployment environment <manage-your-deployment-environment>`.
 
 
 

@@ -167,7 +167,7 @@ def test_pebble_ready_writes_config_file():
 ## Integration testing
 
 Where unit testing focuses on black-box method-by-method verification, integration testing focuses on the big picture. Typically integration tests check that the charm does not break (generally this means: blocks with status `blocked` or `error`) when a (mocked) cloud admin performs certain operations. These operations are scripted by using, in order of abstraction:
- -  shell commands against [the `juju` cli](https://juju.is/docs/olm/juju-cli-commands)
+ -  shell commands against [the `juju` CLI](inv:juju:std:label#list-of-juju-cli-commands)
  - [`python-libjuju`](https://github.com/juju/python-libjuju), wrapping juju api calls
    - [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator), a `pytest` plugin wrapping `python-libjuju`
    - [`zaza`](https://zaza.readthedocs.io/en/latest/index.html), a testing-framework-agnostic wrapper on top of `python-libjuju` 

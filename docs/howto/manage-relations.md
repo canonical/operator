@@ -59,7 +59,7 @@ requires:
 
 Other than this, implement a subordinate relation in the same way as any other relation. Note however that subordinate units cannot see each other's peer data.
 
-> See also: [Charm taxonomy](https://juju.is/docs/sdk/charm-taxonomy#heading--subordinate-charms)
+> See also: {external+juju:ref}`Juju | Charm taxonomy <charm-taxonomy>`
 
 ### Add code to use a relation
 
@@ -123,7 +123,7 @@ To use data received through the relation, have your charm observe the `relation
 framework.observe(self.on.replicas_relation_changed, self._update_configuration)
 ```
 
-> See more: [](ops.RelationChangedEvent), [`juju` | Relation (integration)](https://juju.is/docs/juju/relation#heading--permissions-around-relation-databags)
+> See more: [](ops.RelationChangedEvent), {external+juju:ref}`Juju | Relation (integration) <relation>`
 
 Most of the time, you should use the same holistic handler as when receiving other data, such as `secret-changed` and `config-changed`. To access the relation(s) in your holistic handler, use the [](ops.Model.get_relation) method or [](ops.Model.relations) attribute.
 

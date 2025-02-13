@@ -25,7 +25,7 @@ def _on_leader_elected(self, event: ops.LeaderElectedEvent):
 
 To have the leader notify other units about leadership changes, change data in a peer relation.
 
-> See more: [Peer Relations](https://juju.is/docs/juju/relation#heading--peer)
+> See more: {external+juju:ref}`Juju | Peer relations <relation>`
 
 [note status="Use the peer relation rather than `leader-setting-changed`"]
 In the past, this was done by observing a `leader-setting-changed` event, which is now deprecated.

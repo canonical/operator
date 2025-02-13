@@ -11,7 +11,7 @@ You will need a charm directory, the various tools in the charm SDK, Juju, and a
 
 You can get all of this by following our generic development setup guide, with some annotations. 
 
-> See [Set up / tear down automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#set-up-tear-down-automatically), with the following changes:
+> See the automatic setup instructions in {external+juju:ref}`Juju | Manage your deployment environment <manage-your-deployment-environment>`, with the following changes:
 > - At the directory step, call your directory `fastapi-demo`. 
 > - At the VM setup step, call your VM `charm-dev` and also set up Docker: 
 >     1. `sudo addgroup --system docker`
