@@ -322,7 +322,7 @@ Now,  integrate our charm with the newly deployed `postgresql-k8s` charm:
 juju integrate postgresql-k8s demo-api-charm
 ```
 
-> Read more: [Relation (integration)](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/relation/), [`juju integrate`](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/integrate/) 
+> Read more: {external+juju:ref}`Juju | Relation (integration) <relation>`, [`juju integrate`](inv:juju:std:label#command-juju-integrate)
 
 
 Finally, run:
