@@ -127,7 +127,7 @@ framework.observe(self.on.replicas_relation_changed, self._update_configuration)
 
 Most of the time, you should use the same holistic handler as when receiving other data, such as `secret-changed` and `config-changed`. To access the relation(s) in your holistic handler, use the [](ops.Model.get_relation) method or [](ops.Model.relations) attribute.
 
-> See also: {ref}`holistic-vs-delta-charms`
+> See also: [](/explanation/holistic-vs-delta-charms)
 
 If your change will have at most one relation on the endpoint, to get the `Relation` object use `Model.get_relation`; for example:
 
