@@ -110,7 +110,7 @@ def test_env_clean_on_charm_error():
             context=Context(my_charm_type, meta=meta),
         ) as manager:
             assert manager._juju_context.remote_app_name == remote_name
-            assert "JUJU_REMOTE_APP" not in os.environ
+            assert "JUJU_REMOTE_APP" in os.environ
             _ = 1 / 0  # raise some error
     # Ensure that some other error didn't occur (like AssertionError!).
     assert "ZeroDivisionError" in str(exc.value)
