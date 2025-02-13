@@ -1478,10 +1478,14 @@ class CheckInfo:
         self.startup = startup
         if change_id:
             self.status = status
-        else:
-            # No change ID means the check is inactive, or that the user has an
-            # old version of Pebble. We assume the former.
+        elif startup:
+            # This is a version of Pebble that supports stopping checks, which
+            # means that the check is inactive if it has no change ID.
             self.status = CheckStatus.INACTIVE
+        else:
+            # This must be an older version of Pebble that does not use changes
+            # to drive checks, which means that we just use the status as-is.
+            self.status = status
         self.failures = failures
         self.threshold = threshold
         self.change_id = change_id
@@ -3116,7 +3120,8 @@ class Client:
             checks: Non-empty list of checks to start.
 
         Returns:
-            Set of check names that were started.
+            Set of check names that were started. Checks that were already
+            running will not be included.
         """
         return self._checks_action('start', checks)
 
@@ -3127,7 +3132,8 @@ class Client:
             checks: Non-empty list of checks to stop.
 
         Returns:
-            Set of check names that were stopped.
+            Set of check names that were stopped. Checks that were already
+            inactive will not be included.
         """
         return self._checks_action('stop', checks)
 

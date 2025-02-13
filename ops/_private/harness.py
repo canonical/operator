@@ -3175,37 +3175,42 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
+    def _new_perform_check(self, info: pebble.CheckInfo) -> pebble.Change:
+        now = datetime.datetime.now()
+        change = pebble.Change(
+            pebble.ChangeID(str(uuid.uuid4())),
+            pebble.ChangeKind.PERFORM_CHECK.value,
+            summary=info.name,
+            status=pebble.ChangeStatus.DOING.value,
+            tasks=[],
+            ready=False,
+            err=None,
+            spawn_time=now,
+            ready_time=None,
+        )
+        info.change_id = change.id
+        info.status = pebble.CheckStatus.UP
+        info.failures = 0
+        self._changes[change.id] = change
+        return change
+
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
         for name, check in self._render_checks().items():
-            if check.startup != pebble.CheckStartup.DISABLED:
-                info = self._check_infos.get(name)
-                if info is None:
-                    info = pebble.CheckInfo(
-                        name=name,
-                        level=check.level,
-                        status=pebble.CheckStatus.UP,
-                        failures=0,
-                        threshold=3 if check.threshold is None else check.threshold,
-                        startup=check.startup,
-                    )
-                    self._check_infos[name] = info
-                if not info.change_id:
-                    info.status = pebble.CheckStatus.UP
-                    info.failures = 0
-                    now = datetime.datetime.now()
-                    change = pebble.Change(
-                        pebble.ChangeID(str(uuid.uuid4())),
-                        pebble.ChangeKind.PERFORM_CHECK.value,
-                        summary=name,
-                        status=pebble.ChangeStatus.DOING.value,
-                        tasks=[],
-                        ready=False,
-                        err=None,
-                        spawn_time=now,
-                        ready_time=now,
-                    )
-                    self._changes[change.id] = change
-                    info.change_id = change.id
+            if check.startup == pebble.CheckStartup.DISABLED:
+                continue
+            info = self._check_infos.get(name)
+            if info is None:
+                info = pebble.CheckInfo(
+                    name=name,
+                    level=check.level,
+                    status=pebble.CheckStatus.UP,
+                    failures=0,
+                    threshold=3 if check.threshold is None else check.threshold,
+                    startup=check.startup,
+                )
+                self._check_infos[name] = info
+            if not info.change_id:
+                self._new_perform_check(info)
         return self.autostart_services(timeout, delay)
 
     def start_services(
@@ -3393,21 +3398,8 @@ class _TestingPebbleClient:
             info.threshold = 3 if check.threshold is None else check.threshold
             info.startup = check.startup
             if info.startup != pebble.CheckStartup.DISABLED and not info.change_id:
-                info.status = pebble.CheckStatus.UP
-                info.failures = 0
-                change = pebble.Change(
-                    pebble.ChangeID(str(uuid.uuid4())),
-                    pebble.ChangeKind.PERFORM_CHECK.value,
-                    summary=name,
-                    status=pebble.ChangeStatus.DOING.value,
-                    tasks=[],
-                    ready=False,
-                    err=None,
-                    spawn_time=datetime.datetime.now(),
-                    ready_time=None,
-                )
-                self._changes[change.id] = change
-                info.change_id = change.id
+                self._new_perform_check(info)
+
 
     def _render_services(self) -> Dict[str, pebble.Service]:
         services: Dict[str, pebble.Service] = {}
@@ -3812,21 +3804,7 @@ class _TestingPebbleClient:
                 raise self._api_error(404, f'cannot find check with name "{name}"')
             info = self._check_infos[name]
             if not info.change_id:
-                info.status = pebble.CheckStatus.UP
-                info.failures = 0
-                change = pebble.Change(
-                    pebble.ChangeID(str(uuid.uuid4())),
-                    pebble.ChangeKind.PERFORM_CHECK.value,
-                    summary=name,
-                    status=pebble.ChangeStatus.DOING.value,
-                    tasks=[],
-                    ready=False,
-                    err=None,
-                    spawn_time=datetime.datetime.now(),
-                    ready_time=None,
-                )
-                self._changes[change.id] = change
-                info.change_id = change.id
+                self._new_perform_check(info)
 
     def stop_checks(self, names: List[str]):
         self._check_connection()
