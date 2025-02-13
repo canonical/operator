@@ -1,3 +1,4 @@
+(how-and-when-to-defer-events)=
 # How, and when, to defer events
 
 Deferring an event is a common pattern, and when used appropriately is a convenient tool for charmers. However, there are limitations to `defer()` - in particular, that the charm has no way to specify when the handler will be re-run, and that event ordering and context move away from the expected pattern. Our advice is that `defer()` is a good solution for some problems, but is best avoided for others.
