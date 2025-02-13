@@ -352,14 +352,10 @@ class Runtime:
                 ) from e
 
             finally:
-                for key, value in os.environ.copy().items():
-                    if key in previous_env:
-                        os.environ[key] = value
-                    else:
+                for key in tuple(os.environ):
+                    if key not in previous_env:
                         del os.environ[key]
-                for key, value in previous_env.items():
-                    if key not in os.environ:
-                        os.environ[key] = value
+                os.environ.update(previous_env)
                 logger.info(" - exited ops.main")
 
         context.emitted_events.extend(captured)
