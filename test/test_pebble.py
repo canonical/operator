@@ -1288,7 +1288,7 @@ class TestCheckInfo:
         )
         assert check.name == 'chk1'
         assert check.level == pebble.CheckLevel.READY
-        assert check.status == pebble.CheckStatus.INACTIVE  # No change-id means inactive.
+        assert check.status == pebble.CheckStatus.UP
         assert check.failures == 0
         assert check.threshold == 3
         assert check.change_id is None
@@ -1296,13 +1296,14 @@ class TestCheckInfo:
         check = pebble.CheckInfo(
             name='chk1',
             level=pebble.CheckLevel.READY,
-            status=pebble.CheckStatus.UP,
+            startup=pebble.CheckStartup.ENABLED,
+            status=pebble.CheckStatus.INACTIVE,
             threshold=3,
             change_id=pebble.ChangeID(''),
         )
         assert check.name == 'chk1'
         assert check.level == pebble.CheckLevel.READY
-        assert check.status == pebble.CheckStatus.INACTIVE  # Empty change-id means inactive.
+        assert check.status == pebble.CheckStatus.INACTIVE
         assert check.failures == 0
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('')
@@ -1310,6 +1311,7 @@ class TestCheckInfo:
         check = pebble.CheckInfo(
             name='chk2',
             level=pebble.CheckLevel.ALIVE,
+            startup=pebble.CheckStartup.DISABLED,
             status=pebble.CheckStatus.DOWN,
             failures=5,
             threshold=3,
@@ -1339,6 +1341,7 @@ class TestCheckInfo:
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
             'status': 'down',
+            'startup': 'enabled',
             'failures': 3,
             'threshold': 3,
             'change-id': '42',
@@ -1349,6 +1352,21 @@ class TestCheckInfo:
         assert check.failures == 3
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('42')
+
+        check = pebble.CheckInfo.from_dict({
+            'name': 'chk5',
+            'status': 'down',
+            'startup': 'enabled',
+            'failures': 3,
+            'threshold': 3,
+            'change-id': '',
+        })
+        assert check.name == 'chk5'
+        assert check.level == pebble.CheckLevel.UNSET
+        assert check.status == pebble.CheckStatus.INACTIVE  # Empty change-id means inactive.
+        assert check.failures == 3
+        assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('')
 
 
 _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]

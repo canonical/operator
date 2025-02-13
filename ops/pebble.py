@@ -1106,11 +1106,7 @@ class Check:
         except ValueError:
             level = dct.get('level', '')
         self.level = level
-        try:
-            startup: Union[CheckStartup, str] = CheckStartup(dct.get('startup', ''))
-        except ValueError:
-            startup = dct.get('startup', '')
-        self.startup = startup
+        self.startup = CheckStartup(dct.get('startup', ''))
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
@@ -1133,13 +1129,10 @@ class Check:
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
         level: str = self.level.value if isinstance(self.level, CheckLevel) else self.level
-        startup: str = (
-            self.startup.value if isinstance(self.startup, CheckStartup) else self.startup
-        )
         fields = [
             ('override', self.override),
             ('level', level),
-            ('startup', startup),
+            ('startup', self.startup.value),
             ('period', self.period),
             ('timeout', self.timeout),
             ('threshold', self.threshold),
@@ -1249,6 +1242,7 @@ class CheckStatus(enum.Enum):
 class CheckStartup(enum.Enum):
     """Enum of check startup options."""
 
+    UNSET = ''  # Note that this is treated as ENABLED.
     ENABLED = 'enabled'
     DISABLED = 'disabled'
 
@@ -1427,7 +1421,7 @@ class CheckInfo:
     This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
     """
 
-    startup: Union[CheckStartup, str]
+    startup: CheckStartup
     """Startup mode.
 
     :attr:`CheckStartup.ENABLED` means the check will be started when added, and
@@ -1471,21 +1465,12 @@ class CheckInfo:
         failures: int = 0,
         threshold: int = 0,
         change_id: Optional[ChangeID] = None,
-        startup: Union[CheckStartup, str] = CheckStartup.ENABLED,
+        startup: CheckStartup = CheckStartup.ENABLED,
     ):
         self.name = name
         self.level = level
         self.startup = startup
-        if change_id:
-            self.status = status
-        elif startup:
-            # This is a version of Pebble that supports stopping checks, which
-            # means that the check is inactive if it has no change ID.
-            self.status = CheckStatus.INACTIVE
-        else:
-            # This must be an older version of Pebble that does not use changes
-            # to drive checks, which means that we just use the status as-is.
-            self.status = status
+        self.status = status
         self.failures = failures
         self.threshold = threshold
         self.change_id = change_id
@@ -1498,21 +1483,23 @@ class CheckInfo:
         except ValueError:
             level = d.get('level')
         try:
-            startup = CheckStartup(d.get('startup', 'enabled'))
-        except ValueError:
-            startup = d.get('startup', 'enabled')
-        try:
             status = CheckStatus(d['status'])
         except ValueError:
             status = d['status']
+        change_id = ChangeID(d['change-id']) if 'change-id' in d else None
+        if not change_id and 'startup' in d:
+            # This is a version of Pebble that supports stopping checks, which
+            # means that the check is inactive if it has no change ID.
+            logger.debug('Check %s has raw status %s, but is inactive.', d['name'], status)
+            status = CheckStatus.INACTIVE
         return cls(
             name=d['name'],
             level=level,
-            startup=startup,
+            startup=CheckStartup(d.get('startup', 'enabled')),
             status=status,
             failures=d.get('failures', 0),
             threshold=d['threshold'],
-            change_id=ChangeID(d['change-id']) if 'change-id' in d else None,
+            change_id=change_id,
         )
 
     def __repr__(self):

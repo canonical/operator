@@ -3400,7 +3400,6 @@ class _TestingPebbleClient:
             if info.startup != pebble.CheckStartup.DISABLED and not info.change_id:
                 self._new_perform_check(info)
 
-
     def _render_services(self) -> Dict[str, pebble.Service]:
         services: Dict[str, pebble.Service] = {}
         for key in sorted(self._layers.keys()):
