@@ -2120,7 +2120,8 @@ class WaitingStatus(StatusBase):
     example, a web app charm would set "waiting" status when it is integrated
     with a database charm that is not ready yet (it might be creating a
     database). In contrast to :class:`MaintenanceStatus`, "waiting" reflects
-    activity on other units, whether in this app or an integrated app.
+    activity on integrated units (for unit status) and integrated apps (for
+    app status).
     """
 
     name = 'waiting'
