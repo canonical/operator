@@ -66,7 +66,6 @@ async def get_address(ops_test: OpsTest, app_name: str, unit_num: int = 0) -> st
     status = await ops_test.model.get_status()
     return status['applications'][app_name].public_address
 
-
 def is_port_open(host: str, port: int) -> bool:
     """Check if a port is opened in a particular host."""
     try:
