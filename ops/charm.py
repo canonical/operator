@@ -550,7 +550,7 @@ class RelationEvent(HookEvent):
 class RelationCreatedEvent(RelationEvent):
     """Event triggered when a new relation is created.
 
-    This is triggered when a new integration with another app is added in Juju. This
+    This is triggered when a new relation with another app is added in Juju. This
     can occur before units for those applications have started. All existing
     relations will trigger `RelationCreatedEvent` before :class:`~ops.StartEvent` is
     emitted.
@@ -563,7 +563,7 @@ class RelationCreatedEvent(RelationEvent):
 class RelationJoinedEvent(RelationEvent):
     """Event triggered when a new unit joins a relation.
 
-    This event is triggered whenever a new unit of a related
+    This event is triggered whenever a new unit of an integrated
     application joins the relation.  The event fires only when that
     remote unit is first observed by the unit. Callback methods bound
     to this event may set any local unit data that can be
@@ -579,8 +579,8 @@ class RelationJoinedEvent(RelationEvent):
 class RelationChangedEvent(RelationEvent):
     """Event triggered when relation data changes.
 
-    This event is triggered whenever there is a change to the data bucket for a
-    related application or unit. Look at ``event.relation.data[event.unit/app]``
+    This event is triggered whenever there is a change to the data bucket for an
+    integrated application or unit. Look at ``event.relation.data[event.unit/app]``
     to see the new information, where ``event`` is the event object passed to
     the callback method bound to this event.
 
@@ -682,7 +682,7 @@ class RelationBrokenEvent(RelationEvent):
 
 
 class StorageEvent(HookEvent):
-    """Base class representing storage-related events.
+    """Base class representing events to do with storage.
 
     Juju can provide a variety of storage types to a charms. The
     charms can define several different types of storage that are
@@ -766,7 +766,7 @@ class StorageDetachingEvent(StorageEvent):
 
 
 class WorkloadEvent(HookEvent):
-    """Base class representing workload-related events.
+    """Base class representing events to do with the workload.
 
     Workload events are generated for all containers that the charm
     expects in metadata.
@@ -1137,8 +1137,8 @@ class CollectStatusEvent(LifecycleEvent):
     requires a "port" config option set before it can proceed::
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
-                super().__init__(*args)
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
                 self.webapp = Webapp(self)
                 # initialize other components
 
@@ -1182,7 +1182,7 @@ class CharmEvents(ObjectEvents):
     By default, the events listed as attributes of this class will be
     provided via the :attr:`CharmBase.on` attribute. For example::
 
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        framework.observe(self.on.config_changed, self._on_config_changed)
 
     In addition to the events listed as attributes of this class,
     dynamically-named events will also be defined based on the charm's
@@ -1191,8 +1191,8 @@ class CharmEvents(ObjectEvents):
     ``self.on[<name>].<event>`` or using a prefix like
     ``self.on.<name>_<event>``, for example::
 
-        self.framework.observe(self.on["db"].relation_created, self._on_db_relation_created)
-        self.framework.observe(self.on.workload_pebble_ready, self._on_workload_pebble_ready)
+        framework.observe(self.on["db"].relation_created, self._on_db_relation_created)
+        framework.observe(self.on.workload_pebble_ready, self._on_workload_pebble_ready)
     """
 
     # NOTE: The one-line docstrings below are copied from the first line of
@@ -1302,10 +1302,10 @@ class CharmBase(Object):
         import ops
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, *args):
-                super().__init__(*args)
-                self.framework.observe(self.on.config_changed, self._on_config_changed)
-                self.framework.observe(self.on.stop, self._on_stop)
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on.config_changed, self._on_config_changed)
+                framework.observe(self.on.stop, self._on_stop)
                 # ...
 
         if __name__ == "__main__":

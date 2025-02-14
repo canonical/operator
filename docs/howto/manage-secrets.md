@@ -1,11 +1,8 @@
 (manage-secrets)=
 # How to manage secrets
+> See first: {external+juju:ref}`Juju | Secret <secret>`, {external+juju:ref}`Juju | Manage secrets <manage-secrets>`, {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
 
-<!-- UPDATE LINKS:
-> See first: [`juju` | Secret](https://juju.is/docs/juju/secret), [`juju` | Manage secrets](https://juju.is/docs/juju/manage-secrets), [`charmcraft` | Manage secrets]()
--->
-
-> Added in `ops 2.0.0`, `juju 3.0.2`
+> Added in `Juju 3.0.2`
 
 This document shows how to use secrets in a charm -- both when the charm is the secret owner as well as when it is merely an observer.
 
@@ -57,12 +54,9 @@ Note that:
 - The only data shared in plain text is the secret ID (a locator URI). The secret ID can be publicly shared. Juju will ensure that only remote apps/units to which the secret has explicitly been granted by the owner will be able to fetch the actual secret payload from that ID.
 - The secret needs to be granted to a remote entity (app or unit), and that always goes via a relation instance. By passing a relation to `grant` (in this case the event's relation), we are explicitly declaring the scope of the secret -- its lifetime will be bound to that of this relation instance.
 
-> See more: [`ops.Application.add_secret()`](https://ops.readthedocs.io/en/latest/#ops.Application.add_secret), 
-
-
+> See more: [](ops.Application.add_secret)
 
 ### Create a new secret revision
-
 
 To create a new secret revision, the owner charm must call `secret.set_content()` and pass in the new payload:
 
@@ -81,11 +75,13 @@ class MyDatabaseCharm(ops.CharmBase):
 
 This will inform Juju that a new revision is available, and Juju will inform all observers tracking older revisions that a new one is available, by means of a `secret-changed` hook.
 
+```{caution}
+If your charm creates new revisions, it **must** also add a handler for the `secret-remove` event, and call `remove_revision` in it. If not, old revisions will continually build up in the secret backend. See more: {ref}`howto-remove-a-secret`
+```
 
 ### Change the rotation policy or the expiration date of a secret
 
 Typically you want to rotate a secret periodically to contain the damage from a leak, or to avoid giving hackers too much time to break the encryption.
-
 
 A charm can configure a secret, at creation time, to have one or both of:
 
@@ -144,11 +140,8 @@ class MyDatabaseCharm(ops.CharmBase):
             self._rotate_webserver_secret(event.secret)
 ```
 
-
-
-
+(howto-remove-a-secret)=
 ### Remove a secret
-
 
 To remove a secret (effectively destroying it for good), the owner needs to call `secret.remove_all_revisions`. Regardless of the logic leading to the decision of when to remove a secret, the code will look like some variation of the following:
 
@@ -164,10 +157,9 @@ class MyDatabaseCharm(ops.CharmBase):
 
 After this is called, the observer charm will get a `ModelError` whenever it attempts to get the secret. In general, the presumption is that the observer charm will take the absence of the relation as indication that the secret is gone as well, and so will not attempt to get it.
 
-
 ### Remove a single secret revision
 
-Removing a single secret revision is a more common (and less drastic!) operation than removing all revisions.
+Removing a single secret revision is a more common (and less drastic!) operation than removing all revisions. If your charm creates new revisions of secrets, it **must** implement a `secret-remove` handler that calls `remove_revision`.
 
 Typically, the owner will remove a secret revision when it receives a `secret-remove` event -- that is, when that specific revision is no longer tracked by any observer. If a secret owner did remove a revision while it was still being tracked by observers, they would get a `ModelError` when they tried to get the secret.
 
@@ -184,16 +176,16 @@ class MyDatabaseCharm(ops.CharmBase):
                                self._on_secret_remove)
 
     def _on_secret_remove(self, event: ops.SecretRemoveEvent):
-        # all observers are done with this revision, remove it
+        # All observers are done with this revision, remove it:
         event.secret.remove_revision(event.revision)
 ```
-
 
 ### Revoke a secret
 
 For whatever reason, the owner of a secret can decide to revoke access to the secret to a remote entity. That is done by calling `secret.revoke`, and is the inverse of `secret.grant`.
 
 An example of usage might look like:
+
 ```python
 class MyDatabaseCharm(ops.CharmBase):
 
@@ -206,7 +198,6 @@ class MyDatabaseCharm(ops.CharmBase):
 ```
 
 Just like when the owner granted the secret, we need to pass a relation to the `revoke` call, making it clear what scope this action is to be applied to.
-
 
 ## Secret observer charm
 
@@ -255,11 +246,9 @@ Note that:
 - The observer charm gets a secret via the model (not its app/unit). Because it's the owner who decides who the secret is granted to, the ownership of a secret is not an observer concern. The observer code can rightfully assume that, so long as a secret ID is  shared with it, the owner has taken care to grant and scope the secret in such a way that the observer has the rights to inspect its contents.
 - The charm first gets the secret object from the model, then gets the secret's content (a dict) and accesses individual attributes via the dict's items.
 
-
-> See more: [`ops.Secret.get_content()`](https://ops.readthedocs.io/en/latest/#ops.Secret.get_content)
+> See more: [](ops.Secret.get_content)
 
 ### Label the secrets you're observing
-
 
 Sometimes a charm will observe multiple secrets. In the `secret-changed` event handler above, you might ask yourself: How do I know which secret has changed?
 The answer lies with **secret labels**: a label is a charm-local name that you can assign to a secret. Let's go through the following code:
@@ -318,7 +307,7 @@ So, having labelled the secret on creation, the database charm could add a new r
         secret.set_content(...)  # pass a new revision payload, as before
 ```
 
-> See more: [`ops.Model.get_secret()`](https://ops.readthedocs.io/en/latest/#ops.Model.get_secret)
+> See more: [](ops.Model.get_secret)
 
 #### When to use labels
 
@@ -326,12 +315,9 @@ When should you use labels? A label is basically the secret's *name* (local to t
 
 Most charms that use secrets have a fixed number of secrets each with a specific meaning, so the charm author should give them meaningful labels like `database-credential`, `tls-cert`, and so on. Think of these as "pets" with names.
 
-In rare cases, however, a charm will have a set of secrets all with the same meaning: for example, a set of TLS certificates that are all equally valid. In this case it doesn't make sense to label them -- think of them as "cattle". To distinguish between secrets of this kind, you can use the [`Secret.unique_identifier`](https://ops.readthedocs.io/en/latest/#ops.Secret.unique_identifier) property, added in ops 2.6.0.
+In rare cases, however, a charm will have a set of secrets all with the same meaning: for example, a set of TLS certificates that are all equally valid. In this case it doesn't make sense to label them -- think of them as "cattle". To distinguish between secrets of this kind, you can use the [`Secret.unique_identifier`](ops.Secret.unique_identifier) property.
 
-Note that [`Secret.id`](https://ops.readthedocs.io/en/latest/#ops.Secret.id), despite the name, is not really a unique ID, but a locator URI. We call this the "secret ID" throughout Juju and in the original secrets specification -- it probably should have been called "uri", but the name stuck.
-
-
-
+Note that [`Secret.id`](ops.Secret.id), despite the name, is not really a unique ID, but a locator URI. We call this the "secret ID" throughout Juju and in the original secrets specification -- it probably should have been called "uri", but the name stuck.
 
 ### Peek at a new secret revision
 
@@ -347,11 +333,9 @@ Sometimes, before reconfiguring to use a new credential revision, the observer c
         ...
 ```
 
-> See more: [`ops.Secret.peek_content()`](https://ops.readthedocs.io/en/latest/#ops.Secret.peek_content)
-
+> See more: [](ops.Secret.peek_content)
 
 ### Start tracking a different secret revision
-
 
 To update to a new revision, the web server charm will typically subscribe to the `secret-changed` event and call `get_content` with the "refresh" argument set (refresh asks Juju to start tracking the latest revision for this observer).
 
@@ -369,10 +353,7 @@ class MyWebserverCharm(ops.CharmBase):
         self._configure_db_credentials(content['username'], content['password'])
 ```
 
-
-> See more: [`ops.Secret.get_content()`](https://ops.readthedocs.io/en/latest/#ops.Secret.get_content)
-
-
+> See more: [](ops.Secret.get_content)
 
 <br>
 

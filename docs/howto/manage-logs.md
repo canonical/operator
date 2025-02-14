@@ -1,9 +1,7 @@
 (how-to-log-a-message-in-a-charm)=
 # How to log a message in a charm
 
-<!-- UPDATE LINKS:
-> See first: [`juju` | Log](https://juju.is/docs/juju/log), [`juju` | How to manage logs > Manage the logging configuration](https://juju.is/docs/juju/manage-logs#heading--manage-the-logging-configuration)
--->
+> See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | Manage logs <manage-logs>`
 
 <!--
 > 
@@ -12,7 +10,6 @@ The default logging level for a Juju model is `INFO`. To see, e.g., `DEBUG` leve
 -->
 
 To log a message in a charm, import Python's `logging` module, then use the `getLogger()` function with the desired level. For example:
-
 
 ```python
 import logging
@@ -25,11 +22,10 @@ class HelloOperatorCharm(ops.CharmBase):
     def _on_config_changed(self, _):
         current = self.config["thing"]
         if current not in self._stored.things:
-            # Note the use of the logger here
+            # Note the use of the logger here:
             logger.debug("found a new thing: %r", current)
             self._stored.things.append(current)
 ```
-
 
 > See more: 
 > - [`logging`](https://docs.python.org/3/library/logging.html), [`logging.getLogger()`](https://docs.python.org/3/library/logging.html#logging.getLogger)

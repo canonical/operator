@@ -1,9 +1,6 @@
 (manage-leadership-changes)=
 # Manage leadership changes
-
-<!-- UPDATE LINKS:
-> See first: [`juju` | Leader](https://juju.is/docs/juju/leader)
--->
+> See first: {external+juju:ref}`Juju | Leader unit <leader-unit>`
 
 ## Implement response to leadership changes
 
@@ -15,7 +12,7 @@ In the `src/charm.py` file, in the `__init__` function of your charm, set up an 
 self.framework.observe(self.on.leader_elected, self._on_leader_elected)
 ```
 
-> See more: [`ops.LeaderElectedEvent`](https://ops.readthedocs.io/en/latest/#ops.LeaderElectedEvent)
+> See more: [](ops.LeaderElectedEvent)
 
 Now, in the body of the charm definition, define the event handler. For example, the handler below will update a configuration file:
 
@@ -52,48 +49,11 @@ event or an `is-leader` check. If the charm code may run longer, then extra
 
 > See first: {ref}`get-started-with-charm-testing`
 
-
 ### Write unit tests
-
-> See first: {ref}`write-unit-tests-for-a-charm`
-
-When using Harness for unit tests, use the `set_leader()` method to control whether the unit is the leader. For example, to verify that leadership change is handled correctly:
-
-```python
-@pytest.fixture()
-def harness():
-    yield ops.testing.Harness(MyCharm)
-    harness.cleanup()
-
-
-def test_new_leader(harness):
-    # Before the test, the unit is not leader.
-    harness.set_leader(False)
-    harness.begin()
-    # Simulate Juju electing the unit as leader.
-    harness.set_leader(True)
-    # Assert that it was handled correctly.
-    assert ...
-
-
-def test_leader_sets_secrets(harness):
-    # The unit is the leader throughout the test, and no leader-elected event
-    # is emitted.
-    harness.set_leader(True)
-    harness.begin()
-    secret_id = harness.add_model_secret(APP_NAME, content={"secret": "sssh"})
-    harness.update_config(secret_option=secret_id)
-    # Assert that the config-changed handler set additional secret metadata:
-    assert ...
-```
-
-> See more: [`ops.testing.Harness.set_leader`](https://ops.readthedocs.io/en/latest/harness.html#ops.testing.Harness.set_leader)
-
-## Write scenario tests
 
 > See first: {ref}`write-scenario-tests-for-a-charm`
 
-When using Scenario for unit tests, pass the leadership status to the `State`. For example:
+To verify behaviour when leadership has changed, pass the leadership status to the `State`. For example:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -110,11 +70,10 @@ class MyCharm(ops.CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    ctx = scenario.Context(MyCharm, meta={"name": "foo"})
-    out = ctx.run('start', scenario.State(leader=leader))
-    assert out.unit_status == ops.ActiveStatus('I rule' if leader else 'I am ruled')
+    ctx = testing.Context(MyCharm, meta={"name": "foo"})
+    out = ctx.run(ctx.on.start(), testing.State(leader=leader))
+    assert out.unit_status == testing.ActiveStatus('I rule' if leader else 'I am ruled')
 ```
-
 
 ## Write integration tests
 
@@ -146,5 +105,3 @@ async def get_leader_unit(ops_test, app, model=None):
 > Examples: [Zookeeper testing upgrades](https://github.com/canonical/zookeeper-operator/blob/106f9c2cd9408a172b0e93f741d8c9f860c4c38e/tests/integration/test_upgrade.py#L22), [postgresql testing password rotation action](https://github.com/canonical/postgresql-k8s-operator/blob/62645caa89fd499c8de9ac3e5e9598b2ed22d619/tests/integration/test_password_rotation.py#L38)
 
 > See more: [`juju.unit.Unit.is_leader_from_status`](https://pythonlibjuju.readthedocs.io/en/latest/api/juju.unit.html#juju.unit.Unit.is_leader_from_status)
-
- 

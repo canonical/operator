@@ -66,7 +66,7 @@ When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the con
 
 ### Define the Prometheus relation interface
 
-In your `charmcraft.yaml` file, before the `peers` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrations with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
+In your `charmcraft.yaml` file, before the `peers` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrating with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
 
 ```yaml
 provides:
@@ -131,7 +131,7 @@ When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the con
 
 ### Define the Loki relation interface
 
-In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrations with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
+In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
 
 ```yaml
 requires:
@@ -283,9 +283,9 @@ juju deploy cos-lite --trust
 **Why put COS Lite in a separate model?** Because (1) it is always a good idea to separate logically unrelated applications in different models and (2) this way you can observe applications across all your models. PS In a production-grade scenario you would actually even want to put your COS Lite in a separate *cloud* (i.e., Kubernetes cluster). This is recommended, for example, to ensure proper hardware resource allocation.
 ```
 
-### Expose the application integration endpoints
+### Expose the application relation endpoints
 
-Once all the COS Lite applications are deployed and settled down (you can monitor this by using `juju status --watch 2s`),  expose the integration points you are interested in for your charm -- `loki:logging`, `grafana-dashboard`, and `metrics-endpoint` -- as below. 
+Once all the COS Lite applications are deployed and settled down (you can monitor this by using `juju status --watch 2s`),  expose the relation points you are interested in for your charm -- `loki:logging`, `grafana-dashboard`, and `metrics-endpoint` -- as below. 
 
 ```text
 juju offer prometheus:metrics-endpoint

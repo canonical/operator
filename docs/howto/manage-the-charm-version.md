@@ -39,7 +39,6 @@ there is no version, the key will not be present in the status output.
 Note that this is distinct from the charm **revision**, which is set when
 uploading a charm to CharmHub (or when deploying/refreshing for local charms).
 
-
 > Examples: [`container-log-archive-charm` sets `version` to a version control hash](https://git.launchpad.net/container-log-archive-charm/tree/)
 
 ## Test the feature

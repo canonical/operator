@@ -78,7 +78,7 @@ APP_NAME = METADATA['name']
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
-    """Build the charm-under-test and deploy it together with related charms.
+    """Build the charm-under-test and deploy it.
 
     Assert on the unit status before any relations/configurations take place.
     """

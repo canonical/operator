@@ -24,7 +24,7 @@ The library provides:
 - {ref}`ops_testing`, the recommended API for unit testing charms
 - {ref}`ops_testing_harness`, the deprecated API for unit testing charms
 
-You can structure your charm however you like, but with the `ops` library, you get a framework that promotes consistency and readability by following best practices. It also helps you organise your code better by separating different aspects of the charm, such as managing the application's state, handling integrations with other services, and making the charm easier to test.
+You can structure your charm however you like, but with the `ops` library, you get a framework that promotes consistency and readability by following best practices. It also helps you organise your code better by separating different aspects of the charm, such as managing the application's state, handling integrating with other services, and making the charm easier to test.
 
 
 ---------
@@ -83,11 +83,11 @@ As a community we adhere to the Ubuntu code of conduct.
 * **[Get support](https://discourse.charmhub.io/)**:
 Discourse is the go-to forum for all questions Ops.
 
-* **[Join our online chat](https://matrix.to/#/#charmhub-ops:ubuntu.com)**:
+* **[Join our online chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)**:
 Meet us in the #charmhub-charmdev channel on Matrix.
 
-* **[Report bugs](https://github.com/canonical/operator/)**:
+* **[Report bugs](https://github.com/canonical/operator/issues)**:
 We want to know about the problems so we can fix them.
 
-* **[Contribute docs](https://github.com/canonical/operator/tree/main/docs)**:
-The documentation sources on GitHub.
+* **[Contribute docs](https://github.com/canonical/operator/blob/main/HACKING.md#contributing-documentation)**:
+Get started on GitHub.

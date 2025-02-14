@@ -26,11 +26,11 @@ jobs:
         run: python -m build
         working-directory: ./testing
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1.4.3
+        uses: actions/attest-build-provenance@v2.2.0
         with:
           subject-path: 'testing/dist/*'
       - name: Publish to test.pypi.org
-        working-directory: ./testing
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          packages-dir: ./testing/dist/

@@ -13,15 +13,13 @@ Integration testing is only one part of a comprehensive testing strategy. See {r
 
 The instructions all use the Juju `python-libjuju` client, either through the `pytest-operator` library or directly.
 
-> See more: [`python-libjuju`](https://github.com/charmed-kubernetes/pytest-operator), {ref}`pytest-operator`
+> See more: [`python-libjuju`](https://pythonlibjuju.readthedocs.io/en/latest/), {ref}`pytest-operator`
 
 ## Prepare your environment
 
 In order to run integrations tests you will need to have your environment set up with `tox` installed.
 
-<!-- UPDATE LINKS
-> See more: {ref}`How to set up your development environment <set-up-your-development-environment>`
--->
+> See more: {external+juju:ref}`How to set up your development environment <manage-your-deployment-environment>`
 
 ## Prepare the `tox.ini` configuration file
 
@@ -100,9 +98,7 @@ As an alternative to `wait_for_idle`, you can explicitly block until the applica
 
 ### Deploy your charm with resources
 
-<!-- UPDATE LINKS
-> See also: [Resource (Charm)](https://juju.is/docs/juju/charm-resource)
--->
+> See first: `manage-resources`
 
 A charm can require `file` or `oci-image` `resources` to work, that can be provided to `ops_test.model.deploy`. In Charmhub, resources have revision numbers. For file resources already stored in Charmhub, you can use `ops_test.download_resources`:
 
@@ -136,7 +132,7 @@ For `oci-images` you can reference an image registry.
 
 ### Test a relation
 
-To test an integration between two applications, you can just integrate them through
+To test a relation between two applications, integrate them through
 the model. Both applications have to be deployed beforehand.
 
 ``` 
@@ -156,10 +152,7 @@ async def test_my_integration(ops_test: OpsTest):
 
 ### Test a configuration
 
-<!-- UPDATE LINKS
-
-> See also: [Configuration]()
--->
+> See first: {ref}`manage-configurations`
 
 You can set a configuration option in your application and check its results. 
 
@@ -180,9 +173,7 @@ async def test_config_changed(ops_test: OpsTest):
 
 ### Test an action
 
-<!-- UPDATE LINKS
-> See also: [Action]()
--->
+> See also: {external+juju:ref}`Action <action>`
 
 You can execute an action on a unit and get its results. 
 
@@ -219,11 +210,9 @@ How you can connect to a private or public address is dependent on your configur
 
 > Example implementations: [mongodb-k8s-operator](https://github.com/canonical/mongodb-k8s-operator/blob/8b9ebbee3f225ca98175c25781f1936dc4a62a7d/tests/integration/metrics_tests/test_metrics.py#L33), [tempo-k8s-operator](https://github.com/canonical/tempo-k8s-operator/blob/78a1143d99af99a1a56fe9ff82b1a3563e4fd2f7/tests/integration/test_integration.py#L69), [synapse](https://github.com/canonical/synapse-operator/blob/eb44f4959a00040f08b98470f8b17cae4cc616da/tests/integration/conftest.py#L170)
 
-<!-- UPDATE LINKS:
 > See more: 
-> - [Charm development best practices > Fetching network information]()
-> - [`juju` CLI commands > juju expose]()
--->
+> - {external+juju:ref}`Charm development best practices > Fetching network information <charm-development-best-practices>`
+> - {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
 
 ### Run a subprocess command within Juju context
 
@@ -285,15 +274,12 @@ Using the new alias, you can switch context to the new created model, similar to
 
 > Example implementations: [`charm-kubernetes-autoscaler`](https://github.com/charmed-kubernetes/charm-kubernetes-autoscaler/blob/8f4ddf5d66802ade73ed3aab2bb8d09fd9e4d63a/tests/integration/test_kubernetes_autoscaler.py#L31)
 
-<!-- UPDATE LINKS:
 > See more: 
-> - [Juju offers]()
-> - [How to manage clouds]()
+> - {external+juju:ref}`Juju offers <manage-offers>`
+> - {external+juju:ref}`How to manage clouds <manage-clouds>`
 > - [pytest-operator | track_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L720)
 > - [pytest-operator | model_context](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L480)
 > - [pytest-operator | forget_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L812)
--->
-
 
 ### Deploy a bundle
 
@@ -381,10 +367,6 @@ There are different ways of specifying a subset of tests to run using `pytest`. 
 ```
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
-
-<!-- UPDATE LINKS:
-> Example implementations: [`mysql-k8s-operator`]()
--->
 
 > See more: 
 > - [`pytest-operator` | `skip_if_deployed`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L139)

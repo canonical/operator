@@ -31,13 +31,7 @@ Unit tests are intended to be isolating and fast to complete. These are the test
 **Tools.** Unit testing a charm can be done using:
 
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [`ops.testing.Harness`](https://operator-framework.readthedocs.io/en/latest/#module-ops.testing) and/or {ref}``ops-scenario` <scenario>`
-
-<!--
-Unit tests are written using the `unittest` library shipped with Python or [pytest](https://pypi.org/project/pytest/). To facilitate unit testing of charms, use the [testing harness](https://juju.is/docs/sdk/testing) specifically designed for charmed operators which is available in the [Charmed Operator SDK](https://operator-framework.readthedocs.io/en/latest/#module-ops.testing). 
--->
-
-
+- [state transition testing](ops_testing), using the `ops` unit testing framework
 
 **Examples.**
 
@@ -64,7 +58,7 @@ Integration tests typically take significantly longer to run than unit tests.
 **Coverage.**
 
 * Charm actions
-* Charm integrations
+* Charm relations
 * Charm configurations
 * That the workload is up and running, and responsive
 * Upgrade sequence

@@ -15,13 +15,13 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: 4c4b810d0670af3e6c551fa6ea2b9e84a902a46e  # rev529 rev528 2024-11-27T16:35:24Z
+            commit: 1872cc713bc058f4cec768242640361c1f2099a3  # 2025-01-28T15:07:11Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: 2c41a8d20d0d51d2980f067894a1ec80e14e1296  # 2024-11-27T19:47:17Z
+            commit: 2b75c1e50de640708e0c9f0cbbeef7776974c725  # 2025-01-28T15:07:14Z
           - charm-repo: canonical/mysql-operator
-            commit: 21d23a26da074727d67f1b68dc3a915ed0252cc8  # 2024-11-27T14:48:18Z
+            commit: 5507e955f8847ad3d2fb16a42e0ddf8046548a07  # 2025-01-28T19:25:35Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: cf0d7f9dfe88270fc2fdd9989c098cb7006b82fd  # 2024-11-27T14:47:30Z
+            commit: e1be970a14a71ee4c9cc078d63661b75defe4cdf  # 2025-01-28T19:25:58Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
           path: myops
 
       - name: Install patch dependencies
-        run: pip install poetry~=1.6
+        run: pip install poetry~=2.0
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
@@ -44,7 +44,7 @@ jobs:
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
             sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock --no-update
+            poetry lock
           fi
 
       - name: Install dependencies

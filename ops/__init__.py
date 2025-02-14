@@ -20,8 +20,8 @@ This API provides core features to your charm, including:
   the base class for charm libraries.
 - :class:`~ops.framework.EventBase` class and individual event types, like
   the :class:`~ops.ActionEvent` class.
-- :class:`~ops.Framework` class, accessible as ``self.framework`` in a charm,
-  the main interface for the charm to `ops` library infrastructure, including:
+- :class:`~ops.Framework` class, the main interface for the charm to `ops` library
+  infrastructure, including:
 
   - :attr:`~ops.Framework.on` shorthand property used to
     :meth:`~ops.Framework.observe` and react to Juju events.

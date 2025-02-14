@@ -110,10 +110,25 @@ def test_env_clean_on_charm_error():
             context=Context(my_charm_type, meta=meta),
         ) as manager:
             assert manager._juju_context.remote_app_name == remote_name
-            assert "JUJU_REMOTE_APP" not in os.environ
+            assert "JUJU_REMOTE_APP" in os.environ
             _ = 1 / 0  # raise some error
     # Ensure that some other error didn't occur (like AssertionError!).
     assert "ZeroDivisionError" in str(exc.value)
 
     # Ensure that the Juju environment didn't leak into the outside one.
     assert os.getenv("JUJU_REMOTE_APP", None) is None
+
+
+def test_juju_version_is_set_in_environ():
+    version = "2.9"
+
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: ops.StartEvent):
+            assert ops.JujuVersion.from_environ() == version
+
+    ctx = Context(MyCharm, meta={"name": "foo"}, juju_version=version)
+    ctx.run(ctx.on.start(), State())

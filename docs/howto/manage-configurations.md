@@ -1,9 +1,6 @@
 (manage-configurations)=
 # Manage configurations
-
-<!-- UPDATE LINKS:
-> See first: [`juju` | Application configuration](https://juju.is/docs/juju/configuration#heading--application-configuration), [`juju` | Manage application configurations](https://juju.is/docs/juju/manage-applications#heading--configure-an-application), [`charmcraft` | Manage configurations]()
--->
+> See first: {external+juju:ref}`Juju | <application-configuration>`, {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`, {external+charmcraft:ref}`Charmcraft | Manage configurations <manage-configurations>`
 
 
 ## Implement the feature
@@ -24,7 +21,6 @@ config:
       description: skin for the Wiki
       type: string
 ```
-
 
 ### Observe the `config-changed` event and define the event handler
 
@@ -47,14 +43,14 @@ def _on_config_changed(self, event):
     logger.debug("New application port is requested: %s", port)
     self._update_layer_and_restart(None)
 ```
-> See more: [`ops.CharmBase.config`](https://ops.readthedocs.io/en/latest/#ops.CharmBase.config)
+
+> See more: [](ops.CharmBase.config)
 
 ```{caution}
 
  - Multiple configuration values can be changed at one time through Juju, resulting in only one `config_changed` event. Thus, your charm code must be able to process more than one config value changing at a time.
 - If `juju config` is run with values the same as the current configuration, the  `config_changed` event will not run. Therefore, if you have a single config value, there is no point in tracking its previous value -- the event will only be triggered if the value changes.
 - Configuration cannot be changed from within the charm code. Charms, by design, aren't able to mutate their own configuration by themselves (e.g., in order to ignore an admin-provided configuration), or to configure other applications. In Ops, one typically interacts with config via a read-only facade.
-
 ```
 
 ### (If applicable) Update and restart the Pebble layer
@@ -69,56 +65,27 @@ https://github.com/canonical/juju-sdk-tutorial-k8s/compare/01_create_minimal_cha
 
 > See first: {ref}`get-started-with-charm-testing`
 
-You'll want to add two levels of tests: unit and scenario.
-
 ### Write unit tests
 
 > See first: {ref}`write-unit-tests-for-a-charm`
 
-To use a unit test to verify that the configuration change is handled correct, the test needs to trigger the `config-changed` event and then check that the update method was called. In your `tests/unit/test_charm.py` file, add the following test functions to the file:
+To verify that the `config-changed` event validates the port, pass the new config to the `State`, and, after running the event, check the unit status. For example, in your `tests/unit/test_charm.py` file, add the following test function:
 
 ```python
-def test_invalid_port_configuration():
-    harness = ops.testing.Harness()
-    harness.begin()
+from ops import testing
 
-    harness.update_config({"server-port": 22})
-    assert isinstance(harness.model.unit.status, ops.BlockedStatus)
-
-def test_port_configuration(monkeypatch):
-    update_called = False
-    def mock_update(*args):
-        update_called = True
-    monkeypatch.setattr(MyCharm, "_update_layer_and_restart", mock_update)
-
-    harness = ops.testing.Harness()
-    harness.begin()
-
-    harness.update_config({"server-port": 8080})
-
-    assert update_called
-```
-
-### Write scenario tests
-
-> See first: {ref}`write-scenario-tests-for-a-charm`
-
-To use a Scenario test to verify that the `config-changed` event validates the port, pass the new config to the `State`, and, after running the event, check the unit status. For example, in your `tests/scenario/test_charm.py` file, add the following test function:
-
-```python
 def test_open_port():
-    ctx = scenario.Context(MyCharm)
+    ctx = testing.Context(MyCharm)
 
-    state_out = ctx.run("config_changed", scenario.State(config={"server-port": 22}))
+    state_out = ctx.run(ctx.on.config_changed(), testing.State(config={"server-port": 22}))
 
-    assert isinstance(state_out.unit_status, ops.BlockedStatus)
+    assert isinstance(state_out.unit_status, testingZ.BlockedStatus)
 ```
 
-### Test-deploy
+### Manually test
 
 To verify that the configuration option works as intended, pack your charm, update it in the Juju model, and run `juju config` followed by the name of the application deployed by your charm and then your newly defined configuration option key set to some value. For example, given the `server-port` key defined above, you could try:
 
 ```text
 juju config <name of application deployed by your charm> server-port=4000
 ```
-

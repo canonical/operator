@@ -22,7 +22,7 @@ When you're writing a charm, you will want to ensure that it will behave reliabl
 
 For example, that the various components -- relation data, Pebble services, or configuration files -- all behave as expected in response to an event.
 
-You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially `ops` built-in testing library -- [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
+You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially the operator framework's built-in testing library --  [](ops_testing_harness). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
 
 <!-- TODO
 
@@ -167,6 +167,8 @@ def test_get_db_info_action(monkeypatch: MonkeyPatch):
         'db-password': 'bar',
     }
 ```
+
+> Read more: [](ops_testing_harness)
 
 ## Run the test
 

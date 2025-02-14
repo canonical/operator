@@ -313,6 +313,12 @@ class Harness(Generic[CharmType]):
             self._meta,
             self._model,
             juju_debug_at=self._juju_context.debug_at,
+            # Harness tests will often have defer() usage without 'purging' the
+            # deferred handler with reemit(), but still expect the next emit()
+            # to result in a call, so we can't safely skip duplicate events.
+            # When behaviour matching production is required, Scenario tests
+            # should be used instead.
+            skip_duplicate_events=False,
         )
 
         warnings.warn(
@@ -531,7 +537,7 @@ class Harness(Generic[CharmType]):
             # Note: Juju *does* fire relation events for a given relation in the sorted order of
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
-            # Juju only fires relation-changed (app) if there is data for the related application
+            # Juju only fires relation-changed (app) if there is data for the integrated app
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
@@ -1915,10 +1921,9 @@ class Harness(Generic[CharmType]):
 
             # charm.py
             class ExampleCharm(ops.CharmBase):
-                def __init__(self, *args):
-                    super().__init__(*args)
-                    self.framework.observe(self.on["mycontainer"].pebble_ready,
-                                           self._on_pebble_ready)
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on["mycontainer"].pebble_ready, self._on_pebble_ready)
 
                 def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
                     self.hostname = event.workload.pull("/etc/hostname").read()
