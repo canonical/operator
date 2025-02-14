@@ -2,9 +2,6 @@
 # How to run workloads with a charm - machines
 
 There are several ways your charm might start a workload, depending on the type of charm you’re authoring. 
-<!--
-Before writing the code to start your workload, recall the [Lifecycle events](https://juju.is/docs/sdk/events) section, and note that when the `start` event is emitted, charm authors should ensure their workloads are configured to "persist in a started state without further intervention from Juju or an administrator".
--->
 
 For a machine charm, it is likely that packages will need to be fetched, installed and started to provide the desired charm functionality. This can be achieved by interacting with the system’s package manager, ensuring that package and service status is maintained by reacting to events accordingly.
 
