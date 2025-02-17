@@ -2370,7 +2370,7 @@ class Client:
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def _checks_action(self, action: str, checks: Iterable[str]) -> List[str]:
-        if isinstance(checks, (str, bytes)) or not hasattr(checks, '__iter__'):
+        if isinstance(checks, str) or not hasattr(checks, '__iter__'):
             raise TypeError(f'checks must be of type Iterable[str], not {type(checks).__name__}')
 
         checks = tuple(checks)
