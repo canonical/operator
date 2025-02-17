@@ -874,8 +874,8 @@ class CheckInfo(_max_posargs(1)):
     :attr:`ops.pebble.CheckStatus.UP` means the check is healthy (the number of
     failures is fewer than the threshold), :attr:`ops.pebble.CheckStatus.DOWN`
     means the check is unhealthy (the number of failures has reached the
-    threshold), and :attr:`ops.pebble.CheckStatus.INACTIVE` means the check is
-    not currently running.
+    threshold), and :attr:`ops.pebble.CheckStatus.INACTIVE` means the check has
+    been stopped, so is not currently running.
     """
 
     failures: int = 0
