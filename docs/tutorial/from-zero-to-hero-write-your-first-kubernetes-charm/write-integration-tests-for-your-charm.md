@@ -145,7 +145,7 @@ The test may again take some time to run.
 
 ```{tip}
 
-**Pro tip:** To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results; an example is https://github.com/canonical/spellbook .
+**Pro tip:** To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results; an example is [spellbook](https://github.com/canonical/spellbook).
 ```
 
 When it's done, the output should show two passing tests:
