@@ -28,7 +28,7 @@ def _on_holistic_handler(self, _: ops.EventBase):
 
 > See first: {ref}`get-started-with-charm-testing`
 
-You'll want to add unit and integration tests:
+You'll want to add unit and integration tests.
 
 ### Write unit tests
 
