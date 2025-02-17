@@ -574,6 +574,7 @@ def test_pebble_start_check():
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_foo_ready)
+            framework.observe(self.on.config_changed, self._on_config_changed)
 
         def _on_foo_ready(self, _):
             container = self.unit.get_container("foo")
@@ -581,13 +582,23 @@ def test_pebble_start_check():
                 "foo",
                 {"checks": {"chk1": {"override": "replace", "startup": "disabled"}}},
             )
+
+        def _on_config_changed(self, _):
+            container = self.unit.get_container("foo")
             container.start_checks("chk1")
 
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
     container = Container("foo", can_connect=True)
+
+    # Ensure that it starts as inactive.
     state_out = ctx.run(
         ctx.on.pebble_ready(container), state=State(containers={container})
     )
+    chk1_info = state_out.get_container("foo").get_check_info("chk1")
+    assert chk1_info.status == pebble.CheckStatus.INACTIVE
+
+    # Verify that start_checks works.
+    state_out = ctx.run(ctx.on.config_changed(), state=state_out)
     chk1_info = state_out.get_container("foo").get_check_info("chk1")
     assert chk1_info.status == pebble.CheckStatus.UP
 
