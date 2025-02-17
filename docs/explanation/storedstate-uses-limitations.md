@@ -103,7 +103,7 @@ def some_event_handler(event):
         return
 ```
 
-In the other cases where state is needed, authors ideally want to relate a charm to a database, attach storage (see Juju storage), or simply be opinionated, and hard code the single "correct" state into the charm. (Perhaps `ExampleBlog` should always be run in `production` mode when deployed as a charm?)
+In the other cases where state is needed, authors ideally want to integrate a charm with a database, attach storage (see Juju storage), or simply be opinionated, and hard code the single "correct" state into the charm. (Perhaps `ExampleBlog` should always be run in `production` mode when deployed as a charm?)
 
 > See more: {external+juju:ref}`Juju Storage <manage-storage>`
 

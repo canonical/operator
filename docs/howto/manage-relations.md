@@ -2,7 +2,7 @@
 # How to manage relations
 > See first: {external+juju:ref}`Juju | Relation <relation>`, {external+juju:ref}`Juju | Manage relations <manage-relations>`, {external+charmcraft:ref}`Charmcraft | Manage relations <manage-relations>`
 
-To add integration capabilities to a charm, you’ll have to define the relation in your charm’s charmcraft.yaml file and then add relation event handlers in your charm’s `src/charm.py` file.
+To add relation capabilities to a charm, you’ll have to define the relation in your charm’s charmcraft.yaml file and then add relation event handlers in your charm’s `src/charm.py` file.
 
 ## Implement the feature
 
@@ -65,7 +65,7 @@ Other than this, implement a subordinate relation in the same way as any other r
 
 #### Using a charm library
 
-For most integrations, you will now want to progress with using the charm library recommended by the charm that you are integrating with. Read the documentation for the other charm on Charmhub and follow the instructions, which will typically involve adding a requirer object in your charm’s `__init__` and then observing custom events.
+For most relations, you will now want to progress with using the charm library recommended by the charm that you are integrating with. Read the documentation for the other charm on Charmhub and follow the instructions, which will typically involve adding a requirer object in your charm’s `__init__` and then observing custom events.
 
 In most cases, the charm library will handle observing the Juju relation events, and your charm will only need to interact with the library’s custom API. Come back to this guide when you are ready to add tests.
 

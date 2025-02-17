@@ -288,7 +288,7 @@ config:
 ```
 
 
-> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml | Key config <recipe-key-config>`
+> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml | Key config <charmcraft-yaml-key-config>`
 
 Then, in the `src/charm.py` file, update the `_on_install` function to make use of the new configuration option, as below:
 
