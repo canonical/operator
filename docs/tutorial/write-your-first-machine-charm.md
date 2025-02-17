@@ -1,7 +1,7 @@
 (write-your-first-machine-charm)=
 # Write your first machine charm
 
-In this tutorial you will write a machine charm for Juju using ([Charmcraft](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) and) Ops.
+In this tutorial you will write a machine charm for Juju using {external+charmcraft:doc}`Charmcraft <index>` and Ops.
 
 <!-- TODO (tam)
 Add this link above:
