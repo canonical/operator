@@ -1146,6 +1146,16 @@ class TestModel:
             container.push_path(push_path, '/')
         assert container.exists('/src.txt'), 'push_path failed: file "src.txt" missing'
 
+    def test_juju_version_from_model(self):
+        version = '3.6.2'
+        context = _JujuContext.from_dict({'JUJU_VERSION': version})
+        backend = _ModelBackend('myapp/0', juju_context=context)
+        model = ops.Model(ops.CharmMeta(), backend)
+        assert model.juju_version == version
+        assert isinstance(model.juju_version, ops.JujuVersion)
+        # Make sure it's not being loaded from the environment.
+        assert JujuVersion.from_environ() == '0.0.0'
+
 
 class PushPullCase:
     """Test case for table-driven tests."""
