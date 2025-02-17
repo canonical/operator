@@ -9,10 +9,9 @@ the charm itself open a port.
 
 ## Implement the feature
 
-`ops` offers [](ops.Unit.open_port) and [](ops.Unit.close_port) methods, but
-typically it will be simpler for your charm to declare which ports should be
-open. For example, to set an open TCP port based on a configuration value, in
-your `src/charm.py` file, in your `config-changed` observer:
+It's simplest for your charm to use [](ops.Unit.set_ports) to to declare which ports
+should be open. For example, to set an open TCP port based on a configuration value,
+do the following in your `config-changed` observer in `src/charm.py`:
 
 ```python
 def _on_holistic_handler(self, _: ops.EventBase):
