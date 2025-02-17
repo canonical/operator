@@ -175,17 +175,17 @@ def test_get_db_info_action(monkeypatch: MonkeyPatch):
 In your Multipass Ubuntu VM shell, run your test as below:
 
 ```text
-ubuntu@charm-dev:~/juju-sdk-tutorial-k8s$ tox -e unit     
+ubuntu@charm-dev:~/fastapi-demo$ tox -e unit     
 ```
 
 You should get an output similar to the one below:
 
 ```text                                             
-unit: commands[0]> coverage run --source=/home/ubuntu/code/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/ubuntu/code/juju-sdk-tutorial-k8s/tests/unit
+unit: commands[0]> coverage run --source=/home/ubuntu/fastapi-demo/src -m pytest --tb native -v -s /home/ubuntu/fastapi-demo/tests/unit
 ======================================= test session starts ========================================
-platform linux -- Python 3.11.9, pytest-8.3.3, pluggy-1.5.0 -- /home/ubuntu/code/juju-sdk-tutorial-k8s/.tox/unit/bin/python
+platform linux -- Python 3.11.9, pytest-8.3.3, pluggy-1.5.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python
 cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/code/juju-sdk-tutorial-k8s
+rootdir: /home/ubuntu/fastapi-demo
 plugins: anyio-4.6.0
 collected 1 item                                                                                   
 
