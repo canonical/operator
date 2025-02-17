@@ -2943,11 +2943,13 @@ bad path\r
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 2
+        assert checks[0].change_id == pebble.ChangeID('1')
         assert checks[1].name == 'chk2'
         assert checks[1].level == pebble.CheckLevel.ALIVE
         assert checks[1].status == pebble.CheckStatus.DOWN
         assert checks[1].failures == 5
         assert checks[1].threshold == 3
+        assert checks[1].change_id == pebble.ChangeID('3')
 
         assert client.requests == [
             ('GET', '/v1/checks', {}, None),
@@ -2975,6 +2977,7 @@ bad path\r
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
+        assert checks[0].change_id == pebble.ChangeID('1')
 
         assert client.requests == [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
