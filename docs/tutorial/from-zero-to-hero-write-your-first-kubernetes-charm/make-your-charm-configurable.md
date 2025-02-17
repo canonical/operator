@@ -91,8 +91,8 @@ def _update_layer_and_restart(self) -> None:
         https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layers
     """
 
-    # Learn more about statuses in the SDK docs:
-    # https://juju.is/docs/sdk/status
+    # Learn more about statuses at:
+    # https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/status/
     self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
     try:
         self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
