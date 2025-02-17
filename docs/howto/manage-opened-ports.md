@@ -28,13 +28,11 @@ but the declarative approach is typically simpler.
 
 ## Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
-
 You'll want to add unit and integration tests.
 
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`get-started-with-charm-testing`, {ref}`write-scenario-tests-for-a-charm`
 
 In your unit tests, use the [](ops.testing.State.opened_ports) component of the
 input `State` to specify which ports are already open when the event is
@@ -54,7 +52,7 @@ def test_open_port():
 
 ### Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+> See first: {ref}`get-started-with-charm-testing`, {ref}`write-integration-tests-for-a-charm`
 
 To verify that the correct ports are open in an integration test, deploy your
 charm as usual, and then try to connect to the appropriate ports.
