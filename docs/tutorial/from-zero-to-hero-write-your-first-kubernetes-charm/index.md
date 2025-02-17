@@ -48,8 +48,8 @@ tutorial will guide you though each step.
 ```{toctree}
 :maxdepth: 1
 
-set-up-your-development-environment
 study-your-application
+set-up-your-development-environment
 create-a-minimal-kubernetes-charm
 make-your-charm-configurable
 integrate-your-charm-with-postgresql
