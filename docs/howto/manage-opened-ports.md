@@ -34,9 +34,9 @@ You'll want to add unit and integration tests.
 
 > See first: {ref}`write-scenario-tests-for-a-charm`
 
-In your unit tests, include any ports that are already open when the event is
-run in the [](ops.testing.State.opened_ports) component of the input `State`
-(any ports not listed are assumed to be closed). After events that modify which
+In your unit tests, use the [](ops.testing.State.opened_ports) component of the
+input `State` to specify which ports are already open when the event is
+run. Ports that are not listed are assumed to be closed. After events that modify which
 ports are open, assert that the output `State` has the correct set of ports. 
 
 For example, in `tests/unit/test_charm.py`, this verifies that when the
