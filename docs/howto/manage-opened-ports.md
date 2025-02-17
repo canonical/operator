@@ -57,8 +57,8 @@ def test_open_port():
 To verify that the correct ports are open in an integration test, deploy your
 charm as usual, and then try to connect to the appropriate ports.
 
-Added to your `tests/integration/test_charm.py` file, this test verifies a charm
-that opens a port specified in the configuration, but prohibits using port 22:
+By adding the following test to your `tests/integration/test_charm.py` file, you can verify
+that your charm opens a port specified in the configuration, but prohibits using port 22:
 
 ```python
 async def get_address(ops_test: OpsTest, app_name: str, unit_num: int = 0) -> str:
