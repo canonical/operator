@@ -534,7 +534,7 @@ def check_network_consistency(
     endpoints = {endpoint for endpoint, _ in all_relations}
     if collisions := endpoints.intersection(meta_bindings):
         errors.append(
-            f"Extra bindings and integration endpoints cannot share the same name: {collisions}.",
+            f"Extra bindings and relation endpoints cannot share the same name: {collisions}.",
         )
 
     return Results(errors, [])

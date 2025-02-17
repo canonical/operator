@@ -20,8 +20,8 @@ For simplicity, we refer to them as 'unit' tests in the charm context.
 
 Writing these tests should nudge you into thinking of a charm as a black-box
 input->output function. The input is the union of an `Event` (why am I, charm,
-being executed), a `State` (am I leader? what is my integration data? what is my
-config?...) and the charm's execution `Context` (what integrations can I have?
+being executed), a `State` (am I leader? what is my relation data? what is my
+config?...) and the charm's execution `Context` (what relations can I have?
 what containers can I have?...). The output is another `State`: the state after
 the charm has had a chance to interact with the mocked Juju model and affect the
 state.
@@ -49,7 +49,7 @@ A test consists of three broad steps:
       assertions on APIs and state internal to it.
 
 The most basic scenario is one in which all is defaulted and barely any data is
-available. The charm has no config, no integrations, no leadership, and its
+available. The charm has no config, no relations, no leadership, and its
 status is `unknown`. With that, we can write the simplest possible test:
 
 .. code-block:: python
