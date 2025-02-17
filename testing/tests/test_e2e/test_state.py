@@ -253,15 +253,17 @@ def test_relation_set(mycharm):
     }
 
 
-@pytest.mark.parametrize("id", ("", None, "28"))
+def test_checkinfo_changeid_none():
+    info = CheckInfo("foo", change_id=None)
+    assert info.change_id, "None should result in a random change_id"
+    info2 = CheckInfo("foo")  # None is also the default.
+    assert info.change_id != info2.change_id
+
+
+@pytest.mark.parametrize("id", ("", "28"))
 def test_checkinfo_changeid(id: Optional[str]):
     info = CheckInfo("foo", change_id=ops.pebble.ChangeID(id))
-    if id is None:
-        assert info.change_id, "None should result in a random change_id"
-        info2 = CheckInfo("foo")
-        assert info.change_id != info2.change_id
-    else:
-        assert info.change_id == ops.pebble.ChangeID(id)
+    assert info.change_id == ops.pebble.ChangeID(id)
 
 
 @pytest.mark.parametrize(
