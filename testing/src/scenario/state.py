@@ -902,6 +902,9 @@ class CheckInfo(_max_posargs(1)):
                 change_id = pebble.ChangeID(_generate_new_change_id())
             object.__setattr__(self, "change_id", change_id)
 
+    def __hash__(self) -> int:
+        return hash(self.id)
+
     def _to_ops(self) -> pebble.CheckInfo:
         return pebble.CheckInfo(
             name=self.name,
