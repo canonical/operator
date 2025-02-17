@@ -22,10 +22,12 @@ The  application that we will charm in this tutorial is based on the Python Fast
 
 **What you'll need:** 
 
-- A working station, e.g., a laptop with amd64 architecture. 
-- Familiarity with Juju.
-- Familiarity with the Python programming language, Object-Oriented Programming, event handlers.
-- Understanding of Kubernetes fundamentals.
+- A workstation. For example, a laptop with an amd64 architecture. 
+- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
+
+It will also help if you are familiar with Juju and have an understanding of
+Kubernetes fundamentals, but don't worry if you're new to these topics. This
+tutorial will guide you though each step.
 
 **What you'll do:**
 
@@ -60,7 +62,7 @@ write-integration-tests-for-your-charm
 (tutorial-kubernetes-next-steps)=
 ## Next steps
 
-By the end of this tutorial you will have built a machine charm and evolved it in a number of typical ways. But there is a lot more to explore:
+By the end of this tutorial you will have built a Kubernetes charm and evolved it in a number of typical ways. But there is a lot more to explore:
 
 | If you are wondering... | visit...             |
 |-------------------------|----------------------|
