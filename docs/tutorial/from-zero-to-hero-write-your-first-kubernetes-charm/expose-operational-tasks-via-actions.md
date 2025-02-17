@@ -62,7 +62,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
     database access points by calling the `fetch_postgres_relation_data` method and creates
     an output dictionary containing the host, port, if show_password is True, then include
     username, and password of the database.
-    If the postgresql charm is not integrated, the output is set to "No database connected".
+    If the PostgreSQL charm is not integrated, the output is set to "No database connected".
 
     Learn more about actions at https://juju.is/docs/sdk/actions
     """
