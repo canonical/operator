@@ -2,8 +2,8 @@
 # How to manage opened ports
 > See first: {external+juju:ref}`Juju | Hook Commands | open-port <hook-command-open-port>`
 
-Juju manages the IP of each unit, so you need to instruct Juju when you need to
-have a stable address on which to reach the charm. Typically, charms manage this
+Juju manages the IP of each unit, so you need to instruct Juju
+if you want the charm to have a stable address. Typically, charms manage this
 by offering to integrate with an ingress charm, but you may also wish to have
 the charm itself open a port.
 
