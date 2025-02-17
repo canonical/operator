@@ -9,9 +9,9 @@ the charm itself open a port.
 
 ## Implement the feature
 
-It's simplest for your charm to use [](ops.Unit.set_ports) to to declare which ports
-should be open. For example, to set an open TCP port based on a configuration value,
-do the following in your `config-changed` observer in `src/charm.py`:
+Use [](ops.Unit.set_ports) to to declare which ports should be open. For
+example, to set an open TCP port based on a configuration value, do the
+following in your `config-changed` observer in `src/charm.py`:
 
 ```python
 def _on_holistic_handler(self, _: ops.EventBase):
@@ -22,6 +22,9 @@ def _on_holistic_handler(self, _: ops.EventBase):
 > See more: [](ops.Unit.set_ports)
 
 > Examples: [mysql-k8s opens the MySQL ports](https://github.com/canonical/mysql-k8s-operator/blob/a68147d0fbf66386ab087f4cfcc19784fcc2be6e/src/charm.py#L648), [tempo-coordinator-k8s opens both server and receiver ports](https://github.com/canonical/tempo-coordinator-k8s-operator/blob/ece268eae1158760513807a02972c138fd39afcf/src/charm.py#L95)
+
+`ops` also offers [](ops.Unit.open_port) and [](ops.Unit.close_port) methods,
+but the declarative approach is typically simpler.
 
 ## Test the feature
 
