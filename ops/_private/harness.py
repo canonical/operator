@@ -3175,7 +3175,42 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
+    def _new_perform_check(self, info: pebble.CheckInfo) -> pebble.Change:
+        now = datetime.datetime.now()
+        change = pebble.Change(
+            pebble.ChangeID(str(uuid.uuid4())),
+            pebble.ChangeKind.PERFORM_CHECK.value,
+            summary=info.name,
+            status=pebble.ChangeStatus.DOING.value,
+            tasks=[],
+            ready=False,
+            err=None,
+            spawn_time=now,
+            ready_time=None,
+        )
+        info.change_id = change.id
+        info.status = pebble.CheckStatus.UP
+        info.failures = 0
+        self._changes[change.id] = change
+        return change
+
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
+        for name, check in self._render_checks().items():
+            if check.startup == pebble.CheckStartup.DISABLED:
+                continue
+            info = self._check_infos.get(name)
+            if info is None:
+                info = pebble.CheckInfo(
+                    name=name,
+                    level=check.level,
+                    status=pebble.CheckStatus.UP,
+                    failures=0,
+                    threshold=3 if check.threshold is None else check.threshold,
+                    startup=check.startup,
+                )
+                self._check_infos[name] = info
+            if not info.change_id:
+                self._new_perform_check(info)
         return self.autostart_services(timeout, delay)
 
     def start_services(
@@ -3346,12 +3381,35 @@ class _TestingPebbleClient:
         else:
             self._layers[label] = layer_obj
 
+        # Checks are started when the layer is added, not (only) on replan.
+        for name, check in layer_obj.checks.items():
+            try:
+                info = self._check_infos[name]
+            except KeyError:
+                status = (
+                    pebble.CheckStatus.INACTIVE
+                    if check.startup == pebble.CheckStartup.DISABLED
+                    else pebble.CheckStatus.UP
+                )
+                info = pebble.CheckInfo(
+                    name,
+                    level=check.level,
+                    status=status,
+                    failures=0,
+                    change_id=pebble.ChangeID(''),
+                )
+                self._check_infos[name] = info
+            info.level = check.level
+            info.threshold = 3 if check.threshold is None else check.threshold
+            info.startup = check.startup
+            if info.startup != pebble.CheckStartup.DISABLED and not info.change_id:
+                self._new_perform_check(info)
+
     def _render_services(self) -> Dict[str, pebble.Service]:
         services: Dict[str, pebble.Service] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # TODO: merge existing services https://github.com/canonical/operator/issues/1112
                 services[name] = service
         return services
 
@@ -3742,6 +3800,33 @@ class _TestingPebbleClient:
             for info in self._check_infos.values()
             if (level is None or level == info.level) and (names is None or info.name in names)
         ]
+
+    def start_checks(self, names: List[str]) -> List[str]:
+        self._check_connection()
+        started: List[str] = []
+        for name in names:
+            if name not in self._check_infos:
+                raise self._api_error(404, f'cannot find check with name "{name}"')
+            info = self._check_infos[name]
+            if not info.change_id:
+                self._new_perform_check(info)
+                started.append(name)
+        return started
+
+    def stop_checks(self, names: List[str]) -> List[str]:
+        self._check_connection()
+        stopped: List[str] = []
+        for name in names:
+            if name not in self._check_infos:
+                raise self._api_error(404, f'cannot find check with name "{name}"')
+            info = self._check_infos[name]
+            if info.change_id:
+                change = self._changes[info.change_id]
+                change.status = pebble.ChangeStatus.ABORT.value
+                info.status = pebble.CheckStatus.INACTIVE
+                info.change_id = pebble.ChangeID('')
+                stopped.append(name)
+        return stopped
 
     def notify(
         self,
