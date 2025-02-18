@@ -1489,7 +1489,6 @@ class CheckInfo:
         if not change_id and 'startup' in d:
             # This is a version of Pebble that supports stopping checks, which
             # means that the check is inactive if it has no change ID.
-            logger.debug('Check %s has raw status %s, but is inactive.', d['name'], status)
             status = CheckStatus.INACTIVE
         return cls(
             name=d['name'],
