@@ -252,8 +252,7 @@ The diagram below illustrates the workflow for the case where the database relat
 
 Now that the charm is getting more complex, there are many more cases where the unit status needs to be set. It's often convenient to do this in a more declarative fashion, which is where the collect-status event can be used.
 
-<!-- TODO: this page doesn't belong in the Juju docs, it should be moved over to ops and this can be a local reference. -->
-> Read more: [Events > Collect App Status and Collect Unit Status](https://juju.is/docs/sdk/events-collect-app-status-and-collect-unit-status)
+> Read more: [](ops.CollectStatusEvent)
 
 In your charm's `__init__` add a new observer:
 
