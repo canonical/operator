@@ -35,9 +35,11 @@ class HelloOperatorCharm(ops.CharmBase):
 > - [`logging.getLogger().info()`](https://docs.python.org/3/library/logging.html#logging.Logger.info)
 > - [`logging.getLogger().debug()`](https://docs.python.org/3/library/logging.html#logging.Logger.debug)
 
-Juju automatically picks up logs from charm code that uses the Python [logging facility](https://docs.python.org/3/library/logging.html), so we can use the Juju [`debug-log` command](inv:juju:std:label#command-juju-debug-log) to display logs for a model. Note that it shows logs from the charm code (charm container), but not the workload container.
+Juju automatically picks up logs from charm code that uses the Python [logging facility](https://docs.python.org/3/library/logging.html), so we can use the Juju `debug-log` command to display logs for a model. Note that it shows logs from the charm code (charm container), but not the workload container.
 
 Besides logs, `stderr` is also captured by Juju. So, if a charm generates a warning, it will also end up in Juju's debug log. This behaviour is consistent between K8s charms and machine charms.
+
+> See more: {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
 **Tips for good practice:**
 
