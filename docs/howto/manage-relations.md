@@ -75,6 +75,7 @@ In most cases, the charm library will handle observing the Juju relation events,
 
 If you are developing your own interface - most commonly for charm-specific peer data exchange, then you will need to observe the Juju relation events and add appropriate handlers.
 
+(set-up-a-relation)=
 ##### Set up a relation
 
 To do initial setup work when a charm is first integrated with another charm (or, in the case of a peer relation, when a charm is first deployed) your charm will need to observe the relation-created event. For example, a charm providing a database relation might need to create the database and credentials, so that the requirer charm can use the database. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-created` event observers for the relevant relations and pair those with an event handler.
