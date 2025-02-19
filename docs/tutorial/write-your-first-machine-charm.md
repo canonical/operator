@@ -230,10 +230,11 @@ Machine  State    Address         Inst id        Base          AZ  Message
 
 ```
 
-Finally, test that the service works by executing `curl` on your application unit:
+Finally, use `curl` to test that the service works. Get the address of the running machine from the Juju status
+(10.122.219.101 in this example), then run `curl`:
 
 ```text
-ubuntu@charm-dev:~/microsample-vm$  juju exec --unit microsample/0 -- "curl -s http://localhost:8080"
+ubuntu@charm-dev:~/microsample-vm$  curl http://10.122.219.101:8080
 Online
 ```
 
