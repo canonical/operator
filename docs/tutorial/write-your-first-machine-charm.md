@@ -42,7 +42,9 @@ The application has other features that we can exploit, but for now this is enou
 
 ## Set up your development environment
 
-> See more: {external+juju:ref}`Juju | Manage your deployment environment > Automatically <manage-your-deployment-environment>` for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm. At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD.
+See {external+juju:ref}`Juju | Manage your deployment environment > Set things up <set-things-up>` for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm.
+
+At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD.
 
 ```{important}
 
@@ -522,7 +524,7 @@ Congratulations, your charm user can view the version of the workload deployed f
 
 ## Tear things down
 
-> See the automatic teardown instructions in {external+juju:ref}`Juju | Manage your deployment environment <manage-your-deployment-environment>`.
+See {external+juju:ref}`Juju | Manage your deployment environment > Tear things down <tear-things-down>`.
 
 
 

@@ -9,22 +9,20 @@ In this chapter of the tutorial you will set up your development environment.
 
 You will need a charm directory, the various tools in the charm SDK, Juju, and a Kubernetes cloud. And it’s a good idea if you can do all your work in an isolated development environment. 
 
-You can get all of this by following our generic development setup guide, with some annotations. 
+To set all of this up, see {external+juju:ref}`Juju | Manage your deployment environment > Set things up <set-things-up>`, with the following changes: 
 
-> See the automatic setup instructions in {external+juju:ref}`Juju | Manage your deployment environment <manage-your-deployment-environment>`, with the following changes:
-> - At the directory step, call your directory `fastapi-demo`. 
-> - At the VM setup step, call your VM `charm-dev` and also set up Docker: 
->     1. `sudo addgroup --system docker`
->     1. `sudo adduser $USER docker`
->     1. `newgrp docker`
->     1. `sudo snap install docker`.
-> - At the cloud selection step, choose `microk8s`. 
-> - At the mount step: Make sure to read the box with tips on how to edit files locally while running them inside the VM! <br><br>
-> All set!
+- At the directory step, call your directory `fastapi-demo`.
+- At the VM setup step, call your VM `charm-dev`. Also set up Docker:
+    ```text
+    sudo addgroup --system docker
+    sudo adduser $USER docker
+    newgrp docker
+    sudo snap install docker
+    ```
+- At the cloud selection step, choose `microk8s`.
+- At the mount step, read the tips about how to edit files locally while running them inside the VM.
 
-
-
-Congratulations, your development environment is now ready! 
+Congratulations, your development environment is ready! 
 
 > **See next: {ref}`Create a minimal Kubernetes charm <create-a-minimal-kubernetes-charm>`**
 
