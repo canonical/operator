@@ -48,11 +48,9 @@ This will provide the following files that you'll use when writing your tests (a
 └── tox.ini
 ```
 
-There are also profiles for `kubernetes` and for building charms for apps developed with popular frameworks such as Django and Flask.
+Charmcraft has a similar profile called `kubernetes`. There are also profiles for building apps developed with Django, Flask, Go, and more.
 
-> See more:
-> - {external+charmcraft:ref}`Charmcraft | Write your first Kubernetes charm for a Django app <write-your-first-kubernetes-charm-for-a-django-app>`
-> - {external+charmcraft:ref}`Charmcraft | Write your first Kubernetes charm for a Flask app <write-your-first-kubernetes-charm-for-a-flask-app>`
+> See more: {external+charmcraft:ref}`Charmcraft | Tutorial <tutorial>`
 
 ## Unit testing
 
