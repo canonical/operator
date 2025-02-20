@@ -48,7 +48,7 @@ This will provide the following files that you'll use when writing your tests (a
 └── tox.ini
 ```
 
-Charmcraft has a similar profile called `kubernetes`. There are also profiles for building apps developed with Django, Flask, Go, and more.
+Charmcraft has a similar profile called `kubernetes`. There are also profiles for building charms for apps developed with Django, Flask, Go, and more.
 
 > See more: {external+charmcraft:ref}`Charmcraft | Tutorial <tutorial>`
 
