@@ -1765,6 +1765,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
 
     def __init__(self, relation: Relation, our_unit: Unit, backend: '_ModelBackend'):
         self.relation = weakref.proxy(relation)
+        self._backend = backend  # for __setitem__ v0
         self._data: Dict[Union[Unit, Application], RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
@@ -1789,6 +1790,19 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
 
     def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
+
+    def __setitem__(self, key: Union['Unit', 'Application'], value: Dict[str, str]) -> None:
+        # v0 -- make a new RelationDataContent on assignment
+        content = RelationDataContent(relation=self.relation, entity=key, backend=self._backend)
+        content.update(value)
+        self._data[key] = content
+        return
+        # v1 -- replace contents of existing RelationDataContent object
+        if key not in self._data:
+            raise KeyError(key, 'Assignment only supported for known keys.')
+        content = self._data[key]
+        content.clear()
+        content.update(value)
 
     def __repr__(self):
         return repr(self._data)
@@ -1947,6 +1961,19 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         except RelationDataAccessError:
             return '<n/a>'
         return super().__repr__()
+
+    # v2 -- just provide replace convenience method
+    def replace(self, items: Dict[str, str]) -> None:
+        """Convenience method that calls self.clear() then self.update(items).
+
+        Use like this:
+        ```
+        relation = self.model.relations[relation_name]
+        relation.data[app_or_unit].replace({...})
+        ```
+        """
+        self.clear()
+        self.update(items)
 
 
 class ConfigData(_GenericLazyMapping[Union[bool, int, float, str]]):
