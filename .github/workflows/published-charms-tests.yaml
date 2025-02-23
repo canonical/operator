@@ -39,6 +39,7 @@ jobs:
           - charm-repo: canonical/mongodb-operator
           - charm-repo: canonical/mysql-router-k8s-operator
           - charm-repo: canonical/namecheap-lego-k8s-operator
+            run-static: true
           - charm-repo: canonical/nginx-ingress-integrator-operator
           - charm-repo: canonical/oathkeeper-operator
           - charm-repo: canonical/oauth2-proxy-k8s-operator
@@ -47,10 +48,12 @@ jobs:
           - charm-repo: canonical/pgbouncer-k8s-operator
           - charm-repo: canonical/ranger-k8s-operator
           - charm-repo: canonical/route53-lego-k8s-operator
+            run-static: true
           - charm-repo: canonical/s3-integrator
           - charm-repo: canonical/saml-integrator-operator
           - charm-repo: canonical/seldon-core-operator
           - charm-repo: canonical/self-signed-certificates-operator
+            run-static: true
           - charm-repo: canonical/smtp-integrator-operator
           - charm-repo: canonical/superset-k8s-operator
           - charm-repo: canonical/temporal-admin-k8s-operator
@@ -98,7 +101,13 @@ jobs:
         run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
+        id: unit
         run: tox -vve unit
+
+      - name: Run the charm's static tests
+        if: ${{ !cancelled() && matrix.run-static && steps.unit.outcome != 'skipped' }}
+        run: tox -vve static
+
 
   charmcraft-profile-tests:
     runs-on: ubuntu-latest
