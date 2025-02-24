@@ -1790,6 +1790,14 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
 
+    def __setitem__(self, key: Union['Unit', 'Application'], value: Mapping[str, str]) -> None:
+        try:
+            content = self._data[key]
+        except KeyError:
+            raise KeyError(f'Key "{key}" is not a known unit or app.') from None
+        content.clear()
+        content.update(value)
+
     def __repr__(self):
         return repr(self._data)
 
