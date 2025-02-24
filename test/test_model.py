@@ -270,6 +270,22 @@ class TestModel:
             rel.data[harness.model.app].update(*args, **kwargs)
             assert harness.get_relation_data(relation_id, harness.model.app) == {'foo': 'baz'}
 
+    def test_set_app_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
+        relation_name = 'db1'
+        original_data = {'hello': 'world'}
+        new_data = {'goodnight': 'moon'}
+        relation_id = harness.add_relation(relation_name, 'remote', app_data=original_data)
+        relation = harness.model.get_relation(relation_name)
+        assert relation is not None
+        assert relation.data[relation.app] == original_data
+        # new relation data can be set via RelationData.__setitem__
+        relation.data[relation.app] = new_data
+        assert relation.data[relation.app] == new_data
+        assert harness.get_relation_data(relation_id, relation.app) == new_data
+        # assigning to an unknown key is an error
+        with pytest.raises(KeyError):
+            relation.data[typing.cast(ops.Application, 'bad-key')] = new_data
+
     def test_unit_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
