@@ -242,10 +242,14 @@ Online
 
 ```{note}
 
+If the Juju status doesn't look right, for example if you see an "error" status instead of "active",
+there might be an issue with the charm code. You can use a debug session (`juju debug-log`) to look
+for error reports from Python. After you've identified the issue:
+
 1. Fix the code in `src/charm.py`.
-2. Rebuild the charm: `charmcraft pack`
-3. Refresh the application from the repacked charm: `juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm --force-units`
-4. Let the model know the issue is resolved (fixed): `juju resolved microsample/0`.
+2. Rebuild the charm: `charmcraft pack`.
+3. Refresh the application from the repacked charm: `juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm --force-units`.
+4. Let the model know that you've fixed the issue: `juju resolved microsample/0`.
 
 ```
 
