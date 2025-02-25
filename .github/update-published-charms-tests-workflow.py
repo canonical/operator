@@ -58,6 +58,8 @@ SKIP = {
     'charm-prometheus-libvirt-exporter',
     'juju-dashboard',
     'charm-openstack-service-checks',
+    # Maintenance mode / archived.
+    'charm-sysconfig',
 }
 
 
