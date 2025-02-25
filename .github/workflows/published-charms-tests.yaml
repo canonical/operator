@@ -29,7 +29,6 @@ jobs:
           - charm-repo: canonical/indico-operator
           - charm-repo: canonical/jenkins-agent-k8s-operator
           - charm-repo: canonical/jenkins-agent-operator
-          - charm-repo: canonical/k8s-operator
           - charm-repo: canonical/kafka-operator
           - charm-repo: canonical/kratos-operator
           - charm-repo: canonical/kubeflow-profiles-operator

@@ -54,6 +54,7 @@ SKIP = {
     'jimm',
     'notebook-operators',
     'argo-operators',
+    'k8s-operator',
     # Not ops.
     'charm-prometheus-libvirt-exporter',
     'juju-dashboard',
