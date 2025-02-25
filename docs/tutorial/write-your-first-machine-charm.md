@@ -253,24 +253,6 @@ for error reports from Python. After you've identified the issue:
 
 ```
 
-<!--Might be nice to get people to observe the hooks too:
-```
-unit-microsample-vm-0
-root@microsample-vm-0:/var/lib/juju/agents# cd unit-microsample-vm-0/
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0# ls
-agent.conf  charm  run.socket  state
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0# cd charm
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm# ls
-LICENSE  README.md  dispatch  hooks  manifest.yaml  metadata.yaml  revision  src  venv
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm# cd hooks
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks# ls
-install  start  upgrade-charm
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks#
-```
--->
-
-
-
 ```{note}
 
 The template content from `charmcraft init` was sufficient for the charm to pack and deploy successfully.  However, our goal here was to make it run successfully, that is, to actually install the `microsample` application on our LXD cloud. With the edits above, this goal has been achieved.
