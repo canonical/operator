@@ -88,6 +88,7 @@ jobs:
             poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --lock
           elif [ -e "uv.lock" ]; then
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
+            uv lock
           else
             echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
             exit 1
