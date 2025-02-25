@@ -53,6 +53,7 @@ SKIP = {
     # The charms are in a subfolder, which this can't handle yet.
     'jimm',
     'notebook-operators',
+    'argo-operators',
     # Not ops.
     'charm-prometheus-libvirt-exporter',
     'juju-dashboard',

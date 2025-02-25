@@ -17,7 +17,6 @@ jobs:
         include:
           - charm-repo: canonical/airbyte-k8s-operator
           - charm-repo: canonical/airbyte-ui-k8s-operator
-          - charm-repo: canonical/argo-operators
           - charm-repo: canonical/charm-sysconfig
           - charm-repo: canonical/charm-ubuntu
           - charm-repo: canonical/content-cache-k8s-operator
