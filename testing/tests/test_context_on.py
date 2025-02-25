@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import typing
 
@@ -223,7 +225,7 @@ def test_pebble_ready_event():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        evt = evt.charm.observed[0]
+        evt = mgr.charm.observed[0]
         assert isinstance(evt, ops.PebbleReadyEvent)
         assert evt.workload.name == container.name
 
@@ -363,7 +365,7 @@ class CustomEventWithArgs(CustomEvent):
     arg0: str
     arg1: int
 
-    def __init__(self, handle, arg0='', arg1=0):
+    def __init__(self, handle: ops.Handle, arg0: str = "", arg1: int = 0):
         super().__init__(handle)
         self.arg0 = arg0
         self.arg1 = arg1
@@ -373,78 +375,52 @@ class CustomEventWithArgs(CustomEvent):
         base.update({"arg0": self.arg0, "arg1": self.arg1})
         return base
 
-    def restore(self, snapshot):
+    def restore(self, snapshot: dict[str, typing.Any]):
         super().restore(snapshot)
         self.arg0 = snapshot["arg0"]
         self.arg1 = snapshot["arg1"]
 
 
-@pytest.mark.parametrize("event_class,args,kwargs", [
-    (CustomEvent, (), {}),
-    (CustomEventWithArgs, ("foo"), {"arg1": 1}),
-])
-def test_custom_event(event_class, args, kwargs):
-    ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    # These look like:
-    #   ctx.run(ctx.on.custom(EventBaseSubclass, *args, **kwargs), state)
-    with ctx(ctx.on.custom(event_class, *args, **kwargs), scenario.State()) as mgr:
+class CustomEvents(ops.ObjectEvents):
+    foo_started = ops.EventSource(CustomEvent)
+    foo_changed = ops.EventSource(CustomEventWithArgs)
+
+
+class MyConsumer(ops.Object):
+    on = CustomEvents()  # type: ignore
+
+    def __init__(self, charm: ops.CharmBase):
+        super().__init__(charm, "my-consumer")
+
+
+class CustomCharm(ContextCharm):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.consumer = MyConsumer(self)
+        framework.observe(self.consumer.on.foo_started, self._on_event)
+        framework.observe(self.consumer.on.foo_changed, self._on_event)
+
+
+def test_custom_event_no_args():
+    ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
+    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
         evt = mgr.charm.observed[0]
-        assert isinstance(evt, event_class)
-        for i, arg in enumerate(args):
-            assert getattr(evt, f"arg{i}") == arg
-        for k, v in kwargs.items():
-            assert getattr(evt, k) == v
+        assert isinstance(evt, CustomEvent)
 
 
-# Provide an _Event:
-#  ctx.run(_Event(), state)
-# Pros:
-# Cons:
-
-# Completely different than using ctx.on:
-#  ctx.run(GrafanaSourcesChanged(*args, **kwargs), state)
-# Pros: suggestions for the args for the event, simple
-# Cons: inconsistent (maybe this is a pro?), no autocomplete for the event class
-
-# Just provide the event class itself - simple but inconsistent:
-#   ctx.run(ctx.on.custom(GrafanaSourcesChanged, *args, **kwargs), state)
-# Pros: somewhat consistent, simple, "custom" will be autocompleted, and the
-# event class will be checked for EventBase compatibility.
-# Cons: no autocomplete for the event class, and no suggestions for the args for
-# the event.
-
-# Just provide the event class itself - simple but inconsistent:
-#   ctx.run(ctx.on.custom(GrafanaSourcesChanged(*args, **kwargs)), state)
-# Pros: somewhat consistent, simple, "custom" will be autocompleted, and the
-# event object will be checked for EventBase compatibility.
-# Cons: no autocomplete for the event class.
-
-# Closest to what is used: provide the event path:
-#  ctx.run(ctx.on.custom("grafana_source.on.sources_changed", *args, **kwargs), state)
-# Cons: stringly-typed.
-
-# Register each of the event sources, and then mimic the self.grafana_source_consumer.on:
-#  testing.Context.add_event_source("grafana_source_consumer", GrafanaSourceEvents)
-#  ...
-#  ctx.run(ctx.grafana_source_consumer.on.sources_changed(*args, **kwargs), state)
-#
-# Pros: most consistent with the non-custom events, and with what is done in the
-# charm code itself.
-# Cons: wiring up typing is probably possible but won't be simple, there will
-# be no autocomplete for the event source (and probably not for on. either, or
-# the required arguments).
-
-
-
-
-# framework.observe(self.on.install, self._on_install)
-# ->
-# ctx.run(ctx.on.install(), state)
-
-# self.grafana_source_consumer = GrafanaSourceConsumer(self)
-# self.framework.observe(self.grafana_source_consumer.on.sources_changed, self._on_sources_changed)
-# ->
-# ctx.run(ctx.grafana_source_consumer.on.sources_changed(), state)
+def test_custom_event_with_args():
+    ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
+    with ctx(
+        ctx.on.custom(MyConsumer.on.foo_changed, args=("foo",), kwargs={"arg1": 42}),
+        scenario.State(),
+    ) as mgr:
+        mgr.run()
+        assert len(mgr.charm.observed) == 2
+        assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, CustomEvent)
+        assert evt.arg0 == "foo"
+        assert evt.arg1 == 42

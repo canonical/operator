@@ -8,7 +8,16 @@ import marshal
 import re
 import sys
 import warnings
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Sequence, Set
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    FrozenSet,
+    List,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 import ops
 import ops.jujucontext
@@ -160,6 +169,22 @@ class Ops(_Manager):
         return storage
 
     def _get_event_to_emit(self, event_name: str):
+        if self.event._is_custom_event:
+            # We require the event source to be an attribute on the charm object.
+            # Essentially, we are replacing the unbound event with a bound one.
+            for attr_name in dir(self.charm):
+                attr = getattr(self.charm, attr_name)
+                if not isinstance(attr, ops.Object):
+                    continue
+                for sub_attr_name in dir(attr):
+                    sub_attr = getattr(attr, sub_attr_name)
+                    if not isinstance(sub_attr, ops.ObjectEvents):
+                        continue
+                    emitter_type = type(self.event.custom_event_source.emitter)
+                    if emitter_type is not type(sub_attr):
+                        continue
+                    return getattr(sub_attr, self.event.custom_event_source.event_kind)
+
         owner = (
             self._get_owner(self.charm, self.event.owner_path)
             if self.event
@@ -175,6 +200,15 @@ class Ops(_Manager):
                 f"invalid event (not on charm.on).",
             )
         return event_to_emit
+
+    def _get_event_args(
+        self, bound_event: ops.framework.BoundEvent
+    ) -> Tuple[List[Any], Dict[str, Any]]:
+        if self.event._is_custom_event:
+            # For custom events, we bypass all of the machinery and just return
+            # the event args and kwargs that the caller provided to us.
+            return list(self.event.custom_event_args), self.event.custom_event_kwargs
+        return super()._get_event_args(bound_event)
 
     @staticmethod
     def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:

@@ -365,6 +365,37 @@ class CharmEvents:
             kwargs["id"] = id
         return _Event(f"{name}_action", action=_Action(name, **kwargs))
 
+    @staticmethod
+    def custom(
+        source: ops.EventSource,
+        *,
+        args: tuple[Any] | None = None,
+        kwargs: dict[str, Any] | None = None,
+    ):
+        """Event triggered by a charm library.
+
+        For example, for a library that emits a ``HappenedEvent`` event via a
+        ``MyConsumer`` object, and charm code like::
+
+            class MyCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    self.source = MyConsumer(self, 'source')
+                    framework.observe(self.source.on.it_happened, self._on_happened_event)
+
+        Emit this event with::
+
+            ctx.run(ctx.on.custom(
+                MyConsumer.on.it_happened, args=(1, 2), kwargs={'foo': 'bar'}
+            ), state)
+        """
+        return _Event(
+            f"custom/{type(source.emitter).__name__}/{source.event_kind}",
+            custom_event_source=source,
+            custom_event_args=args or (),
+            custom_event_kwargs=kwargs or {},
+        )
+
 
 class Context(Generic[CharmType]):
     """Represents a simulated charm's execution context.

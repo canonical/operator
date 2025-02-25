@@ -1789,16 +1789,16 @@ class _EventPath(str):
 
 @dataclasses.dataclass(frozen=True)
 class _Event:  # type: ignore
-    """A Juju, ops, or custom event that can be run against a charm.
-
-    Typically, for simple events, the string name (e.g. ``install``) can be used,
-    and for more complex events, an ``event`` property will be available on the
-    related object (e.g. ``relation.joined_event``).
-    """
+    """A Juju, ops, or custom event that can be run against a charm."""
 
     path: str
-    args: tuple[Any, ...] = ()
-    kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
+    """The name of the event.
+    
+    For example: ``start``, ``config_changed``, ``my_relation_joined``, or
+    ``CUSTOM THING HERE``.
+
+    This is converted to an _EventPath object on instantiation.
+    """
 
     storage: Storage | None = None
     """If this is a storage event, the storage it refers to."""
@@ -1824,6 +1824,19 @@ class _Event:  # type: ignore
 
     action: _Action | None = None
     """If this is an action event, the :class:`Action` it refers to."""
+
+    custom_event_source: ops.EventSource | None = None
+    """If this is a custom event, the source of the event.
+
+    The charm object *must* have an attribute that is an instance of the same
+    emitter type.
+    """
+
+    custom_event_args: tuple[Any, ...] = dataclasses.field(default_factory=tuple)
+    """If this is a custom event, the arguments to pass to the event."""
+
+    custom_event_kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
+    """If this is a custom event, the keyword arguments to pass to the event."""
 
     _owner_path: list[str] = dataclasses.field(default_factory=list)
 
@@ -1882,6 +1895,11 @@ class _Event:  # type: ignore
     def _is_workload_event(self) -> bool:
         """Whether the event name indicates that this is a workload event."""
         return self._path.type is _EventType.WORKLOAD
+
+    @property
+    def _is_custom_event(self) -> bool:
+        """Whether the event name indicates that this is a custom event."""
+        return self.custom_event_source is not None
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.
