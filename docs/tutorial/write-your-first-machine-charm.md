@@ -17,7 +17,7 @@ When it's available in Juju.
 - Familiarity with Linux.
 - Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
 
-It will also help if you're familiar with Juju , but don't worry if you're new to Juju. This tutorial will guide you though each step.
+It will also help if you're familiar with Juju , but don't worry if you're new to Juju. This tutorial will guide you through each step.
 
 **What you'll do:**
 
