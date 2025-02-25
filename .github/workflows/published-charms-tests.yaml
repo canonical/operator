@@ -39,7 +39,6 @@ jobs:
           - charm-repo: canonical/mongodb-operator
           - charm-repo: canonical/mysql-router-k8s-operator
           - charm-repo: canonical/namecheap-lego-k8s-operator
-            run-static: true
           - charm-repo: canonical/nginx-ingress-integrator-operator
           - charm-repo: canonical/oathkeeper-operator
           - charm-repo: canonical/oauth2-proxy-k8s-operator
@@ -48,12 +47,10 @@ jobs:
           - charm-repo: canonical/pgbouncer-k8s-operator
           - charm-repo: canonical/ranger-k8s-operator
           - charm-repo: canonical/route53-lego-k8s-operator
-            run-static: true
           - charm-repo: canonical/s3-integrator
           - charm-repo: canonical/saml-integrator-operator
           - charm-repo: canonical/seldon-core-operator
           - charm-repo: canonical/self-signed-certificates-operator
-            run-static: true
           - charm-repo: canonical/smtp-integrator-operator
           - charm-repo: canonical/superset-k8s-operator
           - charm-repo: canonical/temporal-admin-k8s-operator
@@ -98,14 +95,26 @@ jobs:
           fi
 
       - name: Install dependencies
+        id: deps
         run: pip install tox~=4.2
 
+        # the following test steps will only run if the last setup step (deps) succeeded
+
       - name: Run the charm's unit tests
-        id: unit
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: tox -vve unit
 
+      - name: Check for tox static environment
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: |
+          if tox list --no-desc | grep '^static$'; then
+            echo 'HAS_STATIC=true' >> $GITHUB_ENV
+          else
+            echo 'HAS_STATIC=false' >> $GITHUB_ENV
+          fi
+
       - name: Run the charm's static tests
-        if: ${{ !cancelled() && matrix.run-static && steps.unit.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && env.HAS_STATIC == 'true' }}
         run: tox -vve static
 
 
