@@ -12,10 +12,12 @@ When it's available in Juju.
 -->
 
 **What you'll need:**
-- A workstation, e.g., a laptop, with amd64 architecture and which has sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space
-- Familiarity with Linux
-- Familiarity with Juju.
-- Familiarity with object-oriented programming in Python
+
+- A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
+- Familiarity with Linux.
+- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
+
+It will also help if you're familiar with Juju , but don't worry if you're new to Juju. This tutorial will guide you though each step.
 
 **What you'll do:**
 
