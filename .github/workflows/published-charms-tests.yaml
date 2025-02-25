@@ -60,7 +60,7 @@ jobs:
           repository: ${{ matrix.charm-repo }}
 
       - name: Install patch dependencies
-        run: pip install poetry~=2.0 uv~=0.5
+        run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
