@@ -1794,9 +1794,13 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
         try:
             content = self._data[key]
         except KeyError:
-            raise KeyError(f'Key "{key}" is not a known unit or app.') from None
-        content.clear()
-        content.update(value)
+            raise KeyError(f'{key!r} is not a known unit or app') from None
+        for k in tuple(content):
+            if k not in value:
+                del content[k]
+        for k, v in value.items():
+            if k not in content or content[k] != v:
+                content[k] = v
 
     def __repr__(self):
         return repr(self._data)
