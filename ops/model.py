@@ -1947,8 +1947,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._update(data)
 
     def _commit(self, data: Mapping[str, str]) -> None:
-        # NOTE: we have to call update_relation_data rather than relation_set
-        # due to differences in how Harness mocks the two methods
         self._backend.update_relation_data(
             relation_id=self.relation.id, _entity=self._entity, data=data
         )
