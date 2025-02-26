@@ -3476,9 +3476,6 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
-        self._relation_set(relation_id=relation_id, data={key: value}, is_app=is_app)
-
     def _relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
