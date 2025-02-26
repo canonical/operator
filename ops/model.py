@@ -1874,18 +1874,18 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         return True
 
     def _validate_write(self, data: Mapping[str, str]) -> None:
-        """Validate writing key:value to this databag.
+        """Validate writing key:value pairs to this databag.
 
         1) that key: value is a valid str:str pair
         2) that we have write access to this databag
         """
-        # firstly, we validate WHAT we're trying to write.
-        # this is independent of whether we're in testing code or production.
         for key, value in data.items():
             self._validate_write_content(key, value)
         self._validate_write_access()
 
     def _validate_write_content(self, key: str, value: str) -> None:
+        # firstly, we validate WHAT we're trying to write.
+        # this is independent of whether we're in testing code or production.
         if not isinstance(key, str):
             raise RelationDataTypeError(f'relation data keys must be strings, not {type(key)}')
         if not isinstance(value, str):
@@ -3474,6 +3474,8 @@ class _ModelBackend:
             raise
 
     def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+        if not data:
+            raise ValueError('at least one key:value pair is required for relation-set')
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
