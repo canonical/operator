@@ -14,7 +14,6 @@
 
 """Representations of Juju's model, application, unit, and other entities."""
 
-from __future__ import annotations
 import collections
 import dataclasses
 import datetime
