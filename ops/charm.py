@@ -1180,13 +1180,24 @@ class CollectStatusEvent(LifecycleEvent):
             model_.unit._collected_statuses.append(status)
 
 
-# FIXME: API design choice
-# Should we make this more generic?
-# - call this a TelemetryEvent / TelemeryConfigEvent / SetupTelemetryEvent
-# - provide .set_tracing_destination() in this PR
-# - later, perhaps .set_logging_xxx() and .set_metrics_yyy()?
 class SetupTracingEvent(LifecycleEvent):
-    """FIXME docstring."""
+    """Event that allows the charm to configure tracing destination.
+
+    This event triggered before deferred events and the dispatched event.
+
+    Example use may look like this::
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework.ops.Framework):
+                super().__init__(framework)
+                self.framework.observe(self.on.setup_tracing, self._on_setup_tracing)
+                ...
+
+            def _on_setup_tracing(self, event: ops.SetupTracingEvent) -> None:
+                url: str | None = get_tracing_url_from_relation_data()
+                ca: str | None = optionally_get_ca_for_a_tls_connection()
+                event.set_destination(url=url)
+    """
 
     def set_destination(self, *, url: Optional[str], ca: Optional[str] = None) -> None:
         """Configure the destination service for tracing data.
@@ -1362,7 +1373,6 @@ class CharmBase(Object):
         @property
         def on(self) -> CharmEvents: ...  # noqa
 
-    @tracer.start_as_current_span('ops.CharmBase')
     def __init__(self, framework: Framework):
         super().__init__(framework, None)
 

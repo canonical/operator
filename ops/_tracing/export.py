@@ -106,6 +106,11 @@ class ProxySpanExporter(SpanExporter):
 
                 return SpanExportResult.SUCCESS
         except Exception:
+            # FIXME: I'm using this to catch bug during development.
+            # OTEL must disable logging capture during export to avoid data loops.
+            # At least during develpoment, we want to catch and report pure bugs.
+            # Perhaps this part needs to be removed before merge/release.
+            # Leaving here for now to decide how to test this code path.
             logger.exception('export')
             raise
 
@@ -225,6 +230,12 @@ def setup_tracing(charm_class_name: str) -> None:
     span_processor = BatchSpanProcessor(_exporter)
     provider.add_span_processor(span_processor)
     set_tracer_provider(provider)
+    # FIXME: in testing with tracing, we need a hack.
+    # OpenTelemetry disallows setting the tracer provider twice,
+    # a waring is issued and new provider is ignored.
+    #
+    # For example, we could reset the resource instead:
+    # get_tracer_provider()._resource = resource
 
 
 def set_tracing_destination(
@@ -240,6 +251,19 @@ def set_tracing_destination(
     assert _exporter, 'tracing has not been set up'
     _exporter.settings = (url, ca)
 
+    # FIXME: this is not right
+    # We recommend obsering the SetupTracingEvent unconditionally.
+    # This means that this function is called whenever there's a relation.
+    # That's regardless of deferred events being emitted or observed.
+    # And regardless of the dispatched event being observed.
+    #
+    # There needs to be a separate function to mark this dispatch invocation
+    # as observed. The logic would be somewhat complicated though.
+    # In essense:
+    # - any deferred event observed (perhaps simply emitted), or
+    # - the dispatched event observed
+    #
+    # Arguably if a defferred event is emitted, it's almost always observed.
     _exporter.buffer.mark_observed()
 
 
