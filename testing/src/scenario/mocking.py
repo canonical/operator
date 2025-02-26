@@ -379,7 +379,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(
+        self, relation_id: int, data: Mapping[str, str], is_app: bool
+    ) -> None:
         self._check_app_data_access(is_app)
         relation = self._get_relation_by_id(relation_id)
         if is_app:
@@ -390,7 +392,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             tgt = relation.local_app_data
         else:
             tgt = relation.local_unit_data
-        tgt[key] = value
+        for key, value in data.items():
+            tgt[key] = value
 
     def secret_add(
         self,
