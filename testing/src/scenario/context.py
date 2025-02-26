@@ -371,6 +371,7 @@ class CharmEvents:
         *,
         args: tuple[Any] | None = None,
         kwargs: dict[str, Any] | None = None,
+        from_juju_event: _Event | None = None,
     ):
         """Event triggered by a charm library.
 
@@ -388,12 +389,53 @@ class CharmEvents:
             ctx.run(ctx.on.custom(
                 MyConsumer.on.it_happened, args=(1, 2), kwargs={'foo': 'bar'}
             ), state)
+
+        If the custom event is a subclass of a Juju event (rather than :attr:`ops.EventBase`)
+        that itself has arguments (such as :attr:`ops.RelationUpdatedEvent`),
+        then you need to also pass in a suitable originating event, for example::
+
+            ctx.run(ctx.on.custom(
+                MyConsumer.on.it_happened, from_juju_event=ctx.on.relation_changed(my_relation)
+            ), state)
+
+        The arguments for the custom event are the arguments for the original
+        Juju event, combined with any that are passed here.
         """
+        event_kwargs = {}
+        if from_juju_event:
+            name = from_juju_event.name
+            if from_juju_event.storage is not None:
+                event_kwargs["storage"] = from_juju_event.storage
+            if from_juju_event.relation is not None:
+                event_kwargs["relation"] = from_juju_event.relation
+            if from_juju_event.relation_remote_unit_id is not None:
+                event_kwargs["relation_remote_unit_id"] = (
+                    from_juju_event.relation_remote_unit_id
+                )
+            if from_juju_event.relation_departed_unit_id is not None:
+                event_kwargs["relation_departed_unit_id"] = (
+                    from_juju_event.relation_departed_unit_id
+                )
+            if from_juju_event.secret is not None:
+                event_kwargs["secret"] = from_juju_event.secret
+            if from_juju_event.secret_revision is not None:
+                event_kwargs["secret_revision"] = from_juju_event.secret_revision
+            if from_juju_event.container is not None:
+                event_kwargs["container"] = from_juju_event.container
+            if from_juju_event.notice is not None:
+                event_kwargs["notice"] = from_juju_event.notice
+            if from_juju_event.check_info is not None:
+                event_kwargs["check_info"] = from_juju_event.check_info
+            if from_juju_event.action is not None:
+                event_kwargs["action"] = from_juju_event.action
+        else:
+            name = f"custom/{type(source.emitter).__name__}/{source.event_kind}"
         return _Event(
-            f"custom/{type(source.emitter).__name__}/{source.event_kind}",
+            name,
             custom_event_source=source,
             custom_event_args=args or (),
             custom_event_kwargs=kwargs or {},
+            **event_kwargs,
         )
 
 

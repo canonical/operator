@@ -204,11 +204,15 @@ class Ops(_Manager):
     def _get_event_args(
         self, bound_event: ops.framework.BoundEvent
     ) -> Tuple[List[Any], Dict[str, Any]]:
-        if self.event._is_custom_event:
-            # For custom events, we bypass all of the machinery and just return
-            # the event args and kwargs that the caller provided to us.
-            return list(self.event.custom_event_args), self.event.custom_event_kwargs
-        return super()._get_event_args(bound_event)
+        # For custom events, if the caller provided us with explicit args, we
+        # merge them with the Juju ones (to handle libraries subclassing the
+        # Juju events).
+        args, kwargs = super()._get_event_args(bound_event)
+        if self.event.custom_event_args is not None:
+            args += list(self.event.custom_event_args)
+        if self.event.custom_event_kwargs is not None:
+            kwargs.update(self.event.custom_event_kwargs)
+        return args, kwargs
 
     @staticmethod
     def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
