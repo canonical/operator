@@ -3734,10 +3734,7 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self,
-        relation_id: int,
-        _entity: Union['Unit', 'Application'],
-        data: Mapping[str, str]
+        self, relation_id: int, _entity: Union['Unit', 'Application'], data: Mapping[str, str]
     ):
         self._relation_set(
             relation_id=relation_id, data=data, is_app=isinstance(_entity, Application)

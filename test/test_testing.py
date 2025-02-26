@@ -2266,7 +2266,7 @@ class TestHarness:
             ('relation_get', 0, 'test-charm/0', False),
             (
                 'update_relation_data',
-                {'relation_id': 0, '_entity': test_charm_unit, 'data': {'foo': 'bar'}}
+                {'relation_id': 0, '_entity': test_charm_unit, 'data': {'foo': 'bar'}},
             ),
         ]
 
@@ -2283,7 +2283,7 @@ class TestHarness:
             ('relation_get', 0, 'postgresql/0', False),
             (
                 'update_relation_data',
-                {'relation_id': 0, '_entity': pgql_unit, 'data': {'foo': 'bar'}}
+                {'relation_id': 0, '_entity': pgql_unit, 'data': {'foo': 'bar'}},
             ),
         ]
         # If we check again, they are still there, but now we reset it
@@ -2293,7 +2293,7 @@ class TestHarness:
             ('relation_get', 0, 'postgresql/0', False),
             (
                 'update_relation_data',
-                {'relation_id': 0, '_entity': pgql_unit, 'data': {'foo': 'bar'}}
+                {'relation_id': 0, '_entity': pgql_unit, 'data': {'foo': 'bar'}},
             ),
         ]
         # And the calls are gone

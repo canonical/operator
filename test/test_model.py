@@ -556,7 +556,7 @@ class TestModel:
                     {
                         'relation_id': relation_id,
                         '_entity': harness.model.unit,
-                        'data': {'port': ''}
+                        'data': {'port': ''},
                     },
                 ),
             ],
