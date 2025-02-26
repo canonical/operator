@@ -243,8 +243,8 @@ Online
 ```{note}
 
 If the Juju status doesn't look right, for example if you see an "error" status instead of "active",
-there might be an issue with the charm code. You can use a debug session (`juju debug-log`) to look
-for error reports from Python. After you've identified the issue:
+there might be an issue with the charm code. You can use a debug session (`juju debug-log`) to get
+more detailed information about the issue. After you've identified the issue:
 
 1. Fix the code in `src/charm.py`.
 2. Rebuild the charm: `charmcraft pack`.
