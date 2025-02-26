@@ -6,6 +6,7 @@ on:
       - main
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 jobs:
   o11y-charm-tests:
@@ -28,13 +29,20 @@ jobs:
           repository: ${{ matrix.charm-repo }}
           ref: ${{ matrix.commit }}
 
+      - name: Install dependencies
+        run: pip install tox~=4.2 uv~=0.6
+
       - name: Update 'ops' dependency in test charm to latest
         run: |
-          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-
-      - name: Install dependencies
-        run: pip install tox~=4.2
+          if [ -e "requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+          elif [ -e "uv.lock" ]; then
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources
+          else
+            echo "Error: no requirements.txt or uv.lock file found"
+            exit 1
+          fi
 
       - name: Run the charm's unit tests
         if: ${{ !(matrix.disabled) }}
