@@ -381,9 +381,36 @@ class CustomEventWithArgs(CustomEvent):
         self.arg1 = snapshot["arg1"]
 
 
+class CustomRelationEvent(ops.RelationChangedEvent):
+    def __init__(
+        self,
+        handle: ops.Handle,
+        relation: ops.Relation,
+        app: ops.Application | None = None,
+        unit: ops.Unit | None = None,
+        *,
+        arg0: str = "",
+        arg1: int = 0,
+    ):
+        super().__init__(handle, relation)
+        self.arg0 = arg0
+        self.arg1 = arg1
+
+    def snapshot(self):
+        base = super().snapshot()
+        base.update({"arg0": self.arg0, "arg1": self.arg1})
+        return base
+
+    def restore(self, snapshot: dict[str, typing.Any]):
+        super().restore(snapshot)
+        self.arg0 = snapshot["arg0"]
+        self.arg1 = snapshot["arg1"]
+
+
 class CustomEvents(ops.ObjectEvents):
     foo_started = ops.EventSource(CustomEvent)
     foo_changed = ops.EventSource(CustomEventWithArgs)
+    foo_relation_changed = ops.EventSource(CustomRelationEvent)
 
 
 class MyConsumer(ops.Object):
@@ -399,6 +426,7 @@ class CustomCharm(ContextCharm):
         self.consumer = MyConsumer(self)
         framework.observe(self.consumer.on.foo_started, self._on_event)
         framework.observe(self.consumer.on.foo_changed, self._on_event)
+        framework.observe(self.consumer.on.foo_relation_changed, self._on_event)
 
 
 def test_custom_event_no_args():
@@ -421,6 +449,28 @@ def test_custom_event_with_args():
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
         evt = mgr.charm.observed[0]
-        assert isinstance(evt, CustomEvent)
+        assert isinstance(evt, CustomEventWithArgs)
+        assert evt.arg0 == "foo"
+        assert evt.arg1 == 42
+
+
+def test_custom_event_from_juju_event():
+    meta = META.copy()
+    meta["requires"]["db"] = {"interface": "db"}
+    ctx = scenario.Context(CustomCharm, meta=meta, actions=ACTIONS)
+    relation = scenario.Relation("db")
+    originating_event = ctx.on.relation_changed(relation)
+    event = ctx.on.custom(
+        MyConsumer.on.foo_relation_changed,
+        kwargs={"arg0": "foo", "arg1": 42},
+        from_juju_event=originating_event,
+    )
+    with ctx(event, scenario.State(relations={relation})) as mgr:
+        mgr.run()
+        assert len(mgr.charm.observed) == 2
+        assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, CustomRelationEvent)
+        assert evt.relation.id == relation.id
         assert evt.arg0 == "foo"
         assert evt.arg1 == 42
