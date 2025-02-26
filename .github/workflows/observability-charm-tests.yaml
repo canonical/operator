@@ -51,39 +51,38 @@ jobs:
       - name: Check if 'scenario' tox environment exists
         id: check-tox-env-scenario
         run: |
-          tox --listenvs
           if tox --listenvs | grep -q "^scenario$"; then
-            echo "exists=true" >> $GITHUB_ENV
+            echo "scenario_exists=true" >> $GITHUB_ENV
           else
-            echo "exists=false" >> $GITHUB_ENV
+            echo "scenario_exists=false" >> $GITHUB_ENV
           fi
 
       - name: Run the charm's scenario unit tests
-        if: ${{ steps.check-tox-env-scenario.outputs.exists == 'true' && !(matrix.disabled) }}
+        if: ${{ steps.check-tox-env-scenario.outputs.scenario_exists == 'true' && !(matrix.disabled) }}
         run: tox -vve scenario
 
       - name: Check if 'static' tox environment exists
         id: check-tox-env-static
         run: |
           if tox --listenvs | grep -q "^static$"; then
-            echo "exists=true" >> $GITHUB_ENV
+            echo "static_exists=true" >> $GITHUB_ENV
           else
-            echo "exists=false" >> $GITHUB_ENV
+            echo "static_exists=false" >> $GITHUB_ENV
           fi
 
       - name: Run the charm's static analysis checks
-        if: ${{ steps.check-tox-env-static.outputs.exists == 'true' && !(matrix.disabled) }}
+        if: ${{ steps.check-tox-env-static.outputs.static_exists == 'true' && !(matrix.disabled) }}
         run: tox -vve static
 
       - name: Check if 'static-charm' tox environment exists
         id: check-tox-env-static-charm
         run: |
           if tox --listenvs | grep -q "^static-charm$"; then
-            echo "exists=true" >> $GITHUB_ENV
+            echo "static_charm_exists=true" >> $GITHUB_ENV
           else
-            echo "exists=false" >> $GITHUB_ENV
+            echo "static_charm_exists=false" >> $GITHUB_ENV
           fi
 
       - name: Run the charm's static (charm) analysis checks
-        if: ${{ steps.check-tox-env-static-charm.outputs.exists == 'true' && !(matrix.disabled) }}
+        if: ${{ steps.check-tox-env-static-charm.outputs.static_charm_exists == 'true' && !(matrix.disabled) }}
         run: tox -vve static-charm
