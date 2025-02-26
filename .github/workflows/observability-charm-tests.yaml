@@ -51,6 +51,7 @@ jobs:
       - name: Check if 'scenario' tox environment exists
         id: check-tox-env-scenario
         run: |
+          tox --listenvs
           if tox --listenvs | grep -q "^scenario$"; then
             echo "exists=true" >> $GITHUB_ENV
           else
