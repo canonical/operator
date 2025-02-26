@@ -132,7 +132,7 @@ For `oci-images` you can reference an image registry.
 
 ### Test a relation
 
-To test an integration between two applications, you can just integrate them through
+To test a relation between two applications, integrate them through
 the model. Both applications have to be deployed beforehand.
 
 ``` 

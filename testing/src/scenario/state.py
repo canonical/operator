@@ -490,7 +490,7 @@ def _next_relation_id(*, update: bool = True):
 
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_max_posargs(2)):
-    """Base class for the various types of integration (relation)."""
+    """Base class for the various types of relation."""
 
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in the metadata."""
@@ -573,14 +573,14 @@ _DEFAULT_JUJU_DATABAG = {
 
 @dataclasses.dataclass(frozen=True)
 class Relation(RelationBase):
-    """An integration between the charm and another application."""
+    """A relation between the charm and another application."""
 
     remote_app_name: str = "remote"
     """The name of the remote application, as in the charm's metadata."""
 
     # local limit
     limit: int = 1
-    """The maximum number of integrations on this endpoint."""
+    """The maximum number of relations on this endpoint."""
 
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
     """The current content of the application databag."""
@@ -865,13 +865,17 @@ class CheckInfo(_max_posargs(1)):
     level: pebble.CheckLevel | None = None
     """Level of the check."""
 
+    startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED
+    """Startup mode of the check."""
+
     status: pebble.CheckStatus = pebble.CheckStatus.UP
     """Status of the check.
 
     :attr:`ops.pebble.CheckStatus.UP` means the check is healthy (the number of
     failures is fewer than the threshold), :attr:`ops.pebble.CheckStatus.DOWN`
     means the check is unhealthy (the number of failures has reached the
-    threshold).
+    threshold), and :attr:`ops.pebble.CheckStatus.INACTIVE` means the check has
+    been stopped, so is not currently running.
     """
 
     failures: int = 0
@@ -883,13 +887,33 @@ class CheckInfo(_max_posargs(1)):
     This is how many consecutive failures for the check to be considered 'down'.
     """
 
+    change_id: pebble.ChangeID | None = None
+    """The ID of the Pebble Change associated with this check.
+
+    Passing ``None`` will automatically assign a new Change ID if the status is
+    :attr:`ops.pebble.CheckStatus.UP` or :attr:`ops.pebble.CheckStatus.DOWN`.
+    """
+
+    def __post_init__(self):
+        if self.change_id is None:
+            if self.status == pebble.CheckStatus.INACTIVE:
+                change_id = ""
+            else:
+                change_id = pebble.ChangeID(_generate_new_change_id())
+            object.__setattr__(self, "change_id", change_id)
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
     def _to_ops(self) -> pebble.CheckInfo:
         return pebble.CheckInfo(
             name=self.name,
             level=self.level,
+            startup=self.startup,
             status=self.status,
             failures=self.failures,
             threshold=self.threshold,
+            change_id=self.change_id,
         )
 
 
@@ -1010,6 +1034,7 @@ class Container(_max_posargs(1)):
             return plan
         for name in sorted(services.keys()):
             plan.services[name] = services[name]
+        # TODO: This should presumably also have checks and log targets.
         return plan
 
     @property
@@ -1046,6 +1071,13 @@ class Container(_max_posargs(1)):
             charm pushed to the container.
         """
         return ctx._get_container_root(self.name)
+
+    def get_check_info(self, name: str) -> CheckInfo:
+        """Get the check info for a check by name."""
+        for check_info in self.check_infos:
+            if check_info.name == name:
+                return check_info
+        raise KeyError(f"check-info: {name} not found in the Container")
 
 
 _RawStatusLiteral = Literal[

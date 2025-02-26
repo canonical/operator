@@ -218,6 +218,11 @@ class Model:
         """
         return self._backend.model_uuid
 
+    @property
+    def juju_version(self) -> 'ops.JujuVersion':
+        """Return the version of Juju that is running the model."""
+        return self._backend._juju_context.version
+
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -253,7 +258,7 @@ class Model:
                 given application has more than one relation on a given endpoint.
 
         Raises:
-            TooManyRelatedAppsError: is raised if there is more than one integration with the
+            TooManyRelatedAppsError: is raised if there is more than one relation with the
                 supplied relation_name and no relation_id was supplied
         """
         return self.relations._get_unique(relation_name, relation_id)
@@ -2107,7 +2112,7 @@ class MaintenanceStatus(StatusBase):
     ``apt install``, or is waiting for something under its control, such as
     ``pebble-ready`` or an exec operation in the workload container. In
     contrast to :class:`WaitingStatus`, "maintenance" reflects activity on
-    this unit or charm, not on peers or related units.
+    this unit (for unit status), or this app (for app status).
     """
 
     name = 'maintenance'
@@ -2120,7 +2125,8 @@ class WaitingStatus(StatusBase):
     example, a web app charm would set "waiting" status when it is integrated
     with a database charm that is not ready yet (it might be creating a
     database). In contrast to :class:`MaintenanceStatus`, "waiting" reflects
-    activity on related units, not on this unit or charm.
+    activity on integrated units (for unit status) and integrated apps (for
+    app status).
     """
 
     name = 'waiting'
@@ -2496,6 +2502,30 @@ class Container:
         if len(checks) > 1:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
+
+    def start_checks(self, *check_names: str) -> List[str]:
+        """Start given check(s) by name.
+
+        Returns:
+            A list of check names that were started. Checks that were already
+            running will not be included.
+        """
+        if not check_names:
+            raise TypeError('start-checks expected at least 1 argument, got 0')
+
+        return self._pebble.start_checks(check_names)
+
+    def stop_checks(self, *check_names: str) -> List[str]:
+        """Stop given check(s) by name.
+
+        Returns:
+            A list of check names that were stopped. Checks that were already
+            inactive will not be included.
+        """
+        if not check_names:
+            raise TypeError('stop-checks expected at least 1 argument, got 0')
+
+        return self._pebble.stop_checks(check_names)
 
     @typing.overload
     def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO: ...

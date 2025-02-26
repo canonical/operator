@@ -1,7 +1,8 @@
 import copy
 from dataclasses import asdict, replace
-from typing import Type
+from typing import Optional, Type
 
+import ops
 import pytest
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
@@ -11,6 +12,7 @@ from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
     Address,
     BindAddress,
+    CheckInfo,
     Container,
     Model,
     Network,
@@ -249,6 +251,19 @@ def test_relation_set(mycharm):
         "c": "d",
         **_DEFAULT_JUJU_DATABAG,
     }
+
+
+def test_checkinfo_changeid_none():
+    info = CheckInfo("foo", change_id=None)
+    assert info.change_id, "None should result in a random change_id"
+    info2 = CheckInfo("foo")  # None is also the default.
+    assert info.change_id != info2.change_id
+
+
+@pytest.mark.parametrize("id", ("", "28"))
+def test_checkinfo_changeid(id: Optional[str]):
+    info = CheckInfo("foo", change_id=ops.pebble.ChangeID(id))
+    assert info.change_id == ops.pebble.ChangeID(id)
 
 
 @pytest.mark.parametrize(

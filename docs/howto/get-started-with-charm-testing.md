@@ -48,9 +48,9 @@ This will provide the following files that you'll use when writing your tests (a
 └── tox.ini
 ```
 
-There are also profiles for `kubernetes` and for building charms for apps developed with popular frameworks such as Django and Flask.
+Charmcraft has a similar profile called `kubernetes`. There are also profiles for building charms for apps developed with Django, Flask, Go, and more.
 
-> See more: [ Write your first Kubernetes charm for a Flask app](https://juju.is/docs/sdk/write-your-first-kubernetes-charm-for-a-flask-app)
+> See more: {external+charmcraft:ref}`Charmcraft | Tutorial <tutorial>`
 
 ## Unit testing
 
@@ -64,7 +64,7 @@ The "inputs" of a charm run are therefore:
  - integration (relation) data
  - stored state
 
-Only the event context is guaranteed to be present. The other input sources are optional, but typically a charm will have at least some config and a few integrations adding to its inputs.
+Only the event context is guaranteed to be present. The other input sources are optional, but typically a charm will have at least some config and a few relations adding to its inputs.
 
 The charm code executes and typically produces side-effects aimed at its workload (for example: it writes files to a disk, runs commands on a system, or reconfigures a process) or at other charms it integrates with (for example: it writes relation data). We call this 'operating' a workload, and that is what a charm is meant to do. The ways in which a charm operates can be roughly categorised as:
  
@@ -115,7 +115,7 @@ When you instantiate `Context` and `State` objects, the charm instance does not 
 The `Context` provides methods for all the Juju events. For example:
 
  - the cloud admin changes the charm config: `ctx.on.config_changed()`
- - the cloud admin relates this charm to some other: `ctx.on.relation_created(relation)`
+ - the cloud admin integrates this charm with some other: `ctx.on.relation_created(relation)`
  - a remote unit joins in a relation (for example, because the cloud admin has scaled up a remote charm): `ctx.on.relation_joined(relation)`
  - a remote unit touches its relation data: `ctx.on.relation_changed(relation)`
  - a cloud admin removes a relation: `ctx.on.relation_departed(relation)`
@@ -167,7 +167,7 @@ def test_pebble_ready_writes_config_file():
 ## Integration testing
 
 Where unit testing focuses on black-box method-by-method verification, integration testing focuses on the big picture. Typically integration tests check that the charm does not break (generally this means: blocks with status `blocked` or `error`) when a (mocked) cloud admin performs certain operations. These operations are scripted by using, in order of abstraction:
- -  shell commands against [the `juju` cli](https://juju.is/docs/olm/juju-cli-commands)
+ -  shell commands against [the `juju` CLI](inv:juju:std:label#list-of-juju-cli-commands)
  - [`python-libjuju`](https://github.com/juju/python-libjuju), wrapping juju api calls
    - [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator), a `pytest` plugin wrapping `python-libjuju`
    - [`zaza`](https://zaza.readthedocs.io/en/latest/index.html), a testing-framework-agnostic wrapper on top of `python-libjuju` 
@@ -177,7 +177,7 @@ Things you typically want to test with integration tests:
  - The charm can be deployed (i.e. `juju deploy ./packed_charm.charm` deploys an application that reaches `active` or `waiting` within a reasonable time frame)
 
 These are 'smoke tests' that should always be present, and are provided for you when using `charmcraft init`. The following are non-smokey, proper integration tests.
-- The charm can be related to other applications without erroring
+- The charm can be integrated with other applications without erroring
   - and the relation has the expected effect on the charm's operation logic
 - The charm can be configured
   - and the config has the expected effect on the charm's operation logic
@@ -208,7 +208,7 @@ async def test_operation(ops_test: OpsTest):
     app: Application = ops_test.model.applications.get("tester")
     await app.set_config({"my-key": "my-value"})
     
-    # Add another charm and relate them:
+    # Add another charm and integrate them:
     await ops_test.model.deploy('other-app')
     await ops_test.model.relate('tester:endpoint1', 'other-charm:endpoint2')
     

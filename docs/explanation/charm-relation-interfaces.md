@@ -3,13 +3,13 @@
 
 > See also: {ref}`manage-interfaces`
 
-[`charm-relation-interfaces`](https://github.com/canonical/charm-relation-interfaces) is a repository containing specifications, databag schemas and interface tests for Juju relation interfaces. In other words, it is the source of truth for data and behavior of providers and requirers of integrations.
+[`charm-relation-interfaces`](https://github.com/canonical/charm-relation-interfaces) is a repository containing specifications, databag schemas and interface tests for Juju relation interfaces. In other words, it is the source of truth for data and behavior of providers and requirers of relations.
 
-The purpose of this project is to provide uniformity in the landscape of all possible integrations and promote charm interoperability.
+The purpose of this project is to provide uniformity in the landscape of all possible relations and promote charm interoperability.
 
-Juju interfaces are untyped, which means that for juju to think two charms can be integrated all it looks at is whether the interface names of the two endpoints you're trying to connect are the same string. But it might be that the two charms have different, incompatible implementations of two different integrations that happen to have the same name.
+Juju interfaces are untyped, which means that for juju to think two charms can be integrated all it looks at is whether the interface names of the two endpoints you're trying to connect are the same string. But it might be that the two charms have different, incompatible implementations of two different relations that happen to have the same name.
 
-In order to prevent two separate charms from rolling their own integration with the same name, and prevent a sprawl of many subtly different interfaces with similar semantics and similar purposes, we introduced `charm-relation-interfaces`.
+In order to prevent two separate charms from rolling their own relation with the same name, and prevent a sprawl of many subtly different interfaces with similar semantics and similar purposes, we introduced `charm-relation-interfaces`.
 
 ## Using `charm-relation-interfaces`
 
@@ -37,7 +37,6 @@ For each interface, the charm-relation-interfaces repository hosts:
 
 
 ## Charm relation interfaces in Charmhub
-In the future, Charmhub will have a searchable collection of integration interfaces. 
 Charmhub will, for all charms using the interface, verify that they implement it correctly (regardless of whether they use the 'official' implementation or they roll their own) in order to give the charm a happy checkmark on `charmhub.io`. In order to do that it will need to fetch the specification (from `charm-relation-interfaces`) *and* the charm repo, because we can't know what implementation they are using: we need the source code.
 
 

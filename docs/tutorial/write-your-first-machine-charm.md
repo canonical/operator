@@ -1,7 +1,7 @@
 (write-your-first-machine-charm)=
 # Write your first machine charm
 
-In this tutorial you will write a machine charm for Juju using ([Charmcraft](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) and) Ops.
+In this tutorial you will write a machine charm for Juju using {external+charmcraft:doc}`Charmcraft <index>` and Ops.
 
 <!-- TODO (tam)
 Add this link above:
@@ -42,7 +42,9 @@ The application has other features that we can exploit, but for now this is enou
 
 ## Set up your development environment
 
-> See more: {external+juju:ref}`Juju | Manage your deployment environment > Automatically <manage-your-deployment-environment>` for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm. At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD.
+See {external+juju:ref}`Juju | Manage your deployment environment > Set things up <set-things-up>` for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm.
+
+At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD.
 
 ```{important}
 
@@ -288,7 +290,7 @@ config:
 ```
 
 
-> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml | Key config <recipe-key-config>`
+> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml | Key config <charmcraft-yaml-key-config>`
 
 Then, in the `src/charm.py` file, update the `_on_install` function to make use of the new configuration option, as below:
 
@@ -522,7 +524,7 @@ Congratulations, your charm user can view the version of the workload deployed f
 
 ## Tear things down
 
-> See [Juju | Tear down your development environment automatically](https://juju.is/docs/juju/set-up--tear-down-your-test-environment#tear-down-automatically)
+See {external+juju:ref}`Juju | Manage your deployment environment > Tear things down <tear-things-down>`.
 
 
 
