@@ -1795,12 +1795,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
             content = self._data[key]
         except KeyError:
             raise KeyError(f'{key!r} is not a known unit or app') from None
-        for k in tuple(content):
-            if k not in value:
-                del content[k]
-        for k, v in value.items():
-            if k not in content or content[k] != v:
-                content[k] = v
+        content._replace(value)
 
     def __repr__(self):
         return repr(self._data)
@@ -1886,11 +1881,21 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         """
         # firstly, we validate WHAT we're trying to write.
         # this is independent of whether we're in testing code or production.
+        self._validate_write_content(key, value)
+        self._validate_write_access()
+
+    def _validate_write_multiple(self, data: Mapping[str, str]) -> None:
+        for k, v in data.items():
+            self._validate_write_content(k, v)
+        self._validate_write_access()
+
+    def _validate_write_content(self, key: str, value: str):
         if not isinstance(key, str):
             raise RelationDataTypeError(f'relation data keys must be strings, not {type(key)}')
         if not isinstance(value, str):
             raise RelationDataTypeError(f'relation data values must be strings, not {type(value)}')
 
+    def _validate_write_access(self) -> None:
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -1925,8 +1930,31 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._commit(key, value)
         self._update(key, value)
 
+    def _replace(self, data: Mapping[str, str]) -> None:
+        """Remove existing key value pairs and write replacement data to databag.
+
+        Efficiently handles write access validation and calling
+        relation-set hook tool for bulk data,
+        following the validate/commit/update pattern of __setitem__. Has the same final outcome as
+
+        """
+        self._validate_write_multiple(data)  # only validate new data
+        replacement = {
+            **data,
+            **{k: '' for k in self if k not in data},
+        }
+        self._commit_multiple(replacement)
+        self._update_multiple(replacement)
+
     def _commit(self, key: str, value: str):
         self._backend.update_relation_data(self.relation.id, self._entity, key, value)
+
+    def _commit_multiple(self, data: Mapping[str, str]) -> None:
+        self._backend.update_relation_data_multiple(
+            relation_id=self.relation.id,
+            _entity=self._entity,
+            data=data,
+        )
 
     def _update(self, key: str, value: str):
         """Cache key:value in our local lazy data."""
@@ -1938,6 +1966,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 self._data.pop(key, None)
             else:
                 self._data[key] = value
+
+    def _update_multiple(self, data: Mapping[str, str]) -> None:
+        for k, v in data.items():
+            self._update(k, v)
 
     def __getitem__(self, key: str) -> str:
         self._validate_read()
@@ -3450,6 +3482,11 @@ class _ModelBackend:
             raise
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
+        self._relation_set_multiple(relation_id=relation_id, data={key: value}, is_app=is_app)
+
+    def _relation_set_multiple(
+        self, relation_id: int, data: Mapping[str, str], is_app: bool
+    ) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -3465,7 +3502,7 @@ class _ModelBackend:
         args.extend(['--file', '-'])
 
         try:
-            content = yaml.safe_dump({key: value})
+            content = yaml.safe_dump(data)
             self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
@@ -3713,6 +3750,15 @@ class _ModelBackend:
         self, relation_id: int, _entity: Union['Unit', 'Application'], key: str, value: str
     ):
         self.relation_set(relation_id, key, value, isinstance(_entity, Application))
+
+    def update_relation_data_multiple(
+        self, relation_id: int, _entity: Union['Unit', 'Application'], data: Mapping[str, str]
+    ):
+        self._relation_set_multiple(
+            relation_id=relation_id,
+            data=data,
+            is_app=isinstance(_entity, Application),
+        )
 
     def secret_get(
         self,
