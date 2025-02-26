@@ -2466,17 +2466,8 @@ class _TestingModelBackend:
         self,
         relation_id: int,
         _entity: Union[model.Unit, model.Application],
-        key: str | None = None,
-        value: str | None = None,
-        data: Mapping[str, str] | None = None,
+        data: Mapping[str, str],
     ):
-        if data is None:
-            data = {}
-        else:
-            data = dict(data)
-        if key is not None:
-            assert value is not None
-            data[key] = value
         # this is where the 'real' backend would call relation-set.
         raw_data = self._relation_data_raw[relation_id][_entity.name]
         for key, value in data.items():

@@ -24,6 +24,7 @@ import typing
 import unittest
 from collections import OrderedDict
 from textwrap import dedent
+from typing import Mapping
 from unittest import mock
 
 import pytest
@@ -403,7 +404,14 @@ class TestModel:
             harness,
             [
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        '_entity': harness.model.unit,
+                        'data': {'host': 'bar'},
+                    },
+                ),
             ],
         )
 
@@ -431,7 +439,10 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', 0),
                 ('relation_get', 0, 'myapp', True),
-                ('update_relation_data', 0, harness.model.app, 'password', 'foo'),
+                (
+                    'update_relation_data',
+                    {'relation_id': 0, '_entity': harness.model.app, 'data': {'password': 'foo'}},
+                ),
             ],
         )
 
@@ -507,7 +518,14 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        '_entity': harness.model.unit,
+                        'data': {'host': ''},
+                    },
+                ),
             ],
         )
 
@@ -533,7 +551,14 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'port', ''),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        '_entity': harness.model.unit,
+                        'data': {'port': ''}
+                    },
+                ),
             ],
         )
 
@@ -552,11 +577,10 @@ class TestModel:
 
         def broken_update_relation_data(
             relation_id: int,
-            entity: typing.Union[ops.Unit, ops.Application],
-            key: str,
-            value: str,
+            _entity: typing.Union[ops.Unit, ops.Application],
+            data: Mapping[str, str],
         ):
-            backend._calls.append(('update_relation_data', relation_id, entity, key, value))
+            backend._calls.append(('update_relation_data', relation_id, _entity, data))
             raise ops.ModelError()
 
         backend.update_relation_data = broken_update_relation_data
@@ -579,8 +603,8 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': 'bar'}),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': ''}),
             ],
         )
 

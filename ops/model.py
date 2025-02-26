@@ -1948,18 +1948,11 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._update(data)
 
     def _commit(self, data: Mapping[str, str]) -> None:
-        if len(data) == 1:
-            [(key, value)] = data.items()
-            self._backend.update_relation_data(self.relation.id, self._entity, key, value)
-            return
+        # NOTE: we have to call update_relation_data rather than relation_set
+        # due to differences in how Harness mocks the two methods
         self._backend.update_relation_data(
             relation_id=self.relation.id, _entity=self._entity, data=data
         )
-        #self._backend._relation_set(
-        #    relation_id=self.relation.id,
-        #    data=data,
-        #    is_app=isinstance(self._entity, Application),
-        #)
 
     def _update(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
@@ -3750,17 +3743,8 @@ class _ModelBackend:
         self,
         relation_id: int,
         _entity: Union['Unit', 'Application'],
-        key: str | None = None,
-        value: str | None = None,
-        data: Mapping[str, str] | None = None,
+        data: Mapping[str, str]
     ):
-        if data is None:
-            data = {}
-        else:
-            data = dict(data)
-        if key is not None:
-            assert value is not None
-            data[key] = value
         self._relation_set(
             relation_id=relation_id, data=data, is_app=isinstance(_entity, Application)
         )

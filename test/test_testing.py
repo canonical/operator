@@ -2264,7 +2264,10 @@ class TestHarness:
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
             ('relation_get', 0, 'test-charm/0', False),
-            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, '_entity': test_charm_unit, 'data': {'foo': 'bar'}}
+            ),
         ]
 
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -2278,14 +2281,20 @@ class TestHarness:
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, '_entity': pgql_unit, 'data': {'foo': 'bar'}}
+            ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, '_entity': pgql_unit, 'data': {'foo': 'bar'}}
+            ),
         ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
