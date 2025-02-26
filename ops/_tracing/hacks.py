@@ -19,16 +19,13 @@ import shutil
 from collections import defaultdict
 from typing import Any
 
-import opentelemetry.trace
 from importlib_metadata import distributions  # type: ignore
 
 logger = logging.getLogger(__name__)
-tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 # FIXME: Pietro says that this hack has to be run before
 # opentelemetry is imported. Move this to ops top-level.
-@tracer.start_as_current_span('ops.remove_stale_otel_sdk_packages')
 def remove_stale_otel_sdk_packages() -> None:
     """Remove stale opentelemetry sdk packages from the charm's Python venv.
 

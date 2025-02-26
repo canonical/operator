@@ -44,13 +44,14 @@ testing = [
     "ops-scenario>=7.0.5,<8",
 ]
 tracing = [
-    "otlp-json>=0.9.1",
+    "otlp-json>=0.9.2",
     # FIXME: decision needed
+    #
     # On one hand, this instrumenttion provides additional info about pebble
     # (request URL, status code, post and response data sizes)
-    # On the other, the exporter uses urllib too...
-    # I think (but need to check again), that OTEL disables instrumentation
-    # while doing OTEL-ley things, like exporting traces.
+    #
+    # On the other, the exporter uses urllib too, yet
+    # OTEL disables instrumentation while exporting traces.
     "opentelemetry-instrumentation-urllib~=0.51b0",
     "opentelemetry-sdk~=1.30",  # version should match -api
 ]
