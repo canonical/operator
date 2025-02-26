@@ -57,9 +57,11 @@ jobs:
             echo "::set-output name=exists::false"
           fi
 
-      - name: Run the charm's scenario unit tests
-        if: ${{ steps.check-tox-env-scenario.outputs.exists == 'true' && !(matrix.disabled) }}
-        run: tox -vve scenario
+      # alertmanager-k8s has old Scenario tests, so we can't do this until those
+      # are updated.
+#      - name: Run the charm's scenario unit tests
+#        if: ${{ steps.check-tox-env-scenario.outputs.exists == 'true' && !(matrix.disabled) }}
+#        run: tox -vve scenario
 
       - name: Check if 'static' tox environment exists
         id: check-tox-env-static
