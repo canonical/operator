@@ -2464,16 +2464,41 @@ class _TestingModelBackend:
     def update_relation_data(
         self,
         relation_id: int,
-        _entity: Union[model.Unit, model.Application],
+        entity: Union[model.Unit, model.Application],
         data: Mapping[str, str],
     ):
         # this is where the 'real' backend would call relation-set.
-        raw_data = self._relation_data_raw[relation_id][_entity.name]
+        raw_data = self._relation_data_raw[relation_id][entity.name]
         for key, value in data.items():
             if value == '':
                 raw_data.pop(key, None)
             else:
                 raw_data[key] = value
+
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+        if not isinstance(is_app, bool):
+            raise TypeError('is_app parameter to relation_set must be a boolean')
+
+        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+            relation_id
+        ):
+            raise RuntimeError(
+                'remote-side relation data cannot be accessed during a relation-broken event'
+            )
+
+        if relation_id not in self._relation_data_raw:
+            raise RelationNotFoundError(relation_id)
+
+        relation = self._relation_data_raw[relation_id]
+        bucket_key = self.app_name if is_app else self.unit_name
+        if bucket_key not in relation:
+            relation[bucket_key] = {}
+        bucket = relation[bucket_key]
+        for key, value in data.items():
+            if value == '':
+                bucket.pop(key, None)
+            else:
+                bucket[key] = value
 
     def config_get(self) -> _TestingConfig:
         return self._config

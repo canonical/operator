@@ -1948,7 +1948,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _commit(self, data: Mapping[str, str]) -> None:
         self._backend.update_relation_data(
-            relation_id=self.relation.id, _entity=self._entity, data=data
+            relation_id=self.relation.id, entity=self._entity, data=data
         )
 
     def _update(self, data: Mapping[str, str]) -> None:
@@ -3473,7 +3473,7 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def _relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -3734,10 +3734,10 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self, relation_id: int, _entity: Union['Unit', 'Application'], data: Mapping[str, str]
+        self, relation_id: int, entity: Union['Unit', 'Application'], data: Mapping[str, str]
     ):
-        self._relation_set(
-            relation_id=relation_id, data=data, is_app=isinstance(_entity, Application)
+        self.relation_set(
+            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
         )
 
     def secret_get(
