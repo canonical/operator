@@ -12,10 +12,12 @@ When it's available in Juju.
 -->
 
 **What you'll need:**
-- A workstation, e.g., a laptop, with amd64 architecture and which has sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space
-- Familiarity with Linux
-- Familiarity with Juju.
-- Familiarity with object-oriented programming in Python
+
+- A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
+- Familiarity with Linux.
+- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
+
+It will also help if you're familiar with Juju, but don't worry if you're new to Juju. This tutorial will guide you through each step.
 
 **What you'll do:**
 
@@ -232,39 +234,26 @@ Machine  State    Address         Inst id        Base          AZ  Message
 
 ```
 
-Finally, test that the service works by executing `curl` on your application unit:
+Finally, use `curl` to test that the service works. Get the address of the running machine from the Juju status
+(10.122.219.101 in this example), then run `curl`:
 
 ```text
-ubuntu@charm-dev:~/microsample-vm$  juju exec --unit microsample/0 -- "curl -s http://localhost:8080"
+ubuntu@charm-dev:~/microsample-vm$  curl http://10.122.219.101:8080
 Online
 ```
 
 ```{note}
 
+If the Juju status doesn't look right, for example if you see an "error" status instead of "active",
+there might be an issue with the charm code. You can use a debug session (`juju debug-log`) to get
+more detailed information about the issue. After you've identified the issue:
+
 1. Fix the code in `src/charm.py`.
-2. Rebuild the charm: `charmcraft pack`
-3. Refresh the application from the repacked charm: `juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm --force-units`
-4. Let the model know the issue is resolved (fixed): `juju resolved microsample/0`.
+2. Rebuild the charm: `charmcraft pack`.
+3. Refresh the application from the repacked charm: `juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm --force-units`.
+4. Let the model know that you've fixed the issue: `juju resolved microsample/0`.
 
 ```
-
-<!--Might be nice to get people to observe the hooks too:
-```
-unit-microsample-vm-0
-root@microsample-vm-0:/var/lib/juju/agents# cd unit-microsample-vm-0/
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0# ls
-agent.conf  charm  run.socket  state
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0# cd charm
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm# ls
-LICENSE  README.md  dispatch  hooks  manifest.yaml  metadata.yaml  revision  src  venv
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm# cd hooks
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks# ls
-install  start  upgrade-charm
-root@microsample-vm-0:/var/lib/juju/agents/unit-microsample-vm-0/charm/hooks#
-```
--->
-
-
 
 ```{note}
 
