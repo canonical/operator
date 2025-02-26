@@ -52,9 +52,9 @@ jobs:
         id: check-tox-env-scenario
         run: |
           if tox --listenvs | grep -q "^scenario$"; then
-            echo "::set-output name=exists::true"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=exists::false"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       # alertmanager-k8s has old Scenario tests, so we can't do this until those
@@ -67,9 +67,9 @@ jobs:
         id: check-tox-env-static
         run: |
           if tox --listenvs | grep -q "^static$"; then
-            echo "::set-output name=exists::true"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=exists::false"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run the charm's static analysis checks
@@ -80,9 +80,9 @@ jobs:
         id: check-tox-env-static-charm
         run: |
           if tox --listenvs | grep -q "^static-charm$"; then
-            echo "::set-output name=exists::true"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=exists::false"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run the charm's static (charm) analysis checks
