@@ -1921,25 +1921,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                     f'not the same unit.'
                 )
 
-    def _replace(self, data: Mapping[str, str]) -> None:
-        """Remove existing key value pairs and write replacement data to databag.
-
-        Efficiently handles write access validation and calling relation-set hook tool
-        for bulk data, following the validate/commit/update pattern of __setitem__.
-        Has the same final outcome as:
-
-        for k in tuple(self):
-            del self[k]
-        for k, v in data:
-            self[k] = v
-        """
-        changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
-        deletions = {k: '' for k in self if k not in data}
-        replacement = {**changes, **deletions}
-        self._validate_write(replacement)
-        self._commit(replacement)
-        self._update(replacement)
-
     def __setitem__(self, key: str, value: str):
         data = {key: value}
         self._validate_write(data)
@@ -1976,6 +1957,25 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
+
+    def _replace(self, data: Mapping[str, str]) -> None:
+        """Remove existing key value pairs and write replacement data to databag.
+
+        Efficiently handles write access validation and calling relation-set hook tool
+        for bulk data, following the validate/commit/update pattern of __setitem__.
+        Has the same final outcome as:
+
+        for k in tuple(self):
+            del self[k]
+        for k, v in data:
+            self[k] = v
+        """
+        changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
+        deletions = {k: '' for k in self if k not in data}
+        replacement = {**changes, **deletions}
+        self._validate_write(replacement)
+        self._commit(replacement)
+        self._update(replacement)
 
     def __repr__(self):
         try:
