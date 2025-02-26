@@ -55,6 +55,7 @@ jobs:
             echo "exists=true" >> $GITHUB_ENV
           else
             echo "exists=false" >> $GITHUB_ENV
+          fi
 
       - name: Run the charm's scenario unit tests
         if: ${{ steps.check-tox-env-scenario.outputs.exists == 'true' && !(matrix.disabled) }}
@@ -67,6 +68,7 @@ jobs:
             echo "exists=true" >> $GITHUB_ENV
           else
             echo "exists=false" >> $GITHUB_ENV
+          fi
 
       - name: Run the charm's static analysis checks
         if: ${{ steps.check-tox-env-static.outputs.exists == 'true' && !(matrix.disabled) }}
@@ -79,6 +81,7 @@ jobs:
             echo "exists=true" >> $GITHUB_ENV
           else
             echo "exists=false" >> $GITHUB_ENV
+          fi
 
       - name: Run the charm's static (charm) analysis checks
         if: ${{ steps.check-tox-env-static-charm.outputs.exists == 'true' && !(matrix.disabled) }}
