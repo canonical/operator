@@ -14,6 +14,7 @@
 
 """Infrastructure to build unit tests for charms using the ops library."""
 
+from __future__ import annotations
 import dataclasses
 import datetime
 import fnmatch
@@ -2462,16 +2463,32 @@ class _TestingModelBackend:
         return self._relation_data_raw[relation_id][member_name]
 
     def update_relation_data(
-        self, relation_id: int, _entity: Union[model.Unit, model.Application], key: str, value: str
+        self,
+        relation_id: int,
+        _entity: Union[model.Unit, model.Application],
+        key: str | None = None,
+        value: str | None = None,
+        data: Mapping[str, str] | None = None,
     ):
+        if data is None:
+            data = {}
+        else:
+            data = dict(data)
+        if key is not None:
+            assert value is not None
+            data[key] = value
         # this is where the 'real' backend would call relation-set.
         raw_data = self._relation_data_raw[relation_id][_entity.name]
-        if value == '':
-            raw_data.pop(key, None)
-        else:
-            raw_data[key] = value
+        for key, value in data.items():
+            if value == '':
+                raw_data.pop(key, None)
+            else:
+                raw_data[key] = value
 
     def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+        self._relation_set(relation_id=relation_id, data={key: value}, is_app=is_app)
+
+    def _relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -2490,10 +2507,11 @@ class _TestingModelBackend:
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
-        if value == '':
-            bucket.pop(key, None)
-        else:
-            bucket[key] = value
+        for key, value in data.items():
+            if value == '':
+                bucket.pop(key, None)
+            else:
+                bucket[key] = value
 
     def config_get(self) -> _TestingConfig:
         return self._config
