@@ -2506,6 +2506,8 @@ class Container:
     def start_checks(self, *check_names: str) -> List[str]:
         """Start given check(s) by name.
 
+        .. jujuadded:: 3.6.4
+
         Returns:
             A list of check names that were started. Checks that were already
             running will not be included.
@@ -2517,6 +2519,8 @@ class Container:
 
     def stop_checks(self, *check_names: str) -> List[str]:
         """Stop given check(s) by name.
+
+        .. jujuadded:: 3.6.4
 
         Returns:
             A list of check names that were stopped. Checks that were already
