@@ -5,11 +5,6 @@
 * Expose the Juju version via Model objects in (#1563)
 * Support starting and stopping Pebble checks, and the checks enabled field in (#1560)
 
-## Fixes
-
-* Expose the mocked Juju environment variables via os.environ again in (#1573)
-/canonical/operator/pull/1573)
-
 ## Documentation
 
 * Update logo and readme by @tmihoc in (#1571)
