@@ -407,9 +407,7 @@ class CharmEvents:
             if from_.relation is not None:
                 event_kwargs["relation"] = from_.relation
             if from_.relation_remote_unit_id is not None:
-                event_kwargs["relation_remote_unit_id"] = (
-                    from_.relation_remote_unit_id
-                )
+                event_kwargs["relation_remote_unit_id"] = from_.relation_remote_unit_id
             if from_.relation_departed_unit_id is not None:
                 event_kwargs["relation_departed_unit_id"] = (
                     from_.relation_departed_unit_id

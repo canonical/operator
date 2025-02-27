@@ -442,7 +442,7 @@ def test_custom_event_no_args():
 def test_custom_event_with_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with ctx(
-        ctx.on.custom(MyConsumer.on.foo_changed, args=("foo",), kwargs={"arg1": 42}),
+        ctx.on.custom(MyConsumer.on.foo_changed, "foo", arg1=42),
         scenario.State(),
     ) as mgr:
         mgr.run()
@@ -462,8 +462,9 @@ def test_custom_event_from_juju_event():
     originating_event = ctx.on.relation_changed(relation)
     event = ctx.on.custom(
         MyConsumer.on.foo_relation_changed,
-        kwargs={"arg0": "foo", "arg1": 42},
-        from_juju_event=originating_event,
+        arg0="foo",
+        arg1=42,
+        from_=originating_event,
     )
     with ctx(event, scenario.State(relations={relation})) as mgr:
         mgr.run()

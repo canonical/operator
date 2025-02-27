@@ -244,9 +244,7 @@ def test_defer_custom_event(mycharm):
     ctx = Context(MyCharm, meta=mycharm.META, capture_deferred_events=True)
 
     mycharm.defer_next = 1
-    state_1 = ctx.run(
-        ctx.on.custom(MyConsumer.on.foo_changed, args=("foo", 28)), State()
-    )
+    state_1 = ctx.run(ctx.on.custom(MyConsumer.on.foo_changed, "foo", 28), State())
     assert [type(e).__name__ for e in ctx.emitted_events] == ["CustomEventWithArgs"]
     assert ctx.emitted_events[0].snapshot() == {"arg0": "foo", "arg1": 28}
     assert len(state_1.deferred) == 1
