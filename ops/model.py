@@ -1973,6 +1973,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
         deletions = {k: '' for k in self if k not in data}
         replacement = {**changes, **deletions}
+        if not replacement:  # no changes or deletions
+            return  # data is already exactly as requested
         self._validate_write(replacement)
         self._commit(replacement)
         self._update_cache(replacement)
