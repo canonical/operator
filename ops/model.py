@@ -1795,7 +1795,7 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
             content = self._data[key]
         except KeyError:
             raise KeyError(f'{key!r} is not a known unit or app') from None
-        content._replace(value)
+        content._replace_data(value)
 
     def __repr__(self):
         return repr(self._data)
@@ -1925,14 +1925,14 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         data = {key: value}
         self._validate_write(data)
         self._commit(data)
-        self._update(data)
+        self._update_cache(data)
 
     def _commit(self, data: Mapping[str, str]) -> None:
         self._backend.update_relation_data(
             relation_id=self.relation.id, entity=self._entity, data=data
         )
 
-    def _update(self, data: Mapping[str, str]) -> None:
+    def _update_cache(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
         if self._lazy_data is None:
@@ -1958,7 +1958,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
 
-    def _replace(self, data: Mapping[str, str]) -> None:
+    def _replace_data(self, data: Mapping[str, str]) -> None:
         """Remove existing key value pairs and write replacement data to databag.
 
         Efficiently handles write access validation and calling relation-set hook tool
@@ -1975,7 +1975,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         replacement = {**changes, **deletions}
         self._validate_write(replacement)
         self._commit(replacement)
-        self._update(replacement)
+        self._update_cache(replacement)
 
     def __repr__(self):
         try:
