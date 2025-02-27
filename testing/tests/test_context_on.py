@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import typing
 
@@ -115,9 +117,9 @@ def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.secret.id == secret.id
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.secret.id == secret.id
 
 
 @pytest.mark.parametrize(
@@ -143,10 +145,10 @@ def test_revision_secret_events(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.secret.id == secret.id
-        assert mgr.revision == 42
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.secret.id == secret.id
+        assert evt.revision == 42
 
 
 @pytest.mark.parametrize("event_name", ["secret_expired", "secret_remove"])
@@ -179,10 +181,10 @@ def test_storage_events(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.storage.name == storage.name
-        assert mgr.storage.index == storage.index
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.storage.name == storage.name
+        assert evt.storage.index == storage.index
 
 
 def test_action_event_no_params():
@@ -193,8 +195,8 @@ def test_action_event_no_params():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.ActionEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.ActionEvent)
 
 
 def test_action_event_with_params():
@@ -207,10 +209,10 @@ def test_action_event_with_params():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.ActionEvent)
-        assert mgr.id == call_event.action.id
-        assert mgr.params["param"] == call_event.action.params["param"]
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.ActionEvent)
+        assert evt.id == call_event.action.id
+        assert evt.params["param"] == call_event.action.params["param"]
 
 
 def test_pebble_ready_event():
@@ -223,9 +225,9 @@ def test_pebble_ready_event():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.PebbleReadyEvent)
-        assert mgr.workload.name == container.name
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.PebbleReadyEvent)
+        assert evt.workload.name == container.name
 
 
 @pytest.mark.parametrize("as_kwarg", [True, False])
@@ -252,11 +254,11 @@ def test_relation_app_events(as_kwarg, event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit is None
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit is None
 
 
 def test_relation_complex_name():
@@ -268,11 +270,11 @@ def test_relation_complex_name():
     with ctx(ctx.on.relation_created(relation), state_in) as mgr:
         mgr.run()
         assert len(mgr.charm.observed) == 2
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.RelationCreatedEvent)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit is None
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.RelationCreatedEvent)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit is None
 
 
 @pytest.mark.parametrize("event_name", ["relation_created", "relation_broken"])
@@ -302,11 +304,11 @@ def test_relation_unit_events_default_unit(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit.name == "remote/1"
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit.name == "remote/1"
 
 
 @pytest.mark.parametrize(
@@ -328,11 +330,11 @@ def test_relation_unit_events(event_name, event_kind):
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, event_kind)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit.name == "remote/2"
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, event_kind)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit.name == "remote/2"
 
 
 def test_relation_departed_event():
@@ -347,9 +349,129 @@ def test_relation_departed_event():
         mgr.run()
         assert len(mgr.charm.observed) == 2
         assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
-        mgr = mgr.charm.observed[0]
-        assert isinstance(mgr, ops.RelationDepartedEvent)
-        assert mgr.relation.id == relation.id
-        assert mgr.app.name == relation.remote_app_name
-        assert mgr.unit.name == "remote/2"
-        assert mgr.departing_unit.name == "remote/1"
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, ops.RelationDepartedEvent)
+        assert evt.relation.id == relation.id
+        assert evt.app.name == relation.remote_app_name
+        assert evt.unit.name == "remote/2"
+        assert evt.departing_unit.name == "remote/1"
+
+
+class CustomEvent(ops.EventBase):
+    pass
+
+
+class CustomEventWithArgs(CustomEvent):
+    arg0: str
+    arg1: int
+
+    def __init__(self, handle: ops.Handle, arg0: str = "", arg1: int = 0):
+        super().__init__(handle)
+        self.arg0 = arg0
+        self.arg1 = arg1
+
+    def snapshot(self):
+        base = super().snapshot()
+        base.update({"arg0": self.arg0, "arg1": self.arg1})
+        return base
+
+    def restore(self, snapshot: dict[str, typing.Any]):
+        super().restore(snapshot)
+        self.arg0 = snapshot["arg0"]
+        self.arg1 = snapshot["arg1"]
+
+
+class CustomRelationEvent(ops.RelationChangedEvent):
+    def __init__(
+        self,
+        handle: ops.Handle,
+        relation: ops.Relation,
+        app: ops.Application | None = None,
+        unit: ops.Unit | None = None,
+        *,
+        arg0: str = "",
+        arg1: int = 0,
+    ):
+        super().__init__(handle, relation)
+        self.arg0 = arg0
+        self.arg1 = arg1
+
+    def snapshot(self):
+        base = super().snapshot()
+        base.update({"arg0": self.arg0, "arg1": self.arg1})
+        return base
+
+    def restore(self, snapshot: dict[str, typing.Any]):
+        super().restore(snapshot)
+        self.arg0 = snapshot["arg0"]
+        self.arg1 = snapshot["arg1"]
+
+
+class CustomEvents(ops.ObjectEvents):
+    foo_started = ops.EventSource(CustomEvent)
+    foo_changed = ops.EventSource(CustomEventWithArgs)
+    foo_relation_changed = ops.EventSource(CustomRelationEvent)
+
+
+class MyConsumer(ops.Object):
+    on = CustomEvents()  # type: ignore
+
+    def __init__(self, charm: ops.CharmBase):
+        super().__init__(charm, "my-consumer")
+
+
+class CustomCharm(ContextCharm):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.consumer = MyConsumer(self)
+        framework.observe(self.consumer.on.foo_started, self._on_event)
+        framework.observe(self.consumer.on.foo_changed, self._on_event)
+        framework.observe(self.consumer.on.foo_relation_changed, self._on_event)
+
+
+def test_custom_event_no_args():
+    ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
+    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:
+        mgr.run()
+        assert len(mgr.charm.observed) == 2
+        assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, CustomEvent)
+
+
+def test_custom_event_with_args():
+    ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
+    with ctx(
+        ctx.on.custom(MyConsumer.on.foo_changed, "foo", arg1=42),
+        scenario.State(),
+    ) as mgr:
+        mgr.run()
+        assert len(mgr.charm.observed) == 2
+        assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, CustomEventWithArgs)
+        assert evt.arg0 == "foo"
+        assert evt.arg1 == 42
+
+
+def test_custom_event_from_juju_event():
+    meta = META.copy()
+    meta["requires"]["db"] = {"interface": "db"}
+    ctx = scenario.Context(CustomCharm, meta=meta, actions=ACTIONS)
+    relation = scenario.Relation("db")
+    originating_event = ctx.on.relation_changed(relation)
+    event = ctx.on.custom(
+        MyConsumer.on.foo_relation_changed,
+        arg0="foo",
+        arg1=42,
+        from_=originating_event,
+    )
+    with ctx(event, scenario.State(relations={relation})) as mgr:
+        mgr.run()
+        assert len(mgr.charm.observed) == 2
+        assert isinstance(mgr.charm.observed[1], ops.CollectStatusEvent)
+        evt = mgr.charm.observed[0]
+        assert isinstance(evt, CustomRelationEvent)
+        assert evt.relation.id == relation.id
+        assert evt.arg0 == "foo"
+        assert evt.arg1 == 42
