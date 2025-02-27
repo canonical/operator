@@ -1,3 +1,31 @@
+# 2.19.0 - 27 Feb 2025
+
+## Features
+
+* Expose the Juju version via Model objects in (#1563)
+* Support starting and stopping Pebble checks, and the checks enabled field in (#1560)
+
+## Fixes
+
+* Expose the mocked Juju environment variables via os.environ again in (#1573)
+/canonical/operator/pull/1573)
+
+## Documentation
+
+* Update logo and readme by @tmihoc in (#1571)
+* Fill out remaining external link placeholders in (#1564)
+* Use noun relation and verb integrate in (#1574)
+* Update ref to charmcraft.yaml reference by @medubelko in (#1580)
+* Add a how-to for setting open ports in (#1579)
+* Fix links that pointed to earlier Juju docs in (#1575)
+* Update links to Charmcraft docs in (#1582)
+* Small updates to machine charm tutorial in (#1583)
+
+## CI
+
+* Update list of charms and handle increasing uv usage in (#1588)
+* Handle presence/absence of "static" and "static-charm" envs in (#1590)
+
 # 2.18.1 - 5 Feb 2025
 
 ## Fixes

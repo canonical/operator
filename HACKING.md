@@ -360,8 +360,8 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    tag choice on `auto`. If the last release was for only one package, change
    the previous tag to be the last time the same package(s) were being released.
 7. Use the "Generate Release Notes" button to get a copy of the changes into the
-   notes field. The 'Release Documentation' section below details the form that
-   the release notes and changelog should take.
+   notes field. Format it according to the 'Release Documentation' section below,
+   copy it to `CHANGES.md` according to the `CHANGES.md` section below.
 8. For `ops`, change [version.py](ops/version.py)'s `version` to the
    appropriate string. For `ops-scenario`, change the version in
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
@@ -370,7 +370,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 9. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
    using the same Python version as specified in the `.readthedocs.yaml` file.
-10. Add, commit, and push, and open a PR to get the changelogs, version bumps,
+10. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
 11. Save the release notes as a draft, and have someone else in the Charm-Tech
    team proofread the release notes.
@@ -454,6 +454,8 @@ CHANGES.md files.
 * Where appropriate, collapse multiple tightly related bullet points into a
   single point that refers to multiple commits.
 * Where appropriate, add backticks for code formatting.
+* Do not include the "New Contributors" section and the "Full Changelog" link
+  (created by "Generate Release Notes").
 
 For example: the PR
 
