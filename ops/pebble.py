@@ -3101,6 +3101,8 @@ class Client:
     def start_checks(self, checks: Iterable[str]) -> List[str]:
         """Start checks by name.
 
+        .. jujuadded:: 3.6.4
+
         Args:
             checks: Non-empty list of checks to start.
 
@@ -3112,6 +3114,8 @@ class Client:
 
     def stop_checks(self, checks: Iterable[str]) -> List[str]:
         """Stop checks by name.
+
+        .. jujuadded:: 3.6.4
 
         Args:
             checks: Non-empty list of checks to stop.
