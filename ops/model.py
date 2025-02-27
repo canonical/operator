@@ -1819,7 +1819,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # unrestricted, allowing test code to read/write databags at will.
         return bool(self._backend._hook_is_running)
 
-    # FIXME instrument this or LazyMapping?
     def _load(self) -> '_RelationDataContent_Raw':
         """Load the data from the current entity / relation."""
         try:

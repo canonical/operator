@@ -271,9 +271,7 @@ class _Dispatcher:
         argv[0] = str(dispatch_path)
         logger.info('Running legacy %s.', self._dispatch_path)
         try:
-            with tracer.start_as_current_span(f'subprocess.run({argv[0]})') as span:
-                span.set_attribute('argv', ' '.join(argv))
-                subprocess.run(argv, check=True)
+            subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
             logger.warning('Legacy %s exited with status %d.', self._dispatch_path, e.returncode)
             raise _Abort(e.returncode) from e
