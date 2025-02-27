@@ -390,7 +390,6 @@ class CharmEvents:
             ), state)
 
         If the custom event is a subclass of a Juju event (rather than :attr:`ops.EventBase`)
-        that itself has arguments (such as :attr:`ops.RelationChangedEvent`),
         then you need to also pass in a suitable originating event, for example::
 
             ctx.run(ctx.on.custom(
