@@ -3031,8 +3031,8 @@ class Client:
                 process_stdout = _WebsocketReader(stdio_ws)
                 if encoding is not None:
                     process_stdout = io.TextIOWrapper(
-                        process_stdout, encoding=encoding, newline=''
-                    )  # type: ignore
+                        process_stdout, encoding=encoding, newline=''  # type: ignore
+                    )
 
             process_stderr = None
             if not combine_stderr:

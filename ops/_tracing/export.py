@@ -234,7 +234,7 @@ def setup_tracing(charm_class_name: str) -> None:
     set_tracer_provider(provider)
     # FIXME: in testing with tracing, we need a hack.
     # OpenTelemetry disallows setting the tracer provider twice,
-    # a waring is issued and new provider is ignored.
+    # a warning is issued and new provider is ignored.
     #
     # For example, we could reset the resource instead:
     # get_tracer_provider()._resource = resource
