@@ -24,8 +24,7 @@ import urllib.request
 from pathlib import Path
 from typing import Sequence
 
-# FIXME: single-file Python package can't be marked as py.typed
-import otlp_json  # type: ignore
+import otlp_json
 from opentelemetry.instrumentation.urllib import URLLibInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -36,9 +35,6 @@ import ops
 import ops._tracing.buffer
 import ops.jujucontext
 import ops.log
-
-# FIXME otlp_json is typed...
-# https://github.com/python/typing/issues/1333
 
 # Trace `urllib` usage when talking to Pebble
 URLLibInstrumentor().instrument()
@@ -108,7 +104,7 @@ class ProxySpanExporter(SpanExporter):
         except Exception:
             # FIXME: I'm using this to catch bug during development.
             # OTEL must disable logging capture during export to avoid data loops.
-            # At least during develpoment, we want to catch and report pure bugs.
+            # At least during development, we want to catch and report pure bugs.
             # Perhaps this part needs to be removed before merge/release.
             # Leaving here for now to decide how to test this code path.
             logger.exception('export')
@@ -131,16 +127,20 @@ class ProxySpanExporter(SpanExporter):
         # We'd match https://wiki.mozilla.org/Security/Server_Side_TLS "Modern".
         # FIXME SSLContext(args) or create_default_context(args)?
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        # FIXME: we should probably allow ca=None
-        # and then we'd pick up system or certifi certs?
-        assert ca
-        context.load_verify_locations(cadata=ca)
+
+        if ca:
+            context.load_verify_locations(cadata=ca)
+        else:
+            # FIXME: we should probably allow ca=None
+            # and then we'd pick up system or certifi certs?
+            raise ValueError(f'FIXME: unsupported {ca=}')
+
         # FIXME: what's recommended?
         # context.set_ciphers(...)
         # FIXME: we need to set NPN if we're setting ALPN?
         # Does this work the same way across Py 3.8~3.13?
         context.set_npn_protocols('http/1.1')
-        context.set_alpn_protocols('http/1.1')
+        context.set_alpn_protocols(['http/1.1'])
         # TODO: check that we don't need these:
         # .set_sni_callback
         return context
@@ -214,10 +214,12 @@ def setup_tracing(charm_class_name: str) -> None:
     juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
     # FIXME is it ever possible for unit_name to be unset (empty)?
     app_name, unit_number = juju_context.unit_name.split('/', 1)
+    # FIXME we could get charmhub charm name from self.meta.name, but only later
+    # when metadata.yaml file is parsed. I think that Resource is immutable,
+    # so where can we smuggle that bit of info later? An Event perhaps?
 
     resource = Resource.create(
         attributes={
-            # TODO: document these
             'service.namespace': juju_context.model_uuid,
             'service.namespace.name': juju_context.model_name,
             'service.name': app_name,
@@ -241,29 +243,21 @@ def setup_tracing(charm_class_name: str) -> None:
 def set_tracing_destination(
     *,
     url: str | None,
-    ca: str | None,
+    ca: str | None = None,
 ) -> None:
-    # FIXME only if it's a path, obv...
-    # should we also check that this path exists?
-    if ca is not None and not ca.startswith('/'):
-        raise ValueError(f'{ca=} must be an absolute path')
+    """Configure the destination service for tracing data.
 
+    Args:
+        url: The URL of the telemetry service to send tracing data to.
+        ca: The PEM formatted CA list.
+            Only in use if the URL is an HTTPS URL.
+    """
     assert _exporter, 'tracing has not been set up'
     _exporter.settings = (url, ca)
 
-    # FIXME: this is not right
-    # We recommend obsering the SetupTracingEvent unconditionally.
-    # This means that this function is called whenever there's a relation.
-    # That's regardless of deferred events being emitted or observed.
-    # And regardless of the dispatched event being observed.
-    #
-    # There needs to be a separate function to mark this dispatch invocation
-    # as observed. The logic would be somewhat complicated though.
-    # In essense:
-    # - any deferred event observed (perhaps simply emitted), or
-    # - the dispatched event observed
-    #
-    # Arguably if a defferred event is emitted, it's almost always observed.
+
+def mark_observed() -> None:
+    assert _exporter
     _exporter.buffer.mark_observed()
 
 

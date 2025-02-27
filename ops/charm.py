@@ -231,6 +231,9 @@ class ActionEvent(EventBase):
         """
         self.framework.model._backend.action_fail(message)
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
+
 
 class InstallEvent(HookEvent):
     """Event triggered when a charm is installed.
@@ -550,6 +553,14 @@ class RelationEvent(HookEvent):
         else:
             self.unit = None
 
+    def __repr__(self):
+        # FIXME: is this a good idea?
+        # I'm using this to log interesting event attributes in tracing
+        # I dunno if this is generally useful, maybe to debug stuff?
+        app = self.app and self.app.name
+        unit = self.unit and self.unit.name
+        return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'
+
 
 class RelationCreatedEvent(RelationEvent):
     """Event triggered when a new relation is created.
@@ -738,6 +749,9 @@ class StorageEvent(HookEvent):
 
             self.storage.location = storage_location
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.storage!r} via {self.handle}>'
+
 
 class StorageAttachedEvent(StorageEvent):
     """Event triggered when new storage becomes available.
@@ -809,6 +823,9 @@ class WorkloadEvent(HookEvent):
             self.workload = self.framework.model.unit.get_container(container_name)
         else:
             self.workload = None  # type: ignore
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.workload!r} via {self.handle}>'
 
 
 class PebbleReadyEvent(WorkloadEvent):

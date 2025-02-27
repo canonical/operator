@@ -133,6 +133,9 @@ class Buffer:
             else:
                 conn.execute('COMMIT')
 
+    # FIXME: currently unused
+    # If most charms observe the CollectStatusEvent, then an event is observed on every dispatch.
+    # Perhaps we should track juju events and not lifecycle events?
     @retry
     def mark_observed(self):
         if self.observed:

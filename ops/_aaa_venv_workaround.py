@@ -24,8 +24,6 @@ from importlib_metadata import distributions  # type: ignore
 logger = logging.getLogger(__name__)
 
 
-# FIXME: Pietro says that this hack has to be run before
-# opentelemetry is imported. Move this to ops top-level.
 def remove_stale_otel_sdk_packages() -> None:
     """Remove stale opentelemetry sdk packages from the charm's Python venv.
 
@@ -66,3 +64,6 @@ def remove_stale_otel_sdk_packages() -> None:
                 shutil.rmtree(path)
 
     logger.debug('Successfully applied _remove_stale_otel_sdk_packages patch. ')
+
+
+remove_stale_otel_sdk_packages()

@@ -44,10 +44,10 @@ testing = [
     "ops-scenario>=7.0.5,<8",
 ]
 tracing = [
-    "otlp-json>=0.9.2",
+    "otlp-json>=0.9.3",
     # FIXME: decision needed
     #
-    # On one hand, this instrumenttion provides additional info about pebble
+    # On one hand, this instrumentation provides additional info about pebble
     # (request URL, status code, post and response data sizes)
     #
     # On the other, the exporter uses urllib too, yet

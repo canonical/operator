@@ -18,60 +18,31 @@ TODO: quick start, usage example.
 
 from __future__ import annotations
 
-import logging
+import opentelemetry.trace
 
-from ops._tracing import hacks
+import ops.version
 
-# FIXME must this hack be run before OTEL packages are imported?
-hacks.remove_stale_otel_sdk_packages()
+tracer = opentelemetry.trace.get_tracer('ops', ops.version.version)
 
 
 try:
-    from . import export
+    from .export import (
+        mark_observed,
+        set_tracing_destination,
+        setup_tracing,
+        shutdown_tracing,
+    )
 except ImportError:
-    export = None
+
+    def mark_observed() -> None: ...
+    def set_tracing_destination(*, url: str | None, ca: str | None = None) -> None: ...
+    def setup_tracing(charm_class_name: str) -> None: ...
+    def shutdown_tracing() -> None: ...
 
 
-def setup_tracing(charm_class_name: str) -> None:
-    """Setup tracing for this "dispatch" of the charm code."""
-    if not export:
-        return
-    export.setup_tracing(charm_class_name)
-
-
-def set_tracing_destination(
-    *,
-    url: str | None,
-    # FIXME: API design choice, decide on CA semantics:
-    # - a local path to a file with CA data
-    # - or the CA data itself?
-    #
-    # Sadly Requests `verify=` kwarg accepts only:
-    # - bool: use local `certifi` certs if True
-    # - str: path to a file (PEM) or a directory (processed with c_rehash)
-    #
-    # If we plan to go for own exporter (JSON, etc.,) we should design for the future.
-    #
-    # It's not that hard to convert one to another, and yet...
-    ca: str | None = None,
-) -> None:
-    """Configure the destination service for tracing data.
-
-    Args:
-        url: The URL of the telemetry service to send tracing data to.
-        ca: The local path (?) to a CA bundle for the service above.
-            Only in use if the URL is an HTTPS URL.
-    """
-    if not export:
-        return
-    export.set_tracing_destination(url=url, ca=ca)
-
-
-def shutdown_tracing() -> None:
-    """Send out as much as possible, if possible."""
-    if not export:
-        return
-    try:
-        export.shutdown_tracing()
-    except Exception:
-        logging.exception('failed to flush tracing')
+__all__ = [
+    'mark_observed',
+    'set_tracing_destination',
+    'setup_tracing',
+    'shutdown_tracing',
+]

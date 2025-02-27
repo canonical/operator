@@ -23,22 +23,19 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
-import opentelemetry.trace
-
 import ops._tracing
 import ops.charm
 import ops.framework
 import ops.model
 import ops.storage
+from ops._tracing import tracer
 from ops.charm import CharmMeta
 from ops.jujucontext import _JujuContext
 from ops.log import setup_root_logging
 
 CHARM_STATE_FILE = '.unit-state.db'
 
-
 logger = logging.getLogger()
-tracer = opentelemetry.trace.get_tracer(__name__)
 
 
 def _exe_path(path: Path) -> Optional[Path]:
@@ -274,7 +271,7 @@ class _Dispatcher:
         argv[0] = str(dispatch_path)
         logger.info('Running legacy %s.', self._dispatch_path)
         try:
-            with tracer.start_as_current_span('ops._main::subprocess.run') as span:
+            with tracer.start_as_current_span(f'subprocess.run({argv[0]})') as span:
                 span.set_attribute('argv', ' '.join(argv))
                 subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:

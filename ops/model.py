@@ -57,11 +57,10 @@ from typing import (
     get_args,
 )
 
-import opentelemetry.trace
-
 import ops
 import ops.pebble as pebble
 from ops._private import timeconv, yaml
+from ops._tracing import tracer
 from ops.jujucontext import _JujuContext
 from ops.jujuversion import JujuVersion
 
@@ -113,7 +112,6 @@ _NetworkDict = TypedDict(
 
 
 logger = logging.getLogger(__name__)
-tracer = opentelemetry.trace.get_tracer(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
@@ -2289,6 +2287,8 @@ class Storage:
         """
         self._location = Path(location)
 
+    # FIXME add __repr__
+
 
 class MultiPushPullError(Exception):
     """Aggregates multiple push and pull exceptions into one.
@@ -3109,6 +3109,8 @@ class Container:
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
+    # FIXME add __repr__
+
 
 class ContainerMapping(Mapping[str, Container]):
     """Map of container names to Container objects.
@@ -3355,7 +3357,7 @@ class _ModelBackend:
         # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
         #                been fighting with Pyright for half an hour now...
         try:
-            with tracer.start_as_current_span('ops.model::subprocess.run') as span:
+            with tracer.start_as_current_span(f'subprocess.run({args[0]})') as span:
                 span.set_attribute('argv', args)
                 result = subprocess.run(args, **kwargs)  # type: ignore
         except subprocess.CalledProcessError as e:

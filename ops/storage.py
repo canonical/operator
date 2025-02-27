@@ -25,12 +25,11 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Generator, List, Optional, Tuple, Union, cast
 
-import opentelemetry.trace
 import yaml
 
-logger = logging.getLogger()
-tracer = opentelemetry.trace.get_tracer(__name__)
+from ops._tracing import tracer
 
+logger = logging.getLogger()
 
 # _Notice = Tuple[event_path, observer_path, method_name]
 _Notice = Tuple[str, str, str]
@@ -47,7 +46,7 @@ def _run(args: List[str], **kw: Any):
     cmd: Optional[str] = shutil.which(args[0])
     if cmd is None:
         raise FileNotFoundError(args[0])
-    with tracer.start_as_current_span('ops.storage::subprocess.run') as span:
+    with tracer.start_as_current_span(f'subprocess.run({cmd})') as span:
         span.set_attribute('argv', args)
         return subprocess.run([cmd, *args[1:]], encoding='utf-8', **kw)
 
