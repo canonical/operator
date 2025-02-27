@@ -1790,6 +1790,13 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
 
+    def __setitem__(self, key: Union['Unit', 'Application'], value: Mapping[str, str]) -> None:
+        try:
+            content = self._data[key]
+        except KeyError:
+            raise KeyError(f'{key!r} is not a known unit or app') from None
+        content._replace_data(value)
+
     def __repr__(self):
         return repr(self._data)
 
@@ -1866,12 +1873,17 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
         return True
 
-    def _validate_write(self, key: str, value: str):
-        """Validate writing key:value to this databag.
+    def _validate_write(self, data: Mapping[str, str]) -> None:
+        """Validate writing key:value pairs to this databag.
 
         1) that key: value is a valid str:str pair
         2) that we have write access to this databag
         """
+        for key, value in data.items():
+            self._validate_write_content(key, value)
+        self._validate_write_access()
+
+    def _validate_write_content(self, key: str, value: str) -> None:
         # firstly, we validate WHAT we're trying to write.
         # this is independent of whether we're in testing code or production.
         if not isinstance(key, str):
@@ -1879,6 +1891,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if not isinstance(value, str):
             raise RelationDataTypeError(f'relation data values must be strings, not {type(value)}')
 
+    def _validate_write_access(self) -> None:
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -1909,17 +1922,22 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 )
 
     def __setitem__(self, key: str, value: str):
-        self._validate_write(key, value)
-        self._commit(key, value)
-        self._update(key, value)
+        data = {key: value}
+        self._validate_write(data)
+        self._commit(data)
+        self._update_cache(data)
 
-    def _commit(self, key: str, value: str):
-        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
+    def _commit(self, data: Mapping[str, str]) -> None:
+        self._backend.update_relation_data(
+            relation_id=self.relation.id, entity=self._entity, data=data
+        )
 
-    def _update(self, key: str, value: str):
+    def _update_cache(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
-        if self._lazy_data is not None:
+        if self._lazy_data is None:
+            return
+        for key, value in data.items():
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.
@@ -1936,10 +1954,28 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         super().update(other, **kwargs)
 
     def __delitem__(self, key: str):
-        self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
+
+    def _replace_data(self, data: Mapping[str, str]) -> None:
+        """Remove existing key value pairs and write replacement data to databag.
+
+        Efficiently handles write access validation and calling relation-set hook tool
+        for bulk data, following the validate/commit/update pattern of __setitem__.
+        Has the same final outcome as:
+
+        for k in tuple(self):
+            del self[k]
+        for k, v in data:
+            self[k] = v
+        """
+        changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
+        deletions = {k: '' for k in self if k not in data}
+        replacement = {**changes, **deletions}
+        self._validate_write(replacement)
+        self._commit(replacement)
+        self._update_cache(replacement)
 
     def __repr__(self):
         try:
@@ -3437,7 +3473,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+        if not data:
+            raise ValueError('at least one key:value pair is required for relation-set')
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -3453,7 +3491,7 @@ class _ModelBackend:
         args.extend(['--file', '-'])
 
         try:
-            content = yaml.safe_dump({key: value})
+            content = yaml.safe_dump(data)
             self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
@@ -3698,9 +3736,11 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self, relation_id: int, _entity: Union['Unit', 'Application'], key: str, value: str
+        self, relation_id: int, entity: Union['Unit', 'Application'], data: Mapping[str, str]
     ):
-        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
+        self.relation_set(
+            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
+        )
 
     def secret_get(
         self,
