@@ -95,10 +95,28 @@ jobs:
           fi
 
       - name: Install dependencies
+        id: deps
         run: pip install tox~=4.2
 
+        # the following test steps will only run if the last setup step (deps) succeeded
+
       - name: Run the charm's unit tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: tox -vve unit
+
+      - name: Check for tox static environment
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: |
+          if tox list --no-desc | grep '^static$'; then
+            echo 'HAS_STATIC=true' >> $GITHUB_ENV
+          else
+            echo 'HAS_STATIC=false' >> $GITHUB_ENV
+          fi
+
+      - name: Run the charm's static tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && env.HAS_STATIC == 'true' }}
+        run: tox -vve static
+
 
   charmcraft-profile-tests:
     runs-on: ubuntu-latest
