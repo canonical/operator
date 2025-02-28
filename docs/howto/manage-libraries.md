@@ -5,8 +5,6 @@
 
 ## Use a library
 
-> See first: {external+charmcraft:ref}`Charmcraft | Use a library` <use-a-library>
-
 In your `src/charm.py`, observe the custom events it puts at your disposal. For example, a database library may have provided a  `ready` event -- a high-level wrapper around the relevant `juju` relation events -- so you use it to manage the database relation in your charm:
 
 ```python
@@ -43,11 +41,9 @@ def test_ready_event():
 
 ## Write a library
 
-> See first: {external+charmcraft:ref}`Charmcraft | Use a library` <initialise-a-library>
-
 When you're writing libraries, instead of callbacks, use custom events; this results in a more `ops`-native-feeling API. A custom event is, from a technical standpoint, an [](ops.EventBase) subclass that can be emitted at any point throughout the charm's lifecycle. These events are totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the top level Juju event so it can be observed independently.
 
-```important
+```{important}
 Custom events must inherit from `EventBase`, but not from an `ops` subclass of
 `EventBase`, such as `RelationEvent`. When instantiating the custom event, load
 any data needed from Juju from the originating event, and explicitly pass that
