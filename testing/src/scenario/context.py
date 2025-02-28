@@ -367,9 +367,8 @@ class CharmEvents:
 
     @staticmethod
     def custom(
-        source: ops.EventSource,
+        event: ops.BoundEvent,
         *args: Any,
-        from_: _Event | None = None,
         **kwargs: Any,
     ):
         """Event triggered by a charm library.
@@ -389,49 +388,25 @@ class CharmEvents:
                 MyConsumer.on.it_happened, 1, 2, foo='bar'
             ), state)
 
-        If the custom event is a subclass of a Juju event (rather than :attr:`ops.EventBase`)
-        then you need to also pass in a suitable originating event, for example::
+        Custom events do not have access to the Juju context of the originating
+        hook event.
 
-            ctx.run(ctx.on.custom(
-                MyConsumer.on.it_happened, from_=ctx.on.relation_changed(my_relation)
-            ), state)
-
-        The arguments for the custom event are the arguments for the original
-        Juju event, combined with any that are passed here.
+        Any additional arguments are passed through when instantiating the event
+        to pass to observing handlers. Any of these arguments that are State
+        components (such as :attr:`ops.testing.Relation`) will be converted to
+        their ops counterparts.
         """
-        event_kwargs = {}
-        if from_:
-            name = from_.name
-            if from_.storage is not None:
-                event_kwargs["storage"] = from_.storage
-            if from_.relation is not None:
-                event_kwargs["relation"] = from_.relation
-            if from_.relation_remote_unit_id is not None:
-                event_kwargs["relation_remote_unit_id"] = from_.relation_remote_unit_id
-            if from_.relation_departed_unit_id is not None:
-                event_kwargs["relation_departed_unit_id"] = (
-                    from_.relation_departed_unit_id
-                )
-            if from_.secret is not None:
-                event_kwargs["secret"] = from_.secret
-            if from_.secret_revision is not None:
-                event_kwargs["secret_revision"] = from_.secret_revision
-            if from_.container is not None:
-                event_kwargs["container"] = from_.container
-            if from_.notice is not None:
-                event_kwargs["notice"] = from_.notice
-            if from_.check_info is not None:
-                event_kwargs["check_info"] = from_.check_info
-            if from_.action is not None:
-                event_kwargs["action"] = from_.action
-        else:
-            name = f"custom/{type(source.emitter).__name__}/{source.event_kind}"
+        if issubclass(event.event_type, ops.HookEvent):
+            raise ValueError(
+                "custom events should subclass EventBase directly - testing events that inherit "
+                "from a Juju hook event must be done by running the underlying Juju event, for "
+                "example: ctx.run(ctx.on.relation_changed(relation), state)"
+            )
         return _Event(
-            name,
-            custom_event_source=source,
+            f"custom/{type(event.emitter).__name__}/{event.event_kind}",
+            custom_event=event,
             custom_event_args=args,
             custom_event_kwargs=kwargs,
-            **event_kwargs,  # type: ignore
         )
 
 

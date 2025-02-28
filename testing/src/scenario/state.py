@@ -1129,6 +1129,10 @@ class _EntityStatus:
         """Convert from the ops.StatusBase object to the matching _EntityStatus object."""
         return cls.from_status_name(obj.name, obj.message)
 
+    def _to_ops(self) -> StatusBase:
+        """Convert this object to an ops.StatusBase object."""
+        return StatusBase.from_name(self.name, message=self.message)
+
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
 class UnknownStatus(_EntityStatus, ops.UnknownStatus):
@@ -1266,6 +1270,9 @@ class Port(_max_posargs(1)):
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
         return False
+
+    def _to_ops(self) -> ops.Port:
+        return ops.Port(port=self.port, protocol=self.protocol)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1857,17 +1864,17 @@ class _Event:  # type: ignore
     action: _Action | None = None
     """If this is an action event, the :class:`Action` it refers to."""
 
-    custom_event_source: ops.EventSource | None = None
-    """If this is a custom event, the source of the event.
+    custom_event: ops.BoundEvent | None = None
+    """If this is a custom event, the bound event it refers to.
 
     The charm object *must* have an attribute that is an instance of the same
     emitter type.
     """
 
-    custom_event_args: tuple[Any, ...] = dataclasses.field(default_factory=tuple)
+    custom_event_args: Iterable[Any] = dataclasses.field(default_factory=tuple)
     """If this is a custom event, the arguments to pass to the event."""
 
-    custom_event_kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
+    custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     """If this is a custom event, the keyword arguments to pass to the event."""
 
     _owner_path: list[str] = dataclasses.field(default_factory=list)
@@ -1931,7 +1938,7 @@ class _Event:  # type: ignore
     @property
     def _is_custom_event(self) -> bool:
         """Whether the event name indicates that this is a custom event."""
-        return self.custom_event_source is not None
+        return self.custom_event is not None
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.
