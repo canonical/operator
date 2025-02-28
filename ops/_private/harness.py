@@ -3213,75 +3213,102 @@ class _TestingPebbleClient:
                 self._new_perform_check(info)
         return self.autostart_services(timeout, delay)
 
+    def _new_service_change(self, kind: pebble.ChangeKind, services: List[str]) -> pebble.Change:
+        now = datetime.datetime.now()
+        if kind == pebble.ChangeKind.START:
+            action = 'Start'
+        elif kind == pebble.ChangeKind.STOP:
+            action = 'Stop'
+        elif kind == pebble.ChangeKind.RESTART:
+            action = 'Restart'
+        else:
+            raise ValueError(f'unknown kind {kind}')
+        summary = f'{action} service {services[0]}'
+        if len(services) > 1:
+            summary += f' and {len(services) - 1} more'
+        change = pebble.Change(
+            pebble.ChangeID(str(uuid.uuid4())),
+            kind.value,
+            summary=summary,
+            status=pebble.ChangeStatus.DONE.value,
+            tasks=[],
+            ready=True,
+            err=None,
+            spawn_time=now,
+            ready_time=now,
+        )
+        self._changes[change.id] = change
+        return change
+
     def start_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
+    ) -> pebble.ChangeID:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
             raise TypeError(f'start_services should take a list of names, not just "{services}"')
-
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.start() which currently ignores the return value
         known_services = self._render_services()
         # Names appear to be validated before any are activated, so do two passes
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(400, f'cannot start services: service {name} does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
+        return self._new_service_change(pebble.ChangeKind.START, services).id
 
     def stop_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
-        # handle a common mistake of passing just a name rather than a list of names
+    ) -> pebble.ChangeID:
+        # Handle a common mistake of passing just a name rather than a list of names.
         if isinstance(services, str):
             raise TypeError(f'stop_services should take a list of names, not just "{services}"')
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
 
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.stop() which currently ignores the return value
         known_services = self._render_services()
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(400, f'cannot stop services: service {name} does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
+        return self._new_service_change(pebble.ChangeKind.STOP, services).id
 
     def restart_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
-        # handle a common mistake of passing just a name rather than a list of names
+    ) -> pebble.ChangeID:
+        # Handle a common mistake of passing just a name rather than a list of names.
         if isinstance(services, str):
             raise TypeError(f'restart_services should take a list of names, not just "{services}"')
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
 
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.restart() which currently ignores the return value
         known_services = self._render_services()
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(
+                    400,
+                    f'cannot restart services: service {name} does not exist',
+                )
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
+        return self._new_service_change(pebble.ChangeKind.RESTART, services).id
 
     def wait_change(
         self,
