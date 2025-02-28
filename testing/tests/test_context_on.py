@@ -484,9 +484,10 @@ class CustomEventWithScenarioArgs(CustomEvent):
         self.tcpport = ops.Port(protocol="tcp", port=snapshot["tcpport"])
         self.udpport = ops.Port(protocol="udp", port=snapshot["udpport"])
         self.icmpport = ops.Port(protocol="icmp", port=None)
-        self.storage = self.framework.model.storages[snapshot["storage_name"]][
-            snapshot["storage_index"]
-        ]
+        for storage in self.framework.model.storages[snapshot["storage_name"]]:
+            if storage.index == snapshot["storage_index"]:
+                self.storage = storage
+                break
 
 
 class CustomEvents(ops.ObjectEvents):
