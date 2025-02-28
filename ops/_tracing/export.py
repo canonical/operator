@@ -244,12 +244,14 @@ def set_tracing_destination(
         ca: The PEM formatted CA list.
             Only in use if the URL is an HTTPS URL.
     """
-    assert _exporter, 'tracing has not been set up'
+    if not _exporter:
+        return
     _exporter.settings = (url, ca)
 
 
 def mark_observed() -> None:
-    assert _exporter
+    if not _exporter:
+        return
     _exporter.buffer.mark_observed()
 
 
