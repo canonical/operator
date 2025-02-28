@@ -5,12 +5,11 @@
 >
 > **See previous: {ref}`Create a minimal Kubernetes charm <create-a-minimal-kubernetes-charm>`** 
 
-
 ````{important}
 
 This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
 
-```bash
+```text
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
 git checkout 01_create_minimal_charm
@@ -27,17 +26,11 @@ This can be done by defining a charm configuration in a file called `charmcraft.
 
 In this part of the tutorial you will update your charm to make it possible for a charm user to change the port on which the workload application is available.
 
-
-
 ## Define the configuration options
-
 
 To begin with, let's define the options that will be available for configuration. 
 
 In the `charmcraft.yaml` file you created earlier, define a configuration option, as below. The name of your configurable option is going to be `server-port`.  The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
-
-<!--This file can take a top key called `options`, with a nested definition block for each option, where each block consists of a custom option name and then a few attributes including the `default`, `description`, and `type`. As what we want to define is a port, we will name our option `server-port`. As our application is now available on port 8000, we will set the `default` key to `8000`. In the description we clarify that this option controls the default port on which our workload application will be available. Finally,  as a port must be an integer, we set the type to `int`.
--->
 
 ```yaml
 config:
@@ -50,12 +43,6 @@ config:
 
 ## Define the configuration event handlers
 
-<!--
-Now, let's create configuration event handlers. These will control how our charm responds to configuration changes.
-
-As with Pebble event handlers, configuration event handlers must be defined in `src/charm.py` by adding an observer for the event and then defining the event handler appropriately.
--->
-
 Open your `src/charm.py` file.
 
 In the `__init__` function, add an observer for the `config_changed` event and pair it with an `_on_config_changed` handler:
@@ -64,24 +51,23 @@ In the `__init__` function, add an observer for the `config_changed` event and p
 framework.observe(self.on.config_changed, self._on_config_changed)
 ```
 
-Now, define the handler, as below. First, read the `self.config` attribute to get the new value of the setting. Then, validate that this value is allowed (or block the charm otherwise). Next, let's log the value to the logger. Finally, since configuring something like a port affects the way we call our workload application, we also need to update our pebble configuration, which we will do via a newly created method `_update_layer_and_restart` that we will define shortly.
+Now, define the handler, as below. First, read the `self.config` attribute to get the new value of the setting. Then, validate that this value is allowed (or block the charm otherwise). Next, let's log the value to the logger. Finally, since configuring something like a port affects the way we call our workload application, we also need to update our Pebble configuration, which we will do via a newly created method `_update_layer_and_restart` that we will define shortly.
 
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-    port = self.config['server-port']  # see charmcraft.yaml
+    port = self.config['server-port']  # See charmcraft.yaml
 
     if port == 22:
         self.unit.status = ops.BlockedStatus('invalid port number, 22 is reserved for SSH')
         return
     
-    logger.debug("New application port is requested: %s", port)
+    logger.debug('New application port is requested: %s', port)
     self._update_layer_and_restart()
 ```
 
 ```{caution}
 
 A charm does not know which configuration option has been changed. Thus, make sure to validate all the values. This is especially important since multiple values can be changed in one call.
-
 ```
 
 In the `__init__` function, add a new attribute to define a container object for your workload:
@@ -105,23 +91,21 @@ def _update_layer_and_restart(self) -> None:
         https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layers
     """
 
-  # Learn more about statuses in the SDK docs:
-  # https://juju.is/docs/sdk/status
-  self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
-  try:
-      # Get the current pebble layer config
-      services = self.container.get_plan().to_dict().get('services', {})
-      if services != self._pebble_layer.to_dict().get('services', {}):
-          # Changes were made, add the new layer
-          self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
-          logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
-  
-          self.container.restart(self.pebble_service_name)
-          logger.info(f"Restarted '{self.pebble_service_name}' service")
-  
-      self.unit.status = ops.ActiveStatus()
-  except ops.pebble.APIError:
-      self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+    # Learn more about statuses at:
+    # https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/status/
+    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    try:
+        self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
+        logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
+
+        # Tell Pebble to incorporate the changes, including restarting the
+        # service if required.
+        self.container.replan()
+        logger.info(f"Replanned with '{self.pebble_service_name}' service")
+
+        self.unit.status = ops.ActiveStatus()
+    except ops.pebble.APIError:
+        self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
 Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={self.config['server-port']}"`.
@@ -148,14 +132,13 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
 
 First, repack and refresh your charm:
 
-```
+```text
 charmcraft pack
 juju refresh \
   --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
   demo-api-charm --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
-
 
 Now, check the available configuration options:
 
@@ -197,9 +180,7 @@ Unit               Workload  Agent  Address      Ports  Message
 demo-api-charm/0*  blocked   idle   10.1.157.74         invalid port number, 22 is reserved for SSH
 ```
 
-
 Congratulations, you now know how to make your charm configurable!
-
 
 ## Review the final code
 
@@ -207,5 +188,4 @@ For the full code see: [02_make_your_charm_configurable](https://github.com/cano
 
 For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/01_create_minimal_charm...02_make_your_charm_configurable)
 
-
-> **See next: {ref}`Expose the version of the application behind your charm <expose-the-version-of-the-application-behind-your-charm>`**
+> **See next: {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`**

@@ -10,12 +10,11 @@
 
 This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
 
-
 ```text
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
-git checkout 06_create_actions
-git checkout -b 07_cos_integration
+git checkout 04_create_actions
+git checkout -b 05_cos_integration
 ```
 
 ````
@@ -26,13 +25,11 @@ Our application is prepared for that -- as you might recall, it uses [`starlette
 
 In the charming universe, what you would do is deploy the existing [Canonical Observability Stack (COS) lite bundle](https://charmhub.io/cos-lite) -- a convenient collection of charms that includes all of [Prometheus](https://charmhub.io/prometheus-k8s), [Loki](https://charmhub.io/loki-k8s), and [Grafana](https://charmhub.io/grafana-k8s) -- and then integrate your charm with Prometheus to collect real-time application metrics; with Loki to collect application logs; and with Grafana to create dashboards and visualise collected data. 
 
-
 In this part of the tutorial we will follow this process to collect various metrics and logs about your application and visualise them on a dashboard.
 
 ## Integrate with Prometheus
 
 Follow the steps below to make your charm capable of integrating with the existing [Prometheus](https://charmhub.io/prometheus-k8s) charm. This will enable your charm user to collect real-time metrics about your application.
-
 
 ### Fetch the Prometheus interface libraries
 
@@ -63,7 +60,9 @@ lib
             └── prometheus_scrape.py
 ```
 
-Note: When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.prometheus_k8s.v0.prometheus_scrape`.
+```{note}
+When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.prometheus_k8s.v0.prometheus_scrape`.
+```
 
 ### Define the Prometheus relation interface
 
@@ -81,11 +80,11 @@ In your `src/charm.py` file, do the following:
 
 First, at the top of the file, import the `prometheus_scrape` library:
 
-```text
+```python
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 ```
 
-Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider` instance with the desired scrape target, as below. Note that this uses the relation name that you specified earlier in the `charmcraft.yaml` file. Also, reflecting the fact that you've made your charm's port configurable  (see previous chapter {ref}`Make the charm configurable <make-your-charm-configurable>`), the target job is set to be consumed from config. The URL path is not included because it is predictable (defaults to /metrics), so the Prometheus library uses it automatically. The last line, which sets the `refresh_event` to the `config_change` event, ensures that the Prometheus charm will change its scraping target every time someone changes the port configuration. Overall, this code will allow your application to be scraped by Prometheus once they've been integrated. 
+Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider` instance with the desired scrape target, as below. Note that this uses the relation name that you specified earlier in the `charmcraft.yaml` file. Also, reflecting the fact that you've made your charm's port configurable (see previous chapter {ref}`Make the charm configurable <make-your-charm-configurable>`), the target job is set to be consumed from config. The URL path is not included because it is predictable (defaults to /metrics), so the Prometheus library uses it automatically. The last line, which sets the `refresh_event` to the `config_change` event, ensures that the Prometheus charm will change its scraping target every time someone changes the port configuration. Overall, this code will allow your application to be scraped by Prometheus once they've been integrated. 
 
 ```python
 self._prometheus_scraping = MetricsEndpointProvider(
@@ -96,13 +95,6 @@ self._prometheus_scraping = MetricsEndpointProvider(
 )
 ```
 
-<!--
-Let's look closer at the constructor. We specify relation name with the same name as we defined in `charmcraft.yaml` file.  
-Since our application is configurable (see previous chapter [Make the charm configurable <make-your-charm-configurable>`) we need to define a dynamic port based on configuration setting, thus, you can see that target job is set to be consumed from config. Prometheus library automatically appends the URL path (which defaults to `/metrics`), so, we do not need to include it here. 
-Finally, we need to tell Prometheus charm when it should change its scraping target, in our case every time we change config. For that reason we set `refresh_event` to `config_changed` event.
-
--->
-
 Congratulations, your charm is ready to be integrated with Prometheus!
 
 ## Integrate with Loki
@@ -111,13 +103,9 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 ### Fetch the Loki interface libraries
 
-<!--
-According to the documentation of the Loki charm, we require the {ref}``loki_push_api` <7814md>` library.
--->
-
 Ensure you're in your Multipass Ubuntu VM, in your charm folder. 
 
-Then, satisfy the interface library requirements of the Loki charm by fetching the {ref}``loki_push_api` <7814md>` library:
+Then, satisfy the interface library requirements of the Loki charm by fetching the [loki_push_api](https://charmhub.io/loki-k8s/libraries/loki_push_api) library:
 
 ```text
 ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.loki_k8s.v0.loki_push_api
@@ -133,14 +121,17 @@ lib
     │       └── loki_push_api.py
 ```
 
-Note: The `loki_push_api` library also depends on the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library, but you have already fetched it above for Prometheus.
+```{note}
+The `loki_push_api` library also depends on the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library, but you have already fetched it above for Prometheus.
+```
 
-Note: When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.loki_k8s.v0.loki_push_api`.
+```{note}
+When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.loki_k8s.v0.loki_push_api`.
+```
 
 ### Define the Loki relation interface
 
 In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
-
 
 ```yaml
 requires:
@@ -152,7 +143,6 @@ requires:
     limit: 1
 ```
 
-
 ## Import the Loki interface libraries and set up the Loki API
 
 In your `src/charm.py` file, do the following:
@@ -163,7 +153,7 @@ First, import the `loki_push_api` lib:
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 ```
 
-Then, in your charm's `__init__` method, initialise the `LogProxyConsumer` instance with the defined log files, as shown below. The `log-proxy` relation name comes from the `charmcraft.yaml` file and the`demo_server.log` file is the file where the application dumps logs. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api`).
+Then, in your charm's `__init__` method, initialise the `LogProxyConsumer` instance with the defined log files, as shown below. The `log-proxy` relation name comes from the `charmcraft.yaml` file and the`demo_server.log` file is the file where the application writes logs. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api`).
 
 ```python
 self._logging = LogProxyConsumer(
@@ -181,7 +171,7 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 Ensure you're in your Multipass Ubuntu VM, in your charm folder. 
 
-Then, satisfy the interface requirement of the Grafana charm by fetching the  [grafana_dashboard](https://charmhub.io/grafana-k8s/libraries/grafana_dashboard) library:
+Then, satisfy the interface requirement of the Grafana charm by fetching the [grafana_dashboard](https://charmhub.io/grafana-k8s/libraries/grafana_dashboard) library:
 
 ```text
 ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.grafana_k8s.v0.grafana_dashboard
@@ -197,13 +187,17 @@ lib
     │       └── grafana_dashboard.py
 ```
 
-Note: When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.grafana_k8s.v0.grafana_dashboard`.
+```{note}
+The `grafana_dashboard` library also depends on the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library, but you have already fetched it above for Prometheus.
+```
 
-Note: The `grafana_dashboard` library also depends on the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library, but you have already fetched it above for Prometheus.
+```{note}
+When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.grafana_k8s.v0.grafana_dashboard`.
+```
 
 ### Define the Grafana relation interface
 
-In your `charmcraft.yaml` file, add another `provides` endpoint with relation name `grafana-dashboard` and interface name `grafana_dashboard`,  as below. This declares that your charm can offer services to other charms over the `grafana-dashboard` interface. In short, that your charm is open to integrating with, for example, the official Grafana charm. (Note: Here `grafana-dashboard` endpoint is the default relation name recommended by the `grafana_dashboard` library.)
+In your `charmcraft.yaml` file, add another `provides` endpoint with relation name `grafana-dashboard` and interface name `grafana_dashboard`, as below. This declares that your charm can offer services to other charms over the `grafana-dashboard` interface. In short, that your charm is open to integrations with, for example, the official Grafana charm. (Note: Here `grafana-dashboard` endpoint is the default relation name recommended by the `grafana_dashboard` library.)
 
 ```yaml
 provides:
@@ -230,8 +224,14 @@ Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider
 self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
 ```
 
+<!-- UPDATE LINKS
+
+We probably shouldn't link to a file on Discourse any more. Do we want to have this template file in the ops repo? Maybe it's best to just link to file in the tutorial repo?
+
+-->
+
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:  
-[FastAPI-Monitoring.json.tmpl|attachment](https://discourse.charmhub.io/uploads/short-url/6hSGcAA6n20qyStzLFeekgkzqCc.tmpl) (7.7 KB) . Once your charm has been integrated with Grafana, the `GrafanaDashboardProvider` you defined just before will take this file as well as any other files defined in this directory and put them into a Grafana files tree to be read by Grafana.
+[FastAPI-Monitoring.json.tmpl|attachment](https://github.com/canonical/juju-sdk-tutorial-k8s/raw/refs/heads/05_cos_integration/src/grafana_dashboards/FastAPI-Monitoring.json.tmpl). Once your charm has been integrated with Grafana, the `GrafanaDashboardProvider` you defined just before will take this file as well as any other files defined in this directory and put them into a Grafana files tree to be read by Grafana.
 
 ```{important}
 
@@ -269,7 +269,6 @@ juju refresh \
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below. 
 
-
 ### Deploy COS Lite
 
 Create a Juju model called `cos-lite` and, to this model, deploy the Canonical Observability Stack bundle [`cos-lite`](https://charmhub.io/topics/canonical-observability-stack), as below. This will deploy all the COS applications (`alertmanager`, `catalogue`, `grafana`, `loki`, `prometheus`, `traefik`), already suitably integrated with one  another.  Note that these also include the applications that you've been working to make your charm integrate with -- Prometheus, Loki, and Grafana.
@@ -281,11 +280,8 @@ juju deploy cos-lite --trust
 
 ```{important}
 
-
 **Why put COS Lite in a separate model?** Because (1) it is always a good idea to separate logically unrelated applications in different models and (2) this way you can observe applications across all your models. PS In a production-grade scenario you would actually even want to put your COS Lite in a separate *cloud* (i.e., Kubernetes cluster). This is recommended, for example, to ensure proper hardware resource allocation.
-
 ```
-
 
 ### Expose the application relation endpoints
 
@@ -330,9 +326,7 @@ juju integrate demo-api-charm admin/cos-lite.prometheus
 ```{important}
 
 The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes (MicroK8s) network inside of our VM. You can skip this step if you have decided to follow this tutorial directly on your host machine.
-
 ``` 
-
 
 First, run:
 
@@ -360,7 +354,6 @@ From this output, from the `Address` column, retrieve the IP address for each ap
 ```{caution}
 
 Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps represent Kubernetes Services.  Note: The charm should be programmed to support Services.
-
 ```
 
 Now open a terminal on your host machine and run:
@@ -448,24 +441,19 @@ In a while you should see the following data appearing on the dashboard:
 2. Percent of failed requests per 2 minutes time frame. In your case this will be a ratio of all the requests and the requests submitted to the `/error` path (i.e., the ones that cause the Internal Server Error).
 3. Logs from your application that were collected by Loki and forwarded to Grafana. Here you can see some INFO level logs and ERROR logs with traceback from Python when you were calling the `/error` path.
 
-
 ![Observe your charm with COS Lite](../../resources/observe_your_charm_with_cos_lite.png)
-
 
 ```{important}
 
 If you are interested in the Prometheus metrics produced by your application that were used to build these dashboards you can run following command in your VM: `curl <your app pod IP>:8000/metrics`  
 Also, you can reach Prometheus in your web browser (similar to Grafana) at `http://<Prometheus pod IP>:9090/graph` .
-
 ```
-
 
 ## Review the final code
 
+For the full code see: [05_cos_integration](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/05_cos_integration)
 
-For the full code see: [07_cos_integration](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/07_cos_integration)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/06_create_actions...07_cos_integration)
+For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/04_create_actions...05_cos_integration)
 
 > **See next: {ref}`Write units tests for your charm <write-unit-tests-for-your-charm>`**
 

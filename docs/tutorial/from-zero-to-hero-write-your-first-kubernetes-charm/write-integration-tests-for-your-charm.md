@@ -3,17 +3,17 @@
 
 > <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Write integration tests for your charm</small>
 > 
-> **See previous: {ref}`Write scenario tests for your charm <write-unit-tests-for-your-charm>`**
+> **See previous: {ref}`Write unit tests for your charm <write-unit-tests-for-your-charm>`**
 
 ````{important}
 
 This document is part of a series, and we recommend you follow it in sequence. However, you can also jump straight in by checking out the code from the previous branches:
 
-```bash
+```text
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
-git checkout 09_scenario_test
-git checkout -b 10_integration_testing
+git checkout 06_unit_testing
+git checkout -b 07_integration_testing
 ```
 
 ````
@@ -50,15 +50,14 @@ commands =
 ## Prepare your test directory
 
 Create  a  `tests/integration` directory:
-```bash
-mkdir ~/fastapi-demo/tests/integration
 
+```text
+mkdir ~/fastapi-demo/tests/integration
 ```
 
 ## Write and run a pack-and-deploy integration test
 
 Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm and verify that the installation hooks finish without any error. 
-
 
 In your `tests/integration` directory, create a file `test_charm.py` and add the following test case:
 
@@ -130,33 +129,28 @@ async def test_database_integration(ops_test: OpsTest):
         apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=120
     )
 ```
- 
 
 ```{important}
 
 But if you run the one and then the other (as separate `pytest ...` invocations, then two separate models will be created unless you pass `--model=some-existing-model` to inform pytest-operator to use a model you provide.
-
 ```
 
 In your Multipass Ubuntu VM, run the test again:
 
-
-```bash
+```text
 ubuntu@charm-dev:~/fastapi-demo$ tox -e integration
-
 ```
 
 The test may again take some time to run.
 
 ```{tip}
 
-**Pro tip:** To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results; an example is https://github.com/canonical/spellbook . 
-
+**Pro tip:** To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results; an example is [spellbook](https://github.com/canonical/spellbook).
 ```
 
 When it's done, the output should show two passing tests:
 
-```bash
+```text
 ...
   demo-api-charm/0 [idle] waiting: Waiting for database relation
 INFO     juju.model:model.py:2759 Waiting for model:
@@ -195,10 +189,6 @@ Congratulations, with this integration test you have verified that your charms r
 
 ## Review the final code
 
-For the full code see: [10_integration_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/09_scenario_test)
+For the full code see: [07_integration_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/07_integration_testing)
 
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/09_scenario_test...10_integration_testing)
-
-> **See next: {ref}`Open a Kubernetes port in your charm <open-a-kubernetes-port-in-your-charm>`**
-
-
+For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/06_unit_testing...07_integration_testing)
