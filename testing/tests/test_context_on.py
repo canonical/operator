@@ -647,3 +647,43 @@ def test_custom_event_with_scenario_args():
         assert evt.icmpport.protocol == "icmp"
         assert isinstance(evt.storage, ops.Storage)
         assert evt.storage.name == storage.name
+
+
+class OtherEvent(ops.EventBase):
+    pass
+
+
+class OtherEvents(ops.ObjectEvents):
+    foo_changed = ops.EventSource(OtherEvent)
+
+
+class OtherConsumer(ops.Object):
+    on = OtherEvents()  # type: ignore
+
+    def __init__(self, charm: ops.CharmBase, relation_name: str):
+        super().__init__(charm, relation_name)
+
+
+class TwoLibraryCharm(ContextCharm):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.consumer1 = MyConsumer(self)
+        self.consumer2 = OtherConsumer(self, "some-relation")
+        framework.observe(self.consumer1.on.foo_changed, self._on_event)
+        framework.observe(self.consumer2.on.foo_changed, self._on_event)
+
+
+def test_custom_event_two_libraries():
+    ctx = scenario.Context(TwoLibraryCharm, meta=META, actions=ACTIONS)
+
+    with ctx(ctx.on.custom(MyConsumer.on.foo_changed), scenario.State()) as mgr:
+        mgr.run()
+        evt, cs = mgr.charm.observed
+        assert isinstance(cs, ops.CollectStatusEvent)
+        assert isinstance(evt, CustomEvent)
+
+    with ctx(ctx.on.custom(OtherConsumer.on.foo_changed), scenario.State()) as mgr:
+        mgr.run()
+        evt, cs = mgr.charm.observed
+        assert isinstance(cs, ops.CollectStatusEvent)
+        assert isinstance(evt, OtherEvent)
