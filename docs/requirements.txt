@@ -101,7 +101,7 @@ opentelemetry-semantic-conventions==0.51b0
     #   opentelemetry-sdk
 opentelemetry-util-http==0.51b0
     # via opentelemetry-instrumentation-urllib
-otlp-json==0.9.1
+otlp-json==0.9.4
     # via ops (pyproject.toml)
 packaging==24.2
     # via
