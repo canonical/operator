@@ -210,7 +210,7 @@ class Ops(_Manager):
             )
         return event_to_emit
 
-    def _object_to_ops_object(self, obj: Any):
+    def _object_to_ops_object(self, obj: Any) -> Any:
         if hasattr(obj, "_to_ops"):
             return obj._to_ops()
         if isinstance(obj, Secret):
@@ -220,7 +220,9 @@ class Ops(_Manager):
         if isinstance(obj, Container):
             return self.charm.unit.get_container(obj.name)
         elif isinstance(obj, Storage):
-            return self.charm.model.storages[obj.name][obj.index]
+            for storage in self.charm.model.storages[obj.name]:
+                if storage.index == obj.index:
+                    return storage
         return obj
 
     def _get_event_args(
