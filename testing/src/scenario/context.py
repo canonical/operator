@@ -365,6 +365,50 @@ class CharmEvents:
             kwargs["id"] = id
         return _Event(f"{name}_action", action=_Action(name, **kwargs))
 
+    @staticmethod
+    def custom(
+        event: ops.BoundEvent,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Event triggered by a charm library.
+
+        For example, for a library that emits a ``HappenedEvent`` event via a
+        ``MyConsumer`` object, and charm code like::
+
+            class MyCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    self.source = MyConsumer(self, 'source')
+                    framework.observe(self.source.on.it_happened, self._on_happened_event)
+
+        Emit this event with::
+
+            ctx.run(ctx.on.custom(
+                MyConsumer.on.it_happened, 1, 2, foo='bar'
+            ), state)
+
+        Custom events do not have access to the Juju context of the originating
+        hook event.
+
+        Any additional arguments are passed through when instantiating the event
+        provided to observing handlers. Any of these arguments that are State
+        components (such as :attr:`ops.testing.Relation`) will be converted to
+        their ops counterparts (such as :attr:`ops.Relation`).
+        """
+        if issubclass(event.event_type, ops.HookEvent):
+            raise ValueError(
+                "custom events should subclass EventBase directly - testing events that inherit "
+                "from a Juju hook event must be done by running the underlying Juju event, for "
+                "example: ctx.run(ctx.on.relation_changed(relation), state)"
+            )
+        return _Event(
+            f"{{custom}}.{type(event.emitter).__name__}.{event.event_kind}",
+            custom_event=event,
+            custom_event_args=args,
+            custom_event_kwargs=kwargs,
+        )
+
 
 class Context(Generic[CharmType]):
     """Represents a simulated charm's execution context.
