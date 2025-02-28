@@ -392,9 +392,9 @@ class CharmEvents:
         hook event.
 
         Any additional arguments are passed through when instantiating the event
-        to pass to observing handlers. Any of these arguments that are State
+        provided to observing handlers. Any of these arguments that are State
         components (such as :attr:`ops.testing.Relation`) will be converted to
-        their ops counterparts.
+        their ops counterparts (such as :attr:`ops.Relation`).
         """
         if issubclass(event.event_type, ops.HookEvent):
             raise ValueError(
@@ -403,7 +403,7 @@ class CharmEvents:
                 "example: ctx.run(ctx.on.relation_changed(relation), state)"
             )
         return _Event(
-            f"custom/{type(event.emitter).__name__}/{event.event_kind}",
+            f"{{custom}}.{type(event.emitter).__name__}.{event.event_kind}",
             custom_event=event,
             custom_event_args=args,
             custom_event_kwargs=kwargs,

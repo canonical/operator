@@ -1834,7 +1834,7 @@ class _Event:  # type: ignore
     """The name of the event.
     
     For example: ``start``, ``config_changed``, ``my_relation_joined``, or
-    ``CUSTOM THING HERE``.
+    ``custom.MyConsumer.lib_changed``.
 
     This is converted to an _EventPath object on instantiation.
     """

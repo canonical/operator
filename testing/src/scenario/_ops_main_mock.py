@@ -228,9 +228,9 @@ class Ops(_Manager):
     ) -> Tuple[List[Any], Dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
-        # Juju events). We also handler converting from Scenario to ops types,
+        # Juju events). We also handle converting from Scenario to ops types,
         # since the test code typically won't be able to create the ops objects,
-        # since a model is required for many.
+        # as a model is required for many.
         args, kwargs = super()._get_event_args(bound_event)
         if self.event.custom_event_args is not None:
             for arg in self.event.custom_event_args:
