@@ -125,7 +125,7 @@ class ProxySpanExporter(SpanExporter):
         context.minimum_version = ssl.TLSVersion.TLSv1_3
         context.set_alpn_protocols(['http/1.1'])
         context.verify_flags |= ssl.VERIFY_X509_STRICT
-        if (partial_chain := getattr(ssl, "VERIFY_X509_PARTIAL_CHAIN", None)):
+        if partial_chain := getattr(ssl, 'VERIFY_X509_PARTIAL_CHAIN', None):
             # Available starting from Python 3.10. The partial chain flag allows trusting the
             # intermediate CAs in the CA list without the matching root CA
             context.verify_flags |= partial_chain
