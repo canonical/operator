@@ -26,7 +26,7 @@ jobs:
         run: python -m build
         working-directory: ./testing
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2.2.0
+        uses: actions/attest-build-provenance@v2.2.2
         with:
           subject-path: 'testing/dist/*'
       - name: Publish to test.pypi.org
