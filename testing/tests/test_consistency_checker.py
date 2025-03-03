@@ -180,8 +180,8 @@ def test_evt_bad_container_name():
     )
 
 
-@pytest.mark.parametrize("suffix", _RELATION_EVENTS_SUFFIX)
-def test_evt_bad_relation_name(suffix):
+@pytest.mark.parametrize("suffix", sorted(_RELATION_EVENTS_SUFFIX))
+def test_evt_bad_relation_name(suffix: str):
     assert_inconsistent(
         State(),
         _Event(f"foo{suffix}", relation=Relation("bar")),
@@ -195,8 +195,8 @@ def test_evt_bad_relation_name(suffix):
     )
 
 
-@pytest.mark.parametrize("suffix", _RELATION_EVENTS_SUFFIX)
-def test_evt_no_relation(suffix):
+@pytest.mark.parametrize("suffix", sorted(_RELATION_EVENTS_SUFFIX))
+def test_evt_no_relation(suffix: str):
     assert_inconsistent(State(), _Event(f"foo{suffix}"), _CharmSpec(MyCharm, {}))
     relation = Relation("bar")
     assert_consistent(
