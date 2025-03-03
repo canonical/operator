@@ -1790,13 +1790,6 @@ class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent'])
     def __getitem__(self, key: Union['Unit', 'Application']) -> 'RelationDataContent':
         return self._data[key]
 
-    def __setitem__(self, key: Union['Unit', 'Application'], value: Mapping[str, str]) -> None:
-        try:
-            content = self._data[key]
-        except KeyError:
-            raise KeyError(f'{key!r} is not a known unit or app') from None
-        content._replace_data(value)
-
     def __repr__(self):
         return repr(self._data)
 
@@ -1949,35 +1942,30 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
-    def update(self, other: typing.Any = (), /, **kwargs: str):
-        """Update the data from dict/iterable other and the kwargs."""
-        super().update(other, **kwargs)
+    def update(
+        self, data: Union[Mapping[str, str], Iterable[Tuple[str, str]]] = (), /, **kwargs: str
+    ) -> None:
+        """Efficiently write multiple keys and values to the databag.
+
+        Has the same ultimate result as this, but uses a single relation-set call:
+        for k, v in dict(data).items():
+            self[k] = v
+        for k, v in kwargs.items():
+            self[k] = v
+        """
+        data = dict(data)
+        data.update(kwargs)
+        changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
+        if not changes:  # no changes or deletions
+            return  # content is already exactly as requested
+        self._validate_write(changes)
+        self._commit(changes)
+        self._update_cache(changes)
 
     def __delitem__(self, key: str):
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
-
-    def _replace_data(self, data: Mapping[str, str]) -> None:
-        """Remove existing key value pairs and write replacement data to databag.
-
-        Efficiently handles write access validation and calling relation-set hook tool
-        for bulk data, following the validate/commit/update pattern of __setitem__.
-        Has the same final outcome as:
-
-        for k in tuple(self):
-            del self[k]
-        for k, v in data:
-            self[k] = v
-        """
-        changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
-        deletions = {k: '' for k in self if k not in data}
-        replacement = {**changes, **deletions}
-        if not replacement:  # no changes or deletions
-            return  # data is already exactly as requested
-        self._validate_write(replacement)
-        self._commit(replacement)
-        self._update_cache(replacement)
 
     def __repr__(self):
         try:

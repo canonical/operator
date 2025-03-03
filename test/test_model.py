@@ -271,26 +271,6 @@ class TestModel:
             rel.data[harness.model.app].update(*args, **kwargs)
             assert harness.get_relation_data(relation_id, harness.model.app) == {'foo': 'baz'}
 
-    def test_set_app_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
-        relation_name = 'db1'
-        original_data = {'deleted': 'item', 'unchanged': 'item', 'changed': 'original-value'}
-        new_data = {'new': 'item', 'unchanged': 'item', 'changed': 'new-value'}
-        # TODO: break this down into individual test cases? parametrize test?
-        relation_id = harness.add_relation(relation_name, 'remote', app_data=original_data)
-        relation = harness.model.get_relation(relation_name)
-        assert relation is not None
-        relation_data_content = relation.data[relation.app]
-        assert relation_data_content == original_data  # RelationDataContent mapping comparison
-        # new relation data can be set via RelationData.__setitem__
-        relation.data[relation.app] = new_data
-        assert relation.data[relation.app] is relation_data_content  # same RelationDataContent obj
-        assert relation_data_content == new_data
-        assert harness.get_relation_data(relation_id, relation.app) == new_data
-        # TODO: assert that the hook is called the appropriate number of times
-        # assigning to an unknown key is an error
-        with pytest.raises(KeyError):
-            relation.data[typing.cast(ops.Application, 'bad-key')] = new_data
-
     def test_unit_relation_data(self, harness: ops.testing.Harness[ops.CharmBase]):
         relation_id = harness.add_relation('db1', 'remoteapp1')
         harness.add_relation_unit(relation_id, 'remoteapp1/0')
