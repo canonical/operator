@@ -517,7 +517,7 @@ Consider the K8s liveness success (`level=alive` check) to mean "Pebble is alive
 
 When a K8s liveness probe (a `level=alive` check) succeeds, you should consider it to mean "Pebble is alive" rather than "the workload is alive". Similarly, a liveness probe failure means "this container needs to be restarted" rather than an issue with the workload.
 
-This means that for workloads that take a long or indefinite period of time to start, you should not have a `level=alive` check for that service. Instead, use an ordinary Pebble check without a level in conjunction with `on-check-failure: restart` on the service. That way Pebble itself has control over restarting the service in question.
+This means that for workloads that take a long or indefinite period of time to start, you should not have a `level=alive` check for the service. Instead, use a Pebble check without a level and specify `on-check-failure: restart` for the service. That way Pebble itself has control over restarting the service.
 
 ### Testing with checks
 
