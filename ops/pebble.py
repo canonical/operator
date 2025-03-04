@@ -26,7 +26,7 @@ This module provides a way to interact with Pebble, including:
 
 For a command-line interface for local testing, see ``test/pebble_cli.py``.
 
-  See more: `Pebble documentation <https://canonical-pebble.readthedocs-hosted.com/>`_
+  See more: `Pebble documentation <https://documentation.ubuntu.com/pebble/>`_
 """
 
 from __future__ import annotations
@@ -812,7 +812,7 @@ class Plan:
 
     A plan is the combined layer configuration. The layer configuration is
     documented at
-    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
+    https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
     def __init__(self, raw: Optional[Union[str, PlanDict]] = None):
@@ -888,7 +888,7 @@ class Layer:
     """Represents a Pebble configuration layer.
 
     The format of this is documented at
-    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
+    https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
     #: Summary of the purpose of this layer.
@@ -1611,7 +1611,7 @@ class Notice:
     last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/notices/>`_
+    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
@@ -3101,6 +3101,8 @@ class Client:
     def start_checks(self, checks: Iterable[str]) -> List[str]:
         """Start checks by name.
 
+        .. jujuadded:: 3.6.4
+
         Args:
             checks: Non-empty list of checks to start.
 
@@ -3112,6 +3114,8 @@ class Client:
 
     def stop_checks(self, checks: Iterable[str]) -> List[str]:
         """Stop checks by name.
+
+        .. jujuadded:: 3.6.4
 
         Args:
             checks: Non-empty list of checks to stop.
