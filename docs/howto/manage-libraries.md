@@ -5,7 +5,7 @@
 
 ## Use a library
 
-In your `src/charm.py`, observe the custom events it puts at your disposal. For example, a database library may have provided a  `ready` event -- a high-level wrapper around the relevant `juju` relation events -- so you use it to manage the database relation in your charm:
+In your `src/charm.py` file, observe the custom events that the library provides. For example, a database library may have provided a  `ready` event -- a high-level wrapper around the relevant Juju relation events. You can use the `ready` event to manage the database relation in your charm:
 
 ```python
 import ops
@@ -23,7 +23,7 @@ class MyCharm(ops.CharmBase):
         ...
 ```
 
-The tests for the charm that uses this library look like:
+A unit test for the charm that uses the database library looks like:
 
 ```python
 from ops import testing
@@ -41,10 +41,10 @@ def test_ready_event():
 
 ## Write a library
 
-When you're writing libraries, instead of callbacks, use custom events; this results in a more `ops`-native-feeling API. A custom event is, from a technical standpoint, an [](ops.EventBase) subclass that can be emitted at any point throughout the charm's lifecycle. These events are totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the top level Juju event so it can be observed independently.
+When you're writing libraries, instead of callbacks, use custom events. This results in a more Ops-native-feeling API. From a technical standpoint, a custom event is an [](ops.EventBase) subclass that can be emitted to Ops at any point throughout the charm's lifecycle. These events are totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the top level Juju event so it can be observed independently.
 
 ```{important}
-Custom events must inherit from `EventBase`, but not from an `ops` subclass of
+Custom events must inherit from `EventBase`, but not from an Ops subclass of
 `EventBase`, such as `RelationEvent`. When instantiating the custom event, load
 any data needed from Juju from the originating event, and explicitly pass that
 to the custom event object.
@@ -91,9 +91,9 @@ class DatabaseRequirer(ops.Object):
 
 ## Write tests
 
-### Test initialisation
+### Test that the library initialises
 
-In `tests/unit/test_my_lib.py`, add an initial test that a charm can initialise
+In your `tests/unit/test_my_lib.py` file, add a test that validates that a charm can initialise
 the library, and that no events are unexpectedly emitted.
 
 ```python
@@ -129,9 +129,9 @@ def test_charm_runs(event):
 If `DatabaseRequirer` is a relation endpoint wrapper, a frequent pattern is to
 allow customising the name of the endpoint that the object is wrapping.
 
-> Examples: [`traefik's ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
+> Examples: Traefik's [`ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
 
-In our `tests/unit/test_my_lib.py` file, add a test that validates that custom
+In your `tests/unit/test_my_lib.py` file, add a test that validates that custom
 names are supported:
 
 ```python
@@ -182,8 +182,8 @@ def test_charm_runs(context):
 
 ### Test that the custom event is emitted
 
-To verify that the library does emit the custom event appropriately, in the
-`tests/unit/test_my_lib.py` file, add the test:
+To verify that the library does emit the custom event appropriately,
+add a test in your `tests/unit/test_my_lib.py` file:
 
 ```python
 def test_ready_event():

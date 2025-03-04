@@ -373,8 +373,8 @@ class CharmEvents:
     ):
         """Event triggered by a charm library.
 
-        For example, for a library that emits a ``HappenedEvent`` event via a
-        ``MyConsumer`` object, and charm code like::
+        For example, suppose that a library uses a ``MyConsumer`` object to emit a
+        ``HappenedEvent`` event, with charm code::
 
             class MyCharm(ops.CharmBase):
                 def __init__(self, framework: ops.Framework):
@@ -382,7 +382,7 @@ class CharmEvents:
                     self.source = MyConsumer(self, 'source')
                     framework.observe(self.source.on.it_happened, self._on_happened_event)
 
-        Emit this event with::
+        To emit a `HappenedEvent` event::
 
             ctx.run(ctx.on.custom(
                 MyConsumer.on.it_happened, 1, 2, foo='bar'
