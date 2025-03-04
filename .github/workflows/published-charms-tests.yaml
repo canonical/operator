@@ -101,20 +101,21 @@ jobs:
         # the following test steps will only run if the last setup step (deps) succeeded
 
       - name: Run the charm's unit tests
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
         run: tox -vve unit
 
       - name: Check for tox static environment
+        id: has-static
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
           if tox list --no-desc | grep '^static$'; then
-            echo 'HAS_STATIC=true' >> $GITHUB_ENV
+            echo 'static=true' >> "$GITHUB_OUTPUT"
           else
-            echo 'HAS_STATIC=false' >> $GITHUB_ENV
+            echo 'static=false' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run the charm's static tests
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' && env.HAS_STATIC == 'true' }}
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static == 'true' }}
         run: tox -vve static
 
 
