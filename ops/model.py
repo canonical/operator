@@ -1954,12 +1954,15 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             for k, v in kwargs.items():
                 self[k] = v
         """
-        data = dict(data)
-        data.update(kwargs)
-        changes = {k: v for k, v in data.items() if k not in self or v != self[k]}
-        if not changes:  # no changes or deletions
-            return  # content is already exactly as requested
-        self._validate_write(changes)
+        data = dict(data, **kwargs)
+        changes = {
+            key: val
+            for key, val in data.items()
+            if (key not in self and val != '') or (key in self and val != self[key])
+        }
+        self._validate_write(changes)  # always check permissions
+        if not changes:  # return early if there are no changes required
+            return
         self._commit(changes)
         self._update_cache(changes)
 
