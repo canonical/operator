@@ -1,6 +1,8 @@
 name: ops/ops-scenario compatibility
 
 on:
+  schedule:
+    - cron: '0 3 25 * *'
   workflow_dispatch:
 
 jobs:
