@@ -18,7 +18,7 @@ import dataclasses
 from pathlib import Path
 from typing import Any, Mapping, Optional, Set
 
-from ops.jujuversion import JujuVersion
+from .jujuversion import JujuVersion
 
 
 @dataclasses.dataclass(frozen=True)

@@ -37,29 +37,22 @@ The module includes:
 
 import importlib.metadata
 
+from . import charm, framework, model, pebble, storage
 from ._private.harness import (
     ActionFailed,
     ActionOutput,
     AppUnitOrName,
-    CharmBase,
-    CharmMeta,
     CharmType,
-    Container,
     ExecArgs,
     ExecHandler,
-    ExecProcess,
     ExecResult,
     Harness,
     ReadableBuffer,
-    RelationNotFoundError,
-    RelationRole,
     YAMLStringOrFile,
-    charm,
-    framework,
-    model,
-    pebble,
-    storage,
 )
+from .charm import CharmBase, CharmMeta, RelationRole
+from .model import Container, RelationNotFoundError
+from .pebble import ExecProcess
 
 # The Harness unit testing framework.
 __all__ = [
