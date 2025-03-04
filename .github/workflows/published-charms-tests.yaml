@@ -98,7 +98,7 @@ jobs:
         id: deps
         run: pip install tox~=4.2
 
-        # the following test steps will only run if the last setup step (deps) succeeded
+        # The following test steps will only run if the last setup step (deps) succeeded.
 
       - name: Run the charm's unit tests
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
