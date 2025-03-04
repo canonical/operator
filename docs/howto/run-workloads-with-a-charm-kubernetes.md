@@ -210,7 +210,7 @@ You can see an example of `add_layer` under the ["Replan" heading](#replan). The
 
 Because `combine=True` combines the layer with an existing layer of the same name, it's normally used with `override: replace` in the YAML service configuration. This means replacing the entire service configuration with the fields in the new layer.
 
-If you're adding a single layer with `combine=False` (default option) on top of an existing base layer, you may want to use `override: merge` in the service configuration. This will merge the fields specified with the service by that name in the base layer. See {external+pebble:ref}`an example of overriding a layer <use_layers_layer_override)>`.
+If you're adding a single layer with `combine=False` (default option) on top of an existing base layer, you may want to use `override: merge` in the service configuration. This will merge the fields specified with the service by that name in the base layer. See {external+pebble:ref}`an example of overriding a layer <use_layers_layer_override>`.
 
 #### Fetch the effective plan
 
