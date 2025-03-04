@@ -1665,6 +1665,14 @@ class Secret:
         self._backend.secret_remove(typing.cast(str, self.id))
 
 
+@dataclasses.dataclass(frozen=True)
+class RemoteModel:
+    """Information about the model on the remote side of a relation."""
+
+    uuid: str
+    """The remote model's UUID."""
+
+
 class Relation:
     """Represents an established relation between this application and another application.
 
@@ -1718,6 +1726,7 @@ class Relation:
         self.id = relation_id
         self.units: Set[Unit] = set()
         self.active = active
+        self._backend = backend
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1746,6 +1755,19 @@ class Relation:
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+
+    @property
+    def remote_model(self) -> RemoteModel:
+        """Information about the model on the remote side of this relation.
+
+        .. jujuadded:: 3.6.2
+
+        Raises:
+            ModelError: if on a version of Juju that doesn't support the
+                "relation-model-get" hook tool.
+        """
+        d = self._backend.relation_model_get(self.id)
+        return RemoteModel(uuid=d['uuid'])
 
 
 class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent']):
@@ -3455,6 +3477,16 @@ class _ModelBackend:
         try:
             content = yaml.safe_dump({key: value})
             self._run(*args, input_stream=content)
+        except ModelError as e:
+            if self._is_relation_not_found(e):
+                raise RelationNotFoundError() from e
+            raise
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        args = ['relation-model-get', '-r', str(relation_id)]
+        try:
+            result = self._run(*args, return_output=True, use_json=True)
+            return typing.cast(Dict[str, Any], result)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e

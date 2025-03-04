@@ -2495,6 +2495,9 @@ class _TestingModelBackend:
         else:
             bucket[key] = value
 
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        return {'uuid': 'TODO'}
+
     def config_get(self) -> _TestingConfig:
         return self._config
 
