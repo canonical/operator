@@ -1,0 +1,60 @@
+name: ops/ops-scenario compatibility
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ops: ["main", "2.17.1", "2.18.0", "2.18.1", "2.19.0"]
+        scenario: ["7.1.1", "7.1.2", "7.1.3", "7.2.0"]
+        exclude:
+        - {ops: "2.17.1", scenario: "7.1.1"} # ops-scenario 7.1.1 explicitly depends on ops 2.18
+        - {ops: "2.17.1", scenario: "7.1.2"} # ops-scenario 7.1.2 explicitly depends on ops 2.18
+        - {ops: "2.17.1", scenario: "7.1.3"} # ops-scenario 7.1.2 explicitly depends on ops 2.18
+        - {ops: "2.17.1", scenario: "7.2.0"} # Missed requiring ops 2.19.0 for CheckStartup
+        - {ops: "2.18.0", scenario: "7.2.0"} # Missed requiring ops 2.19.0 for CheckStartup
+        - {ops: "2.18.1", scenario: "7.2.0"} # Missed requiring ops 2.19.0 for CheckStartup
+
+    steps:
+      - name: Expand ref
+        id: set-ref
+        run: |
+          if [ "${{ matrix.ops }}" == "main" ]; then
+            echo "refs=refs/heads/main" >> "$GITHUB_OUTPUT"
+          else
+            echo "refs=refs/tags/${{ matrix.ops }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout ops
+        uses: actions/checkout@v4
+        with:
+          repository: canonical/operator
+          ref: ${{ steps.set-ref.outputs.refs }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+
+      - name: Install tox
+        run: pip install tox~=4.24
+
+      - name: Checkout ops-scenario
+        uses: actions/checkout@v4
+        with:
+          repository: canonical/operator
+          ref: refs/tags/scenario-${{ matrix.scenario }}
+          path: temp_scenario
+          sparse-checkout: |
+            testing
+
+      - name: Inject scenario
+        run: |
+          rm -rf $GITHUB_WORKSPACE/testing
+          mv temp_scenario/testing $GITHUB_WORKSPACE/testing
+
+      - name: Run unit tests
+        run: tox -e unit
