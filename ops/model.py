@@ -1947,11 +1947,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     ) -> None:
         """Efficiently write multiple keys and values to the databag.
 
-        Has the same ultimate result as this, but uses a single relation-set call:
-        for k, v in dict(data).items():
-            self[k] = v
-        for k, v in kwargs.items():
-            self[k] = v
+        Has the same ultimate result as this, but uses a single relation-set call::
+
+            for k, v in dict(data).items():
+                self[k] = v
+            for k, v in kwargs.items():
+                self[k] = v
         """
         data = dict(data)
         data.update(kwargs)
