@@ -102,9 +102,9 @@ def test_relation_set_single():
             rel = self.model.get_relation(relation_name)
             assert rel is not None
             data = rel.data[self.unit]
-            data['to-change-key'] = 'to-change-val-new'
-            del data['to-remove-key']
-            data['new-key'] = 'new-val'
+            data["to-change-key"] = "to-change-val-new"
+            del data["to-remove-key"]
+            data["new-key"] = "new-val"
 
     ctx = Context(
         Charm,
@@ -116,17 +116,17 @@ def test_relation_set_single():
     rel_in = PeerRelation(
         endpoint=relation_name,
         local_unit_data={
-            'to-ignore-key': 'to-ignore-val',
-            'to-change-key': 'to-change-val-original',
-            'to-remove-key': 'to-remove-val',
-        }
+            "to-ignore-key": "to-ignore-val",
+            "to-change-key": "to-change-val-original",
+            "to-remove-key": "to-remove-val",
+        },
     )
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
     assert rel_out.local_unit_data == {
-        'to-ignore-key': 'to-ignore-val',
-        'to-change-key': 'to-change-val-new',
-        'new-key': 'new-val',
+        "to-ignore-key": "to-ignore-val",
+        "to-change-key": "to-change-val-new",
+        "new-key": "new-val",
     }
 
 
