@@ -1915,10 +1915,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 )
 
     def __setitem__(self, key: str, value: str):
-        data = {key: value}
-        self._validate_write(data)
-        self._commit(data)
-        self._update_cache(data)
+        self.update({key: value})
 
     def _commit(self, data: Mapping[str, str]) -> None:
         self._backend.update_relation_data(
