@@ -54,7 +54,8 @@ counts: Optional[Tuple[str, int]]
 
 ### Use relative imports inside a package
 
-In code inside a package (directory), use relative `.` imports. For example, in the `ops` directory of the Ops codebase:
+When writing code inside a package (a directory containing an `__init__.py` file), use relative imports with a `.` instead of absolute imports.
+For example, within the `ops` package:
 
 **Don't:**
 
