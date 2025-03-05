@@ -64,9 +64,8 @@ def test_emitted_framework():
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
-    assert len(ctx.emitted_events) == 5
+    assert len(ctx.emitted_events) == 4
     assert list(map(type, ctx.emitted_events)) == [
-        ops.SetupTracingEvent,
         ops.UpdateStatusEvent,
         ops.CollectStatusEvent,
         ops.PreCommitEvent,
@@ -91,9 +90,8 @@ def test_emitted_deferred():
         ctx.on.start(), State(deferred=[_Event("update-status").deferred(MyCharm._foo)])
     )
 
-    assert len(ctx.emitted_events) == 6
+    assert len(ctx.emitted_events) == 5
     assert [e.handle.kind for e in ctx.emitted_events] == [
-        "setup_tracing",
         "update_status",
         "start",
         "collect_unit_status",

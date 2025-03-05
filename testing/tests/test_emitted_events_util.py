@@ -1,10 +1,4 @@
-from ops.charm import (
-    CharmBase,
-    CharmEvents,
-    CollectStatusEvent,
-    SetupTracingEvent,
-    StartEvent,
-)
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
 from scenario import State
@@ -41,23 +35,21 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
     with capture_events(include_framework=True) as emitted:
         trigger(State(), "start", MyCharm, meta=MyCharm.META)
 
-    assert len(emitted) == 6
-    assert isinstance(emitted[0], SetupTracingEvent)
-    assert isinstance(emitted[1], StartEvent)
-    assert isinstance(emitted[2], Foo)
-    assert isinstance(emitted[3], CollectStatusEvent)
-    assert isinstance(emitted[4], PreCommitEvent)
-    assert isinstance(emitted[5], CommitEvent)
+    assert len(emitted) == 5
+    assert isinstance(emitted[0], StartEvent)
+    assert isinstance(emitted[1], Foo)
+    assert isinstance(emitted[2], CollectStatusEvent)
+    assert isinstance(emitted[3], PreCommitEvent)
+    assert isinstance(emitted[4], CommitEvent)
 
 
 def test_capture_juju_evt():
     with capture_events() as emitted:
         trigger(State(), "start", MyCharm, meta=MyCharm.META)
 
-    assert len(emitted) == 3
-    assert isinstance(emitted[0], SetupTracingEvent)
-    assert isinstance(emitted[1], StartEvent)
-    assert isinstance(emitted[2], Foo)
+    assert len(emitted) == 2
+    assert isinstance(emitted[0], StartEvent)
+    assert isinstance(emitted[1], Foo)
 
 
 def test_capture_deferred_evt():
@@ -70,11 +62,10 @@ def test_capture_deferred_evt():
             meta=MyCharm.META,
         )
 
-    assert len(emitted) == 4
-    assert isinstance(emitted[0], SetupTracingEvent)
-    assert isinstance(emitted[1], Foo)
-    assert isinstance(emitted[2], StartEvent)
-    assert isinstance(emitted[3], Foo)
+    assert len(emitted) == 3
+    assert isinstance(emitted[0], Foo)
+    assert isinstance(emitted[1], StartEvent)
+    assert isinstance(emitted[2], Foo)
 
 
 def test_capture_no_deferred_evt():
@@ -87,7 +78,6 @@ def test_capture_no_deferred_evt():
             meta=MyCharm.META,
         )
 
-    assert len(emitted) == 3
-    assert isinstance(emitted[0], SetupTracingEvent)
-    assert isinstance(emitted[1], StartEvent)
-    assert isinstance(emitted[2], Foo)
+    assert len(emitted) == 2
+    assert isinstance(emitted[0], StartEvent)
+    assert isinstance(emitted[1], Foo)

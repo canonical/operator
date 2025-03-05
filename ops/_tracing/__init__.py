@@ -18,6 +18,9 @@ TODO: quick start, usage example.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from typing import Generator
+
 import opentelemetry.trace
 
 import ops.version
@@ -30,19 +33,18 @@ try:
         mark_observed,
         set_tracing_destination,
         setup_tracing,
-        shutdown_tracing,
     )
 except ImportError:
 
     def mark_observed() -> None: ...
     def set_tracing_destination(*, url: str | None, ca: str | None = None) -> None: ...
-    def setup_tracing(charm_class_name: str) -> None: ...
-    def shutdown_tracing() -> None: ...
+    @contextmanager
+    def setup_tracing(charm_class_name: str) -> Generator[None, None, None]:
+        yield
 
 
 __all__ = [
     'mark_observed',
     'set_tracing_destination',
     'setup_tracing',
-    'shutdown_tracing',
 ]

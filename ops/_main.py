@@ -491,7 +491,6 @@ class _Manager:
 
     def _emit(self):
         """Emit the event on the charm."""
-        _charm._setup_tracing(self.charm)
         # TODO: Remove the collect_metrics check below as soon as the relevant
         #       Juju changes are made. Also adjust the docstring on
         #       EventBase.defer().
@@ -556,14 +555,11 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    _tracing.setup_tracing(charm_class.__name__)
-
-    try:
-        with tracer.start_as_current_span('ops.main'):
-            manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+    with _tracing.setup_tracing(charm_class.__name__):
+        try:
+            with tracer.start_as_current_span('ops.main'):
+                manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
 
             manager.run()
-    except _Abort as e:
-        sys.exit(e.exit_code)
-    finally:
-        _tracing.shutdown_tracing()
+        except _Abort as e:
+            sys.exit(e.exit_code)

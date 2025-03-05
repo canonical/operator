@@ -6,6 +6,8 @@
 #
 alabaster==1.0.0
     # via sphinx
+annotated-types==0.7.0
+    # via pydantic
 anyio==4.8.0
     # via
     #   starlette
@@ -101,12 +103,16 @@ opentelemetry-semantic-conventions==0.51b0
     #   opentelemetry-sdk
 opentelemetry-util-http==0.51b0
     # via opentelemetry-instrumentation-urllib
-otlp-json==0.9.4
+otlp-json==0.9.7
     # via ops (pyproject.toml)
 packaging==24.2
     # via
     #   opentelemetry-instrumentation
     #   sphinx
+pydantic==2.10.6
+    # via ops (pyproject.toml)
+pydantic-core==2.27.2
+    # via pydantic
 pygments==2.19.1
     # via
     #   furo
@@ -183,6 +189,8 @@ typing-extensions==4.12.2
     # via
     #   anyio
     #   opentelemetry-sdk
+    #   pydantic
+    #   pydantic-core
 uc-micro-py==1.0.3
     # via linkify-it-py
 urllib3==2.3.0

@@ -24,8 +24,6 @@ def charm_type():
                 self.framework.observe(evt, self._catchall)
 
         def _catchall(self, e: ops.EventBase):
-            if isinstance(e, ops.LifecycleEvent):
-                return
             if self._event:
                 return
             MyCharm._event = e

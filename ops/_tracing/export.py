@@ -22,7 +22,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Sequence
+from typing import Generator, Sequence
 
 import otlp_json
 from opentelemetry.instrumentation.urllib import URLLibInstrumentor
@@ -200,7 +200,8 @@ def suppress_juju_log_handler():
         juju_log_handler.drop.reset(token)
 
 
-def setup_tracing(charm_class_name: str) -> None:
+@contextlib.contextmanager
+def setup_tracing(charm_class_name: str) -> Generator[None, None, None]:
     global _exporter
     # FIXME would it be better to pass Juju context explicitly?
     juju_context = ops.jujucontext._JujuContext.from_dict(os.environ)
@@ -224,6 +225,10 @@ def setup_tracing(charm_class_name: str) -> None:
     span_processor = BatchSpanProcessor(_exporter)
     provider.add_span_processor(span_processor)
     set_tracer_provider(provider)
+    try:
+        yield
+    finally:
+        shutdown_tracing()
     # FIXME: in testing with tracing, we need a hack.
     # OpenTelemetry disallows setting the tracer provider twice,
     # a warning is issued and new provider is ignored.
