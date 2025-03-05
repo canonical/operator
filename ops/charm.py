@@ -36,9 +36,9 @@ from typing import (
     cast,
 )
 
-from ops import model
-from ops._private import yaml
-from ops.framework import (
+from . import model
+from ._private import yaml
+from .framework import (
     EventBase,
     EventSource,
     Framework,

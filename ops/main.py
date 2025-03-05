@@ -16,9 +16,8 @@
 
 from typing import Optional, Type
 
-import ops.charm
-
 from . import _main
+from . import charm as _charm
 
 # Re-export specific set of symbols that Scenario 6 imports from ops.main
 from ._main import (  # noqa: F401
@@ -29,7 +28,7 @@ from ._main import (  # noqa: F401
 )
 
 
-def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
+def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
     """Legacy entrypoint to set up the charm and dispatch the observed event.
 
     .. deprecated:: 2.16.0
