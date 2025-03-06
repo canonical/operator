@@ -1581,11 +1581,11 @@ class State(_max_posargs(0)):
         storage: str,
         /,
         *,
-        index: int | None = 0,
+        index: int = 0,
     ) -> Storage:
         """Get storage from this State, based on the storage's name and index."""
         for state_storage in self.storages:
-            if state_storage.name == storage and storage.index == index:
+            if state_storage.name == storage and state_storage.index == index:
                 return state_storage
         raise ValueError(
             f"storage: name={storage}, index={index} not found in the State",
