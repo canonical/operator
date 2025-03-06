@@ -4688,7 +4688,10 @@ class TestTestingPebbleClient:
                 command: '/bin/echo bar'
             """,
         )
-        client.start_services(['bar'])
+        change_id = client.start_services(['bar'])
+        change = client.get_change(change_id)
+        assert change.kind == pebble.ChangeKind.START.value
+        assert 'start' in change.summary.lower()
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
@@ -4701,7 +4704,10 @@ class TestTestingPebbleClient:
         assert foo_info.name == 'foo'
         assert foo_info.startup == pebble.ServiceStartup.ENABLED
         assert foo_info.current == pebble.ServiceStatus.INACTIVE
-        client.stop_services(['bar'])
+        change_id = client.stop_services(['bar'])
+        change = client.get_change(change_id)
+        assert change.kind == pebble.ChangeKind.STOP.value
+        assert 'stop' in change.summary.lower()
         infos = client.get_services()
         bar_info = infos[0]
         assert bar_info.name == 'bar'
@@ -4772,8 +4778,7 @@ class TestTestingPebbleClient:
         assert infos == []
 
     def test_invalid_start_service(self, client: _TestingPebbleClient):
-        # TODO: jam 2021-04-20 This should become a better error
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.start_services(['unknown'])
 
     def test_start_service_str(self, client: _TestingPebbleClient):
@@ -4782,11 +4787,19 @@ class TestTestingPebbleClient:
         with pytest.raises(TypeError):
             client.start_services('unknown')
 
+    def test_start_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.start_services([])
+
     def test_stop_service_str(self, client: _TestingPebbleClient):
         # Start service takes a list of names, but it is really easy to accidentally pass just a
         # name
         with pytest.raises(TypeError):
             client.stop_services('unknown')
+
+    def test_stop_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.stop_services([])
 
     def test_mixed_start_service(self, client: _TestingPebbleClient):
         client.add_layer(
@@ -4800,8 +4813,7 @@ class TestTestingPebbleClient:
                 command: '/bin/echo foo'
             """,
         )
-        # TODO: jam 2021-04-20 better error type
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.start_services(['foo', 'unknown'])
         # foo should not be started
         infos = client.get_services()
@@ -4824,8 +4836,7 @@ class TestTestingPebbleClient:
             """,
         )
         client.autostart_services()
-        # TODO: jam 2021-04-20 better error type
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.stop_services(['foo', 'unknown'])
         # foo should still be running
         infos = client.get_services()
@@ -4900,6 +4911,20 @@ class TestTestingPebbleClient:
         assert foo_info.name == 'foo'
         assert foo_info.startup == pebble.ServiceStartup.ENABLED
         assert foo_info.current == pebble.ServiceStatus.INACTIVE
+
+    def test_invalid_restart_service(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.restart_services(['unknown'])
+
+    def test_restart_service_str(self, client: _TestingPebbleClient):
+        # Restart service takes a list of names, but it is really easy to
+        # accidentally pass just a name.
+        with pytest.raises(TypeError):
+            client.restart_services('unknown')
+
+    def test_restart_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.restart_services([])
 
     @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self, client: _TestingPebbleClient):
@@ -7025,6 +7050,74 @@ class TestCloudSpec:
         harness.begin()
         with pytest.raises(ops.ModelError):
             harness.model.get_cloud_spec()
+
+
+class TestChecks:
+    @staticmethod
+    def _container_with_layer(request: pytest.FixtureRequest):
+        layer = pebble.Layer({
+            'checks': {
+                'chk1': {
+                    'override': 'replace',
+                    'exec': {'command': 'foo'},
+                },
+                'chk2': {
+                    'override': 'replace',
+                    'startup': 'enabled',
+                    'exec': {'command': 'foo'},
+                },
+                'chk3': {
+                    'override': 'replace',
+                    'startup': 'disabled',
+                    'exec': {'command': 'foo'},
+                },
+            },
+        })
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta='name: mycharm\ncontainers:\n  mycontainer:',
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer('mylayer', layer)
+        return container
+
+    def test_add_layer_with_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        chk1 = container.get_checks('chk1')['chk1']
+        assert chk1.startup == pebble.CheckStartup.UNSET
+        assert chk1.failures == 0
+        assert chk1.status == pebble.CheckStatus.UP
+        chk2 = container.get_checks('chk2')['chk2']
+        assert chk2.startup == pebble.CheckStartup.ENABLED
+        assert chk2.failures == 0
+        assert chk2.status == pebble.CheckStatus.UP
+        chk3 = container.get_checks('chk3')['chk3']
+        assert chk3.startup == pebble.CheckStartup.DISABLED
+        assert chk3.failures == 0
+        assert chk3.status == pebble.CheckStatus.INACTIVE
+
+    def test_start_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        changed = container.start_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk3']
+
+    def test_stop_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk1', 'chk2']
+
+    def test_stop_then_start(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk1', 'chk2']
+        changed = container.start_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk1', 'chk2', 'chk3']
+        for info in container.get_checks('chk1').values():
+            assert info.status == pebble.CheckStatus.UP
+            assert info.change_id, 'Change ID should not be None or the empty string'
 
 
 @pytest.mark.skipif(

@@ -74,7 +74,7 @@ Notably, specifying relations in `charmcraft.yaml` does not automatically make t
 harness.  If you have e.g. code that accesses relation data, you must manually add those relations
 (including peer relations) for the harness to provide access to that relation data to your charm.
 
-In some cases it may be useful to start the test harness and fire the same hooks that Juju would fire on deployment. This can be achieved using the `begin_with_initial_hooks()` method , to be used in place of the `begin()` method. This method will trigger the events: `install -> relation-created -> config-changed -> start -> relation-joined` depending on whether any relations have been created prior calling `begin_with_initial_hooks()`. An example of this is shown in the [testing relations](https://juju.is/docs/sdk/relations) section.
+In some cases it may be useful to start the test harness and fire the same hooks that Juju would fire on deployment. This can be achieved using the `begin_with_initial_hooks()` method , to be used in place of the `begin()` method. This method will trigger the events: `install -> relation-created -> config-changed -> start -> relation-joined` depending on whether any relations have been created prior calling `begin_with_initial_hooks()`. An example of this is shown in [](ops.testing.Harness).
 
 Using the `harness` variable, we can simulate various events in the charm’s lifecycle:
 
@@ -99,7 +99,7 @@ harness.charm.unit.status = BlockedStatus("Testing")
 Any of your charm’s properties and methods (including event callbacks) can be accessed using
 `harness.charm`.  You can check out the [harness API
 docs](ops_testing_harness) for more ways to use the
-harness to trigger other events and to test your charm (e.g. triggering leadership-related events,
+harness to trigger other events and to test your charm (e.g. triggering events regarding leadership,
 testing pebble events and sidecar container interactions, etc.).
 
 

@@ -57,13 +57,13 @@ from typing import (
     get_args,
 )
 
-import ops
-import ops.pebble as pebble
-from ops._private import timeconv, yaml
-from ops.jujucontext import _JujuContext
-from ops.jujuversion import JujuVersion
+from . import charm as _charm
+from . import pebble
+from ._private import timeconv, yaml
+from .jujucontext import _JujuContext
+from .jujuversion import JujuVersion
 
-# JujuVersion is not used in ops.model, but there are charms that are importing JujuVersion
+# JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
 _ = JujuVersion
 
@@ -82,7 +82,7 @@ _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStat
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
 # mapping from container name to container metadata
-_ContainerMeta_Raw = Dict[str, 'ops.charm.ContainerMeta']
+_ContainerMeta_Raw = Dict[str, '_charm.ContainerMeta']
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
@@ -124,14 +124,14 @@ class Model:
 
     def __init__(
         self,
-        meta: 'ops.charm.CharmMeta',
+        meta: '_charm.CharmMeta',
         backend: '_ModelBackend',
         broken_relation_id: Optional[int] = None,
     ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        relations: Dict[str, ops.RelationMeta] = meta.relations
+        relations: Dict[str, _charm.RelationMeta] = meta.relations
         self._relations = RelationMapping(
             relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
         )
@@ -218,6 +218,11 @@ class Model:
         """
         return self._backend.model_uuid
 
+    @property
+    def juju_version(self) -> JujuVersion:
+        """Return the version of Juju that is running the model."""
+        return self._backend._juju_context.version
+
     def get_unit(self, unit_name: str) -> 'Unit':
         """Get an arbitrary unit by name.
 
@@ -253,7 +258,7 @@ class Model:
                 given application has more than one relation on a given endpoint.
 
         Raises:
-            TooManyRelatedAppsError: is raised if there is more than one integration with the
+            TooManyRelatedAppsError: is raised if there is more than one relation with the
                 supplied relation_name and no relation_id was supplied
         """
         return self.relations._get_unique(relation_name, relation_id)
@@ -338,7 +343,7 @@ if typing.TYPE_CHECKING:
 
 
 class _ModelCache:
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
+    def __init__(self, meta: '_charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
         self._secret_set_cache: collections.defaultdict[str, Dict[str, Any]] = (
@@ -378,7 +383,7 @@ class Application:
     """
 
     def __init__(
-        self, name: str, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend', cache: _ModelCache
+        self, name: str, meta: '_charm.CharmMeta', backend: '_ModelBackend', cache: _ModelCache
     ):
         self.name = name
         self._backend = backend
@@ -554,7 +559,7 @@ class Unit:
     def __init__(
         self,
         name: str,
-        meta: 'ops.charm.CharmMeta',
+        meta: '_charm.CharmMeta',
         backend: '_ModelBackend',
         cache: '_ModelCache',
     ):
@@ -903,7 +908,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
 
     def __init__(
         self,
-        relations_meta: Dict[str, 'ops.RelationMeta'],
+        relations_meta: Dict[str, '_charm.RelationMeta'],
         our_unit: 'Unit',
         backend: '_ModelBackend',
         cache: '_ModelCache',
@@ -1665,7 +1670,7 @@ class Relation:
 
     This class should not be instantiated directly, instead use :meth:`Model.get_relation`,
     :attr:`Model.relations`, or :attr:`ops.RelationEvent.relation`. This is principally used by
-    :class:`ops.RelationMeta` to represent the relationships between charms.
+    :class:`ops.charm.RelationMeta` to represent the relationships between charms.
     """
 
     name: str
@@ -2107,7 +2112,7 @@ class MaintenanceStatus(StatusBase):
     ``apt install``, or is waiting for something under its control, such as
     ``pebble-ready`` or an exec operation in the workload container. In
     contrast to :class:`WaitingStatus`, "maintenance" reflects activity on
-    this unit or charm, not on peers or related units.
+    this unit (for unit status), or this app (for app status).
     """
 
     name = 'maintenance'
@@ -2120,7 +2125,8 @@ class WaitingStatus(StatusBase):
     example, a web app charm would set "waiting" status when it is integrated
     with a database charm that is not ready yet (it might be creating a
     database). In contrast to :class:`MaintenanceStatus`, "waiting" reflects
-    activity on related units, not on this unit or charm.
+    activity on integrated units (for unit status) and integrated apps (for
+    app status).
     """
 
     name = 'waiting'
@@ -2496,6 +2502,34 @@ class Container:
         if len(checks) > 1:
             raise RuntimeError(f'expected 1 check, got {len(checks)}')
         return checks[check_name]
+
+    def start_checks(self, *check_names: str) -> List[str]:
+        """Start given check(s) by name.
+
+        .. jujuadded:: 3.6.4
+
+        Returns:
+            A list of check names that were started. Checks that were already
+            running will not be included.
+        """
+        if not check_names:
+            raise TypeError('start-checks expected at least 1 argument, got 0')
+
+        return self._pebble.start_checks(check_names)
+
+    def stop_checks(self, *check_names: str) -> List[str]:
+        """Stop given check(s) by name.
+
+        .. jujuadded:: 3.6.4
+
+        Returns:
+            A list of check names that were stopped. Checks that were already
+            inactive will not be included.
+        """
+        if not check_names:
+            raise TypeError('stop-checks expected at least 1 argument, got 0')
+
+        return self._pebble.stop_checks(check_names)
 
     @typing.overload
     def pull(self, path: Union[str, PurePath], *, encoding: None) -> BinaryIO: ...
@@ -3928,7 +3962,7 @@ class LazyNotice:
             self.type = type
         self.key = key
 
-        self._notice: Optional[ops.pebble.Notice] = None
+        self._notice: Optional[pebble.Notice] = None
 
     def __repr__(self):
         type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
@@ -3965,7 +3999,7 @@ class LazyCheckInfo:
     def __init__(self, container: Container, name: str):
         self._container = container
         self.name = name
-        self._info: Optional[ops.pebble.CheckInfo] = None
+        self._info: Optional[pebble.CheckInfo] = None
 
     def __repr__(self):
         return f'LazyCheckInfo(name={self.name!r})'

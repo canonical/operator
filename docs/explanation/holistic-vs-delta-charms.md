@@ -61,6 +61,6 @@ Only some events make sense to handle holistically. For example, `remove` is tri
 
 Similarly, events like `secret-expired` and `secret-rotate` don't make sense to handle holistically, because the charm must do something specific in response to the event. For example, Juju will keep triggering `secret-expired` until the charm creates a new secret revision by calling [`event.secret.set_content()`](ops.Secret.set_content).
 
-This is very closely related to [which events can be `defer`red](https://juju.is/docs/sdk/how-and-when-to-defer-events). A good rule of thumb is this: if an event can be deferred, it may make sense to handle it holistically.
+This is very closely related to [which events can be deferred](/explanation/how-and-when-to-defer-events). A good rule of thumb is this: if an event can be deferred, it may make sense to handle it holistically.
 
 On the other hand, if an event cannot be deferred, the charm cannot handle it holistically. This applies to action "events", `stop`, `remove`, `secret-expired`, `secret-rotate`, and Ops-emitted events such as `collect-status`.

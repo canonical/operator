@@ -59,7 +59,7 @@ title: |
   demo-fastapi-k8s
 description: |
   This is a demo charm built on top of a small Python FastAPI server.
-  This charm could be related to PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
+  This charm could be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
 summary: |
   FastAPI Demo charm for Kubernetes
 ```
@@ -200,7 +200,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent)  -> None:
 
     Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble
     Learn more about Pebble layers at
-        https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layers
+        https://documentation.ubuntu.com/pebble/how-to/use-layers/
     """
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload

@@ -1,3 +1,15 @@
+# 7.1.3 - 13 Feb 2025
+
+## Fixes
+
+* Expose the mocked Juju environment variables via os.environ again (#1573)
+
+## Documentation
+
+* Update logo and readme (#1571)
+* Fill out remaining external link placeholders (#1564)
+* Consistently use relation as the noun and integrate as the verb (#1574)
+
 # 7.1.2 - 5 Feb 2025
 
 ## Fixes

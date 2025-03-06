@@ -136,7 +136,6 @@ It is in our interest to move the handler logic for each `/hooks/<hook_name>` to
 - We can avoid code duplication by accessing shared data via the CharmBase interface provided through `self`. 
 - The code is all in one place, easier to maintain.
 - We automatically have one Python object we can test, instead of going back and forth between Bash scripts and Python wrappers.
-- We can use [the awesome testing Harness](https://juju.is/docs/sdk/testing).
 
 So let's do that.
 
@@ -206,7 +205,7 @@ That allows us to fetch the Relation wherever we need it and access its contents
         )
 ```
 
-Note how `relation.data` provides an interface to the relation databag (more on that [here](https://juju.is/docs/sdk/relations#heading--relation-data)) and we need to select which part of that bag to access by passing an `ops.model.Unit` instance.
+Note how `relation.data` provides an interface to the relation databag (see [](#set-up-a-relation)) and we need to select which part of that bag to access by passing an `ops.model.Unit` instance.
 
 #### Logging
 
@@ -285,6 +284,9 @@ Furthermore we can get rid of the `start` handler, since the `snap.ensure()` cal
 
 The final result can be inspected at [this branch](https://github.com/PietroPasotti/hooks-to-ops/tree/3-py-final).
 
+### Testing
+
+After you've prepared the event handlers, you should write tests for the charm. See [](/howto/get-started-with-charm-testing).
 
 ## Closing notes
 

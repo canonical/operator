@@ -322,10 +322,10 @@ class Runtime:
             juju_context = _JujuContext.from_dict(env)
             # We need to set JUJU_VERSION in os.environ, because charms may use
             # `JujuVersion.from_environ()` to get the (simulated) Juju version.
-            # All of the other environment variables are exposed to the charm
-            # through the framework machinery, so don't require this.
-            previous_juju_version = os.environ.get("JUJU_VERSION")
-            os.environ["JUJU_VERSION"] = env["JUJU_VERSION"]
+            # For consistency, we put all the other ones there too, although we'd
+            # like to change this in the future.
+            previous_env = os.environ.copy()
+            os.environ.update(env)
 
             logger.info(" - entering ops.main (mocked)")
             from ._ops_main_mock import Ops  # noqa: F811
@@ -352,10 +352,10 @@ class Runtime:
                 ) from e
 
             finally:
-                if previous_juju_version is None:
-                    del os.environ["JUJU_VERSION"]
-                else:
-                    os.environ["JUJU_VERSION"] = previous_juju_version
+                for key in tuple(os.environ):
+                    if key not in previous_env:
+                        del os.environ[key]
+                os.environ.update(previous_env)
                 logger.info(" - exited ops.main")
 
         context.emitted_events.extend(captured)

@@ -349,6 +349,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
                 'status': 'down',
                 'failures': 3,
                 'threshold': 3,
+                'change-id': '1',
             })
         ]
 
@@ -1128,3 +1129,19 @@ assumes:
             ops.JujuAssumesCondition.ANY,
         ),
     ]
+
+
+@pytest.mark.parametrize('user', ['root', 'sudoer', 'non-root'])
+def test_meta_charm_user(user: str):
+    meta = ops.CharmMeta.from_yaml(f"""
+name: my-charm
+charm-user: {user}
+""")
+    assert meta.charm_user == user
+
+
+def test_meta_charm_user_default():
+    meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+""")
+    assert meta.charm_user == 'root'

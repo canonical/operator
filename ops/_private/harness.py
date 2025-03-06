@@ -58,16 +58,16 @@ from typing import (
     cast,
 )
 
-from ops import charm, framework, model, pebble, storage
-from ops._private import yaml
-from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.jujucontext import _JujuContext
-from ops.model import Container, RelationNotFoundError, StatusName, _NetworkDict
-from ops.pebble import ExecProcess
+from .. import charm, framework, model, pebble, storage
+from ..charm import CharmBase, CharmMeta, RelationRole
+from ..jujucontext import _JujuContext
+from ..model import Container, RelationNotFoundError, StatusName, _NetworkDict
+from ..pebble import ExecProcess
+from . import yaml
 
 if typing.TYPE_CHECKING:
     try:
-        from ops.testing import State  # type: ignore
+        from ..testing import State  # type: ignore
     except ImportError:
         # This is used in the ActionFailed type annotations: it will never be
         # used in this case, because it's only relevant when ops.testing has
@@ -537,7 +537,7 @@ class Harness(Generic[CharmType]):
             # Note: Juju *does* fire relation events for a given relation in the sorted order of
             # the unit names. It also always fires relation-changed immediately after
             # relation-joined for the same unit.
-            # Juju only fires relation-changed (app) if there is data for the related application
+            # Juju only fires relation-changed (app) if there is data for the integrated app
             relation = self._model.get_relation(rel_name, rel_id)
             if self._backend._relation_data_raw[rel_id].get(app_name):
                 app = self._model.get_app(app_name)
@@ -3175,78 +3175,140 @@ class _TestingPebbleClient:
             if startup == pebble.ServiceStartup.ENABLED:
                 self._service_status[name] = pebble.ServiceStatus.ACTIVE
 
+    def _new_perform_check(self, info: pebble.CheckInfo) -> pebble.Change:
+        now = datetime.datetime.now()
+        change = pebble.Change(
+            pebble.ChangeID(str(uuid.uuid4())),
+            pebble.ChangeKind.PERFORM_CHECK.value,
+            summary=info.name,
+            status=pebble.ChangeStatus.DOING.value,
+            tasks=[],
+            ready=False,
+            err=None,
+            spawn_time=now,
+            ready_time=None,
+        )
+        info.change_id = change.id
+        info.status = pebble.CheckStatus.UP
+        info.failures = 0
+        self._changes[change.id] = change
+        return change
+
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
+        for name, check in self._render_checks().items():
+            if check.startup == pebble.CheckStartup.DISABLED:
+                continue
+            info = self._check_infos.get(name)
+            if info is None:
+                info = pebble.CheckInfo(
+                    name=name,
+                    level=check.level,
+                    status=pebble.CheckStatus.UP,
+                    failures=0,
+                    threshold=3 if check.threshold is None else check.threshold,
+                    startup=check.startup,
+                )
+                self._check_infos[name] = info
+            if not info.change_id:
+                self._new_perform_check(info)
         return self.autostart_services(timeout, delay)
+
+    def _new_service_change(self, kind: pebble.ChangeKind, services: List[str]) -> pebble.Change:
+        now = datetime.datetime.now()
+        if kind == pebble.ChangeKind.START:
+            action = 'Start'
+        elif kind == pebble.ChangeKind.STOP:
+            action = 'Stop'
+        elif kind == pebble.ChangeKind.RESTART:
+            action = 'Restart'
+        else:
+            raise ValueError(f'unknown kind {kind}')
+        summary = f'{action} service {services[0]}'
+        if len(services) > 1:
+            summary += f' and {len(services) - 1} more'
+        change = pebble.Change(
+            pebble.ChangeID(str(uuid.uuid4())),
+            kind.value,
+            summary=summary,
+            status=pebble.ChangeStatus.DONE.value,
+            tasks=[],
+            ready=True,
+            err=None,
+            spawn_time=now,
+            ready_time=now,
+        )
+        self._changes[change.id] = change
+        return change
 
     def start_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
+    ) -> pebble.ChangeID:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
             raise TypeError(f'start_services should take a list of names, not just "{services}"')
-
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.start() which currently ignores the return value
         known_services = self._render_services()
         # Names appear to be validated before any are activated, so do two passes
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(400, f'cannot start services: service {name} does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
+        return self._new_service_change(pebble.ChangeKind.START, services).id
 
     def stop_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
-        # handle a common mistake of passing just a name rather than a list of names
+    ) -> pebble.ChangeID:
+        # Handle a common mistake of passing just a name rather than a list of names.
         if isinstance(services, str):
             raise TypeError(f'stop_services should take a list of names, not just "{services}"')
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
 
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.stop() which currently ignores the return value
         known_services = self._render_services()
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(400, f'cannot stop services: service {name} does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
+        return self._new_service_change(pebble.ChangeKind.STOP, services).id
 
     def restart_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
-        # handle a common mistake of passing just a name rather than a list of names
+    ) -> pebble.ChangeID:
+        # Handle a common mistake of passing just a name rather than a list of names.
         if isinstance(services, str):
             raise TypeError(f'restart_services should take a list of names, not just "{services}"')
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
 
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.restart() which currently ignores the return value
         known_services = self._render_services()
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(
+                    400,
+                    f'cannot restart services: service {name} does not exist',
+                )
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
+        return self._new_service_change(pebble.ChangeKind.RESTART, services).id
 
     def wait_change(
         self,
@@ -3346,12 +3408,35 @@ class _TestingPebbleClient:
         else:
             self._layers[label] = layer_obj
 
+        # Checks are started when the layer is added, not (only) on replan.
+        for name, check in layer_obj.checks.items():
+            try:
+                info = self._check_infos[name]
+            except KeyError:
+                status = (
+                    pebble.CheckStatus.INACTIVE
+                    if check.startup == pebble.CheckStartup.DISABLED
+                    else pebble.CheckStatus.UP
+                )
+                info = pebble.CheckInfo(
+                    name,
+                    level=check.level,
+                    status=status,
+                    failures=0,
+                    change_id=pebble.ChangeID(''),
+                )
+                self._check_infos[name] = info
+            info.level = check.level
+            info.threshold = 3 if check.threshold is None else check.threshold
+            info.startup = check.startup
+            if info.startup != pebble.CheckStartup.DISABLED and not info.change_id:
+                self._new_perform_check(info)
+
     def _render_services(self) -> Dict[str, pebble.Service]:
         services: Dict[str, pebble.Service] = {}
         for key in sorted(self._layers.keys()):
             layer = self._layers[key]
             for name, service in layer.services.items():
-                # TODO: merge existing services https://github.com/canonical/operator/issues/1112
                 services[name] = service
         return services
 
@@ -3742,6 +3827,33 @@ class _TestingPebbleClient:
             for info in self._check_infos.values()
             if (level is None or level == info.level) and (names is None or info.name in names)
         ]
+
+    def start_checks(self, names: List[str]) -> List[str]:
+        self._check_connection()
+        started: List[str] = []
+        for name in names:
+            if name not in self._check_infos:
+                raise self._api_error(404, f'cannot find check with name "{name}"')
+            info = self._check_infos[name]
+            if not info.change_id:
+                self._new_perform_check(info)
+                started.append(name)
+        return started
+
+    def stop_checks(self, names: List[str]) -> List[str]:
+        self._check_connection()
+        stopped: List[str] = []
+        for name in names:
+            if name not in self._check_infos:
+                raise self._api_error(404, f'cannot find check with name "{name}"')
+            info = self._check_infos[name]
+            if info.change_id:
+                change = self._changes[info.change_id]
+                change.status = pebble.ChangeStatus.ABORT.value
+                info.status = pebble.CheckStatus.INACTIVE
+                info.change_id = pebble.ChangeID('')
+                stopped.append(name)
+        return stopped
 
     def notify(
         self,
