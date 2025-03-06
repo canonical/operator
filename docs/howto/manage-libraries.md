@@ -30,6 +30,13 @@ class DatabaseRequirer(ops.framework.Object):
             self.on.ready.emit()
 ```
 
+```{admonition} Best practice
+:class: hint
+
+Libraries should never mutate the status of a unit or application. Instead, use
+return values, or raise exceptions and let them bubble back up to the charm for
+the charm author to handle as they see fit.
+```
 
 ## Write tests for a library
 
