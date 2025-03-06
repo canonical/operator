@@ -15,7 +15,7 @@ If you are familiar with  Juju, as we assume here, you'll know that, to start us
 
 As you already know from your knowledge of Juju, when you deploy a Kubernetes charm, the following things happen:
 
-1. The Juju controller provisions a pod with two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`. 
+1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`. 
 1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready. 
 1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble. 
 1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations. 
@@ -59,12 +59,12 @@ title: |
   demo-fastapi-k8s
 description: |
   This is a demo charm built on top of a small Python FastAPI server.
-  This charm could be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
+  This charm can be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
 summary: |
   FastAPI Demo charm for Kubernetes
 ```
 
-Second, add an environment constraint assuming the latest major Juju version and a Kubernetes-type cloud:
+Second, add a constraint assuming a Juju version with the required features and a Kubernetes-type cloud:
 
 ```text
 assumes:
@@ -425,7 +425,4 @@ For the full code see: [01_create_minimal_charm](https://github.com/canonical/ju
 For a comparative view of the code before and after our edits see:
 [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/main...01_create_minimal_charm)  
 
-
-
 >**See next: {ref}`Make your charm configurable <make-your-charm-configurable>`**
-
