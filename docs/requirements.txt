@@ -165,4 +165,4 @@ websocket-client==1.8.0
     # via ops (pyproject.toml)
 websockets==14.1
     # via sphinx-autobuild
-./testing/
+ops-scenario==7.2.0

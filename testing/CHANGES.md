@@ -1,3 +1,18 @@
+# 7.19.1 - 5 Mar 2025
+
+**Note that there are no versions 7.3 through 7.18.** The minor version number
+was increased to align with the matching `ops` release.
+
+## Fixes
+
+* Require `ops` 2.19.1, to ensure that the Pebble checks startup field is available
+
+# 7.2.0 - 27 Feb 2025
+
+## Features
+
+* Support starting and stopping Pebble checks, and the checks enabled field (#1560)
+
 # 7.1.3 - 13 Feb 2025
 
 ## Fixes

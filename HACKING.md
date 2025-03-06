@@ -349,39 +349,38 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    charms and ops get tested.
 2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
 3. Click "Draft a new release"
-4. The "Release Title" is the full version numbers of ops and/or ops-scenario,
+4. The "Release Title" is the full version numbers of ops and ops-scenario,
    in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
-   For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
+   For example: `ops 2.3.12 and ops-scenario 7.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
 5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
-   `ops` and `scenario-<major>.<minor>.<patch>` for `ops-scenario`. If releasing
-   both packages, use the ops tag.
-6. If the last release was for both `ops` and `ops-scenario`, leave the previous
-   tag choice on `auto`. If the last release was for only one package, change
-   the previous tag to be the last time the same package(s) were being released.
-7. Use the "Generate Release Notes" button to get a copy of the changes into the
+   `ops`. Leave the previous tag choice on `auto`.
+6. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field.
-8. Format the auto-generated release notes according to the 'Release Documentation'
+7. Format the auto-generated release notes according to the 'Release Documentation'
    section below, save the release notes as a draft, and have someone else in the
    Charm-Tech team proofread it.
-9. Format the auto-generated release notes according to the `CHANGES.md` section below,
-   and add it to `CHANGES.md`.
-10. For `ops`, change [version.py](ops/version.py)'s `version` to the
+8. Format the auto-generated release notes according to the `CHANGES.md` section below,
+   and add it to `CHANGES.md` and `testing/CHANGES.md`.
+9. For `ops`, change [version.py](ops/version.py)'s `version` to the
    appropriate string. For `ops-scenario`, change the version in
    [testing/pyproject.toml](testing/pyproject.toml). Both packages use
-   [semantic versioning](https://semver.org/), and adjust independently
-   (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
-11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
+   [semantic versioning](https://semver.org/), and adjust together, so that
+   the minor and bugfix version are the same; for example, ops 2.19.1 and
+   ops-scenario 7.19.1. 
+10. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
    using the same Python version as specified in the `.readthedocs.yaml` file.
-12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
+11. Run `sed -i -e "s/\$GITHUB_SHA/main/g" .github/workflows/observability-charm-tests.yaml` and
+    replace `./testing/` in `docs/requirements.txt` with `ops-scenario==x`, where `x` is the
+    latest release (before the one you are preparing) of `ops-scenario`.
+12. Add, commit, and push, and open a PR to get the `CHANGES.md` updates, version bumps,
    and doc requirement bumps into main (and get it merged).
-13. If the release includes both `ops` and `ops-scenario` packages, then push a
-   new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
+13. Push a new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-14. When you are ready, click "Publish". GitHub will create the additional tag.
+14. When you are ready, click "Publish". GitHub will create the ops tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -397,9 +396,12 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 
 15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-16. Open a PR to change the version strings to the expected
+16. Run `sed -i -e "s/main/\$GITHUB_SHA/g" .github/workflows/observability-charm-tests.yaml`
+    and `uvx --python=3.11 tox -e docs-deps`
+17. Open a PR to change the version strings to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
-   expected version, use `'3.14.1.dev0'`).
+   expected version, use `'3.14.1.dev0'`), as well as the changes from the
+   previous step.
 
 ## Release Documentation
 
@@ -452,7 +454,8 @@ CHANGES.md files.
   word.
 * Strip the username (who did each commit) if the author is a member of the
   Charm Tech team.
-* Replace the link to the pull request with the PR number in parentheses.
+* Replace the link to the pull request with the PR number in parentheses, including
+  removing the word "in".
 * Where appropriate, collapse multiple tightly related bullet points into a
   single point that refers to multiple commits.
 * Where appropriate, add backticks for code formatting.
