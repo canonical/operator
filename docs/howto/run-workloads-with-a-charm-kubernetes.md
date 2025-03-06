@@ -1,5 +1,5 @@
 (run-workloads-with-a-charm-kubernetes)=
-# How to run workloads with a charm - Kubernetes
+# How to run workloads with a Kubernetes charm
 
 The recommended way to create charms for Kubernetes is using the sidecar pattern with the workload container running Pebble.
 
@@ -206,7 +206,7 @@ See the {external+pebble:ref}`layer specification <layer-specification>` for mor
 
 To add a configuration layer, call [`Container.add_layer`](ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](ops.pebble.Layer) object.
 
-You can see an example of `add_layer` under the ["Replan" heading](#replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
+You can see an example of `add_layer` in [](#run-workloads-with-a-charm-kubernetes-replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
 
 Because `combine=True` combines the layer with an existing layer of the same name, it's normally used with `override: replace` in the YAML service configuration. This means replacing the entire service configuration with the fields in the new layer.
 
@@ -239,9 +239,10 @@ The main purpose of Pebble is to control and monitor services, which are usually
 
 In the context of Juju sidecar charms, Pebble is run with the `--hold` argument, which prevents it from automatically starting the services marked with `startup: enabled`. This is to give the charm full control over when the services in Pebble's configuration are actually started.
 
+(run-workloads-with-a-charm-kubernetes-replan)=
 ### Replan
 
-After adding a configuration layer to the plan (details below), you need to call `replan` to make any changes to `services` take effect. When you execute replan, Pebble will automatically restart any services that have changed, respecting dependency order. If the services are already running, it will stop them first using the normal [stop sequence](#start-and-stop).
+After adding a configuration layer to the plan (details below), you need to call `replan` to make any changes to `services` take effect. When you execute replan, Pebble will automatically restart any services that have changed, respecting dependency order. If the services are already running, it will stop them first using the normal [stop sequence](#run-workloads-with-a-charm-kubernetes-start-and-stop).
 
 The reason for replan is so that you as a user have control over when the (potentially high-impact) action of stopping and restarting your services takes place.
 
@@ -276,6 +277,7 @@ class SnappassTestCharm(ops.CharmBase):
 
 > See more: [](ops.Container)
 
+(run-workloads-with-a-charm-kubernetes-start-and-stop)=
 ### Start and stop
 
 To start (or stop) one or more services by name, use the [`start`](ops.Container.start) and [`stop`](ops.Container.stop) methods. Here's an example of how you might stop and start a database service during a backup action:
