@@ -5,8 +5,8 @@
 :maxdepth: 2
 
 Manage logs <manage-logs>
-Run workloads with a charm machines <run-workloads-with-a-charm-machines>
-Run workloads with a charm Kubernetes <run-workloads-with-a-charm-kubernetes>
+Run workloads with a machine charm <run-workloads-with-a-charm-machines>
+Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 Manage storage <manage-storage>
 Manage resources <manage-resources>
 Manage actions <manage-actions>

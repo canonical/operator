@@ -1,5 +1,5 @@
 (run-workloads-with-a-charm-kubernetes)=
-# How to run workloads with a charm - Kubernetes
+# How to run workloads with a Kubernetes charm
 
 The recommended way to create charms for Kubernetes is using the sidecar pattern with the workload container running Pebble.
 
