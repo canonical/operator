@@ -371,13 +371,16 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 10. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
    using the same Python version as specified in the `.readthedocs.yaml` file.
-11. Add, commit, and push, and open a PR to get the `CHANGES.md` updates, version bumps,
+11. Run `sed -i -e "s/\$GITHUB_SHA/main/g" .github/workflows/observability-charm-tests.yaml` and
+    replace `./testing/` in `docs/requirements.txt` with `ops-scenario==x`, where `x` is the
+    latest release (before the one you are preparing) of `ops-scenario`.
+12. Add, commit, and push, and open a PR to get the `CHANGES.md` updates, version bumps,
    and doc requirement bumps into main (and get it merged).
-12. Push a new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
+13. Push a new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-13. When you are ready, click "Publish". GitHub will create the ops tag.
+14. When you are ready, click "Publish". GitHub will create the ops tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -391,11 +394,14 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-15. Open a PR to change the version strings to the expected
+16. Run `sed -i -e "s/main/\$GITHUB_SHA/g" .github/workflows/observability-charm-tests.yaml`
+    and `uvx --python=3.11 tox -e docs-deps`
+17. Open a PR to change the version strings to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
-   expected version, use `'3.14.1.dev0'`).
+   expected version, use `'3.14.1.dev0'`), as well as the changes from the
+   previous step.
 
 ## Release Documentation
 
