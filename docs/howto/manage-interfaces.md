@@ -11,7 +11,7 @@ Suppose that your interface specification has the following data model:
 - the requirer app is supposed to forward a list of tables that it wants to be provisioned by the database provider
 - the provider app (the database) at that point will reply with an API endpoint and, for each replica, it will provide a separate secret ID to authenticate the requests
 
-These are the steps you need to take in order to  register it with {ref}``charm-relation-interfaces` <charm-relation-interfaces>`.
+These are the steps you need to take in order to  register it with [`charm-relation-interfaces`](charm-relation-interfaces).
 
 
 ```{dropdown} Expand to preview some example results
@@ -53,6 +53,7 @@ At this point you should see this directory structure:
 2 directories, 3 files
 ```
 
+(edit-interface-yaml)=
 ### 3. Edit `interface.yaml`
 
 Add to `interface.yaml` the charm that owns the reference implementation of the `my_fancy_database` interface. Assuming your `my_fancy_database_charm` plays the `provider` role in the interface, your `interface.yaml` will look like this:
@@ -239,7 +240,10 @@ $ tree ./interfaces/my_fancy_database
 ### Create the test module
 
 Add a file to the `interface_tests` directory called `test_provider.py`.
-> touch ./interfaces/my_fancy_database/interface_tests/test_provider.py
+
+```bash
+touch ./interfaces/my_fancy_database/interface_tests/test_provider.py
+```
 
 ### Write a test for the 'negative' path
 
@@ -269,7 +273,7 @@ def test_nothing_happens_if_remote_empty():
     t.assert_relation_data_empty()
 ```
 
-This test verifies part of a 'negative' path: it verifies that if the remote end did not (yet) comply with his part of the contract, then our side did not either.
+This test verifies part of a 'negative' path: it verifies that if the remote end did not (yet) comply with its part of the contract, then our side did not either.
 
 ### Write a test for the 'positive' path
 
@@ -303,13 +307,13 @@ def test_contract_happy_path():
     t.assert_schema_valid()
 ```
 
-This test verifies that the databags of the 'my-fancy-database' relation are valid according to the  pydantic schema you have specified in `schema.py`. 
+This test verifies that the databags of the 'my-fancy-database' relation are valid according to the pydantic schema you have specified in `schema.py`. 
 
 To check that things work as they should, you can run `interface_tester discover --include my_fancy_database` from the `charm-relation-interfaces` root.
 
 ```{note}
 
-Note that the `interface_tester` is installed in the previous how-to guide  [How to register an interface <how-to-register-an-interface>`. If you haven't done it yet, install it by running: `pip install pytest-interface-tester `.
+Note that the `interface_tester` is installed in {ref}`Register an interface <register-an-interface>`. If you haven't done it yet, install it by running: `pip install pytest-interface-tester `.
 
 ```
 
@@ -332,7 +336,7 @@ You should see:
 
 In particular, pay attention to the `provider` field. If it says `<no tests>` then there is something wrong with your setup, and the collector isn't able to find your test or identify it as a valid test.
 
-Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/v0/interface_tests/test_requirer.py`. Don't forget to edit the `interface.yaml` file in the "requirers" section to add the name of the charm and the URL. See the "Edit `interface.yaml`" section in the previous how-to guide "How to register an interface" for more detail on editing `interface.yaml`. [Here](https://github.com/IronCore864/charm-relation-interfaces/tree/my-fancy-database/interfaces/my_fancy_database/v0) is an example of tests for requirers added.
+Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/v0/interface_tests/test_requirer.py`. Don't forget to [edit the `interface.yaml`](edit-interface-yaml) file in the "requirers" section to add the name of the charm and the URL.
 
 ### Merge in charm-relation-interfaces
 
