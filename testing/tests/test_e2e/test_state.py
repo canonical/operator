@@ -1,6 +1,6 @@
 import copy
 from dataclasses import asdict, replace
-from typing import Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import ops
 import pytest
@@ -13,12 +13,19 @@ from scenario.state import (
     Address,
     BindAddress,
     CheckInfo,
+    CloudCredential,
+    CloudSpec,
     Container,
     Model,
     Network,
+    Notice,
+    PeerRelation,
     Relation,
     Resource,
+    Secret,
     State,
+    StoredState,
+    SubordinateRelation,
 )
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
@@ -340,3 +347,100 @@ def test_replace_state():
     state2 = replace(state, leader=False)
     assert state.leader != state2.leader
     assert state.containers == state2.containers
+
+
+@pytest.mark.parametrize(
+    "component,attribute,required_args",
+    [
+        (CloudCredential, "attributes", {"auth_type": "foo"}),
+        (Secret, "tracked_content", {}),
+        (Secret, "latest_content", {"tracked_content": {"password": "password"}}),
+        (Secret, "remote_grants", {"tracked_content": {"password": "password"}}),
+        (Relation, "local_app_data", {"endpoint": "foo"}),
+        (Relation, "local_unit_data", {"endpoint": "foo"}),
+        (Relation, "remote_app_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "local_app_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "local_unit_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "remote_app_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "remote_unit_data", {"endpoint": "foo"}),
+        (PeerRelation, "local_app_data", {"endpoint": "foo"}),
+        (PeerRelation, "local_unit_data", {"endpoint": "foo"}),
+        (Notice, "last_data", {"key": "foo"}),
+        (Container, "layers", {"name": "foo"}),
+        (Container, "service_statuses", {"name": "foo"}),
+        (Container, "mounts", {"name": "foo"}),
+        (Container, "notices", {"name": "foo"}),
+        (StoredState, "content", {}),
+    ],
+)
+def test_immutable_content_dict(
+    component: Type[object], attribute: str, required_args: Dict[str, Any]
+):
+    content = {"foo": "bar"}
+    obj1 = component(**required_args, **{attribute: content})
+    obj2 = component(**required_args, **{attribute: content})
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == content
+    assert getattr(obj1, attribute) is not getattr(obj2, attribute)
+    content["baz"] = "qux"
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == {"foo": "bar"}
+    # This shouldn't be done in a charm test, since the attribute should be immutable,
+    # but it's convenient to verify that the content is not connected.
+    setattr(obj1, attribute, {"baz": "qux"})
+    assert getattr(obj1, attribute) == {"baz": "qux"}
+    assert getattr(obj2, attribute) == {"foo": "bar"}
+
+
+@pytest.mark.parametrize(
+    "component,attribute,required_args",
+    [
+        (CloudCredential, "redacted", {"auth_type": "foo"}),
+        (CloudSpec, "ca_certificates", {"type": "foo"}),
+        (BindAddress, "addresses", {}),
+        (Network, "bind_addresses", {"binding_name": "foo"}),
+        (Network, "ingress_addresses", {"binding_name": "foo"}),
+        (Network, "egress_subnets", {"binding_name": "foo"}),
+    ],
+)
+def test_immutable_content_list(
+    component: Type[object], attribute: str, required_args: Dict[str, Any]
+):
+    content = ["foo", "bar"]
+    obj1 = component(**required_args, **{attribute: content})
+    obj2 = component(**required_args, **{attribute: content})
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == content
+    assert getattr(obj1, attribute) is not getattr(obj2, attribute)
+    content.append("baz")
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == ["foo", "bar"]
+    # This shouldn't be done in a charm test, since the attribute should be immutable,
+    # but it's convenient to verify that the content is not connected.
+    setattr(obj1, attribute, ["baz", "qux"])
+    assert getattr(obj1, attribute) == ["baz", "qux"]
+    assert getattr(obj2, attribute) == ["foo", "bar"]
+
+
+@pytest.mark.parametrize(
+    "component,attribute,required_args",
+    [
+        (Relation, "remote_units_data", {"endpoint": "foo"}),
+        (PeerRelation, "peers_data", {"endpoint": "foo"}),
+    ],
+)
+def test_immutable_content_dict_of_dicts(
+    component: Type[object], attribute: str, required_args: Dict[str, Any]
+):
+    content = {0: {"foo": "bar"}, 1: {"baz": "qux"}}
+    obj1 = component(**required_args, **{attribute: content})
+    obj2 = component(**required_args, **{attribute: content})
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == content
+    assert getattr(obj1, attribute) is not getattr(obj2, attribute)
+    content[0]["baz"] = "qux"
+    assert (
+        getattr(obj1, attribute)
+        == getattr(obj2, attribute)
+        == {0: {"foo": "bar"}, 1: {"baz": "qux"}}
+    )
+    # This shouldn't be done in a charm test, since the attribute should be immutable,
+    # but it's convenient to verify that the content is not connected.
+    setattr(obj1, attribute, {0: {"foo": "qux"}})
+    assert getattr(obj1, attribute) == {"foo": "qux"}
+    assert getattr(obj2, attribute) == {0: {"foo": "bar"}, 1: {"baz": "qux"}}
