@@ -22,7 +22,7 @@ In the previous chapter we checked the basic functionality of our charm by writi
 
 However, there is one more type of test to cover, namely: state transition tests. 
 
-In the charming world the current recommendation is to write state transition tests with the 'scenario' model popularised by the {ref}``ops-scenario` <scenario>` library.
+In the charming world the current recommendation is to write state transition tests with the 'scenario' model popularised by the `ops-scenario` library.
 
 ```{note}
  Scenario is a state-transition testing SDK for operator framework charms. 
