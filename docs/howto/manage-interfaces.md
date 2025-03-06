@@ -11,7 +11,7 @@ Suppose that your interface specification has the following data model:
 - the requirer app is supposed to forward a list of tables that it wants to be provisioned by the database provider
 - the provider app (the database) at that point will reply with an API endpoint and, for each replica, it will provide a separate secret ID to authenticate the requests
 
-These are the steps you need to take in order to  register it with [`charm-relation-interfaces`](charm-relation-interfaces).
+These are the steps you need to take in order to  register it with [`charm-relation-interfaces`](#charm-relation-interfaces).
 
 
 ```{dropdown} Expand to preview some example results
@@ -220,7 +220,7 @@ Finally, open a pull request to the `charm-relation-interfaces` repo and drive i
 
 > See also: {ref}`interface-tests`
 
-Suppose you have an interface specification in {ref}`charm-relation-interfaces`, or you are working on one, and you want to add interface tests. These are the steps you need to take.
+Suppose you have an interface specification in [`charm-relation-interfaces`](#charm-relation-interfaces), or you are working on one, and you want to add interface tests. These are the steps you need to take.
 
 We will continue from the running example from {ref}`register-an-interface`. Your starting setup should look like this:
 
@@ -336,7 +336,7 @@ You should see:
 
 In particular, pay attention to the `provider` field. If it says `<no tests>` then there is something wrong with your setup, and the collector isn't able to find your test or identify it as a valid test.
 
-Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/v0/interface_tests/test_requirer.py`. Don't forget to [edit the `interface.yaml`](edit-interface-yaml) file in the "requirers" section to add the name of the charm and the URL.
+Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/v0/interface_tests/test_requirer.py`. Don't forget to [edit the `interface.yaml`](#edit-interface-yaml) file in the "requirers" section to add the name of the charm and the URL.
 
 ### Merge in charm-relation-interfaces
 
