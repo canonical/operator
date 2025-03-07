@@ -6,8 +6,10 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import datetime
+import functools
 import inspect
 import pathlib
 import random
@@ -108,6 +110,26 @@ _SECRET_EVENTS = {
     "secret_rotate",
     "secret_expired",
 }
+
+
+def _detach_dicts_and_lists(cls):
+    original_post_init = getattr(cls, "__post_init__", None)
+
+    @functools.wraps(cls)
+    def __post_init__(self):
+        if original_post_init:
+            original_post_init(self)
+        # We don't have a frozendict to freeze any dictionaries, and while we
+        # could freeze a list into a tuple, we would break tests that currently
+        # assert that they get a list, so we can't do that until 8.0. That means
+        # we can't actually freeze the content here, but we can at least
+        # disassociate it from the original object.
+        for attr, value in self.__dict__.items():
+            if isinstance(value, (dict, list)):
+                object.__setattr__(self, attr, copy.deepcopy(value))
+
+    cls.__post_init__ = __post_init__
+    return cls
 
 
 # This can be replaced with the KW_ONLY dataclasses functionality in Python 3.10+.
@@ -212,20 +234,22 @@ class JujuLogLine:
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class CloudCredential(_max_posargs(0)):
     __doc__ = ops.CloudCredential.__doc__
 
     auth_type: str
     """Authentication type."""
 
-    attributes: dict[str, str] = dataclasses.field(default_factory=dict)
+    attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
     """A dictionary containing cloud credentials.
+
     For example, for AWS, it contains `access-key` and `secret-key`;
     for Azure, `application-id`, `application-password` and `subscription-id`
     can be found here.
     """
 
-    redacted: list[str] = dataclasses.field(default_factory=list)
+    redacted: Sequence[str] = dataclasses.field(default_factory=list)
     """A list of redacted generic cloud API secrets."""
 
     def _to_ops(self) -> CloudCredential_Ops:
@@ -237,6 +261,7 @@ class CloudCredential(_max_posargs(0)):
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class CloudSpec(_max_posargs(1)):
     __doc__ = ops.CloudSpec.__doc__
 
@@ -261,7 +286,7 @@ class CloudSpec(_max_posargs(1)):
     credential: CloudCredential | None = None
     """Cloud credentials with key-value attributes."""
 
-    ca_certificates: list[str] = dataclasses.field(default_factory=list)
+    ca_certificates: Sequence[str] = dataclasses.field(default_factory=list)
     """A list of CA certificates."""
 
     skip_tls_verify: bool = False
@@ -295,6 +320,7 @@ def _generate_secret_id():
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class Secret(_max_posargs(1)):
     """A Juju secret.
 
@@ -326,7 +352,7 @@ class Secret(_max_posargs(1)):
     to this unit.
     """
 
-    remote_grants: dict[int, set[str]] = dataclasses.field(default_factory=dict)
+    remote_grants: Mapping[int, set[str]] = dataclasses.field(default_factory=dict)
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
@@ -418,10 +444,11 @@ class Address(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class BindAddress(_max_posargs(1)):
     """An address bound to a network interface in a Juju space."""
 
-    addresses: list[Address]
+    addresses: Sequence[Address]
     """The addresses in the space."""
     interface_name: str = ""
     """The name of the network interface."""
@@ -440,20 +467,21 @@ class BindAddress(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class Network(_max_posargs(2)):
     """A Juju network space."""
 
     binding_name: str
     """The name of the network space."""
-    bind_addresses: list[BindAddress] = dataclasses.field(
+    bind_addresses: Sequence[BindAddress] = dataclasses.field(
         default_factory=lambda: [BindAddress([Address("192.0.2.0")])],
     )
     """Addresses that the charm's application should bind to."""
-    ingress_addresses: list[str] = dataclasses.field(
+    ingress_addresses: Sequence[str] = dataclasses.field(
         default_factory=lambda: ["192.0.2.0"],
     )
     """Addresses other applications should use to connect to the unit."""
-    egress_subnets: list[str] = dataclasses.field(
+    egress_subnets: Sequence[str] = dataclasses.field(
         default_factory=lambda: ["192.0.2.0/24"],
     )
     """Subnets that other units will see the charm connecting from."""
@@ -489,6 +517,7 @@ def _next_relation_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class RelationBase(_max_posargs(2)):
     """Base class for the various types of relation."""
 
@@ -795,6 +824,7 @@ def _next_notice_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class Notice(_max_posargs(1)):
     """A Pebble notice."""
 
@@ -830,7 +860,7 @@ class Notice(_max_posargs(1)):
     occurrences: int = 1
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str] = dataclasses.field(default_factory=dict)
+    last_data: Mapping[str, str] = dataclasses.field(default_factory=dict)
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None = None
@@ -918,6 +948,7 @@ class CheckInfo(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class Container(_max_posargs(1)):
     """A Kubernetes container where a charm's workload runs."""
 
@@ -932,13 +963,13 @@ class Container(_max_posargs(1)):
     # pebble or derive them from the resulting plan (which one CAN get from pebble).
     # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
     # will be unknown. all that we can know is the resulting plan (the 'computed plan').
-    _base_plan: dict[str, Any] = dataclasses.field(default_factory=dict)
+    _base_plan: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
-    layers: dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
+    layers: Mapping[str, pebble.Layer] = dataclasses.field(default_factory=dict)
     """All :class:`ops.pebble.Layer` definitions that have already been added to the container."""
 
-    service_statuses: dict[str, pebble.ServiceStatus] = dataclasses.field(
+    service_statuses: Mapping[str, pebble.ServiceStatus] = dataclasses.field(
         default_factory=dict,
     )
     """The current status of each Pebble service running in the container."""
@@ -957,7 +988,7 @@ class Container(_max_posargs(1)):
     # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
     # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
     # create a tempfile and insert its path in the mock filesystem tree
-    mounts: dict[str, Mount] = dataclasses.field(default_factory=dict)
+    mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
@@ -995,7 +1026,7 @@ class Container(_max_posargs(1)):
         )
     """
 
-    notices: list[Notice] = dataclasses.field(default_factory=list)
+    notices: Sequence[Notice] = dataclasses.field(default_factory=list)
     """Any Pebble notices that already exist in the container."""
 
     check_infos: frozenset[CheckInfo] = frozenset()
@@ -1201,6 +1232,7 @@ _EntityStatus._entity_statuses.update(
 
 
 @dataclasses.dataclass(frozen=True)
+@_detach_dicts_and_lists
 class StoredState(_max_posargs(1)):
     """Represents unit-local state that persists across events."""
 
@@ -1225,7 +1257,7 @@ class StoredState(_max_posargs(1)):
     # However, it's complex to describe those types, since it's a recursive
     # definition - even in TypeShed the _Marshallable type includes containers
     # like list[Any], which seems to defeat the point.
-    content: dict[str, Any] = dataclasses.field(default_factory=dict)
+    content: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     """The content of the :class:`ops.StoredState` instance."""
 
     _data_type_name: str = "StoredStateData"
@@ -1437,7 +1469,7 @@ class State(_max_posargs(0)):
     # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
-    deferred: list[DeferredEvent] = dataclasses.field(default_factory=list)
+    deferred: Sequence[DeferredEvent] = dataclasses.field(default_factory=list)
     """Events that have been deferred on this charm by some previous execution."""
     stored_states: Iterable[StoredState] = dataclasses.field(
         default_factory=frozenset,
@@ -1501,6 +1533,24 @@ class State(_max_posargs(0)):
             # a frozenset as the actual attribute.
             if not isinstance(val, frozenset):
                 object.__setattr__(self, name, frozenset(val))
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> State:
+        new_state = copy.copy(self)
+        for attr in (
+            "relations",
+            "containers",
+            "storages",
+            "networks",
+            "opened_ports",
+            "secrets",
+            "resources",
+            "stored_states",
+        ):
+            value = getattr(self, attr)
+            new_value = frozenset(copy.deepcopy(v, memo) for v in value)
+            object.__setattr__(new_state, attr, new_value)
+        object.__setattr__(new_state, "config", self.config.copy())
+        return new_state
 
     def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
@@ -1581,11 +1631,11 @@ class State(_max_posargs(0)):
         storage: str,
         /,
         *,
-        index: int | None = 0,
+        index: int = 0,
     ) -> Storage:
         """Get storage from this State, based on the storage's name and index."""
         for state_storage in self.storages:
-            if state_storage.name == storage and storage.index == index:
+            if state_storage.name == storage and state_storage.index == index:
                 return state_storage
         raise ValueError(
             f"storage: name={storage}, index={index} not found in the State",
