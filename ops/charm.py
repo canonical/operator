@@ -36,7 +36,7 @@ from typing import (
     cast,
 )
 
-from . import model
+from . import _tracing, model
 from ._private import yaml
 from .framework import (
     EventBase,
@@ -226,6 +226,9 @@ class ActionEvent(EventBase):
             message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
 
 
 class InstallEvent(HookEvent):
@@ -546,6 +549,14 @@ class RelationEvent(HookEvent):
         else:
             self.unit = None
 
+    def __repr__(self):
+        # FIXME: is this a good idea?
+        # I'm using this to log interesting event attributes in tracing
+        # I dunno if this is generally useful, maybe to debug stuff?
+        app = self.app and self.app.name
+        unit = self.unit and self.unit.name
+        return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'
+
 
 class RelationCreatedEvent(RelationEvent):
     """Event triggered when a new relation is created.
@@ -734,6 +745,9 @@ class StorageEvent(HookEvent):
 
             self.storage.location = storage_location
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.storage!r} via {self.handle}>'
+
 
 class StorageAttachedEvent(StorageEvent):
     """Event triggered when new storage becomes available.
@@ -805,6 +819,9 @@ class WorkloadEvent(HookEvent):
             self.workload = self.framework.model.unit.get_container(container_name)
         else:
             self.workload = None  # type: ignore
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.workload!r} via {self.handle}>'
 
 
 class PebbleReadyEvent(WorkloadEvent):
@@ -1383,6 +1400,10 @@ class CharmBase(Object):
     def config(self) -> model.ConfigData:
         """A mapping containing the charm's config and current values."""
         return self.model.config
+
+    def set_tracing_destination(self, url: Optional[str], ca: Optional[str]) -> None:
+        """FIXME docstring."""
+        _tracing.set_tracing_destination(url=url, ca=ca)
 
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]

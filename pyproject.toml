@@ -18,6 +18,9 @@ classifiers = [
 dependencies = [
     "PyYAML==6.*",
     "websocket-client==1.*",
+    # Wide version range to preempt conflicts when charms pin a version.
+    "opentelemetry-api~=1.0",
+    "importlib-metadata",
 ]
 dynamic = ["version"]
 
@@ -39,6 +42,19 @@ docs = [
 ]
 testing = [
     "ops-scenario>=7.0.5,<8",
+]
+tracing = [
+    "otlp-json>=0.9.7",
+    # FIXME: decision needed
+    #
+    # On one hand, this instrumentation provides additional info about pebble
+    # (request URL, status code, post and response data sizes)
+    #
+    # On the other, the exporter uses urllib too, yet
+    # OTEL disables instrumentation while exporting traces.
+    "opentelemetry-instrumentation-urllib~=0.51b0",
+    "opentelemetry-sdk~=1.30",
+    "pydantic",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -87,6 +103,7 @@ extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 # Ruff formatter configuration
 [tool.ruff.format]
 quote-style = "single"
+exclude = ["ops/_tracing/vendor/*"]
 
 [tool.ruff.lint]
 select = [
@@ -196,6 +213,22 @@ keep-runtime-typing = true
     "RUF003",  # Comment contains ambiguous unicode characters (EN DASH, RIGHT SINGLE QUOTATION MARK)
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
+]
+"ops/_tracing/vendor/*" = [
+    "A002",
+    "B904",
+    "CPY001",
+    "E402",
+    "E501",
+    "I001",
+    "PERF203",
+    "RUF005",
+    "RUF012",
+    "RUF100",
+    "S110",
+    "SIM102",
+    "SIM108",
+    "UP032",
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -9,5 +9,6 @@ ops
 pebble
 ops-testing
 ops-testing-harness
+ops-tracing
 ```
 
