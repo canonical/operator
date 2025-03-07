@@ -17,6 +17,11 @@ jobs:
         preset: ['machine', 'microk8s', 'k8s']
 
     steps:
+      - name: Temporary Docker workaround
+        run: |
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+          sudo rm -rf /run/containerd
+
       - name: Install concierge
         run: sudo snap install --classic concierge
 
