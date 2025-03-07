@@ -241,7 +241,7 @@ class CloudCredential(_max_posargs(0)):
     auth_type: str
     """Authentication type."""
 
-    attributes: dict[str, str] = dataclasses.field(default_factory=dict)
+    attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
     """A dictionary containing cloud credentials.
 
     For example, for AWS, it contains `access-key` and `secret-key`;
@@ -352,7 +352,7 @@ class Secret(_max_posargs(1)):
     to this unit.
     """
 
-    remote_grants: dict[int, set[str]] = dataclasses.field(default_factory=dict)
+    remote_grants: Mapping[int, set[str]] = dataclasses.field(default_factory=dict)
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
@@ -860,7 +860,7 @@ class Notice(_max_posargs(1)):
     occurrences: int = 1
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str] = dataclasses.field(default_factory=dict)
+    last_data: Mapping[str, str] = dataclasses.field(default_factory=dict)
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None = None
@@ -963,13 +963,13 @@ class Container(_max_posargs(1)):
     # pebble or derive them from the resulting plan (which one CAN get from pebble).
     # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
     # will be unknown. all that we can know is the resulting plan (the 'computed plan').
-    _base_plan: dict[str, Any] = dataclasses.field(default_factory=dict)
+    _base_plan: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
-    layers: dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
+    layers: Mapping[str, pebble.Layer] = dataclasses.field(default_factory=dict)
     """All :class:`ops.pebble.Layer` definitions that have already been added to the container."""
 
-    service_statuses: dict[str, pebble.ServiceStatus] = dataclasses.field(
+    service_statuses: Mapping[str, pebble.ServiceStatus] = dataclasses.field(
         default_factory=dict,
     )
     """The current status of each Pebble service running in the container."""
@@ -988,7 +988,7 @@ class Container(_max_posargs(1)):
     # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
     # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
     # create a tempfile and insert its path in the mock filesystem tree
-    mounts: dict[str, Mount] = dataclasses.field(default_factory=dict)
+    mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
@@ -1257,7 +1257,7 @@ class StoredState(_max_posargs(1)):
     # However, it's complex to describe those types, since it's a recursive
     # definition - even in TypeShed the _Marshallable type includes containers
     # like list[Any], which seems to defeat the point.
-    content: dict[str, Any] = dataclasses.field(default_factory=dict)
+    content: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     """The content of the :class:`ops.StoredState` instance."""
 
     _data_type_name: str = "StoredStateData"
