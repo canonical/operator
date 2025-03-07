@@ -1,12 +1,13 @@
 import pytest
 from ops.charm import (
     CharmBase,
+    LifecycleEvent,
     RelationChangedEvent,
     StartEvent,
     UpdateStatusEvent,
     WorkloadEvent,
 )
-from ops.framework import Framework, LifecycleEvent
+from ops.framework import Framework
 
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
@@ -176,7 +177,9 @@ def test_defer_reemit_lifecycle_event(mycharm):
     state_2 = ctx.run(ctx.on.start(), state_1)
 
     assert [type(e).__name__ for e in ctx.emitted_events] == [
+        "SetupTracingEvent",
         "UpdateStatusEvent",
+        "SetupTracingEvent",
         "UpdateStatusEvent",
         "StartEvent",
     ]
@@ -195,7 +198,9 @@ def test_defer_reemit_relation_event(mycharm):
     state_2 = ctx.run(ctx.on.start(), state_1)
 
     assert [type(e).__name__ for e in ctx.emitted_events] == [
+        "SetupTracingEvent",
         "RelationCreatedEvent",
+        "SetupTracingEvent",
         "RelationCreatedEvent",
         "StartEvent",
     ]

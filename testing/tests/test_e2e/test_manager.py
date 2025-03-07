@@ -58,7 +58,8 @@ def test_context_manager(mycharm):
     with ctx(ctx.on.start(), State()) as manager:
         state_out = manager.run()
         assert isinstance(state_out, State)
-    assert ctx.emitted_events[0].handle.kind == "start"
+    assert ctx.emitted_events[0].handle.kind == "setup_tracing"
+    assert ctx.emitted_events[1].handle.kind == "start"
 
 
 def test_context_action_manager(mycharm):
@@ -66,4 +67,5 @@ def test_context_action_manager(mycharm):
     with ctx(ctx.on.action("do-x"), State()) as manager:
         state_out = manager.run()
         assert isinstance(state_out, State)
-    assert ctx.emitted_events[0].handle.kind == "do_x_action"
+    assert ctx.emitted_events[0].handle.kind == "setup_tracing"
+    assert ctx.emitted_events[1].handle.kind == "do_x_action"

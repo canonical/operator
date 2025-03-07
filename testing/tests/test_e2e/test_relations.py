@@ -9,6 +9,7 @@ from ops.charm import (
     RelationCreatedEvent,
     RelationDepartedEvent,
     RelationEvent,
+    SetupTracingEvent,
 )
 from ops.framework import EventBase, Framework
 
@@ -156,7 +157,7 @@ def test_relation_events_attrs(
     )
 
     def callback(charm: CharmBase, event):
-        if isinstance(event, CollectStatusEvent):
+        if isinstance(event, (SetupTracingEvent, CollectStatusEvent)):
             return
 
         assert event.app
@@ -201,7 +202,7 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     )
 
     def callback(charm: CharmBase, event):
-        if isinstance(event, CollectStatusEvent):
+        if isinstance(event, (SetupTracingEvent, CollectStatusEvent)):
             return
 
         assert event.app  # that's always present
@@ -266,7 +267,7 @@ def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
     )
 
     def callback(charm: CharmBase, event):
-        if isinstance(event, CollectStatusEvent):
+        if isinstance(event, (SetupTracingEvent, CollectStatusEvent)):
             return
 
         assert event.app  # that's always present

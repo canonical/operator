@@ -99,6 +99,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'SecretExpiredEvent',
     'SecretRemoveEvent',
     'SecretRotateEvent',
+    'SetupTracingEvent',
     'StartEvent',
     'StopEvent',
     'StorageAttachedEvent',
@@ -187,6 +188,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # isort:skip_file
 from typing import Optional, Type
 
+from . import _aaa_venv_workaround as _aaa_venv_workaround
+
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble
 
@@ -243,6 +246,7 @@ from .charm import (
     SecretExpiredEvent,
     SecretRemoveEvent,
     SecretRotateEvent,
+    SetupTracingEvent,
     StartEvent,
     StopEvent,
     StorageAttachedEvent,
