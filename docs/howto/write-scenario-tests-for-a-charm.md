@@ -56,7 +56,7 @@ def test_charm_runs():
 
     # Assert:
     #  Verify that the output state looks like you expect it to.
-    assert state_out.unit_status.name == 'unknown'
+    assert state_out.unit_status == testing.UnknownStatus()
 ```
 
 > See more: 
