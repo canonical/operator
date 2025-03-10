@@ -1,3 +1,7 @@
+# 7.19.2 - 10 Mar 2025
+
+There are no differences from 7.19.1 -- this is a bump purely for CI purposes.
+
 # 7.19.1 - 5 Mar 2025
 
 **Note that there are no versions 7.3 through 7.18.** The minor version number

@@ -1,3 +1,7 @@
+# 2.19.2 - 10 Mar 2025
+
+There are no differences from 2.19.1 -- this is purely a bump for CI.
+
 # 2.19.1 - 5 Mar 2025
 
 ## Fixes
