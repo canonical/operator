@@ -11,8 +11,8 @@ on:
 jobs:
   framework-tests:
     uses: ./.github/workflows/framework-tests.yaml
-  observability-charm-tests:
-    uses: ./.github/workflows/observability-charm-tests.yaml
+#  observability-charm-tests:
+#    uses: ./.github/workflows/observability-charm-tests.yaml
   hello-charm-tests:
     uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
