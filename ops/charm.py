@@ -1059,7 +1059,8 @@ class SecretExpiredEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`event.remove_revision() <ops.SecretExpired.remove_revision>`.
+    revision by calling :meth:`event.remove_revision()
+    <ops.SecretExpiredEvent.remove_revision>`.
 
     .. jujuadded:: 3.0
     """
