@@ -4,6 +4,14 @@ import typing
 
 import ops
 import pytest
+from ops.charm import (
+    CharmBase,
+    RelationChangedEvent,
+    StartEvent,
+    UpdateStatusEvent,
+    WorkloadEvent,
+)
+from ops.framework import Framework, LifecycleEvent
 
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
@@ -26,6 +34,9 @@ def mycharm():
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
+                if issubclass(evt.event_type, LifecycleEvent):
+                    continue
+
                 self.framework.observe(evt, self._on_event)
 
         def _on_event(self, event: ops.EventBase):
@@ -55,15 +66,14 @@ def test_deferred_evt_emitted(mycharm):
     )
 
     # we deferred the first 2 events we saw: update-status, start.
-    assert len(out.deferred) == 2
-    assert out.deferred[0].name == "start"
-    assert out.deferred[1].name == "update_status"
+    start, update_status = out.deferred
+    assert start.name == "start"
+    assert update_status.name == "update_status"
 
     # we saw start and update-status.
-    assert len(mycharm.captured) == 3
     upstat, start, _ = mycharm.captured
-    assert isinstance(upstat, ops.UpdateStatusEvent)
-    assert isinstance(start, ops.StartEvent)
+    assert isinstance(upstat, UpdateStatusEvent)
+    assert isinstance(start, StartEvent)
 
 
 def test_deferred_relation_event(mycharm):
@@ -86,15 +96,14 @@ def test_deferred_relation_event(mycharm):
     )
 
     # we deferred the first 2 events we saw: relation-changed, start.
-    assert len(out.deferred) == 2
-    assert out.deferred[0].name == "foo_relation_changed"
-    assert out.deferred[1].name == "start"
+    relation_changed, start = out.deferred
+    assert relation_changed.name == "foo_relation_changed"
+    assert start.name == "start"
 
     # we saw start and relation-changed.
-    assert len(mycharm.captured) == 3
     upstat, start, _ = mycharm.captured
-    assert isinstance(upstat, ops.RelationChangedEvent)
-    assert isinstance(start, ops.StartEvent)
+    assert isinstance(upstat, RelationChangedEvent)
+    assert isinstance(start, StartEvent)
 
 
 def test_deferred_relation_event_from_relation(mycharm):
@@ -116,21 +125,25 @@ def test_deferred_relation_event_from_relation(mycharm):
     )
 
     # we deferred the first 2 events we saw: foo_relation_changed, start.
-    assert len(out.deferred) == 2
-    assert out.deferred[0].name == "foo_relation_changed"
-    assert out.deferred[0].snapshot_data == {
+    relation_changed, start = out.deferred
+    assert relation_changed.name == "foo_relation_changed"
+    assert relation_changed.snapshot_data == {
         "relation_name": rel.endpoint,
         "relation_id": rel.id,
         "app_name": "remote",
         "unit_name": "remote/1",
     }
-    assert out.deferred[1].name == "start"
+    assert start.name == "start"
 
     # we saw start and foo_relation_changed.
     assert len(mycharm.captured) == 3
     upstat, start, collect_status = mycharm.captured
     assert isinstance(upstat, ops.RelationChangedEvent)
     assert isinstance(start, ops.StartEvent)
+    assert isinstance(collect_status, ops.CollectStatusEvent)
+    upstat, start, collect_status = mycharm.captured
+    assert isinstance(upstat, RelationChangedEvent)
+    assert isinstance(start, StartEvent)
     assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
@@ -154,15 +167,14 @@ def test_deferred_workload_event(mycharm):
     )
 
     # we deferred the first 2 events we saw: foo_pebble_ready, start.
-    assert len(out.deferred) == 2
-    assert out.deferred[0].name == "foo_pebble_ready"
-    assert out.deferred[1].name == "start"
+    pebble_ready, start = out.deferred
+    assert pebble_ready.name == "foo_pebble_ready"
+    assert start.name == "start"
 
     # we saw start and foo_pebble_ready.
-    assert len(mycharm.captured) == 3
     upstat, start, collect_status = mycharm.captured
-    assert isinstance(upstat, ops.WorkloadEvent)
-    assert isinstance(start, ops.StartEvent)
+    assert isinstance(upstat, WorkloadEvent)
+    assert isinstance(start, StartEvent)
     assert isinstance(collect_status, ops.CollectStatusEvent)
 
 

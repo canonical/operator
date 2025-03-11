@@ -58,16 +58,16 @@ from typing import (
     cast,
 )
 
-from ops import charm, framework, model, pebble, storage
-from ops._private import yaml
-from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.jujucontext import _JujuContext
-from ops.model import Container, RelationNotFoundError, StatusName, _NetworkDict
-from ops.pebble import ExecProcess
+from .. import charm, framework, model, pebble, storage
+from ..charm import CharmBase, CharmMeta, RelationRole
+from ..jujucontext import _JujuContext
+from ..model import Container, RelationNotFoundError, StatusName, _NetworkDict
+from ..pebble import ExecProcess
+from . import yaml
 
 if typing.TYPE_CHECKING:
     try:
-        from ops.testing import State  # type: ignore
+        from ..testing import State  # type: ignore
     except ImportError:
         # This is used in the ActionFailed type annotations: it will never be
         # used in this case, because it's only relevant when ops.testing has

@@ -20,7 +20,7 @@ import types
 import typing
 import warnings
 
-from ops.model import _ModelBackend
+from .model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):

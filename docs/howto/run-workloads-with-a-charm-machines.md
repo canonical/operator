@@ -1,5 +1,5 @@
 (run-workloads-with-a-charm-machines)=
-# How to run workloads with a charm - machines
+# How to run workloads with a machine charm
 
 There are several ways your charm might start a workload, depending on the type of charm you’re authoring. 
 
