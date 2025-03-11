@@ -382,7 +382,7 @@ class CharmEvents:
                     self.db = DatabaseRequirer(self, 'db-relation')
                     framework.observe(self.db.on.ready, self._on_db_ready)
 
-        To emit a `DatabaseReadyEvent` event::
+        To emit a ``DatabaseReadyEvent`` event::
 
             ctx.run(ctx.on.custom(
                 DatabaseRequirer.on.ready, 1, 2, foo='bar'
