@@ -9,7 +9,6 @@ from __future__ import annotations
 import copy
 import dataclasses
 import datetime
-import functools
 import inspect
 import pathlib
 import random
@@ -112,24 +111,17 @@ _SECRET_EVENTS = {
 }
 
 
-def _detach_dicts_and_lists(cls):
-    original_post_init = getattr(cls, "__post_init__", None)
-
-    @functools.wraps(cls)
-    def __post_init__(self):
-        if original_post_init:
-            original_post_init(self)
-        # We don't have a frozendict to freeze any dictionaries, and while we
-        # could freeze a list into a tuple, we would break tests that currently
-        # assert that they get a list, so we can't do that until 8.0. That means
-        # we can't actually freeze the content here, but we can at least
-        # disassociate it from the original object.
-        for attr, value in self.__dict__.items():
-            if isinstance(value, (dict, list)):
-                object.__setattr__(self, attr, copy.deepcopy(value))
-
-    cls.__post_init__ = __post_init__
-    return cls
+def _deepcopy_mutable_fields(obj: object):
+    # We don't have a frozendict to freeze any dictionaries, and while we
+    # could freeze a list into a tuple, we would break tests that currently
+    # assert that they get a list, so we can't do that until 8.0. That means
+    # we can't actually freeze the content here, but we can at least
+    # disassociate it from the original object.
+    for attr, value in obj.__dict__.items():
+        if isinstance(value, (dict, list)):
+            # We expect that the obj is a frozen dataclass, so have to use
+            # object.__setattr__ to bypass the frozen check.
+            object.__setattr__(obj, attr, copy.deepcopy(value))
 
 
 # This can be replaced with the KW_ONLY dataclasses functionality in Python 3.10+.
@@ -234,7 +226,6 @@ class JujuLogLine:
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class CloudCredential(_max_posargs(0)):
     __doc__ = ops.CloudCredential.__doc__
 
@@ -252,6 +243,9 @@ class CloudCredential(_max_posargs(0)):
     redacted: Sequence[str] = dataclasses.field(default_factory=list)
     """A list of redacted generic cloud API secrets."""
 
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
+
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
             auth_type=self.auth_type,
@@ -261,7 +255,6 @@ class CloudCredential(_max_posargs(0)):
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class CloudSpec(_max_posargs(1)):
     __doc__ = ops.CloudSpec.__doc__
 
@@ -295,6 +288,9 @@ class CloudSpec(_max_posargs(1)):
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
 
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
+
     def _to_ops(self) -> CloudSpec_Ops:
         return CloudSpec_Ops(
             type=self.type,
@@ -320,7 +316,6 @@ def _generate_secret_id():
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class Secret(_max_posargs(1)):
     """A Juju secret.
 
@@ -381,6 +376,7 @@ class Secret(_max_posargs(1)):
         if self.latest_content is None:
             # bypass frozen dataclass
             object.__setattr__(self, "latest_content", self.tracked_content)
+        _deepcopy_mutable_fields(self)
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
@@ -444,7 +440,6 @@ class Address(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class BindAddress(_max_posargs(1)):
     """An address bound to a network interface in a Juju space."""
 
@@ -454,6 +449,9 @@ class BindAddress(_max_posargs(1)):
     """The name of the network interface."""
     mac_address: str | None = None
     """The MAC address of the interface."""
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook tool would."""
@@ -467,7 +465,6 @@ class BindAddress(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class Network(_max_posargs(2)):
     """A Juju network space."""
 
@@ -488,6 +485,9 @@ class Network(_max_posargs(2)):
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
@@ -517,7 +517,6 @@ def _next_relation_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class RelationBase(_max_posargs(2)):
     """Base class for the various types of relation."""
 
@@ -575,6 +574,8 @@ class RelationBase(_max_posargs(2)):
 
         for databag in self._databags:
             self._validate_databag(databag)
+
+        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -824,7 +825,6 @@ def _next_notice_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class Notice(_max_posargs(1)):
     """A Pebble notice."""
 
@@ -868,6 +868,9 @@ class Notice(_max_posargs(1)):
 
     expire_after: datetime.timedelta | None = None
     """How long since one of these last occurred until Pebble will drop the notice."""
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> pebble.Notice:
         return pebble.Notice(
@@ -948,7 +951,6 @@ class CheckInfo(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class Container(_max_posargs(1)):
     """A Kubernetes container where a charm's workload runs."""
 
@@ -1039,6 +1041,7 @@ class Container(_max_posargs(1)):
         if not isinstance(self.execs, frozenset):
             # Allow passing a regular set (or other iterable) of Execs.
             object.__setattr__(self, "execs", frozenset(self.execs))
+        _deepcopy_mutable_fields(self)
 
     def _render_services(self):
         # copied over from ops.testing._TestingPebbleClient._render_services()
@@ -1232,7 +1235,6 @@ _EntityStatus._entity_statuses.update(
 
 
 @dataclasses.dataclass(frozen=True)
-@_detach_dicts_and_lists
 class StoredState(_max_posargs(1)):
     """Represents unit-local state that persists across events."""
 
@@ -1265,6 +1267,9 @@ class StoredState(_max_posargs(1)):
     @property
     def _handle_path(self):
         return f"{self.owner_path or ''}/{self._data_type_name}[{self.name}]"
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self._handle_path)
@@ -1535,6 +1540,13 @@ class State(_max_posargs(0)):
                 object.__setattr__(self, name, frozenset(val))
 
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> State:
+        # We use copy.deepcopy() to create the initial output state (that is
+        # then typically modified by the charm execution). This would normally
+        # 'just work', but we have a custom `__reduce__` method to handle the
+        # odd way we are setting keyword-only arguments. It's cleaner to have
+        # this custom `__deepcopy__` than to try to handle this case in the
+        # reduce method as well.
+        # TODO: When we require Python 3.10+ this method should be removed.
         new_state = copy.copy(self)
         for attr in (
             "relations",
