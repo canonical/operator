@@ -392,7 +392,7 @@ class CharmEvents:
         hook event.
 
         If the custom event takes more arguments than an :attr:`ops.Handle`,
-        pass these as additional arguments to `custom()`. Any of these
+        pass these as additional arguments to ``custom()``. Any of these
         arguments that are State components (such as
         :attr:`ops.testing.Relation`) will be converted to their ops
         counterparts (such as :attr:`ops.Relation`).
