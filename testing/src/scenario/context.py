@@ -373,28 +373,29 @@ class CharmEvents:
     ):
         """Event triggered by a charm library.
 
-        For example, suppose that a library uses a ``MyConsumer`` object to emit a
-        ``HappenedEvent`` event, with charm code::
+        For example, suppose that a library uses a ``DatabaseRequirer`` object
+        to emit a ``DatabaseReadyEvent`` event, with charm code::
 
             class MyCharm(ops.CharmBase):
                 def __init__(self, framework: ops.Framework):
                     super().__init__(framework)
-                    self.source = MyConsumer(self, 'source')
-                    framework.observe(self.source.on.it_happened, self._on_happened_event)
+                    self.db = DatabaseRequirer(self, 'db-relation')
+                    framework.observe(self.db.on.ready, self._on_db_ready)
 
-        To emit a `HappenedEvent` event::
+        To emit a `DatabaseReadyEvent` event::
 
             ctx.run(ctx.on.custom(
-                MyConsumer.on.it_happened, 1, 2, foo='bar'
+                DatabaseRequirer.on.ready, 1, 2, foo='bar'
             ), state)
 
         Custom events do not have access to the Juju context of the originating
         hook event.
 
-        Any additional arguments are passed through when instantiating the event
-        provided to observing handlers. Any of these arguments that are State
-        components (such as :attr:`ops.testing.Relation`) will be converted to
-        their ops counterparts (such as :attr:`ops.Relation`).
+        If the custom event takes more arguments than an :attr:`ops.Handle`,
+        pass these as additional arguments to `custom()`. Any of these
+        arguments that are State components (such as
+        :attr:`ops.testing.Relation`) will be converted to their ops
+        counterparts (such as :attr:`ops.Relation`).
         """
         if issubclass(event.event_type, ops.HookEvent):
             raise ValueError(

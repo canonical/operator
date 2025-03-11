@@ -511,7 +511,7 @@ class _Manager:
         return None
 
     def _get_event_args(
-        self, bound_event: 'ops.framework.BoundEvent'
+        self, bound_event: '_framework.BoundEvent'
     ) -> Tuple[List[Any], Dict[str, Any]]:
         return _get_event_args(self.charm, bound_event, self._juju_context)
 

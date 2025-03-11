@@ -4,14 +4,7 @@ import typing
 
 import ops
 import pytest
-from ops.charm import (
-    CharmBase,
-    RelationChangedEvent,
-    StartEvent,
-    UpdateStatusEvent,
-    WorkloadEvent,
-)
-from ops.framework import Framework, LifecycleEvent
+from ops.framework import LifecycleEvent
 
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
@@ -71,9 +64,9 @@ def test_deferred_evt_emitted(mycharm):
     assert update_status.name == "update_status"
 
     # we saw start and update-status.
-    upstat, start, _ = mycharm.captured
-    assert isinstance(upstat, UpdateStatusEvent)
-    assert isinstance(start, StartEvent)
+    upstat, start = mycharm.captured
+    assert isinstance(upstat, ops.UpdateStatusEvent)
+    assert isinstance(start, ops.StartEvent)
 
 
 def test_deferred_relation_event(mycharm):
@@ -101,9 +94,9 @@ def test_deferred_relation_event(mycharm):
     assert start.name == "start"
 
     # we saw start and relation-changed.
-    upstat, start, _ = mycharm.captured
-    assert isinstance(upstat, RelationChangedEvent)
-    assert isinstance(start, StartEvent)
+    relation_changed, start = mycharm.captured
+    assert isinstance(relation_changed, ops.RelationChangedEvent)
+    assert isinstance(start, ops.StartEvent)
 
 
 def test_deferred_relation_event_from_relation(mycharm):
@@ -136,15 +129,9 @@ def test_deferred_relation_event_from_relation(mycharm):
     assert start.name == "start"
 
     # we saw start and foo_relation_changed.
-    assert len(mycharm.captured) == 3
-    upstat, start, collect_status = mycharm.captured
-    assert isinstance(upstat, ops.RelationChangedEvent)
+    relation_changed, start = mycharm.captured
+    assert isinstance(relation_changed, ops.RelationChangedEvent)
     assert isinstance(start, ops.StartEvent)
-    assert isinstance(collect_status, ops.CollectStatusEvent)
-    upstat, start, collect_status = mycharm.captured
-    assert isinstance(upstat, RelationChangedEvent)
-    assert isinstance(start, StartEvent)
-    assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
 def test_deferred_workload_event(mycharm):
@@ -172,10 +159,9 @@ def test_deferred_workload_event(mycharm):
     assert start.name == "start"
 
     # we saw start and foo_pebble_ready.
-    upstat, start, collect_status = mycharm.captured
-    assert isinstance(upstat, WorkloadEvent)
-    assert isinstance(start, StartEvent)
-    assert isinstance(collect_status, ops.CollectStatusEvent)
+    ready, start = mycharm.captured
+    assert isinstance(ready, ops.WorkloadEvent)
+    assert isinstance(start, ops.StartEvent)
 
 
 def test_defer_reemit_lifecycle_event(mycharm):
