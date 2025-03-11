@@ -1,3 +1,7 @@
+# 7.19.4 - 11 Mar 2025
+
+There are no differences from 7.19.3 -- this is a bump purely for CI purposes.
+
 # 7.19.3 - 10 Mar 2025
 
 There are no differences from 7.19.2 -- this is a bump purely for CI purposes.
