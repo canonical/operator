@@ -1562,6 +1562,7 @@ class State(_max_posargs(0)):
             value = getattr(self, attr)
             new_value = frozenset(copy.deepcopy(v, memo) for v in value)
             object.__setattr__(new_state, attr, new_value)
+        object.__setattr__(new_state, "deferred", self.deferred[:])
         return new_state
 
     def _update_workload_version(self, new_workload_version: str):
