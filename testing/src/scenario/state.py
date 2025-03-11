@@ -1548,11 +1548,12 @@ class State(_max_posargs(0)):
         # reduce method as well.
         # TODO: When we require Python 3.10+ this method should be removed.
         new_state = copy.copy(self)
+        object.__setattr__(new_state, "config", self.config.copy())
         for attr in (
             "relations",
+            "networks",
             "containers",
             "storages",
-            "networks",
             "opened_ports",
             "secrets",
             "resources",
@@ -1561,7 +1562,6 @@ class State(_max_posargs(0)):
             value = getattr(self, attr)
             new_value = frozenset(copy.deepcopy(v, memo) for v in value)
             object.__setattr__(new_state, attr, new_value)
-        object.__setattr__(new_state, "config", self.config.copy())
         return new_state
 
     def _update_workload_version(self, new_workload_version: str):
