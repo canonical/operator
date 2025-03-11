@@ -47,9 +47,9 @@ from typing import (
     Union,
 )
 
-from ops import charm
-from ops.model import Model, _ModelBackend
-from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
+from . import charm
+from .model import Model, _ModelBackend
+from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 
 class Serializable(typing.Protocol):
