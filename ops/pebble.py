@@ -876,6 +876,9 @@ class Plan:
 
     __str__ = to_yaml
 
+    def __repr__(self):
+        return f'Plan({self.to_dict()!r})'
+
     def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1106,8 +1109,8 @@ class Check:
             level = dct.get('level', '')
         self.level = level
         self.startup = CheckStartup(dct.get('startup', ''))
-        self.period: Optional[str] = dct.get('period', '')
-        self.timeout: Optional[str] = dct.get('timeout', '')
+        self.period: Optional[str] = dct.get('period')
+        self.timeout: Optional[str] = dct.get('timeout')
         self.threshold: Optional[int] = dct.get('threshold')
 
         http = dct.get('http')
@@ -1210,7 +1213,7 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
-            if not value or name == 'name':
+            if value is None or name == 'name':
                 continue
             if name == 'http':
                 self._merge_http(value)
@@ -1218,6 +1221,10 @@ class Check:
                 self._merge_tcp(value)
             elif name == 'exec':
                 self._merge_exec(value)
+            elif name == 'startup' and value == CheckStartup.UNSET:
+                continue
+            # Note that CheckLevel.UNSET has a different meaning to CheckStart.UNSET.
+            # In the former, it means 'there is no level'; in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
