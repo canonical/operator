@@ -905,7 +905,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    def reemit(self) -> None:
+    def reemit(self, single_event_path: Optional[str] = None) -> None:
         """Reemit previously deferred events to the observers that deferred them.
 
         Only the specific observers that have previously deferred the event will be
@@ -913,7 +913,7 @@ class Framework(Object):
         been first emitted won't be notified, as that would mean potentially observing
         events out of order.
         """
-        self._reemit()
+        self._reemit(single_event_path)
 
     @contextmanager
     def _event_context(self, event_name: str):
