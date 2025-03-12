@@ -936,7 +936,13 @@ class Container(_max_posargs(1)):
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
     layers: dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
-    """All :class:`ops.pebble.Layer` definitions that have already been added to the container."""
+    """All :class:`ops.pebble.Layer` definitions that have already been added to the container.
+
+    Note that the layers should be added to the dictionary in the order in which they would have
+    been added to Pebble. For layers loaded on Pebble start from the filesystem, this means adding
+    them to the dictionary in alphabetical order by filename. For layers loaded via the Pebble API,
+    this means adding them in the order of the API calls.
+    """
 
     service_statuses: dict[str, pebble.ServiceStatus] = dataclasses.field(
         default_factory=dict,
@@ -1012,28 +1018,34 @@ class Container(_max_posargs(1)):
     def _render_services(self):
         # copied over from ops.testing._TestingPebbleClient._render_services()
         services: dict[str, pebble.Service] = {}
-        for key in sorted(self.layers.keys()):
-            layer = self.layers[key]
+        for layer in self.layers.values():
             for name, service in layer.services.items():
-                services[name] = service
+                if name in services and service.override == "merge":
+                    services[name]._merge(service)
+                else:
+                    services[name] = service
         return services
 
     def _render_checks(self) -> Dict[str, pebble.Check]:
         # copied over from ops.testing._TestingPebbleClient._render_checks()
         checks: Dict[str, pebble.Check] = {}
-        for key in sorted(self.layers.keys()):
-            layer = self.layers[key]
+        for layer in self.layers.values():
             for name, check in layer.checks.items():
-                checks[name] = check
+                if name in checks and check.override == "merge":
+                    checks[name]._merge(check)
+                else:
+                    checks[name] = check
         return checks
 
     def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
         # copied over from ops.testing._TestingPebbleClient._render_log_targets()
         log_targets: Dict[str, pebble.LogTarget] = {}
-        for key in sorted(self.layers.keys()):
-            layer = self.layers[key]
+        for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
-                log_targets[name] = log_target
+                if name in log_targets and log_target.override == "merge":
+                    log_targets[name]._merge(log_target)
+                else:
+                    log_targets[name] = log_target
         return log_targets
 
     @property
