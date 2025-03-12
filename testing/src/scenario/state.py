@@ -1018,6 +1018,24 @@ class Container(_max_posargs(1)):
                 services[name] = service
         return services
 
+    def _render_checks(self) -> Dict[str, pebble.Check]:
+        # copied over from ops.testing._TestingPebbleClient._render_checks()
+        checks: Dict[str, pebble.Check] = {}
+        for key in sorted(self.layers.keys()):
+            layer = self.layers[key]
+            for name, check in layer.checks.items():
+                checks[name] = check
+        return checks
+
+    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
+        # copied over from ops.testing._TestingPebbleClient._render_log_targets()
+        log_targets: Dict[str, pebble.LogTarget] = {}
+        for key in sorted(self.layers.keys()):
+            layer = self.layers[key]
+            for name, log_target in layer.log_targets.items():
+                log_targets[name] = log_target
+        return log_targets
+
     @property
     def plan(self) -> pebble.Plan:
         """The 'computed' Pebble plan.
@@ -1030,11 +1048,14 @@ class Container(_max_posargs(1)):
         # copied over from ops.testing._TestingPebbleClient.get_plan().
         plan = pebble.Plan(yaml.safe_dump(self._base_plan))
         services = self._render_services()
-        if not services:
-            return plan
+        checks = self._render_checks()
+        log_targets = self._render_log_targets()
         for name in sorted(services.keys()):
             plan.services[name] = services[name]
-        # TODO: This should presumably also have checks and log targets.
+        for name in sorted(checks.keys()):
+            plan.checks[name] = checks[name]
+        for name in sorted(log_targets.keys()):
+            plan.log_targets[name] = log_targets[name]
         return plan
 
     @property
