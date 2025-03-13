@@ -15,7 +15,7 @@ the work, and can revert to an earlier version when required.
 Name the repository using the pattern ``<charm name>-operator`` for a single
 charm, or ``<base charm name>-operators`` when the repository will hold
 multiple related charms. For the charm name, see
-{external+charmcraft:ref}`<specify-a-name>`.
+{external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
 ```
     
 In your new repository, run `charmcraft init` to generate the recommended
@@ -24,7 +24,7 @@ structure for building a charm.
 ```{note}
 In most cases, you'll want to use `--profile=machine` or `profile=kubernetes`.
 If you are charming an application built with a popular framework, check if
-charmcraft has a profile for it: {external+charmcraft:ref}`<tutorial>`.
+charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
 
 Avoid the default (`--profile=simple`), which provides a demo charm, rather than
 a base for building a charm of your own.
