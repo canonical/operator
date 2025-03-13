@@ -14,9 +14,14 @@ jobs:
         # pylibjuju does not currently support Juju 4.x
         juju-channel: ['2.9/stable', '3/stable']
         charmcraft-channel: ['2.x/stable', '3.x/stable']
-        preset: ['machine', 'microk8s']
+        preset: ['machine', 'microk8s', 'k8s']
 
     steps:
+      - name: Temporary Docker workaround
+        run: |
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+          sudo rm -rf /run/containerd
+
       - name: Install concierge
         run: sudo snap install --classic concierge
 
