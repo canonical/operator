@@ -477,15 +477,10 @@ class ObjectEvents(Object):
     @classmethod
     def undefine_event(cls, event_kind: str):
         """Remove the definition of an event on this type at runtime.
-        
+
         This undoes the effect of :meth:`define_event`. This is not intended
         for use by charm authors, but rather for use by the ops library itself.
         """
-        event_descriptor = getattr(cls, event_kind)
-        if hasattr(event_descriptor, 'framework') and event_descriptor.framework is not None:
-            event_descriptor.framework.unregister_type(
-                event_descriptor.event_type, event_descriptor.emitter, event_descriptor.event_kind
-            )
         try:
             delattr(cls, event_kind)
         except AttributeError:
@@ -994,6 +989,7 @@ class Framework(Object):
             try:
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
+                logger.debug("Skipping notice %s - cannot find event class.", event_path)
                 self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 

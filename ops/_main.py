@@ -63,7 +63,7 @@ def _create_event_link(
     # type guard
     assert bound_event.event_kind, f'unbound BoundEvent {bound_event}'
 
-    if issubclass(bound_event.event_type, _.HookEvent):
+    if issubclass(bound_event.event_type, _charm.HookEvent):
         event_dir = charm_dir / 'hooks'
         event_path = event_dir / bound_event.event_kind.replace('_', '-')
     elif issubclass(bound_event.event_type, _charm.ActionEvent):
@@ -108,7 +108,7 @@ def _setup_event_links(charm_dir: Path, charm: '_charm.CharmBase', juju_context:
     link_to = os.path.realpath(juju_context.dispatch_path or sys.argv[0])
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
-        if issubclass(bound_event.event_type, (_charm.HookEvent, _.ActionEvent)):
+        if issubclass(bound_event.event_type, (_charm.HookEvent, _charm.ActionEvent)):
             _create_event_link(charm_dir, bound_event, link_to)
 
 
@@ -516,7 +516,7 @@ class _Manager:
         framework.set_breakpointhook()
         return framework
 
-    def _emit(self, charm: ops.charm.CharmBase, event_name: str):
+    def _emit(self, charm: _charm.CharmBase, event_name: str):
         """Emit the event on the charm."""
         # Emit the Juju event.
         self._emit_charm_event(charm, event_name)
@@ -524,15 +524,15 @@ class _Manager:
         _charm._evaluate_status(charm)
 
     def _get_event_to_emit(
-        self, charm: ops.charm.CharmBase, event_name: str
-    ) -> Optional[ops.framework.BoundEvent]:
+        self, charm: _charm.CharmBase, event_name: str
+    ) -> Optional[_framework.BoundEvent]:
         try:
             return getattr(charm.on, event_name)
         except AttributeError:
             logger.debug('Event %s not defined for %s.', event_name, charm)
         return None
 
-    def _emit_charm_event(self, charm: ops.charm.CharmBase, event_name: str):
+    def _emit_charm_event(self, charm: _charm.CharmBase, event_name: str):
         """Emits a charm event based on a Juju event name.
 
         Args:
@@ -551,7 +551,7 @@ class _Manager:
         logger.debug('Emitting Juju event %s.', event_name)
         event_to_emit.emit(*args, **kwargs)
 
-    def _commit(self, framework: ops.framework.Framework):
+    def _commit(self, framework: _framework.Framework):
         """Commit the framework and gracefully teardown."""
         framework.commit()
 
@@ -577,11 +577,12 @@ class _Manager:
             return
         # Re-emit previously deferred events to the observers that deferred them.
         for event_path, _, _ in self._storage.notices():
-            event_handle = ops.framework.Handle.from_path(event_path)
+            event_handle = _framework.Handle.from_path(event_path)
             logger.debug('Re-emitting deferred event %s.', event_handle)
             charm = self._make_charm(event_handle.kind)
             charm.framework.reemit(event_path)
             self._commit(charm.framework)
+            charm._destroy_charm()
 
     def run(self):
         """Emit and then commit the framework."""

@@ -77,7 +77,7 @@ def test_emitted_deferred():
     class MyCharm(CharmBase):
         META = {"name": "joop"}
 
-        def _foo(self, e):
+        def _foo(self, _):
             pass
 
     ctx = Context(
@@ -90,9 +90,10 @@ def test_emitted_deferred():
         ctx.on.start(), State(deferred=[_Event("update-status").deferred(MyCharm._foo)])
     )
 
-    assert len(ctx.emitted_events) == 5
     assert [e.handle.kind for e in ctx.emitted_events] == [
         "update_status",
+        "pre_commit",
+        "commit",
         "start",
         "collect_unit_status",
         "pre_commit",

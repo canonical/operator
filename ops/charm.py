@@ -1359,7 +1359,7 @@ class CharmBase(Object):
                 f'{container_name}_pebble_check_recovered', PebbleCheckRecoveredEvent
             )
 
-    def __del__(self):
+    def _destroy_charm(self):
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
             self.on.undefine_event(f'{relation_name}_relation_created')

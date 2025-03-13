@@ -277,7 +277,7 @@ class Runtime:
             typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
 
     @contextmanager
-    def _exec_ctx(self, ctx: "Context"):
+    def _exec_ctx(self, ctx: "Context[CharmType]"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
             with capture_events(
@@ -291,7 +291,7 @@ class Runtime:
         self,
         state: "State",
         event: "_Event",
-        context: "Context",
+        context: "Context[CharmType]",
     ):
         """Runs an event with this state as initial state on a charm.
 
@@ -411,14 +411,14 @@ def capture_events(
         return _real_emit(self, evt)
 
     def _wrapped_reemit(self: Framework, single_event_path: Optional[str] = None):
-        # Framework calls reemit() before emitting the main juju event. We intercept that call
+        # Framework calls reemit() before emitting the main Juju event. We intercept that call
         # and capture all events in storage.
 
         if not include_deferred:
             return _real_reemit(self, single_event_path=single_event_path)
 
-        # load all notices from storage as events.
-        for event_path, _, _ in self._storage.notices():
+        # Load all notices from storage as events.
+        for event_path, _, _ in self._storage.notices(single_event_path):
             event_handle = Handle.from_path(event_path)
             try:
                 event = self.load_snapshot(event_handle)
