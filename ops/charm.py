@@ -36,9 +36,9 @@ from typing import (
     cast,
 )
 
-from ops import model
-from ops._private import yaml
-from ops.framework import (
+from . import model
+from ._private import yaml
+from .framework import (
     EventBase,
     EventSource,
     Framework,
@@ -1451,6 +1451,17 @@ class CharmMeta:
     assumes: 'JujuAssumes'
     """Juju features this charm requires."""
 
+    charm_user: Literal['root', 'sudoer', 'non-root']
+    """Type of user used to run the charm hook code.
+
+    The value of ``root`` ensures the charm runs as root. The value of
+    ``sudoer`` runs the charm as a user other than root with access to sudo to
+    elevate its privileges. ``non-root`` ensures the charm does not run as root
+    and also does not have ``sudo`` privileges.
+
+    .. jujuadded 3.6.0
+    """
+
     containers: Dict[str, 'ContainerMeta']
     """Container metadata for each defined container."""
 
@@ -1524,6 +1535,7 @@ class CharmMeta:
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
+        self.charm_user = raw_.get('charm-user', 'root')
         self.requires = {
             name: RelationMeta(RelationRole.requires, name, rel)
             for name, rel in raw_.get('requires', {}).items()

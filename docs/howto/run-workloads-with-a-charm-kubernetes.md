@@ -1,5 +1,5 @@
 (run-workloads-with-a-charm-kubernetes)=
-# How to run workloads with a charm - Kubernetes
+# How to run workloads with a Kubernetes charm
 
 The recommended way to create charms for Kubernetes is using the sidecar pattern with the workload container running Pebble.
 
@@ -23,7 +23,7 @@ The [`Container.pebble`](ops.Container.pebble) property returns the [`pebble.Cli
 
 <!--Juju already sets it up when it provisions the container-->
 
-The preferred way to run workloads on Kubernetes with charms is to start your workload with [Pebble](https://canonical-pebble.readthedocs-hosted.com/). You do not need to modify upstream container images to make use of Pebble for managing your workload. The Juju controller automatically injects Pebble into workload containers using an [Init Container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) and [Volume Mount](https://kubernetes.io/docs/concepts/storage/volumes/). The entrypoint of the container is overridden so that Pebble starts first and is able to manage running services. Charms communicate with the Pebble API using a UNIX socket, which is mounted into both the charm and workload containers.
+The preferred way to run workloads on Kubernetes with charms is to start your workload with {external+pebble:doc}`Pebble <index>`. You do not need to modify upstream container images to make use of Pebble for managing your workload. The Juju controller automatically injects Pebble into workload containers using an [Init Container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) and [Volume Mount](https://kubernetes.io/docs/concepts/storage/volumes/). The entrypoint of the container is overridden so that Pebble starts first and is able to manage running services. Charms communicate with the Pebble API using a UNIX socket, which is mounted into both the charm and workload containers.
 
 ```{note}
 
@@ -83,7 +83,7 @@ resources:
 # ...
 ```
 
-Once the containers are initialised, the charm needs to tell Pebble how to start the workload. Pebble uses a series of "layers" for its configuration. Layers contain a description of the processes to run, along with the path and arguments to the executable, any environment variables to be specified for the running process and any relevant process ordering (more information available in the [Pebble documentation](https://canonical-pebble.readthedocs-hosted.com)).
+Once the containers are initialised, the charm needs to tell Pebble how to start the workload. Pebble uses a series of "layers" for its configuration. Layers contain a description of the processes to run, along with the path and arguments to the executable, any environment variables to be specified for the running process and any relevant process ordering (more information available in the {external+pebble:doc}`Pebble documentation<index>`).
 
 ```{note}
 
@@ -194,23 +194,23 @@ In this example, each time a `config-changed` event is fired, a new overlay laye
 
 ### Configure a Pebble layer
 
-Pebble services are [configured by means of layers](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/), with higher layers adding to or overriding lower layers, forming the effective Pebble configuration, or "plan".
+Pebble services are {external+pebble:ref}`configured by means of layers <how-to-use-layers>`, with higher layers adding to or overriding lower layers, forming the effective Pebble configuration, or "plan".
 
 When a workload container is created and Pebble starts up, it looks in `/var/lib/pebble/default/layers` (if that exists) for configuration layers already present in the container image, such as `001-layer.yaml`. If there are existing layers there, that becomes the starting configuration, otherwise Pebble is happy to start with an empty configuration, meaning no services.
 
 In the latter case, Pebble is configured dynamically via the API by adding layers at runtime.
 
-See the [layer specification](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/) for more details.
+See the {external+pebble:ref}`layer specification <layer-specification>` for more details.
 
 #### Add a configuration layer
 
 To add a configuration layer, call [`Container.add_layer`](ops.Container.add_layer) with a label for the layer, and the layer's contents as a YAML string, Python dict, or [`pebble.Layer`](ops.pebble.Layer) object.
 
-You can see an example of `add_layer` under the ["Replan" heading](#replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
+You can see an example of `add_layer` in [](#run-workloads-with-a-charm-kubernetes-replan). The `combine=True` argument tells Pebble to combine the named layer into an existing layer of that name (or add a layer if none by that name exists). Using `combine=True` is common when dynamically adding layers.
 
 Because `combine=True` combines the layer with an existing layer of the same name, it's normally used with `override: replace` in the YAML service configuration. This means replacing the entire service configuration with the fields in the new layer.
 
-If you're adding a single layer with `combine=False` (default option) on top of an existing base layer, you may want to use `override: merge` in the service configuration. This will merge the fields specified with the service by that name in the base layer. [See an example of overriding a layer.](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layers/#layer-override)
+If you're adding a single layer with `combine=False` (default option) on top of an existing base layer, you may want to use `override: merge` in the service configuration. This will merge the fields specified with the service by that name in the base layer. See {external+pebble:ref}`an example of overriding a layer <use_layers_layer_override>`.
 
 #### Fetch the effective plan
 
@@ -239,9 +239,10 @@ The main purpose of Pebble is to control and monitor services, which are usually
 
 In the context of Juju sidecar charms, Pebble is run with the `--hold` argument, which prevents it from automatically starting the services marked with `startup: enabled`. This is to give the charm full control over when the services in Pebble's configuration are actually started.
 
+(run-workloads-with-a-charm-kubernetes-replan)=
 ### Replan
 
-After adding a configuration layer to the plan (details below), you need to call `replan` to make any changes to `services` take effect. When you execute replan, Pebble will automatically restart any services that have changed, respecting dependency order. If the services are already running, it will stop them first using the normal [stop sequence](#start-and-stop).
+After adding a configuration layer to the plan (details below), you need to call `replan` to make any changes to `services` take effect. When you execute replan, Pebble will automatically restart any services that have changed, respecting dependency order. If the services are already running, it will stop them first using the normal [stop sequence](#run-workloads-with-a-charm-kubernetes-start-and-stop).
 
 The reason for replan is so that you as a user have control over when the (potentially high-impact) action of stopping and restarting your services takes place.
 
@@ -276,6 +277,7 @@ class SnappassTestCharm(ops.CharmBase):
 
 > See more: [](ops.Container)
 
+(run-workloads-with-a-charm-kubernetes-start-and-stop)=
 ### Start and stop
 
 To start (or stop) one or more services by name, use the [`start`](ops.Container.start) and [`stop`](ops.Container.stop) methods. Here's an example of how you might stop and start a database service during a backup action:
@@ -421,7 +423,7 @@ Each check is performed with the specified `period` (the default is 10 seconds a
 
 A check is considered healthy until it's had `threshold` errors in a row (the default is 3). At that point, the `on-check-failure` action will be triggered, and the health endpoint will return an error response (both are discussed below). When the check succeeds again, the failure count is reset.
 
-See the [layer specification](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/) for more details about the fields and options for different types of checks.
+See the {external+pebble:ref}`layer specification <layer-specification>` for more details about the fields and options for different types of checks.
 
 ### Respond to a check failing or recovering
 
@@ -839,7 +841,7 @@ The first argument to `pebble notify` is the key, which must be in the format `<
 
 The `pebble notify` command has an optional `--repeat-after` flag, which tells Pebble to only allow the notice to repeat after the specified duration (the default is to repeat for every occurrence). If the caller says `--repeat-after=1h`, Pebble will prevent the notice with the same type and key from repeating within an hour -- useful to avoid the charm waking up too often when a notice occurs frequently.
 
-> See more: [GitHub | Pebble > Notices > `pebble notify`](https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/cli-commands/#reference-pebble-notify-command)
+> See more: [Pebble | `pebble notify`](inv:pebble:std:label#reference_pebble_notify_command)
 
 ### Respond to a notice
 

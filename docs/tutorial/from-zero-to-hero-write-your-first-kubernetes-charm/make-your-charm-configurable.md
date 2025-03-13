@@ -102,7 +102,7 @@ def _update_layer_and_restart(self) -> None:
     standard entrypoint of an existing container using docker inspect
     Learn more about interacting with Pebble at https://juju.is/docs/sdk/pebble
     Learn more about Pebble layers at
-        https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layers
+        https://documentation.ubuntu.com/pebble/how-to/use-layers/
     """
 
   # Learn more about statuses in the SDK docs:
