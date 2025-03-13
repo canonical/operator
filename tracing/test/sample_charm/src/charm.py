@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""FIXME docstring."""
 
 from __future__ import annotations
 
@@ -29,7 +28,6 @@ class SampleCharm(ops.CharmBase):
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
-    # FIXME: not strictly necessary, only testing that charm didn't crash
     def _on_collect_status(self, event: ops.CollectStatusEvent):
         event.add_status(ops.ActiveStatus())
 

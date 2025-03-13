@@ -912,6 +912,17 @@ class Framework(Object):
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
         if saved:
+            from . import tracing  # break circular import
+
+            if tracing:
+                # When an app has just been deployed, the tracing relation is not yet established.
+                # The operator would like to see the tracing data for early events like install.
+                # The tracing buffer may fill up in the interim and older data is evicted.
+                # To help preserve the interesting tracing data, we mark a dispatch that has an
+                # observer as "observed" increasing its data priority in the buffer.
+                # The logic could be different, for example, deferred events that are resolved
+                # during unobserved disptach could be interesting too. We keep it simple here.
+                tracing._mark_observed()
             self._reemit(event_path)
 
     def reemit(self) -> None:
@@ -989,15 +1000,7 @@ class Framework(Object):
                     # it must be a custom event
                     logger.debug('Emitting custom event %s.', event)
                 else:
-                    # The Juju event that we called to process
-                    # FIXME: this logic seems to miss the case where:
-                    # The unit agent called us to process e.g. relation-changed
-                    # There's also a deferred relation-changed event
-                    # The two events are collapsed... which is actually run?
-                    from . import tracing  # break circular import
-
-                    if tracing:
-                        tracing.mark_observed()
+                    pass
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:

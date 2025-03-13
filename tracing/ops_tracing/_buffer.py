@@ -16,29 +16,21 @@ from __future__ import annotations
 import contextlib
 import functools
 import logging
+import pathlib
 import sqlite3
-from pathlib import Path
 from typing import Callable
 
 from typing_extensions import ParamSpec, TypeVar
 
-from .const import Config
-
-# Approximate safety limit for the database file size
-BUFFER_SIZE = 40 * 1024 * 1024
-
-# Default priority for tracing data.
-# Dispatch invocation that doesn't result in any event being observed
-# by charm or its charm lib produces data at this priority.
-DEFAULT_PRIORITY = 10
-
-# Higher priority for data from invocation with observed events.
-OBSERVED_PRIORITY = 50
-
-# Must have a short timeout when terminating
-# May want to have a longer timeout otherwise
-DB_TIMEOUT = 5
-LONG_DB_TIMEOUT = 3600
+from ._const import (
+    BUFFER_SIZE,
+    DB_RETRY,
+    DB_TIMEOUT,
+    DEFAULT_PRIORITY,
+    LONG_DB_TIMEOUT,
+    OBSERVED_PRIORITY,
+    Config,
+)
 
 # Must use isolation_level=None for consistency between Python 3.8 and 3.12
 # Can't use the STRICT keyword for tables, requires sqlite 3.37.0
@@ -56,20 +48,20 @@ R = TypeVar('R')
 
 
 def retry(f: Callable[P, R]) -> Callable[P, R]:
-    """Simple retry decorator."""
+    """Retry a database operation N times."""
 
     @functools.wraps(f)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         exc: sqlite3.Error | None = None
 
-        for _ in range(3):
+        for _ in range(DB_RETRY):
             try:
                 return f(*args, **kwargs)
             except sqlite3.Error as e:  # noqa: PERF203
                 exc = e
                 continue
         else:
-            assert exc
+            assert exc  # noqa: S101  # we'd have returned otherwise
             raise exc
 
     return wrapper
@@ -87,7 +79,7 @@ class Buffer:
     """Marks that data from this dispatch invocation has been marked observed."""
     stored: int | None = None
 
-    def __init__(self, path: Path | str):
+    def __init__(self, path: pathlib.Path | str):
         self.path = str(path)
         self.ids = set()
         self._set_db_schema()
@@ -164,9 +156,6 @@ class Buffer:
                 """REPLACE INTO settings(key, value) VALUES('ca', ?)""", (config.ca or '',)
             )
 
-    # FIXME: currently unused
-    # If most charms observe the CollectStatusEvent, then an event is observed on every dispatch.
-    # Perhaps we should track juju events and not lifecycle events?
     @retry
     def mark_observed(self):
         """Mark the tracing data collected in this dispatch as higher priority."""
@@ -186,12 +175,12 @@ class Buffer:
         self.ids.clear()
 
     @retry
-    def pump(self, record: tuple[bytes, str] | None = None) -> tuple[int, bytes, str] | None:
-        """Pump the buffer queue.
+    def pushpop(self, record: tuple[bytes, str] | None = None) -> tuple[int, bytes, str] | None:
+        """Push a message into the queue and return another.
 
-        Accepts an optional new data chunk.
-        Removes old, boring data if needed.
-        Returns the oldest important record.
+        Accepts an optional new data chunk (data, mime type).
+        Removes old, boring data if the queue would grow beyond the set limit.
+        Returns the oldest important record (id, data, mime type).
         """
         data, mime = record if record else (None, None)
         stored_size = 0 if data is None else (len(data) + 4095) // 4096 * 4096
@@ -223,11 +212,11 @@ class Buffer:
                         if collected_size > excess:
                             break
 
-                    assert collected_ids
+                    collected_template = ','.join(['?'] * len(collected_ids))
                     conn.execute(
                         f"""
                         DELETE FROM tracing
-                        WHERE id IN ({','.join(('?',) * len(collected_ids))})
+                        WHERE id IN ({collected_template})
                         """,  # noqa: S608
                         tuple(collected_ids),
                     )
@@ -242,7 +231,7 @@ class Buffer:
                     (priority, data, mime),
                 )
 
-                assert cursor.lastrowid is not None
+                assert cursor.lastrowid is not None  # noqa: S101  # just inserted
                 if not self.observed:
                     self.ids.add(cursor.lastrowid)
 
@@ -256,8 +245,9 @@ class Buffer:
                 """
             ).fetchone()
 
-        assert self.stored is not None
-        self.stored += stored_size - collected_size
+        if self.stored is not None:
+            self.stored += stored_size - collected_size
+
         return rv
 
     def _stored_size(self, conn: sqlite3.Connection) -> int:

@@ -564,10 +564,8 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
     from . import tracing  # break circular import
 
     juju_context = _JujuContext.from_dict(os.environ)
-    tracing_manager = (
-        tracing.setup(juju_context, charm_class.__name__) if tracing else nullcontext()
-    )
-    with tracing_manager:
+    context = tracing._setup(juju_context, charm_class.__name__) if tracing else nullcontext()
+    with context:
         try:
             with tracer.start_as_current_span('ops.main'):
                 manager = _Manager(

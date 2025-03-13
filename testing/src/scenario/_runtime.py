@@ -299,7 +299,7 @@ class Runtime:
         event handling.
 
         This will set the environment up and call ops.main().
-        After that it's up to ops.
+        After that it's up to Ops.
         """
         from ._consistency_checker import check_consistency  # avoid cycles
 

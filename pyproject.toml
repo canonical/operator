@@ -44,7 +44,6 @@ testing = [
     "ops-scenario>=7.0.5,<8",
 ]
 tracing = [
-    # FIXME pin exact version, like ops-scenario
     "ops-tracing",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
@@ -214,6 +213,7 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
+exclude = ["tracing/*"]
 pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

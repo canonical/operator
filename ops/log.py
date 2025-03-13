@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import contextvars
 import logging
 import sys
 import types
@@ -30,17 +29,9 @@ if TYPE_CHECKING:
 class JujuLogHandler(logging.Handler):
     """A handler for sending logs and warnings to Juju via juju-log."""
 
-    drop: contextvars.ContextVar[bool]
-    """When set to True, drop any record we're asked to emit, because:
-
-    - either we're already logging here and this record is recursive,
-    - or we're exporting tracing data and this record stems from that.
-    """
-
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
         self.model_backend = model_backend
-        self.drop = contextvars.ContextVar('drop', default=False)
 
     def emit(self, record: logging.LogRecord):
         """Send the specified logging record to the Juju backend.
@@ -48,14 +39,7 @@ class JujuLogHandler(logging.Handler):
         This method is not used directly by the ops library, but by
         :class:`logging.Handler` itself as part of the logging machinery.
         """
-        if self.drop.get():
-            return
-
-        token = self.drop.set(True)
-        try:
-            self.model_backend.juju_log(record.levelname, self.format(record))
-        finally:
-            self.drop.reset(token)
+        self.model_backend.juju_log(record.levelname, self.format(record))
 
 
 def setup_root_logging(

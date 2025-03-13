@@ -11,17 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""FIXME docstring."""
 
 from __future__ import annotations
 
 from typing import Type
 from unittest.mock import Mock
 
-import pytest
-
 import ops
 import ops.testing
+import pytest
 
 _pydantic = pytest.importorskip('pydantic')
 

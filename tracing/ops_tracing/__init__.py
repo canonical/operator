@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""The tracing facility for the Ops framework.
+"""The tracing facility for the Ops library.
 
-FIXME: more docs here, incl examples.
+Quick start.
 
 Declare the charm tracing interface and optionally the TLS interface in your
-``charmcraft.yaml``. If you're migrating from the ``charm-tracing`` charm lib,
-you most likely already have these::
+``charmcraft.yaml``.::
 
     requires:
         charm-tracing:
@@ -29,19 +28,20 @@ you most likely already have these::
             limit: 1
             optional: true
 
+If you're migrating from the ``charm-tracing`` charm lib, you most likely already
+have these relations, but do note their names.
 
-Caveat: presently pulls in ``pydantic``, which means that Rust build packages
-must be specified in your ``charmcraft.yaml``. If you're migrating from the
-``charm-tracing`` charm lib, you most likely already have these::
+Caveat: this library pulls in ``pydantic``, and the Rust build packages must be
+specified in your ``charmcraft.yaml``.::
 
     parts:
         charm:
             plugin: charm
             source: .
             build-packages:
-                - rustc
                 - cargo
 
+If you're migrating from the ``charm-tracing`` charm lib, that should already be the case.
 
 Then add the Tracing object in your charm::
 
@@ -57,15 +57,17 @@ Then add the Tracing object in your charm::
             ca_relation_name='send-ca-cert',
         )
 
-Note that you don't have to ``import ops.tracing``.
+Note that you don't have to ``import ops.tracing`` or ``import ops_tracing``.
+When ``ops[tracing]`` has been added to your charm's dependencies, the Ops
+library imports this library and re-exports it as ``ops.tracing``.
 """
 
-from .api import Tracing
-from .backend import mark_observed, set_destination, setup
+from ._api import Tracing
+from ._backend import _mark_observed, _setup, set_destination
 
 __all__ = [
     'Tracing',
-    'mark_observed',
+    '_mark_observed',
+    '_setup',
     'set_destination',
-    'setup',
 ]

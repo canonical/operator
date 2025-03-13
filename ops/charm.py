@@ -553,9 +553,6 @@ class RelationEvent(HookEvent):
             self.unit = None
 
     def __repr__(self):
-        # FIXME: is this a good idea?
-        # I'm using this to log interesting event attributes in tracing
-        # I dunno if this is generally useful, maybe to debug stuff?
         app = self.app and self.app.name
         unit = self.unit and self.unit.name
         return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'

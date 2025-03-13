@@ -1,4 +1,4 @@
-name: fixme_charm
+name: sample_charm
 
 requires:
   charm-tracing:

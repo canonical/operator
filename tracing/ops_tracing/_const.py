@@ -24,6 +24,23 @@ SENDOUT_FACTOR: int = 2
 BUFFER_FILE: str = '.tracing-data.db'
 """Name of the file whither data is buffered, located next to .unit-state.db."""
 
+DB_RETRY = 3
+# Must have a short timeout when terminating
+# May want to have a longer timeout otherwise
+DB_TIMEOUT = 5
+LONG_DB_TIMEOUT = 3600
+
+# Approximate safety limit for the database file size
+BUFFER_SIZE = 40 * 1024 * 1024
+
+# Default priority for tracing data.
+# Dispatch invocation that doesn't result in any event being observed
+# by charm or its charm lib produces data at this priority.
+DEFAULT_PRIORITY = 10
+
+# Higher priority for data from invocation with observed events.
+OBSERVED_PRIORITY = 50
+
 
 @dataclass
 class Config:
