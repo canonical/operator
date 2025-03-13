@@ -1,4 +1,4 @@
-(how-to-manage-charms)=
+(manage-charms)=
 # How to manage charms
 
 > See first: {external+juju:ref}`Juju | Build a charm <build-a-charm>`, {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`
@@ -65,11 +65,11 @@ my-charm-set-operators/
 
 ````
 
-## Development tooling
+## Use the provided tooling to maintain style and detect issues early
 
-The charmcraft profiles configured recommended tools for developing charms. To
-use these, install [tox](https://tox.wiki/en/stable/index.html) on your
-development server.
+The Charmcraft profile you've chosen has configured a number of recommended
+tools for developing charms. To use these, install
+[`tox`](https://tox.wiki/en/stable/index.html) on your development server.
 
 ```{tip}
 If you use the `charm-dev` [Multipass](https://canonical.com/multipass) image or
@@ -91,9 +91,9 @@ configuration of individual tools, or to add additional commands, but keep the
 command names and meanings that the profiles provide.
 ```
 
-## Dependencies
+## Define the required dependencies
 
-### Python version
+### Use the Python provided by the base
 
 Charms run using the Python version provided by the base Ubuntu version. Write
 charm code that will run with the Python version of the oldest base you support.
@@ -108,9 +108,9 @@ version in your `pyproject.toml` so that tooling will detect any use of Python
 features not available in the versions you support.
 ```
 
-### Python packages
+### Add Python dependencies to pyproject.toml, and generate a lock file
 
-Specify all the all direct dependencies of your charm in your `pyproject.toml`
+Specify all the direct dependencies of your charm in your `pyproject.toml`
 file in the top-level charm folder. For example:
 
 ```toml
@@ -160,7 +160,7 @@ it from `pyproject.toml`).
 ```{tip}
 Charmcraft provides plugins for {external+charmcraft:ref}`uv <craft_parts_uv_plugin>`
 and {external+charmcraft:ref}`poetry <craft_parts_poetry_plugin>`. Use one of
-these tools to simplify generating your lock file.
+these tools to simplify the generation of your lock file.
 ```
 
 ```{admonition} Best practice
@@ -179,7 +179,7 @@ keeping track of upstream versions, particularly around security issues.
 > See more: [Our Software Dependency Problem](https://research.swtch.com/deps)
 ```
 
-## Continuous integration
+## Validate your charm with every change
 
 Configure your continuous integration tooling so that whenever changes are
 proposed for or accepted into your main branch the `lint`, `unit`, and

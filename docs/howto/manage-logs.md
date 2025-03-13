@@ -1,16 +1,16 @@
 
-(how-to-manage-logs)=
+(manage-logs)=
 # How manage logs
 
 > See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
 Ops configures Python logging and warnings to end up in the Juju log, and the
-charmcraft profiles provide a `logger` object for your charm to use at the top
+Charmcraft profiles provide a `logger` object for your charm to use at the top
 of your `src/charm.py` file. This lets you use the Juju `debug-log` command to
 display logs from the charm. Note that it shows logs from the charm code, but
 not the workload.
 
-Use the provided logger to log information relevant to the Juju admin. For
+Use the provided logger to log information relevant to the charm user. For
 example:
 
 ```python
@@ -40,7 +40,7 @@ The default logging level for a Juju model is `INFO`. To see, for example,
 :class: hint
 
 Capture output to `stdout` and `stderr` in your charm and use the logging and
-warning functionality to send messages to the Juju admin, rather than rely on
+warning functionality to send messages to the charm user, rather than rely on
 Juju capturing output.
 
 In particular, you should avoid `print()` calls, and ensure that any subprocess
