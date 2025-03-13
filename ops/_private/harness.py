@@ -3406,6 +3406,7 @@ class _TestingPebbleClient:
                 info = pebble.CheckInfo(
                     name,
                     level=check.level,
+                    startup=check.startup,
                     status=status,
                     threshold=3 if check.threshold is None else check.threshold,
                     failures=0,
