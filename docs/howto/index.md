@@ -4,6 +4,8 @@
 ```{toctree}
 :maxdepth: 2
 
+Manage charms <manage-charms>
+Manage charm design <manage-charm-design>
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
 Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 Manage logs <manage-logs>
@@ -25,6 +27,4 @@ Write unit tests for a charm <write-scenario-tests-for-a-charm>
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 Write legacy unit tests for a charm <write-unit-tests-for-a-charm>
 Turn a hooks-based charm into an ops charm <turn-a-hooks-based-charm-into-an-ops-charm>
-
 ```
-

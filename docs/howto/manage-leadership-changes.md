@@ -27,9 +27,9 @@ To have the leader notify other units about leadership changes, change data in a
 
 > See more: {external+juju:ref}`Juju | Relation <relation>`
 
-[note status="Use the peer relation rather than `leader-setting-changed`"]
+```{note}
 In the past, this was done by observing a `leader-setting-changed` event, which is now deprecated.
-[/note]
+```
 
 Commonly, other event handlers will need to check for leadership. For example,
 only the leader unit can change charm application secrets, so checks for
