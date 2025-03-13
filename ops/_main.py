@@ -513,6 +513,8 @@ class _Manager:
     def _get_event_args(
         self, bound_event: '_framework.BoundEvent'
     ) -> Tuple[List[Any], Dict[str, Any]]:
+        # A wrapper so that the testing subclasses can easily override the
+        # behaviour.
         return _get_event_args(self.charm, bound_event, self._juju_context)
 
     def _emit_charm_event(self, event_name: str):
