@@ -1223,8 +1223,9 @@ class Check:
                 self._merge_exec(value)
             elif name == 'startup' and value == CheckStartup.UNSET:
                 continue
-            # Note that CheckLevel.UNSET has a different meaning to CheckStart.UNSET.
-            # In the former, it means 'there is no level'; in the latter it means 'use the default'.
+            # Note that CheckLevel.UNSET has a different meaning to
+            # CheckStartup.UNSET. In the former, it means 'there is no level';
+            # in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
