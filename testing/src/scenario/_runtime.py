@@ -410,12 +410,12 @@ def capture_events(
 
         return _real_emit(self, evt)
 
-    def _wrapped_reemit(self: Framework):
+    def _wrapped_reemit(self: Framework, single_event_path: Optional[str] = None):
         # Framework calls reemit() before emitting the main juju event. We intercept that call
         # and capture all events in storage.
 
         if not include_deferred:
-            return _real_reemit(self)
+            return _real_reemit(self, single_event_path=single_event_path)
 
         # load all notices from storage as events.
         for event_path, _, _ in self._storage.notices():
@@ -437,7 +437,7 @@ def capture_events(
             if isinstance(event, allowed_types):
                 captured.append(event)
 
-        return _real_reemit(self)
+        return _real_reemit(self, single_event_path=single_event_path)
 
     Framework._emit = _wrapped_emit  # type: ignore
     Framework.reemit = _wrapped_reemit

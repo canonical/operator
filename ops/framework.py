@@ -474,6 +474,23 @@ class ObjectEvents(Object):
         event_descriptor.__set_name__(cls, event_kind)
         setattr(cls, event_kind, event_descriptor)
 
+    @classmethod
+    def undefine_event(cls, event_kind: str):
+        """Remove the definition of an event on this type at runtime.
+        
+        This undoes the effect of :meth:`define_event`. This is not intended
+        for use by charm authors, but rather for use by the ops library itself.
+        """
+        event_descriptor = getattr(cls, event_kind)
+        if hasattr(event_descriptor, 'framework') and event_descriptor.framework is not None:
+            event_descriptor.framework.unregister_type(
+                event_descriptor.event_type, event_descriptor.emitter, event_descriptor.event_kind
+            )
+        try:
+            delattr(cls, event_kind)
+        except AttributeError:
+            raise RuntimeError(f'no event with event_kind {event_kind} to undefine') from None
+
     def _event_kinds(self) -> List[str]:
         event_kinds: List[str] = []
         # We have to iterate over the class rather than instance to allow for properties which
@@ -721,6 +738,23 @@ class Framework(Object):
         self._type_registry[parent_path, kind_] = cls
         self._type_known.add(cls)
 
+    def unregister_type(
+        self,
+        cls: Type[Serializable],
+        parent: Optional[Union['Handle', 'Object']],
+        kind: Optional[str] = None,
+    ):
+        """Unregister a type from a handle."""
+        parent_path: Optional[str] = None
+        if isinstance(parent, Object):
+            parent_path = parent.handle.path
+        elif isinstance(parent, Handle):
+            parent_path = parent.path
+
+        kind_: str = kind or cls.handle_kind
+        del self._type_registry[parent_path, kind_]
+        self._type_known.remove(cls)
+
     def _validate_snapshot_data(
         self, value: Union['StoredStateData', 'EventBase'], data: Dict[str, Any]
     ):
@@ -905,7 +939,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    def reemit(self, single_event_path: Optional[str] = None) -> None:
+    def reemit(self, single_event_path: Optional[str] = None):
         """Reemit previously deferred events to the observers that deferred them.
 
         Only the specific observers that have previously deferred the event will be

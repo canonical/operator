@@ -1359,6 +1359,31 @@ class CharmBase(Object):
                 f'{container_name}_pebble_check_recovered', PebbleCheckRecoveredEvent
             )
 
+    def __del__(self):
+        for relation_name in self.framework.meta.relations:
+            relation_name = relation_name.replace('-', '_')
+            self.on.undefine_event(f'{relation_name}_relation_created')
+            self.on.undefine_event(f'{relation_name}_relation_joined')
+            self.on.undefine_event(f'{relation_name}_relation_changed')
+            self.on.undefine_event(f'{relation_name}_relation_departed')
+            self.on.undefine_event(f'{relation_name}_relation_broken')
+
+        for storage_name in self.framework.meta.storages:
+            storage_name = storage_name.replace('-', '_')
+            self.on.undefine_event(f'{storage_name}_storage_attached')
+            self.on.undefine_event(f'{storage_name}_storage_detaching')
+
+        for action_name in self.framework.meta.actions:
+            action_name = action_name.replace('-', '_')
+            self.on.undefine_event(f'{action_name}_action')
+
+        for container_name in self.framework.meta.containers:
+            container_name = container_name.replace('-', '_')
+            self.on.undefine_event(f'{container_name}_pebble_ready')
+            self.on.undefine_event(f'{container_name}_pebble_custom_notice')
+            self.on.undefine_event(f'{container_name}_pebble_check_failed')
+            self.on.undefine_event(f'{container_name}_pebble_check_recovered')
+
     @property
     def app(self) -> model.Application:
         """Application that this unit is part of."""
