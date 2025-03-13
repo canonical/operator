@@ -1064,8 +1064,8 @@ class TestCheck:
         assert check.override == ''
         assert check.level == pebble.CheckLevel.UNSET
         assert check.startup == pebble.CheckStartup.UNSET
-        assert check.period is None
-        assert check.timeout is None
+        assert check.period == ''
+        assert check.timeout == ''
         assert check.threshold is None
         assert check.http is None
         assert check.tcp is None

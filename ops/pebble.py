@@ -1109,8 +1109,8 @@ class Check:
             level = dct.get('level', '')
         self.level = level
         self.startup = CheckStartup(dct.get('startup', ''))
-        self.period: Optional[str] = dct.get('period')
-        self.timeout: Optional[str] = dct.get('timeout')
+        self.period: Optional[str] = dct.get('period', '')
+        self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
 
         http = dct.get('http')
@@ -1213,7 +1213,7 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
-            if value is None or name == 'name':
+            if value is None or value == '' or name == 'name':
                 continue
             if name == 'http':
                 self._merge_http(value)
