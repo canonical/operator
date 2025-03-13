@@ -7,6 +7,13 @@
 
 When you're writing libraries, instead of callbacks, you can use custom events; that'll result in a more `ops`-native-feeling API. A custom event is, from a technical standpoint, an EventBase subclass that can be emitted at any point throughout the charm's lifecycle. These events are therefore totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the toplevel Juju event so it can be observed independently.
 
+```{important}
+Charms should never define custom events themselves. They have no need for
+emitting events (custom or otherwise) for their own consumption, and as they
+lack consumers, they don’t need to emit any for others to consume either.
+Custom events should only be defined and emitted in a library.
+```
+
 For example, suppose you have a charm lib wrapping a relation endpoint. The wrapper might want to check that the remote end has sent valid data and, if that is the case, communicate it to the charm. For example, suppose that you have a `DatabaseRequirer` object, and the charm using it is interested in knowing when the database is ready. The `DatabaseRequirer` then will be:
 
 ```python
