@@ -7,7 +7,7 @@ This document shows how to write integration tests for a charm.
 
 ```{important}
 
-Integration testing is only one part of a comprehensive testing strategy. See {ref}`How to test a charm <write-unit-tests-for-a-charm>` for unit testing and {ref}`How to write a functional test <write-scenario-tests-for-a-charm>`  for functional tests.
+Integration testing is only one part of a comprehensive testing strategy. Also see {ref}`write-scenario-tests-for-a-charm`.
 
 ```
 

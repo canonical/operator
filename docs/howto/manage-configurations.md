@@ -67,7 +67,7 @@ https://github.com/canonical/juju-sdk-tutorial-k8s/compare/01_create_minimal_cha
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+> See first: {ref}`write-scenario-tests-for-a-charm`
 
 To verify that the `config-changed` event validates the port, pass the new config to the `State`, and, after running the event, check the unit status. For example, in your `tests/unit/test_charm.py` file, add the following test function:
 

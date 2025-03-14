@@ -286,7 +286,7 @@ The final result can be inspected at [this branch](https://github.com/PietroPaso
 
 ### Testing
 
-After you've prepared the event handlers, you should write tests for the charm. See [](/howto/get-started-with-charm-testing).
+After you've prepared the event handlers, you should write tests for the charm. See {ref}`get-started-with-charm-testing`.
 
 ## Closing notes
 
