@@ -41,6 +41,7 @@ from typing import (
     Callable,
     ClassVar,
     Dict,
+    Final,
     Generic,
     Iterable,
     List,
@@ -3106,6 +3107,8 @@ class _TestingPebbleClient:
     as the only public methods of this type are for implementing Client.
     """
 
+    _DEFAULT_CHECK_THRESHOLD: Final[int] = 3
+
     def __init__(self, backend: _TestingModelBackend, container_root: pathlib.Path):
         self._backend = _TestingModelBackend
         self._layers: Dict[str, pebble.Layer] = {}
@@ -3200,12 +3203,15 @@ class _TestingPebbleClient:
                 continue
             info = self._check_infos.get(name)
             if info is None:
+                threshold = (
+                    self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
+                )
                 info = pebble.CheckInfo(
                     name=name,
                     level=check.level,
                     status=pebble.CheckStatus.UP,
                     failures=0,
-                    threshold=3 if check.threshold is None else check.threshold,
+                    threshold=threshold,
                     startup=check.startup,
                 )
                 self._check_infos[name] = info
@@ -3327,7 +3333,9 @@ class _TestingPebbleClient:
             if not info:
                 continue
             info.level = check.level
-            info.threshold = 3 if check.threshold is None else check.threshold
+            info.threshold = (
+                self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
+            )
             info.startup = check.startup
 
     def add_layer(
@@ -3430,12 +3438,15 @@ class _TestingPebbleClient:
                     if check.startup == pebble.CheckStartup.DISABLED
                     else pebble.CheckStatus.UP
                 )
+                threshold = (
+                    self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
+                )
                 info = pebble.CheckInfo(
                     name,
                     level=check.level,
                     startup=check.startup,
                     status=status,
-                    threshold=3 if check.threshold is None else check.threshold,
+                    threshold=threshold,
                     failures=0,
                     change_id=pebble.ChangeID(''),
                 )
