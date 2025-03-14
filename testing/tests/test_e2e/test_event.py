@@ -79,7 +79,7 @@ def test_emitted_deferred():
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            framework.observe(self.on.start, self._foo)
+            framework.observe(self.on.update_status, self._foo)
 
         def _foo(self, _: ops.StartEvent):
             pass
