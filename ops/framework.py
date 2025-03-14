@@ -47,9 +47,12 @@ from typing import (
     Union,
 )
 
+import opentelemetry.trace
+
 from . import charm
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
+from .version import tracer
 
 
 class Serializable(typing.Protocol):
@@ -872,6 +875,11 @@ class Framework(Object):
         saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
+        ops_event = event.__class__.__module__.startswith('ops.')
+        opentelemetry.trace.get_current_span().add_event(
+            f'{"ops." if ops_event else ""}{event.__class__.__name__}',
+            attributes={'deferred': event.deferred, 'kind': event_kind},
+        )
         parent = event.handle.parent
         assert isinstance(parent, Handle), 'event handle must have a parent'
         parent_path = parent.path
@@ -904,6 +912,17 @@ class Framework(Object):
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
         if saved:
+            from . import tracing  # break circular import
+
+            if tracing:
+                # When an app has just been deployed, the tracing relation is not yet established.
+                # The operator would like to see the tracing data for early events like install.
+                # The tracing buffer may fill up in the interim and older data is evicted.
+                # To help preserve the interesting tracing data, we mark a dispatch that has an
+                # observer as "observed" increasing its data priority in the buffer.
+                # The logic could be different, for example, deferred events that are resolved
+                # during unobserved disptach could be interesting too. We keep it simple here.
+                tracing.mark_observed()
             self._reemit(event_path)
 
     def reemit(self) -> None:
@@ -980,21 +999,35 @@ class Framework(Object):
                     # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
                     logger.debug('Emitting custom event %s.', event)
+                else:
+                    pass
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with self._event_context(event_handle.kind):
-                        if (
-                            event_is_from_juju or event_is_action
-                        ) and self._juju_debug_at.intersection({'all', 'hook'}):
-                            # Present the welcome message and run under PDB.
-                            self._show_debug_code_message()
-                            pdb.runcall(custom_handler, event)
-                        else:
-                            # Regular call to the registered method.
-                            custom_handler(event)
+                    synthetic = not event_is_from_juju and not event_is_action
+                    event_module = event.__class__.__module__
+                    if event_module.startswith('ops.'):
+                        # ops.charm.Events are re-exported through ops
+                        event_module = 'ops'
+                    event_class = f'{event_module}.{event.__class__.__qualname__}'
+                    obs_class = observer_path.split('/')[-1].split('[')[0]
+                    with tracer.start_as_current_span(f'{event_handle.kind}: {obs_class}') as span:
+                        span.set_attribute('deferred', single_event_path is None)
+                        span.set_attribute('synthetic', synthetic)
+                        span.set_attribute('event', repr(event))
+                        span.set_attribute('event_class', event_class)
+                        span.set_attribute('event_name', event_handle.kind)
+                        span.set_attribute('handler', f'{observer_path}.{method_name}')
+                        with self._event_context(event_handle.kind):
+                            if not synthetic and self._juju_debug_at.intersection({'all', 'hook'}):
+                                # Present the welcome message and run under PDB.
+                                self._show_debug_code_message()
+                                pdb.runcall(custom_handler, event)
+                            else:
+                                # Regular call to the registered method.
+                                custom_handler(event)
 
             else:
                 logger.warning(

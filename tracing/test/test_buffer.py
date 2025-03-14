@@ -1,4 +1,4 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2025 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-"""Package version.
 
-This module is NOT to be used when developing charms using ops.
-"""
-
-import opentelemetry.trace
-
-version: str = '2.20.0.dev0'
-
-tracer = opentelemetry.trace.get_tracer('ops', version)
+def test_mark_observed(): ...
+def test_mark_observed_no_ids(): ...
+def test_mark_observed_missing_ids(): ...

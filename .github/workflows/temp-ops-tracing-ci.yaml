@@ -1,0 +1,29 @@
+on:
+  push:
+    branches: [feat-otel-ops-tracing-lib]
+
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          cd tracing
+          uv build --sdist --wheel
+          rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          verbose: true
+      - run: rm -f tracing/dist/*.attestation
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          skip-existing: true
+          verbose: true
