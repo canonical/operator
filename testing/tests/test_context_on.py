@@ -453,14 +453,15 @@ class CustomEventWithScenarioArgs(CustomEvent):
         )
         assert subordinaterelation is not None
         self.subordinaterelation = subordinaterelation
+        now = datetime.datetime.now()
         self.notice = ops.pebble.Notice(
             snapshot["notice_id"],
             None,
             "",
             snapshot["notice_key"],
-            datetime.datetime.now(),
-            datetime.datetime.now(),
-            datetime.datetime.now(),
+            now,
+            now,
+            now,
             1,
         )
         self.checkinfo = ops.pebble.CheckInfo(snapshot["checkinfo"], None, "")
