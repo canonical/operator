@@ -77,7 +77,11 @@ def test_emitted_deferred():
     class MyCharm(CharmBase):
         META = {"name": "joop"}
 
-        def _foo(self, _):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.start, self._foo)
+
+        def _foo(self, _: ops.StartEvent):
             pass
 
     ctx = Context(
@@ -87,7 +91,7 @@ def test_emitted_deferred():
         capture_framework_events=True,
     )
     ctx.run(
-        ctx.on.start(), State(deferred=[_Event("update-status").deferred(MyCharm._foo)])
+        ctx.on.start(), State(deferred=[ctx.on.update_status().deferred(MyCharm._foo)])
     )
 
     assert [e.handle.kind for e in ctx.emitted_events] == [
