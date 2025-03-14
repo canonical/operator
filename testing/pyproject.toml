@@ -14,7 +14,7 @@ authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
 ]
 maintainers = [
-    { name = "The Charm Tech team at Canonical Ltd.", email = "charm-tech@lists.launchpad.net" }
+    { name = "The Charm Tech team at Canonical Ltd." }
 ]
 description = "Python library providing a state-transition testing API for Operator Framework charms."
 license.text = "Apache-2.0"
