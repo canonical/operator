@@ -1,6 +1,12 @@
 (write-scenario-tests-for-a-charm)=
 # How to write unit tests for a charm
 
+```{note}
+
+This page is currently being refactored.
+
+```
+
 First of all, install the Ops testing framework. To do this in a virtual environment
 while you are developing, use `pip` or another package
 manager. For example:
@@ -101,8 +107,6 @@ If you use pytest, you should put the `my_charm` fixture in a top level `conftes
 ```
 
 ---
-
-TODO
 
 (get-started-with-charm-testing)=
 ## Get started with charm testing

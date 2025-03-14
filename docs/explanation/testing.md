@@ -1,6 +1,12 @@
 (testing)=
 # Testing
 
+```{note}
+
+This page is currently being refactored.
+
+```
+
 Charms should have tests to verify that they are functioning correctly. This document describes some of the various types of testing you may want to consider -- their meaning, recommended coverage, and recommended tooling in the context of a charm.
 
 <!--
@@ -104,8 +110,6 @@ It also provides convenient markers and command line parameters (e.g., the `@pyt
 - [https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py)
 
 ---
-
-TODO:
 
 (interface-tests)=
 ## Interface tests
