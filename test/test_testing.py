@@ -7124,10 +7124,8 @@ class TestChecks:
         [
             (False, 'new-layer'),
             (True, 'base'),
-            (
-                True,
-                'new-layer',
-            ),  # This doesn't have anything to combine with, but for completeness.
+            # This doesn't have anything to combine with, but for completeness:
+            (True, 'new-layer'),
         ],
     )
     @pytest.mark.parametrize(
