@@ -13,6 +13,7 @@ from typing import (
     Any,
     Dict,
     FrozenSet,
+    Generic,
     List,
     Sequence,
     Set,
@@ -24,7 +25,7 @@ import ops.jujucontext
 import ops.storage
 
 from ops.framework import _event_regex
-from ops._main import _Dispatcher, _Manager
+from ops._main import _Manager
 from ops._main import logger as ops_logger
 
 from .errors import BadOwnerPath, NoObserverError
@@ -115,7 +116,7 @@ class UnitStateDB:
             db.save_snapshot(stored_state._handle_path, stored_state.content)
 
 
-class Ops(_Manager):
+class Ops(_Manager, Generic[CharmType]):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
     def __init__(
@@ -127,21 +128,16 @@ class Ops(_Manager):
         juju_context: ops.jujucontext._JujuContext,
     ):
         self.state = state
+        # This is the event passed to `run`, corresponding to the event that
+        # caused Juju to start the framework.
         self.event = event
         self.context = context
         self.charm_spec = charm_spec
         self.store = None
-
-        model_backend = _MockModelBackend(
-            state=state,
-            event=event,
-            context=context,
-            charm_spec=charm_spec,
-            juju_context=juju_context,
-        )
+        self._juju_context = juju_context
 
         super().__init__(
-            self.charm_spec.charm_type, model_backend, juju_context=juju_context
+            charm_class=self.charm_spec.charm_type, juju_context=juju_context
         )
 
     def _load_charm_meta(self):
@@ -153,6 +149,18 @@ class Ops(_Manager):
             actions_metadata = None
 
         return ops.CharmMeta.from_yaml(metadata, actions_metadata)
+
+    def _make_model_backend(self):
+        # The event here is used to in the context of the Juju event that caused
+        # the framework to start, so we pass in the original one, even though
+        # this backend might be used for a deferred event.
+        return _MockModelBackend(
+            state=self.state,
+            event=self.event,
+            context=self.context,
+            charm_spec=self.charm_spec,
+            juju_context=self._juju_context,
+        )
 
     def _setup_root_logging(self):
         # The warnings module captures this in _showwarning_orig, but we
@@ -168,7 +176,7 @@ class Ops(_Manager):
         # useful in a testing context, so we reset it here.
         sys.excepthook = sys.__excepthook__
 
-    def _make_storage(self, _: _Dispatcher):
+    def _make_storage(self):
         # TODO: add use_juju_for_storage support
         storage = ops.storage.SQLiteStorage(":memory:")
         logger.info("Copying input state to storage.")
@@ -176,7 +184,7 @@ class Ops(_Manager):
         self.store.apply_state(self.state)
         return storage
 
-    def _get_event_to_emit(self, event_name: str):
+    def _get_event_to_emit(self, charm: ops.CharmBase, event_name: str):
         if self.event._is_custom_event:
             assert self.event.custom_event is not None
             emitter_type = type(self.event.custom_event.emitter)
@@ -195,15 +203,13 @@ class Ops(_Manager):
                     return getattr(sub_attr, self.event.custom_event.event_kind)
 
         owner = (
-            self._get_owner(self.charm, self.event.owner_path)
-            if self.event
-            else self.charm.on
+            self._get_owner(charm, self.event.owner_path) if self.event else charm.on
         )
 
         try:
             event_to_emit = getattr(owner, event_name)
         except AttributeError:
-            ops_logger.debug("Event %s not defined for %s.", event_name, self.charm)
+            ops_logger.debug("Event %s not defined for %s.", event_name, charm)
             raise NoObserverError(
                 f"Cannot fire {event_name!r} on {owner}: "
                 f"invalid event (not on charm.on).",
@@ -226,14 +232,14 @@ class Ops(_Manager):
         return obj
 
     def _get_event_args(
-        self, bound_event: ops.framework.BoundEvent
+        self, charm: ops.CharmBase, bound_event: ops.framework.BoundEvent
     ) -> Tuple[List[Any], Dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
         # Juju events). We also handle converting from Scenario to ops types,
         # since the test code typically won't be able to create the ops objects,
         # as a model is required for many.
-        args, kwargs = super()._get_event_args(bound_event)
+        args, kwargs = super()._get_event_args(charm, bound_event)
         if self.event.custom_event_args is not None:
             for arg in self.event.custom_event_args:
                 args.append(self._object_to_ops_object(arg))
