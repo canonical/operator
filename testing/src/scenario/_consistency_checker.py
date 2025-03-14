@@ -670,6 +670,31 @@ def check_containers_consistency(
             f"Missing from metadata: {diff}.",
         )
 
+    # If you have check-infos, then they must match the plan.
+    for container in state.containers:
+        plan = container.plan
+        for check in container.check_infos:
+            if check.name not in plan.checks:
+                if plan.checks:
+                    plan_has = f"plan has only checks: {', '.join(plan.checks)}"
+                else:
+                    plan_has = "plan has no checks"
+                errors.append(
+                    f"container {container.name!r} has a check {check.name!r} "
+                    f"but the {plan_has}.",
+                )
+                continue
+            plan_check = plan.checks[check.name]
+            for attr_from_plan in ("level", "startup", "threshold"):
+                if getattr(check, attr_from_plan) != getattr(
+                    plan_check, attr_from_plan
+                ):
+                    errors.append(
+                        f"container {container.name!r} has a check {check.name!r} with a "
+                        f"different {attr_from_plan!r} ({getattr(check, attr_from_plan)}) "
+                        f"than the plan ({getattr(plan_check, attr_from_plan)}).",
+                    )
+
     return Results(errors, [])
 
 

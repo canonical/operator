@@ -481,8 +481,18 @@ def test_pebble_check_failed():
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    check = CheckInfo("http-check", failures=7, status=pebble.CheckStatus.DOWN)
-    container = Container("foo", check_infos={check})
+    layer = pebble.Layer({
+        "checks": {"http-check": {"override": "replace", "startup": "enabled"}}
+    })
+    check = CheckInfo(
+        "http-check",
+        failures=7,
+        status=pebble.CheckStatus.DOWN,
+        level=layer.checks["http-check"].level,
+        startup=layer.checks["http-check"].startup,
+        threshold=layer.checks["http-check"].threshold,
+    )
+    container = Container("foo", check_infos={check}, layers={"layer1": layer})
     state = State(containers={container})
     ctx.run(ctx.on.pebble_check_failed(container, check), state=state)
     assert len(infos) == 1
@@ -505,8 +515,17 @@ def test_pebble_check_recovered():
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    check = CheckInfo("http-check")
-    container = Container("foo", check_infos={check})
+    layer = pebble.Layer({
+        "checks": {"http-check": {"override": "replace", "startup": "enabled"}}
+    })
+    check = CheckInfo(
+        "http-check",
+        status=pebble.CheckStatus.UP,
+        level=layer.checks["http-check"].level,
+        startup=layer.checks["http-check"].startup,
+        threshold=layer.checks["http-check"].threshold,
+    )
+    container = Container("foo", check_infos={check}, layers={"layer1": layer})
     state = State(containers={container})
     ctx.run(ctx.on.pebble_check_recovered(container, check), state=state)
     assert len(infos) == 1
@@ -536,9 +555,20 @@ def test_pebble_check_failed_two_containers():
             bar_infos.append(event.info)
 
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}, "bar": {}}})
-    check = CheckInfo("http-check", failures=7, status=pebble.CheckStatus.DOWN)
-    foo_container = Container("foo", check_infos={check})
-    bar_container = Container("bar", check_infos={check})
+
+    layer = pebble.Layer({
+        "checks": {"http-check": {"override": "replace", "startup": "enabled"}}
+    })
+    check = CheckInfo(
+        "http-check",
+        failures=7,
+        status=pebble.CheckStatus.DOWN,
+        level=layer.checks["http-check"].level,
+        startup=layer.checks["http-check"].startup,
+        threshold=layer.checks["http-check"].threshold,
+    )
+    foo_container = Container("foo", check_infos={check}, layers={"layer1": layer})
+    bar_container = Container("bar", check_infos={check}, layers={"layer1": layer})
     state = State(containers={foo_container, bar_container})
     ctx.run(ctx.on.pebble_check_failed(foo_container, check), state=state)
     assert len(foo_infos) == 1
@@ -580,7 +610,15 @@ def test_pebble_start_check():
             container = self.unit.get_container("foo")
             container.add_layer(
                 "foo",
-                {"checks": {"chk1": {"override": "replace", "startup": "disabled"}}},
+                {
+                    "checks": {
+                        "chk1": {
+                            "override": "replace",
+                            "startup": "disabled",
+                            "threshold": 3,
+                        }
+                    }
+                },
             )
 
         def _on_config_changed(self, _):
@@ -614,8 +652,23 @@ def test_pebble_stop_check():
             container.stop_checks("chk1")
 
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    info_in = CheckInfo("chk1", status=pebble.CheckStatus.UP)
-    container = Container("foo", can_connect=True, check_infos=frozenset({info_in}))
+
+    layer = pebble.Layer({
+        "checks": {"chk1": {"override": "replace", "startup": "enabled"}}
+    })
+    info_in = CheckInfo(
+        "chk1",
+        status=pebble.CheckStatus.UP,
+        level=layer.checks["chk1"].level,
+        startup=layer.checks["chk1"].startup,
+        threshold=layer.checks["chk1"].threshold,
+    )
+    container = Container(
+        "foo",
+        can_connect=True,
+        check_infos=frozenset({info_in}),
+        layers={"layer1": layer},
+    )
     state_out = ctx.run(ctx.on.config_changed(), state=State(containers={container}))
     info_out = state_out.get_container("foo").get_check_info("chk1")
     assert info_out.status == pebble.CheckStatus.INACTIVE
@@ -632,8 +685,16 @@ def test_pebble_replan_checks():
             container.replan()
 
     ctx = Context(MyCharm, meta={"name": "foo", "containers": {"foo": {}}})
-    info_in = CheckInfo("chk1", status=pebble.CheckStatus.INACTIVE)
-    layer = pebble.Layer({"checks": {"chk1": {"override": "replace"}}})
+    layer = pebble.Layer({
+        "checks": {"chk1": {"override": "replace", "startup": "enabled"}}
+    })
+    info_in = CheckInfo(
+        "chk1",
+        status=pebble.CheckStatus.INACTIVE,
+        level=layer.checks["chk1"].level,
+        startup=layer.checks["chk1"].startup,
+        threshold=layer.checks["chk1"].threshold,
+    )
     container = Container(
         "foo",
         can_connect=True,
