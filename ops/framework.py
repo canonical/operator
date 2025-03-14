@@ -995,7 +995,7 @@ class Framework(Object):
             try:
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
-                logger.debug("Skipping notice %s - cannot find event class.", event_path)
+                logger.debug('Skipping notice %s - cannot find event class.', event_path)
                 self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 

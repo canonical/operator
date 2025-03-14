@@ -227,14 +227,14 @@ class Ops(_Manager, Generic[CharmType]):
         return obj
 
     def _get_event_args(
-        self, bound_event: ops.framework.BoundEvent
+        self, charm: ops.CharmBase, bound_event: ops.framework.BoundEvent
     ) -> Tuple[List[Any], Dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
         # Juju events). We also handle converting from Scenario to ops types,
         # since the test code typically won't be able to create the ops objects,
         # as a model is required for many.
-        args, kwargs = super()._get_event_args(bound_event)
+        args, kwargs = super()._get_event_args(charm, bound_event)
         if self.event.custom_event_args is not None:
             for arg in self.event.custom_event_args:
                 args.append(self._object_to_ops_object(arg))

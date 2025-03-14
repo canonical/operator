@@ -582,7 +582,7 @@ class _Manager:
         # Skip re-emission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
         if self._dispatcher.is_restricted_context():
-            logger.debug("Skipping re-emission of deferred events in restricted context.")
+            logger.debug('Skipping re-emission of deferred events in restricted context.')
             return
         # Re-emit previously deferred events to the observers that deferred them.
         for event_path, _, _ in self._storage.notices():

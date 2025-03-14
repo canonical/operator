@@ -812,6 +812,13 @@ class _TestMain(abc.ABC):
 
         expected = [
             VERSION_LOGLINE,
+            [
+                'juju-log',
+                '--log-level',
+                'DEBUG',
+                '--',
+                'Skipping re-emission of deferred events in restricted context.',
+            ],
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
             ['is-leader', '--format=json'],
