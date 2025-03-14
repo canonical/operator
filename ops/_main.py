@@ -450,7 +450,6 @@ class _Manager:
         # * for scenario.mocking._MockModelBackend, `juju_log` sends the logging
         #   through to the `Context` object, which will be the same for all
         #   events.
-        # TODO: write tests to make sure that everything remains ok here.
         setup_root_logging(
             self._make_model_backend(), debug=self._juju_context.debug, exc_stderr=handling_action
         )
