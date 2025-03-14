@@ -3319,7 +3319,7 @@ class _TestingPebbleClient:
         raise NotImplementedError(self.wait_change)
 
     def _update_check_infos_from_plan(self):
-        # In testing, the check info is has the level, threshold, and startup
+        # In testing, the check info has the level, threshold, and startup
         # from the check baked in, so we need to update the info when the plan
         # changes.
         for check in self.get_plan().checks.values():
