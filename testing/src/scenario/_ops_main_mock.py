@@ -128,6 +128,8 @@ class Ops(_Manager, Generic[CharmType]):
         juju_context: ops.jujucontext._JujuContext,
     ):
         self.state = state
+        # This is the event passed to `run`, corresponding to the event that
+        # caused Juju to start the framework.
         self.event = event
         self.context = context
         self.charm_spec = charm_spec
@@ -149,9 +151,12 @@ class Ops(_Manager, Generic[CharmType]):
         return ops.CharmMeta.from_yaml(metadata, actions_metadata)
 
     def _make_model_backend(self):
+        # The event here is used to in the context of the Juju event that caused
+        # the framework to start, so we pass in the original one, even though
+        # this backend might be used for a deferred event.
         return _MockModelBackend(
             state=self.state,
-            event=self.event,  # TODO: surely this must need to change?
+            event=self.event,
             context=self.context,
             charm_spec=self.charm_spec,
             juju_context=self._juju_context,
