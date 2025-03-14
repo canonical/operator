@@ -1213,7 +1213,10 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
-            if value is None or value == '' or name == 'name':
+            # 'not value' is safe here because a threshold of 0 is valid but
+            # inconsistently applied and not of any actual use, and the other
+            # fields are strings where the empty string means 'not in the layer'.
+            if not value or name == 'name':
                 continue
             if name == 'http':
                 self._merge_http(value)

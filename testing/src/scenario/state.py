@@ -1050,7 +1050,6 @@ class Container(_max_posargs(1)):
         _deepcopy_mutable_fields(self)
 
     def _render_services(self):
-        # copied over from ops.testing._TestingPebbleClient._render_services()
         services: dict[str, pebble.Service] = {}
         for layer in self.layers.values():
             for name, service in layer.services.items():
@@ -1061,7 +1060,6 @@ class Container(_max_posargs(1)):
         return services
 
     def _render_checks(self) -> Dict[str, pebble.Check]:
-        # copied over from ops.testing._TestingPebbleClient._render_checks()
         checks: Dict[str, pebble.Check] = {}
         for layer in self.layers.values():
             for name, check in layer.checks.items():
@@ -1072,7 +1070,6 @@ class Container(_max_posargs(1)):
         return checks
 
     def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
-        # copied over from ops.testing._TestingPebbleClient._render_log_targets()
         log_targets: Dict[str, pebble.LogTarget] = {}
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
