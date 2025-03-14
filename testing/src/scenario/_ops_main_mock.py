@@ -17,6 +17,7 @@ from typing import (
     List,
     Sequence,
     Set,
+    Tuple,
 )
 
 import ops
@@ -30,7 +31,15 @@ from ops._main import logger as ops_logger
 from .errors import BadOwnerPath, NoObserverError
 from .logger import logger as scenario_logger
 from .mocking import _MockModelBackend
-from .state import CharmType, StoredState, DeferredEvent
+from .state import (
+    CharmType,
+    Container,
+    DeferredEvent,
+    RelationBase,
+    Secret,
+    Storage,
+    StoredState,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
@@ -171,6 +180,23 @@ class Ops(_Manager, Generic[CharmType]):
         return storage
 
     def _get_event_to_emit(self, charm: ops.CharmBase, event_name: str):
+        if self.event._is_custom_event:
+            assert self.event.custom_event is not None
+            emitter_type = type(self.event.custom_event.emitter)
+            # We require the event source to be an attribute on the charm object.
+            # Essentially, we are replacing the unbound event with a bound one.
+            for attr_name in dir(self.charm):
+                attr = getattr(self.charm, attr_name)
+                if not isinstance(attr, ops.Object):
+                    continue
+                for sub_attr_name in dir(attr):
+                    sub_attr = getattr(attr, sub_attr_name)
+                    if not isinstance(sub_attr, ops.ObjectEvents):
+                        continue
+                    if type(sub_attr) is not emitter_type:
+                        continue
+                    return getattr(sub_attr, self.event.custom_event.event_kind)
+
         owner = (
             self._get_owner(charm, self.event.owner_path) if self.event else charm.on
         )
@@ -184,6 +210,38 @@ class Ops(_Manager, Generic[CharmType]):
                 f"invalid event (not on charm.on).",
             )
         return event_to_emit
+
+    def _object_to_ops_object(self, obj: Any) -> Any:
+        if hasattr(obj, "_to_ops"):
+            return obj._to_ops()
+        if isinstance(obj, Secret):
+            return self.charm.model.get_secret(id=obj.id, label=obj.label)
+        if isinstance(obj, RelationBase):
+            return self.charm.model.get_relation(obj.endpoint, obj.id)
+        if isinstance(obj, Container):
+            return self.charm.unit.get_container(obj.name)
+        elif isinstance(obj, Storage):
+            for storage in self.charm.model.storages[obj.name]:
+                if storage.index == obj.index:
+                    return storage
+        return obj
+
+    def _get_event_args(
+        self, bound_event: ops.framework.BoundEvent
+    ) -> Tuple[List[Any], Dict[str, Any]]:
+        # For custom events, if the caller provided us with explicit args, we
+        # merge them with the Juju ones (to handle libraries subclassing the
+        # Juju events). We also handle converting from Scenario to ops types,
+        # since the test code typically won't be able to create the ops objects,
+        # as a model is required for many.
+        args, kwargs = super()._get_event_args(bound_event)
+        if self.event.custom_event_args is not None:
+            for arg in self.event.custom_event_args:
+                args.append(self._object_to_ops_object(arg))
+        if self.event.custom_event_kwargs is not None:
+            for key, value in self.event.custom_event_kwargs.items():
+                kwargs[key] = self._object_to_ops_object(value)
+        return args, kwargs
 
     @staticmethod
     def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
