@@ -26,7 +26,10 @@ import shutil
 from collections import defaultdict
 from typing import Any
 
-from importlib_metadata import distributions  # type: ignore
+try:
+    from importlib.metadata import distributions
+except ImportError:
+    from importlib_metadata import distributions  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,9 @@ def remove_stale_otel_sdk_packages() -> None:
     logger.debug('Applying _remove_stale_otel_sdk_packages patch on charm upgrade')
     # group by name all distributions starting with "opentelemetry_"
     otel_distributions: dict[str, list[Any]] = defaultdict(list)
-    for distribution in distributions():
-        name = distribution._normalized_name
+    for distribution in distributions():  # type: ignore
+        # it's already a string, but pyright can't grok that
+        name = str(distribution._normalized_name)  # type: ignore
         if name.startswith('opentelemetry_'):
             otel_distributions[name].append(distribution)
 
