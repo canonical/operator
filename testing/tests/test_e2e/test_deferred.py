@@ -268,6 +268,7 @@ def test_juju_log_over_deferred(mycharm):
     # for the primary event. We want to ensure that all the logs end up in the
     # context.
     logger = logging.getLogger(__name__)
+
     class MyCharm(mycharm):
         def _on_event(self, event: ops.EventBase):
             super()._on_event(event)
@@ -275,7 +276,10 @@ def test_juju_log_over_deferred(mycharm):
 
     ctx = Context(MyCharm, meta=mycharm.META)
     mycharm.defer_next = 1
-    ctx.run(ctx.on.start(), State(deferred=[ctx.on.update_status().deferred(MyCharm._on_event)]))
+    ctx.run(
+        ctx.on.start(),
+        State(deferred=[ctx.on.update_status().deferred(MyCharm._on_event)]),
+    )
     logs = [log.message for log in ctx.juju_log if log.level == "INFO"]
     assert logs == [
         "Handled event UpdateStatusEvent",

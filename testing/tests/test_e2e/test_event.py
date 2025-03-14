@@ -81,7 +81,7 @@ def test_emitted_deferred():
             super().__init__(framework)
             framework.observe(self.on.update_status, self._foo)
 
-        def _foo(self, _: ops.StartEvent):
+        def _foo(self, _: ops.UpdateStatusEvent):
             pass
 
     ctx = Context(
