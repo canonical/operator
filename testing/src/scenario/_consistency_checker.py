@@ -683,21 +683,16 @@ def check_containers_consistency(
                     f"container {container.name!r} has a check {check.name!r} "
                     f"but the {plan_has}.",
                 )
-            else:
-                if check.level != plan.checks[check].level:
+                continue
+            plan_check = plan.checks[check.name]
+            for attr_from_plan in ("level", "startup", "threshold"):
+                if getattr(check, attr_from_plan) != getattr(
+                    plan_check, attr_from_plan
+                ):
                     errors.append(
-                        f"container {container.name!r} has a check {check.name!r} with a different "
-                        f"'level' than the plan ({plan.checks[check].level}).",
-                    )
-                if check.startup != plan.checks[check].startup:
-                    errors.append(
-                        f"container {container.name!r} has a check {check.name!r} with a different "
-                        f"'startup' than the plan ({plan.checks[check].startup}).",
-                    )
-                if check.threshold != plan.checks[check].threshold:
-                    errors.append(
-                        f"container {container.name!r} has a check {check.name!r} with a different "
-                        f"'threshold' than the plan ({plan.checks[check].threshold}).",
+                        f"container {container.name!r} has a check {check.name!r} with a "
+                        f"different {attr_from_plan!r} ({getattr(check, attr_from_plan)}) "
+                        f"than the plan ({getattr(plan_check, attr_from_plan)}).",
                     )
 
     return Results(errors, [])
