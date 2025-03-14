@@ -481,6 +481,11 @@ class ObjectEvents(Object):
         This undoes the effect of :meth:`define_event`. This is not intended
         for use by charm authors, but rather for use by the ops library itself.
         """
+        event_descriptor = getattr(cls, event_kind)
+        if hasattr(event_descriptor, 'framework') and event_descriptor.framework is not None:
+            event_descriptor.framework.unregister_type(
+                event_descriptor.event_type, event_descriptor.emitter, event_descriptor.event_kind
+            )
         try:
             delattr(cls, event_kind)
         except AttributeError:

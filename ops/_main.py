@@ -372,8 +372,9 @@ class _Manager:
       - graceful teardown of the storage
 
     The above steps are first run for any deferred notices found in the storage
-    (all three steps for each notice, except for emitting Lifecycle events), and
-    then run a final time for the Juju event that triggered this execution.
+    (all three steps for each notice, except for emitting status collection
+    events), and then run a final time for the Juju event that triggered this
+    execution.
     """
 
     def __init__(
@@ -574,14 +575,16 @@ class _Manager:
         # Skip re-emission of deferred events for collect-metrics events because
         # they do not have the full access to all hook tools.
         if self._dispatcher.is_restricted_context():
+            logger.debug("Skipping re-emission of deferred events in restricted context.")
             return
         # Re-emit previously deferred events to the observers that deferred them.
         for event_path, _, _ in self._storage.notices():
             event_handle = _framework.Handle.from_path(event_path)
-            logger.debug('Re-emitting deferred event %s.', event_handle)
+            logger.debug('Re-emitting deferred event: %s', event_handle)
             charm = self._make_charm(event_handle.kind)
             charm.framework.reemit(event_path)
             self._commit(charm.framework)
+            self._close()
             charm._destroy_charm()
 
     def run(self):
