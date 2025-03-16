@@ -685,14 +685,12 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            for attr_from_plan in ("level", "startup", "threshold"):
-                if getattr(check, attr_from_plan) != getattr(
-                    plan_check, attr_from_plan
-                ):
+            for attr in ("level", "startup", "threshold"):
+                if getattr(check, attr) != getattr(plan_check, attr):
                     errors.append(
                         f"container {container.name!r} has a check {check.name!r} with a "
-                        f"different {attr_from_plan!r} ({getattr(check, attr_from_plan)}) "
-                        f"than the plan ({getattr(plan_check, attr_from_plan)}).",
+                        f"different {attr!r} ({getattr(check, attr)}) "
+                        f"than the plan ({getattr(plan_check, attr)}).",
                     )
 
     return Results(errors, [])
