@@ -14,7 +14,8 @@
 
 """The tracing facility for the Ops library.
 
-Quick start.
+Quick start
+-----------
 
 Declare the charm tracing interface and optionally the TLS interface in your
 ``charmcraft.yaml``.::

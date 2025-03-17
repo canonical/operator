@@ -34,6 +34,8 @@ from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
     TracingEndpointRequirer,
 )
 
+logger = logging.getLogger(__name__)
+
 # Databag operations can be trivially re-coded in pure Python:
 # - we'd get rid of pydantic dependency
 # - we'd avoid init-time relation listing and databag update (tracing)
@@ -67,7 +69,52 @@ from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
 
 
 class Tracing(ops.Object):
-    """Tracing service."""
+    """Initialise the tracing service.
+
+    Usage:
+        - Include ``ops[tracing]`` in your dependencies.
+        - Declare the relations that the charm supports.
+        - Initialise ``Tracing`` with the names of these relations.
+
+    Example::
+
+        # charmcraft.yaml
+        requires:
+            charm-tracing:
+                interface: tracing
+                limit: 1
+                optional: true
+            send-ca-cert:
+                interface: certificate_transfer
+                limit: 1
+                optional: true
+
+        # src/charm.py
+        import ops.tracing
+
+        class SomeCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                ...
+                self.tracing = ops.tracing.Tracing(
+                    tracing_relation_name="charm-tracing",
+                    ca_relation_name="send-ca-cert",
+                )
+
+    Args:
+        charm: your charm instance
+        tracing_relation_name: the name of the relation that provides the
+            destination to send tracing data to.
+        ca_relation_name: the name of the relation that provides the CA
+            list to validate the tracing destination against.
+        ca_data: a fixed CA list (PEM bundle, a multi-line string).
+
+    If the destination is resolved to an HTTPS URL, a CA list is required
+    to establish a secure connection.
+
+    The CA list can be provided over a relation via the ``ca_relation_name``
+    argument, as a fixed string via the ``ca_data`` argument, or the system CA
+    list will be used if the earlier two are both ``None``.
+    """
 
     def __init__(
         self,
@@ -76,52 +123,7 @@ class Tracing(ops.Object):
         ca_relation_name: str | None = None,
         ca_data: str | None = None,
     ):
-        """Initialise the tracing service.
-
-        Args:
-            charm: your charm instange
-            tracing_relation_name: the name of the relation that provides the
-                destination to send tracing data to.
-            ca_relation_name: the name of the relation that provides the CA
-                list to validate the tracing destination against.
-            ca_data: a fixed CA list (PEM bundle, a multi-line string).
-
-        If the destination is resolved to an HTTPS URL, a CA list is required
-        to establish a secure connection.
-
-        The CA list can be provided over a relation via ``ca_relation_name=``
-        argument, as a fixed string via ``ca_data`` argument, or the system CA
-        list will be used if the earlier two are both ``None``.
-
-        Usage:
-            - Include ``ops[tracing]`` in your dependencies.
-            - Declare the relations that the charm supports.
-            - Initialise ``Tracing`` with the names of these relations.
-
-        Example::
-            # charmcraft.yaml
-            requires:
-                charm-tracing:
-                    interface: tracing
-                    limit: 1
-                    optional: true
-                send-ca-cert:
-                    interface: certificate_transfer
-                    limit: 1
-                    optional: true
-
-            # src/charm.py
-            import ops.tracing
-
-            class SomeCharm(ops.CharmBase):
-                def __init__(self, framework: ops.Framework):
-                    ...
-                    self.tracing = ops.tracing.Tracing(
-                        tracing_relation_name="charm-tracing",
-                        ca_relation_name="send-ca-cert",
-                    )
-
-        """
+        """Initialise the tracing service."""
         super().__init__(charm, f'{tracing_relation_name}+{ca_relation_name}')
         self.charm = charm
         self.tracing_relation_name = tracing_relation_name
@@ -199,7 +201,7 @@ class Tracing(ops.Object):
                 return Config(None, None)
 
             if not url.startswith(('http://', 'https://')):
-                logging.warning(f'The {url=} must be an HTTP or an HTTPS URL')
+                logger.warning(f'The {url=} must be an HTTP or an HTTPS URL')
                 return Config(None, None)
 
             if url.startswith('http://'):
@@ -219,5 +221,5 @@ class Tracing(ops.Object):
             else:
                 return Config(None, None)
         except (AmbiguousRelationUsageError, ProtocolNotRequestedError):
-            logging.exception('Error getting the tracing destination')
+            logger.exception('Error getting the tracing destination')
             return Config(None, None)

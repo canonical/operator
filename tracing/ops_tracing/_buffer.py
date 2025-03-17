@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import logging
 import pathlib
 import sqlite3
 from typing import Callable
@@ -41,8 +40,6 @@ from ._const import (
 # Ubuntu 20.04  Python  3.8.2  Sqlite 3.31.1  Adds UPSERT, window functions
 # Ubuntu 22.04  Python 3.10.x  Sqlite 3.37.2  Adds STRICT tables, JSON ops
 # Ubuntu 24.04  Python 3.12.x  Sqlite 3.45.2  Adds math functions
-
-logger = logging.getLogger(__name__)
 
 P = ParamSpec('P')
 R = TypeVar('R')

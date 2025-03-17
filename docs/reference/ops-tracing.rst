@@ -1,6 +1,6 @@
 .. _ops_tracing:
 
-`ops[tracing]`
+`ops.tracing`
 ==============
 
 .. automodule:: ops_tracing

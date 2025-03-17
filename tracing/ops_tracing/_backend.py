@@ -59,7 +59,7 @@ def _setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None,
     """
     app_name, unit_number = juju_context.unit_name.split('/', 1)
     # Note that the Resource is immutable, and we want to start tracing early.
-    # This means that charmhub charm name (self.meta.name) is not available yet.
+    # This means that the Charmhub charm name (self.meta.name) is not available yet.
     resource = Resource.create(
         attributes={
             'service.namespace': juju_context.model_uuid,
@@ -98,7 +98,6 @@ def set_destination(url: str | None, ca: str | None) -> None:
     Args:
         url: the URL of the telemetry service to send tracing data to
         ca: the CA list (PEM bundle, a multi-line string), only used for HTTPS URLs.
-
     """
     if url and not url.startswith(('http://', 'https://')):
         raise ValueError('Only HTTP and HTTPS tracing destinations are supported.')
