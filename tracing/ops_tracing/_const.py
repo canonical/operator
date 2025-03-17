@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 EXPORT_TIMEOUT: int | float = 1  # seconds
-"""How much to give OTLP span exporter has to push traces to the backend."""
+"""How much time to give OTLP span exporter to push traces to the backend."""
 
 SENDOUT_FACTOR: int = 2
 """How many buffered chunks to send out for each incoming chunk."""
@@ -46,7 +46,7 @@ OBSERVED_PRIORITY = 50
 class Config:
     """Tracing destination configuration.
 
-    NOTE: that empty string values may be coerced to None.
+    Empty string values may be coerced to None.
     """
 
     url: str | None

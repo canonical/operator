@@ -60,7 +60,7 @@ def _setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None,
     """
     global _exporter
     app_name, unit_number = juju_context.unit_name.split('/', 1)
-    # NOTE: Resource is immutable, and we want to start tracing early.
+    # Note that the Resource is immutable, and we want to start tracing early.
     # This means that charmhub charm name (self.meta.name) is not available yet.
     resource = Resource.create(
         attributes={

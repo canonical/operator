@@ -32,7 +32,7 @@ Overview of what's available at this point.
 - include ``ops.tracing.Tracing()`` in your charm's ``__init__``
 - instrument key functions in the charm
 
-NOTE: the ``charm\_tracing`` charm lib auto-instruments all public function on the class
+Note that the ``charm\_tracing`` charm lib auto-instruments all public function on the class
 it's applied to. The ``ops[tracing]`` approach doesn't do that.
 
 ## Tracing for machine charms

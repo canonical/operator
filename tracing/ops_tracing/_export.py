@@ -84,8 +84,8 @@ class BufferingSpanExporter(SpanExporter):
         return context
 
     def _ssl_context(self, ca: str | None) -> ssl.SSLContext:
-        # NOTE: ssl.create_default_context() doesn't allow setting the context.protocol in a way
-        # that's the same across Python 3.8 and 3.10 onwards. Whip the context up by hand.
+        # Note that ssl.create_default_context() doesn't allow setting the context.protocol in a
+        # way that's the same across Python 3.8 and 3.10 onwards. Whip the context up by hand.
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         context.minimum_version = ssl.TLSVersion.TLSv1_3
         context.set_alpn_protocols(['http/1.1'])

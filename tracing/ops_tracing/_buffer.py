@@ -86,10 +86,10 @@ class Buffer:
 
     @retry
     def _set_db_schema(self):
-        # NOTE: measure the cost of this vs two-level approach:
+        # TODO: measure the cost of this vs two-level approach:
         # - check table and index in read-only mode
         # - if needed, update the DSL
-        # NOTE: ops storage sets u+rw, go-rw permissions
+        # Note that ops storage sets u+rw, go-rw permissions
         # should we follow suit?
         with self.tx(timeout=LONG_DB_TIMEOUT) as conn:
             conn.execute(
@@ -264,7 +264,7 @@ class Buffer:
     def remove(self, id_: int) -> None:
         """Remove a tracing record by id."""
         with self.tx() as conn:
-            # NOTE: the RETURNING clause would be ideal here, but it can't be used.
+            # The RETURNING clause would be ideal here, but it can't be used.
             # Sqlite shipped with Python 3.8 is too old.
             row = conn.execute(
                 """
