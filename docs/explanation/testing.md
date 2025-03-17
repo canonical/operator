@@ -60,13 +60,18 @@ Interface tests also:
 - Enable alternative implementations of an interface to validate themselves against the contractual specification stored in `charm-relation-interfaces`.
 - Help verify compliance with multiple versions of an interface.
 
-An interface test is a contract test powered by [`ops.testing`](ops_testing) and a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester). An interface test has the following pattern: 
+An interface test has the following pattern: 
 
-1) **GIVEN** an initial state of the relation over the interface under test
-2) **WHEN** a specific relation event fires
-3) **THEN** the state of the databags is valid (e.g. it satisfies an expected pydantic schema)
+1) **Given** - An initial state of the relation over the interface under test.
+2) **When** - A specific relation event fires.
+3) **Then** - The state of the databags is valid. For example, the state satisfies a [pydantic](https://docs.pydantic.dev/latest/) schema.
 
-On top of databag state validity, one can check for more elaborate conditions.
+In addition to validity of the databag state, we could check for more elaborate conditions.
+
+### Tools
+
+- [`ops.testing`](ops_testing)
+- a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
 
 ### Examples
 
