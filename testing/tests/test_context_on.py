@@ -551,9 +551,14 @@ def test_custom_event_with_scenario_args():
     peerrelation = scenario.PeerRelation("peer-endpoint")
     subordinaterelation = scenario.SubordinateRelation("sub-endpoint")
     notice = scenario.Notice("key.example.com")
-    checkinfo = scenario.CheckInfo("check1")
+    layer = ops.pebble.Layer({
+        "checks": {
+            "check1": {"override": "replace", "startup": "enabled", "threshold": 3}
+        }
+    })
+    checkinfo = scenario.CheckInfo("check1", level=ops.pebble.CheckLevel.UNSET)
     container = scenario.Container(
-        "container", notices=[notice], check_infos={checkinfo}
+        "container", notices=[notice], check_infos={checkinfo}, layers={"layer": layer}
     )
     errorstatus = scenario.ErrorStatus("error")
     activestatus = scenario.ActiveStatus("working")

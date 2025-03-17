@@ -1,7 +1,7 @@
 import dataclasses
 
 import pytest
-from ops.charm import CharmBase
+import ops
 
 from scenario._consistency_checker import check_consistency
 from scenario.context import Context
@@ -28,7 +28,7 @@ from scenario.state import (
 )
 
 
-class MyCharm(CharmBase):
+class MyCharm(ops.CharmBase):
     pass
 
 
@@ -85,46 +85,40 @@ def test_workload_event_without_container():
         _Event("foo-pebble-custom-notice", container=Container("foo"), notice=notice),
         _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
-    check = CheckInfo("http-check")
-    assert_consistent(
-        State(containers={Container("foo", check_infos={check})}),
-        _Event("foo-pebble-check-failed", container=Container("foo"), check_info=check),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+
+
+def test_check_info_container_matches_event():
+    check = CheckInfo(
+        "http-check",
+        level=ops.pebble.CheckLevel.UNSET,
+        startup=ops.pebble.CheckStartup.UNSET,
+        threshold=3,
     )
-    assert_inconsistent(
-        State(containers={Container("foo")}),
-        _Event("foo-pebble-check-failed", container=Container("foo"), check_info=check),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
-    )
-    assert_consistent(
-        State(containers={Container("foo", check_infos={check})}),
-        _Event(
-            "foo-pebble-check-recovered", container=Container("foo"), check_info=check
-        ),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
-    )
-    assert_inconsistent(
-        State(containers={Container("foo")}),
-        _Event(
-            "foo-pebble-check-recovered", container=Container("foo"), check_info=check
-        ),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
-    )
-    # Ensure the check is in the correct container.
-    assert_inconsistent(
-        State(containers={Container("foo", check_infos={check}), Container("bar")}),
-        _Event(
-            "foo-pebble-check-recovered", container=Container("bar"), check_info=check
-        ),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}, "bar": {}}}),
-    )
-    assert_inconsistent(
-        State(containers={Container("foo", check_infos={check}), Container("bar")}),
-        _Event(
-            "bar-pebble-check-recovered", container=Container("bar"), check_info=check
-        ),
-        _CharmSpec(MyCharm, {"containers": {"foo": {}, "bar": {}}}),
-    )
+    layer = ops.pebble.Layer({
+        "checks": {"http-check": {"override": "replace", "threshold": 3}}
+    })
+    for event in ("foo-pebble-check-failed", "foo-pebble-check-recovered"):
+        assert_consistent(
+            State(
+                containers={
+                    Container("foo", check_infos={check}, layers={"base": layer})
+                }
+            ),
+            _Event(event, container=Container("foo"), check_info=check),
+            _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+        )
+        # The check used in the event is missing from the input state.
+        assert_inconsistent(
+            State(containers={Container("foo", layers={"base": layer})}),
+            _Event(event, container=Container("foo"), check_info=check),
+            _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
+        )
+        # The check is in the wrong container.
+        assert_inconsistent(
+            State(containers={Container("foo", check_infos={check}), Container("bar")}),
+            _Event(event, container=Container("bar"), check_info=check),
+            _CharmSpec(MyCharm, {"containers": {"foo": {}, "bar": {}}}),
+        )
 
 
 def test_container_meta_mismatch():
@@ -177,6 +171,71 @@ def test_evt_bad_container_name():
         State(containers={Container("bar")}),
         _Event("bar-pebble-ready", container=Container("bar")),
         _CharmSpec(MyCharm, {"containers": {"bar": {}}}),
+    )
+
+
+@pytest.mark.parametrize(
+    "check,consistent",
+    [
+        (
+            CheckInfo(
+                "chk1",
+                level=ops.pebble.CheckLevel.READY,
+                startup=ops.pebble.CheckStartup.DISABLED,
+                threshold=42,
+            ),
+            True,
+        ),
+        (
+            CheckInfo(
+                "chk1",
+                level=ops.pebble.CheckLevel.UNSET,
+                startup=ops.pebble.CheckStartup.DISABLED,
+                threshold=42,
+            ),
+            False,
+        ),
+        (
+            CheckInfo(
+                "chk1",
+                level=ops.pebble.CheckLevel.READY,
+                startup=ops.pebble.CheckStartup.ENABLED,
+                threshold=42,
+            ),
+            False,
+        ),
+        (
+            CheckInfo(
+                "chk1",
+                level=ops.pebble.CheckLevel.READY,
+                startup=ops.pebble.CheckStartup.DISABLED,
+                threshold=3,
+            ),
+            False,
+        ),
+        (CheckInfo("chk2"), False),
+    ],
+)
+def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
+    layer = ops.pebble.Layer({
+        "checks": {
+            "chk1": {
+                "override": "replace",
+                "level": "ready",
+                "startup": "disabled",
+                "threshold": 42,
+                "http": {"url": "http://localhost:5000/version"},
+            }
+        }
+    })
+    state = State(
+        containers={Container("foo", check_infos={check}, layers={"base": layer})}
+    )
+    asserter = assert_consistent if consistent else assert_inconsistent
+    asserter(
+        state,
+        _Event("foo-pebble-ready", container=Container("foo")),
+        _CharmSpec(MyCharm, {"containers": {"foo": {}}}),
     )
 
 
