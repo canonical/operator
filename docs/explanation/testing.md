@@ -56,7 +56,9 @@ Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relat
 
 Interface tests enable Charmhub to validate the relations of a charm and verify that your charm supports the registered interface. For example, if your charm supports an interface called "ingress", interface tests enable Charmhub to verify that your charm supports the [registered `ingress` interface](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2).
 
-Also, they allow alternative implementations of an interface to validate themselves against the contractual specification stored in charm-relation-interfaces, and they help verify compliance with multiple versions of an interface.
+Interface tests also:
+- Enable alternative implementations of an interface to validate themselves against the contractual specification stored in `charm-relation-interfaces`.
+- Help verify compliance with multiple versions of an interface.
 
 An interface test is a contract test powered by [`ops.testing`](ops_testing) and a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester). An interface test has the following pattern: 
 
