@@ -48,9 +48,9 @@ Unit testing a charm can be done using:
 
 Interface tests validate charm library behavior against mock Juju APIs, ensuring compliance with an interface specification without requiring individual charm code.
 
-> For more information on how to create an interface, {ref}`register-an-interface`.
+Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface. For information about how to create an interface, see {ref}`register-an-interface`.
 
-Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface.
+> See also: {ref}`write-tests-for-an-interface`.
 
 ### Coverage
 
