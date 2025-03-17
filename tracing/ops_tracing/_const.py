@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import dataclasses
 
 EXPORT_TIMEOUT: int | float = 1  # seconds
 """How much time to give OTLP span exporter to push traces to the backend."""
@@ -43,7 +43,7 @@ DEFAULT_PRIORITY = 10
 OBSERVED_PRIORITY = 50
 
 
-@dataclass
+@dataclasses.dataclass
 class Config:
     """Tracing destination configuration."""
 

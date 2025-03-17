@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
-from dataclasses import asdict
 
 import ops
 
@@ -186,7 +186,7 @@ class Tracing(ops.Object):
             self._certificate_transfer = None
 
     def _reconcile(self, _event: ops.EventBase):
-        ops.tracing.set_destination(**asdict(self._get_config()))
+        ops.tracing.set_destination(**dataclasses.asdict(self._get_config()))
 
     def _get_config(self) -> Config:
         try:
