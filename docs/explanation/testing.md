@@ -48,23 +48,34 @@ Unit testing a charm can be done using:
 
 Interface tests validate charm library behavior against mock Juju APIs, ensuring compliance with an interface specification without requiring individual charm code.
 
-> For more information on how to create an interface, {ref}`register-an-interface`.
+Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface. For information about how to create an interface, see {ref}`register-an-interface`.
 
-Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface.
+> See also: {ref}`write-tests-for-an-interface`.
 
-Interface tests will allow `charmhub` to validate the relations of a charm and verify that your charm indeed supports "the" `ingress` interface and not just an interface called "ingress", which happens to be the same name as "the official `ingress` interface v2" as registered in charm-relation-interfaces (see [here](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2)).
+### Coverage
 
-Also, they allow alternative implementations of an interface to validate themselves against the contractual specification stored in charm-relation-interfaces, and they help verify compliance with multiple versions of an interface.
+Interface tests enable Charmhub to validate the relations of a charm and verify that your charm supports the registered interface. For example, if your charm supports an interface called "ingress", interface tests enable Charmhub to verify that your charm supports the [registered `ingress` interface](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2).
 
-An interface test is a contract test powered by [`ops.testing`](ops_testing) and a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester). An interface test has the following pattern: 
+Interface tests also:
+- Enable alternative implementations of an interface to validate themselves against the contractual specification stored in `charm-relation-interfaces`.
+- Help verify compliance with multiple versions of an interface.
 
-1) **GIVEN** an initial state of the relation over the interface under test
-2) **WHEN** a specific relation event fires
-3) **THEN** the state of the databags is valid (e.g. it satisfies an expected pydantic schema)
+An interface test has the following pattern: 
 
-On top of databag state validity, one can check for more elaborate conditions.
+1) **Given** - An initial state of the relation over the interface under test.
+2) **When** - A specific relation event fires.
+3) **Then** - The state of the databags is valid. For example, the state satisfies a [pydantic](https://docs.pydantic.dev/latest/) schema.
 
-A typical interface test will look like:
+In addition to validity of the databag state, we could check for more elaborate conditions.
+
+### Tools
+
+- [`ops.testing`](ops_testing)
+- a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
+
+### Examples
+
+A typical interface test looks like:
 
 ```python
 from interface_tester import Tester
@@ -82,9 +93,7 @@ def test_data_published_on_changed_remote_valid():
     t.assert_schema_valid()
 ```
 
-This allows us to, independently from what charm we are testing, determine if the behavioural specification of this interface is complied with.
-
-> For more information on how to write interface tests, see {ref}`write-tests-for-an-interface`.
+This enables us to check whether our charm complies with the behavioural specification of the interface, independently from whichever charm is integrated with our charm.
 
 (integration-testing)=
 ## Integration testing
