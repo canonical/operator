@@ -44,10 +44,7 @@ OBSERVED_PRIORITY = 50
 
 @dataclass
 class Config:
-    """Tracing destination configuration.
-
-    Empty string values may be coerced to None.
-    """
+    """Tracing destination configuration."""
 
     url: str | None
     """The URL to send tracing data to."""

@@ -21,25 +21,30 @@ from ops_tracing._const import Config
 
 
 def test_unset_destination(setup_tracing: None):
-    assert _backend._exporter
+    exporter = _backend.get_exporter()
+    assert exporter
     ops_tracing.set_destination(None, None)
-    assert _backend._exporter.buffer.get_destination() == Config(None, None)
+    assert exporter.buffer.get_destination() == Config(None, None)
 
 
 def test_set_destination(setup_tracing: None):
-    assert _backend._exporter
+    exporter = _backend.get_exporter()
+    assert exporter
     ops_tracing.set_destination('http://a.com', None)
-    assert _backend._exporter.buffer.get_destination() == Config('http://a.com', None)
+    assert exporter.buffer.get_destination() == Config('http://a.com', None)
 
 
 def test_set_destination_again(setup_tracing: None):
-    assert _backend._exporter
+    exporter = _backend.get_exporter()
+    assert exporter
     ops_tracing.set_destination('http://a.com', None)
     ops_tracing.set_destination('http://a.com', None)
+    # maybe check that the database was written only once?
 
 
 @pytest.mark.parametrize('url', ['file:///etc/passwd', 'gopher://aaa'])
 def test_set_destination_invalid_url(setup_tracing: None, url: str):
-    assert _backend._exporter
+    exporter = _backend.get_exporter()
+    assert exporter
     with pytest.raises(ValueError):
         ops_tracing.set_destination(url, None)

@@ -28,8 +28,6 @@ if TYPE_CHECKING:
 from ._const import BUFFER_FILE, Config
 from ._export import BufferingSpanExporter
 
-_exporter: BufferingSpanExporter | None = None
-
 
 class LogsToEvents(logging.Handler):
     """An adaptor that convert log records to OTEL events."""
@@ -42,9 +40,9 @@ class LogsToEvents(logging.Handler):
                 message = record.getMessage()
                 level = record.levelname
             except Exception as e:
-                # This should never happen, except if the charm includes custom logging
+                # This should never happen, except if the charm includes a custom logging
                 # library like structlog that enriches both the format and record attributes,
-                # or if the record format doesn't match the arguments.
+                # or if the record format doesn't match the provided arguments.
                 message = f'log {record=} error {e}'
                 level = 'UNKNOWN'
             span.add_event(message, {'level': level})
@@ -58,7 +56,6 @@ def _setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None,
         juju_context: the context for this dispatch, for annotation
         charm_class_name: the name of the charm class, for annotation
     """
-    global _exporter
     app_name, unit_number = juju_context.unit_name.split('/', 1)
     # Note that the Resource is immutable, and we want to start tracing early.
     # This means that charmhub charm name (self.meta.name) is not available yet.
@@ -71,17 +68,27 @@ def _setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None,
             'service.charm': charm_class_name,
         }
     )
-    provider = TracerProvider(resource=resource)
-    _exporter = BufferingSpanExporter(juju_context.charm_dir / BUFFER_FILE)
-    span_processor = BatchSpanProcessor(_exporter)
-    provider.add_span_processor(span_processor)
+    exporter = BufferingSpanExporter(juju_context.charm_dir / BUFFER_FILE)
+    span_processor = BatchSpanProcessor(exporter)
+    provider = TracerProvider(resource=resource, active_span_processor=span_processor)  # type: ignore
     set_tracer_provider(provider)
-    if not any(isinstance(h, LogsToEvents) for h in logging.root.handlers):
-        logging.root.addHandler(LogsToEvents())
+    logging.root.addHandler(log_handler := LogsToEvents())
     try:
         yield
     finally:
         shutdown_tracing()
+        logging.root.handlers.remove(log_handler)
+
+
+def get_exporter() -> BufferingSpanExporter | None:
+    try:
+        exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
+    except AttributeError:
+        # The global tracer provider was not configured by us and has a wrong processor.
+        return
+    if not exporter or not isinstance(exporter, BufferingSpanExporter):
+        return
+    return exporter
 
 
 def set_destination(url: str | None, ca: str | None) -> None:
@@ -97,19 +104,20 @@ def set_destination(url: str | None, ca: str | None) -> None:
 
     config = Config(url, ca)
 
-    if not _exporter:
+    if not (exporter := get_exporter()):
+        # Perhaps our tracer provider was never set up.
         return
 
-    if config == _exporter.buffer.get_destination():
+    if config == exporter.buffer.get_destination():
         return
-    _exporter.buffer.set_destination(config)
+    exporter.buffer.set_destination(config)
 
 
 def _mark_observed() -> None:
     """Mark the tracing data collected in this dispatch as higher priority."""
-    if not _exporter:
+    if not (exporter := get_exporter()):
         return
-    _exporter.buffer.mark_observed()
+    exporter.buffer.mark_observed()
 
 
 def shutdown_tracing() -> None:
