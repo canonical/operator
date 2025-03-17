@@ -670,7 +670,7 @@ def check_containers_consistency(
             f"Missing from metadata: {diff}.",
         )
 
-    # If you have check-infos, then they must match the plan.
+    # If you have check-infos, then they must match the computed plan.
     for container in state.containers:
         plan = container.plan
         for check in container.check_infos:
