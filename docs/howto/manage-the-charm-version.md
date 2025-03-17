@@ -43,7 +43,7 @@ uploading a charm to CharmHub (or when deploying/refreshing for local charms).
 
 ## Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 Since the version isn't set by the charm code itself, you'll want to test that
 the version is correctly set with an integration test, and don't need to write

@@ -123,13 +123,13 @@ has attached the new storage.
 
 ## Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 You'll want to add unit and integration tests:
 
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the charm state is as expected after storage changes, use the `run` method of the `Context` object. For example, to provide the charm with mock storage:
 

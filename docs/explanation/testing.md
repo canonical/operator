@@ -21,7 +21,7 @@ Every unit test involves a mocked event context, as charms only execute in respo
 
 Charm unit testing uses [`ops.testing`](ops_testing) framework for state-transition testing. `State` mocks inputs and outputs, while `Context` and `Container` offer a mock filesystem. Tests involve setup (charm, metadata, context, output mocks, Juju state), event simulation via `Context.run`, output retrieval, and assertions. `Context` and `State` are instantiated before the charm, allowing pre-event state setup (storage, relations, config). `Context` provides methods for simulating various Juju events like `config_changed`, `relation_created`, `relation_joined`, `relation_changed`, `relation_departed`, `storage_attached`, `storage_detached`, `pebble_ready`, and so on.
 
-> See also: {ref}`write-legacy-unit-tests-for-a-charm`, {ref}`write-scenario-tests-for-a-charm`.
+> See also: {ref}`write-legacy-unit-tests-for-a-charm`, {ref}`write-unit-tests-for-a-charm`.
 
 ### Coverage
 

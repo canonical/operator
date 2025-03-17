@@ -53,13 +53,13 @@ def _on_start(self, event: ops.StartEvent):
 
 ## Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 You'll want to add unit and integration tests.
 
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify the workload version is set in a unit test, retrieve the workload
 version from the `State`. In your `tests/unit/test_charm.py` file, add a

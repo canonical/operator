@@ -147,13 +147,13 @@ def _on_snapshot(self, event: ops.ActionEvent):
 
 ## Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 What you need to do depends on what kind of tests you want to write.
 
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the charm state is as expected after executing an action, use the `run` method of the `Context` object, with `ctx.on.action`. The context contains any logs and results that the charm set.
 

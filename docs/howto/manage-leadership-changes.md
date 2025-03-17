@@ -47,11 +47,11 @@ event or an `is-leader` check. If the charm code may run longer, then extra
 
 ## Test response to leadership changes
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify behaviour when leadership has changed, pass the leadership status to the `State`. For example:
 

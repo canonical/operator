@@ -71,7 +71,7 @@ def _on_install(self, event: ops.InstallEvent):
 
 ### Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 You'll want to add unit tests.
 
@@ -82,7 +82,7 @@ an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 Add `StoredState` objects to the `State` with any content that you want to mock
 having persisted from a previous event. For example, in your
@@ -151,7 +151,7 @@ to wait until later events, like `start`, to store and retrieve data.
 
 ### Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 You'll want to add unit tests.
 
@@ -162,7 +162,7 @@ an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 In your `tests/unit/test_charm.py` file, add tests that have an initial state
 that includes a [](ops.testing.PeerRelation) object.
