@@ -86,7 +86,7 @@ def test_data_published_on_changed_remote_valid():
     t.assert_schema_valid()
 ```
 
-This allows us to, independently from what charm we are testing, determine if the behavioural specification of this interface is complied with.
+This enables us to check whether our charm complies with the behavioural specification of the interface, independently from whichever charm is integrated with our charm.
 
 (integration-testing)=
 ## Integration testing
