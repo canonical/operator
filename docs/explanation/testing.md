@@ -66,7 +66,9 @@ An interface test is a contract test powered by [`ops.testing`](ops_testing) and
 
 On top of databag state validity, one can check for more elaborate conditions.
 
-A typical interface test will look like:
+### Examples
+
+A typical interface test looks like:
 
 ```python
 from interface_tester import Tester
