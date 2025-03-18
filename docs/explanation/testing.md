@@ -1,27 +1,22 @@
 (testing)=
 # Testing
 
-```{note}
-
-This page is currently being refactored.
-
-```
-
-Charms should have tests to verify that they are functioning correctly. This document describes some of the various types of testing you may want to consider -- their meaning, recommended coverage, and recommended tooling in the context of a charm.
+Charms should have tests to verify that they are functioning correctly. This page describes the types of testing that you should consider.
 
 ## Unit testing
 
-Charm unit tests isolate and validate individual code units (functions, methods, etc.) by mocking Juju APIs and workloads without external interactions. Unit tests are intended to be isolating and fast to complete. These are the tests you would run every time before committing code changes.
+Unit tests isolate and validate individual code units (functions, methods, and so on) by mocking Juju APIs and workloads without external interactions. Unit tests are intended to be isolating and fast to complete. These are the tests you would run before committing any code changes.
 
-A charm acts like a function, taking event context (always present), configuration, relation data, and stored state as inputs. It then performs operations affecting its workload or other charms: system operations (e.g., file writes), cloud operations (e.g., VM launches), workload operations (often via Pebble for Kubernetes charms), and Juju operations (sharing data with related charms). Unit tests focus on mapping these inputs to expected outputs, such as verifying specific system calls, file content based on configuration, or relation data updates given specific events, configurations, and existing relation data.
+Every unit test involves a mocked event context, as charms only execute in response to events. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is _always_ an event context to be mocked, and the starting point of a unit test is typically an event. A charm acts like a function, taking event context (always present), configuration, relation data, and stored state as inputs. It then performs operations affecting its workload or other charms:
 
-Every unit test involves a mocked event context, as charms only execute in response to events. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is _always_ an event context to be mocked, and the starting point of a unit test is typically an event.
+- System operations such as writing files.
+- Cloud operations such as launching virtual machines.
+- Workload operations, using Pebble in the case of a Kubernetes charm.
+- Juju operations such as sharing data with related charms.
 
-### The testing framework
+Unit tests focus on mapping these inputs to expected outputs. For example, a unit test could verify a system call, the contents of a file, or the contents of a relation databag.
 
-Charm unit testing uses [`ops.testing`](ops_testing) framework for state-transition testing. `State` mocks inputs and outputs, while `Context` and `Container` offer a mock filesystem. Tests involve setup (charm, metadata, context, output mocks, Juju state), event simulation via `Context.run`, output retrieval, and assertions. `Context` and `State` are instantiated before the charm, allowing pre-event state setup (storage, relations, config). `Context` provides methods for simulating various Juju events like `config_changed`, `relation_created`, `relation_joined`, `relation_changed`, `relation_departed`, `storage_attached`, `storage_detached`, `pebble_ready`, and so on.
-
-> See also: {ref}`write-legacy-unit-tests-for-a-charm`, {ref}`write-unit-tests-for-a-charm`.
+> See also: {ref}`write-scenario-tests-for-a-charm`.
 
 ### Coverage
 
@@ -33,11 +28,20 @@ Unit testing a charm should cover:
 
 ### Tools
 
-Unit testing a charm can be done using:
-
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [state transition testing](ops_testing), using the `ops` unit testing framework
+- [](ops_testing), the Ops unit testing framework
 - [`tox`](https://tox.wiki/en/latest/index.html) can be used to automate and standardize tests.
+- [`ops.testing`](ops_testing), the framework for state-transition testing in Ops
+- [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html)
+- [`tox`](https://tox.wiki/en/latest/index.html) for automating and standardizing tests
+
+The `ops.testing` framework provides `State`, which mocks inputs and outputs. The framework also provides `Context` and `Container`, which offer mock filesystems. Tests involve:
+
+1. Setting up the charm, metadata, context, output mocks, and Juju state.
+2. Simulating events using `Context.run`. For example, `config_changed`, `relation_changed`, `storage_attached`, `pebble_ready`, and so on.
+3. Retrieving and asserting the output.
+
+`Context` and `State` are instantiated before the charm. This enables you to prepare the state of config, relations, and storage before simulating an event.
 
 ### Examples
 
