@@ -982,20 +982,6 @@ class Container(_max_posargs(1)):
     )
     """The current status of each Pebble service running in the container."""
 
-    # this is how you specify the contents of the filesystem: suppose you want to express that your
-    # container has:
-    # - /home/foo/bar.py
-    # - /bin/bash
-    # - /bin/baz
-    #
-    # this becomes:
-    # mounts = {
-    #     'foo': Mount(location='/home/foo/', source=Path('/path/to/local/dir/containing/bar/py/'))
-    #     'bin': Mount(location='/bin/', source=Path('/path/to/local/dir/containing/bash/and/baz/'))
-    # }
-    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
-    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
-    # create a tempfile and insert its path in the mock filesystem tree
     mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
     """Provides access to the contents of the simulated container filesystem.
 
@@ -1011,6 +997,9 @@ class Container(_max_posargs(1)):
             'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
     """
+    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
+    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
+    # create a tempfile and insert its path in the mock filesystem tree
 
     execs: Iterable[Exec] = frozenset()
     """Simulate executing commands in the container.
