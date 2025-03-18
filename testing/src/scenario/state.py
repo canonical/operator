@@ -796,7 +796,7 @@ class Exec(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Mount(_max_posargs(0)):
-    """Maps local files to a :class:`Container` filesystem."""
+    """Maps a local path to a :class:`Container` filesystem."""
 
     location: str | pathlib.PurePosixPath
     """The location inside of the container."""
