@@ -222,4 +222,4 @@ Integration tests are a bit more complex, because these tests require a Juju con
           model: testing
 ```
 
-> You can find more actions, advanced documentation and use cases in [charming-actions](https://github.com/canonical/charming-actions)
+For more actions, documentation, and use cases, see [charming-actions](https://github.com/canonical/charming-actions).
