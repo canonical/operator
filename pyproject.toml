@@ -4,7 +4,7 @@ description = "The Python library behind great charms"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-    {name="The Charm Tech team at Canonical Ltd.", email="charm-tech@lists.launchpad.net"},
+    {name="The Charm Tech team at Canonical Ltd."},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

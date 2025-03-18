@@ -1063,6 +1063,7 @@ class TestCheck:
         assert check.name == name
         assert check.override == ''
         assert check.level == pebble.CheckLevel.UNSET
+        assert check.startup == pebble.CheckStartup.UNSET
         assert check.period == ''
         assert check.timeout == ''
         assert check.threshold is None
@@ -1078,6 +1079,7 @@ class TestCheck:
         d: pebble.CheckDict = {
             'override': 'replace',
             'level': 'alive',
+            'startup': 'enabled',
             'period': '10s',
             'timeout': '3s',
             'threshold': 5,
@@ -1091,6 +1093,7 @@ class TestCheck:
         assert check.name == 'chk-http'
         assert check.override == 'replace'
         assert check.level == pebble.CheckLevel.ALIVE
+        assert check.startup == pebble.CheckStartup.ENABLED
         assert check.period == '10s'
         assert check.timeout == '3s'
         assert check.threshold == 5
@@ -1139,7 +1142,6 @@ class TestCheck:
         assert two == two.to_dict()
         d['level'] = 'ready'
         assert one != d
-
         assert one != 5
 
 

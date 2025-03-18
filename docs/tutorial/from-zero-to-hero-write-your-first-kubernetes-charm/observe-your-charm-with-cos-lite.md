@@ -111,13 +111,9 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 ### Fetch the Loki interface libraries
 
-<!--
-According to the documentation of the Loki charm, we require the {ref}``loki_push_api` <7814md>` library.
--->
-
 Ensure you're in your Multipass Ubuntu VM, in your charm folder. 
 
-Then, satisfy the interface library requirements of the Loki charm by fetching the {ref}``loki_push_api` <7814md>` library:
+Then, satisfy the interface library requirements of the Loki charm by fetching the [loki_push_api](https://charmhub.io/loki-k8s/libraries/loki_push_api) library:
 
 ```text
 ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.loki_k8s.v0.loki_push_api

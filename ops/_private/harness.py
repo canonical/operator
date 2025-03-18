@@ -41,6 +41,7 @@ from typing import (
     Callable,
     ClassVar,
     Dict,
+    Final,
     Generic,
     Iterable,
     List,
@@ -58,16 +59,16 @@ from typing import (
     cast,
 )
 
-from ops import charm, framework, model, pebble, storage
-from ops._private import yaml
-from ops.charm import CharmBase, CharmMeta, RelationRole
-from ops.jujucontext import _JujuContext
-from ops.model import Container, RelationNotFoundError, StatusName, _NetworkDict
-from ops.pebble import ExecProcess
+from .. import charm, framework, model, pebble, storage
+from ..charm import CharmBase, CharmMeta, RelationRole
+from ..jujucontext import _JujuContext
+from ..model import Container, RelationNotFoundError, StatusName, _NetworkDict
+from ..pebble import ExecProcess
+from . import yaml
 
 if typing.TYPE_CHECKING:
     try:
-        from ops.testing import State  # type: ignore
+        from ..testing import State  # type: ignore
     except ImportError:
         # This is used in the ActionFailed type annotations: it will never be
         # used in this case, because it's only relevant when ops.testing has
@@ -3111,6 +3112,8 @@ class _TestingPebbleClient:
     as the only public methods of this type are for implementing Client.
     """
 
+    _DEFAULT_CHECK_THRESHOLD: Final[int] = 3
+
     def __init__(self, backend: _TestingModelBackend, container_root: pathlib.Path):
         self._backend = _TestingModelBackend
         self._layers: Dict[str, pebble.Layer] = {}
@@ -3205,12 +3208,15 @@ class _TestingPebbleClient:
                 continue
             info = self._check_infos.get(name)
             if info is None:
+                threshold = (
+                    self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
+                )
                 info = pebble.CheckInfo(
                     name=name,
                     level=check.level,
                     status=pebble.CheckStatus.UP,
                     failures=0,
-                    threshold=3 if check.threshold is None else check.threshold,
+                    threshold=threshold,
                     startup=check.startup,
                 )
                 self._check_infos[name] = info
@@ -3218,75 +3224,102 @@ class _TestingPebbleClient:
                 self._new_perform_check(info)
         return self.autostart_services(timeout, delay)
 
+    def _new_service_change(self, kind: pebble.ChangeKind, services: List[str]) -> pebble.Change:
+        now = datetime.datetime.now()
+        if kind == pebble.ChangeKind.START:
+            action = 'Start'
+        elif kind == pebble.ChangeKind.STOP:
+            action = 'Stop'
+        elif kind == pebble.ChangeKind.RESTART:
+            action = 'Restart'
+        else:
+            raise ValueError(f'unknown kind {kind}')
+        summary = f'{action} service {services[0]}'
+        if len(services) > 1:
+            summary += f' and {len(services) - 1} more'
+        change = pebble.Change(
+            pebble.ChangeID(str(uuid.uuid4())),
+            kind.value,
+            summary=summary,
+            status=pebble.ChangeStatus.DONE.value,
+            tasks=[],
+            ready=True,
+            err=None,
+            spawn_time=now,
+            ready_time=now,
+        )
+        self._changes[change.id] = change
+        return change
+
     def start_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
+    ) -> pebble.ChangeID:
         # A common mistake is to pass just the name of a service, rather than a list of services,
         # so trap that so it is caught quickly.
         if isinstance(services, str):
             raise TypeError(f'start_services should take a list of names, not just "{services}"')
-
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.start() which currently ignores the return value
         known_services = self._render_services()
         # Names appear to be validated before any are activated, so do two passes
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(400, f'cannot start services: service {name} does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
+        return self._new_service_change(pebble.ChangeKind.START, services).id
 
     def stop_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
-        # handle a common mistake of passing just a name rather than a list of names
+    ) -> pebble.ChangeID:
+        # Handle a common mistake of passing just a name rather than a list of names.
         if isinstance(services, str):
             raise TypeError(f'stop_services should take a list of names, not just "{services}"')
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
 
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.stop() which currently ignores the return value
         known_services = self._render_services()
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(400, f'cannot stop services: service {name} does not exist')
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.INACTIVE
+        return self._new_service_change(pebble.ChangeKind.STOP, services).id
 
     def restart_services(
         self,
         services: List[str],
         timeout: float = 30.0,
         delay: float = 0.1,
-    ):
-        # handle a common mistake of passing just a name rather than a list of names
+    ) -> pebble.ChangeID:
+        # Handle a common mistake of passing just a name rather than a list of names.
         if isinstance(services, str):
             raise TypeError(f'restart_services should take a list of names, not just "{services}"')
+        if not services:
+            raise self._api_error(400, 'must specify services for start action')
 
         self._check_connection()
 
-        # Note: jam 2021-04-20 We don't implement ChangeID, but the default caller of this is
-        # Container.restart() which currently ignores the return value
         known_services = self._render_services()
         for name in services:
             if name not in known_services:
-                # TODO: jam 2021-04-20 This needs a better error type
-                #  400 Bad Request: service "bal" does not exist
-                raise RuntimeError(f'400 Bad Request: service "{name}" does not exist')
+                raise self._api_error(
+                    400,
+                    f'cannot restart services: service {name} does not exist',
+                )
         for name in services:
             self._service_status[name] = pebble.ServiceStatus.ACTIVE
+        return self._new_service_change(pebble.ChangeKind.RESTART, services).id
 
     def wait_change(
         self,
@@ -3295,6 +3328,20 @@ class _TestingPebbleClient:
         delay: float = 0.1,
     ) -> pebble.Change:
         raise NotImplementedError(self.wait_change)
+
+    def _update_check_infos_from_plan(self):
+        # In testing, the check info has the level, threshold, and startup
+        # from the check baked in, so we need to update the info when the plan
+        # changes.
+        for check in self.get_plan().checks.values():
+            info = self._check_infos.get(check.name)
+            if not info:
+                continue
+            info.level = check.level
+            info.threshold = (
+                self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
+            )
+            info.startup = check.startup
 
     def add_layer(
         self,
@@ -3396,42 +3443,58 @@ class _TestingPebbleClient:
                     if check.startup == pebble.CheckStartup.DISABLED
                     else pebble.CheckStatus.UP
                 )
+                threshold = (
+                    self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
+                )
                 info = pebble.CheckInfo(
                     name,
                     level=check.level,
+                    startup=check.startup,
                     status=status,
+                    threshold=threshold,
                     failures=0,
                     change_id=pebble.ChangeID(''),
                 )
                 self._check_infos[name] = info
-            info.level = check.level
-            info.threshold = 3 if check.threshold is None else check.threshold
-            info.startup = check.startup
             if info.startup != pebble.CheckStartup.DISABLED and not info.change_id:
                 self._new_perform_check(info)
+        self._update_check_infos_from_plan()
 
     def _render_services(self) -> Dict[str, pebble.Service]:
         services: Dict[str, pebble.Service] = {}
-        for key in sorted(self._layers.keys()):
-            layer = self._layers[key]
+        # Note that this must done in the order that the layers were added to
+        # the dictionary, *not* sorted. If Pebble loads the layers from a
+        # directory on startup, then the order of the checks is alphabetical
+        # using the 001 style prefix. However, when adding layers via the API,
+        # the order is the order in which the API calls were made. If using this
+        # testing class to simulate the former, then care must be taken to run
+        # the add_layer calls in alphabetical (by filename) order.
+        for layer in self._layers.values():
             for name, service in layer.services.items():
-                services[name] = service
+                if name in services and service.override == 'merge':
+                    services[name]._merge(service)
+                else:
+                    services[name] = service
         return services
 
     def _render_checks(self) -> Dict[str, pebble.Check]:
         checks: Dict[str, pebble.Check] = {}
-        for key in sorted(self._layers.keys()):
-            layer = self._layers[key]
+        for layer in self._layers.values():
             for name, check in layer.checks.items():
-                checks[name] = check
+                if name in checks and check.override == 'merge':
+                    checks[name]._merge(check)
+                else:
+                    checks[name] = check
         return checks
 
     def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
         log_targets: Dict[str, pebble.LogTarget] = {}
-        for key in sorted(self._layers.keys()):
-            layer = self._layers[key]
+        for layer in self._layers.values():
             for name, log_target in layer.log_targets.items():
-                log_targets[name] = log_target
+                if name in log_targets and log_target.override == 'merge':
+                    log_targets[name]._merge(log_target)
+                else:
+                    log_targets[name] = log_target
         return log_targets
 
     def get_plan(self) -> pebble.Plan:

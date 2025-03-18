@@ -4697,7 +4697,10 @@ class TestTestingPebbleClient:
                 command: '/bin/echo bar'
             """,
         )
-        client.start_services(['bar'])
+        change_id = client.start_services(['bar'])
+        change = client.get_change(change_id)
+        assert change.kind == pebble.ChangeKind.START.value
+        assert 'start' in change.summary.lower()
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
@@ -4710,7 +4713,10 @@ class TestTestingPebbleClient:
         assert foo_info.name == 'foo'
         assert foo_info.startup == pebble.ServiceStartup.ENABLED
         assert foo_info.current == pebble.ServiceStatus.INACTIVE
-        client.stop_services(['bar'])
+        change_id = client.stop_services(['bar'])
+        change = client.get_change(change_id)
+        assert change.kind == pebble.ChangeKind.STOP.value
+        assert 'stop' in change.summary.lower()
         infos = client.get_services()
         bar_info = infos[0]
         assert bar_info.name == 'bar'
@@ -4781,8 +4787,7 @@ class TestTestingPebbleClient:
         assert infos == []
 
     def test_invalid_start_service(self, client: _TestingPebbleClient):
-        # TODO: jam 2021-04-20 This should become a better error
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.start_services(['unknown'])
 
     def test_start_service_str(self, client: _TestingPebbleClient):
@@ -4791,11 +4796,19 @@ class TestTestingPebbleClient:
         with pytest.raises(TypeError):
             client.start_services('unknown')
 
+    def test_start_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.start_services([])
+
     def test_stop_service_str(self, client: _TestingPebbleClient):
         # Start service takes a list of names, but it is really easy to accidentally pass just a
         # name
         with pytest.raises(TypeError):
             client.stop_services('unknown')
+
+    def test_stop_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.stop_services([])
 
     def test_mixed_start_service(self, client: _TestingPebbleClient):
         client.add_layer(
@@ -4809,8 +4822,7 @@ class TestTestingPebbleClient:
                 command: '/bin/echo foo'
             """,
         )
-        # TODO: jam 2021-04-20 better error type
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.start_services(['foo', 'unknown'])
         # foo should not be started
         infos = client.get_services()
@@ -4833,8 +4845,7 @@ class TestTestingPebbleClient:
             """,
         )
         client.autostart_services()
-        # TODO: jam 2021-04-20 better error type
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.stop_services(['foo', 'unknown'])
         # foo should still be running
         infos = client.get_services()
@@ -4909,6 +4920,20 @@ class TestTestingPebbleClient:
         assert foo_info.name == 'foo'
         assert foo_info.startup == pebble.ServiceStartup.ENABLED
         assert foo_info.current == pebble.ServiceStatus.INACTIVE
+
+    def test_invalid_restart_service(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.restart_services(['unknown'])
+
+    def test_restart_service_str(self, client: _TestingPebbleClient):
+        # Restart service takes a list of names, but it is really easy to
+        # accidentally pass just a name.
+        with pytest.raises(TypeError):
+            client.restart_services('unknown')
+
+    def test_restart_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.restart_services([])
 
     @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self, client: _TestingPebbleClient):
@@ -7102,6 +7127,178 @@ class TestChecks:
         for info in container.get_checks('chk1').values():
             assert info.status == pebble.CheckStatus.UP
             assert info.change_id, 'Change ID should not be None or the empty string'
+
+    @pytest.mark.parametrize(
+        'combine,new_layer_name',
+        [
+            (False, 'new-layer'),
+            (True, 'base'),
+            # This doesn't have anything to combine with, but for completeness:
+            (True, 'new-layer'),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'new_layer_dict',
+        [
+            {
+                'checks': {
+                    'server-ready': {
+                        'override': 'merge',
+                        'level': 'ready',
+                        'http': {'url': 'http://localhost:5050/version'},
+                    }
+                }
+            },
+            {
+                'checks': {
+                    'server-ready': {
+                        'override': 'merge',
+                        'level': 'alive',
+                        'threshold': 30,
+                        'startup': 'disabled',
+                        'http': {'url': 'http://localhost:5050/version'},
+                    }
+                }
+            },
+        ],
+    )
+    def test_add_layer_merge_check(
+        self,
+        request: pytest.FixtureRequest,
+        new_layer_name: str,
+        combine: bool,
+        new_layer_dict: ops.pebble.LayerDict,
+    ):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on['my-container'].pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, _: ops.PebbleReadyEvent):
+                container = self.unit.get_container('my-container')
+                container.add_layer(
+                    new_layer_name, ops.pebble.Layer(new_layer_dict), combine=combine
+                )
+
+        layer_in = pebble.Layer({
+            'checks': {
+                'server-ready': {
+                    'override': 'replace',
+                    'level': 'ready',
+                    'startup': 'enabled',
+                    'threshold': 10,
+                    'http': {'url': 'http://localhost:5000/version'},
+                }
+            }
+        })
+        harness = ops.testing.Harness(MyCharm, meta='name: mycharm\ncontainers:\n  my-container:')
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('my-container', True)
+        harness.begin()
+        container_in = harness.charm.unit.get_container('my-container')
+        container_in.add_layer('base', layer_in)
+
+        harness.container_pebble_ready('my-container')
+
+        assert 'checks' in new_layer_dict and 'server-ready' in new_layer_dict['checks']
+        new_layer_check = new_layer_dict['checks']['server-ready']
+        container_out = harness.charm.unit.get_container('my-container')
+        check_out = container_out.get_checks('server-ready')['server-ready']
+        assert check_out.level == pebble.CheckLevel(new_layer_check.get('level', 'ready'))
+        assert check_out.startup == pebble.CheckStartup(new_layer_check.get('startup', 'enabled'))
+        assert check_out.threshold == new_layer_check.get('threshold', 10)
+
+
+@pytest.mark.parametrize('layer1_name,layer2_name', [('a-base', 'b-base'), ('b-base', 'a-base')])
+def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, layer2_name: str):
+    layer1 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'replace',
+                'command': '/bin/sleep 10',
+                'summary': 'sum',
+                'description': 'desc',
+                'startup': 'enabled',
+            },
+        },
+        'checks': {
+            'server-ready': {
+                'override': 'replace',
+                'level': 'ready',
+                'startup': 'enabled',
+                'threshold': 10,
+                'period': '1s',
+                'timeout': '28s',
+                'http': {'url': 'http://localhost:5000/version'},
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://loki.example.com',
+                'services': ['server'],
+                'labels': {'foo': 'bar'},
+            }
+        },
+    })
+    layer2 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'merge',
+                'command': '/bin/sleep 20',
+            }
+        },
+        'checks': {
+            'server-ready': {
+                'override': 'merge',
+                'level': 'alive',
+                'http': {'url': 'http://localhost:5050/version'},
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'merge',
+                'location': 'https://loki2.example.com',
+            },
+        },
+    })
+    harness = ops.testing.Harness(
+        ops.CharmBase, meta='name: mycharm\ncontainers:\n  my-container:'
+    )
+    request.addfinalizer(harness.cleanup)
+    harness.set_can_connect('my-container', True)
+    harness.begin()
+    container_in = harness.charm.unit.get_container('my-container')
+    container_in.add_layer(layer1_name, layer1)
+    container_in.add_layer(layer2_name, layer2)
+    container_out = harness.charm.unit.get_container('my-container')
+    plan = container_out.get_plan()
+
+    service = plan.services['server']
+    assert service.summary == 'sum'
+    assert service.description == 'desc'
+    # Service.startup is always a string, even though we have the enum.
+    assert service.startup == pebble.ServiceStartup.ENABLED.value
+    assert service.override == 'merge'
+    assert service.command == '/bin/sleep 20'
+
+    check = plan.checks['server-ready']
+    assert check.startup == pebble.CheckStartup.ENABLED
+    assert check.threshold == 10
+    assert check.period == '1s'
+    assert check.timeout == '28s'
+    assert check.override == 'merge'
+    assert check.level == pebble.CheckLevel.ALIVE
+    assert check.http is not None
+    assert check.http.get('url') == 'http://localhost:5050/version'
+
+    log_target = plan.log_targets['loki']
+    assert log_target.type == 'loki'
+    assert log_target.services == ['server']
+    assert log_target.labels == {'foo': 'bar'}
+    assert log_target.override == 'merge'
+    assert log_target.location == 'https://loki2.example.com'
 
 
 @pytest.mark.skipif(
