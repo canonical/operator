@@ -431,7 +431,7 @@ class _Manager:
         return _model._ModelBackend(juju_context=self._juju_context)
 
     def _make_charm(self, event_name: str):
-        framework = self._make_framework(event_name)
+        framework = self._build_framework(event_name)
         return self._charm_class(framework)
 
     def _setup_root_logging(self):
@@ -492,7 +492,10 @@ class _Manager:
             store = _storage.SQLiteStorage(charm_state_path)
         return store
 
-    def _make_framework(self, event_name: str):
+    def _make_framework(self, *args: Any, **kwargs: Any):
+        return _framework.Framework(*args, **kwargs)
+
+    def _build_framework(self, event_name: str):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
 
@@ -505,7 +508,7 @@ class _Manager:
         model = _model.Model(
             self._charm_meta, model_backend, broken_relation_id=broken_relation_id
         )
-        framework = _framework.Framework(
+        framework = self._make_framework(
             self._storage,
             self._charm_root,
             self._charm_meta,

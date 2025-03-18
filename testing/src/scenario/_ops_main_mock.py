@@ -18,6 +18,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    cast,
 )
 
 import ops
@@ -28,6 +29,7 @@ from ops.framework import _event_regex
 from ops._main import _Manager
 from ops._main import logger as ops_logger
 
+from .context import Context
 from .errors import BadOwnerPath, NoObserverError
 from .logger import logger as scenario_logger
 from .mocking import _MockModelBackend
@@ -135,6 +137,7 @@ class Ops(_Manager, Generic[CharmType]):
         self.charm_spec = charm_spec
         self.store = None
         self._juju_context = juju_context
+        self.captured_events: List[ops.EventBase] = []
 
         super().__init__(
             charm_class=self.charm_spec.charm_type, juju_context=juju_context
@@ -149,6 +152,9 @@ class Ops(_Manager, Generic[CharmType]):
             actions_metadata = None
 
         return ops.CharmMeta.from_yaml(metadata, actions_metadata)
+
+    def _make_framework(self, *args: Any, **kwargs: Any):
+        return CapturingFramework(*args, context=self.context, **kwargs)
 
     def _make_model_backend(self):
         # The event here is used to in the context of the Juju event that caused
@@ -275,3 +281,41 @@ class Ops(_Manager, Generic[CharmType]):
         self.state = dataclasses.replace(
             self.state, deferred=deferred, stored_states=stored_state
         )
+
+
+class CapturingFramework(ops.Framework):
+    def __init__(self, *args: Any, context: Context[CharmType], **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._context = context
+
+    def _emit(self, event: ops.EventBase):
+        if self._context.capture_framework_events or not isinstance(
+            event,
+            (ops.PreCommitEvent, ops.CommitEvent, ops.CollectStatusEvent),
+        ):
+            # Dump/undump the event to ensure any custom attributes are (re)set by restore().
+            event.restore(event.snapshot())
+            self._context.emitted_events.append(event)
+
+        return super()._emit(event)
+
+    def _reemit_single_path(self, single_event_path: str):
+        if not self._context.capture_deferred_events:
+            return super()._reemit_single_path(single_event_path)
+
+        # Load all notices from storage as events.
+        for event_path, _, _ in self._storage.notices(single_event_path):
+            event_handle = ops.Handle.from_path(event_path)
+            try:
+                event = self.load_snapshot(event_handle)
+            except ops.NoTypeError:
+                continue
+            event = cast(ops.EventBase, event)
+            event.deferred = False
+            self._forget(event)  # prevent tracking conflicts
+
+            # Dump/undump the event to ensure any custom attributes are (re)set by restore().
+            event.restore(event.snapshot())
+            self._context.emitted_events.append(event)
+
+        return super()._reemit_single_path(single_event_path)
