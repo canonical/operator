@@ -188,15 +188,82 @@ proposed for or accepted into your main branch the `lint`, `unit`, and
 ```{admonition} Best practice
 :class: hint
 
-Ensure that tooling is configured to automatically detect new versions,
-particularly security releases, for all your dependencies.
-```
-
-```{admonition} Best practice
-:class: hint
-
 The quality assurance pipeline of a charm should be automated using a
 continuous integration (CI) system.
+```
+
+If you are using GitHub, create a file called `.github/workflows/ci.yaml`. For
+example, to include a `lint` job that runs the `tox` `lint` environment:
+
+```yaml
+name: Tests
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run linters
+        run: tox -e lint
+```
+
+Other `tox` environments can be run similarly; for example unit tests:
+
+```yaml
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run tests
+        run: tox -e unit
+```
+
+Integration tests are a bit more complex, because in order to run those tests, a Juju controller and
+a cloud in which to deploy it, is required. This example uses a `concierge` in order to set up
+`k8s` and Juju:
+
+```
+  integration-test-k8s:
+    name: Integration tests (k8s)
+    needs:
+      - lint
+      - unit-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install concierge
+        run: sudo snap install --classic concierge
+      - name: Install Juju and tools
+        run: sudo concierge prepare -p k8s
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run integration tests
+        # Set a predictable model name so it can be consumed by charm-logdump-action
+        run: tox -e integration -- --model testing
+      - name: Dump logs
+        uses: canonical/charm-logdump-action@main
+        if: failure()
+        with:
+          app: my-app-name
+          model: testing
 ```
 
 ```{tip}
@@ -204,4 +271,11 @@ continuous integration (CI) system.
 The `charming-actions <https://github.com/canonical/charming-actions>`_
 repository includes actions to ensure that libraries are up-to-date, publish
 charms and libraries, and more.
+```
+
+```{admonition} Best practice
+:class: hint
+
+Ensure that tooling is configured to automatically detect new versions,
+particularly security releases, for all your dependencies.
 ```
