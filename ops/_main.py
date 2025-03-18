@@ -510,6 +510,13 @@ class _Manager:
             logger.debug('Event %s not defined for %s.', event_name, self.charm)
         return None
 
+    def _get_event_args(
+        self, bound_event: '_framework.BoundEvent'
+    ) -> Tuple[List[Any], Dict[str, Any]]:
+        # A wrapper so that the testing subclasses can easily override the
+        # behaviour.
+        return _get_event_args(self.charm, bound_event, self._juju_context)
+
     def _emit_charm_event(self, event_name: str):
         """Emits a charm event based on a Juju event name.
 
@@ -525,7 +532,7 @@ class _Manager:
         if event_to_emit is None:
             return
 
-        args, kwargs = _get_event_args(self.charm, event_to_emit, self._juju_context)
+        args, kwargs = self._get_event_args(event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
         event_to_emit.emit(*args, **kwargs)
 

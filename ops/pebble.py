@@ -876,6 +876,9 @@ class Plan:
 
     __str__ = to_yaml
 
+    def __repr__(self):
+        return f'Plan({self.to_dict()!r})'
+
     def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1210,6 +1213,9 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            # 'not value' is safe here because a threshold of 0 is valid but
+            # inconsistently applied and not of any actual use, and the other
+            # fields are strings where the empty string means 'not in the layer'.
             if not value or name == 'name':
                 continue
             if name == 'http':
@@ -1218,6 +1224,11 @@ class Check:
                 self._merge_tcp(value)
             elif name == 'exec':
                 self._merge_exec(value)
+            elif name == 'startup' and value == CheckStartup.UNSET:
+                continue
+            # Note that CheckLevel.UNSET has a different meaning to
+            # CheckStartup.UNSET. In the former, it means 'there is no level';
+            # in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
