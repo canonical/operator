@@ -71,7 +71,7 @@ In addition to validity of the databag state, we could check for more elaborate 
 ### Tools
 
 - [`ops.testing`](ops_testing)
-- a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
+- A pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
 
 ### Examples
 
@@ -98,13 +98,13 @@ This enables us to check whether our charm complies with the behavioural specifi
 (integration-testing)=
 ## Integration testing
 
-Integration tests verify the interaction of multiple software components. In the context of a charm, they ensure the charm functions correctly when deployed in a test model in a real controller, checking for "blocked" or "error" states during typical operations. Leveraging tools like [the `juju` CLI](inv:juju:std:label#list-of-juju-cli-commands), [`python-libjuju`](https://github.com/juju/python-libjuju), [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator), and [`zaza`](https://zaza.readthedocs.io/en/latest/index.html), these tests cover charm packing, deployment, integration with other applications, configuration changes, action execution, and overall functionality within various combinations of these factors. This ensures the charm's operational logic performs as expected under diverse conditions.
+Integration tests verify the interaction of multiple software components. In the context of a charm, they ensure the charm functions correctly when deployed in a test model in a real controller, checking for "blocked" or "error" states during typical operations. The goal of integration testing is to ensure the charm's operational logic performs as expected under diverse conditions.
 
 Integration tests should be focused on a single charm. Sometimes an integration test requires multiple charms to be deployed for adequate testing, but ideally integration tests should not become end-to-end tests.
 
 Integration tests typically take significantly longer to run than unit tests.
 
-> See also: {ref}`write-integration-tests-for-a-charm`
+> See also: {ref}`write-integration-tests-for-a-charm`.
 
 ### Coverage
 
@@ -126,15 +126,15 @@ When writing an integration test, it is not sufficient to simply check that Juju
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
 - [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and/or [`zaza`](https://github.com/openstack-charmers/zaza)
 
-Note that the integration tests and unit tests should run on the same minor Python version as is shipped with the OS as configured under the `charmcraft.yaml` `base.run-on` key. With tox, for Ubuntu 22.04, this can be done using:
+Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
-```
+```ini
 [testenv]
 basepython = python3.10
 ```
 
 (pytest-operator)=
-### `pytest-operator`
+#### `pytest-operator`
 
 `pytest-operator` is a Python library that provides Juju plugins for the generic Python library `pytest` to facilitate the {ref}`integration testing <integration-testing>` of charms.
 
@@ -158,7 +158,7 @@ It also provides convenient markers and command line parameters (e.g., the `@pyt
 
 ## Continuous integration
 
-Typically, you want the tests to be run automatically against any PR into your repository's main branch, and sometimes, to trigger a new release whenever that succeeds. CD is out of scope for this article, but we will look at how to set up a basic CI.
+Typically, you want the tests to be run automatically against any PR into your repository's main branch, and potentially trigger a new release whenever the tests succeed. Continuous deployment is out of scope for this page, but we will look at how to set up basic continuous integration.
 
 Create a file called `.github/workflows/ci.yaml`. For example, to include a `lint` job that runs the `tox` `lint` environment:
 
@@ -180,7 +180,7 @@ jobs:
         run: tox -e lint
 ```
 
-Other `tox` environments can be run similarly; for example unit tests:
+Other `tox` environments can be run similarly. For example, unit tests:
 
 ```yaml
   unit-test:
@@ -195,9 +195,9 @@ Other `tox` environments can be run similarly; for example unit tests:
         run: tox -e unit
 ```
 
-Integration tests are a bit more complex, because in order to run those tests, a Juju controller and a cloud in which to deploy it, is required. This example uses a `actions-operator` workflow provided by `charmed-kubernetes` in order to set up `microk8s` and Juju:
+Integration tests are a bit more complex, because these tests require a Juju controller and a cloud in which to deploy it. The following example uses the [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator) workflow provided by `charmed-kubernetes` to set up `microk8s` and Juju:
 
-```
+```yaml
   integration-test-microk8s:
     name: Integration tests (microk8s)
     needs:
@@ -222,4 +222,4 @@ Integration tests are a bit more complex, because in order to run those tests, a
           model: testing
 ```
 
-> You can find more actions, advanced documentation and use cases in [charming-actions](https://github.com/canonical/charming-actions)
+For more actions, documentation, and use cases, see [charming-actions](https://github.com/canonical/charming-actions).
