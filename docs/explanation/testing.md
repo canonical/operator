@@ -197,7 +197,7 @@ Other `tox` environments can be run similarly. For example, unit tests:
 
 Integration tests are a bit more complex, because these tests require a Juju controller and a cloud in which to deploy it. The following example uses the [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator) workflow provided by `charmed-kubernetes` to set up `microk8s` and Juju:
 
-```
+```yaml
   integration-test-microk8s:
     name: Integration tests (microk8s)
     needs:
