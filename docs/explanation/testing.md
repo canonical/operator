@@ -180,7 +180,7 @@ jobs:
         run: tox -e lint
 ```
 
-Other `tox` environments can be run similarly; for example unit tests:
+Other `tox` environments can be run similarly. For example, unit tests:
 
 ```yaml
   unit-test:
