@@ -134,7 +134,7 @@ basepython = python3.10
 ```
 
 (pytest-operator)=
-### `pytest-operator`
+#### `pytest-operator`
 
 `pytest-operator` is a Python library that provides Juju plugins for the generic Python library `pytest` to facilitate the {ref}`integration testing <integration-testing>` of charms.
 
