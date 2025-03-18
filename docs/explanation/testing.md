@@ -98,7 +98,7 @@ This enables us to check whether our charm complies with the behavioural specifi
 (integration-testing)=
 ## Integration testing
 
-Integration tests verify the interaction of multiple software components. In the context of a charm, they ensure the charm functions correctly when deployed in a test model in a real controller, checking for "blocked" or "error" states during typical operations. Leveraging tools like [the `juju` CLI](inv:juju:std:label#list-of-juju-cli-commands), [`python-libjuju`](https://github.com/juju/python-libjuju), [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator), and [`zaza`](https://zaza.readthedocs.io/en/latest/index.html), these tests cover charm packing, deployment, integration with other applications, configuration changes, action execution, and overall functionality within various combinations of these factors. This ensures the charm's operational logic performs as expected under diverse conditions.
+Integration tests verify the interaction of multiple software components. In the context of a charm, they ensure the charm functions correctly when deployed in a test model in a real controller, checking for "blocked" or "error" states during typical operations. The goal of integration testing is to ensure the charm's operational logic performs as expected under diverse conditions.
 
 Integration tests should be focused on a single charm. Sometimes an integration test requires multiple charms to be deployed for adequate testing, but ideally integration tests should not become end-to-end tests.
 
