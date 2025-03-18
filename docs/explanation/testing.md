@@ -1,12 +1,6 @@
 (testing)=
 # Testing
 
-```{note}
-
-This page is currently being refactored.
-
-```
-
 Charms should have tests to verify that they are functioning correctly. This page describes the types of testing that you should consider.
 
 ## Unit testing
