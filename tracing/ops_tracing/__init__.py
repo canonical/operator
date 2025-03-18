@@ -17,8 +17,8 @@
 Quick start
 -----------
 
-Declare the charm tracing interface and optionally the TLS interface in your
-``charmcraft.yaml``.::
+In your ``charmcraft.yaml``, declare the charm tracing relation with a ``tracing``
+interface and optionally the TLS relation with a ``certificate_transfer`` interface.::
 
     requires:
         charm-tracing:
@@ -33,8 +33,8 @@ Declare the charm tracing interface and optionally the TLS interface in your
 If you're migrating from the ``charm-tracing`` charm lib, you most likely already
 have these relations, but do note their names.
 
-Caveat: this library pulls in ``pydantic``, and the Rust build packages must be
-specified in your ``charmcraft.yaml``.::
+Caveat: your ``charmcraft.yaml`` needs to include the Rust build packages, because
+this library pulls in ``pydantic``.::
 
     parts:
         charm:
@@ -45,11 +45,11 @@ specified in your ``charmcraft.yaml``.::
 
 If you're migrating from the ``charm-tracing`` charm lib, that should already be the case.
 
-Then add the Tracing object in your charm::
+In your charm, add the ``Tracing`` object.::
 
     import ops
 
-    class Charm(ops.CharmBase):
+    class SomeCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         ...

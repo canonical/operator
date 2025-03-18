@@ -18,9 +18,7 @@ import contextlib
 import functools
 import pathlib
 import sqlite3
-from typing import Callable
-
-from typing_extensions import ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Callable
 
 from ._const import (
     BUFFER_SIZE,
@@ -32,6 +30,12 @@ from ._const import (
     Config,
 )
 
+if TYPE_CHECKING:
+    from typing_extensions import ParamSpec, TypeVar
+
+    P = ParamSpec('P')
+    R = TypeVar('R')
+
 # Must use isolation_level=None for consistency between Python 3.8 and 3.12
 # Can't use the STRICT keyword for tables, requires sqlite 3.37.0
 # Can't use the octet_length() either, requires sqlite 3.43.0
@@ -40,9 +44,6 @@ from ._const import (
 # Ubuntu 20.04  Python  3.8.2  Sqlite 3.31.1  Adds UPSERT, window functions
 # Ubuntu 22.04  Python 3.10.x  Sqlite 3.37.2  Adds STRICT tables, JSON ops
 # Ubuntu 24.04  Python 3.12.x  Sqlite 3.45.2  Adds math functions
-
-P = ParamSpec('P')
-R = TypeVar('R')
 
 
 def retry(f: Callable[P, R]) -> Callable[P, R]:

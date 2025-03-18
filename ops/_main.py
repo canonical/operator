@@ -14,13 +14,13 @@
 
 """Implement the main entry point to the framework."""
 
+import contextlib
 import logging
 import os
 import shutil
 import subprocess
 import sys
 import warnings
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
@@ -564,8 +564,10 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
     from . import tracing  # break circular import
 
     juju_context = _JujuContext.from_dict(os.environ)
-    context = tracing._setup(juju_context, charm_class.__name__) if tracing else nullcontext()
-    with context:
+    tracing_context = (
+        tracing._setup(juju_context, charm_class.__name__) if tracing else contextlib.nullcontext()
+    )
+    with tracing_context:
         try:
             with tracer.start_as_current_span('ops.main'):
                 manager = _Manager(

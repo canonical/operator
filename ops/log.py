@@ -11,19 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Interface to emit messages to the Juju logging system."""
 
-from __future__ import annotations
+"""Interface to emit messages to the Juju logging system."""
 
 import logging
 import sys
 import types
 import typing
 import warnings
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .model import _ModelBackend
+from .model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):

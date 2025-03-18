@@ -221,5 +221,7 @@ class Tracing(ops.Object):
             else:
                 return Config(None, None)
         except (AmbiguousRelationUsageError, ProtocolNotRequestedError):
+            # These should not really happen, as we've set up a single relation
+            # and requested the protocol explicitly.
             logger.exception('Error getting the tracing destination')
             return Config(None, None)
