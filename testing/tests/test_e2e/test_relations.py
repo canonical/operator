@@ -90,7 +90,7 @@ def test_get_relation(mycharm):
     )
 
 
-def test_relation_set_single():
+def test_relation_set_single_add_del_change():
     relation_name = "relation-name"
 
     class Charm(CharmBase):
@@ -231,7 +231,7 @@ def test_relation_set_single():
         ),
     ],
 )
-def test_relation_set_update(
+def test_relation_set_bulk_update(
     original_data: dict[str, str], new_data: dict[str, str], result_data: dict[str, str]
 ):
     relation_name = "relation-name"
