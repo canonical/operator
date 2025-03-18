@@ -126,7 +126,7 @@ When writing an integration test, it is not sufficient to simply check that Juju
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
 - [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and/or [`zaza`](https://github.com/openstack-charmers/zaza)
 
-Note that the integration tests and unit tests should run on the same minor Python version as is shipped with the OS as configured under the `charmcraft.yaml` `base.run-on` key. With tox, for Ubuntu 22.04, this can be done using:
+Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
 ```
 [testenv]
