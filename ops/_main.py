@@ -588,7 +588,7 @@ class _Manager:
             event_handle = _framework.Handle.from_path(event_path)
             logger.debug('Re-emitting deferred event: %s', event_handle)
             charm = self._make_charm(event_handle.kind)
-            charm.framework.reemit(event_path)
+            charm.framework._reemit_single_path(event_path)
             self._commit(charm.framework)
             self._close()
             charm._destroy_charm()
