@@ -394,29 +394,23 @@ def capture_events(
 
     captured: List[EventBase] = []
     _real_emit = Framework._emit
-    _real_reemit = Framework.reemit
+    _real_reemit_single_path = Framework._reemit
 
-    def _wrapped_emit(self: Framework, evt: EventBase):
+    def _wrapped_emit(self: Framework, event: EventBase):
         if not include_framework and isinstance(
-            evt,
+            event,
             (PreCommitEvent, CommitEvent, CollectStatusEvent),
         ):
-            return _real_emit(self, evt)
+            return _real_emit(self, event)
 
-        if isinstance(evt, allowed_types):
+        if isinstance(event, allowed_types):
             # dump/undump the event to ensure any custom attributes are (re)set by restore()
-            evt.restore(evt.snapshot())
-            captured.append(evt)
+            event.restore(event.snapshot())
+            captured.append(event)
 
-        return _real_emit(self, evt)
+        return _real_emit(self, event)
 
-    def _wrapped_reemit(self: Framework, single_event_path: Optional[str] = None):
-        # Framework calls reemit() before emitting the main Juju event. We intercept that call
-        # and capture all events in storage.
-
-        if not include_deferred:
-            return _real_reemit(self, single_event_path=single_event_path)
-
+    def _wrapped_reemit_single_path(self: Framework, single_event_path: str):
         # Load all notices from storage as events.
         for event_path, _, _ in self._storage.notices(single_event_path):
             event_handle = Handle.from_path(event_path)
@@ -428,21 +422,20 @@ def capture_events(
             event.deferred = False
             self._forget(event)  # prevent tracking conflicts
 
-            if not include_framework and isinstance(
-                event,
-                (PreCommitEvent, CommitEvent),
-            ):
+            if not include_framework and isinstance(event, (PreCommitEvent, CommitEvent)):
                 continue
 
             if isinstance(event, allowed_types):
                 captured.append(event)
 
-        return _real_reemit(self, single_event_path=single_event_path)
+        return _real_reemit_single_path(self, single_event_path)
 
-    Framework._emit = _wrapped_emit  # type: ignore
-    Framework.reemit = _wrapped_reemit
+    Framework._emit = _wrapped_emit
+    if include_deferred:
+        Framework._reemit_single_path = _wrapped_reemit_single_path
 
     yield captured
 
     Framework._emit = _real_emit
-    Framework.reemit = _real_reemit
+    if include_deferred:
+        Framework._reemit_single_path = _real_reemit_single_path
