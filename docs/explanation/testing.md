@@ -7,7 +7,7 @@ This page is currently being refactored.
 
 ```
 
-Charms should have tests to verify that they are functioning correctly. This document describes some of the various types of testing you may want to consider -- their meaning, recommended coverage, and recommended tooling in the context of a charm.
+Charms should have tests to verify that they are functioning correctly. This page describes the types of testing that you should consider.
 
 ## Unit testing
 
