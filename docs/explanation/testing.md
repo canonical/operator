@@ -104,7 +104,7 @@ Integration tests should be focused on a single charm. Sometimes an integration 
 
 Integration tests typically take significantly longer to run than unit tests.
 
-> See also: {ref}`write-integration-tests-for-a-charm`
+> See also: {ref}`write-integration-tests-for-a-charm`.
 
 ### Coverage
 
