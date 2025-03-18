@@ -2,26 +2,19 @@ name: Publish (ops-tracing)
 on: [workflow_call, workflow_dispatch]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [3.8, "3.10", 3.12]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: |
-          uv python install ${{ matrix.python-version }}
-          cd tracing; uvx tox
-
+  framework-tests:
+    uses: ./.github/workflows/framework-tests.yaml
+  observability-charm-tests:
+    uses: ./.github/workflows/observability-charm-tests.yaml
+  hello-charm-tests:
+    uses: ./.github/workflows/hello-charm-tests.yaml
   release:
-    needs: test
     runs-on: ubuntu-latest
     environment: release
     permissions:
       id-token: write
       attestations: write
+    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -29,7 +22,8 @@ jobs:
           cd tracing
           uv build --sdist --wheel
           rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
-      # NOTE: this step is expected to fail until the PYPI configuration is updated
+      # This step is expected to fail until the trusted publisher configuration
+      # is updated on the PYPI.
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: ./tracing/dist/

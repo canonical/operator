@@ -1,3 +1,5 @@
+# Remove this file when we're ready to make a simultaneous release.
+# That is {ops, ops-tracing, ops-scenario} with matching versions.
 on:
   push:
     branches: [feat-otel-ops-tracing-lib]

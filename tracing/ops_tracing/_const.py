@@ -26,20 +26,20 @@ BUFFER_FILE: str = '.tracing-data.db'
 """Name of the file whither data is buffered, located next to .unit-state.db."""
 
 DB_RETRY = 3
-# Must have a short timeout when terminating
-# May want to have a longer timeout otherwise
+# Must have a short timeout when terminating.
+# May want to have a longer timeout otherwise.
 DB_TIMEOUT = 5
 LONG_DB_TIMEOUT = 3600
 
-# Approximate safety limit for the database file size
+# Approximate safety limit for the database file size.
 BUFFER_SIZE = 40 * 1024 * 1024
 
 # Default priority for tracing data.
-# Dispatch invocation that doesn't result in any event being observed
-# by charm or its charm lib produces data at this priority.
+# Dispatch invocation where the juju event is not observed by the charm or any charm lib
+# produces data at this priority.
 DEFAULT_PRIORITY = 10
 
-# Higher priority for data from invocation with observed events.
+# Higher priority for data from dispatch where the juju event is observed.
 OBSERVED_PRIORITY = 50
 
 

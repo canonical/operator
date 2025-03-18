@@ -46,21 +46,24 @@ class BufferingSpanExporter(SpanExporter):
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         """Export a batch of telemetry data.
 
-        Note: to avoid data loops or recursion, this function cannot be instrumented.
+        Note that this function cannot be instrumented to avoid data loops or recursion.
         """
         try:
-            # Note:
-            # this is called in a helper thread, which is daemonic,
-            # the MainThread will wait at most 10s for this thread.
+            # Notes:
+            # This function is called in a helper thread, which is daemonic.
+            # When the dispatch is done, telemetry is shut down, causing the main thread to wait.
+            # We don't want the main thread to wait for longer than 10s.
             # Margins:
             # - 1s safety margin
             # - 1s for buffered data time overhang
             # - 2s for live data
+            # We don't distinguish between an export in background or due to shutdown.
+            # We'll limit the running time of each export to (10 - 4) seconds.
             deadline = time.monotonic() + 6
 
-            assert spans  # noqa: S101  # the BatchSpanProcessor won't call us if there's no data
+            assert spans  # noqa: S101  # The BatchSpanProcessor won't call us if there's no data.
             rv = self.buffer.pushpop((otlp_json.encode_spans(spans), otlp_json.CONTENT_TYPE))
-            assert rv  # noqa: S101  # we've just pushed something in
+            assert rv  # noqa: S101  # We've just pushed something in.
             self.do_export(*rv)
 
             for _ in range(SENDOUT_FACTOR - 1):
@@ -92,8 +95,8 @@ class BufferingSpanExporter(SpanExporter):
         context.set_alpn_protocols(['http/1.1'])
         context.verify_flags |= ssl.VERIFY_X509_STRICT
         if partial_chain := getattr(ssl, 'VERIFY_X509_PARTIAL_CHAIN', None):
-            # Available starting from Python 3.10. The partial chain flag allows trusting the
-            # intermediate CAs in the CA list without the matching root CA
+            # Available starting from Python 3.10. The partial chain flag allows trusting an
+            # intermediate CAs in the CA list without the matching root CA.
             context.verify_flags |= partial_chain
 
         if ca is not None:

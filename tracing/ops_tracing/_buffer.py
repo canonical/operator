@@ -69,14 +69,15 @@ def retry(f: Callable[P, R]) -> Callable[P, R]:
 class Buffer:
     """Buffer for tracing data.
 
-    Access buffer attributes is effectively protected by an sqlite transaction.
+    Access to the buffer attributes is effectively protected by an sqlite transaction.
     """
 
     ids: set[int]
-    """tracing data ids buffered during this dispatch invocation."""
+    """Tracing data ids buffered during this dispatch invocation."""
     observed = False
     """Marks that data from this dispatch invocation has been marked observed."""
     stored: int | None = None
+    """Estimate of stored data size in bytes if known, or None if not yet known."""
 
     def __init__(self, path: pathlib.Path | str):
         self.path = str(path)
@@ -189,7 +190,7 @@ class Buffer:
             if data:
                 # Ensure that there's enough space in the buffer
 
-                # TODO: expose `stored` in metrics, one day
+                # TODO: expose `stored` in metrics, one day.
                 if self.stored is None:
                     self.stored = self._stored_size(conn)
                 excess = self.stored + stored_size - BUFFER_SIZE
@@ -220,7 +221,7 @@ class Buffer:
                         tuple(collected_ids),
                     )
 
-                # Store the new tracing data
+                # Store the new tracing data.
                 priority = OBSERVED_PRIORITY if self.observed else DEFAULT_PRIORITY
                 cursor = conn.execute(
                     """
@@ -230,11 +231,11 @@ class Buffer:
                     (priority, data, mime),
                 )
 
-                assert cursor.lastrowid is not None  # noqa: S101  # just inserted
+                assert cursor.lastrowid is not None  # noqa: S101  # Just inserted.
                 if not self.observed:
                     self.ids.add(cursor.lastrowid)
 
-            # Return oldest important data, if any
+            # Return the oldest important record, if any.
             rv = conn.execute(
                 """
                 SELECT id, data, mime
