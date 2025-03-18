@@ -1001,15 +1001,14 @@ class Container(_max_posargs(1)):
 
     For example, suppose you want to express that your container has:
 
-    * ``/home/foo/bar.py``
-    * ``/bin/bash``
-    * ``/bin/baz``
+    * A file ``/home/foo.py``
+    * A directory ``/bin``
 
-    this becomes::
+    This becomes::
 
         mounts = {
-            'foo': Mount('/home/foo', pathlib.Path('/path/to/local/dir/containing/bar/py/')),
-            'bin': Mount('/bin/', pathlib.Path('/path/to/local/dir/containing/bash/and/baz/')),
+            'foo': Mount('/home/foo.py', pathlib.Path('/path/to/local/foo.py')),
+            'bin': Mount('/bin', pathlib.Path('/path/to/local/bin')),
         }
     """
 
