@@ -128,7 +128,7 @@ When writing an integration test, it is not sufficient to simply check that Juju
 
 Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
-```
+```ini
 [testenv]
 basepython = python3.10
 ```
