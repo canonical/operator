@@ -158,7 +158,7 @@ It also provides convenient markers and command line parameters (e.g., the `@pyt
 
 ## Continuous integration
 
-Typically, you want the tests to be run automatically against any PR into your repository's main branch, and sometimes, to trigger a new release whenever that succeeds. CD is out of scope for this article, but we will look at how to set up a basic CI.
+Typically, you want the tests to be run automatically against any PR into your repository's main branch, and potentially trigger a new release whenever the tests succeed. Continuous deployment is out of scope for this page, but we will look at how to set up basic continuous integration.
 
 Create a file called `.github/workflows/ci.yaml`. For example, to include a `lint` job that runs the `tox` `lint` environment:
 
