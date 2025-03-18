@@ -1,0 +1,38 @@
+name: Publish (ops-tracing)
+on: [workflow_call, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8, "3.10", 3.12]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          uv python install ${{ matrix.python-version }}
+          cd tracing; uvx tox
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          cd tracing
+          uv build --sdist --wheel
+          rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
+      # NOTE: this step is expected to fail until the PYPI configuration is updated
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          skip-existing: true
+          verbose: true
+
