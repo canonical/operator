@@ -1007,8 +1007,8 @@ class Container(_max_posargs(1)):
     This becomes::
 
         mounts = {
-            'foo': Mount('/home/foo.py', pathlib.Path('/path/to/local/foo.py')),
-            'bin': Mount('/bin', pathlib.Path('/path/to/local/bin')),
+            'foo': Mount(location='/home/foo.py', source=pathlib.Path('/path/to/local/foo.py')),
+            'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
     """
 
