@@ -71,7 +71,7 @@ In addition to validity of the databag state, we could check for more elaborate 
 ### Tools
 
 - [`ops.testing`](ops_testing)
-- a pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
+- A pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
 
 ### Examples
 
