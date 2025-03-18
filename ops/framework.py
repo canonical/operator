@@ -460,9 +460,9 @@ class ObjectEvents(Object):
         """
         prefix = 'unable to define an event with event_kind that '
         if not event_kind.isidentifier():
-            raise RuntimeError(f'{prefix}is not a valid python identifier: {event_kind}')
+            raise RuntimeError(f'{prefix}is not a valid Python identifier: {event_kind}')
         elif keyword.iskeyword(event_kind):
-            raise RuntimeError(f'{prefix}is a python keyword: {event_kind}')
+            raise RuntimeError(f'{prefix}is a Python keyword: {event_kind}')
         try:
             getattr(cls, event_kind)
             raise RuntimeError(
@@ -476,7 +476,7 @@ class ObjectEvents(Object):
         setattr(cls, event_kind, event_descriptor)
 
     @classmethod
-    def undefine_event(cls, event_kind: str):
+    def _undefine_event(cls, event_kind: str):
         """Remove the definition of an event on this type at runtime.
 
         This undoes the effect of :meth:`define_event`. This is not intended
@@ -484,7 +484,7 @@ class ObjectEvents(Object):
         """
         event_descriptor = getattr(cls, event_kind)
         if hasattr(event_descriptor, 'framework') and event_descriptor.framework is not None:
-            event_descriptor.framework.unregister_type(
+            event_descriptor.framework._unregister_type(
                 event_descriptor.event_type, event_descriptor.emitter, event_descriptor.event_kind
             )
         try:
@@ -739,7 +739,7 @@ class Framework(Object):
         self._type_registry[parent_path, kind_] = cls
         self._type_known.add(cls)
 
-    def unregister_type(
+    def _unregister_type(
         self,
         cls: Type[Serializable],
         parent: Optional[Union['Handle', 'Object']],
@@ -940,7 +940,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    def reemit(self, single_event_path: Optional[str] = None):
+    def reemit(self):
         """Reemit previously deferred events to the observers that deferred them.
 
         Only the specific observers that have previously deferred the event will be
@@ -948,7 +948,7 @@ class Framework(Object):
         been first emitted won't be notified, as that would mean potentially observing
         events out of order.
         """
-        self._reemit(single_event_path)
+        self._reemit(emitting_deferred=True)
 
     @contextmanager
     def _event_context(self, event_name: str):
@@ -980,7 +980,10 @@ class Framework(Object):
 
         self._event_name = old_event_name
 
-    def _reemit(self, single_event_path: Optional[str] = None):
+    def _reemit_single_path(self, single_event_path: str):
+        self._reemit(single_event_path, emitting_deferred=True)
+
+    def _reemit(self, single_event_path: Optional[str] = None, emitting_deferred: bool = False):
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):
@@ -1004,7 +1007,7 @@ class Framework(Object):
             observer = self._observer.get(observer_path)
 
             if observer:
-                if single_event_path is None:
+                if emitting_deferred:
                     logger.debug('Re-emitting deferred event %s.', event)
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
