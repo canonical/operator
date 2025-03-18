@@ -531,14 +531,6 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                (
-                    'update_relation_data',
-                    {
-                        'relation_id': relation_id,
-                        'entity': harness.model.unit,
-                        'data': {'port': ''},
-                    },
-                ),
             ],
         )
 
