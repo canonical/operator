@@ -875,9 +875,8 @@ class Framework(Object):
         saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
-        ops_event = event.__class__.__module__.startswith('ops.')
         opentelemetry.trace.get_current_span().add_event(
-            f'{"ops." if ops_event else ""}{event.__class__.__name__}',
+            event.__class__.__name__,
             attributes={'deferred': event.deferred, 'kind': event_kind},
         )
         parent = event.handle.parent
@@ -915,13 +914,10 @@ class Framework(Object):
             from . import tracing  # break circular import
 
             if tracing:
-                # When an app has just been deployed, the tracing relation is not yet established.
-                # The operator would like to see the tracing data for early events like install.
-                # The tracing buffer may fill up in the interim and older data is evicted.
-                # To help preserve the interesting tracing data, we mark a dispatch that has an
-                # observer as "observed" increasing its data priority in the buffer.
-                # The logic could be different, for example, deferred events that are resolved
-                # during unobserved disptach could be interesting too. We keep it simple here.
+                # To ensure early events (install, start) are not evicted from the tracing buffer
+                # before the tracing relation is established, we mark any dispatch where the juju
+                # event has an observer as "observed". This increases its data priority within the
+                # buffer, helping preserve those initial pieces of tracing data.
                 tracing._mark_observed()
             self._reemit(event_path)
 
