@@ -383,6 +383,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self, relation_id: int, data: Mapping[str, str], is_app: bool
     ) -> None:
         self._check_app_data_access(is_app)
+        # NOTE: The code below currently does not have any effect, because
+        # the dictionary has already had the same set/delete operations
+        # applied to it by RelationDataContent -- unlike in production,
+        # where this method calls out to Juju's relation-set to operate on
+        # the real databag, this method currently operates on the same
+        # dictionary object that RelationDataContent does.
         relation = self._get_relation_by_id(relation_id)
         if is_app:
             if not self._state.leader:
