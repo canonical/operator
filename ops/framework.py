@@ -876,7 +876,7 @@ class Framework(Object):
         event_path = event.handle.path
         event_kind = event.handle.kind
         opentelemetry.trace.get_current_span().add_event(
-            event.__class__.__name__,
+            event.__class__.__qualname__,
             attributes={'deferred': event.deferred, 'kind': event_kind},
         )
         parent = event.handle.parent
@@ -995,29 +995,31 @@ class Framework(Object):
                     # and is also not a lifecycle (framework-emitted) event,
                     # it must be a custom event
                     logger.debug('Emitting custom event %s.', event)
-                else:
-                    pass
 
                 custom_handler = getattr(observer, method_name, None)
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    synthetic = not event_is_from_juju and not event_is_action
-                    event_module = event.__class__.__module__
-                    if event_module.startswith('ops.'):
-                        # ops.charm.Events are re-exported through ops
-                        event_module = 'ops'
-                    event_class = f'{event_module}.{event.__class__.__qualname__}'
+                    if event_is_from_juju:
+                        event_type = 'hook'
+                    elif event_is_action:
+                        event_type = 'action'
+                    elif isinstance(event, LifecycleEvent):
+                        event_type = 'framework'
+                    else:
+                        event_type = 'custom'
                     obs_class = observer_path.split('/')[-1].split('[')[0]
                     with tracer.start_as_current_span(f'{event_handle.kind}: {obs_class}') as span:
                         span.set_attribute('deferred', single_event_path is None)
-                        span.set_attribute('synthetic', synthetic)
                         span.set_attribute('event', repr(event))
-                        span.set_attribute('event_class', event_class)
+                        span.set_attribute('event_type', event_type)
+                        span.set_attribute('event_class', event.__class__.__qualname__)
                         span.set_attribute('event_name', event_handle.kind)
                         span.set_attribute('handler', f'{observer_path}.{method_name}')
                         with self._event_context(event_handle.kind):
-                            if not synthetic and self._juju_debug_at.intersection({'all', 'hook'}):
+                            if (
+                                event_is_from_juju or event_is_action
+                            ) and self._juju_debug_at.intersection({'all', 'hook'}):
                                 # Present the welcome message and run under PDB.
                                 self._show_debug_code_message()
                                 pdb.runcall(custom_handler, event)
