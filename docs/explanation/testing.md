@@ -28,9 +28,6 @@ Unit testing a charm should cover:
 
 ### Tools
 
-- [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [](ops_testing), the Ops unit testing framework
-- [`tox`](https://tox.wiki/en/latest/index.html) can be used to automate and standardize tests.
 - [`ops.testing`](ops_testing), the framework for state-transition testing in Ops
 - [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html)
 - [`tox`](https://tox.wiki/en/latest/index.html) for automating and standardizing tests
