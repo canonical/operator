@@ -323,8 +323,8 @@ class Harness(Generic[CharmType]):
         )
 
         warnings.warn(
-            'Harness is deprecated; we recommend using state transition testing '
-            "(previously known as 'Scenario') instead",
+            'Harness is deprecated. For the recommended approach, see: '
+            'https://ops.readthedocs.io/en/latest/howto/write-unit-tests-for-a-charm.html',
             PendingDeprecationWarning,
             stacklevel=2,
         )
