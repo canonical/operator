@@ -145,12 +145,6 @@ def _on_snapshot(self, event: ops.ActionEvent):
 ```
 > See more: [](ops.ActionEvent.id)
 
-## Test the feature
-
-> See first: {ref}`write-unit-tests-for-a-charm`
-
-What you need to do depends on what kind of tests you want to write.
-
 ### Write unit tests
 
 > See first: {ref}`write-unit-tests-for-a-charm`

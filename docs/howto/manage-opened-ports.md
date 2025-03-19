@@ -32,7 +32,7 @@ You'll want to add unit and integration tests.
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`, {ref}`write-unit-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 In your unit tests, use the [](ops.testing.State.opened_ports) component of the
 input `State` to specify which ports are already open when the event is

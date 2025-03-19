@@ -121,12 +121,6 @@ The storage will not be available immediately after that call - the charm should
 observe the `storage-attached` event and handle any remaining setup once Juju
 has attached the new storage.
 
-## Test the feature
-
-> See first: {ref}`write-unit-tests-for-a-charm`
-
-You'll want to add unit and integration tests:
-
 ### Write unit tests
 
 > See first: {ref}`write-unit-tests-for-a-charm`

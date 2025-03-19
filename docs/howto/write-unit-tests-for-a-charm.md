@@ -1,15 +1,15 @@
 (write-unit-tests-for-a-charm)=
 # How to write unit tests for a charm
 
-## Setting up
+## Setting up your environment
 
-First of all, install the Ops testing framework. To do this in a virtual environment while we are developing, use `pip` or other package managers. For example:
+First of all, install the Ops testing framework. To do this in a virtual environment while we're developing, use `pip` or a different package manager. For example:
 
 ```
 pip install ops[testing]
 ```
 
-Normally, we'll include this and pin-point it to the latest minor version in the dependency group for our unit tests, for example in a `test-requirements.txt` file:
+When we want to run repeatable unit tests, we'll normally pin `ops[testing]` to the latest minor version in the dependency group for our unit tests. For example, in a `test-requirements.txt` file:
 
 ```text
 ops[testing] ~= 2.19
@@ -26,14 +26,14 @@ test = [
 
 ## Creating the charm and test files
 
-Declare our new charm type in `charm.py`:
+So that we have a charm to test, declare a placeholder charm type in `charm.py`:
 
 ```python
 class MyCharm(ops.CharmBase):
     pass        
 ```
 
-Open a new `test_foo.py` file where we will put the test code and import the [`ops.testing`](ops_testing) framework:
+Then open a new `test_foo.py` file for the test code and import the [`ops.testing`](ops_testing) framework:
 
 ```python
 import ops
@@ -46,11 +46,11 @@ To write a test function, use a `Context` object to encapsulate the charm type (
 
 This follows the typical test structure:
 
-- Arrange: arrange inputs, mock necessary functions/system calls, initialize the charm
-- Act: act by calling `Context.run`
-- Assert: assert expected outputs or function calls.
+- Arrange inputs, mock necessary functions/system calls, and initialise the charm
+- Act by calling `Context.run`
+- Assert expected outputs or function calls.
 
-For example, if `MyCharm` writes a YAML config file via `Container.Push` on the pebble-ready event:
+For example, suppose that `MyCharm` uses `Container.Push` to write a YAML config file on the pebble-ready event:
 
 ```python
 def _on_pebble_ready(self, event: ops.PebbleReadyEvent):        
@@ -59,7 +59,7 @@ def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
     # ...
 ```
 
-And we want to test this behaviour, the test might look like this:
+A test for this behaviour might look like:
 
 ```python
 import yaml
@@ -82,7 +82,7 @@ def test_pebble_ready_writes_config_file():
     ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
-    container_root_fs = container.get_filesystem(ctx)
+    container_root_fs = state_out.get_container("some-container").get_filesystem(ctx)
     cfg_file = container_root_fs / "etc" / "config.yaml"
     config = yaml.safe_load(cfg_file.read_text())
     assert config["message"] == "Hello, world!"
@@ -91,7 +91,7 @@ def test_pebble_ready_writes_config_file():
 
 ```{note}
 
-If you like using unittest, you should rewrite this as a method of some TestCase subclass.
+If you prefer to use unittest, you should rewrite this as a method of a `TestCase` subclass.
 
 ```
 
@@ -101,7 +101,7 @@ If you like using unittest, you should rewrite this as a method of some TestCase
 
 ## Mocking beyond the State
 
-If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls on top of what the framework does for you.
+If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
 
 For example, suppose that the charm we're testing uses the `KubernetesServicePatch`. To update the test above to mock that object, modify the test file to contain:
 

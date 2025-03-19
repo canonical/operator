@@ -71,8 +71,6 @@ def _on_install(self, event: ops.InstallEvent):
 
 ### Test the feature
 
-> See first: {ref}`write-unit-tests-for-a-charm`
-
 You'll want to add unit tests.
 
 For integration tests: stored state isn't a feature, it's functionality that
