@@ -7,7 +7,9 @@ Charms should have tests to verify that they are functioning correctly. This pag
 
 Unit tests isolate and validate individual code units (functions, methods, and so on) by mocking Juju APIs and workloads without external interactions. Unit tests are intended to be isolating and fast to complete. These are the tests you would run before committing any code changes.
 
-Every unit test involves a mocked event context, as charms only execute in response to events. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is _always_ an event context to be mocked, and the starting point of a unit test is typically an event. A charm acts like a function, taking event context (always present), configuration, relation data, and stored state as inputs. It then performs operations affecting its workload or other charms:
+Every unit test involves a mocked event context, as charms only execute in response to events. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is _always_ an event context to be mocked, and the starting point of a unit test is typically an event.
+
+A charm acts like a function, taking event context (always present), configuration, relation data, and stored state as inputs. It then performs operations affecting its workload or other charms:
 
 - System operations such as writing files.
 - Cloud operations such as launching virtual machines.
