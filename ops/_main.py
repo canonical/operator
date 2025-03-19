@@ -493,6 +493,8 @@ class _Manager:
         return store
 
     def _make_framework(self, *args: Any, **kwargs: Any):
+        # A wrapper so that the testing subclasses can easily override which
+        # framework class is created.
         return _framework.Framework(*args, **kwargs)
 
     def _build_framework(self, event_name: str):
@@ -570,7 +572,7 @@ class _Manager:
         # Provided for child classes - nothing needs to be done in the base.
 
     def run_deferred(self):
-        """Emit and then commit the framework.
+        """Emit deferred events and then commit the framework.
 
         A framework and charm object are created for each notice in the storage
         (an event and observer pair), the relevant deferred event is emitted,
