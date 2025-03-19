@@ -95,7 +95,7 @@ class DatabaseRequirer(ops.Object):
 ```
 
 ```{admonition} Best practice
-:class: hint
+:class: important
 
 Libraries should never mutate the status of a unit or application. Instead, use
 return values, or raise exceptions and let them bubble back up to the charm for

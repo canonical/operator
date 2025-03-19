@@ -6,7 +6,7 @@ There are several ways your charm might start a workload, depending on the type 
 For a machine charm, it is likely that packages will need to be fetched, installed and started to provide the desired charm functionality. This can be achieved by interacting with the system's package manager, ensuring that package and service status is maintained by reacting to events accordingly.
 
 ```{admonition} Best practice
-:class: hint
+:class: important
 
 Limit the use of shell scripts and commands as much as possible in favour of
 writing Python for charm code.
@@ -76,20 +76,20 @@ class MachineCharm(ops.CharmBase):
 ```
 
 ```{admonition} Best practice
-:class: hint
+:class: important
 
 When running subprocesses, log the return (exit) code as well as `stderr` when
 errors occur.
 ```
 
 ```{admonition} Best practice
-:class: hint
+:class: important
 
 Use absolute paths in subprocesses to prevent security issues.
 ```
 
 ```{admonition} Best practice
-:class: hint
+:class: important
 
 Execute processes directly rather than via the shell.
 ```
