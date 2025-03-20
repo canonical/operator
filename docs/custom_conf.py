@@ -292,6 +292,9 @@ autodoc_default_options = {
     'show-inheritance': None,
 }
 
+# This value stacks args vertically if a signature is too long.
+maximum_signature_line_length = 80
+
 # -- Options for sphinx.ext.intersphinx --------------------------------------
 
 # This config value contains the locations and names of other projects
