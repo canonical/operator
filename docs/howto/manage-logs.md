@@ -37,7 +37,7 @@ The default logging level for a Juju model is `INFO`. To see, for example,
 > See more: [`logging`](https://docs.python.org/3/library/logging.html)
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Capture output to `stdout` and `stderr` in your charm and use the logging and
 warning functionality to send messages to the charm user, rather than rely on
@@ -54,7 +54,7 @@ charm code.
 ```
 
 ````{admonition} Best practice
-:class: important
+:class: hint
 
 Do not build log strings yourself: allow the logger to do this for you as
 required. That is:
@@ -70,13 +70,13 @@ logger.info(f"Got some more information {more_info}")
 ````
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Avoid spurious logging. Ensure that log messages are clear and meaningful and
 provide the information a user would require to rectify any issues.
 ```
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 Never log credentials or other sensitive information.
 ```

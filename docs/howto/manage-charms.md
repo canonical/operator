@@ -10,14 +10,14 @@ added and changed after every significant change, so that you have a record of
 the work, and can revert to an earlier version when required.
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Name the repository using the pattern ``<charm name>-operator`` for a single
 charm, or ``<base charm name>-operators`` when the repository will hold
 multiple related charms. For the charm name, see
 {external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
 ```
-
+    
 In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
@@ -83,7 +83,7 @@ development environment, you'll already have `tox` installed.
 - Run `tox list` to see the available commands.
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 All charms should provide the commands configured by the charmcraft profiles, to
 allow easily testing across the charm ecosystem. It's fine to tweak the
@@ -101,7 +101,7 @@ charm code that will run with the Python version of the oldest base you support.
 > See also: {external+juju:ref}`Juju | Roadmap and releases <juju-roadmap-and-releases>`
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python)
 version in your `pyproject.toml` so that tooling will detect any use of Python
@@ -140,7 +140,7 @@ Use the `pyproject.toml` dependencies to specify *all* dependencies (including
 indirect or transitive dependencies) in a lock file.
 
 ````{admonition} Best practice
-:class: important
+:class: hint
 
 When using the `charm` plugin with charmcraft, ensure that you set strict
 dependencies to true, for example:
@@ -164,7 +164,7 @@ these tools to simplify the generation of your lock file.
 ```
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Ensure that the `pyproject.toml` *and* the lock file are committed to version
 control, so that exact versions of charms can be reproduced.
@@ -186,7 +186,7 @@ proposed for or accepted into your main branch the `lint`, `unit`, and
 `integration` commands are run, and will block merging when failing.
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 The quality assurance pipeline of a charm should be automated using a
 continuous integration (CI) system.
@@ -274,7 +274,7 @@ charms and libraries, and more.
 ```
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Ensure that tooling is configured to automatically detect new versions,
 particularly security releases, for all your dependencies.

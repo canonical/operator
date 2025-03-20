@@ -12,7 +12,7 @@ have the same lifetime as the machine or container, and storing state in a Juju
 peer relation - for state that should have the same lifetime as the application.
 
 ```{admonition} Best practice
-:class: important
+:class: hint
 
 Write your charm to be stateless, where possible.
 ```
