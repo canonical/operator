@@ -4,6 +4,8 @@
 ```{toctree}
 :maxdepth: 2
 
+Manage charms <manage-charms>
+Manage charm design <manage-charm-design>
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
 Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 Manage logs <manage-logs>

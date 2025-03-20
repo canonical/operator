@@ -1,15 +1,7 @@
 (write-your-first-machine-charm)=
 # Write your first machine charm
 
-In this tutorial you will write a machine charm for Juju using {external+charmcraft:doc}`Charmcraft <index>` and Ops.
-
-<!-- TODO (tam)
-Add this link above:
-
-{external+juju:ref}`machine charm <machine-charm>` for Juju 
-
-When it's available in Juju.
--->
+In this tutorial you will write a {external+juju:ref}`machine charm <machine-charm>` for Juju using {external+charmcraft:doc}`Charmcraft <index>` and Ops.
 
 **What you'll need:**
 
