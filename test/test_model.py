@@ -1185,6 +1185,7 @@ class TestModel:
         """)
         model = ops.Model(meta, _ModelBackend('myapp/0'))
         rel = model.get_relation('db')
+        assert rel is not None
         remote_model = rel.remote_model
         assert remote_model.uuid == 'UUID'
 

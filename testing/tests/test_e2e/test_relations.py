@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Type
 
 import pytest
+
 from ops.charm import (
     CharmBase,
     CharmEvents,
@@ -665,34 +666,28 @@ def test_peer_relation_default_values():
     assert relation.peers_data == {0: _DEFAULT_JUJU_DATABAG}
 
 
-def test_relation_remote_model(mycharm):
-    def pre_event(charm: CharmBase):
-        assert charm.model.get_relation("foo")
-        assert charm.model.get_relation("bar") is None
-        assert charm.model.get_relation("qux")
-        assert charm.model.get_relation("zoo") is None
+def test_relation_remote_model():
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
 
-    state = State(
-        relations={
-            Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
-            Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
-        },
-    ),
+        def _on_start(self, event):
+            relation = self.model.get_relation("foo")
+            assert relation is not None
+            self.remote_model_uuid = relation.remote_model.uuid
 
-    trigger(
-        "start",
-        mycharm,
-        meta={
-            "name": "local",
-            "requires": {
-                "foo": {"interface": "foo"},
-                "bar": {"interface": "bar"},
-            },
-            "provides": {
-                "qux": {"interface": "qux"},
-                "zoo": {"interface": "zoo"},
-            },
-        },
-        config={"options": {"foo": {"type": "string"}}},
-        pre_event=pre_event,
+    ctx = Context(
+        MyCharm, meta={"name": "foo", "requires": {"foo": {"interface": "foo"}}}
     )
+    state = State(relations={Relation("foo")})
+    with ctx(ctx.on.start(), state) as mgr:
+        mgr.run()
+        assert mgr.charm.remote_model_uuid
+        assert mgr.charm.remote_model_uuid == mgr.charm.model.uuid
+
+    state = State(relations={Relation("foo", remote_model_uuid="UUID")})
+    with ctx(ctx.on.start(), state) as mgr:
+        mgr.run()
+        assert mgr.charm.remote_model_uuid == "UUID"
+        assert mgr.charm.remote_model_uuid != mgr.charm.model.uuid

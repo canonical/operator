@@ -157,6 +157,7 @@ class TestHarness:
         request.addfinalizer(harness.cleanup)
         harness.add_relation('db', 'remoteapp1', unit_data={'foo': 'bar'})
         rel = harness.model.get_relation('db')
+        assert rel is not None
         remote_model = rel.remote_model
         assert isinstance(remote_model, ops.RemoteModel)
         assert remote_model
