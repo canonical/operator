@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Type
 
 import pytest
-
 from ops.charm import (
     CharmBase,
     CharmEvents,
