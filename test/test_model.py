@@ -1172,6 +1172,33 @@ class TestModel:
         # Make sure it's not being loaded from the environment.
         assert JujuVersion.from_environ() == '0.0.0'
 
+    def test_relation_remote_model(self, fake_script: FakeScript):
+        fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
+        fake_script.write('relation-ids', """echo '["db0:1"]'""")
+        fake_script.write('relation-model-get', """echo '{"uuid": "UUID"}'""")
+
+        meta = ops.CharmMeta.from_yaml("""
+            name: myapp
+            requires:
+                db:
+                    interface: pgsql
+        """)
+        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        rel = model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
+        # Multiple accesses to remote_model are cached (shouldn't call hook tool again).
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
+        assert fake_script.calls() == [
+            ['relation-ids', 'db', '--format=json'],
+            ['relation-list', '-r', '1', '--format=json'],
+            ['relation-model-get', '-r', '1', '--format=json'],
+        ]
+
 
 class PushPullCase:
     """Test case for table-driven tests."""

@@ -663,3 +663,30 @@ def test_peer_relation_default_values():
     assert relation.local_app_data == {}
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
     assert relation.peers_data == {0: _DEFAULT_JUJU_DATABAG}
+
+
+def test_relation_remote_model():
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, event):
+            relation = self.model.get_relation("foo")
+            assert relation is not None
+            self.remote_model_uuid = relation.remote_model.uuid
+
+    ctx = Context(
+        MyCharm, meta={"name": "foo", "requires": {"foo": {"interface": "foo"}}}
+    )
+    state = State(relations={Relation("foo")})
+    with ctx(ctx.on.start(), state) as mgr:
+        mgr.run()
+        assert mgr.charm.remote_model_uuid
+        assert mgr.charm.remote_model_uuid == mgr.charm.model.uuid
+
+    state = State(relations={Relation("foo", remote_model_uuid="UUID")})
+    with ctx(ctx.on.start(), state) as mgr:
+        mgr.run()
+        assert mgr.charm.remote_model_uuid == "UUID"
+        assert mgr.charm.remote_model_uuid != mgr.charm.model.uuid

@@ -619,6 +619,9 @@ class Relation(RelationBase):
     )
     """The current content of the databag for each unit in the relation."""
 
+    remote_model_uuid: str | None = None
+    """The remote model's UUID; uses the main model's UUID if not specified."""
+
     def __hash__(self) -> int:
         return hash(self.id)
 
