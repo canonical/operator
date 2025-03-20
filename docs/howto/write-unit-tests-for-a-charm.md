@@ -103,15 +103,20 @@ If you prefer to use unittest, you should rewrite this as a method of a `TestCas
 
 If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
 
-For example, suppose that the charm we're testing uses the `KubernetesServicePatch`. To update the test above to mock that object, modify the test file to contain:
+For example, suppose that the charm we're testing uses the [lightkube client](https://github.com/gtsystem/lightkube) to talk to Kubernetes, to mock that object, modify the test file to contain:
 
 ```python
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest import patch
+from ops import testing
+
+from charm import MyCharm
+
 
 @pytest.fixture
 def my_charm():
-    with patch("charm.KubernetesServicePatch"):
+    with patch("charm.lightkube.Client"):
         yield MyCharm
 ```
 
@@ -121,7 +126,7 @@ Then you should rewrite the test to pass the patched charm type to the `Context`
 def test_charm_runs(my_charm):
     # Arrange: 
     #  Create a Context to specify what code we will be running
-    ctx = Context(my_charm)
+    ctx = testing.Context(my_charm)
     # ...
 ```
 
