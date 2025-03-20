@@ -5,7 +5,7 @@ Charms should have tests to verify that they are functioning correctly. This pag
 
 ## Unit testing
 
-Unit tests isolate and validate individual code units (functions, methods, and so on) by mocking Juju APIs and workloads without external interactions. Unit tests are intended to be isolating and fast to complete. These are the tests you would run before committing any code changes.
+Unit tests isolate and validate individual code units (functions, methods, and so on) by mocking Juju APIs and workloads without external interactions. Unit tests are intended to be isolated and fast to complete. These are the tests you would run before committing any code changes.
 
 Every unit test involves a mocked event context, as charms only execute in response to events. A charm doesn't do anything unless it's being run, and it is only run when an event occurs. So there is _always_ an event context to be mocked, and the starting point of a unit test is typically an event.
 
@@ -22,7 +22,7 @@ Unit tests focus on mapping these inputs to expected outputs. For example, a uni
 
 ### Coverage
 
-Unit testing a charm should cover:
+Unit testing a charm should cover at least:
 
 - How relation data is modified as a result of an event.
 - What pebble services are running as a result of an event.
@@ -31,7 +31,7 @@ Unit testing a charm should cover:
 ### Tools
 
 - [`ops.testing`](ops_testing), the framework for state-transition testing in Ops
-- [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html)
+- [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html)
 - [`tox`](https://tox.wiki/en/latest/index.html) for automating and standardizing tests
 
 The `ops.testing` framework provides `State`, which mocks inputs and outputs. The framework also provides `Context` and `Container`, which offer mock filesystems. Tests involve:
@@ -44,7 +44,7 @@ The `ops.testing` framework provides `State`, which mocks inputs and outputs. Th
 
 ### Examples
 
-- [https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/unit/test_charm.py](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/unit/test_charm.py)
+- [Prometheus K8s charm unit tests](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/scenario/test_alert_expression_labels.py)
 
 (interface-tests)=
 ## Interface testing
@@ -69,7 +69,7 @@ An interface test has the following pattern:
 2) **When** - A specific relation event fires.
 3) **Then** - The state of the databags is valid. For example, the state satisfies a [pydantic](https://docs.pydantic.dev/latest/) schema.
 
-In addition to validity of the databag state, we could check for more elaborate conditions.
+In addition to checking that the databag state is valid, we could check for more elaborate conditions.
 
 ### Tools
 
@@ -78,25 +78,9 @@ In addition to validity of the databag state, we could check for more elaborate 
 
 ### Examples
 
-A typical interface test looks like:
+- [Ingress interface tests](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v2/interface_tests/test_provider.py)
 
-```python
-from interface_tester import Tester
-
-def test_data_published_on_changed_remote_valid():
-    """This test verifies that if the remote end has published valid data and we receive a db-relation-changed event, then the schema is satisfied."""
-    # GIVEN that we have a relation over "db" and the remote end has published valid data
-    relation = Relation(endpoint='db', interface='db',
-                        remote_app_data={'model': '"bar"', 'port': '42', 'name': '"remote"', },
-                        remote_units_data={0: {'host': '"0.0.0.42"', }})
-    t = Tester(State(relations=[relation]))
-    # WHEN the charm receives a db-relation-changed event
-    state_out = t.run(relation.changed_event)
-    # THEN the schema is valid
-    t.assert_schema_valid()
-```
-
-This enables us to check whether our charm complies with the behavioural specification of the interface, independently from whichever charm is integrated with our charm.
+Interface tests enable us to check whether our charm complies with the behavioural specification of the interface, independently from whichever charm is integrated with our charm.
 
 (integration-testing)=
 ## Integration testing
@@ -111,6 +95,7 @@ Integration tests typically take significantly longer to run than unit tests.
 
 ### Coverage
 
+* Packing and deploying the charm
 * Charm actions
 * Charm relations
 * Charm configurations
@@ -126,8 +111,8 @@ When writing an integration test, it is not sufficient to simply check that Juju
 
 ### Tools
 
-- [`pytest`](https://pytest.org/) and/or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and/or [`zaza`](https://github.com/openstack-charmers/zaza)
+- [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html) and
+- [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator)
 
 Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
@@ -157,35 +142,22 @@ It also provides convenient markers and command line parameters (e.g., the `@pyt
 
 ### Examples
 
-- [https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py)
+- [Prometheus K8s integration tests](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py)
 
 ## Continuous integration
 
 Typically, you want the tests to be run automatically against any PR into your repository's main branch, and potentially trigger a new release whenever the tests succeed. Continuous deployment is out of scope for this page, but we will look at how to set up basic continuous integration.
 
-Create a file called `.github/workflows/ci.yaml`. For example, to include a `lint` job that runs the `tox` `lint` environment:
+Create a file called `.github/workflows/ci.yaml`. For example, to include a `lint` job that runs the `tox` `unit` environment:
 
 ```yaml
 name: Tests
 on:
-  workflow_call:
+  push:
+    branches:
+      - main
+  pull_request:
 
-jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install dependencies
-        run: python3 -m pip install tox
-      - name: Run linters
-        run: tox -e lint
-```
-
-Other `tox` environments can be run similarly. For example, unit tests:
-
-```yaml
   unit-test:
     name: Unit tests
     runs-on: ubuntu-latest
