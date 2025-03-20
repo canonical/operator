@@ -18,7 +18,7 @@ A charm acts like a function, taking event context (always present), configurati
 
 Unit tests focus on mapping these inputs to expected outputs. For example, a unit test could verify a system call, the contents of a file, or the contents of a relation databag.
 
-> See also: {ref}`write-scenario-tests-for-a-charm`.
+> See also: {ref}`write-unit-tests-for-a-charm`.
 
 ### Coverage
 
