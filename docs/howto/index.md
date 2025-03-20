@@ -22,6 +22,5 @@ Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
 Write unit tests for a charm <write-unit-tests-for-a-charm>
 Write integration tests for a charm <write-integration-tests-for-a-charm>
-Turn a hooks-based charm into an ops charm <turn-a-hooks-based-charm-into-an-ops-charm>
 Legacy how-to guides <legacy/index>
 ```
