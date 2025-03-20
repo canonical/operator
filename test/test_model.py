@@ -1189,6 +1189,10 @@ class TestModel:
         remote_model = rel.remote_model
         assert remote_model.uuid == 'UUID'
 
+        # Multiple accesses to remote_model are cached (shouldn't call hook tool again).
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
         assert fake_script.calls() == [
             ['relation-ids', 'db', '--format=json'],
             ['relation-list', '-r', '1', '--format=json'],

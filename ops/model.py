@@ -1753,6 +1753,8 @@ class Relation:
         self.app = typing.cast(Application, app)
         self.data = RelationData(self, our_unit, backend)
 
+        self._remote_model: 'RemoteModel | None' = None
+
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
 
@@ -1766,8 +1768,10 @@ class Relation:
             ModelError: if on a version of Juju that doesn't support the
                 "relation-model-get" hook tool.
         """
-        d = self._backend.relation_model_get(self.id)
-        return RemoteModel(uuid=d['uuid'])
+        if self._remote_model is None:
+            d = self._backend.relation_model_get(self.id)
+            self._remote_model = RemoteModel(uuid=d['uuid'])
+        return self._remote_model
 
 
 class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent']):

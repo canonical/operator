@@ -279,6 +279,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ModelError("Relation.remote_model is only available on Juju >= 3.6.2")
 
         relation = self._get_relation_by_id(relation_id)
+        # Only Relation has remote_model_uuid, not the other subclasses of RelationBase.
         if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
             uuid = relation.remote_model_uuid
         else:
