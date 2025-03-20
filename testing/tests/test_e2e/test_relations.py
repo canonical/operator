@@ -663,3 +663,36 @@ def test_peer_relation_default_values():
     assert relation.local_app_data == {}
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
     assert relation.peers_data == {0: _DEFAULT_JUJU_DATABAG}
+
+
+def test_relation_remote_model(mycharm):
+    def pre_event(charm: CharmBase):
+        assert charm.model.get_relation("foo")
+        assert charm.model.get_relation("bar") is None
+        assert charm.model.get_relation("qux")
+        assert charm.model.get_relation("zoo") is None
+
+    state = State(
+        relations={
+            Relation(endpoint="foo", interface="foo", remote_app_name="remote"),
+            Relation(endpoint="qux", interface="qux", remote_app_name="remote"),
+        },
+    ),
+
+    trigger(
+        "start",
+        mycharm,
+        meta={
+            "name": "local",
+            "requires": {
+                "foo": {"interface": "foo"},
+                "bar": {"interface": "bar"},
+            },
+            "provides": {
+                "qux": {"interface": "qux"},
+                "zoo": {"interface": "zoo"},
+            },
+        },
+        config={"options": {"foo": {"type": "string"}}},
+        pre_event=pre_event,
+    )

@@ -144,6 +144,24 @@ class TestHarness:
         assert harness.get_relation_data(rel_id, 'postgresql') == {}
         assert harness.get_relation_data(rel_id, 'postgresql/0') == {'a': '1', 'b': '2'}
 
+    def test_relation_remote_model(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'remoteapp1', unit_data={'foo': 'bar'})
+        rel = harness.model.get_relation('db')
+        remote_model = rel.remote_model
+        assert isinstance(remote_model, ops.RemoteModel)
+        assert remote_model
+        assert remote_model.uuid == harness.model.uuid
+
     def test_can_connect_default(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,

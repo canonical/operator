@@ -274,6 +274,14 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         unit_id = int(member_name.split("/")[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
 
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        relation = self._get_relation_by_id(relation_id)
+        if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
+            uuid = relation.remote_model_uuid
+        else:
+            uuid = self._state.model.uuid
+        return {"uuid": uuid}
+
     def is_leader(self):
         return self._state.leader
 
