@@ -58,7 +58,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = scenario_logger.getChild("runtime")
 
-_DEFAULT_JUJU_VERSION = "3.5"
+_DEFAULT_JUJU_VERSION = "3.6.4"
 
 
 class Manager(Generic[CharmType]):
