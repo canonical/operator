@@ -1753,7 +1753,7 @@ class Relation:
         self.app = typing.cast(Application, app)
         self.data = RelationData(self, our_unit, backend)
 
-        self._remote_model: 'RemoteModel | None' = None
+        self._remote_model: Optional[RemoteModel] = None
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
