@@ -57,13 +57,13 @@ from typing import (
     get_args,
 )
 
-import ops
-import ops.pebble as pebble
-from ops._private import timeconv, yaml
-from ops.jujucontext import _JujuContext
-from ops.jujuversion import JujuVersion
+from . import charm as _charm
+from . import pebble
+from ._private import timeconv, yaml
+from .jujucontext import _JujuContext
+from .jujuversion import JujuVersion
 
-# JujuVersion is not used in ops.model, but there are charms that are importing JujuVersion
+# JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
 _ = JujuVersion
 
@@ -82,7 +82,7 @@ _SETTABLE_STATUS_NAMES: Tuple[_SettableStatusName, ...] = get_args(_SettableStat
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw = Dict[str, Optional[List['Relation']]]
 # mapping from container name to container metadata
-_ContainerMeta_Raw = Dict[str, 'ops.charm.ContainerMeta']
+_ContainerMeta_Raw = Dict[str, '_charm.ContainerMeta']
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
@@ -124,14 +124,14 @@ class Model:
 
     def __init__(
         self,
-        meta: 'ops.charm.CharmMeta',
+        meta: '_charm.CharmMeta',
         backend: '_ModelBackend',
         broken_relation_id: Optional[int] = None,
     ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
-        relations: Dict[str, ops.RelationMeta] = meta.relations
+        relations: Dict[str, _charm.RelationMeta] = meta.relations
         self._relations = RelationMapping(
             relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
         )
@@ -219,7 +219,7 @@ class Model:
         return self._backend.model_uuid
 
     @property
-    def juju_version(self) -> 'ops.JujuVersion':
+    def juju_version(self) -> JujuVersion:
         """Return the version of Juju that is running the model."""
         return self._backend._juju_context.version
 
@@ -343,7 +343,7 @@ if typing.TYPE_CHECKING:
 
 
 class _ModelCache:
-    def __init__(self, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend'):
+    def __init__(self, meta: '_charm.CharmMeta', backend: '_ModelBackend'):
         self._meta = meta
         self._backend = backend
         self._secret_set_cache: collections.defaultdict[str, Dict[str, Any]] = (
@@ -383,7 +383,7 @@ class Application:
     """
 
     def __init__(
-        self, name: str, meta: 'ops.charm.CharmMeta', backend: '_ModelBackend', cache: _ModelCache
+        self, name: str, meta: '_charm.CharmMeta', backend: '_ModelBackend', cache: _ModelCache
     ):
         self.name = name
         self._backend = backend
@@ -559,7 +559,7 @@ class Unit:
     def __init__(
         self,
         name: str,
-        meta: 'ops.charm.CharmMeta',
+        meta: '_charm.CharmMeta',
         backend: '_ModelBackend',
         cache: '_ModelCache',
     ):
@@ -908,7 +908,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
 
     def __init__(
         self,
-        relations_meta: Dict[str, 'ops.RelationMeta'],
+        relations_meta: Dict[str, '_charm.RelationMeta'],
         our_unit: 'Unit',
         backend: '_ModelBackend',
         cache: '_ModelCache',
@@ -1678,7 +1678,7 @@ class Relation:
 
     This class should not be instantiated directly, instead use :meth:`Model.get_relation`,
     :attr:`Model.relations`, or :attr:`ops.RelationEvent.relation`. This is principally used by
-    :class:`ops.RelationMeta` to represent the relationships between charms.
+    :class:`ops.charm.RelationMeta` to represent the relationships between charms.
     """
 
     name: str
@@ -1888,12 +1888,17 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
         return True
 
-    def _validate_write(self, key: str, value: str):
-        """Validate writing key:value to this databag.
+    def _validate_write(self, data: Mapping[str, str]) -> None:
+        """Validate writing key:value pairs to this databag.
 
         1) that key: value is a valid str:str pair
         2) that we have write access to this databag
         """
+        for key, value in data.items():
+            self._validate_write_content(key, value)
+        self._validate_write_access()
+
+    def _validate_write_content(self, key: str, value: str) -> None:
         # firstly, we validate WHAT we're trying to write.
         # this is independent of whether we're in testing code or production.
         if not isinstance(key, str):
@@ -1901,6 +1906,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if not isinstance(value, str):
             raise RelationDataTypeError(f'relation data values must be strings, not {type(value)}')
 
+    def _validate_write_access(self) -> None:
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -1931,17 +1937,19 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 )
 
     def __setitem__(self, key: str, value: str):
-        self._validate_write(key, value)
-        self._commit(key, value)
-        self._update(key, value)
+        self.update({key: value})
 
-    def _commit(self, key: str, value: str):
-        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
+    def _commit(self, data: Mapping[str, str]) -> None:
+        self._backend.update_relation_data(
+            relation_id=self.relation.id, entity=self._entity, data=data
+        )
 
-    def _update(self, key: str, value: str):
+    def _update_cache(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
-        if self._lazy_data is not None:
+        if self._lazy_data is None:
+            return
+        for key, value in data.items():
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.
@@ -1953,12 +1961,31 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
-    def update(self, other: typing.Any = (), /, **kwargs: str):
-        """Update the data from dict/iterable other and the kwargs."""
-        super().update(other, **kwargs)
+    def update(
+        self, data: Union[Mapping[str, str], Iterable[Tuple[str, str]]] = (), /, **kwargs: str
+    ) -> None:
+        """Efficiently write multiple keys and values to the databag.
+
+        Has the same ultimate result as this, but uses a single relation-set call::
+
+            for k, v in dict(data).items():
+                self[k] = v
+            for k, v in kwargs.items():
+                self[k] = v
+        """
+        data = dict(data, **kwargs)
+        changes = {
+            key: val
+            for key, val in data.items()
+            if (key not in self and val != '') or (key in self and val != self[key])
+        }
+        self._validate_write(changes)  # always check permissions
+        if not changes:  # return early if there are no changes required
+            return
+        self._commit(changes)
+        self._update_cache(changes)
 
     def __delitem__(self, key: str):
-        self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
@@ -3459,7 +3486,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+        if not data:
+            raise ValueError('at least one key:value pair is required for relation-set')
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -3475,7 +3504,7 @@ class _ModelBackend:
         args.extend(['--file', '-'])
 
         try:
-            content = yaml.safe_dump({key: value})
+            content = yaml.safe_dump(data)
             self._run(*args, input_stream=content)
         except ModelError as e:
             if self._is_relation_not_found(e):
@@ -3730,9 +3759,11 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self, relation_id: int, _entity: Union['Unit', 'Application'], key: str, value: str
+        self, relation_id: int, entity: Union['Unit', 'Application'], data: Mapping[str, str]
     ):
-        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
+        self.relation_set(
+            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
+        )
 
     def secret_get(
         self,
@@ -3994,7 +4025,7 @@ class LazyNotice:
             self.type = type
         self.key = key
 
-        self._notice: Optional[ops.pebble.Notice] = None
+        self._notice: Optional[pebble.Notice] = None
 
     def __repr__(self):
         type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
@@ -4031,7 +4062,7 @@ class LazyCheckInfo:
     def __init__(self, container: Container, name: str):
         self._container = container
         self.name = name
-        self._info: Optional[ops.pebble.CheckInfo] = None
+        self._info: Optional[pebble.CheckInfo] = None
 
     def __repr__(self):
         return f'LazyCheckInfo(name={self.name!r})'

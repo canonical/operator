@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Type
 
 import pytest
@@ -86,6 +88,176 @@ def test_get_relation(mycharm):
         config={"options": {"foo": {"type": "string"}}},
         pre_event=pre_event,
     )
+
+
+def test_relation_set_single_add_del_change():
+    relation_name = "relation-name"
+
+    class Charm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._update_status)
+
+        def _update_status(self, event: EventBase):
+            rel = self.model.get_relation(relation_name)
+            assert rel is not None
+            data = rel.data[self.unit]
+            data["to-change-key"] = "to-change-val-new"
+            del data["to-remove-key"]
+            data["new-key"] = "new-val"
+
+    ctx = Context(
+        Charm,
+        meta={
+            "name": "charm-name",
+            "peers": {relation_name: {"interface": "interface-name"}},
+        },
+    )
+    rel_in = PeerRelation(
+        endpoint=relation_name,
+        local_unit_data={
+            "to-ignore-key": "to-ignore-val",
+            "to-change-key": "to-change-val-original",
+            "to-remove-key": "to-remove-val",
+        },
+    )
+    state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
+    rel_out = state.get_relation(rel_in.id)
+    assert rel_out.local_unit_data == {
+        "to-ignore-key": "to-ignore-val",
+        "to-change-key": "to-change-val-new",
+        "new-key": "new-val",
+    }
+
+
+@pytest.mark.parametrize(
+    ("original_data", "new_data", "result_data"),
+    [
+        pytest.param(
+            {},
+            {"NEW-KEY-1": "NEW-VAL-1", "NEW-KEY-2": "NEW-VAL-2"},
+            {"NEW-KEY-1": "NEW-VAL-1", "NEW-KEY-2": "NEW-VAL-2"},
+            id="populate the relation data from scratch",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {},
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            id="make no changes",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"NEW-KEY-1": "NEW-VAL-1"},
+            {
+                "old-key-1": "old-val-1",
+                "old-key-2": "old-val-2",
+                "NEW-KEY-1": "NEW-VAL-1",
+            },
+            id="insert a new key and value into existing relation data",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1"},
+            {"NEW-KEY-1": "NEW-VAL-1", "NEW-KEY-2": "NEW-VAL-2"},
+            {
+                "old-key-1": "old-val-1",
+                "NEW-KEY-1": "NEW-VAL-1",
+                "NEW-KEY-2": "NEW-VAL-2",
+            },
+            id="insert multiple new keys and values",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"old-key-1": "NEW-VAL-1"},
+            {"old-key-1": "NEW-VAL-1", "old-key-2": "old-val-2"},
+            id="update an existing entry",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"old-key-1": "NEW-VAL-1", "old-key-2": "NEW-VAL-2"},
+            {"old-key-1": "NEW-VAL-1", "old-key-2": "NEW-VAL-2"},
+            id="update multiple existing entries",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {
+                "old-key-1": "NEW-VAL-1",
+                "old-key-2": "NEW-VAL-2",
+                "NEW-KEY-3": "NEW-VAL-3",
+            },
+            {
+                "old-key-1": "NEW-VAL-1",
+                "old-key-2": "NEW-VAL-2",
+                "NEW-KEY-3": "NEW-VAL-3",
+            },
+            id="update multiple existing entries and add a new one",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"old-key-1": ""},
+            {"old-key-2": "old-val-2"},
+            id="delete an existing entry",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"old-key-1": "", "old-key-2": ""},
+            {},
+            id="delete multiple existing entries",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"NEW-KEY-1": ""},
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            id="deleting a non-existing key has no effect",
+        ),
+        pytest.param(
+            {"old-key-1": "old-val-1", "old-key-2": "old-val-2"},
+            {"old-key-1": "", "old-key-2": "", "NEW-KEY-1": ""},
+            {},
+            id="delete multiple existing entries and a non-existing key",
+        ),
+        pytest.param(
+            {
+                "old-key-1": "old-val-1",
+                "old-key-2": "old-val-2",
+                "old-key-3": "old-val-3",
+            },
+            {"NEW-KEY-1": "NEW-VAL-1", "old-key-2": "NEW-VAL-2", "old-key-3": ""},
+            {
+                "old-key-1": "old-val-1",
+                "NEW-KEY-1": "NEW-VAL-1",
+                "old-key-2": "NEW-VAL-2",
+            },
+            id="add a key, update another, and delete a third",
+        ),
+    ],
+)
+def test_relation_set_bulk_update(
+    original_data: dict[str, str], new_data: dict[str, str], result_data: dict[str, str]
+):
+    relation_name = "relation-name"
+
+    class Charm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._update_status)
+
+        def _update_status(self, event: EventBase):
+            rel = self.model.get_relation(relation_name)
+            assert rel is not None
+            data = rel.data[self.unit]
+            data.update(new_data)
+
+    ctx = Context(
+        Charm,
+        meta={
+            "name": "charm-name",
+            "peers": {relation_name: {"interface": "interface-name"}},
+        },
+    )
+    rel_in = PeerRelation(endpoint=relation_name, local_unit_data=original_data)
+    state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
+    rel_out = state.get_relation(rel_in.id)
+    assert rel_out.local_unit_data == result_data
 
 
 @pytest.mark.parametrize(

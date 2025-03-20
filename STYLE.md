@@ -52,6 +52,28 @@ counts: Optional[Tuple[str, int]]
 ```
 
 
+### Use relative imports inside a package
+
+When writing code inside a package (a directory containing an `__init__.py` file), use relative imports with a `.` instead of absolute imports.
+For example, within the `ops` package:
+
+**Don't:**
+
+```python
+from ops import charm
+```
+
+**Do:**
+
+```python
+from . import charm
+
+# Or, if you need to avoid adding the public name "charm" to the namespace:
+
+from . import charm as _charm
+```
+
+
 ### Avoid nested comprehensions and generator expressions
 
 "Flat is better than nested."

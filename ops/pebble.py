@@ -26,7 +26,7 @@ This module provides a way to interact with Pebble, including:
 
 For a command-line interface for local testing, see ``test/pebble_cli.py``.
 
-  See more: `Pebble documentation <https://canonical-pebble.readthedocs-hosted.com/>`_
+  See more: `Pebble documentation <https://documentation.ubuntu.com/pebble/>`_
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ from typing import (
 
 import websocket
 
-from ops._private import timeconv, yaml
+from ._private import timeconv, yaml
 
 # Public as these are used in the Container.add_layer signature
 ServiceDict = typing.TypedDict(
@@ -812,7 +812,7 @@ class Plan:
 
     A plan is the combined layer configuration. The layer configuration is
     documented at
-    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
+    https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
     def __init__(self, raw: Optional[Union[str, PlanDict]] = None):
@@ -876,6 +876,9 @@ class Plan:
 
     __str__ = to_yaml
 
+    def __repr__(self):
+        return f'Plan({self.to_dict()!r})'
+
     def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -888,7 +891,7 @@ class Layer:
     """Represents a Pebble configuration layer.
 
     The format of this is documented at
-    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
+    https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
     #: Summary of the purpose of this layer.
@@ -1210,6 +1213,9 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            # 'not value' is safe here because a threshold of 0 is valid but
+            # inconsistently applied and not of any actual use, and the other
+            # fields are strings where the empty string means 'not in the layer'.
             if not value or name == 'name':
                 continue
             if name == 'http':
@@ -1218,6 +1224,11 @@ class Check:
                 self._merge_tcp(value)
             elif name == 'exec':
                 self._merge_exec(value)
+            elif name == 'startup' and value == CheckStartup.UNSET:
+                continue
+            # Note that CheckLevel.UNSET has a different meaning to
+            # CheckStartup.UNSET. In the former, it means 'there is no level';
+            # in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
@@ -1611,7 +1622,7 @@ class Notice:
     last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/notices/>`_
+    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
