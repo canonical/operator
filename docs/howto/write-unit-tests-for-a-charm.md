@@ -82,8 +82,8 @@ def test_pebble_ready_writes_config_file():
     ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
-    container_root_fs = state_out.get_container("some-container").get_filesystem(ctx)
-    cfg_file = container_root_fs / "etc" / "config.yaml"
+    container_fs = state_out.get_container("some-container").get_filesystem(ctx)
+    cfg_file = container_fs / "etc" / "config.yaml"
     config = yaml.safe_load(cfg_file.read_text())
     assert config["message"] == "Hello, world!"
 
@@ -103,7 +103,7 @@ If you prefer to use unittest, you should rewrite this as a method of a `TestCas
 
 If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
 
-For example, suppose that the charm we're testing uses the [lightkube client](https://github.com/gtsystem/lightkube) to talk to Kubernetes, to mock that object, modify the test file to contain:
+For example, suppose that the charm we're testing uses the [lightkube client](https://github.com/gtsystem/lightkube) to talk to Kubernetes. To mock that object, modify the test file to contain:
 
 ```python
 from unittest.mock import MagicMock, patch
