@@ -2501,6 +2501,10 @@ class _TestingModelBackend:
             else:
                 bucket[key] = value
 
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        # For Harness, ignore relation_id and assume relation is never cross-model.
+        return {'uuid': self.model_uuid}
+
     def config_get(self) -> _TestingConfig:
         return self._config
 

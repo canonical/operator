@@ -212,7 +212,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise RelationNotFoundError() from None
 
     def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
-        if self._context.juju_version < "3.0.2":
+        if JujuVersion(self._context.juju_version) < "3.0.2":
             raise ModelError(
                 "secrets are only available in juju >= 3.0.2."
                 "Set ``Context.juju_version`` to 3.0.2+ to use them.",
@@ -273,6 +273,18 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         unit_id = int(member_name.split("/")[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        if JujuVersion(self._context.juju_version) < "3.6.2":
+            raise ModelError("Relation.remote_model is only available on Juju >= 3.6.2")
+
+        relation = self._get_relation_by_id(relation_id)
+        # Only Relation has remote_model_uuid, not the other subclasses of RelationBase.
+        if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
+            uuid = relation.remote_model_uuid
+        else:
+            uuid = self._state.model.uuid
+        return {"uuid": uuid}
 
     def is_leader(self):
         return self._state.leader
@@ -455,7 +467,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
             secret._set_label(label)
-        juju_version = self._context.juju_version
+        juju_version = JujuVersion(self._context.juju_version)
         if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # In this medieval Juju chapter,
             # secret owners always used to track the latest revision.
