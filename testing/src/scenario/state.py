@@ -996,10 +996,13 @@ class Container(_max_posargs(1)):
             'foo': Mount(location='/home/foo.py', source=pathlib.Path('/path/to/local/foo.py')),
             'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
+
+    The simulated container filesystem will have symlinks to `/path/to/local/foo.py` and
+    `/path/to/local/bin` at the specified locations.
+
+    If you're testing charm code that uses :meth:`ops.pebble.push` to write files to the container
+    filesystem, make sure to specify *source* files/directories that can be safely modified.
     """
-    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
-    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
-    # create a tempfile and insert its path in the mock filesystem tree
 
     execs: Iterable[Exec] = frozenset()
     """Simulate executing commands in the container.
