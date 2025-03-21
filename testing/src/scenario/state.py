@@ -997,11 +997,11 @@ class Container(_max_posargs(1)):
             'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
 
-    The simulated container filesystem will have symlinks to `/path/to/local/foo.py` and
-    `/path/to/local/bin` at the specified locations.
+    When your charm runs, the simulated container filesystem will have symlinks to
+    ``/path/to/local/foo.py`` and ``/path/to/local/bin`` at the specified locations.
 
-    If you're testing charm code that uses :meth:`ops.pebble.push` to write files to the container
-    filesystem, make sure to specify *source* files/directories that can be safely modified.
+    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files to the
+    container filesystem, make sure to specify source files/directories that can be safely modified.
     """
 
     execs: Iterable[Exec] = frozenset()
