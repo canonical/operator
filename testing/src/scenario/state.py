@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -1925,7 +1924,7 @@ class _Event:  # type: ignore
 
     path: str
     """The name of the event.
-    
+
     For example: ``start``, ``config_changed``, ``my_relation_joined``, or
     ``custom.MyConsumer.lib_changed``.
 
