@@ -1796,7 +1796,7 @@ class Harness(Generic[CharmType]):
         # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(
-                f'Secret {secret_id!r} owned by the charm under test, "can\'t call revoke_secret'
+                f"Secret {secret_id!r} owned by the charm under test, can't call revoke_secret"
             )
 
         relation_id = self._secret_relation_id_to(secret)
