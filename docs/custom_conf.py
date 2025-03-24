@@ -292,6 +292,9 @@ autodoc_default_options = {
     'show-inheritance': None,
 }
 
+# This value stacks args vertically if a signature is too long.
+maximum_signature_line_length = 80
+
 # -- Options for sphinx.ext.intersphinx --------------------------------------
 
 # This config value contains the locations and names of other projects
@@ -300,6 +303,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://canonical-juju.readthedocs-hosted.com/en/latest', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
+    'pebble': ('https://documentation.ubuntu.com/pebble', None),
 }
 
 # -- General configuration ---------------------------------------------------

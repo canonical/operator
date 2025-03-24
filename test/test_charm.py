@@ -349,6 +349,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
                 'status': 'down',
                 'failures': 3,
                 'threshold': 3,
+                'change-id': '1',
             })
         ]
 
@@ -797,6 +798,33 @@ def test_secret_events(request: pytest.FixtureRequest):
     ]
 
 
+@pytest.mark.parametrize('event', ['secret_remove', 'secret_expired'])
+def test_secret_event_remove_revision(
+    request: pytest.FixtureRequest, fake_script: FakeScript, event: str
+):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(getattr(self.on, event), self.on_secret_event)
+
+        def on_secret_event(
+            self, event: typing.Union[ops.SecretRemoveEvent, ops.SecretExpiredEvent]
+        ):
+            event.remove_revision()
+
+    framework = create_framework(request)
+    charm = MyCharm(framework)
+    fake_script.write('secret-remove', 'exit 0')
+    secret_id = 'secret:remove'
+    revision = 28
+
+    getattr(charm.on, event).emit(secret_id, 'secret-label', revision)
+
+    assert fake_script.calls(True) == [
+        ['secret-remove', secret_id, '--revision', str(revision)],
+    ]
+
+
 def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -1128,3 +1156,19 @@ assumes:
             ops.JujuAssumesCondition.ANY,
         ),
     ]
+
+
+@pytest.mark.parametrize('user', ['root', 'sudoer', 'non-root'])
+def test_meta_charm_user(user: str):
+    meta = ops.CharmMeta.from_yaml(f"""
+name: my-charm
+charm-user: {user}
+""")
+    assert meta.charm_user == user
+
+
+def test_meta_charm_user_default():
+    meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+""")
+    assert meta.charm_user == 'root'

@@ -48,7 +48,7 @@ In the `src/charm.py` file, in the `__init__` function of your charm, set up an 
 self.framework.observe(self.on.cache_storage_attached, self._update_configuration)
 ```
 
-> See more: [](ops.StorageAttachedEvent), [Juju SDK | Holistic vs delta charms](https://juju.is/docs/sdk/holistic-vs-delta-charms)
+> See more: [](ops.StorageAttachedEvent), [](/explanation/holistic-vs-delta-charms)
 
 Storage volumes will be automatically mounted into the charm container at either the path specified in the `location` field in the metadata, or the default location `/var/lib/juju/storage/<storage-name>`. However, your charm code should not hard-code the location, and should instead use the `.location` property of the storage object.
 
@@ -121,15 +121,9 @@ The storage will not be available immediately after that call - the charm should
 observe the `storage-attached` event and handle any remaining setup once Juju
 has attached the new storage.
 
-## Test the feature
-
-> See first: {ref}`get-started-with-charm-testing`
-
-You'll want to add unit and integration tests:
-
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the charm state is as expected after storage changes, use the `run` method of the `Context` object. For example, to provide the charm with mock storage:
 

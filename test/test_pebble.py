@@ -1063,6 +1063,7 @@ class TestCheck:
         assert check.name == name
         assert check.override == ''
         assert check.level == pebble.CheckLevel.UNSET
+        assert check.startup == pebble.CheckStartup.UNSET
         assert check.period == ''
         assert check.timeout == ''
         assert check.threshold is None
@@ -1078,6 +1079,7 @@ class TestCheck:
         d: pebble.CheckDict = {
             'override': 'replace',
             'level': 'alive',
+            'startup': 'enabled',
             'period': '10s',
             'timeout': '3s',
             'threshold': 5,
@@ -1091,6 +1093,7 @@ class TestCheck:
         assert check.name == 'chk-http'
         assert check.override == 'replace'
         assert check.level == pebble.CheckLevel.ALIVE
+        assert check.startup == pebble.CheckStartup.ENABLED
         assert check.period == '10s'
         assert check.timeout == '3s'
         assert check.threshold == 5
@@ -1139,7 +1142,6 @@ class TestCheck:
         assert two == two.to_dict()
         d['level'] = 'ready'
         assert one != d
-
         assert one != 5
 
 
@@ -1273,9 +1275,11 @@ class TestCheckInfo:
         assert list(pebble.CheckStatus) == [
             pebble.CheckStatus.UP,
             pebble.CheckStatus.DOWN,
+            pebble.CheckStatus.INACTIVE,
         ]
         assert pebble.CheckStatus.UP.value == 'up'
         assert pebble.CheckStatus.DOWN.value == 'down'
+        assert pebble.CheckStatus.INACTIVE.value == 'inactive'
 
     def test_check_info(self):
         check = pebble.CheckInfo(
@@ -1292,8 +1296,24 @@ class TestCheckInfo:
         assert check.change_id is None
 
         check = pebble.CheckInfo(
+            name='chk1',
+            level=pebble.CheckLevel.READY,
+            startup=pebble.CheckStartup.ENABLED,
+            status=pebble.CheckStatus.INACTIVE,
+            threshold=3,
+            change_id=pebble.ChangeID(''),
+        )
+        assert check.name == 'chk1'
+        assert check.level == pebble.CheckLevel.READY
+        assert check.status == pebble.CheckStatus.INACTIVE
+        assert check.failures == 0
+        assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('')
+
+        check = pebble.CheckInfo(
             name='chk2',
             level=pebble.CheckLevel.ALIVE,
+            startup=pebble.CheckStartup.DISABLED,
             status=pebble.CheckStatus.DOWN,
             failures=5,
             threshold=3,
@@ -1310,6 +1330,7 @@ class TestCheckInfo:
             'name': 'chk3',
             'status': 'up',
             'threshold': 3,
+            'change-id': '28',
         }
         check = pebble.CheckInfo.from_dict(d)
         assert check.name == 'chk3'
@@ -1317,11 +1338,12 @@ class TestCheckInfo:
         assert check.status == pebble.CheckStatus.UP
         assert check.failures == 0
         assert check.threshold == 3
-        assert check.change_id is None
+        assert check.change_id == pebble.ChangeID('28')
 
         check = pebble.CheckInfo.from_dict({
             'name': 'chk4',
             'status': 'down',
+            'startup': 'enabled',
             'failures': 3,
             'threshold': 3,
             'change-id': '42',
@@ -1332,6 +1354,21 @@ class TestCheckInfo:
         assert check.failures == 3
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('42')
+
+        check = pebble.CheckInfo.from_dict({
+            'name': 'chk5',
+            'status': 'down',
+            'startup': 'enabled',
+            'failures': 3,
+            'threshold': 3,
+            'change-id': '',
+        })
+        assert check.name == 'chk5'
+        assert check.level == pebble.CheckLevel.UNSET
+        assert check.status == pebble.CheckStatus.INACTIVE  # Empty change-id means inactive.
+        assert check.failures == 3
+        assert check.threshold == 3
+        assert check.change_id == pebble.ChangeID('')
 
 
 _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]
@@ -2886,6 +2923,7 @@ bad path\r
                     'name': 'chk1',
                     'status': 'up',
                     'threshold': 2,
+                    'change-id': '1',
                 },
                 {
                     'name': 'chk2',
@@ -2893,6 +2931,7 @@ bad path\r
                     'status': 'down',
                     'failures': 5,
                     'threshold': 3,
+                    'change-id': '3',
                 },
             ],
             'status': 'OK',
@@ -2906,11 +2945,13 @@ bad path\r
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 2
+        assert checks[0].change_id == pebble.ChangeID('1')
         assert checks[1].name == 'chk2'
         assert checks[1].level == pebble.CheckLevel.ALIVE
         assert checks[1].status == pebble.CheckStatus.DOWN
         assert checks[1].failures == 5
         assert checks[1].threshold == 3
+        assert checks[1].change_id == pebble.ChangeID('3')
 
         assert client.requests == [
             ('GET', '/v1/checks', {}, None),
@@ -2924,6 +2965,7 @@ bad path\r
                     'level': 'ready',
                     'status': 'up',
                     'threshold': 3,
+                    'change-id': '1',
                 },
             ],
             'status': 'OK',
@@ -2937,6 +2979,7 @@ bad path\r
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
+        assert checks[0].change_id == pebble.ChangeID('1')
 
         assert client.requests == [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),
@@ -2950,6 +2993,7 @@ bad path\r
                     'level': 'foobar!',
                     'status': 'up',
                     'threshold': 3,
+                    'change-id': '8',
                 },
             ],
             'status': 'OK',
@@ -2963,6 +3007,7 @@ bad path\r
         assert checks[0].status == pebble.CheckStatus.UP
         assert checks[0].failures == 0
         assert checks[0].threshold == 3
+        assert checks[0].change_id == pebble.ChangeID('8')
 
         assert client.requests == [
             ('GET', '/v1/checks', {'level': 'ready', 'names': ['chk2']}, None),

@@ -26,7 +26,7 @@ This module provides a way to interact with Pebble, including:
 
 For a command-line interface for local testing, see ``test/pebble_cli.py``.
 
-  See more: `Pebble documentation <https://canonical-pebble.readthedocs-hosted.com/>`_
+  See more: `Pebble documentation <https://documentation.ubuntu.com/pebble/>`_
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ from typing import (
 
 import websocket
 
-from ops._private import timeconv, yaml
+from ._private import timeconv, yaml
 
 # Public as these are used in the Container.add_layer signature
 ServiceDict = typing.TypedDict(
@@ -135,6 +135,7 @@ CheckDict = typing.TypedDict(
     {
         'override': str,
         'level': Union['CheckLevel', str],
+        'startup': Literal['', 'enabled', 'disabled'],
         'period': Optional[str],
         'timeout': Optional[str],
         'http': Optional[HttpDict],
@@ -243,6 +244,7 @@ if TYPE_CHECKING:
         {
             'name': str,
             'level': NotRequired[str],
+            'startup': NotRequired[Literal['enabled', 'disabled']],
             'status': str,
             'failures': NotRequired[int],
             'threshold': int,
@@ -810,7 +812,7 @@ class Plan:
 
     A plan is the combined layer configuration. The layer configuration is
     documented at
-    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
+    https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
     def __init__(self, raw: Optional[Union[str, PlanDict]] = None):
@@ -874,6 +876,9 @@ class Plan:
 
     __str__ = to_yaml
 
+    def __repr__(self):
+        return f'Plan({self.to_dict()!r})'
+
     def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -886,7 +891,7 @@ class Layer:
     """Represents a Pebble configuration layer.
 
     The format of this is documented at
-    https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/layer-specification/
+    https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
     #: Summary of the purpose of this layer.
@@ -1103,6 +1108,7 @@ class Check:
         except ValueError:
             level = dct.get('level', '')
         self.level = level
+        self.startup = CheckStartup(dct.get('startup', ''))
         self.period: Optional[str] = dct.get('period', '')
         self.timeout: Optional[str] = dct.get('timeout', '')
         self.threshold: Optional[int] = dct.get('threshold')
@@ -1128,6 +1134,7 @@ class Check:
         fields = [
             ('override', self.override),
             ('level', level),
+            ('startup', self.startup.value),
             ('period', self.period),
             ('timeout', self.timeout),
             ('threshold', self.threshold),
@@ -1206,6 +1213,9 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            # 'not value' is safe here because a threshold of 0 is valid but
+            # inconsistently applied and not of any actual use, and the other
+            # fields are strings where the empty string means 'not in the layer'.
             if not value or name == 'name':
                 continue
             if name == 'http':
@@ -1214,6 +1224,11 @@ class Check:
                 self._merge_tcp(value)
             elif name == 'exec':
                 self._merge_exec(value)
+            elif name == 'startup' and value == CheckStartup.UNSET:
+                continue
+            # Note that CheckLevel.UNSET has a different meaning to
+            # CheckStartup.UNSET. In the former, it means 'there is no level';
+            # in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
@@ -1231,6 +1246,15 @@ class CheckStatus(enum.Enum):
 
     UP = 'up'
     DOWN = 'down'
+    INACTIVE = 'inactive'
+
+
+class CheckStartup(enum.Enum):
+    """Enum of check startup options."""
+
+    UNSET = ''  # Note that this is treated as ENABLED.
+    ENABLED = 'enabled'
+    DISABLED = 'disabled'
 
 
 class LogTarget:
@@ -1407,12 +1431,21 @@ class CheckInfo:
     This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
     """
 
+    startup: CheckStartup
+    """Startup mode.
+
+    :attr:`CheckStartup.ENABLED` means the check will be started when added, and
+    in a replan. :attr:`CheckStartup.DISABLED` means the check must be manually
+    started.
+    """
+
     status: Union[CheckStatus, str]
     """Status of the check.
 
     :attr:`CheckStatus.UP` means the check is healthy (the number of failures
     is less than the threshold), :attr:`CheckStatus.DOWN` means the check is
-    unhealthy (the number of failures has reached the threshold).
+    unhealthy (the number of failures has reached the threshold), and
+    :attr:`CheckStatus.INACTIVE` means the check is not running.
     """
 
     failures: int
@@ -1442,9 +1475,11 @@ class CheckInfo:
         failures: int = 0,
         threshold: int = 0,
         change_id: Optional[ChangeID] = None,
+        startup: CheckStartup = CheckStartup.ENABLED,
     ):
         self.name = name
         self.level = level
+        self.startup = startup
         self.status = status
         self.failures = failures
         self.threshold = threshold
@@ -1461,13 +1496,19 @@ class CheckInfo:
             status = CheckStatus(d['status'])
         except ValueError:
             status = d['status']
+        change_id = ChangeID(d['change-id']) if 'change-id' in d else None
+        if not change_id and 'startup' in d:
+            # This is a version of Pebble that supports stopping checks, which
+            # means that the check is inactive if it has no change ID.
+            status = CheckStatus.INACTIVE
         return cls(
             name=d['name'],
             level=level,
+            startup=CheckStartup(d.get('startup', 'enabled')),
             status=status,
             failures=d.get('failures', 0),
             threshold=d['threshold'],
-            change_id=ChangeID(d['change-id']) if 'change-id' in d else None,
+            change_id=change_id,
         )
 
     def __repr__(self):
@@ -1475,6 +1516,7 @@ class CheckInfo:
             'CheckInfo('
             f'name={self.name!r}, '
             f'level={self.level}, '
+            f'startup={self.startup}, '
             f'status={self.status}, '
             f'failures={self.failures}, '
             f'threshold={self.threshold!r}, '
@@ -1580,7 +1622,7 @@ class Notice:
     last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/notices/>`_
+    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
@@ -2126,7 +2168,9 @@ class Client:
         return self._services_action('autostart', [], timeout, delay)
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1) -> ChangeID:
-        """Replan by (re)starting changed and startup-enabled services and wait for them to start.
+        """Replan by (re)starting changed and startup-enabled services and checks.
+
+        After requesting the replan, also wait for any impacted services to start.
 
         Args:
             timeout: Seconds before replan change is considered timed out (float). If
@@ -2334,6 +2378,19 @@ class Client:
             time.sleep(delay)
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
+
+    def _checks_action(self, action: str, checks: Iterable[str]) -> List[str]:
+        if isinstance(checks, str) or not hasattr(checks, '__iter__'):
+            raise TypeError(f'checks must be of type Iterable[str], not {type(checks).__name__}')
+
+        checks = tuple(checks)
+        for chk in checks:
+            if not isinstance(chk, str):
+                raise TypeError(f'check names must be str, not {type(chk).__name__}')
+
+        body = {'action': action, 'checks': checks}
+        resp = self._request('POST', '/v1/checks', body=body)
+        return resp['result']['changed']
 
     def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -3051,6 +3108,34 @@ class Client:
             query['names'] = list(names)
         resp = self._request('GET', '/v1/checks', query)
         return [CheckInfo.from_dict(info) for info in resp['result']]
+
+    def start_checks(self, checks: Iterable[str]) -> List[str]:
+        """Start checks by name.
+
+        .. jujuadded:: 3.6.4
+
+        Args:
+            checks: Non-empty list of checks to start.
+
+        Returns:
+            Set of check names that were started. Checks that were already
+            running will not be included.
+        """
+        return self._checks_action('start', checks)
+
+    def stop_checks(self, checks: Iterable[str]) -> List[str]:
+        """Stop checks by name.
+
+        .. jujuadded:: 3.6.4
+
+        Args:
+            checks: Non-empty list of checks to stop.
+
+        Returns:
+            Set of check names that were stopped. Checks that were already
+            inactive will not be included.
+        """
+        return self._checks_action('stop', checks)
 
     def notify(
         self,

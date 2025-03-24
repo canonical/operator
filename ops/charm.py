@@ -36,9 +36,9 @@ from typing import (
     cast,
 )
 
-from ops import model
-from ops._private import yaml
-from ops.framework import (
+from . import model
+from ._private import yaml
+from .framework import (
     EventBase,
     EventSource,
     Framework,
@@ -1012,7 +1012,7 @@ class SecretRemoveEvent(SecretEvent):
     inform the secret owner that the old revision can be removed.
 
     After any required cleanup, the charm should call
-    :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
+    :meth:`event.remove_revision() <ops.SecretRemoveEvent.remove_revision>` to
     remove the now-unused revision. If the charm does not, then the event will
     be emitted again, when further revisions are ready for removal.
 
@@ -1027,6 +1027,14 @@ class SecretRemoveEvent(SecretEvent):
     def revision(self) -> int:
         """The secret revision this event refers to."""
         return self._revision
+
+    def remove_revision(self):
+        """Remove the revision this event refers to.
+
+        Call this method after any required cleanup to inform Juju that the
+        secret revision can be removed.
+        """
+        self.secret.remove_revision(self._revision)
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -1051,7 +1059,8 @@ class SecretExpiredEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
+    revision by calling :meth:`event.remove_revision()
+    <ops.SecretExpiredEvent.remove_revision>`.
 
     .. jujuadded:: 3.0
     """
@@ -1064,6 +1073,14 @@ class SecretExpiredEvent(SecretEvent):
     def revision(self) -> int:
         """The secret revision this event refers to."""
         return self._revision
+
+    def remove_revision(self):
+        """Remove the revision this event refers to.
+
+        Call this method after any required cleanup to inform Juju that the
+        secret revision can be removed.
+        """
+        self.secret.remove_revision(self._revision)
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -1451,6 +1468,17 @@ class CharmMeta:
     assumes: 'JujuAssumes'
     """Juju features this charm requires."""
 
+    charm_user: Literal['root', 'sudoer', 'non-root']
+    """Type of user used to run the charm hook code.
+
+    The value of ``root`` ensures the charm runs as root. The value of
+    ``sudoer`` runs the charm as a user other than root with access to sudo to
+    elevate its privileges. ``non-root`` ensures the charm does not run as root
+    and also does not have ``sudo`` privileges.
+
+    .. jujuadded 3.6.0
+    """
+
     containers: Dict[str, 'ContainerMeta']
     """Container metadata for each defined container."""
 
@@ -1524,6 +1552,7 @@ class CharmMeta:
         # Note that metadata v2 does not define min-juju-version ('assumes'
         # should be used instead).
         self.min_juju_version = raw_.get('min-juju-version')
+        self.charm_user = raw_.get('charm-user', 'root')
         self.requires = {
             name: RelationMeta(RelationRole.requires, name, rel)
             for name, rel in raw_.get('requires', {}).items()

@@ -1,7 +1,8 @@
 import copy
 from dataclasses import asdict, replace
-from typing import Type
+from typing import Any, Dict, Optional, Type
 
+import ops
 import pytest
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
@@ -11,12 +12,22 @@ from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
     Address,
     BindAddress,
+    CheckInfo,
+    CloudCredential,
+    CloudSpec,
     Container,
     Model,
     Network,
+    Notice,
+    PeerRelation,
     Relation,
     Resource,
+    Secret,
     State,
+    Storage,
+    StoredState,
+    SubordinateRelation,
+    TCPPort,
 )
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
@@ -251,6 +262,19 @@ def test_relation_set(mycharm):
     }
 
 
+def test_checkinfo_changeid_none():
+    info = CheckInfo("foo", change_id=None)
+    assert info.change_id, "None should result in a random change_id"
+    info2 = CheckInfo("foo")  # None is also the default.
+    assert info.change_id != info2.change_id
+
+
+@pytest.mark.parametrize("id", ("", "28"))
+def test_checkinfo_changeid(id: Optional[str]):
+    info = CheckInfo("foo", change_id=ops.pebble.ChangeID(id))
+    assert info.change_id == ops.pebble.ChangeID(id)
+
+
 @pytest.mark.parametrize(
     "klass,num_args",
     [
@@ -325,3 +349,303 @@ def test_replace_state():
     state2 = replace(state, leader=False)
     assert state.leader != state2.leader
     assert state.containers == state2.containers
+
+
+@pytest.mark.parametrize(
+    "component,attribute,required_args",
+    [
+        (CloudCredential, "attributes", {"auth_type": "foo"}),
+        (Secret, "tracked_content", {}),
+        (Secret, "latest_content", {"tracked_content": {"password": "password"}}),
+        (Secret, "remote_grants", {"tracked_content": {"password": "password"}}),
+        (Relation, "local_app_data", {"endpoint": "foo"}),
+        (Relation, "local_unit_data", {"endpoint": "foo"}),
+        (Relation, "remote_app_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "local_app_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "local_unit_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "remote_app_data", {"endpoint": "foo"}),
+        (SubordinateRelation, "remote_unit_data", {"endpoint": "foo"}),
+        (PeerRelation, "local_app_data", {"endpoint": "foo"}),
+        (PeerRelation, "local_unit_data", {"endpoint": "foo"}),
+        (Notice, "last_data", {"key": "foo"}),
+        (Container, "layers", {"name": "foo"}),
+        (Container, "service_statuses", {"name": "foo"}),
+        (Container, "mounts", {"name": "foo"}),
+        (Container, "notices", {"name": "foo"}),
+        (StoredState, "content", {}),
+    ],
+)
+def test_immutable_content_dict(
+    component: Type[object], attribute: str, required_args: Dict[str, Any]
+):
+    content = {"foo": "bar"}
+    obj1 = component(**required_args, **{attribute: content})
+    obj2 = component(**required_args, **{attribute: content})
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == content
+    assert getattr(obj1, attribute) is not getattr(obj2, attribute)
+    content["baz"] = "qux"
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == {"foo": "bar"}
+    # This shouldn't be done in a charm test, since the attribute should be immutable,
+    # but it's convenient to verify that the content is not connected.
+    object.__setattr__(obj1, attribute, {"baz": "qux"})
+    assert getattr(obj1, attribute) == {"baz": "qux"}
+    assert getattr(obj2, attribute) == {"foo": "bar"}
+
+
+@pytest.mark.parametrize(
+    "component,attribute,required_args",
+    [
+        (CloudCredential, "redacted", {"auth_type": "foo"}),
+        (CloudSpec, "ca_certificates", {"type": "foo"}),
+        (BindAddress, "addresses", {}),
+        (Network, "bind_addresses", {"binding_name": "foo"}),
+        (Network, "ingress_addresses", {"binding_name": "foo"}),
+        (Network, "egress_subnets", {"binding_name": "foo"}),
+    ],
+)
+def test_immutable_content_list(
+    component: Type[object], attribute: str, required_args: Dict[str, Any]
+):
+    content = ["foo", "bar"]
+    obj1 = component(**required_args, **{attribute: content})
+    obj2 = component(**required_args, **{attribute: content})
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == content
+    assert getattr(obj1, attribute) is not getattr(obj2, attribute)
+    content.append("baz")
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == ["foo", "bar"]
+    # This shouldn't be done in a charm test, since the attribute should be immutable,
+    # but it's convenient to verify that the content is not connected.
+    object.__setattr__(obj1, attribute, ["baz", "qux"])
+    assert getattr(obj1, attribute) == ["baz", "qux"]
+    assert getattr(obj2, attribute) == ["foo", "bar"]
+
+
+@pytest.mark.parametrize(
+    "component,attribute,required_args",
+    [
+        (Relation, "remote_units_data", {"endpoint": "foo"}),
+        (PeerRelation, "peers_data", {"endpoint": "foo"}),
+    ],
+)
+def test_immutable_content_dict_of_dicts(
+    component: Type[object], attribute: str, required_args: Dict[str, Any]
+):
+    content = {0: {"foo": "bar"}, 1: {"baz": "qux"}}
+    obj1 = component(**required_args, **{attribute: content})
+    obj2 = component(**required_args, **{attribute: content})
+    assert getattr(obj1, attribute) == getattr(obj2, attribute) == content
+    assert getattr(obj1, attribute) is not getattr(obj2, attribute)
+    content[0]["baz"] = "quux"
+    assert (
+        getattr(obj1, attribute)
+        == getattr(obj2, attribute)
+        == {0: {"foo": "bar"}, 1: {"baz": "qux"}}
+    )
+    # This shouldn't be done in a charm test, since the attribute should be immutable,
+    # but it's convenient to verify that the content is not connected.
+    object.__setattr__(obj1, attribute, {0: {"foo": "qux"}})
+    assert getattr(obj1, attribute) == {0: {"foo": "qux"}}
+    assert getattr(obj2, attribute) == {0: {"foo": "bar"}, 1: {"baz": "qux"}}
+
+
+@pytest.mark.parametrize(
+    "obj_in,attribute,get_method,key_attr",
+    [
+        ({"foo": "bar"}, "config", "", ""),
+        (Relation("rel"), "relations", "get_relation", "id"),
+        (PeerRelation("peer"), "relations", "get_relation", "id"),
+        (SubordinateRelation("sub"), "relations", "get_relation", "id"),
+        (Network("foo"), "networks", "get_network", "binding_name"),
+        (Container("foo"), "containers", "get_container", "name"),
+        (Storage("foo"), "storages", "get_storage", "name"),
+        (TCPPort(80), "opened_ports", "", ""),
+        (Secret({"foo": "bar"}), "secrets", "", ""),
+        (Resource(name="foo", path="bar"), "resources", "", ""),
+        (StoredState(), "stored_states", "get_stored_state", "name"),
+    ],
+)
+def test_state_immutable(
+    obj_in, attribute: str, get_method: str, key_attr: str, mycharm
+):
+    state_in = State(**{attribute: obj_in if isinstance(obj_in, dict) else [obj_in]})
+
+    state_out: State = trigger(
+        state_in,
+        event="start",
+        charm_type=mycharm,
+        meta={
+            "name": "foo",
+            "containers": {"foo": {"resource": "bar"}},
+            "extra-bindings": {"foo": {}},
+            "peers": {"peer": {"interface": "bar"}},
+            "requires": {
+                "rel": {"interface": "bar"},
+                "sub": {"interface": "bar", "scope": "container"},
+            },
+            "resources": {"foo": {"type": "bar"}},
+            "storage": {"foo": {"type": "file"}},
+        },
+        config={"options": {"foo": {"type": "string"}}},
+    )
+
+    if attribute == "config":
+        # There's no State.get_config, we just get it directly.
+        obj_out = state_out.config
+    elif attribute == "opened_ports":
+        # There's no State.get_opened_ports, because in a charm tests you just
+        # want to assert the port is/is not in the set.
+        obj_out = [p for p in state_out.opened_ports if p == obj_in][0]
+    elif attribute == "secrets":
+        # State.get_secret only takes keyword arguments, while the others take
+        # only positional arguments.
+        obj_out = state_out.get_secret(id=obj_in.id)
+    elif attribute == "resources":
+        # Charms can't change resources, so there's no State.get_resource.
+        obj_out = [r for r in state_out.resources if r == obj_in][0]
+    else:
+        obj_out = getattr(state_out, get_method)(getattr(obj_in, key_attr))
+    assert obj_in is not obj_out
+
+
+@pytest.mark.parametrize(
+    "relation_type",
+    [
+        Relation,
+        PeerRelation,
+        SubordinateRelation,
+    ],
+)
+def test_state_immutable_with_changed_data_relation(relation_type, mycharm):
+    def event_handler(charm: CharmBase, _):
+        rel = charm.model.get_relation(relation_type.__name__)
+        rel.data[charm.app]["a"] = "b"
+        rel.data[charm.unit]["c"] = "d"
+
+    mycharm._call = event_handler
+
+    relation_in = relation_type(relation_type.__name__)
+
+    state_in = State(relations={relation_in}, leader=True)
+
+    state_out = trigger(
+        state_in,
+        event="start",
+        charm_type=mycharm,
+        meta={
+            "name": "foo",
+            "peers": {"PeerRelation": {"interface": "bar"}},
+            "requires": {
+                "Relation": {"interface": "bar"},
+                "SubordinateRelation": {"interface": "bar", "scope": "container"},
+            },
+        },
+    )
+
+    relation_out = state_out.get_relation(relation_in.id)
+    assert not relation_in.local_app_data
+    assert relation_out.local_app_data == {"a": "b"}
+    assert relation_out.local_unit_data == {"c": "d", **_DEFAULT_JUJU_DATABAG}
+
+
+def test_state_immutable_with_changed_data_container(mycharm):
+    layer_name = "my-layer"
+    layer = ops.pebble.Layer({
+        "services": {
+            "foo": {
+                "command": "bar",
+                "override": "replace",
+            },
+        }
+    })
+
+    def event_handler(charm: CharmBase, _):
+        container = charm.model.unit.get_container("foo")
+        container.add_layer(layer_name, layer, combine=True)
+
+    mycharm._call = event_handler
+
+    container_in = Container("foo", can_connect=True)
+    state_in = State(containers={container_in})
+
+    state_out = trigger(
+        state_in,
+        event="start",
+        charm_type=mycharm,
+        meta={
+            "name": "foo",
+            "containers": {"foo": {"resource": "bar"}},
+        },
+    )
+
+    container_out = state_out.get_container(container_in.name)
+    assert not container_in.layers
+    assert container_out.layers == {layer_name: layer}
+
+
+def test_state_immutable_with_changed_data_ports(mycharm):
+    def event_handler(charm: CharmBase, _):
+        charm.model.unit.open_port(protocol="tcp", port=80)
+
+    mycharm._call = event_handler
+
+    state_in = State()
+    state_out = trigger(
+        state_in,
+        event="start",
+        charm_type=mycharm,
+        meta={"name": "foo"},
+    )
+
+    assert not state_in.opened_ports
+    assert state_out.opened_ports == {TCPPort(80)}
+
+
+def test_state_immutable_with_changed_data_secret(mycharm):
+    def event_handler(charm: CharmBase, _):
+        secret = charm.model.get_secret(label="my-secret")
+        secret.set_content({"password": "bar"})
+
+    mycharm._call = event_handler
+
+    secret_in = Secret({"password": "foo"}, label="my-secret", owner="unit")
+    state_in = State(secrets={secret_in})
+
+    state_out = trigger(
+        state_in,
+        event="start",
+        charm_type=mycharm,
+        meta={"name": "foo"},
+    )
+
+    secret_out = state_out.get_secret(id=secret_in.id)
+    assert secret_in.latest_content == {"password": "foo"}
+    assert secret_out.latest_content == {"password": "bar"}
+
+
+def test_state_immutable_with_changed_data_stored_state():
+    class MyCharm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self._stored.set_default(seen=set())
+            framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, event: ops.StartEvent):
+            self._stored.seen.add(str(event))
+
+    stored_state_in = StoredState(owner_path="MyCharm")
+    state_in = State(stored_states={stored_state_in})
+
+    state_out = trigger(
+        state_in,
+        event="start",
+        charm_type=MyCharm,
+        meta={"name": "foo"},
+    )
+
+    stored_state_out = state_out.get_stored_state(
+        stored_state_in.name, owner_path=stored_state_in.owner_path
+    )
+    assert not stored_state_in.content
+    assert "seen" in stored_state_out.content

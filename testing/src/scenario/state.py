@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import datetime
 import inspect
@@ -108,6 +109,19 @@ _SECRET_EVENTS = {
     "secret_rotate",
     "secret_expired",
 }
+
+
+def _deepcopy_mutable_fields(obj: object):
+    # We don't have a frozendict to freeze any dictionaries, and while we
+    # could freeze a list into a tuple, we would break tests that currently
+    # assert that they get a list, so we can't do that until 8.0. That means
+    # we can't actually freeze the content here, but we can at least
+    # disassociate it from the original object.
+    for attr, value in obj.__dict__.items():
+        if isinstance(value, (dict, list)):
+            # We expect that the obj is a frozen dataclass, so have to use
+            # object.__setattr__ to bypass the frozen check.
+            object.__setattr__(obj, attr, copy.deepcopy(value))
 
 
 # This can be replaced with the KW_ONLY dataclasses functionality in Python 3.10+.
@@ -218,15 +232,19 @@ class CloudCredential(_max_posargs(0)):
     auth_type: str
     """Authentication type."""
 
-    attributes: dict[str, str] = dataclasses.field(default_factory=dict)
+    attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
     """A dictionary containing cloud credentials.
+
     For example, for AWS, it contains `access-key` and `secret-key`;
     for Azure, `application-id`, `application-password` and `subscription-id`
     can be found here.
     """
 
-    redacted: list[str] = dataclasses.field(default_factory=list)
+    redacted: Sequence[str] = dataclasses.field(default_factory=list)
     """A list of redacted generic cloud API secrets."""
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
@@ -261,7 +279,7 @@ class CloudSpec(_max_posargs(1)):
     credential: CloudCredential | None = None
     """Cloud credentials with key-value attributes."""
 
-    ca_certificates: list[str] = dataclasses.field(default_factory=list)
+    ca_certificates: Sequence[str] = dataclasses.field(default_factory=list)
     """A list of CA certificates."""
 
     skip_tls_verify: bool = False
@@ -269,6 +287,9 @@ class CloudSpec(_max_posargs(1)):
 
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller."""
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> CloudSpec_Ops:
         return CloudSpec_Ops(
@@ -326,7 +347,7 @@ class Secret(_max_posargs(1)):
     to this unit.
     """
 
-    remote_grants: dict[int, set[str]] = dataclasses.field(default_factory=dict)
+    remote_grants: Mapping[int, set[str]] = dataclasses.field(default_factory=dict)
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
@@ -355,6 +376,7 @@ class Secret(_max_posargs(1)):
         if self.latest_content is None:
             # bypass frozen dataclass
             object.__setattr__(self, "latest_content", self.tracked_content)
+        _deepcopy_mutable_fields(self)
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
@@ -421,12 +443,15 @@ class Address(_max_posargs(1)):
 class BindAddress(_max_posargs(1)):
     """An address bound to a network interface in a Juju space."""
 
-    addresses: list[Address]
+    addresses: Sequence[Address]
     """The addresses in the space."""
     interface_name: str = ""
     """The name of the network interface."""
     mac_address: str | None = None
     """The MAC address of the interface."""
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook tool would."""
@@ -445,21 +470,24 @@ class Network(_max_posargs(2)):
 
     binding_name: str
     """The name of the network space."""
-    bind_addresses: list[BindAddress] = dataclasses.field(
+    bind_addresses: Sequence[BindAddress] = dataclasses.field(
         default_factory=lambda: [BindAddress([Address("192.0.2.0")])],
     )
     """Addresses that the charm's application should bind to."""
-    ingress_addresses: list[str] = dataclasses.field(
+    ingress_addresses: Sequence[str] = dataclasses.field(
         default_factory=lambda: ["192.0.2.0"],
     )
     """Addresses other applications should use to connect to the unit."""
-    egress_subnets: list[str] = dataclasses.field(
+    egress_subnets: Sequence[str] = dataclasses.field(
         default_factory=lambda: ["192.0.2.0/24"],
     )
     """Subnets that other units will see the charm connecting from."""
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
@@ -547,6 +575,8 @@ class RelationBase(_max_posargs(2)):
         for databag in self._databags:
             self._validate_databag(databag)
 
+        _deepcopy_mutable_fields(self)
+
     def __hash__(self) -> int:
         return hash(self.id)
 
@@ -588,6 +618,9 @@ class Relation(RelationBase):
         default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
     """The current content of the databag for each unit in the relation."""
+
+    remote_model_uuid: str | None = None
+    """The remote model's UUID; uses the main model's UUID if not specified."""
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -766,7 +799,7 @@ class Exec(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Mount(_max_posargs(0)):
-    """Maps local files to a :class:`Container` filesystem."""
+    """Maps a local path to a :class:`Container` filesystem."""
 
     location: str | pathlib.PurePosixPath
     """The location inside of the container."""
@@ -823,14 +856,14 @@ class Notice(_max_posargs(1)):
     last_repeated: datetime.datetime = dataclasses.field(default_factory=_now_utc)
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://canonical-pebble.readthedocs-hosted.com/en/latest/reference/notices/>`_
+    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
     occurrences: int = 1
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str] = dataclasses.field(default_factory=dict)
+    last_data: Mapping[str, str] = dataclasses.field(default_factory=dict)
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None = None
@@ -838,6 +871,9 @@ class Notice(_max_posargs(1)):
 
     expire_after: datetime.timedelta | None = None
     """How long since one of these last occurred until Pebble will drop the notice."""
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> pebble.Notice:
         return pebble.Notice(
@@ -865,13 +901,17 @@ class CheckInfo(_max_posargs(1)):
     level: pebble.CheckLevel | None = None
     """Level of the check."""
 
+    startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED
+    """Startup mode of the check."""
+
     status: pebble.CheckStatus = pebble.CheckStatus.UP
     """Status of the check.
 
     :attr:`ops.pebble.CheckStatus.UP` means the check is healthy (the number of
     failures is fewer than the threshold), :attr:`ops.pebble.CheckStatus.DOWN`
     means the check is unhealthy (the number of failures has reached the
-    threshold).
+    threshold), and :attr:`ops.pebble.CheckStatus.INACTIVE` means the check has
+    been stopped, so is not currently running.
     """
 
     failures: int = 0
@@ -883,13 +923,33 @@ class CheckInfo(_max_posargs(1)):
     This is how many consecutive failures for the check to be considered 'down'.
     """
 
+    change_id: pebble.ChangeID | None = None
+    """The ID of the Pebble Change associated with this check.
+
+    Passing ``None`` will automatically assign a new Change ID if the status is
+    :attr:`ops.pebble.CheckStatus.UP` or :attr:`ops.pebble.CheckStatus.DOWN`.
+    """
+
+    def __post_init__(self):
+        if self.change_id is None:
+            if self.status == pebble.CheckStatus.INACTIVE:
+                change_id = ""
+            else:
+                change_id = pebble.ChangeID(_generate_new_change_id())
+            object.__setattr__(self, "change_id", change_id)
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
     def _to_ops(self) -> pebble.CheckInfo:
         return pebble.CheckInfo(
             name=self.name,
             level=self.level,
+            startup=self.startup,
             status=self.status,
             failures=self.failures,
             threshold=self.threshold,
+            change_id=self.change_id,
         )
 
 
@@ -908,46 +968,43 @@ class Container(_max_posargs(1)):
     # pebble or derive them from the resulting plan (which one CAN get from pebble).
     # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
     # will be unknown. all that we can know is the resulting plan (the 'computed plan').
-    _base_plan: dict[str, Any] = dataclasses.field(default_factory=dict)
+    _base_plan: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
-    layers: dict[str, pebble.Layer] = dataclasses.field(default_factory=dict)
-    """All :class:`ops.pebble.Layer` definitions that have already been added to the container."""
+    layers: Mapping[str, pebble.Layer] = dataclasses.field(default_factory=dict)
+    """All :class:`ops.pebble.Layer` definitions that have already been added to the container.
 
-    service_statuses: dict[str, pebble.ServiceStatus] = dataclasses.field(
+    Note that the layers should be added to the dictionary in the order in which they would have
+    been added to Pebble. For layers loaded on Pebble start from the filesystem, this means adding
+    them to the dictionary in alphabetical order by filename. For layers loaded via the Pebble API,
+    this means adding them in the order of the API calls.
+    """
+
+    service_statuses: Mapping[str, pebble.ServiceStatus] = dataclasses.field(
         default_factory=dict,
     )
     """The current status of each Pebble service running in the container."""
 
-    # this is how you specify the contents of the filesystem: suppose you want to express that your
-    # container has:
-    # - /home/foo/bar.py
-    # - /bin/bash
-    # - /bin/baz
-    #
-    # this becomes:
-    # mounts = {
-    #     'foo': Mount(location='/home/foo/', source=Path('/path/to/local/dir/containing/bar/py/'))
-    #     'bin': Mount(location='/bin/', source=Path('/path/to/local/dir/containing/bash/and/baz/'))
-    # }
-    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
-    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
-    # create a tempfile and insert its path in the mock filesystem tree
-    mounts: dict[str, Mount] = dataclasses.field(default_factory=dict)
+    mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
 
-    * ``/home/foo/bar.py``
-    * ``/bin/bash``
-    * ``/bin/baz``
+    * A file ``/home/foo.py``
+    * A directory ``/bin``
 
-    this becomes::
+    This becomes::
 
         mounts = {
-            'foo': Mount('/home/foo', pathlib.Path('/path/to/local/dir/containing/bar/py/')),
-            'bin': Mount('/bin/', pathlib.Path('/path/to/local/dir/containing/bash/and/baz/')),
+            'foo': Mount(location='/home/foo.py', source=pathlib.Path('/path/to/local/foo.py')),
+            'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
+
+    When your charm runs, the simulated container filesystem will have symlinks to
+    ``/path/to/local/foo.py`` and ``/path/to/local/bin`` at the specified locations.
+
+    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files to the
+    container filesystem, make sure to specify source files/directories that can be safely modified.
     """
 
     execs: Iterable[Exec] = frozenset()
@@ -971,7 +1028,7 @@ class Container(_max_posargs(1)):
         )
     """
 
-    notices: list[Notice] = dataclasses.field(default_factory=list)
+    notices: Sequence[Notice] = dataclasses.field(default_factory=list)
     """Any Pebble notices that already exist in the container."""
 
     check_infos: frozenset[CheckInfo] = frozenset()
@@ -984,15 +1041,37 @@ class Container(_max_posargs(1)):
         if not isinstance(self.execs, frozenset):
             # Allow passing a regular set (or other iterable) of Execs.
             object.__setattr__(self, "execs", frozenset(self.execs))
+        _deepcopy_mutable_fields(self)
 
     def _render_services(self):
-        # copied over from ops.testing._TestingPebbleClient._render_services()
         services: dict[str, pebble.Service] = {}
-        for key in sorted(self.layers.keys()):
-            layer = self.layers[key]
+        for layer in self.layers.values():
             for name, service in layer.services.items():
-                services[name] = service
+                if name in services and service.override == "merge":
+                    services[name]._merge(service)
+                else:
+                    services[name] = service
         return services
+
+    def _render_checks(self) -> Dict[str, pebble.Check]:
+        checks: Dict[str, pebble.Check] = {}
+        for layer in self.layers.values():
+            for name, check in layer.checks.items():
+                if name in checks and check.override == "merge":
+                    checks[name]._merge(check)
+                else:
+                    checks[name] = check
+        return checks
+
+    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
+        log_targets: Dict[str, pebble.LogTarget] = {}
+        for layer in self.layers.values():
+            for name, log_target in layer.log_targets.items():
+                if name in log_targets and log_target.override == "merge":
+                    log_targets[name]._merge(log_target)
+                else:
+                    log_targets[name] = log_target
+        return log_targets
 
     @property
     def plan(self) -> pebble.Plan:
@@ -1006,10 +1085,14 @@ class Container(_max_posargs(1)):
         # copied over from ops.testing._TestingPebbleClient.get_plan().
         plan = pebble.Plan(yaml.safe_dump(self._base_plan))
         services = self._render_services()
-        if not services:
-            return plan
+        checks = self._render_checks()
+        log_targets = self._render_log_targets()
         for name in sorted(services.keys()):
             plan.services[name] = services[name]
+        for name in sorted(checks.keys()):
+            plan.checks[name] = checks[name]
+        for name in sorted(log_targets.keys()):
+            plan.log_targets[name] = log_targets[name]
         return plan
 
     @property
@@ -1046,6 +1129,13 @@ class Container(_max_posargs(1)):
             charm pushed to the container.
         """
         return ctx._get_container_root(self.name)
+
+    def get_check_info(self, name: str) -> CheckInfo:
+        """Get the check info for a check by name."""
+        for check_info in self.check_infos:
+            if check_info.name == name:
+                return check_info
+        raise KeyError(f"check-info: {name} not found in the Container")
 
 
 _RawStatusLiteral = Literal[
@@ -1096,6 +1186,10 @@ class _EntityStatus:
     def from_ops(cls, obj: StatusBase) -> _EntityStatus:
         """Convert from the ops.StatusBase object to the matching _EntityStatus object."""
         return cls.from_status_name(obj.name, obj.message)
+
+    def _to_ops(self) -> StatusBase:
+        """Convert this object to an ops.StatusBase object."""
+        return StatusBase.from_name(self.name, message=self.message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
@@ -1193,7 +1287,7 @@ class StoredState(_max_posargs(1)):
     # However, it's complex to describe those types, since it's a recursive
     # definition - even in TypeShed the _Marshallable type includes containers
     # like list[Any], which seems to defeat the point.
-    content: dict[str, Any] = dataclasses.field(default_factory=dict)
+    content: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     """The content of the :class:`ops.StoredState` instance."""
 
     _data_type_name: str = "StoredStateData"
@@ -1201,6 +1295,9 @@ class StoredState(_max_posargs(1)):
     @property
     def _handle_path(self):
         return f"{self.owner_path or ''}/{self._data_type_name}[{self.name}]"
+
+    def __post_init__(self):
+        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self._handle_path)
@@ -1234,6 +1331,9 @@ class Port(_max_posargs(1)):
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
         return False
+
+    def _to_ops(self) -> ops.Port:
+        return ops.Port(port=self.port, protocol=self.protocol)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1405,7 +1505,7 @@ class State(_max_posargs(0)):
     # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
-    deferred: list[DeferredEvent] = dataclasses.field(default_factory=list)
+    deferred: Sequence[DeferredEvent] = dataclasses.field(default_factory=list)
     """Events that have been deferred on this charm by some previous execution."""
     stored_states: Iterable[StoredState] = dataclasses.field(
         default_factory=frozenset,
@@ -1469,6 +1569,32 @@ class State(_max_posargs(0)):
             # a frozenset as the actual attribute.
             if not isinstance(val, frozenset):
                 object.__setattr__(self, name, frozenset(val))
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> State:
+        # We use copy.deepcopy() to create the initial output state (that is
+        # then typically modified by the charm execution). This would normally
+        # 'just work', but we have a custom `__reduce__` method to handle the
+        # odd way we are setting keyword-only arguments. It's cleaner to have
+        # this custom `__deepcopy__` than to try to handle this case in the
+        # reduce method as well.
+        # TODO: When we require Python 3.10+ this method should be removed.
+        new_state = copy.copy(self)
+        object.__setattr__(new_state, "config", self.config.copy())
+        for attr in (
+            "relations",
+            "networks",
+            "containers",
+            "storages",
+            "opened_ports",
+            "secrets",
+            "resources",
+            "stored_states",
+        ):
+            value = getattr(self, attr)
+            new_value = frozenset(copy.deepcopy(v, memo) for v in value)
+            object.__setattr__(new_state, attr, new_value)
+        object.__setattr__(new_state, "deferred", self.deferred[:])
+        return new_state
 
     def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
@@ -1549,11 +1675,11 @@ class State(_max_posargs(0)):
         storage: str,
         /,
         *,
-        index: int | None = 0,
+        index: int = 0,
     ) -> Storage:
         """Get storage from this State, based on the storage's name and index."""
         for state_storage in self.storages:
-            if state_storage.name == storage and storage.index == index:
+            if state_storage.name == storage and state_storage.index == index:
                 return state_storage
         raise ValueError(
             f"storage: name={storage}, index={index} not found in the State",
@@ -1789,16 +1915,16 @@ class _EventPath(str):
 
 @dataclasses.dataclass(frozen=True)
 class _Event:  # type: ignore
-    """A Juju, ops, or custom event that can be run against a charm.
-
-    Typically, for simple events, the string name (e.g. ``install``) can be used,
-    and for more complex events, an ``event`` property will be available on the
-    related object (e.g. ``relation.joined_event``).
-    """
+    """A Juju, ops, or custom event that can be run against a charm."""
 
     path: str
-    args: tuple[Any, ...] = ()
-    kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
+    """The name of the event.
+    
+    For example: ``start``, ``config_changed``, ``my_relation_joined``, or
+    ``custom.MyConsumer.lib_changed``.
+
+    This is converted to an _EventPath object on instantiation.
+    """
 
     storage: Storage | None = None
     """If this is a storage event, the storage it refers to."""
@@ -1824,6 +1950,19 @@ class _Event:  # type: ignore
 
     action: _Action | None = None
     """If this is an action event, the :class:`Action` it refers to."""
+
+    custom_event: ops.BoundEvent | None = None
+    """If this is a custom event, the bound event it refers to.
+
+    The charm object *must* have an attribute that is an instance of the same
+    emitter type.
+    """
+
+    custom_event_args: Iterable[Any] = dataclasses.field(default_factory=tuple)
+    """If this is a custom event, the arguments to pass to the event."""
+
+    custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    """If this is a custom event, the keyword arguments to pass to the event."""
 
     _owner_path: list[str] = dataclasses.field(default_factory=list)
 
@@ -1882,6 +2021,11 @@ class _Event:  # type: ignore
     def _is_workload_event(self) -> bool:
         """Whether the event name indicates that this is a workload event."""
         return self._path.type is _EventType.WORKLOAD
+
+    @property
+    def _is_custom_event(self) -> bool:
+        """Whether the event name indicates that this is a custom event."""
+        return self.custom_event is not None
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.

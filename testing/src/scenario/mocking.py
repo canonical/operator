@@ -11,6 +11,7 @@ to interact with the Juju controller and the Pebble service manager.
 import datetime
 import io
 import shutil
+import uuid
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -54,6 +55,7 @@ from .errors import ActionMissingFromContextError
 from .logger import logger as scenario_logger
 from .state import (
     CharmType,
+    CheckInfo,
     JujuLogLine,
     Mount,
     Network,
@@ -210,7 +212,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise RelationNotFoundError() from None
 
     def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
-        if self._context.juju_version < "3.0.2":
+        if JujuVersion(self._context.juju_version) < "3.0.2":
             raise ModelError(
                 "secrets are only available in juju >= 3.0.2."
                 "Set ``Context.juju_version`` to 3.0.2+ to use them.",
@@ -271,6 +273,18 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         unit_id = int(member_name.split("/")[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        if JujuVersion(self._context.juju_version) < "3.6.2":
+            raise ModelError("Relation.remote_model is only available on Juju >= 3.6.2")
+
+        relation = self._get_relation_by_id(relation_id)
+        # Only Relation has remote_model_uuid, not the other subclasses of RelationBase.
+        if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
+            uuid = relation.remote_model_uuid
+        else:
+            uuid = self._state.model.uuid
+        return {"uuid": uuid}
 
     def is_leader(self):
         return self._state.leader
@@ -377,8 +391,16 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(
+        self, relation_id: int, data: Mapping[str, str], is_app: bool
+    ) -> None:
         self._check_app_data_access(is_app)
+        # NOTE: The code below currently does not have any effect, because
+        # the dictionary has already had the same set/delete operations
+        # applied to it by RelationDataContent -- unlike in production,
+        # where this method calls out to Juju's relation-set to operate on
+        # the real databag, this method currently operates on the same
+        # dictionary object that RelationDataContent does.
         relation = self._get_relation_by_id(relation_id)
         if is_app:
             if not self._state.leader:
@@ -388,7 +410,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             tgt = relation.local_app_data
         else:
             tgt = relation.local_unit_data
-        tgt[key] = value
+        for key, value in data.items():
+            tgt[key] = value
 
     def secret_add(
         self,
@@ -444,7 +467,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
             secret._set_label(label)
-        juju_version = self._context.juju_version
+        juju_version = JujuVersion(self._context.juju_version)
         if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # In this medieval Juju chapter,
             # secret owners always used to track the latest revision.
@@ -775,18 +798,91 @@ class _MockPebbleClient(_TestingPebbleClient):
         # load any existing notices and check information from the state
         self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
         self._check_infos: Dict[str, pebble.CheckInfo] = {}
-        for container in state.containers:
+        try:
+            container = state.get_container(self._container_name)
+        except KeyError:
+            # The container is in the metadata but not in the state - perhaps
+            # this is an install event, at which point the container doesn't
+            # exist yet. This means there will be no notices or check infos.
+            pass
+        else:
             for notice in container.notices:
                 if hasattr(notice.type, "value"):
                     notice_type = cast(pebble.NoticeType, notice.type).value
                 else:
                     notice_type = str(notice.type)
                 self._notices[notice_type, notice.key] = notice._to_ops()
+            now = datetime.datetime.now()
             for check in container.check_infos:
                 self._check_infos[check.name] = check._to_ops()
+                kind = (
+                    pebble.ChangeKind.PERFORM_CHECK.value
+                    if check.status == pebble.CheckStatus.UP
+                    else pebble.ChangeKind.RECOVER_CHECK.value
+                )
+                change = pebble.Change(
+                    pebble.ChangeID(str(uuid.uuid4())),
+                    kind,
+                    summary=check.name,
+                    status=pebble.ChangeStatus.DOING.value,
+                    tasks=[],
+                    ready=False,
+                    err=None,
+                    spawn_time=now,
+                    ready_time=now,
+                )
+                self._changes[check.change_id] = change
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
+
+    def _update_state_check_infos(self):
+        """Copy any new or changed check infos into the state."""
+        infos: set[CheckInfo] = set()
+        for info in self._check_infos.values():
+            if isinstance(info.level, str):
+                level = pebble.CheckLevel(info.level)
+            else:
+                level = info.level
+            if isinstance(info.status, str):
+                status = pebble.CheckStatus(info.status)
+            else:
+                status = info.status
+            check_info = CheckInfo(
+                name=info.name,
+                level=level,
+                startup=info.startup,
+                status=status,
+                failures=info.failures,
+                threshold=info.threshold,
+                change_id=info.change_id,
+            )
+            infos.add(check_info)
+        object.__setattr__(self._container, "check_infos", frozenset(infos))
+
+    def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
+        super().replan_services(timeout=timeout, delay=delay)
+        self._update_state_check_infos()
+
+    def add_layer(
+        self,
+        label: str,
+        layer: Union[str, "pebble.LayerDict", pebble.Layer],
+        *,
+        combine: bool = False,
+    ):
+        super().add_layer(label, layer, combine=combine)
+        self._update_state_check_infos()
+
+    def start_checks(self, names: List[str]) -> List[str]:
+        started = super().start_checks(names)
+        self._update_state_check_infos()
+        return started
+
+    def stop_checks(self, names: List[str]) -> List[str]:
+        stopped = super().stop_checks(names)
+        self._update_state_check_infos()
+        return stopped
 
     @property
     def _container(self) -> "ContainerSpec":

@@ -6,6 +6,7 @@ on:
       - main
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 jobs:
   o11y-charm-tests:
@@ -16,11 +17,11 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 76a98ac2e8eb94d2ef714039c2b8f365f937dedc  # rev149 2025-01-25T12:09:32Z
+            commit: 003eb9c25f35f616a9af1a5c7e15b306a36e804e  # rev155 2025-02-26T12:12:03Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 62cd2d9b8c3a528910ce12c553209817e1b7a889 # rev226 2024-12-19T16:01:25Z
+            commit: 043ae123939ed02e32a3ca7223e194ea0394259e  # 2025-02-25T00:03:54Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 3c8db2d5ca7106bb39b5745de44732053888e190  # rev135 2025-01-28T15:24:39Z
+            commit: 13fa90ed7d5304ce26eaba17f0dff3c2831c07a8  # 2025-02-10T20:16:10Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
@@ -28,18 +29,67 @@ jobs:
           repository: ${{ matrix.charm-repo }}
           ref: ${{ matrix.commit }}
 
-      - name: Update 'ops' dependency in test charm to latest
-        run: |
-          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-
       - name: Install dependencies
-        run: pip install tox~=4.2
+        run: pip install tox~=4.2 uv~=0.6
+
+      - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        run: |
+          if [ -e "requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+          elif [ -e "uv.lock" ]; then
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --raw-sources
+          else
+            echo "Error: no requirements.txt or uv.lock file found"
+            exit 1
+          fi
 
       - name: Run the charm's unit tests
         if: ${{ !(matrix.disabled) }}
         run: tox -vve unit
 
+      - name: Check if 'scenario' tox environment exists
+        id: check-tox-env-scenario
+        run: |
+          if tox --listenvs | grep -q "^scenario$"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # alertmanager-k8s has old Scenario tests, so we can't do this until those
+      # are updated.
+#      - name: Run the charm's scenario unit tests
+#        if: ${{ steps.check-tox-env-scenario.outputs.exists == 'true' && !(matrix.disabled) }}
+#        run: tox -vve scenario
+
+      - name: Check if 'static' tox environment exists
+        id: check-tox-env-static
+        run: |
+          if tox --listenvs | grep -q "^static$"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run the charm's static analysis checks
-        if: ${{ !(matrix.disabled) }}
+        if: ${{ steps.check-tox-env-static.outputs.exists == 'true' && !(matrix.disabled)
+          }}
+        run: tox -vve static
+
+      - name: Check if 'static-charm' tox environment exists
+        id: check-tox-env-static-charm
+        run: |
+          if tox --listenvs | grep -q "^static-charm$"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the charm's static (charm) analysis checks
+        if: ${{ steps.check-tox-env-static-charm.outputs.exists == 'true' && !(matrix.disabled)
+          }}
         run: tox -vve static-charm

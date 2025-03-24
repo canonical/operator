@@ -25,7 +25,7 @@ def _on_leader_elected(self, event: ops.LeaderElectedEvent):
 
 To have the leader notify other units about leadership changes, change data in a peer relation.
 
-> See more: [Peer Relations](https://juju.is/docs/juju/relation#heading--peer)
+> See more: {external+juju:ref}`Juju | Relation <relation>`
 
 [note status="Use the peer relation rather than `leader-setting-changed`"]
 In the past, this was done by observing a `leader-setting-changed` event, which is now deprecated.
@@ -45,13 +45,9 @@ Note that Juju guarantees leadership for only 30 seconds after a `leader-elected
 event or an `is-leader` check. If the charm code may run longer, then extra
 `is_leader()` calls should be made to ensure that the unit is still the leader.
 
-## Test response to leadership changes
-
-> See first: {ref}`get-started-with-charm-testing`
-
 ### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify behaviour when leadership has changed, pass the leadership status to the `State`. For example:
 

@@ -177,7 +177,7 @@ class MyDatabaseCharm(ops.CharmBase):
 
     def _on_secret_remove(self, event: ops.SecretRemoveEvent):
         # All observers are done with this revision, remove it:
-        event.secret.remove_revision(event.revision)
+        event.remove_revision()
 ```
 
 ### Revoke a secret
