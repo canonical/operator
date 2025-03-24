@@ -29,10 +29,18 @@ class HelloOperatorCharm(ops.CharmBase):
             self._stored.things.append(current)
 ```
 
-```{tip}
-The default logging level for a Juju model is `INFO`. To see, for example,
-`DEBUG` level messages, you should change the model configuration.
+````{tip}
+In addition to logs from your charm, `juju debug-log` contains a wealth of
+information about everything happening in your model. To focus on what's
+happening in your charm, you can adjust the logging configuration. For example,
+to limit logs to ones from your charm and the uniter operation (generally: which
+events are being emitted), and include `DEBUG` level logs, use:
+
 ```
+juju debug-log --debug --include-module juju.worker.uniter.operation --include-module unit.<charm name>/<unit number>.juju-log
+```
+
+````
 
 > See more: [`logging`](https://docs.python.org/3/library/logging.html)
 
