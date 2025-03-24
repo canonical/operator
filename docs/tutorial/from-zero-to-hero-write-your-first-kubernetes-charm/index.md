@@ -22,11 +22,12 @@ The  application that we will charm in this tutorial is based on the Python Fast
 
 **What you'll need:** 
 
-- A working station, e.g., a laptop with amd64 architecture. 
-- Familiarity with Juju.
-- Familiarity with the Python programming language, Object-Oriented Programming, event handlers.
-- Understanding of Kubernetes fundamentals.
+- A workstation. For example, a laptop with an amd64 architecture. 
+- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
 
+It will also help if you are familiar with Juju and have an understanding of
+Kubernetes fundamentals, but don't worry if you're new to these topics. This
+tutorial will guide you though each step.
 
 **What you'll do:**
 
@@ -36,49 +37,35 @@ The  application that we will charm in this tutorial is based on the Python Fast
 - Develop your charm:
     1. {ref}`Create a minimal Kubernetes charm <create-a-minimal-kubernetes-charm>`
     1. {ref}`Make your charm configurable <make-your-charm-configurable>`
-    1. {ref}`Expose the version of the application behind your charm <expose-the-version-of-the-application-behind-your-charm>`
     1. {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`
-    1. {ref}`Preserve your charm's data <preserve-your-charms-data>`
     1. {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`
     1. {ref}`Observe your charm with COS Lite and set up cross-model integrations <observe-your-charm-with-cos-lite>`
     1. {ref}`Write unit tests for your charm <write-unit-tests-for-your-charm>`
-    1. {ref}`Write scenario tests for your charm <write-scenario-tests-for-your-charm>`
     1. {ref}`Write integration tests for your charm <write-integration-tests-for-your-charm>`
-    1. {ref}`Open a Kubernetes port in your charm <open-a-kubernetes-port-in-your-charm>`
-    1. {ref}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`
 -->
 
 
 ```{toctree}
 :maxdepth: 1
 
-set-up-your-development-environment
 study-your-application
+set-up-your-development-environment
 create-a-minimal-kubernetes-charm
 make-your-charm-configurable
-expose-the-version-of-the-application-behind-your-charm
 integrate-your-charm-with-postgresql
-preserve-your-charms-data
 expose-operational-tasks-via-actions
 observe-your-charm-with-cos-lite
 write-unit-tests-for-your-charm
-write-scenario-tests-for-your-charm
 write-integration-tests-for-your-charm
-open-a-kubernetes-port-in-your-charm
-publish-your-charm-on-charmhub
 ```
-
-
 
 (tutorial-kubernetes-next-steps)=
 ## Next steps
 
-By the end of this tutorial you will have built a machine charm and evolved it in a number of typical ways. But there is a lot more to explore:
+By the end of this tutorial you will have built a Kubernetes charm and evolved it in a number of typical ways. But there is a lot more to explore:
 
 | If you are wondering... | visit...             |
 |-------------------------|----------------------|
 | "How do I...?"          | {ref}`how-to-guides` |
 | "What is...?"           | {ref}`reference`     |
 | "Why...?", "So what?"   | {ref}`explanation`   |
-
-
