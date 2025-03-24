@@ -1,13 +1,5 @@
 # Contributing
 
-![GitHub License](https://img.shields.io/github/license/canonical/ops-scenario)
-![GitHub Commit Activity](https://img.shields.io/github/commit-activity/y/canonical/ops-scenario)
-![GitHub Lines of Code](https://img.shields.io/tokei/lines/github/canonical/ops-scenario)
-![GitHub Issues](https://img.shields.io/github/issues/canonical/ops-scenario)
-![GitHub PRs](https://img.shields.io/github/issues-pr/canonical/ops-scenario)
-![GitHub Contributors](https://img.shields.io/github/contributors/canonical/ops-scenario)
-![GitHub Watchers](https://img.shields.io/github/watchers/canonical/ops-scenario?style=social)
-
 This documents explains the processes and practices recommended for contributing enhancements to this project.
 
 - Generally, before developing enhancements to this project, you should consider [opening an issue](https://github.com/canonical/ops-scenario/issues) explaining your use case.
@@ -34,18 +26,4 @@ At the moment there is some hackery here and there (`object.__setattr__`...) to 
 
 ## Developing
 
-To set up the dependencies you can run:
-`pip install . ; pip uninstall ops-scenario`
-
-We recommend using the provided `pre-commit` config. For how to set up git pre-commit: [see here](https://pre-commit.com/).
-If you dislike that, you can always manually remember to `tox -e lint` before you push.
- 
-### Testing
-```shell
-tox -e fmt           # auto-fix your code as much as possible, including formatting and linting
-tox -e lint          # code style
-tox -e unit          # unit tests
-tox -e lint-tests    # lint testing code
-tox                  # runs 'lint', 'lint-tests' and 'unit' environments
-```
-
+See the top-level [HACKING.md](../HACKING.md).

@@ -1,25 +1,18 @@
-(write-scenario-tests-for-a-charm)=
+(write-unit-tests-for-a-charm)=
 # How to write unit tests for a charm
 
-```{note}
+## Setting up your environment
 
-This page is currently being refactored.
-
-```
-
-First of all, install the Ops testing framework. To do this in a virtual environment
-while you are developing, use `pip` or another package
-manager. For example:
+First of all, install the Ops testing framework. To do this in a virtual environment while we're developing, use `pip` or a different package manager. For example:
 
 ```
 pip install ops[testing]
 ```
 
-Normally, you'll include this in the dependency group for your unit tests, for
-example in a test-requirements.txt file:
+When we want to run repeatable unit tests, we'll normally pin `ops[testing]` to the latest minor version in the dependency group for our unit tests. For example, in a `test-requirements.txt` file:
 
 ```text
-ops[testing] ~= 2.17
+ops[testing] ~= 2.19
 ```
 
 Or in `pyproject.toml`:
@@ -27,67 +20,103 @@ Or in `pyproject.toml`:
 ```toml
 [dependency-groups]
 test = [
-  "ops[testing] ~= 2.17",
+  "ops[testing] ~= 2.19",
 ]
 ```
 
-Then, open a new `test_foo.py` file where you will put the test code.
+## Creating the charm and test files
+
+So that we have a charm to test, declare a placeholder charm type in `charm.py`:
+
+```python
+class MyCharm(ops.CharmBase):
+    pass        
+```
+
+Then open a new `test_foo.py` file for the test code and import the [`ops.testing`](ops_testing) framework:
 
 ```python
 import ops
 from ops import testing
 ```
 
-Then declare a new charm type:
+## Writing a test
+
+To write a test function, use a `Context` object to encapsulate the charm type (`MyCharm`) and any necessary metadata. The test should then define the initial `State` and call `Context.run` with an `event` and initial `State`.
+
+This follows the typical test structure:
+
+- Arrange inputs, mock necessary functions/system calls, and initialise the charm
+- Act by calling `Context.run`
+- Assert expected outputs or function calls.
+
+For example, suppose that `MyCharm` uses `Container.Push` to write a YAML config file on the pebble-ready event:
+
 ```python
-class MyCharm(ops.CharmBase):
-    pass        
+def _on_pebble_ready(self, event: ops.PebbleReadyEvent):        
+    container = event.workload
+    container.push('/etc/config.yaml', 'message: Hello, world!', make_dirs=True)
+    # ...
 ```
 
-And finally we can write a test function. The test code should use a `Context` object to encapsulate the charm type being tested (`MyCharm`) and any necessary metadata, then declare the initial `State` the charm will be presented when run, and `run` the context with an `event` and that initial state as parameters. 
-
-In code:
+A test for this behaviour might look like:
 
 ```python
-def test_charm_runs():
-    # Arrange: 
-    #  Create a Context to specify what code we will be running,
+import yaml
+from ops import testing
+
+from charm import MyCharm
+
+
+def test_pebble_ready_writes_config_file():
+    """Test that on pebble-ready, a config file is written."""
+    # Arrange: setting up the inputs
     ctx = testing.Context(MyCharm)
-    #  and create a State to specify what simulated data the charm being run will access.
-    state_in = testing.State(leader=True)
+    container = testing.Container(name="some-container", can_connect=True)
+    state_in = testing.State(
+        containers=[container],
+        leader=True,
+    )
 
     # Act:
-    #  Ask the context to run an event, e.g. 'start', with the state we have previously created.
-    state_out = ctx.run(ctx.on.start(), state_in)
+    ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
-    #  Verify that the output state looks like you expect it to.
-    assert state_out.unit_status == testing.UnknownStatus()
+    container_fs = state_out.get_container("some-container").get_filesystem(ctx)
+    cfg_file = container_fs / "etc" / "config.yaml"
+    config = yaml.safe_load(cfg_file.read_text())
+    assert config["message"] == "Hello, world!"
+
+```
+
+```{note}
+
+If you prefer to use unittest, you should rewrite this as a method of a `TestCase` subclass.
+
 ```
 
 > See more: 
 >  - [`State`](ops.testing.State)
 >  - [`Context`](ops.testing.Context)
 
-```{note}
-
-If you like using unittest, you should rewrite this as a method of some TestCase subclass.
-```
-
 ## Mocking beyond the State
 
-If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure.
-In that case, you will have to manually mock, patch or otherwise simulate those calls on top of what the framework does for you.
+If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
 
-For example, suppose that the charm we're testing uses the `KubernetesServicePatch`. To update the test above to mock that object, modify the test file to contain:
+For example, suppose that the charm we're testing uses the [lightkube client](https://github.com/gtsystem/lightkube) to talk to Kubernetes. To mock that object, modify the test file to contain:
 
 ```python
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest import patch
+from ops import testing
+
+from charm import MyCharm
+
 
 @pytest.fixture
 def my_charm():
-    with patch("charm.KubernetesServicePatch"):
+    with patch("charm.lightkube.Client"):
         yield MyCharm
 ```
 
@@ -97,7 +126,7 @@ Then you should rewrite the test to pass the patched charm type to the `Context`
 def test_charm_runs(my_charm):
     # Arrange: 
     #  Create a Context to specify what code we will be running
-    ctx = Context(my_charm)
+    ctx = testing.Context(my_charm)
     # ...
 ```
 

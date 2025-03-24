@@ -619,6 +619,9 @@ class Relation(RelationBase):
     )
     """The current content of the databag for each unit in the relation."""
 
+    remote_model_uuid: str | None = None
+    """The remote model's UUID; uses the main model's UUID if not specified."""
+
     def __hash__(self) -> int:
         return hash(self.id)
 
@@ -796,7 +799,7 @@ class Exec(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Mount(_max_posargs(0)):
-    """Maps local files to a :class:`Container` filesystem."""
+    """Maps a local path to a :class:`Container` filesystem."""
 
     location: str | pathlib.PurePosixPath
     """The location inside of the container."""
@@ -982,35 +985,26 @@ class Container(_max_posargs(1)):
     )
     """The current status of each Pebble service running in the container."""
 
-    # this is how you specify the contents of the filesystem: suppose you want to express that your
-    # container has:
-    # - /home/foo/bar.py
-    # - /bin/bash
-    # - /bin/baz
-    #
-    # this becomes:
-    # mounts = {
-    #     'foo': Mount(location='/home/foo/', source=Path('/path/to/local/dir/containing/bar/py/'))
-    #     'bin': Mount(location='/bin/', source=Path('/path/to/local/dir/containing/bash/and/baz/'))
-    # }
-    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
-    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
-    # create a tempfile and insert its path in the mock filesystem tree
     mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
 
-    * ``/home/foo/bar.py``
-    * ``/bin/bash``
-    * ``/bin/baz``
+    * A file ``/home/foo.py``
+    * A directory ``/bin``
 
-    this becomes::
+    This becomes::
 
         mounts = {
-            'foo': Mount('/home/foo', pathlib.Path('/path/to/local/dir/containing/bar/py/')),
-            'bin': Mount('/bin/', pathlib.Path('/path/to/local/dir/containing/bash/and/baz/')),
+            'foo': Mount(location='/home/foo.py', source=pathlib.Path('/path/to/local/foo.py')),
+            'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
+
+    When your charm runs, the simulated container filesystem will have symlinks to
+    ``/path/to/local/foo.py`` and ``/path/to/local/bin`` at the specified locations.
+
+    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files to the
+    container filesystem, make sure to specify source files/directories that can be safely modified.
     """
 
     execs: Iterable[Exec] = frozenset()

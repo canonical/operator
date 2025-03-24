@@ -144,6 +144,25 @@ class TestHarness:
         assert harness.get_relation_data(rel_id, 'postgresql') == {}
         assert harness.get_relation_data(rel_id, 'postgresql/0') == {'a': '1', 'b': '2'}
 
+    def test_relation_remote_model(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'remoteapp1', unit_data={'foo': 'bar'})
+        rel = harness.model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert isinstance(remote_model, ops.RemoteModel)
+        assert remote_model
+        assert remote_model.uuid == harness.model.uuid
+
     def test_can_connect_default(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,
@@ -2264,7 +2283,10 @@ class TestHarness:
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
             ('relation_get', 0, 'test-charm/0', False),
-            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': test_charm_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
 
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -2278,14 +2300,20 @@ class TestHarness:
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
