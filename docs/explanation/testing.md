@@ -181,11 +181,12 @@ Integration tests are a bit more complex, because these tests require a Juju con
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: microk8s
+          channel: 1.32-strict/stable
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action
         run: tox -e integration -- --model testing
