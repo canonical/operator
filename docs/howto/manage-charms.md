@@ -3,279 +3,66 @@
 
 > See first: {external+juju:ref}`Juju | Build a charm <build-a-charm>`, {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`
 
-## Create a repository and initialise it
+Hit the ground running with Ops by setting up standard project structure and tools.
 
-Create a repository with your source control of choice. Commit the code you have
-added and changed after every significant change, so that you have a record of
-the work, and can revert to an earlier version when required.
+> See more: {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`
 
-```{admonition} Best practice
-:class: hint
+Use Charmcraft to quickly initialise your charm project. This generates the
+folder structure, creates placeholder configuration and code files, and
+configures development tooling.
 
-Name the repository using the pattern ``<charm name>-operator`` for a single
-charm, or ``<base charm name>-operators`` when the repository will hold
-multiple related charms. For the charm name, see
-{external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
-```
-    
-In your new repository, run `charmcraft init` to generate the recommended
-structure for building a charm.
+> See more:
+>
+> * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
+> * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
 
-```{note}
-In most cases, you'll want to use `--profile=machine` or `profile=kubernetes`.
-If you are charming an application built with a popular framework, check if
-charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
+<!--
+TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
+-->
 
-Avoid the default (`--profile=simple`), which provides a demo charm, rather than
-a base for building a charm of your own.
-```
+The essence of a charm is the ``src/charm.py`` file. This is the entry point for
+your code whenever Juju emits an event, and defines the interface between Juju
+and the charm workflow.
 
-````{tip}
-If your repository will hold multiple charms, or a charm and source for other
-artifacts, like a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft --init` in each charm
-folder. You'll end up with a structure similar to:
+> See more: {ref}`run-workloads-with-a-charm-kubernetes`, {ref}`run-workloads-with-a-charm-machines`, {ref}`write-and-structure-charm-code`, {ref}`write-unit-tests-for-a-charm`, {ref}`write-integration-tests-for-a-charm`, {ref}`manage-logs`
 
-```
-my-charm-set-operators/
-├── charms
-│   ├── my-charm
-│   │   ├── charmcraft.yaml
-│   │   ├── pyproject.toml
-│   │   ├── README.md
-│   │   ├── requirements.txt
-│   │   ├── src
-│   │   │   └── charm.py
-│   │   ├── tests
-│   │   │   ├── integration
-│   │   │   │   └── test_charm.py
-│   │   │   └── unit
-│   │   │       └── test_charm.py
-│   │   └── tox.ini
-│   ├── my-charm-dashboard
-|   |   └── ...
-│   └── my-charm-helper
-|   |   └── ...
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-└── rock
-    └── ...
-```
-
-````
-
-## Use the provided tooling to maintain style and detect issues early
-
-The Charmcraft profile you've chosen has configured a number of recommended
-tools for developing charms. To use these, install
-[`tox`](https://tox.wiki/en/stable/index.html) on your development server.
-
-```{tip}
-If you use the `charm-dev` [Multipass](https://canonical.com/multipass) image or
-the [`concierge`](https://github.com/jnsgruk/concierge) tool to configure your
-development environment, you'll already have `tox` installed.
-```
-
-- Run `tox` to format and lint the code, and run static type checking and the
-  charm unit tests.
-- Run `tox -e integration` to run the charm integration tests.
-- Run `tox list` to see the available commands.
+These files are, of course, quite generic, so the next thing to do is add
+functionality to your charm. Part of that is also packing, test deploying,
+debugging, and, when ready, publishing your charm on Charmhub.
 
 ```{admonition} Best practice
 :class: hint
+One of the powers of charms is their reusability. As such, do not try to
+duplicate functionality already achieved by an existing charm – rather, make
+your charm take advantage of the [charm ecosystem](https://charmhub.io) by
+supporting integrating with existing charm solutions for observability,
+identity, scaling, and so on.
 
-All charms should provide the commands configured by the charmcraft profiles, to
-allow easily testing across the charm ecosystem. It's fine to tweak the
-configuration of individual tools, or to add additional commands, but keep the
-command names and meanings that the profiles provide.
+This also helps you stay compliant with another fundamental rule in charms,
+namely that, following the Unix philosophy, each charm should do one thing and
+do it well.
 ```
 
-## Define the required dependencies
+> See more:
+> 
+> * Make use of core Juju functionality
+>   - {ref}`manage-storage`
+>   - {ref}`manage-resources`
+>   - {ref}`manage-secrets`
+> * Add functionality
+>   - [Charmcraft | Add runtime details to a charm](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-runtime-details-to-a-charm)
+>   - {ref}`manage-actions`
+>   - {ref}`manage-configurations`
+>   - {ref}`manage-opened-ports`
+> * {external+charmcraft:ref}`Charmcraft | Manage charms > Pack a charm <pack-a-charm>`
+> * {external+juju:ref}`Juju | Manage charms > Deploy a charm <deploy-a-charm>` (you'll need to follow the Deploy a local charm example)
+> * {external+juju:ref}`Juju | Manage charms > Debug a charm <debug-a-charm>`
+> * {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>` (see especially the note on requesting formal review for your charm)
 
-### Use the Python provided by the base
-
-Charms run using the Python version provided by the base Ubuntu version. Write
-charm code that will run with the Python version of the oldest base you support.
-
-> See also: {external+juju:ref}`Juju | Roadmap and releases <juju-roadmap-and-releases>`
-
-```{admonition} Best practice
-:class: hint
-
-Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python)
-version in your `pyproject.toml` so that tooling will detect any use of Python
-features not available in the versions you support.
-```
-
-### Add Python dependencies to pyproject.toml, and generate a lock file
-
-Specify all the direct dependencies of your charm in your `pyproject.toml`
-file in the top-level charm folder. For example:
-
-```toml
-# Required group: these are all dependencies required to run the charm.
-dependencies = [
-    "ops~=2.19",
-]
-
-# Required group: these are all dependencies required to run all the charm's tests.
-[dependency-groups]
-test = [
-    "ops[testing]",
-    "pytest",
-    "coverage[toml]",
-    "jubilant",
-]
-# Optional additional groups:
-docs = [
-    "canonical-sphinx-extensions",
-    "furo",
-    "sphinx ~= 8.0.0",
-    "sphinxext-opengraph",
-]
-```
-
-Use the `pyproject.toml` dependencies to specify *all* dependencies (including
-indirect or transitive dependencies) in a lock file.
-
-````{admonition} Best practice
-:class: hint
-
-When using the `charm` plugin with charmcraft, ensure that you set strict
-dependencies to true, for example:
-
-```yaml
-parts:
-  my-charm:
-    plugin: charm
-    charm-strict-dependencies: false
-```
-````
-
-The default lock file is a plain `requirements.txt` file (you can use a tool
-such as [pip-compile](https://pip-tools.readthedocs.io/en/latest/) to produce
-it from `pyproject.toml`).
-
-```{tip}
-Charmcraft provides plugins for {external+charmcraft:ref}`uv <craft_parts_uv_plugin>`
-and {external+charmcraft:ref}`poetry <craft_parts_poetry_plugin>`. Use one of
-these tools to simplify the generation of your lock file.
-```
-
-```{admonition} Best practice
-:class: hint
-
-Ensure that the `pyproject.toml` *and* the lock file are committed to version
-control, so that exact versions of charms can be reproduced.
-```
-
-```{tip}
-Including an external dependency is a significant choice. It can help with
-reducing the complexity and development cost. However, it also increases the
-complexity of understanding the entire system, and adds a maintenance burden of
-keeping track of upstream versions, particularly around security issues.
-
-> See more: [Our Software Dependency Problem](https://research.swtch.com/deps)
-```
-
-## Validate your charm with every change
-
-Configure your continuous integration tooling so that whenever changes are
-proposed for or accepted into your main branch the `lint`, `unit`, and
-`integration` commands are run, and will block merging when failing.
-
-```{admonition} Best practice
-:class: hint
-
-The quality assurance pipeline of a charm should be automated using a
-continuous integration (CI) system.
-```
-
-If you are using GitHub, create a file called `.github/workflows/ci.yaml`. For
-example, to include a `lint` job that runs the `tox` `lint` environment:
-
-```yaml
-name: Tests
-on:
-  workflow_call:
-  workflow_dispatch:
-
-jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run linters
-        run: tox -e lint
-```
-
-Other `tox` environments can be run similarly; for example unit tests:
-
-```yaml
-  unit-test:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run tests
-        run: tox -e unit
-```
-
-Integration tests are a bit more complex, because in order to run those tests, a Juju controller and
-a cloud in which to deploy it, is required. This example uses a `concierge` in order to set up
-`k8s` and Juju:
-
-```
-  integration-test-k8s:
-    name: Integration tests (k8s)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install concierge
-        run: sudo snap install --classic concierge
-      - name: Install Juju and tools
-        run: sudo concierge prepare -p k8s
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run integration tests
-        # Set a predictable model name so it can be consumed by charm-logdump-action
-        run: tox -e integration -- --model testing
-      - name: Dump logs
-        uses: canonical/charm-logdump-action@main
-        if: failure()
-        with:
-          app: my-app-name
-          model: testing
-```
-
-```{tip}
-
-The `charming-actions <https://github.com/canonical/charming-actions>`_
-repository includes actions to ensure that libraries are up-to-date, publish
-charms and libraries, and more.
-```
-
-```{admonition} Best practice
-:class: hint
-
-Ensure that tooling is configured to automatically detect new versions,
-particularly security releases, for all your dependencies.
-```
+A charm is software: while there can be milestones, there is never a finish
+line. So, keep investing in every bit of your charm so that it looks and feels
+professional – from polishing metadata (including an icon, a website, docs, and
+so on) through polishing features (for example, working to ensure correct and
+reliable behavior, adding libraries so people can quickly integrate with your
+charm, and so on) all the way to turning it into a successful open source
+project with a community that enjoys it and wants to contribute to it. 
