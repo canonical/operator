@@ -1,6 +1,7 @@
 (write-and-structure-charm-code)=
 # How to write and structure charm code
 
+(create-a-repository-and-initialise-it)=
 ## Create a repository and initialise it
 
 Create a repository with your source control of choice. Commit the code you have
@@ -28,7 +29,6 @@ Avoid the default (`--profile=simple`), which provides a demo charm, rather than
 a base for building a charm of your own.
 ```
 
-````{tip}
 If your repository will hold multiple charms, or a charm and source for other
 artifacts, like a Rock, create a `charms` folder at the top level, then a folder
 for each charm inside of that one, and run `charmcraft --init` in each charm
@@ -37,7 +37,7 @@ folder. You'll end up with a structure similar to:
 ```
 my-charm-set-operators/
 ├── charms
-│   ├── my-charm
+│   ├── my-charm-core
 │   │   ├── charmcraft.yaml
 │   │   ├── pyproject.toml
 │   │   ├── README.md
@@ -45,10 +45,7 @@ my-charm-set-operators/
 │   │   ├── src
 │   │   │   └── charm.py
 │   │   ├── tests
-│   │   │   ├── integration
-│   │   │   │   └── test_charm.py
-│   │   │   └── unit
-│   │   │       └── test_charm.py
+|   |   |   └── ...
 │   │   └── tox.ini
 │   ├── my-charm-dashboard
 |   |   └── ...
@@ -61,8 +58,7 @@ my-charm-set-operators/
     └── ...
 ```
 
-````
-
+(define-the-required-dependencies)=
 ## Define the required dependencies
 
 ### Use the Python provided by the base
@@ -133,6 +129,13 @@ parts:
     charm-strict-dependencies: false
 ```
 ````
+
+```{admonition} Best practice
+:class: hint
+
+Ensure that tooling is configured to automatically detect new versions,
+particularly security releases, for all your dependencies.
+```
 
 The default lock file is a plain `requirements.txt` file (you can use a tool
 such as [pip-compile](https://pip-tools.readthedocs.io/en/latest/) to produce
@@ -208,6 +211,7 @@ By default, Juju will retry hooks that fail, but Juju admins can disable this
 behaviour, so charms should not rely on it.
 ```
 
+(validate-your-charm-with-every-change)=
 ## Validate your charm with every change
 
 Configure your continuous integration tooling so that whenever changes are
@@ -297,14 +301,7 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
 
 ```{tip}
 
-The `charming-actions <https://github.com/canonical/charming-actions>`_
+The [charming-actions](https://github.com/canonical/charming-actions)
 repository includes actions to ensure that libraries are up-to-date, publish
 charms and libraries, and more.
-```
-
-```{admonition} Best practice
-:class: hint
-
-Ensure that tooling is configured to automatically detect new versions,
-particularly security releases, for all your dependencies.
 ```
