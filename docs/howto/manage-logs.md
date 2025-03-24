@@ -36,7 +36,7 @@ happening in your charm, you can adjust the logging configuration. For example,
 to limit logs to ones from your charm and the uniter operation (generally: which
 events are being emitted), and include `DEBUG` level logs, use:
 
-```
+```text
 juju debug-log --debug --include-module juju.worker.uniter.operation --include-module unit.<charm name>/<unit number>.juju-log
 ```
 
