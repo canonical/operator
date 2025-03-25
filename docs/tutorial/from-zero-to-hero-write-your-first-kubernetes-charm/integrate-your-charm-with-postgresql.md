@@ -413,9 +413,7 @@ Run `tox -e unit` to make sure all test cases pass.
 
 ## Add integration tests for your charm
 
-Now that our charm integrates with the PostgreSQL database, we can tweak our existing integration test case and add another one to check the integration is successful.
-
-First, we need to update our existing integration test case `test_build_and_deploy`, because now without a database, after deploying our charm, it will be in a blocked status rather than active:
+Now that our charm integrates with the PostgreSQL database, without a database integration, the app will be in the blocked status instead of active, because it requires a database relation. Let's tweak our existing integration test case `test_build_and_deploy` accordingly:
 
 ```python
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -439,7 +437,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 ```
 
-Then, since the charm requires a database to be functional, we can add an integrate-with-database integration test to verify that this behaviour works as intended. For that, we need to deploy a database to the test cluster and integrate both applications. Finally, we should check that the charm reports an active status.
+Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intendedFinally, we should check that the charm reports an active status.
 
 In your `tests/integration/test_charm.py` file add the following test case:
 

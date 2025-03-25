@@ -136,7 +136,7 @@ Congratulations, you now know how to expose operational tasks via actions!
 
 ## Add unit tests for your charm
 
-Let's add a test case to check the behaviour of the `get_db_info` action that we just set up. In the test case, we set up the context, define the input state with a relation, then run the action and check if the results match the expected values.
+Let's add a test case to check the behaviour of the `get_db_info` action that we just set up. In the test case, we set up the context, define the input state with a relation, then run the action and check if the results match the expected values:
 
 ```python
 def test_get_db_info_action():
@@ -166,7 +166,7 @@ def test_get_db_info_action():
     }
 ```
 
-Since the `get_db_info` action has a parameter `show-password`, let's add another test case to cover the scenario where we want to show password:
+Since the `get_db_info` action has a parameter `show-password`, let's also add another test to cover the case where users want to show password:
 
 ```python
 def test_get_db_info_action_show_password():
