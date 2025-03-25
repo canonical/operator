@@ -3382,10 +3382,10 @@ class _ModelBackend:
         self._is_leader: Optional[bool] = None
         self._leader_check_time = None
         self._hook_is_running = ''
-        self._is_recursive = contextvars.ContextVar('_prevent_recursion', default=False)
+        self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
 
     @contextlib.contextmanager
-    def prevent_recursion(self):
+    def _prevent_recursion(self):
         token = self._is_recursive.set(True)
         try:
             yield
@@ -3405,7 +3405,7 @@ class _ModelBackend:
         # Logs are collected via log integration, omit the subprocess calls that push
         # the same content to juju from telemetry.
         mgr = (
-            self.prevent_recursion()
+            self._prevent_recursion()
             if args[0] == 'juju-log'
             else tracer.start_as_current_span(args[0])
         )
