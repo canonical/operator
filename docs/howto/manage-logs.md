@@ -55,12 +55,6 @@ In particular, you should avoid `print()` calls, and ensure that any subprocess
 calls capture output.
 ```
 
-```{tip}
-Some logging is performed automatically by the Juju controller; for example,
-when an event handler is called. Try not to replicate this behaviour in your
-charm code.
-```
-
 ````{admonition} Best practice
 :class: hint
 
