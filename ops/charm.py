@@ -553,8 +553,8 @@ class RelationEvent(HookEvent):
             self.unit = None
 
     def __repr__(self):
-        app = self.app and self.app.name
-        unit = self.unit and self.unit.name
+        app = None if self.app is None else self.app.name
+        unit = None if self.unit is None else self.unit.name
         return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'
 
 

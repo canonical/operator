@@ -3347,7 +3347,7 @@ class _ModelBackend:
         input_stream: Optional[str] = None,
     ) -> Union[str, Any, None]:
         if self._is_recursive.get():
-            # Would be nice to do something about this, sys.stderr maybe?
+            # Either `juju-log` hook tool failed or there's a bug in ops.
             return
         # Logs are collected via log integration, omit the subprocess calls that push
         # the same content to juju from telemetry.

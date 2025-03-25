@@ -3204,7 +3204,8 @@ class Client:
         Returns:
             The notice's ID.
         """
-        with tracer.start_as_current_span('pebble notify'):
+        with tracer.start_as_current_span('pebble notify') as span:
+            span.set_attributes({"type": type.value, "key": key})
             body: Dict[str, Any] = {
                 'action': 'add',
                 'type': type.value,
@@ -3214,6 +3215,7 @@ class Client:
                 body['data'] = data
             if repeat_after is not None:
                 body['repeat-after'] = _format_timeout(repeat_after.total_seconds())
+                span.set_attribute('repeat_after', _format_timeout(repeat_after.total_seconds()))
             resp = self._request('POST', '/v1/notices', body=body)
             return resp['result']['id']
 
@@ -3223,7 +3225,8 @@ class Client:
         Raises:
             APIError: if a notice with the given ID is not found (``code`` 404)
         """
-        with tracer.start_as_current_span('pebble get_notice'):
+        with tracer.start_as_current_span('pebble get_notice') as span:
+            span.set_attribute("id", id)
             resp = self._request('GET', f'/v1/notices/{id}')
             return Notice.from_dict(resp['result'])
 
@@ -3258,16 +3261,19 @@ class Client:
             types: Filter for notices with any of the specified types.
             keys: Filter for notices with any of the specified keys.
         """
-        with tracer.start_as_current_span('pebble get_notices'):
+        with tracer.start_as_current_span('pebble get_notices') as span:
             query: Dict[str, Union[str, List[str]]] = {}
             if users is not None:
                 query['users'] = users.value
             if user_id is not None:
                 query['user-id'] = str(user_id)
             if types is not None:
-                query['types'] = [(t.value if isinstance(t, NoticeType) else t) for t in types]
+                types_value = [(t.value if isinstance(t, NoticeType) else t) for t in types]
+                query['types'] = types_value
             if keys is not None:
-                query['keys'] = list(keys)
+                keys = list(keys)
+                query['keys'] = keys
+            span.set_attributes(query)
             resp = self._request('GET', '/v1/notices', query)
             return [Notice.from_dict(info) for info in resp['result']]
 
