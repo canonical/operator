@@ -380,7 +380,7 @@ class TestHarness:
         harness.set_leader(False)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
         assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v3'}
-        assert len(harness.charm.observed_events), 1
+        assert len(harness.charm.observed_events) == 1
         assert isinstance(harness.charm.observed_events[0], ops.RelationEvent)
 
     def test_remove_relation(self, request: pytest.FixtureRequest):
@@ -5220,7 +5220,7 @@ class PebbleStorageAPIsTestMixin:
             client.list_files('/not/existing/file/')
         assert excinfo.value.code == 404
         assert excinfo.value.status == 'Not Found'
-        assert excinfo.value.message == 'stat /not/existing/file/: no ' 'such file or directory'
+        assert excinfo.value.message == 'stat /not/existing/file/: no such file or directory'
 
     def test_list_directory_object_itself(
         self,
