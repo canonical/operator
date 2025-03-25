@@ -104,7 +104,7 @@ def _update_layer_and_restart(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
         self.unit.status = ops.ActiveStatus()
-    except ops.pebble.APIError:
+    except (ops.pebble.APIError, ops.pebble.ConnectionError):
         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
