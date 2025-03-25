@@ -47,9 +47,12 @@ from typing import (
     Union,
 )
 
+import opentelemetry.trace
+
 from . import charm
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
+from .version import tracer
 
 
 class Serializable(typing.Protocol):
@@ -872,6 +875,10 @@ class Framework(Object):
         saved = False
         event_path = event.handle.path
         event_kind = event.handle.kind
+        opentelemetry.trace.get_current_span().add_event(
+            event.__class__.__qualname__,
+            attributes={'deferred': event.deferred, 'kind': event_kind},
+        )
         parent = event.handle.parent
         assert isinstance(parent, Handle), 'event handle must have a parent'
         parent_path = parent.path
@@ -904,6 +911,14 @@ class Framework(Object):
             # Again, only commit this after all notices are saved.
             self._storage.save_notice(event_path, observer_path, method_name)
         if saved:
+            from . import tracing  # break circular import
+
+            if tracing:
+                # To ensure early events (install, start) are not evicted from the tracing buffer
+                # before the tracing relation is established, we mark any dispatch where the juju
+                # event has an observer as "observed". This increases its data priority within the
+                # buffer, helping preserve those initial pieces of tracing data.
+                tracing._mark_observed()
             self._reemit(event_path)
 
     def reemit(self) -> None:
@@ -985,16 +1000,32 @@ class Framework(Object):
                 if custom_handler:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
-                    with self._event_context(event_handle.kind):
-                        if (
-                            event_is_from_juju or event_is_action
-                        ) and self._juju_debug_at.intersection({'all', 'hook'}):
-                            # Present the welcome message and run under PDB.
-                            self._show_debug_code_message()
-                            pdb.runcall(custom_handler, event)
-                        else:
-                            # Regular call to the registered method.
-                            custom_handler(event)
+                    if event_is_from_juju:
+                        event_type = 'hook'
+                    elif event_is_action:
+                        event_type = 'action'
+                    elif isinstance(event, LifecycleEvent):
+                        event_type = 'framework'
+                    else:
+                        event_type = 'custom'
+                    obs_class = observer_path.split('/')[-1].split('[')[0]
+                    with tracer.start_as_current_span(f'{event_handle.kind}: {obs_class}') as span:
+                        span.set_attribute('deferred', single_event_path is None)
+                        span.set_attribute('event', repr(event))
+                        span.set_attribute('event_type', event_type)
+                        span.set_attribute('event_class', event.__class__.__qualname__)
+                        span.set_attribute('event_name', event_handle.kind)
+                        span.set_attribute('handler', f'{observer_path}.{method_name}')
+                        with self._event_context(event_handle.kind):
+                            if (
+                                event_is_from_juju or event_is_action
+                            ) and self._juju_debug_at.intersection({'all', 'hook'}):
+                                # Present the welcome message and run under PDB.
+                                self._show_debug_code_message()
+                                pdb.runcall(custom_handler, event)
+                            else:
+                                # Regular call to the registered method.
+                                custom_handler(event)
 
             else:
                 logger.warning(
