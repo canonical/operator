@@ -133,5 +133,4 @@ def test_charm_runs(my_charm):
 ```{note}
 
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
-
 ```

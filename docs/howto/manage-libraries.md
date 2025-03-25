@@ -44,11 +44,16 @@ def test_ready_event():
 When you're writing libraries, instead of callbacks, use custom events. This results in a more Ops-native-feeling API. From a technical standpoint, a custom event is an [](ops.EventBase) subclass that can be emitted to Ops at any point throughout the charm's lifecycle. These events are totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the top level Juju event so it can be observed independently.
 
 ```{important}
+Charms should never define custom events themselves. They have no need for
+emitting events (custom or otherwise) for their own consumption, and as they
+lack consumers, they don’t need to emit any for others to consume either.
+Custom events should only be defined and emitted in a library.
+```
+
 Custom events must inherit from `EventBase`, but not from an Ops subclass of
 `EventBase`, such as `RelationEvent`. When instantiating the custom event, load
 any data needed from Juju from the originating event, and explicitly pass that
 to the custom event object.
-```
 
 For example, suppose you have a charm library wrapping a relation endpoint. The wrapper might want to check that the remote end has sent valid data and, if that is the case, communicate it to the charm. In this example, you have a `DatabaseRequirer` object, and the charm using it is interested in knowing when the database is ready. In your `lib/charms/my_charm/v0/my_lib.py` file, the `DatabaseRequirer` then will be:
 
@@ -89,7 +94,13 @@ class DatabaseRequirer(ops.Object):
             self.on.ready.emit(credential_secret=secret)
 ```
 
-## Write tests
+```{admonition} Best practice
+:class: hint
+
+Libraries should never mutate the status of a unit or application. Instead, use
+return values, or raise exceptions and let them bubble back up to the charm for
+the charm author to handle as they see fit.
+```
 
 ### Test that the library initialises
 
