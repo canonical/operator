@@ -1,6 +1,5 @@
-
-(manage-logs)=
-# How manage logs
+(log-from-your-charm)=
+# How to log from your charm
 
 > See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 

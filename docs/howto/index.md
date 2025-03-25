@@ -8,7 +8,7 @@ Manage charms <manage-charms>
 Write and structure charm code <write-and-structure-charm-code>
 Write unit tests for a charm <write-unit-tests-for-a-charm>
 Write integration tests for a charm <write-integration-tests-for-a-charm>
-Manage logs <manage-logs>
+Log from your charm <log-from-your-charm>
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
 Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 Manage storage <manage-storage>
