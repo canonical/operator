@@ -1,7 +1,7 @@
 (write-unit-tests-for-your-charm)=
 # Write unit tests for your charm
 
-> <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Write a unit test for your charm</small>
+> <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Write unit tests for your charm</small>
 > 
 > **See previous: {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>`**
 
@@ -9,23 +9,32 @@
 
 This document is part of a series, and we recommend you follow it in sequence. However, you can also jump straight in by checking out the code from the previous branches:
 
-```bash
+```text
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
-git checkout 07_cos_integration
-git checkout -b 08_unit_testing
+git checkout 05_cos_integration
+git checkout -b 06_unit_testing
 ```
 
 ````
 
 When you're writing a charm, you will want to ensure that it will behave reliably as intended.
 
-For example, that the various components -- relation data, pebble services, or configuration files -- all behave as expected in response to an event.
+For example, that the various components -- relation data, Pebble services, or configuration files -- all behave as expected in response to an event.
 
-You can ensure all this by writing a rich battery of units tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially the operator framework's built-in testing library --  [](ops_testing_harness). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
+You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially the operator framework's built-in testing library --  [](ops_testing_harness). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
 
-In this chapter you will write a simple unit test to check that your workload container is initialised correctly.
+<!-- TODO
 
+This chapter and the next should be removed and the content spread throughout
+each of the previous chapters. Each time a feature is added, a unit and
+integration test should also be added. At the end of each chapter, before
+manually checking the feature works, the user should run the tests to make sure
+that they pass.
+
+-->
+
+In this chapter you will write a scenario test to check that the `get_db_info` action that you defined in an earlier chapter behaves as expected.
 
 ## Prepare your test environment
 
@@ -58,6 +67,7 @@ deps =
     pytest
     cosl
     coverage[toml]
+    ops[testing]
     -r {tox_root}/requirements.txt
 commands =
     coverage run --source={[vars]src_path} \
@@ -71,130 +81,138 @@ commands =
 ```
 > Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
 
-
 ## Prepare your test directory
 
 In your project root, create a `tests/unit` directory:
 
-```bash
+```text
 mkdir -p tests/unit
 ```
 
-### Write your unit test
+## Write your test
 
-In your `tests/unit` directory, create a file called `test_charm.py`.
-
-In this file, do all of the following:
-
-First, add the necessary imports:
+In your `tests/unit` directory, create a new file `test_charm.py` and add the test below. This test will check the behaviour of the `get_db_info` action that you set up in a previous chapter. It will first set up the test context by setting the appropriate metadata, then define the input state, then run the action and, finally, check if the results match the expected values.
 
 ```python
-import ops
-import ops.testing
-import pytest
+from unittest.mock import Mock
+from pytest import MonkeyPatch
+
+from ops import testing
 
 from charm import FastAPIDemoCharm
-```
 
-Then, add a test [fixture](https://docs.pytest.org/en/7.1.x/how-to/fixtures.html) that sets up the testing harness and makes sure that it will be cleaned up after each test:
 
-```python
-@pytest.fixture
-def harness():
-    harness = ops.testing.Harness(FastAPIDemoCharm)
-    harness.begin()
-    yield harness
-    harness.cleanup()
+def test_get_db_info_action(monkeypatch: MonkeyPatch):
+    monkeypatch.setattr('charm.LogProxyConsumer', Mock())
+    monkeypatch.setattr('charm.MetricsEndpointProvider', Mock())
+    monkeypatch.setattr('charm.GrafanaDashboardProvider', Mock())
 
-```
-
-Finally, add a first test case as a function, as below. As you can see, this test case is used to verify that the deployment of the `fastapi-service` within the `demo-server` container is configured correctly and that the service is started and running as expected when the container is marked as `pebble-ready`. It also checks that the unit's status is set to active without any error messages. Note that we mock some methods of the charm because they do external calls that are not represented in the state of this unit test.
-
-```python
-def test_pebble_layer(
-    monkeypatch: pytest.MonkeyPatch, harness: ops.testing.Harness[FastAPIDemoCharm]
-):
-    monkeypatch.setattr(FastAPIDemoCharm, 'version', '1.0.0')
-    # Expected plan after Pebble ready with default config
-    expected_plan = {
-        'services': {
-            'fastapi-service': {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': 'uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000',
-                'startup': 'enabled',
-                # Since the environment is empty, Layer.to_dict() will not
-                # include it.
+    # Use testing.Context to declare what charm we are testing.
+    # Note that the test framework will automatically pick up the metadata from
+    # your charmcraft.yaml file, so you typically could just do
+    # `ctx = testing.Context(FastAPIDemoCharm)` here, but the full
+    # version is included here as an example.
+    ctx = testing.Context(
+        FastAPIDemoCharm,
+        meta={
+            'name': 'demo-api-charm',
+            'containers': {'demo-server': {}},
+            'peers': {'fastapi-peer': {'interface': 'fastapi_demo_peers'}},
+            'requires': {
+                'database': {
+                    'interface': 'postgresql_client',
+                }
+            },
+        },
+        config={
+            'options': {
+                'server-port': {
+                    'default': 8000,
+                }
             }
-        }
+        },
+        actions={
+            'get-db-info': {'params': {'show-password': {'default': False, 'type': 'boolean'}}}
+        },
+    )
+
+    # Declare the input state.
+    state_in = testing.State(
+        leader=True,
+        relations={
+            testing.Relation(
+                endpoint='database',
+                interface='postgresql_client',
+                remote_app_name='postgresql-k8s',
+                local_unit_data={},
+                remote_app_data={
+                    'endpoints': '127.0.0.1:5432',
+                    'username': 'foo',
+                    'password': 'bar',
+                },
+            ),
+        },
+        containers={
+            testing.Container('demo-server', can_connect=True),
+        },
+    )
+
+    # Run the action with the defined state and collect the output.
+    ctx.run(ctx.on.action('get-db-info', params={'show-password': True}), state_in)
+
+    assert ctx.action_results == {
+        'db-host': '127.0.0.1',
+        'db-port': '5432',
+        'db-username': 'foo',
+        'db-password': 'bar',
     }
-
-    # Simulate the container coming up and emission of pebble-ready event
-    harness.container_pebble_ready('demo-server')
-    harness.evaluate_status()
-
-    # Get the plan now we've run PebbleReady
-    updated_plan = harness.get_container_pebble_plan('demo-server').to_dict()
-    service = harness.model.unit.get_container('demo-server').get_service('fastapi-service')
-    # Check that we have the plan we expected:
-    assert updated_plan == expected_plan
-    # Check the service was started:
-    assert service.is_running()
-    # Ensure we set a BlockedStatus with appropriate message:
-    assert isinstance(harness.model.unit.status, ops.BlockedStatus)
-    assert 'Waiting for database' in harness.model.unit.status.message
 ```
-
 
 > Read more: [](ops_testing_harness)
 
 ## Run the test
 
-In your Multipass Ubuntu VM shell, run your unit test as below:
+In your Multipass Ubuntu VM shell, run your test as below:
 
-```bash
-ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
+```text
+ubuntu@charm-dev:~/fastapi-demo$ tox -e unit     
 ```
 
 You should get an output similar to the one below:
 
-```bash
+```text                                             
 unit: commands[0]> coverage run --source=/home/ubuntu/fastapi-demo/src -m pytest --tb native -v -s /home/ubuntu/fastapi-demo/tests/unit
-=============================================================================================================================================================================== test session starts ===============================================================================================================================================================================
-platform linux -- Python 3.10.13, pytest-8.0.2, pluggy-1.4.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python
+======================================= test session starts ========================================
+platform linux -- Python 3.11.9, pytest-8.3.3, pluggy-1.5.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python
 cachedir: .tox/unit/.pytest_cache
 rootdir: /home/ubuntu/fastapi-demo
-collected 1 item                                                                                                                                                                                                                                                                                                                                                                  
+plugins: anyio-4.6.0
+collected 1 item                                                                                   
 
-tests/unit/test_charm.py::test_pebble_layer PASSED
+tests/unit/test_charm.py::test_get_db_info_action PASSED
 
-================================================================================================================================================================================ 1 passed in 0.30s ================================================================================================================================================================================
+======================================== 1 passed in 0.19s =========================================
 unit: commands[1]> coverage report
 Name           Stmts   Miss  Cover
 ----------------------------------
-src/charm.py     118     49    58%
+src/charm.py     129     57    56%
 ----------------------------------
-TOTAL            118     49    58%
-  unit: OK (0.99=setup[0.04]+cmd[0.78,0.16] seconds)
-  congratulations :) (1.02 seconds)
+TOTAL            129     57    56%
+  unit: OK (6.89=setup[6.39]+cmd[0.44,0.06] seconds)
+  congratulations :) (6.94 seconds)
 ```
 
-Congratulations, you have now successfully implemented your first unit test!
+Congratulations, you have written your first unit test!
 
 ```{caution}
 
-As you can see in the output, the current tests cover 58% of the charm code. In a real-life scenario make sure to cover much more!
-
+As you can see in the output, the current tests cover 56% of the charm code. In a real-life scenario make sure to cover much more!
 ```
 
 ## Review the final code
 
-For the full code see: [08_unit_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/08_unit_testing)
+For the full code see: [06_unit_testing](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/06_unit_testing)
 
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/07_cos_integration...08_unit_testing)
+For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/05_cos_integration...06_unit_testing)
 
-> **See next: {ref}`Write scenario tests for your charm <write-scenario-tests-for-your-charm>`**
-
-
-
-
+> **See next: {ref}`Write integration tests for your charm <write-integration-tests-for-your-charm>`**
