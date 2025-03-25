@@ -134,6 +134,72 @@ db-username: relation_id_4
 
 Congratulations, you now know how to expose operational tasks via actions!
 
+## Add unit tests for your charm
+
+Let's add a test case to check the behaviour of the `get_db_info` action that we just set up. In the test case, we set up the context, define the input state with a relation, then run the action and check if the results match the expected values.
+
+```python
+def test_get_db_info_action():
+    ctx = testing.Context(FastAPIDemoCharm)
+    relation = testing.Relation(
+        endpoint="database",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
+        remote_app_data={
+            "endpoints": "example.com:5432",
+            "username": "foo",
+            "password": "bar",
+        },
+    )
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        relations={relation},
+        leader=True,
+    )
+
+    ctx.run(ctx.on.action("get-db-info", params={"show-password": False}), state_in)
+
+    assert ctx.action_results == {
+        "db-host": "example.com",
+        "db-port": "5432",
+    }
+```
+
+Since the `get_db_info` action has a parameter `show-password`, let's add another test case to cover the scenario where we want to show password:
+
+```python
+def test_get_db_info_action_show_password():
+    ctx = testing.Context(FastAPIDemoCharm)
+    relation = testing.Relation(
+        endpoint="database",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
+        remote_app_data={
+            "endpoints": "example.com:5432",
+            "username": "foo",
+            "password": "bar",
+        },
+    )
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        relations={relation},
+        leader=True,
+    )
+
+    ctx.run(ctx.on.action("get-db-info", params={"show-password": True}), state_in)
+
+    assert ctx.action_results == {
+        "db-host": "example.com",
+        "db-port": "5432",
+        "db-username": "foo",
+        "db-password": "bar",
+    }
+```
+
+Run `tox -e unit` to make sure all test cases pass.
+
 ## Review the final code
 
 For the full code see: [04_create_actions](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_create_actions)

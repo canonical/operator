@@ -182,6 +182,42 @@ demo-api-charm/0*  blocked   idle   10.1.157.74         invalid port number, 22 
 
 Congratulations, you now know how to make your charm configurable!
 
+## Add unit tests for your charm
+
+Since we added a new feature to configure `server-port` and use it in the `_pebble_layer` dynamically, we want to add some test cases to cover it. First, we can add a test case where we set the port in the input state, and assert the port is indeed used in the service's command in the container layer:
+
+```python
+def test_config_changed():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        config={"server-port": 8080},
+        leader=True,
+    )
+    ctx.run(ctx.on.config_changed(), state_in)
+    assert "--port=8080" in container.layers["fastapi_demo"].services["fastapi-service"].command
+```
+
+Then, in `_on_config_changed`, we specifically don't allow port 22 to be used. When port is configured to 22, we will set the status as blocked. Let's also add a test case to cover this behaviour by setting the port explicitly to 22 in the input state and assert the unit status is blocked:
+
+```python
+def test_config_changed_invalid_port():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        config={"server-port": 22},
+        leader=True,
+    )
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    assert state_out.unit_status == ops.BlockedStatus(
+        "Invalid port number, 22 is reserved for SSH"
+    )
+```
+
+Run `tox -e unit` to make sure all test cases pass.
+
 ## Review the final code
 
 For the full code see: [02_make_your_charm_configurable](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/02_make_your_charm_configurable)
