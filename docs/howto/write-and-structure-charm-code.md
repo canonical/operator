@@ -6,7 +6,7 @@
 
 Create a repository with your source control of choice. Commit the code you have
 added and changed after every significant change, so that you have a record of
-the work, and can revert to an earlier version when required.
+your work and can revert to an earlier version if required.
 
 ```{admonition} Best practice
 :class: hint
@@ -30,7 +30,7 @@ a base for building a charm of your own.
 ```
 
 If your repository will hold multiple charms, or a charm and source for other
-artifacts, like a Rock, create a `charms` folder at the top level, then a folder
+artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
 for each charm inside of that one, and run `charmcraft --init` in each charm
 folder. You'll end up with a structure similar to:
 
@@ -76,7 +76,7 @@ version in your `pyproject.toml` so that tooling will detect any use of Python
 features not available in the versions you support.
 ```
 
-### Add Python dependencies to pyproject.toml, and generate a lock file
+### Add Python dependencies to pyproject.toml and generate a lock file
 
 Specify all the direct dependencies of your charm in your `pyproject.toml`
 file in the top-level charm folder. For example:
@@ -120,13 +120,13 @@ indirect or transitive dependencies) in a lock file.
 :class: hint
 
 When using the `charm` plugin with charmcraft, ensure that you set strict
-dependencies to true, for example:
+dependencies to true. For example:
 
 ```yaml
 parts:
   my-charm:
     plugin: charm
-    charm-strict-dependencies: false
+    charm-strict-dependencies: true
 ```
 ````
 
@@ -157,7 +157,7 @@ control, so that exact versions of charms can be reproduced.
 (design-your-python-modules)=
 ## Design your Python modules
 
-In your `src/charm.py` define the charm class and manage the charm's interface
+In your `src/charm.py` file, define the charm class and manage the charm's interface
 with Juju: set up the event observation and add the handlers. For each workload
 that the charm manages, add a `{workload}.py` file that contains methods for
 interacting with the workload.
@@ -173,8 +173,8 @@ In your `src/charm.py` file, you will have a single class inheriting from
 1. An `__init__` that instantiates any needed library objects and then observes
    all relevant events.
 2. Event handlers, in the order that they are observed in the `__init__` method.
-   Note that these handlers should all be private to the class
-   (`def _on_install(...):` not `def on_install(...):`)
+   Note that these handlers should all be private to the class.
+   For example, `def _on_install(...)` instead of `def on_install(...)`.
 3. Public methods.
 3. Other private methods.
 
@@ -193,21 +193,21 @@ letting the charm crash and go into an error state.
   of automatically recoverable errors are those where the operation that
   resulted in the error can be retried. Retry a small number of times, with
   short delays between attempts, rather than having the charm error out and
-  relying on Juju or the Juju admin for the retry. If the error is not resolved
+  relying on Juju or the user for the retry. If the error is not resolved
   after retrying, then use one of the following techniques.
 * **Operator recoverable error**: the charm should go into the `blocked` state
-  until the operator resolves the error. An example is that a configuration
+  until the user resolves the error. An example is that a configuration
   option is invalid.
 * **Unexpected/unrecoverable error**: the charm should enter the error state. Do
   this by raising an appropriate exception in the charm code. Note that the unit
-  status will only show an `error` status, and the charm user will need to use
+  status will only show an `error` status, and the user will need to use
   the Juju log to get details of the problem. Ensure that the logging and
   exception raised makes it clear what is happening, and -- when possible -- how
-  the Juju admin can solve it. The admin may need to file a bug and potentially
+  the user can solve it. The user may need to file a bug and potentially
   downgrade to a previous version of the charm.
 
 ```{tip}
-By default, Juju will retry hooks that fail, but Juju admins can disable this
+By default, Juju will retry hooks that fail, but users can disable this
 behaviour, so charms should not rely on it.
 ```
 

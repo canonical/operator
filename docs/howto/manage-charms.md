@@ -26,9 +26,9 @@ and the charm workflow.
 
 > See more: {ref}`run-workloads-with-a-charm-kubernetes`, {ref}`run-workloads-with-a-charm-machines`, {ref}`write-and-structure-charm-code`, {ref}`write-unit-tests-for-a-charm`, {ref}`write-integration-tests-for-a-charm`, {ref}`manage-logs`
 
-These files are, of course, quite generic, so the next thing to do is add
-functionality to your charm. Part of that is also packing, test deploying,
-debugging, and, when ready, publishing your charm on Charmhub.
+The next thing to do is add functionality to your charm.
+As you do that, you'll frequently pack, test, and debug your charm.
+Finally, when you're ready, you'll publish your charm on Charmhub.
 
 ```{admonition} Best practice
 :class: hint
@@ -55,7 +55,7 @@ do it well.
 >   - {ref}`manage-configurations`
 >   - {ref}`manage-opened-ports`
 > * {external+charmcraft:ref}`Charmcraft | Manage charms > Pack a charm <pack-a-charm>`
-> * {external+juju:ref}`Juju | Manage charms > Deploy a charm <deploy-a-charm>` (you'll need to follow the Deploy a local charm example)
+> * {external+juju:ref}`Juju | Manage charms > Deploy a charm <deploy-a-charm>` (you'll need to follow the "Deploy a local charm" example)
 > * {external+juju:ref}`Juju | Manage charms > Debug a charm <debug-a-charm>`
 > * {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>` (see especially the note on requesting formal review for your charm)
 

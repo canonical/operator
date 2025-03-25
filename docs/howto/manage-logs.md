@@ -80,8 +80,7 @@ logger.info(f"Got some more information {more_info}")
 ```{admonition} Best practice
 :class: hint
 
-Avoid spurious logging. Ensure that log messages are clear and meaningful and
-provide the information a user would require to rectify any issues.
+Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
 ```
 
 ```{admonition} Best practice
