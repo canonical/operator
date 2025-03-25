@@ -3205,7 +3205,7 @@ class Client:
             The notice's ID.
         """
         with tracer.start_as_current_span('pebble notify') as span:
-            span.set_attributes({"type": type.value, "key": key})
+            span.set_attributes({'type': type.value, 'key': key})
             body: Dict[str, Any] = {
                 'action': 'add',
                 'type': type.value,
@@ -3226,7 +3226,7 @@ class Client:
             APIError: if a notice with the given ID is not found (``code`` 404)
         """
         with tracer.start_as_current_span('pebble get_notice') as span:
-            span.set_attribute("id", id)
+            span.set_attribute('id', id)
             resp = self._request('GET', f'/v1/notices/{id}')
             return Notice.from_dict(resp['result'])
 
