@@ -361,7 +361,7 @@ Congratulations, your relation with PostgreSQL is functional!
 
 ## Add unit tests for your charm
 
-Now that our charm will extract the database authentication data and endpoints information from the relation data in function `fetch_postgres_relation_data`, we can add a test case to cover this scenario. In the test case, we create a relation and set it in the input state; on the relation-changed event, the database information should be extracted and set as environment variables for our `fastapi-service`:
+Now that our charm will extract the database authentication data and endpoints information from the relation data in function `fetch_postgres_relation_data`, we can add a test case to cover this scenario. Here, we are not testing the `fetch_postgres_relation_data` function directly, but rather, we are checking that the response to a Juju event is what it should be. So, in the test case, we create a relation and set it in the input state; on the relation-changed event, the database information should be extracted and set as environment variables for our `fastapi-service`:
 
 ```python
 def test_relation_data():
@@ -406,7 +406,7 @@ def test_no_database_blocked():
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
-    assert state_out.unit_status == ops.BlockedStatus("Waiting for database relation")
+    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
 ```
 
 Run `tox -e unit` to make sure all test cases pass.

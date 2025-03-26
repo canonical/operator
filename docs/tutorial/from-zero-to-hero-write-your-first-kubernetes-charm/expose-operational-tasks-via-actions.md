@@ -166,7 +166,7 @@ def test_get_db_info_action():
     }
 ```
 
-Since the `get_db_info` action has a parameter `show-password`, let's also add another test to cover the case where users want to show password:
+Since the `get_db_info` action has a parameter `show-password`, let's also add another test to cover the case where users want to show the password:
 
 ```python
 def test_get_db_info_action_show_password():

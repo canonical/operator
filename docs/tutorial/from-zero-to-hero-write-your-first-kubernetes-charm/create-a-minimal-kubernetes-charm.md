@@ -424,19 +424,9 @@ When you're writing a charm, you will want to ensure that it will behave reliabl
 
 For example, that the various components -- relation data, Pebble services, or configuration files -- all behave as expected in response to an event.
 
-You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially the operator framework's built-in testing library --  [](ops_testing_harness). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
+You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially Ops's built-in testing library --  [](ops_testing). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
 
-<!-- TODO
-
-This chapter and the next should be removed and the content spread throughout
-each of the previous chapters. Each time a feature is added, a unit and
-integration test should also be added. At the end of each chapter, before
-manually checking the feature works, the user should run the tests to make sure
-that they pass.
-
--->
-
-In this chapter you will write a scenario test to check that the `get_db_info` action that you defined in an earlier chapter behaves as expected.
+In this chapter you will write a test to check that Pebble is configured as expected.
 
 ### Prepare your test environment
 
@@ -608,10 +598,10 @@ If you used `charmcraft init --profile kubernetes` in previous steps to bootstra
 
 ### Prepare your test directory
 
-Create  a  `tests/integration` directory:
+In your project root, create a `tests/integration` directory:
 
 ```text
-mkdir ~/fastapi-demo/tests/integration
+mkdir -p tests/integration
 ```
 
 ### Write and run a pack-and-deploy integration test
