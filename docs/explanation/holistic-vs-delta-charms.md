@@ -32,9 +32,9 @@ class MyCharm(ops.CharmBase):
         # container's config file and restart Redis if needed.
         container = self.unit.get_container('redis')
         try:
-	        self._update_redis_config(container, redis_port)
-	    except ops.pebble.ConnectionError:
-	    	# config-changed happened first, wait for pebble-ready
+            self._update_redis_config(container, redis_port)
+        except ops.pebble.ConnectionError:
+            # config-changed happened first, wait for pebble-ready
             return
 ```
 
