@@ -1241,7 +1241,7 @@ class TestHarness:
         assert harness.charm.changes == [{'name': 'config-changed', 'data': {'a': secret_id}}]
 
     def test_no_config_option_type(self):
-        with pytest.raises(KeyError):
+        with pytest.raises(RuntimeError):
             ops.testing.Harness(
                 RecordingCharm,
                 config="""

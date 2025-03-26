@@ -1928,19 +1928,21 @@ class ConfigMeta:
     name: str
     """Name of the config option."""
 
-    type: Literal['string', 'int', 'float', 'boolean', 'secret']
+    type: Literal['boolean', 'int', 'float', 'string', 'secret']
     """Type of the config option."""
 
-    default: Any
+    default: Optional[Union[bool, int, float, str]]
     """Default value of the config option."""
 
     description: str
     """Description of the config option."""
 
-    def __init__(self, name: str, raw: Optional[Dict[str, Any]] = None):
-        raw = raw or {}
+    def __init__(self, name: str, raw: Dict[str, Any]):
         self.name = name
-        self.type = raw['type']
+        try:
+            self.type = raw['type']
+        except KeyError:
+            raise RuntimeError('"type" is required for all options') from None
         self.default = raw.get('default')
         self.description = raw.get('description', '')
 
