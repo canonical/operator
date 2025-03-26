@@ -413,7 +413,7 @@ Run `tox -e unit` to make sure all test cases pass.
 
 ## Add integration tests for your charm
 
-Now that our charm integrates with the PostgreSQL database, without a database integration, the app will be in the blocked status instead of active, because it requires a database relation. Let's tweak our existing integration test case `test_build_and_deploy` accordingly:
+Now that our charm integrates with the PostgreSQL database, without a database integration, the app will be in the blocked status instead of active, because it requires a database relation. Let's tweak our existing integration test case `test_build_and_deploy` accordingly and set the expected status as `blocked` in `ops_test.model.wait_for_idle`:
 
 ```python
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -437,7 +437,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 ```
 
-Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intendedFinally, we should check that the charm reports an active status.
+Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
 
 In your `tests/integration/test_charm.py` file add the following test case:
 
@@ -462,7 +462,7 @@ async def test_database_integration(ops_test: OpsTest):
 
 ```{important}
 
-But if you run the one and then the other (as separate `pytest ...` invocations, then two separate models will be created unless you pass `--model=some-existing-model` to inform pytest-operator to use a model you provide.
+If you run one test and then the other as separate `pytest ...` invocations, then two separate models will be created unless you pass `--model=some-existing-model` to inform pytest-operator to use a model you provide.
 
 ```
 
@@ -476,7 +476,7 @@ The test may again take some time to run.
 
 ```{tip}
 
-**Pro tip:** To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results; an example is [spellbook](https://github.com/canonical/spellbook).
+To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results.
 
 ```
 
