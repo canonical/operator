@@ -383,9 +383,20 @@ class _Manager:
         charm_state_path: str = CHARM_STATE_FILE,
         juju_context: Optional[_JujuContext] = None,
     ):
+        from . import tracing  # break circular import
+
         if juju_context is None:
             juju_context = _JujuContext.from_dict(os.environ)
+
+        try:
+            name = charm_class.__name__
+        except AttributeError:
+            name = str(charm_class)
+
         self._juju_context = juju_context
+        self._tracing = tracing._setup(juju_context, name) if tracing else contextlib.nullcontext()
+        self._tracing.__enter__()
+        self._root_span = tracer.start_span('ops.main')
         self._charm_state_path = charm_state_path
         self._charm_class = charm_class
         if model_backend is None:
@@ -546,6 +557,11 @@ class _Manager:
         """Perform any necessary cleanup before the framework is closed."""
         # Provided for child classes - nothing needs to be done in the base.
 
+    def _destroy(self):
+        """Finalise the manager."""
+        self._root_span.end()
+        self._tracing.__exit__(None, None, None)
+
     def run(self):
         """Emit and then commit the framework."""
         try:
@@ -561,20 +577,12 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    from . import tracing  # break circular import
-
-    juju_context = _JujuContext.from_dict(os.environ)
-    tracing_context = (
-        tracing._setup(juju_context, charm_class.__name__) if tracing else contextlib.nullcontext()
-    )
-    with tracing_context:
-        try:
-            with tracer.start_as_current_span('ops.main'):
-                manager = _Manager(
-                    charm_class,
-                    use_juju_for_storage=use_juju_for_storage,
-                    juju_context=juju_context,
-                )
-                manager.run()
-        except _Abort as e:
-            sys.exit(e.exit_code)
+    manager = None
+    try:
+        manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+        manager.run()
+    except _Abort as e:
+        sys.exit(e.exit_code)
+    finally:
+        if manager:
+            manager._destroy()

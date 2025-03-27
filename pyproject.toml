@@ -44,7 +44,7 @@ testing = [
     "ops-scenario>=7.0.5,<8",
 ]
 tracing = [
-    "ops-tracing",
+    "ops-tracing==2.20.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.

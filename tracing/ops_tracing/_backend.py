@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import pathlib
 from typing import TYPE_CHECKING, Generator
 
 from opentelemetry.sdk.resources import Resource
@@ -50,7 +51,7 @@ class LogsToEvents(logging.Handler):
 
 
 @contextlib.contextmanager
-def _setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None, None, None]:
+def setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None, None, None]:
     """Control tracing lifespan of tracing.
 
     Args:
@@ -69,19 +70,25 @@ def _setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None,
             'service.charm': charm_class_name,
         }
     )
-    exporter = BufferingSpanExporter(juju_context.charm_dir / BUFFER_FILE)
-    span_processor = BatchSpanProcessor(exporter)
-    provider = TracerProvider(resource=resource, active_span_processor=span_processor)  # type: ignore
-    set_tracer_provider(provider)
+    set_tracer_provider(_create_provider(resource, juju_context.charm_dir))
     logging.root.addHandler(log_handler := LogsToEvents())
     try:
         yield
     finally:
-        shutdown_tracing()
         logging.root.handlers.remove(log_handler)
+        shutdown_tracing()
+
+
+def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
+    """Create the OpenTelemetry tracer provider."""
+    # Separate function so that it's easy to override in tests
+    exporter = BufferingSpanExporter(charm_dir / BUFFER_FILE)
+    span_processor = BatchSpanProcessor(exporter)
+    return TracerProvider(resource=resource, active_span_processor=span_processor)  # type: ignore
 
 
 def get_exporter() -> BufferingSpanExporter | None:
+    """Get our export from OpenTelemetry SDK."""
     try:
         exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
     except AttributeError:
@@ -113,7 +120,7 @@ def set_destination(url: str | None, ca: str | None) -> None:
     exporter.buffer.set_destination(config)
 
 
-def _mark_observed() -> None:
+def mark_observed() -> None:
     """Mark the tracing data collected in this dispatch as higher priority."""
     if not (exporter := get_exporter()):
         return

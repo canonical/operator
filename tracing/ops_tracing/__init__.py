@@ -65,7 +65,9 @@ library imports this library and re-exports it as ``ops.tracing``.
 """
 
 from ._api import Tracing
-from ._backend import _mark_observed, _setup, set_destination
+from ._backend import mark_observed as _mark_observed
+from ._backend import set_destination
+from ._backend import setup as _setup
 
 __all__ = [
     'Tracing',
