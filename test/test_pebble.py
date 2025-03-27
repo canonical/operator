@@ -1472,7 +1472,7 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     }
 
 
-@dataclass
+@dataclass(frozen=True)
 class MultipartParserTestCase:
     name: str
     data: bytes

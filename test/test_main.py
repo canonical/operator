@@ -57,7 +57,7 @@ class SymlinkTargetError(Exception):
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class EventSpec:
     event_type: typing.Type[ops.EventBase]
     event_name: str
