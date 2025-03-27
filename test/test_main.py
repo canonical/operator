@@ -165,7 +165,7 @@ class TestCharmInit:
             juju_backend_available.return_value = False
             with pytest.raises(
                 RuntimeError,
-                match='charm set use_juju_for_storage=True, but Juju .* does not support it',
+                match=r'charm set use_juju_for_storage=True, but Juju .* does not support it',
             ):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 

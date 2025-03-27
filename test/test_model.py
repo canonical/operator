@@ -2856,7 +2856,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
 
@@ -2893,7 +2893,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
 
