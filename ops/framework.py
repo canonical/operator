@@ -940,7 +940,7 @@ class Framework(Object):
         if saved:
             self._reemit(event_path)
 
-    def reemit(self):
+    def reemit(self) -> None:
         """Reemit previously deferred events to the observers that deferred them.
 
         Only the specific observers that have previously deferred the event will be
