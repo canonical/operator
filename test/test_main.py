@@ -912,8 +912,8 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script.calls()]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
-        assert re.search('Using local storage: not a Kubernetes podspec charm', calls.pop(0))
-        assert re.search('Initializing SQLite local storage: ', calls.pop(0))
+        assert 'Using local storage: not a Kubernetes podspec charm' in calls.pop(0)
+        assert 'Initializing SQLite local storage: ' in calls.pop(0)
         assert re.search(
             '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
             'Traceback .most recent call last.:\n'
@@ -1191,7 +1191,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1222,7 +1222,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1313,7 +1313,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected
 
