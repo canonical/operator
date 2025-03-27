@@ -1587,8 +1587,22 @@ class CharmMeta:
         }
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
+        # This is predominately for backwards compatibility with Harness. In a
+        # real Juju environment this shouldn't be possible, because charmcraft
+        # validates the config when packing.
+        for name, config in config_raw_.get('options', {}).items():
+            if 'type' not in config:
+                raise RuntimeError(
+                    f'Incorrectly formatted config in YAML, option {name} is '
+                    f'expected to declare a `type`.'
+                )
         self.config = {
-            name: ConfigMeta(name, config)
+            name: ConfigMeta(
+                name,
+                type=config['type'],
+                default=config.get('default'),
+                description=config.get('description'),
+            )
             for name, config in config_raw_.get('options', {}).items()
         }
         self.containers = {
@@ -1922,6 +1936,7 @@ class ActionMeta:
         self.additional_properties = raw.get('additionalProperties', True)
 
 
+@dataclasses.dataclass(frozen=True)
 class ConfigMeta:
     """Object containing metadata about a config option."""
 
@@ -1934,17 +1949,8 @@ class ConfigMeta:
     default: Optional[Union[bool, int, float, str]]
     """Default value of the config option."""
 
-    description: str
+    description: Optional[str]
     """Description of the config option."""
-
-    def __init__(self, name: str, raw: Dict[str, Any]):
-        self.name = name
-        try:
-            self.type = raw['type']
-        except KeyError:
-            raise RuntimeError('"type" is required for all options') from None
-        self.default = raw.get('default')
-        self.description = raw.get('description', '')
 
 
 @dataclasses.dataclass(frozen=True)
