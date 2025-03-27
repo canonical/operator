@@ -420,17 +420,19 @@ In the output you should see the definition for both containers. You'll be able 
 (write-unit-tests-for-your-charm)=
 ## Write unit tests for your charm
 
-When you're writing a charm, you will want to ensure that it will behave reliably as intended.
+When you're writing a charm, you will want to ensure that it will behave as intended.
 
-For example, that the various components -- relation data, Pebble services, or configuration files -- all behave as expected in response to an event.
+For example, you'll want to check that the various components -- relation data, Pebble services, or configuration files -- all behave as expected in response to an event.
 
-You can ensure all this by writing a rich battery of unit tests. In the context of a charm we recommended using [`pytest`](https://pytest.org/) (but [`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) and especially Ops's built-in testing library --  [](ops_testing). We will be using the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
+You can ensure all this by writing a rich battery of unit tests. In the context of a charm, we recommended using [`pytest`](https://pytest.org/) ([`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) with [](ops_testing), the framework for state-transition testing in Ops.
 
-In this chapter you will write a test to check that Pebble is configured as expected.
+We'll also use the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
+
+In this section we'll write a test to check that Pebble is configured as expected.
 
 ### Prepare your test environment
 
-Create a file called `tox.ini` in your charm project's root directory and add the following to configure your test environment:
+Create a file called `tox.ini` in your project root directory and add the following configuration:
 
 ```
 [tox]
@@ -473,23 +475,19 @@ commands =
 ```
 > Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
 
-```{tip}
-
-Once you've mastered the basics, you can speed things up by navigating to your empty charm project directory and running `charmcraft init --profile kubernetes`. This will create the `tox.ini` config file for you.
-
-```
+If you used `charmcraft init --profile kubernetes` at the beginning of your project, you will already have the `tox.ini` file.
 
 ### Prepare your test directory
 
-In your project root, create a `tests/unit` directory:
+In your project root directory, create directory for the unit test:
 
 ```text
 mkdir -p tests/unit
 ```
 
-### Write your test
+### Write a test
 
-In your `tests/unit` directory, create a new file `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up in a previous chapter. It will first set up the test context, then define the input state, then run the action and, finally, check if the results match the expected values.
+In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
 
 ```python
 import ops
@@ -530,13 +528,13 @@ def test_pebble_layer():
 
 ### Run the test
 
-In your Multipass Ubuntu VM shell, run your test as below:
+In your Multipass Ubuntu VM shell, run your test:
 
 ```text
 ubuntu@charm-dev:~/fastapi-demo$ tox -e unit     
 ```
 
-You should get an output similar to the one below:
+The result should be similar to the following output:
 
 ```text                                             
 unit: install_deps> python -I -m pip install 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/juju-sdk-tutorial-k8s/requirements.txt
@@ -567,13 +565,13 @@ Congratulations, you have written your first unit test!
 (write-integration-tests-for-your-charm)=
 ## Write integration tests for your charm
 
-A charm should function correctly not just in a mocked environment but also in a real deployment.
+A charm should function correctly not just in a mocked environment, but also in a real deployment.
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
 You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator) library.
 
-In this chapter you will write a small integration test to check that the charm packs and deploys correctly.
+In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
 ### Prepare your test environment
 
@@ -596,11 +594,11 @@ commands =
            {[vars]tests_path}/integration
 ```
 
-If you used `charmcraft init --profile kubernetes` in previous steps to bootstrap your project, the `testenv:integration` section is already in the `tox.ini` config file.
+If you used `charmcraft init --profile kubernetes` at the beginning of your project, the `testenv:integration` section is already in the `tox.ini` file.
 
 ### Prepare your test directory
 
-In your project root, create a `tests/integration` directory:
+In your project root directory, create a directory for the integration test:
 
 ```text
 mkdir -p tests/integration
@@ -608,9 +606,9 @@ mkdir -p tests/integration
 
 ### Write and run a pack-and-deploy integration test
 
-Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm and verify that the installation hooks finish without any error. 
+Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm, then verify that the installation event is handled without errors.
 
-In your `tests/integration` directory, create a file `test_charm.py` and add the following test case:
+In your `tests/integration` directory, create a file called `test_charm.py` and add the following test:
 
 ```python
 import asyncio
@@ -655,7 +653,7 @@ tox -e integration
 
 The test takes some time to run as the `pytest-operator` running in the background will add a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
 
-You should get an output similar to the one below:
+The result should be similar to the following output:
 
 ```bash
 integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/juju-sdk-tutorial-k8s/tests/integration

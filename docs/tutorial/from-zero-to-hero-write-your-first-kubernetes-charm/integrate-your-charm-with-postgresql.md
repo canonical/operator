@@ -359,9 +359,9 @@ This should produce something similar to the output below (of course, with the n
 
 Congratulations, your relation with PostgreSQL is functional!
 
-## Add unit tests for your charm
+## Write unit tests
 
-Now that our charm will extract the database authentication data and endpoints information from the relation data in function `fetch_postgres_relation_data`, we can add a test case to cover this scenario. Here, we are not testing the `fetch_postgres_relation_data` function directly, but rather, we are checking that the response to a Juju event is what it should be. So, in the test case, we create a relation and set it in the input state; on the relation-changed event, the database information should be extracted and set as environment variables for our `fastapi-service`:
+Now that our charm uses `fetch_postgres_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_postgres_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
 
 ```python
 def test_relation_data():
@@ -393,7 +393,7 @@ def test_relation_data():
     }
 ```
 
-In this chapter, we have also defined a new method `_on_collect_status` that checks various things including if the required database relation is there or not. If not, we wait for the database relation and set it to the blocked status. We can also add a test case to cover this scenario by not setting a relation in the input state and assert the unit status is blocked:
+In this chapter, we also defined a new method `_on_collect_status` that checks various things, including whether the required database relation exists. If the relation doesn't exist, we wait and set the unit status to `blocked`. We can also add a test to cover this behaviour:
 
 ```python
 def test_no_database_blocked():
@@ -402,7 +402,7 @@ def test_no_database_blocked():
     state_in = testing.State(
         containers={container},
         leader=True,
-    )
+    )  # We've omitted relation data from the input state.
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
@@ -411,9 +411,9 @@ def test_no_database_blocked():
 
 Run `tox -e unit` to make sure all test cases pass.
 
-## Add integration tests for your charm
+## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, without a database integration, the app will be in the blocked status instead of active, because it requires a database relation. Let's tweak our existing integration test case `test_build_and_deploy` accordingly and set the expected status as `blocked` in `ops_test.model.wait_for_idle`:
+Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
 
 ```python
 async def test_build_and_deploy(ops_test: OpsTest):

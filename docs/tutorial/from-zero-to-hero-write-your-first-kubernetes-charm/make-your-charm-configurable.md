@@ -182,9 +182,11 @@ demo-api-charm/0*  blocked   idle   10.1.157.74         invalid port number, 22 
 
 Congratulations, you now know how to make your charm configurable!
 
-## Add unit tests for your charm
+## Write unit tests
 
-Since we added a new feature to configure `server-port` and use it in the `_pebble_layer` dynamically, we want to add some test cases to cover it. We can add a test case where we set the port in the input state, and assert the port is indeed used in the service's command in the container layer:
+Since we added a new feature to configure `server-port` and use it in the `_pebble_layer` dynamically, we should write tests for the feature.
+
+First, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
 
 ```python
 def test_config_changed():
@@ -199,7 +201,7 @@ def test_config_changed():
     assert "--port=8080" in container.layers["fastapi_demo"].services["fastapi-service"].command
 ```
 
-In `_on_config_changed`, we specifically don't allow port 22 to be used. When port is configured to 22, we will set the status as blocked. So, we can also add a test case to cover this behaviour by setting the port explicitly to 22 in the input state and assert the unit status is blocked:
+In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
 
 ```python
 def test_config_changed_invalid_port():
@@ -216,7 +218,7 @@ def test_config_changed_invalid_port():
     )
 ```
 
-Run `tox -e unit` to make sure all test cases pass.
+Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 

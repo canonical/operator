@@ -134,9 +134,9 @@ db-username: relation_id_4
 
 Congratulations, you now know how to expose operational tasks via actions!
 
-## Add unit tests for your charm
+## Write unit tests
 
-Let's add a test case to check the behaviour of the `get_db_info` action that we just set up. In the test case, we set up the context, define the input state with a relation, then run the action and check if the results match the expected values:
+Let's add a test to check the behaviour of the `get_db_info` action that we just set up. Our test sets up the context, defines the input state with a relation, then runs the action and checks whether the results match the expected values:
 
 ```python
 def test_get_db_info_action():
@@ -166,7 +166,7 @@ def test_get_db_info_action():
     }
 ```
 
-Since the `get_db_info` action has a parameter `show-password`, let's also add another test to cover the case where users want to show the password:
+Since the `get_db_info` action has a parameter `show-password`, let's also add a test to cover the case where the user wants to show the password:
 
 ```python
 def test_get_db_info_action_show_password():
@@ -198,7 +198,7 @@ def test_get_db_info_action_show_password():
     }
 ```
 
-Run `tox -e unit` to make sure all test cases pass.
+Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
