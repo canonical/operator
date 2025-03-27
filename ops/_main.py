@@ -580,6 +580,7 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
     manager = None
     try:
         manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+
         manager.run()
     except _Abort as e:
         sys.exit(e.exit_code)
