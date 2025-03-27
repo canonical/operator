@@ -16,11 +16,11 @@
 
 import logging
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
 import warnings
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 from . import charm as _charm
@@ -37,7 +37,7 @@ CHARM_STATE_FILE = '.unit-state.db'
 logger = logging.getLogger()
 
 
-def _exe_path(path: Path) -> Optional[Path]:
+def _exe_path(path: pathlib.Path) -> Optional[pathlib.Path]:
     """Find and return the full path to the given binary.
 
     Here path is the absolute path to a binary, but might be missing an extension.
@@ -45,13 +45,13 @@ def _exe_path(path: Path) -> Optional[Path]:
     p = shutil.which(path.name, mode=os.F_OK, path=str(path.parent))
     if p is None:
         return None
-    return Path(p)
+    return pathlib.Path(p)
 
 
 def _create_event_link(
-    charm_dir: Path,
+    charm_dir: pathlib.Path,
     bound_event: '_framework.BoundEvent',
-    link_to: Union[str, Path],
+    link_to: Union[str, pathlib.Path],
 ):
     """Create a symlink for a particular event.
 
@@ -89,7 +89,9 @@ def _create_event_link(
         event_path.symlink_to(target_path)
 
 
-def _setup_event_links(charm_dir: Path, charm: '_charm.CharmBase', juju_context: _JujuContext):
+def _setup_event_links(
+    charm_dir: pathlib.Path, charm: '_charm.CharmBase', juju_context: _JujuContext
+):
     """Set up links for supported events that originate from Juju.
 
     Whether a charm can handle an event or not can be determined by
@@ -212,10 +214,10 @@ class _Dispatcher:
 
     """
 
-    def __init__(self, charm_dir: Path, juju_context: _JujuContext):
+    def __init__(self, charm_dir: pathlib.Path, juju_context: _JujuContext):
         self._juju_context = juju_context
         self._charm_dir = charm_dir
-        self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
+        self._exec_path = pathlib.Path(self._juju_context.dispatch_path or sys.argv[0])
 
         dispatch = charm_dir / 'dispatch'
         if self._juju_context.version.is_dispatch_aware() and _exe_path(dispatch) is not None:
@@ -260,7 +262,7 @@ class _Dispatcher:
             logger.warning('Legacy %s exists but is not executable.', self._dispatch_path)
             return
 
-        if dispatch_path.resolve() == Path(sys.argv[0]).resolve():
+        if dispatch_path.resolve() == pathlib.Path(sys.argv[0]).resolve():
             logger.debug('Legacy %s is just a link to ourselves.', self._dispatch_path)
             return
 
@@ -278,7 +280,7 @@ class _Dispatcher:
         else:
             logger.debug('Legacy %s exited with status 0.', self._dispatch_path)
 
-    def _set_name_from_path(self, path: Path):
+    def _set_name_from_path(self, path: pathlib.Path):
         """Sets the name attribute to that which can be inferred from the given path."""
         name = path.name.replace('-', '_')
         if path.parent.name == 'actions':
@@ -303,7 +305,7 @@ class _Dispatcher:
         JUJU_DISPATCH_PATH will be set to the wanted hook, e.g. hooks/install,
         in both cases.
         """
-        self._dispatch_path = Path(self._juju_context.dispatch_path)
+        self._dispatch_path = pathlib.Path(self._juju_context.dispatch_path)
 
         if 'OPERATOR_DISPATCH' in os.environ:
             logger.debug('Charm called itself via %s.', self._dispatch_path)
@@ -324,7 +326,7 @@ class _Dispatcher:
 
 
 def _should_use_controller_storage(
-    db_path: Path, meta: _charm.CharmMeta, juju_context: _JujuContext
+    db_path: pathlib.Path, meta: _charm.CharmMeta, juju_context: _JujuContext
 ) -> bool:
     """Figure out whether we want to use controller storage or not."""
     # if local state has been used previously, carry on using that
