@@ -24,6 +24,7 @@ import sys
 import tempfile
 import typing
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
 
@@ -56,44 +57,25 @@ class SymlinkTargetError(Exception):
     pass
 
 
+@dataclass
 class EventSpec:
-    def __init__(
-        self,
-        event_type: typing.Type[ops.EventBase],
-        event_name: str,
-        env_var: typing.Optional[str] = None,
-        relation_id: typing.Optional[int] = None,
-        remote_app: typing.Optional[str] = None,
-        remote_unit: typing.Optional[str] = None,
-        model_name: typing.Optional[str] = None,
-        set_in_env: typing.Optional[typing.Dict[str, str]] = None,
-        workload_name: typing.Optional[str] = None,
-        notice_id: typing.Optional[str] = None,
-        notice_type: typing.Optional[str] = None,
-        notice_key: typing.Optional[str] = None,
-        departing_unit_name: typing.Optional[str] = None,
-        secret_id: typing.Optional[str] = None,
-        secret_label: typing.Optional[str] = None,
-        secret_revision: typing.Optional[str] = None,
-        check_name: typing.Optional[str] = None,
-    ):
-        self.event_type = event_type
-        self.event_name = event_name
-        self.env_var = env_var
-        self.relation_id = relation_id
-        self.remote_app = remote_app
-        self.remote_unit = remote_unit
-        self.departing_unit_name = departing_unit_name
-        self.model_name = model_name
-        self.set_in_env = set_in_env
-        self.workload_name = workload_name
-        self.notice_id = notice_id
-        self.notice_type = notice_type
-        self.notice_key = notice_key
-        self.secret_id = secret_id
-        self.secret_label = secret_label
-        self.secret_revision = secret_revision
-        self.check_name = check_name
+    event_type: typing.Type[ops.EventBase]
+    event_name: str
+    env_var: typing.Optional[str] = None
+    relation_id: typing.Optional[int] = None
+    remote_app: typing.Optional[str] = None
+    remote_unit: typing.Optional[str] = None
+    model_name: typing.Optional[str] = None
+    set_in_env: typing.Optional[typing.Dict[str, str]] = None
+    workload_name: typing.Optional[str] = None
+    notice_id: typing.Optional[str] = None
+    notice_type: typing.Optional[str] = None
+    notice_key: typing.Optional[str] = None
+    departing_unit_name: typing.Optional[str] = None
+    secret_id: typing.Optional[str] = None
+    secret_label: typing.Optional[str] = None
+    secret_revision: typing.Optional[str] = None
+    check_name: typing.Optional[str] = None
 
 
 @patch('ops._main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore

@@ -24,6 +24,7 @@ import typing
 import unittest
 import unittest.mock
 import unittest.util
+from dataclasses import dataclass
 
 import pytest
 import websocket
@@ -1471,26 +1472,16 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     }
 
 
+@dataclass
 class MultipartParserTestCase:
-    def __init__(
-        self,
-        name: str,
-        data: bytes,
-        want_headers: typing.List[bytes],
-        want_bodies: typing.List[bytes],
-        want_bodies_done: typing.List[bool],
-        max_boundary: int = 14,
-        max_lookahead: int = 8 * 1024,
-        error: str = '',
-    ):
-        self.name = name
-        self.data = data
-        self.want_headers = want_headers
-        self.want_bodies = want_bodies
-        self.want_bodies_done = want_bodies_done
-        self.max_boundary = max_boundary
-        self.max_lookahead = max_lookahead
-        self.error = error
+    name: str
+    data: bytes
+    want_headers: typing.List[bytes]
+    want_bodies: typing.List[bytes]
+    want_bodies_done: typing.List[bool]
+    max_boundary: int = 14
+    max_lookahead: int = 8 * 1024
+    error: str = ''
 
 
 class TestMultipartParser:
