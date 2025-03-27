@@ -1613,15 +1613,15 @@ class CharmMeta:
     @staticmethod
     def from_charm_root(charm_root: Union[pathlib.Path, str]):
         """Initialise CharmMeta from the path to a charm repository root folder."""
-        _charm_root = pathlib.Path(charm_root)
-        metadata_path = _charm_root / 'metadata.yaml'
+        charm_root = pathlib.Path(charm_root)
+        metadata_path = charm_root / 'metadata.yaml'
 
         with metadata_path.open() as f:
             meta = yaml.safe_load(f.read())
 
         actions = None
 
-        actions_path = _charm_root / 'actions.yaml'
+        actions_path = charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
                 actions = yaml.safe_load(f.read())
