@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -157,7 +156,7 @@ class Ops(_Manager, Generic[CharmType]):
         return CapturingFramework(*args, context=self.context, **kwargs)
 
     def _make_model_backend(self):
-        # The event here is used to in the context of the Juju event that caused
+        # The event here is used in the context of the Juju event that caused
         # the framework to start, so we pass in the original one, even though
         # this backend might be used for a deferred event.
         return _MockModelBackend(
