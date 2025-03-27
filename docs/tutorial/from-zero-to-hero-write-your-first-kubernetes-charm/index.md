@@ -55,8 +55,6 @@ make-your-charm-configurable
 integrate-your-charm-with-postgresql
 expose-operational-tasks-via-actions
 observe-your-charm-with-cos-lite
-write-unit-tests-for-your-charm
-write-integration-tests-for-your-charm
 ```
 
 (tutorial-kubernetes-next-steps)=
