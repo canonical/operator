@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -273,7 +272,7 @@ class Runtime:
     def _exec_ctx(self, ctx: "Context[CharmType]"):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
-            yield (temporary_charm_root)
+            yield temporary_charm_root
 
     @contextlib.contextmanager
     def exec(
