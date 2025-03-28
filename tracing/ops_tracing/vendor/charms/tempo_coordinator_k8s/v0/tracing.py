@@ -768,7 +768,7 @@ class TracingEndpointRequirer(Object):
             charm, relation_name, RELATION_INTERFACE_NAME, RelationRole.requires
         )
 
-        super().__init__(charm, relation_name)
+        super().__init__(charm, f"internal: {relation_name}")
 
         self._is_single_endpoint = charm.meta.relations[relation_name].limit == 1
 

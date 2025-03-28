@@ -376,7 +376,7 @@ class CertificateTransferRequires(Object):
             charm: Charm object
             relationship_name: Juju relation name
         """
-        super().__init__(charm, relationship_name + "_v1")
+        super().__init__(charm, f"internal: {relationship_name}_v1")
         self.relationship_name = relationship_name
         self.charm = charm
         self.framework.observe(
