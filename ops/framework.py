@@ -811,9 +811,9 @@ class Framework(Object):
 
         method_name = observer.__name__
 
-        assert isinstance(
-            observer.__self__, Object
-        ), "can't register observers that aren't `Object`s"
+        assert isinstance(observer.__self__, Object), (
+            "can't register observers that aren't `Object`s"
+        )
         observer_obj = observer.__self__
 
         # Validate that the method has an acceptable call signature.
