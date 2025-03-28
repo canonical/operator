@@ -41,7 +41,7 @@ docs = [
     "sphinxext-opengraph",
 ]
 testing = [
-    "ops-scenario>=7.0.5,<8",
+    "ops-scenario==7.3.0.dev0"
 ]
 tracing = [
     "ops-tracing==2.20.0.dev0",
