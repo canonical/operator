@@ -29,6 +29,7 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
+    Set,
     TextIO,
     Tuple,
     TypedDict,
@@ -1350,6 +1351,8 @@ class CharmBase(Object):
     def __init__(self, framework: Framework):
         super().__init__(framework, None)
 
+        self._static_events: Set[str] = set(self.on.events())
+
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
             self.on.define_event(f'{relation_name}_relation_created', RelationCreatedEvent)
@@ -1375,6 +1378,12 @@ class CharmBase(Object):
             self.on.define_event(
                 f'{container_name}_pebble_check_recovered', PebbleCheckRecoveredEvent
             )
+
+    def _destroy_charm(self):
+        for event in self.on.events():
+            if event in self._static_events:
+                continue
+            self.on._undefine_event(event)
 
     @property
     def app(self) -> model.Application:

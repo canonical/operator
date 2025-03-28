@@ -64,7 +64,6 @@ def test_emitted_framework():
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
-    assert len(ctx.emitted_events) == 4
     assert list(map(type, ctx.emitted_events)) == [
         ops.UpdateStatusEvent,
         ops.CollectStatusEvent,
@@ -77,7 +76,11 @@ def test_emitted_deferred():
     class MyCharm(CharmBase):
         META = {"name": "joop"}
 
-        def _foo(self, e):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._foo)
+
+        def _foo(self, _: ops.UpdateStatusEvent):
             pass
 
     ctx = Context(
@@ -87,12 +90,13 @@ def test_emitted_deferred():
         capture_framework_events=True,
     )
     ctx.run(
-        ctx.on.start(), State(deferred=[_Event("update-status").deferred(MyCharm._foo)])
+        ctx.on.start(), State(deferred=[ctx.on.update_status().deferred(MyCharm._foo)])
     )
 
-    assert len(ctx.emitted_events) == 5
     assert [e.handle.kind for e in ctx.emitted_events] == [
         "update_status",
+        "pre_commit",
+        "commit",
         "start",
         "collect_unit_status",
         "pre_commit",
