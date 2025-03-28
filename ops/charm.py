@@ -1627,7 +1627,7 @@ class CharmMeta:
                 actions = yaml.safe_load(f.read())
 
         options = None
-        config_path = _charm_root / 'config.yaml'
+        config_path = charm_root / 'config.yaml'
         if config_path.exists():
             with config_path.open() as f:
                 options = yaml.safe_load(f.read())
