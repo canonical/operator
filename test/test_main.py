@@ -24,7 +24,7 @@ import sys
 import tempfile
 import typing
 import warnings
-from dataclasses import dataclass
+import dataclasses
 from pathlib import Path
 from unittest.mock import patch
 
@@ -57,7 +57,7 @@ class SymlinkTargetError(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class EventSpec:
     event_type: typing.Type[ops.EventBase]
     event_name: str

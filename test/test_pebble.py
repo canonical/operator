@@ -24,7 +24,7 @@ import typing
 import unittest
 import unittest.mock
 import unittest.util
-from dataclasses import dataclass
+import dataclasses
 
 import pytest
 import websocket
@@ -1472,7 +1472,7 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     }
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class MultipartParserTestCase:
     name: str
     data: bytes
