@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import dataclasses
 import importlib.util
 import io
 import logging
@@ -24,7 +25,6 @@ import sys
 import tempfile
 import typing
 import warnings
-import dataclasses
 from pathlib import Path
 from unittest.mock import patch
 

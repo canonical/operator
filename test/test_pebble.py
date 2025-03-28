@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import dataclasses
 import datetime
 import email.message
 import email.parser
@@ -24,7 +25,6 @@ import typing
 import unittest
 import unittest.mock
 import unittest.util
-import dataclasses
 
 import pytest
 import websocket
