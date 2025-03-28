@@ -915,11 +915,11 @@ class _TestMain(abc.ABC):
         assert 'Using local storage: not a Kubernetes podspec charm' in calls.pop(0)
         assert 'Initializing SQLite local storage: ' in calls.pop(0)
         assert re.search(
-            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
-            'Traceback .most recent call last.:\n'
-            '  .*'
-            "    raise RuntimeError.'failing as requested'.\n"
-            'RuntimeError: failing as requested',
+            r'(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
+            r'Traceback .most recent call last.:\n'
+            r'  .*'
+            r"    raise RuntimeError.'failing as requested'.\n"
+            r'RuntimeError: failing as requested',
             calls[0],
         )
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
