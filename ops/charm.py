@@ -29,6 +29,7 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
+    Set,
     TextIO,
     Tuple,
     TypedDict,
@@ -1350,6 +1351,8 @@ class CharmBase(Object):
     def __init__(self, framework: Framework):
         super().__init__(framework, None)
 
+        self._static_events: Set[str] = set(self.on.events())
+
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')
             self.on.define_event(f'{relation_name}_relation_created', RelationCreatedEvent)
@@ -1377,29 +1380,10 @@ class CharmBase(Object):
             )
 
     def _destroy_charm(self):
-        for relation_name in self.framework.meta.relations:
-            relation_name = relation_name.replace('-', '_')
-            self.on._undefine_event(f'{relation_name}_relation_created')
-            self.on._undefine_event(f'{relation_name}_relation_joined')
-            self.on._undefine_event(f'{relation_name}_relation_changed')
-            self.on._undefine_event(f'{relation_name}_relation_departed')
-            self.on._undefine_event(f'{relation_name}_relation_broken')
-
-        for storage_name in self.framework.meta.storages:
-            storage_name = storage_name.replace('-', '_')
-            self.on._undefine_event(f'{storage_name}_storage_attached')
-            self.on._undefine_event(f'{storage_name}_storage_detaching')
-
-        for action_name in self.framework.meta.actions:
-            action_name = action_name.replace('-', '_')
-            self.on._undefine_event(f'{action_name}_action')
-
-        for container_name in self.framework.meta.containers:
-            container_name = container_name.replace('-', '_')
-            self.on._undefine_event(f'{container_name}_pebble_ready')
-            self.on._undefine_event(f'{container_name}_pebble_custom_notice')
-            self.on._undefine_event(f'{container_name}_pebble_check_failed')
-            self.on._undefine_event(f'{container_name}_pebble_check_recovered')
+        for event in self.on.events():
+            if event in self._static_events:
+                continue
+            self.on._undefine_event(event)
 
     @property
     def app(self) -> model.Application:
