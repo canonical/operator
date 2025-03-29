@@ -22,6 +22,7 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     ClassVar,
     Dict,
     List,
@@ -31,6 +32,8 @@ from typing import (
     Optional,
     TextIO,
     Tuple,
+    Type,
+    TypeVar,
     TypedDict,
     Union,
     cast,
@@ -110,6 +113,9 @@ class HookEvent(EventBase):
     - Storage events
     - Metric events
     """
+
+
+_ActionType = TypeVar('_ActionType')
 
 
 class ActionEvent(EventBase):
@@ -226,6 +232,55 @@ class ActionEvent(EventBase):
             message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
+
+    def load_params(
+        self,
+        cls: Type[_ActionType],
+        *args: Any,
+        convert_name: Optional[Callable[[str], str]] = None,
+        **kwargs: Any,
+    ) -> _ActionType:
+        """Load the action parameters into an instance of an action class.
+
+        The object will be instantiated with keyword arguments of all the raw
+        Juju action parameters, but with dashes in names converted to
+        underscores, unless a custom conversion function is provided.
+
+        Any additional positional or keyword arguments will be passed through to
+        the action class.
+
+        Args:
+            cls: A class that inherits from :class:`ops.ActionBase`.
+            convert_name: An optional function that takes a string parameter
+                name as found in the YAML config, and returns the name of the
+                attribute, which must be a valid Python identifier.
+            args: positional arguments to pass through to the config class.
+            kwargs: keyword arguments to pass through to the config class.
+
+        Returns:
+            An instance of the action class with the provided parameter values.
+        """
+        from ._main import _Abort  # Avoid circular import.
+        # We exit with a 'success' code because we can use fail() to indicate
+        # the failure, and don't want a retry.
+
+        params: Dict[str, Any] = kwargs.copy()
+        for key, value in self.params.items():
+            if convert_name:
+                attr = convert_name(key)
+                if not attr.isidentifier():
+                    logger.error('Invalid attribute name %r from %s', attr, key)
+                    self.fail(f'Invalid attribute name {attr}')
+                    raise _Abort(0) from None
+            else:
+                attr = key.replace('-', '_')
+            params[attr] = value
+        try:
+            return cls(*args, **params)
+        except ValueError as e:
+            logger.error('Invalid parameters for %s: %r (%s)', cls.__name__, params, e)
+            self.fail(f'Error in action parameters: {e}')
+            raise _Abort(0) from None
 
 
 class InstallEvent(HookEvent):
