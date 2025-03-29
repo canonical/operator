@@ -160,7 +160,7 @@ class ExecResult:
     stderr: Union[str, bytes] = b''
 
 
-ExecHandler = Callable[[ExecArgs], Union[None, ExecResult]]
+ExecHandler = Callable[[ExecArgs], Union[ExecResult, None]]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -297,7 +297,7 @@ class Harness(Generic[CharmType]):
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
-        self._meta = self._create_meta(meta, actions)
+        self._meta = self._create_meta(meta, actions, config)
         self._unit_name: str = f'{self._meta.name}/0'
         self._hooks_enabled: bool = True
         self._relation_id_counter: int = 0
@@ -323,8 +323,8 @@ class Harness(Generic[CharmType]):
         )
 
         warnings.warn(
-            'Harness is deprecated; we recommend using state transition testing '
-            "(previously known as 'Scenario') instead",
+            'Harness is deprecated. For the recommended approach, see: '
+            'https://ops.readthedocs.io/en/latest/howto/write-unit-tests-for-a-charm.html',
             PendingDeprecationWarning,
             stacklevel=2,
         )
@@ -559,13 +559,15 @@ class Harness(Generic[CharmType]):
         self,
         charm_metadata_yaml: Optional[YAMLStringOrFile],
         action_metadata_yaml: Optional[YAMLStringOrFile],
+        config_metadata_yaml: Optional[YAMLStringOrFile],
     ) -> CharmMeta:
         """Create a CharmMeta object.
 
         Handle the cases where a user doesn't supply explicit metadata snippets.
         This will try to load metadata from ``<charm_dir>/charmcraft.yaml`` first, then
         ``<charm_dir>/metadata.yaml`` if charmcraft.yaml does not include metadata,
-        and ``<charm_dir>/actions.yaml`` if charmcraft.yaml does not include actions.
+        and ``<charm_dir>/actions.yaml`` and ``<charm_dir>/config.yaml`` if
+        charmcraft.yaml does not include actions or config.
         """
         try:
             filename = inspect.getfile(self._charm_cls)
@@ -625,7 +627,25 @@ class Harness(Generic[CharmType]):
                     action_metadata = yaml.safe_load(actions_path.read_text())
                     self._charm_dir = charm_dir
 
-        return CharmMeta(charm_metadata, action_metadata)
+        config_metadata: Optional[Dict[str, Any]] = None
+        # Load config from parameters if provided
+        if config_metadata_yaml is not None:
+            if isinstance(config_metadata_yaml, str):
+                config_metadata_yaml = dedent(config_metadata_yaml)
+            config_metadata = yaml.safe_load(config_metadata_yaml)
+        else:
+            # Check charmcraft.yaml for config if no config is provided
+            if charmcraft_metadata is not None and 'config' in charmcraft_metadata:
+                config_metadata = charmcraft_metadata['config']
+
+            # Still no config, check config.yaml
+            if charm_dir and config_metadata is None:
+                config_path = charm_dir / 'config.yaml'
+                if config_path.is_file():
+                    config_metadata = yaml.safe_load(config_path.read_text())
+                    self._charm_dir = charm_dir
+
+        return CharmMeta(charm_metadata, action_metadata, config_metadata)
 
     def _get_config(self, charm_config_yaml: Optional['YAMLStringOrFile']):
         """If the user passed a config to Harness, use it.
@@ -1796,8 +1816,7 @@ class Harness(Generic[CharmType]):
         # Model secrets:
         if secret.owner_name in [self.model.app.name, self.model.unit.name]:
             raise RuntimeError(
-                f'Secret {secret_id!r} owned by the charm under test, "'
-                f"can't call revoke_secret"
+                f"Secret {secret_id!r} owned by the charm under test, can't call revoke_secret"
             )
 
         relation_id = self._secret_relation_id_to(secret)
@@ -2119,7 +2138,7 @@ class Harness(Generic[CharmType]):
                         f'given {{"{key}":{params[key]!r}}}'
                     )
         action_under_test = _RunningAction(action_name, ActionOutput([], {}), params)
-        handler = getattr(self.charm.on, f"{action_name.replace('-', '_')}_action")
+        handler = getattr(self.charm.on, f'{action_name.replace("-", "_")}_action')
         self._backend._running_action = action_under_test
         self._action_id_counter += 1
         handler.emit(str(self._action_id_counter))
@@ -2463,16 +2482,20 @@ class _TestingModelBackend:
         return self._relation_data_raw[relation_id][member_name]
 
     def update_relation_data(
-        self, relation_id: int, _entity: Union[model.Unit, model.Application], key: str, value: str
+        self,
+        relation_id: int,
+        entity: Union[model.Unit, model.Application],
+        data: Mapping[str, str],
     ):
         # this is where the 'real' backend would call relation-set.
-        raw_data = self._relation_data_raw[relation_id][_entity.name]
-        if value == '':
-            raw_data.pop(key, None)
-        else:
-            raw_data[key] = value
+        raw_data = self._relation_data_raw[relation_id][entity.name]
+        for key, value in data.items():
+            if value == '':
+                raw_data.pop(key, None)
+            else:
+                raw_data[key] = value
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -2491,10 +2514,15 @@ class _TestingModelBackend:
         if bucket_key not in relation:
             relation[bucket_key] = {}
         bucket = relation[bucket_key]
-        if value == '':
-            bucket.pop(key, None)
-        else:
-            bucket[key] = value
+        for key, value in data.items():
+            if value == '':
+                bucket.pop(key, None)
+            else:
+                bucket[key] = value
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        # For Harness, ignore relation_id and assume relation is never cross-model.
+        return {'uuid': self.model_uuid}
 
     def config_get(self) -> _TestingConfig:
         return self._config

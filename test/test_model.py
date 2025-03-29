@@ -24,6 +24,7 @@ import typing
 import unittest
 from collections import OrderedDict
 from textwrap import dedent
+from typing import Mapping
 from unittest import mock
 
 import pytest
@@ -383,7 +384,14 @@ class TestModel:
             harness,
             [
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        'entity': harness.model.unit,
+                        'data': {'host': 'bar'},
+                    },
+                ),
             ],
         )
 
@@ -411,7 +419,10 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', 0),
                 ('relation_get', 0, 'myapp', True),
-                ('update_relation_data', 0, harness.model.app, 'password', 'foo'),
+                (
+                    'update_relation_data',
+                    {'relation_id': 0, 'entity': harness.model.app, 'data': {'password': 'foo'}},
+                ),
             ],
         )
 
@@ -487,7 +498,14 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        'entity': harness.model.unit,
+                        'data': {'host': ''},
+                    },
+                ),
             ],
         )
 
@@ -513,7 +531,6 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'port', ''),
             ],
         )
 
@@ -533,10 +550,9 @@ class TestModel:
         def broken_update_relation_data(
             relation_id: int,
             entity: typing.Union[ops.Unit, ops.Application],
-            key: str,
-            value: str,
+            data: Mapping[str, str],
         ):
-            backend._calls.append(('update_relation_data', relation_id, entity, key, value))
+            backend._calls.append(('update_relation_data', relation_id, entity, data))
             raise ops.ModelError()
 
         backend.update_relation_data = broken_update_relation_data
@@ -559,8 +575,8 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': 'bar'}),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': ''}),
             ],
         )
 
@@ -1155,6 +1171,33 @@ class TestModel:
         assert isinstance(model.juju_version, ops.JujuVersion)
         # Make sure it's not being loaded from the environment.
         assert JujuVersion.from_environ() == '0.0.0'
+
+    def test_relation_remote_model(self, fake_script: FakeScript):
+        fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
+        fake_script.write('relation-ids', """echo '["db0:1"]'""")
+        fake_script.write('relation-model-get', """echo '{"uuid": "UUID"}'""")
+
+        meta = ops.CharmMeta.from_yaml("""
+            name: myapp
+            requires:
+                db:
+                    interface: pgsql
+        """)
+        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        rel = model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
+        # Multiple accesses to remote_model are cached (shouldn't call hook tool again).
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
+        assert fake_script.calls() == [
+            ['relation-ids', 'db', '--format=json'],
+            ['relation-list', '-r', '1', '--format=json'],
+            ['relation-model-get', '-r', '1', '--format=json'],
+        ]
 
 
 class PushPullCase:
@@ -2694,7 +2737,7 @@ class TestModelBackend:
     def test_relation_get_set_is_app_arg(self):
         # No is_app provided.
         with pytest.raises(TypeError):
-            self.backend.relation_set(1, 'fookey', 'barval')  # type: ignore
+            self.backend.relation_set(1, {'fookey': 'barval'})  # type: ignore
 
         with pytest.raises(TypeError):
             self.backend.relation_get(1, 'fooentity')  # type: ignore
@@ -2702,7 +2745,7 @@ class TestModelBackend:
         # Invalid types for is_app.
         for is_app_v in [None, 1, 2.0, 'a', b'beef']:
             with pytest.raises(TypeError):
-                self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)  # type: ignore
+                self.backend.relation_set(1, {'fookey': 'barval'}, is_app=is_app_v)  # type: ignore
 
             with pytest.raises(TypeError):
                 self.backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
@@ -2749,19 +2792,19 @@ class TestModelBackend:
             ),
             (
                 lambda: fake_script.write('relation-set', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
+                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=False),
                 ops.ModelError,
                 [['relation-set', '-r', '3', '--file', '-']],
             ),
             (
                 lambda: fake_script.write('relation-set', f'echo {err_msg} >&2 ; exit 2'),
-                lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
+                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=False),
                 ops.RelationNotFoundError,
                 [['relation-set', '-r', '3', '--file', '-']],
             ),
             (
                 lambda: None,
-                lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
+                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=True),
                 ops.RelationNotFoundError,
                 [['relation-set', '-r', '3', '--app', '--file', '-']],
             ),
@@ -2836,7 +2879,7 @@ class TestModelBackend:
             monkeypatch.setattr(
                 self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
             )
-            self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+            self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
             t.seek(0)
@@ -2851,7 +2894,7 @@ class TestModelBackend:
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
         with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
-            self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+            self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
 
     def test_status_get(self, fake_script: FakeScript):

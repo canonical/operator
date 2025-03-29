@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -212,7 +211,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise RelationNotFoundError() from None
 
     def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
-        if self._context.juju_version < "3.0.2":
+        if JujuVersion(self._context.juju_version) < "3.0.2":
             raise ModelError(
                 "secrets are only available in juju >= 3.0.2."
                 "Set ``Context.juju_version`` to 3.0.2+ to use them.",
@@ -273,6 +272,18 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         unit_id = int(member_name.split("/")[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        if JujuVersion(self._context.juju_version) < "3.6.2":
+            raise ModelError("Relation.remote_model is only available on Juju >= 3.6.2")
+
+        relation = self._get_relation_by_id(relation_id)
+        # Only Relation has remote_model_uuid, not the other subclasses of RelationBase.
+        if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
+            uuid = relation.remote_model_uuid
+        else:
+            uuid = self._state.model.uuid
+        return {"uuid": uuid}
 
     def is_leader(self):
         return self._state.leader
@@ -379,8 +390,16 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(
+        self, relation_id: int, data: Mapping[str, str], is_app: bool
+    ) -> None:
         self._check_app_data_access(is_app)
+        # NOTE: The code below currently does not have any effect, because
+        # the dictionary has already had the same set/delete operations
+        # applied to it by RelationDataContent -- unlike in production,
+        # where this method calls out to Juju's relation-set to operate on
+        # the real databag, this method currently operates on the same
+        # dictionary object that RelationDataContent does.
         relation = self._get_relation_by_id(relation_id)
         if is_app:
             if not self._state.leader:
@@ -390,7 +409,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             tgt = relation.local_app_data
         else:
             tgt = relation.local_unit_data
-        tgt[key] = value
+        for key, value in data.items():
+            tgt[key] = value
 
     def secret_add(
         self,
@@ -428,8 +448,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             )
         if secret.owner == "app" and not self.is_leader():
             understandable_error = SecretNotFoundError(
-                f"App-owned secret {secret.id!r} can only be "
-                f"managed by the leader.",
+                f"App-owned secret {secret.id!r} can only be managed by the leader.",
             )
             # charm-facing side: respect ops error
             raise ModelError("ERROR permission denied") from understandable_error
@@ -446,7 +465,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
             secret._set_label(label)
-        juju_version = self._context.juju_version
+        juju_version = JujuVersion(self._context.juju_version)
         if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
             # In this medieval Juju chapter,
             # secret owners always used to track the latest revision.

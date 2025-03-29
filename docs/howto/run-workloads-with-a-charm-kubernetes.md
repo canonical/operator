@@ -515,7 +515,13 @@ If there are no checks configured, Pebble returns HTTP 200 so the liveness and r
 
 Consider the K8s liveness success (`level=alive` check) to mean "Pebble is alive" rather than "the application is fully alive" (and failure to mean "this container needs to die"). For charms that take a long time to start, you should not have a `level=alive` check (if Pebble's running, it will report alive to K8s), and instead use an ordinary Pebble check (without a `level`) in conjunction with `on-check-failure: restart`. That way Pebble itself has full control over restarting the service in question.
 
-### Test checks
+### Services with long startup time
+
+When a K8s liveness probe (a `level=alive` check) succeeds, you should consider it to mean "Pebble is alive" rather than "the workload is alive". Similarly, a liveness probe failure means "this container needs to be restarted" rather than an issue with the workload.
+
+This means you should not usually have a `level=alive` check for a service in a charm. This is especially important for workloads that take a long or indefinite period of time to start. Instead, use a Pebble check without a level and specify `on-check-failure: restart` for the service. That way Pebble itself has control over restarting the service.
+
+### Testing with checks
 
 > Added in ops 2.17
 

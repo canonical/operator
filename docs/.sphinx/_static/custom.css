@@ -359,3 +359,14 @@ p code.literal {
 .admonition p code.literal {
     font-size: var(--admonition-font-size);
 }
+
+/* Define a star icon for use in admonitions */
+body {
+    --icon-star: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%2016l4.9376%202.596l-0.9432%20-5.4984l4%20-3.8936l-5.52%20-0.8l-2.4688%20-5.0024l-2.4688%205.0024l-5.52%200.8l4%203.8936l-0.9432%205.4984zM12%202c2.75%200%205.1%201%207.05%202.95C21%206.9%2022%209.25%2022%2012s-1%205.1-2.95%207.05C17.1%2021%2014.75%2022%2012%2022s-5.1-1-7.05-2.95C3%2017.1%202%2014.75%202%2012s1-5.1%202.95-7.05C6.9%203%209.25%202%2012%202z%22/%3E%3C/svg%3E");
+}
+
+/* Use the star icon for 'hint' admonitions */
+.admonition.hint > .admonition-title::before {
+    -webkit-mask-image: var(--icon-star);
+    mask-image: var(--icon-star);
+}
