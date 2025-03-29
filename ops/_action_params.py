@@ -26,9 +26,6 @@ import re
 import sys
 from typing import Any, ClassVar, cast
 
-from ._private import yaml
-
-
 logger = logging.getLogger(__name__)
 
 

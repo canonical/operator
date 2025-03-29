@@ -33,8 +33,8 @@ from typing import (
     TextIO,
     Tuple,
     Type,
-    TypeVar,
     TypedDict,
+    TypeVar,
     Union,
     cast,
 )

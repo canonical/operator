@@ -32,7 +32,6 @@ import ops._main
 import ops._private.yaml
 from ops import testing
 
-
 logger = logging.getLogger(__name__)
 
 
