@@ -252,18 +252,18 @@ class ActionBase:
         # TODO: is there a 'required' equivalent with Pydantic?
         # Pydantic classes provide this, so we can just get it directly.
         if hasattr(cls, 'schema'):
-            return cls.schema(), []
+            return cls.schema(), []  # type: ignore
         # Pydantic dataclasses also have the schema, but we need to get it via
         # the model.
         if hasattr(cls, '__pydantic_model__'):
-            return cls.__pydantic_model__.schema(), []
+            return cls.__pydantic_model__.schema(), []  # type: ignore
 
         params: dict[str, Any] = {}
         required_params: list[str] = []
         attrs = dir(cls)
         attrs.extend(cls.__annotations__)
         if hasattr(cls, '__dataclass_fields__'):
-            attrs.extend(cls.__dataclass_fields__)
+            attrs.extend(cls.__dataclass_fields__)  # type: ignore
         for attr in set(attrs):
             if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
                 continue
@@ -277,15 +277,15 @@ class ActionBase:
             except AttributeError:
                 if hasattr(cls, '__dataclass_fields__'):
                     try:
-                        field = cls.__dataclass_fields__[attr]
+                        field = cls.__dataclass_fields__[attr]  # type: ignore
                     except KeyError:
                         default = None
                     else:
-                        if field.default != dataclasses.MISSING:
-                            default = field.default
+                        if field.default != dataclasses.MISSING:  # type: ignore
+                            default = field.default  # type: ignore
                             required = False
-                        elif field.default_factory != dataclasses.MISSING:
-                            default = field.default_factory()
+                        elif field.default_factory != dataclasses.MISSING:  # type: ignore
+                            default = field.default_factory()  # type: ignore
                             required = False
                         else:
                             default = None
@@ -293,7 +293,7 @@ class ActionBase:
                     default = None
             else:
                 required = False
-            if type(default).__name__ in cls.JSON_TYPES:
+            if type(default).__name__ in cls.JSON_TYPES:  # type: ignore
                 param['default'] = default
             try:
                 hint_obj = sys.modules[cls.__module__].__dict__[cls.__annotations__[attr]]
