@@ -22,6 +22,7 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     ClassVar,
     Dict,
     List,
@@ -31,7 +32,9 @@ from typing import (
     Optional,
     TextIO,
     Tuple,
+    Type,
     TypedDict,
+    TypeVar,
     Union,
     cast,
 )
@@ -1289,6 +1292,9 @@ class CharmEvents(ObjectEvents):
     """
 
 
+_ConfigType = TypeVar('_ConfigType')
+
+
 class CharmBase(Object):
     """Base class that represents the charm overall.
 
@@ -1384,6 +1390,72 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
+    def load_config(
+        self,
+        cls: Type[_ConfigType],
+        *args: Any,
+        convert_name: Optional[Callable[[str], str]] = None,
+        **kwargs: Any,
+    ) -> _ConfigType:
+        """Load the config into an instance of a config class.
+
+        The object will be instantiated with keyword arguments of all the raw
+        Juju config, but with:
+
+        * `secret` type options having a :class:`model.Secret` value rather than
+          the secret ID.
+        * dashes in names converted to underscores, unless a custom conversion
+          function is provided.
+
+        Any additional positional or keyword arguments will be passed through to
+        the config class.
+
+        Args:
+            cls: A class that inherits from :class:`ops.ConfigBase`.
+            convert_name: An optional function that takes a string option name
+                as found in the YAML config, and returns the name of the
+                attribute, which must be a valid Python identifier.
+            args: positional arguments to pass through to the config class.
+            kwargs: keyword arguments to pass through to the config class.
+
+        Returns:
+            An instance of the config class with the current config values.
+        """
+        from ._main import _Abort  # Avoid circular import.
+        # We exit with a 'success' code because we don't want Juju to retry
+        # the hook - we need the Juju user to fix the config first, at
+        # which point the error will no longer be raised.
+
+        # Convert secret IDs to secret objects.
+        config: Dict[str, Union[bool, int, float, str, model.Secret]] = kwargs.copy()
+        for key, value in self.config.items():
+            if convert_name:
+                attr = convert_name(key)
+                if not attr.isidentifier():
+                    logger.error('Invalid attribute name %r from %s', attr, key)
+                    self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
+                    raise _Abort(0)
+            else:
+                attr = key.replace('-', '_')
+            option_type = self.meta.config.get(key)
+            if option_type and option_type.type == 'secret' and isinstance(value, str):
+                try:
+                    config[attr] = self.model.get_secret(id=value)
+                except model.SecretNotFoundError:
+                    logger.error('secret referenced in option {key} not found')
+                    self.unit.status = model.BlockedStatus(
+                        f"{key} option refers to a secret that doesn't exist or is not accessible"
+                    )
+                    raise _Abort(0) from None
+            else:
+                config[attr] = value
+        try:
+            return cls(*args, **config)
+        except ValueError as e:
+            logger.error('Invalid configuration for %s: %r (%s)', cls.__name__, config, e)
+            self.unit.status = model.BlockedStatus(f'Error in config: {e}')
+            raise _Abort(0) from None
+
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
@@ -1405,13 +1477,15 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from ``metadata.yaml`` and ``actions.yaml``. Generally
-    charms will define this information, rather than reading it at runtime. This
-    class is mostly for the framework to understand what the charm has defined.
+    This is read from ``metadata.yaml``, ``config.yaml``, and ``actions.yaml``.
+    Generally charms will define this information, rather than reading it at
+    runtime. This class is mostly for the framework to understand what the charm
+    has defined.
 
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
+        config_raw: a mapping containing the contents of config.yaml
     """
 
     name: str
@@ -1497,11 +1571,18 @@ class CharmMeta:
     actions: Dict[str, 'ActionMeta']
     """Actions the charm has defined."""
 
+    config: Dict[str, 'ConfigMeta']
+    """Config options the charm has defined."""
+
     def __init__(
-        self, raw: Optional[Dict[str, Any]] = None, actions_raw: Optional[Dict[str, Any]] = None
+        self,
+        raw: Optional[Dict[str, Any]] = None,
+        actions_raw: Optional[Dict[str, Any]] = None,
+        config_raw: Optional[Dict[str, Any]] = None,
     ):
         raw_: Dict[str, Any] = raw or {}
         actions_raw_: Dict[str, Any] = actions_raw or {}
+        config_raw_: Dict[str, Any] = config_raw or {}
 
         # When running in production, this data is generally loaded from
         # metadata.yaml. However, when running tests, this data is
@@ -1563,6 +1644,10 @@ class CharmMeta:
         }
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
+        self.config = {
+            name: ConfigMeta(name, config)
+            for name, config in config_raw_.get('options', {}).items()
+        }
         self.containers = {
             name: ContainerMeta(name, container)
             for name, container in raw_.get('containers', {}).items()
@@ -1578,13 +1663,18 @@ class CharmMeta:
             meta = yaml.safe_load(f.read())
 
         actions = None
-
         actions_path = _charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
                 actions = yaml.safe_load(f.read())
 
-        return CharmMeta(meta, actions)
+        options = None
+        config_path = _charm_root / 'config.yaml'
+        if config_path.exists():
+            with config_path.open() as f:
+                options = yaml.safe_load(f.read())
+
+        return CharmMeta(meta, actions, options)
 
     def _load_links(self, raw: Dict[str, Any]):
         websites = raw.get('website', [])
@@ -1617,7 +1707,10 @@ class CharmMeta:
 
     @classmethod
     def from_yaml(
-        cls, metadata: Union[str, TextIO], actions: Optional[Union[str, TextIO]] = None
+        cls,
+        metadata: Union[str, TextIO],
+        actions: Optional[Union[str, TextIO]] = None,
+        config: Optional[Union[str, TextIO]] = None,
     ) -> 'CharmMeta':
         """Instantiate a :class:`CharmMeta` from a YAML description of ``metadata.yaml``.
 
@@ -1625,6 +1718,7 @@ class CharmMeta:
             metadata: A YAML description of charm metadata (name, relations, etc.)
                 This can be a simple string, or a file-like object (passed to ``yaml.safe_load``).
             actions: YAML description of Actions for this charm (e.g., actions.yaml)
+            config: YAML description of Config for this charm (e.g., config.yaml)
         """
         meta = yaml.safe_load(metadata)
         raw_actions = {}
@@ -1632,7 +1726,12 @@ class CharmMeta:
             raw_actions = cast(Optional[Dict[str, Any]], yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
-        return cls(meta, raw_actions)
+        raw_config = {}
+        if config is not None:
+            raw_config = cast(Optional[Dict[str, Any]], yaml.safe_load(config))
+            if raw_config is None:
+                raw_config = {}
+        return cls(meta, raw_actions, raw_config)
 
 
 class RelationRole(enum.Enum):
@@ -1877,6 +1976,29 @@ class ActionMeta:
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
         self.additional_properties = raw.get('additionalProperties', True)
+
+
+class ConfigMeta:
+    """Object containing metadata about a config option."""
+
+    name: str
+    """Name of the config option."""
+
+    type: Literal['string', 'int', 'float', 'boolean', 'secret']
+    """Type of the config option."""
+
+    default: Any
+    """Default value of the config option."""
+
+    description: str
+    """Description of the config option."""
+
+    def __init__(self, name: str, raw: Optional[Dict[str, Any]] = None):
+        raw = raw or {}
+        self.name = name
+        self.type = raw['type']
+        self.default = raw.get('default')
+        self.description = raw.get('description', '')
 
 
 @dataclasses.dataclass(frozen=True)

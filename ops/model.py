@@ -3929,7 +3929,7 @@ class _ModelBackendValidator:
         if not value:
             raise ModelError(f'metric label {label} has an empty value, which is not allowed')
         v = str(value)
-        if re.search('[,=]', v) is not None:
+        if re.search(r'[,=]', v) is not None:
             raise ModelError(f'metric label values must not contain "," or "=": {label}={value!r}')
 
 

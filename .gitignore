@@ -11,6 +11,7 @@ coverage.xml
 .coverage.data
 /.tox
 .*.swp
+/src
 
 # Tokens and settings for `act` to run GHA locally
 .env

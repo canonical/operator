@@ -2072,7 +2072,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'connection error!', caplog.text)
+        assert r'connection error!' in caplog.text
 
     def test_can_connect_file_not_found_error(
         self,
@@ -2086,7 +2086,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'file not found!', caplog.text)
+        assert r'file not found!' in caplog.text
 
     def test_can_connect_api_error(
         self,
@@ -2100,7 +2100,7 @@ containers:
         with caplog.at_level(level='WARNING', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'api error!', caplog.text)
+        assert r'api error!' in caplog.text
 
     def test_exec(self, container: ops.Container, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(container, '_juju_version', JujuVersion('3.1.6'))
