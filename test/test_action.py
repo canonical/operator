@@ -429,6 +429,7 @@ def test_action_yaml_additional_properties():
 def test_action_subclass_modification():
     class ActionMinimum(ops.ActionBase):
         """An action."""
+
         x: int = 42
 
         @classmethod
@@ -442,7 +443,7 @@ def test_action_subclass_modification():
         'action-minimum': {
             'description': 'An action.',
             'additionalProperties': False,
-            'params': {'x': {'type': 'integer', 'default': 42, 'minimum': 0}}
+            'params': {'x': {'type': 'integer', 'default': 42, 'minimum': 0}},
         },
     }
     assert generated_yaml == expected_yaml

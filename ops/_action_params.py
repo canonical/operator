@@ -66,59 +66,59 @@ class _AttributeDocstringExtractor(ast.NodeVisitor):
 class ActionBase:
     """Base class for strongly typed charm actions.
 
-        Use :class:`ActionBase` as a base class for your actions, and define the
-        attributes as you would in ``charmcraft.yaml``. For example::
+    Use :class:`ActionBase` as a base class for your actions, and define the
+    attributes as you would in ``charmcraft.yaml``. For example::
 
-            class Compression(enum.Enum):
-                GZ = 'gzip'
-                BZ = 'bzip2'
+        class Compression(enum.Enum):
+            GZ = 'gzip'
+            BZ = 'bzip2'
 
-            @dataclasses.dataclass(frozen=True)
-            class RunBackup(ops.ActionBase):
-                '''Backup the database.'''
+        @dataclasses.dataclass(frozen=True)
+        class RunBackup(ops.ActionBase):
+            '''Backup the database.'''
 
-                filename: str
-                '''The name of the backup file.'''
+            filename: str
+            '''The name of the backup file.'''
 
-                compression: Compression = Compression.GZ
-                '''The type of compression to use.'''
+            compression: Compression = Compression.GZ
+            '''The type of compression to use.'''
 
-            @dataclasses.dataclass(frozen=True)
-            class AddAdminUser(ops.ActionBase):
-                '''Add a new admin user and return their credentials.'''
+        @dataclasses.dataclass(frozen=True)
+        class AddAdminUser(ops.ActionBase):
+            '''Add a new admin user and return their credentials.'''
 
-                username: str
+            username: str
 
-        ```{note}
-        These are dataclasses, but can be any objects that inherit from
-        ``ops.ActionBase``, and can be initialised with the raw Juju action params
-        passed as keyword arguments. Any errors should be indicated by raising
-        ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
+    ```{note}
+    These are dataclasses, but can be any objects that inherit from
+    ``ops.ActionBase``, and can be initialised with the raw Juju action params
+    passed as keyword arguments. Any errors should be indicated by raising
+    ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
 
-        Inheriting from ``ops.ActionBase`` is not strictly necessary, but it
-        provides utility methods for translating the class to a YAML schema suitable
-        for use with Juju.
-        ```
+    Inheriting from ``ops.ActionBase`` is not strictly necessary, but it
+    provides utility methods for translating the class to a YAML schema suitable
+    for use with Juju.
+    ```
 
-        Use this in your charm class like so::
+    Use this in your charm class like so::
 
-            class MyCharm(ops.CharmBase):
-                def __init__(self, framework):
-                    super().__init__(framework)
-                    framework.observe(self.on['run-backup'].action, self._on_run_backup)
-                    framework.observe(self.on['add-admin-user'].action, self._on_add_admin_user)
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework):
+                super().__init__(framework)
+                framework.observe(self.on['run-backup'].action, self._on_run_backup)
+                framework.observe(self.on['add-admin-user'].action, self._on_add_admin_user)
 
-                def _on_run_backup(self, event: ops.ActionEvent):
-                    params = event.load_params(RunBackup)
-                    ...
+            def _on_run_backup(self, event: ops.ActionEvent):
+                params = event.load_params(RunBackup)
+                ...
 
-                def _on_add_admin_user(self, event: ops.ActionEvent):
-                    params = event.load_params(AddAdminUser)
-                    ...
+            def _on_add_admin_user(self, event: ops.ActionEvent):
+                params = event.load_params(AddAdminUser)
+                ...
 
-        If the params provided by Juju are not valid, the action will fail and exit
-        the hook when the class is initialised, using the ``str()`` of the exception
-        raised as the failure message.
+    If the params provided by Juju are not valid, the action will fail and exit
+    the hook when the class is initialised, using the ``str()`` of the exception
+    raised as the failure message.
     """
 
     _additional_properties: bool = False
