@@ -7,7 +7,7 @@ This document shows how to write integration tests for a charm.
 
 ```{important}
 
-Integration testing is only one part of a comprehensive testing strategy. See {ref}`How to test a charm <write-unit-tests-for-a-charm>` for unit testing and {ref}`How to write a functional test <write-scenario-tests-for-a-charm>`  for functional tests.
+Integration testing is only one part of a comprehensive testing strategy. Also see {ref}`write-unit-tests-for-a-charm`.
 
 ```
 
@@ -53,7 +53,44 @@ import pytest
 from pytest_operator.plugin import OpsTest
 ```
 
-The `ops_test` fixture is your entry point to the `pytest-operator` library, and the preferred way of interacting with Juju in integration tests. This fixture will create a model for each test file -- if you write two tests that should not share a model, make sure to place them in different files.
+The `ops_test` fixture is your entry point to the `pytest-operator` library, and the preferred way of interacting with Juju in integration tests. The fixture will create a model for each test file -- if you write two tests that should not share a model, make sure to place them in different files. The fixture is a module-scoped context which, on entry, adds to Juju a randomly-named new model and destroys it on exit. All tests in that module, and all interactions with the `ops_test` object, will take place against that model. Once you have used `ops_test` to get a model in which to run your integration tests, most of the remaining integration test code will interact with Juju via the `python-libjuju` package.  
+
+```{note}
+
+*Pro tip*: you can prevent `ops_test` from tearing down the model on exit by passing the `--keep-models` argument. This is useful when the tests fail and the logs don't provide a sufficient post-mortem and a real live autopsy is required.
+
+```
+
+Below is an example of a typical integration test:
+
+```python
+async def test_operation(ops_test: OpsTest):
+    # Tweak the config:
+    app: Application = ops_test.model.applications.get("tester")
+    await app.set_config({"my-key": "my-value"})
+    
+    # Add another charm and integrate them:
+    await ops_test.model.deploy('other-app')
+    await ops_test.model.relate('tester:endpoint1', 'other-charm:endpoint2')
+    
+    # Scale it up:
+    await app.add_unit(2)
+    
+    # Remove another app:
+    await ops_test.model.remove_application('yet-another-app')
+    
+    # Run an action on a unit:
+    unit: Unit = app.units[1]
+    action = await unit.run('my-action')
+    assert action.results == <foo>
+    
+    # What this means depends on the workload:
+    assert charm_operates_correctly()  
+```
+
+`python-libjuju` has, of course, an API for all inverse operations: remove an app, scale it down, remove a relation...
+
+A good integration testing suite will check that the charm continues to operate as expected whenever possible, by combining these simple elements.
 
 ## Build your tests
 
@@ -129,7 +166,6 @@ For `oci-images` you can reference an image registry.
 > - [`pytest-operator` |  `download_resources`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1101)
 > - [`python-libjuju` | `model.deploy`](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/model.py#L1658)
 
-
 ### Test a relation
 
 To test a relation between two applications, integrate them through
@@ -168,8 +204,6 @@ async def test_config_changed(ops_test: OpsTest):
 > See also: https://discourse.charmhub.io/t/how-to-add-a-configuration-option-to-a-charm/4458
 >
 > See also: [python-libjuju | application.set_config](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/application.py#L591)
-
-
 
 ### Test an action
 
@@ -289,7 +323,6 @@ It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle
 
 ```
 
-
 ### Render bundles and charms
 
 `pytest-operator` has utilities to template your charms and bundles using Jinja2.
@@ -319,8 +352,6 @@ async def test_build_and_deploy_bundle(ops_test: OpsTest):
 
 
 > Example implementations: [`hardware-observer-operator`](https://github.com/canonical/hardware-observer-operator/blob/47a79eb2872f6222099e7f48b8daafe8d20aa946/tests/functional/test_charm.py#L57)
-
-
 
 ### Speed up `update_status`  with `fast_forward`
 

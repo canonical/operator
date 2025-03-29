@@ -1318,7 +1318,7 @@ class Secret:
             fields.append(f'id={self._id!r}')
         if self._label is not None:
             fields.append(f'label={self._label!r}')
-        return f"<Secret {' '.join(fields)}>"
+        return f'<Secret {" ".join(fields)}>'
 
     @staticmethod
     def _canonicalize_id(id: str, model_uuid: Optional[str]) -> str:
@@ -1665,6 +1665,14 @@ class Secret:
         self._backend.secret_remove(typing.cast(str, self.id))
 
 
+@dataclasses.dataclass(frozen=True)
+class RemoteModel:
+    """Information about the model on the remote side of a relation."""
+
+    uuid: str
+    """The remote model's UUID."""
+
+
 class Relation:
     """Represents an established relation between this application and another application.
 
@@ -1718,6 +1726,7 @@ class Relation:
         self.id = relation_id
         self.units: Set[Unit] = set()
         self.active = active
+        self._backend = backend
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1744,8 +1753,25 @@ class Relation:
         self.app = typing.cast(Application, app)
         self.data = RelationData(self, our_unit, backend)
 
+        self._remote_model: Optional[RemoteModel] = None
+
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
+
+    @property
+    def remote_model(self) -> RemoteModel:
+        """Information about the model on the remote side of this relation.
+
+        .. jujuadded:: 3.6.2
+
+        Raises:
+            ModelError: if on a version of Juju that doesn't support the
+                "relation-model-get" hook tool.
+        """
+        if self._remote_model is None:
+            d = self._backend.relation_model_get(self.id)
+            self._remote_model = RemoteModel(uuid=d['uuid'])
+        return self._remote_model
 
 
 class RelationData(Mapping[Union['Unit', 'Application'], 'RelationDataContent']):
@@ -1866,12 +1892,17 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
         return True
 
-    def _validate_write(self, key: str, value: str):
-        """Validate writing key:value to this databag.
+    def _validate_write(self, data: Mapping[str, str]) -> None:
+        """Validate writing key:value pairs to this databag.
 
         1) that key: value is a valid str:str pair
         2) that we have write access to this databag
         """
+        for key, value in data.items():
+            self._validate_write_content(key, value)
+        self._validate_write_access()
+
+    def _validate_write_content(self, key: str, value: str) -> None:
         # firstly, we validate WHAT we're trying to write.
         # this is independent of whether we're in testing code or production.
         if not isinstance(key, str):
@@ -1879,6 +1910,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         if not isinstance(value, str):
             raise RelationDataTypeError(f'relation data values must be strings, not {type(value)}')
 
+    def _validate_write_access(self) -> None:
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -1909,17 +1941,19 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 )
 
     def __setitem__(self, key: str, value: str):
-        self._validate_write(key, value)
-        self._commit(key, value)
-        self._update(key, value)
+        self.update({key: value})
 
-    def _commit(self, key: str, value: str):
-        self._backend.update_relation_data(self.relation.id, self._entity, key, value)
+    def _commit(self, data: Mapping[str, str]) -> None:
+        self._backend.update_relation_data(
+            relation_id=self.relation.id, entity=self._entity, data=data
+        )
 
-    def _update(self, key: str, value: str):
+    def _update_cache(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
         # Don't load data unnecessarily if we're only updating.
-        if self._lazy_data is not None:
+        if self._lazy_data is None:
+            return
+        for key, value in data.items():
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.
@@ -1931,12 +1965,31 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._validate_read()
         return super().__getitem__(key)
 
-    def update(self, other: typing.Any = (), /, **kwargs: str):
-        """Update the data from dict/iterable other and the kwargs."""
-        super().update(other, **kwargs)
+    def update(
+        self, data: Union[Mapping[str, str], Iterable[Tuple[str, str]]] = (), /, **kwargs: str
+    ) -> None:
+        """Efficiently write multiple keys and values to the databag.
+
+        Has the same ultimate result as this, but uses a single relation-set call::
+
+            for k, v in dict(data).items():
+                self[k] = v
+            for k, v in kwargs.items():
+                self[k] = v
+        """
+        data = dict(data, **kwargs)
+        changes = {
+            key: val
+            for key, val in data.items()
+            if (key not in self and val != '') or (key in self and val != self[key])
+        }
+        self._validate_write(changes)  # always check permissions
+        if not changes:  # return early if there are no changes required
+            return
+        self._commit(changes)
+        self._update_cache(changes)
 
     def __delitem__(self, key: str):
-        self._validate_write(key, '')
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
@@ -2224,7 +2277,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
         """
         if storage_name not in self._storage_map:
             raise ModelError(
-                f'cannot add storage {storage_name!r}:' ' it is not present in the charm metadata'
+                f'cannot add storage {storage_name!r}: it is not present in the charm metadata'
             )
         self._backend.storage_add(storage_name, count)
 
@@ -3437,7 +3490,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool) -> None:
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+        if not data:
+            raise ValueError('at least one key:value pair is required for relation-set')
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
@@ -3453,8 +3508,18 @@ class _ModelBackend:
         args.extend(['--file', '-'])
 
         try:
-            content = yaml.safe_dump({key: value})
+            content = yaml.safe_dump(data)
             self._run(*args, input_stream=content)
+        except ModelError as e:
+            if self._is_relation_not_found(e):
+                raise RelationNotFoundError() from e
+            raise
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        args = ['relation-model-get', '-r', str(relation_id)]
+        try:
+            result = self._run(*args, return_output=True, use_json=True)
+            return typing.cast(Dict[str, Any], result)
         except ModelError as e:
             if self._is_relation_not_found(e):
                 raise RelationNotFoundError() from e
@@ -3698,9 +3763,11 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self, relation_id: int, _entity: Union['Unit', 'Application'], key: str, value: str
+        self, relation_id: int, entity: Union['Unit', 'Application'], data: Mapping[str, str]
     ):
-        self.relation_set(relation_id, key, value, isinstance(_entity, Application))
+        self.relation_set(
+            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
+        )
 
     def secret_get(
         self,
@@ -3913,12 +3980,12 @@ class _ModelBackendValidator:
     def format_metric_value(cls, value: Union[int, float]):
         if not isinstance(value, (int, float)):
             raise ModelError(
-                f'invalid metric value {value!r} provided:' ' must be a positive finite float'
+                f'invalid metric value {value!r} provided: must be a positive finite float'
             )
 
         if math.isnan(value) or math.isinf(value) or value < 0:
             raise ModelError(
-                f'invalid metric value {value!r} provided:' ' must be a positive finite float'
+                f'invalid metric value {value!r} provided: must be a positive finite float'
             )
         return str(value)
 

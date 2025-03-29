@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: check-added-large-files
       - id: check-ast
@@ -18,7 +18,7 @@ repos:
       - id: detect-private-key
   # Run the Ruff linter.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.5
+    rev: v0.11.2
     hooks:
       - id: ruff
         args: [ --preview ]
@@ -26,7 +26,7 @@ repos:
         args: [ --preview ]
   # Spellcheck the code.
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.4
+    rev: v2.4.1
     hooks:
     - id: codespell
       additional_dependencies:

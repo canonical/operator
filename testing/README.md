@@ -1,11 +1,6 @@
 # Scenario
 
-[![Build](https://github.com/canonical/ops-scenario/actions/workflows/build_wheels.yaml/badge.svg)](https://github.com/canonical/ops-scenario/actions/workflows/build_wheels.yaml)
-[![QC](https://github.com/canonical/ops-scenario/actions/workflows/quality_checks.yaml/badge.svg?event=pull_request)](https://github.com/canonical/ops-scenario/actions/workflows/quality_checks.yaml?event=pull_request)
-[![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
-[![foo](https://img.shields.io/badge/everything-charming-blueviolet)](https://github.com/PietroPasotti/jhack)
-[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://discourse.charmhub.io/t/rethinking-charm-testing-with-ops-scenario/8649)
-[![Python >= 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[**Read the online documentation.**](https://ops.readthedocs.io/en/latest/reference/ops-testing.html)
 
 Scenario is a state-transition testing SDK for Operator Framework charms.
 
@@ -649,9 +644,20 @@ check doesn't have to match the event being generated: by the time that Juju
 sends a pebble-check-failed event the check might have started passing again.
 
 ```python
+from ops import pebble
+
 ctx = scenario.Context(MyCharm, meta={"name": "foo", "containers": {"my_container": {}}})
-check_info = scenario.CheckInfo("http-check", failures=7, status=ops.pebble.CheckStatus.DOWN)
-container = scenario.Container("my_container", check_infos={check_info})
+layer = pebble.Layer({
+    "checks": {"http-check": {"override": "replace", "startup": "enabled", "failures": 7}},
+})
+check_info = scenario.CheckInfo(
+    "http-check",
+    status=pebble.CheckStatus.UP,
+    level=layer.checks["http-check"].level,
+    startup=layer.checks["http-check"].startup,
+    threshold=layer.checks["http-check"].threshold,
+)
+container = scenario.Container("my_container", check_infos={check_info}, layers={"layer1": layer})
 state = scenario.State(containers={container})
 ctx.run(ctx.on.pebble_check_failed(info=check_info, container=container), state=state)
 ```

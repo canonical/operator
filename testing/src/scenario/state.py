@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -619,6 +618,9 @@ class Relation(RelationBase):
     )
     """The current content of the databag for each unit in the relation."""
 
+    remote_model_uuid: str | None = None
+    """The remote model's UUID; uses the main model's UUID if not specified."""
+
     def __hash__(self) -> int:
         return hash(self.id)
 
@@ -796,7 +798,7 @@ class Exec(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Mount(_max_posargs(0)):
-    """Maps local files to a :class:`Container` filesystem."""
+    """Maps a local path to a :class:`Container` filesystem."""
 
     location: str | pathlib.PurePosixPath
     """The location inside of the container."""
@@ -969,42 +971,39 @@ class Container(_max_posargs(1)):
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
     layers: Mapping[str, pebble.Layer] = dataclasses.field(default_factory=dict)
-    """All :class:`ops.pebble.Layer` definitions that have already been added to the container."""
+    """All :class:`ops.pebble.Layer` definitions that have already been added to the container.
+
+    Note that the layers should be added to the dictionary in the order in which they would have
+    been added to Pebble. For layers loaded on Pebble start from the filesystem, this means adding
+    them to the dictionary in alphabetical order by filename. For layers loaded via the Pebble API,
+    this means adding them in the order of the API calls.
+    """
 
     service_statuses: Mapping[str, pebble.ServiceStatus] = dataclasses.field(
         default_factory=dict,
     )
     """The current status of each Pebble service running in the container."""
 
-    # this is how you specify the contents of the filesystem: suppose you want to express that your
-    # container has:
-    # - /home/foo/bar.py
-    # - /bin/bash
-    # - /bin/baz
-    #
-    # this becomes:
-    # mounts = {
-    #     'foo': Mount(location='/home/foo/', source=Path('/path/to/local/dir/containing/bar/py/'))
-    #     'bin': Mount(location='/bin/', source=Path('/path/to/local/dir/containing/bash/and/baz/'))
-    # }
-    # when the charm runs `pebble.pull`, it will return .open() from one of those paths.
-    # when the charm pushes, it will either overwrite one of those paths (careful!) or it will
-    # create a tempfile and insert its path in the mock filesystem tree
     mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
 
-    * ``/home/foo/bar.py``
-    * ``/bin/bash``
-    * ``/bin/baz``
+    * A file ``/home/foo.py``
+    * A directory ``/bin``
 
-    this becomes::
+    This becomes::
 
         mounts = {
-            'foo': Mount('/home/foo', pathlib.Path('/path/to/local/dir/containing/bar/py/')),
-            'bin': Mount('/bin/', pathlib.Path('/path/to/local/dir/containing/bash/and/baz/')),
+            'foo': Mount(location='/home/foo.py', source=pathlib.Path('/path/to/local/foo.py')),
+            'bin': Mount(location='/bin', source=pathlib.Path('/path/to/local/bin')),
         }
+
+    When your charm runs, the simulated container filesystem will have symlinks to
+    ``/path/to/local/foo.py`` and ``/path/to/local/bin`` at the specified locations.
+
+    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files to the
+    container filesystem, make sure to specify source files/directories that can be safely modified.
     """
 
     execs: Iterable[Exec] = frozenset()
@@ -1044,13 +1043,34 @@ class Container(_max_posargs(1)):
         _deepcopy_mutable_fields(self)
 
     def _render_services(self):
-        # copied over from ops.testing._TestingPebbleClient._render_services()
         services: dict[str, pebble.Service] = {}
-        for key in sorted(self.layers.keys()):
-            layer = self.layers[key]
+        for layer in self.layers.values():
             for name, service in layer.services.items():
-                services[name] = service
+                if name in services and service.override == "merge":
+                    services[name]._merge(service)
+                else:
+                    services[name] = service
         return services
+
+    def _render_checks(self) -> Dict[str, pebble.Check]:
+        checks: Dict[str, pebble.Check] = {}
+        for layer in self.layers.values():
+            for name, check in layer.checks.items():
+                if name in checks and check.override == "merge":
+                    checks[name]._merge(check)
+                else:
+                    checks[name] = check
+        return checks
+
+    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
+        log_targets: Dict[str, pebble.LogTarget] = {}
+        for layer in self.layers.values():
+            for name, log_target in layer.log_targets.items():
+                if name in log_targets and log_target.override == "merge":
+                    log_targets[name]._merge(log_target)
+                else:
+                    log_targets[name] = log_target
+        return log_targets
 
     @property
     def plan(self) -> pebble.Plan:
@@ -1064,11 +1084,14 @@ class Container(_max_posargs(1)):
         # copied over from ops.testing._TestingPebbleClient.get_plan().
         plan = pebble.Plan(yaml.safe_dump(self._base_plan))
         services = self._render_services()
-        if not services:
-            return plan
+        checks = self._render_checks()
+        log_targets = self._render_log_targets()
         for name in sorted(services.keys()):
             plan.services[name] = services[name]
-        # TODO: This should presumably also have checks and log targets.
+        for name in sorted(checks.keys()):
+            plan.checks[name] = checks[name]
+        for name in sorted(log_targets.keys()):
+            plan.log_targets[name] = log_targets[name]
         return plan
 
     @property
@@ -1162,6 +1185,10 @@ class _EntityStatus:
     def from_ops(cls, obj: StatusBase) -> _EntityStatus:
         """Convert from the ops.StatusBase object to the matching _EntityStatus object."""
         return cls.from_status_name(obj.name, obj.message)
+
+    def _to_ops(self) -> StatusBase:
+        """Convert this object to an ops.StatusBase object."""
+        return StatusBase.from_name(self.name, message=self.message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
@@ -1303,6 +1330,9 @@ class Port(_max_posargs(1)):
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
         return False
+
+    def _to_ops(self) -> ops.Port:
+        return ops.Port(port=self.port, protocol=self.protocol)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1884,16 +1914,16 @@ class _EventPath(str):
 
 @dataclasses.dataclass(frozen=True)
 class _Event:  # type: ignore
-    """A Juju, ops, or custom event that can be run against a charm.
-
-    Typically, for simple events, the string name (e.g. ``install``) can be used,
-    and for more complex events, an ``event`` property will be available on the
-    related object (e.g. ``relation.joined_event``).
-    """
+    """A Juju, ops, or custom event that can be run against a charm."""
 
     path: str
-    args: tuple[Any, ...] = ()
-    kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
+    """The name of the event.
+
+    For example: ``start``, ``config_changed``, ``my_relation_joined``, or
+    ``custom.MyConsumer.lib_changed``.
+
+    This is converted to an _EventPath object on instantiation.
+    """
 
     storage: Storage | None = None
     """If this is a storage event, the storage it refers to."""
@@ -1919,6 +1949,19 @@ class _Event:  # type: ignore
 
     action: _Action | None = None
     """If this is an action event, the :class:`Action` it refers to."""
+
+    custom_event: ops.BoundEvent | None = None
+    """If this is a custom event, the bound event it refers to.
+
+    The charm object *must* have an attribute that is an instance of the same
+    emitter type.
+    """
+
+    custom_event_args: Iterable[Any] = dataclasses.field(default_factory=tuple)
+    """If this is a custom event, the arguments to pass to the event."""
+
+    custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    """If this is a custom event, the keyword arguments to pass to the event."""
 
     _owner_path: list[str] = dataclasses.field(default_factory=list)
 
@@ -1977,6 +2020,11 @@ class _Event:  # type: ignore
     def _is_workload_event(self) -> bool:
         """Whether the event name indicates that this is a workload event."""
         return self._path.type is _EventType.WORKLOAD
+
+    @property
+    def _is_custom_event(self) -> bool:
+        """Whether the event name indicates that this is a custom event."""
+        return self.custom_event is not None
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.

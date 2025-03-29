@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -58,7 +57,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = scenario_logger.getChild("runtime")
 
-_DEFAULT_JUJU_VERSION = "3.5"
+_DEFAULT_JUJU_VERSION = "3.6.4"
 
 
 class Manager(Generic[CharmType]):
@@ -364,6 +363,51 @@ class CharmEvents:
         if id:
             kwargs["id"] = id
         return _Event(f"{name}_action", action=_Action(name, **kwargs))
+
+    @staticmethod
+    def custom(
+        event: ops.BoundEvent,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Event triggered by a charm library.
+
+        For example, suppose that a library uses a ``DatabaseRequirer`` object
+        to emit a ``DatabaseReadyEvent`` event, with charm code::
+
+            class MyCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    self.db = DatabaseRequirer(self, 'db-relation')
+                    framework.observe(self.db.on.ready, self._on_db_ready)
+
+        To emit a ``DatabaseReadyEvent`` event::
+
+            ctx.run(ctx.on.custom(
+                DatabaseRequirer.on.ready, 1, 2, foo='bar'
+            ), state)
+
+        Custom events do not have access to the Juju context of the originating
+        hook event.
+
+        If the custom event takes more arguments than an :attr:`ops.Handle`,
+        pass these as additional arguments to ``custom()``. Any of these
+        arguments that are State components (such as
+        :attr:`ops.testing.Relation`) will be converted to their ops
+        counterparts (such as :attr:`ops.Relation`).
+        """
+        if issubclass(event.event_type, ops.HookEvent):
+            raise ValueError(
+                "custom events should subclass EventBase directly - testing events that inherit "
+                "from a Juju hook event must be done by running the underlying Juju event, for "
+                "example: ctx.run(ctx.on.relation_changed(relation), state)"
+            )
+        return _Event(
+            f"{{custom}}.{type(event.emitter).__name__}.{event.event_kind}",
+            custom_event=event,
+            custom_event_args=args,
+            custom_event_kwargs=kwargs,
+        )
 
 
 class Context(Generic[CharmType]):

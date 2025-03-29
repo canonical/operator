@@ -108,7 +108,7 @@
 * Change ops.main() so that you don't need to `type: ignore` it (#1345)
 * Expand the secret ID out to the full URI when only given the ID (#1358)
 * Add a JujuVersion property for Pebble log forwarding to Loki (#1370)
-* Pre-emptively raise `InvalidStatusError` instead of waiting for Juju:
+* Preemptively raise `InvalidStatusError` instead of waiting for Juju:
     * Make it an error to call `CollectStatusEvent.add_status` with error or unknown (#1386)
     * Document and validate settable status values in `_ModelBackend.set_status` (#1354)
 

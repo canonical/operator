@@ -1015,7 +1015,7 @@ class SecretRemoveEvent(SecretEvent):
     inform the secret owner that the old revision can be removed.
 
     After any required cleanup, the charm should call
-    :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>` to
+    :meth:`event.remove_revision() <ops.SecretRemoveEvent.remove_revision>` to
     remove the now-unused revision. If the charm does not, then the event will
     be emitted again, when further revisions are ready for removal.
 
@@ -1030,6 +1030,14 @@ class SecretRemoveEvent(SecretEvent):
     def revision(self) -> int:
         """The secret revision this event refers to."""
         return self._revision
+
+    def remove_revision(self):
+        """Remove the revision this event refers to.
+
+        Call this method after any required cleanup to inform Juju that the
+        secret revision can be removed.
+        """
+        self.secret.remove_revision(self._revision)
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -1054,7 +1062,8 @@ class SecretExpiredEvent(SecretEvent):
 
     This event is fired on the secret owner to inform it that the secret revision
     must be removed. The event will keep firing until the owner removes the
-    revision by calling :meth:`event.secret.remove_revision() <ops.Secret.remove_revision>`.
+    revision by calling :meth:`event.remove_revision()
+    <ops.SecretExpiredEvent.remove_revision>`.
 
     .. jujuadded:: 3.0
     """
@@ -1067,6 +1076,14 @@ class SecretExpiredEvent(SecretEvent):
     def revision(self) -> int:
         """The secret revision this event refers to."""
         return self._revision
+
+    def remove_revision(self):
+        """Remove the revision this event refers to.
+
+        Call this method after any required cleanup to inform Juju that the
+        secret revision can be removed.
+        """
+        self.secret.remove_revision(self._revision)
 
     def snapshot(self) -> Dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -1644,8 +1661,22 @@ class CharmMeta:
         }
         self.extra_bindings = raw_.get('extra-bindings', {})
         self.actions = {name: ActionMeta(name, action) for name, action in actions_raw_.items()}
+        # This is predominately for backwards compatibility with Harness. In a
+        # real Juju environment this shouldn't be possible, because charmcraft
+        # validates the config when packing.
+        for name, config in config_raw_.get('options', {}).items():
+            if 'type' not in config:
+                raise RuntimeError(
+                    f'Incorrectly formatted config in YAML, option {name} is '
+                    f'expected to declare a `type`.'
+                )
         self.config = {
-            name: ConfigMeta(name, config)
+            name: ConfigMeta(
+                name,
+                type=config['type'],
+                default=config.get('default'),
+                description=config.get('description'),
+            )
             for name, config in config_raw_.get('options', {}).items()
         }
         self.containers = {
@@ -1793,9 +1824,9 @@ class RelationMeta:
     VALID_SCOPES: ClassVar[List[str]] = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(
-            role, RelationRole
-        ), f'role should be one of {list(RelationRole)!r}, not {role!r}'
+        assert isinstance(role, RelationRole), (
+            f'role should be one of {list(RelationRole)!r}, not {role!r}'
+        )
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
@@ -1999,6 +2030,23 @@ class ConfigMeta:
         self.type = raw['type']
         self.default = raw.get('default')
         self.description = raw.get('description', '')
+
+
+@dataclasses.dataclass(frozen=True)
+class ConfigMeta:
+    """Object containing metadata about a config option."""
+
+    name: str
+    """Name of the config option."""
+
+    type: Literal['boolean', 'int', 'float', 'string', 'secret']
+    """Type of the config option."""
+
+    default: Optional[Union[bool, int, float, str]]
+    """Default value of the config option."""
+
+    description: Optional[str]
+    """Description of the config option."""
 
 
 @dataclasses.dataclass(frozen=True)

@@ -663,12 +663,7 @@ class TaskProgress:
         )
 
     def __repr__(self):
-        return (
-            'TaskProgress('
-            f'label={self.label!r}, '
-            f'done={self.done!r}, '
-            f'total={self.total!r})'
-        )
+        return f'TaskProgress(label={self.label!r}, done={self.done!r}, total={self.total!r})'
 
 
 class TaskID(str):
@@ -875,6 +870,9 @@ class Plan:
         return yaml.safe_dump(self.to_dict())
 
     __str__ = to_yaml
+
+    def __repr__(self):
+        return f'Plan({self.to_dict()!r})'
 
     def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
         if isinstance(other, dict):
@@ -1085,12 +1083,7 @@ class ServiceInfo:
         )
 
     def __repr__(self):
-        return (
-            'ServiceInfo('
-            f'name={self.name!r}, '
-            f'startup={self.startup}, '
-            f'current={self.current})'
-        )
+        return f'ServiceInfo(name={self.name!r}, startup={self.startup}, current={self.current})'
 
 
 class Check:
@@ -1210,6 +1203,9 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            # 'not value' is safe here because a threshold of 0 is valid but
+            # inconsistently applied and not of any actual use, and the other
+            # fields are strings where the empty string means 'not in the layer'.
             if not value or name == 'name':
                 continue
             if name == 'http':
@@ -1218,6 +1214,11 @@ class Check:
                 self._merge_tcp(value)
             elif name == 'exec':
                 self._merge_exec(value)
+            elif name == 'startup' and value == CheckStartup.UNSET:
+                continue
+            # Note that CheckLevel.UNSET has a different meaning to
+            # CheckStartup.UNSET. In the former, it means 'there is no level';
+            # in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
@@ -2593,7 +2594,7 @@ class Client:
             source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')
-        content_type = f"multipart/form-data; boundary=\"{boundary.decode('utf-8')}\""
+        content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
         def generator() -> Generator[bytes, None, None]:
             yield b''.join([

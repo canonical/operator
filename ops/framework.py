@@ -175,7 +175,8 @@ class EventBase:
     """The base class for all events.
 
     Inherit this and override the ``snapshot`` and ``restore`` methods to
-    create a custom event.
+    create a custom event. Custom events should not inherit from any of the ops
+    subclasses of ``EventBase``, such as ``RelationEvent``.
     """
 
     # gets patched in by `Framework.restore()`, if this event is being re-emitted
@@ -810,9 +811,9 @@ class Framework(Object):
 
         method_name = observer.__name__
 
-        assert isinstance(observer.__self__, Object), (
-            "can't register observers " "that aren't `Object`s"
-        )
+        assert isinstance(
+            observer.__self__, Object
+        ), "can't register observers that aren't `Object`s"
         observer_obj = observer.__self__
 
         # Validate that the method has an acceptable call signature.

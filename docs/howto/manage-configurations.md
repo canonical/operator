@@ -61,10 +61,6 @@ def _on_config_changed(self, event):
 https://github.com/canonical/juju-sdk-tutorial-k8s/compare/01_create_minimal_charm...02_make_your_charm_configurable
 -->
 
-## Test the feature
-
-> See first: {ref}`get-started-with-charm-testing`
-
 ### Write unit tests
 
 > See first: {ref}`write-unit-tests-for-a-charm`

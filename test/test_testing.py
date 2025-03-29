@@ -144,6 +144,25 @@ class TestHarness:
         assert harness.get_relation_data(rel_id, 'postgresql') == {}
         assert harness.get_relation_data(rel_id, 'postgresql/0') == {'a': '1', 'b': '2'}
 
+    def test_relation_remote_model(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'remoteapp1', unit_data={'foo': 'bar'})
+        rel = harness.model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert isinstance(remote_model, ops.RemoteModel)
+        assert remote_model
+        assert remote_model.uuid == harness.model.uuid
+
     def test_can_connect_default(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,
@@ -361,7 +380,7 @@ class TestHarness:
         harness.set_leader(False)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
         assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v3'}
-        assert len(harness.charm.observed_events), 1
+        assert len(harness.charm.observed_events) == 1
         assert isinstance(harness.charm.observed_events[0], ops.RelationEvent)
 
     def test_remove_relation(self, request: pytest.FixtureRequest):
@@ -1707,9 +1726,9 @@ class TestHarness:
 
         harness.add_storage('test')
         harness.begin()
-        assert (
-            len(harness.model.storages['test']) == 0
-        ), 'storage should start in detached state and be excluded from storage listing'
+        assert len(harness.model.storages['test']) == 0, (
+            'storage should start in detached state and be excluded from storage listing'
+        )
 
     def test_add_storage_without_metadata_key_fails(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -2264,7 +2283,10 @@ class TestHarness:
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
             ('relation_get', 0, 'test-charm/0', False),
-            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': test_charm_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
 
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -2278,14 +2300,20 @@ class TestHarness:
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
@@ -3781,9 +3809,9 @@ class TestTestingModelBackend:
         assert backend._resource_dir is None
         path = backend.resource_get('image')
         assert backend._resource_dir is not None
-        assert str(path).startswith(
-            str(backend._resource_dir.name)
-        ), f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        assert str(path).startswith(str(backend._resource_dir.name)), (
+            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        )
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -5192,7 +5220,7 @@ class PebbleStorageAPIsTestMixin:
             client.list_files('/not/existing/file/')
         assert excinfo.value.code == 404
         assert excinfo.value.status == 'Not Found'
-        assert excinfo.value.message == 'stat /not/existing/file/: no ' 'such file or directory'
+        assert excinfo.value.message == 'stat /not/existing/file/: no such file or directory'
 
     def test_list_directory_object_itself(
         self,
@@ -7118,6 +7146,178 @@ class TestChecks:
         for info in container.get_checks('chk1').values():
             assert info.status == pebble.CheckStatus.UP
             assert info.change_id, 'Change ID should not be None or the empty string'
+
+    @pytest.mark.parametrize(
+        'combine,new_layer_name',
+        [
+            (False, 'new-layer'),
+            (True, 'base'),
+            # This doesn't have anything to combine with, but for completeness:
+            (True, 'new-layer'),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'new_layer_dict',
+        [
+            {
+                'checks': {
+                    'server-ready': {
+                        'override': 'merge',
+                        'level': 'ready',
+                        'http': {'url': 'http://localhost:5050/version'},
+                    }
+                }
+            },
+            {
+                'checks': {
+                    'server-ready': {
+                        'override': 'merge',
+                        'level': 'alive',
+                        'threshold': 30,
+                        'startup': 'disabled',
+                        'http': {'url': 'http://localhost:5050/version'},
+                    }
+                }
+            },
+        ],
+    )
+    def test_add_layer_merge_check(
+        self,
+        request: pytest.FixtureRequest,
+        new_layer_name: str,
+        combine: bool,
+        new_layer_dict: ops.pebble.LayerDict,
+    ):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on['my-container'].pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, _: ops.PebbleReadyEvent):
+                container = self.unit.get_container('my-container')
+                container.add_layer(
+                    new_layer_name, ops.pebble.Layer(new_layer_dict), combine=combine
+                )
+
+        layer_in = pebble.Layer({
+            'checks': {
+                'server-ready': {
+                    'override': 'replace',
+                    'level': 'ready',
+                    'startup': 'enabled',
+                    'threshold': 10,
+                    'http': {'url': 'http://localhost:5000/version'},
+                }
+            }
+        })
+        harness = ops.testing.Harness(MyCharm, meta='name: mycharm\ncontainers:\n  my-container:')
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('my-container', True)
+        harness.begin()
+        container_in = harness.charm.unit.get_container('my-container')
+        container_in.add_layer('base', layer_in)
+
+        harness.container_pebble_ready('my-container')
+
+        assert 'checks' in new_layer_dict and 'server-ready' in new_layer_dict['checks']
+        new_layer_check = new_layer_dict['checks']['server-ready']
+        container_out = harness.charm.unit.get_container('my-container')
+        check_out = container_out.get_checks('server-ready')['server-ready']
+        assert check_out.level == pebble.CheckLevel(new_layer_check.get('level', 'ready'))
+        assert check_out.startup == pebble.CheckStartup(new_layer_check.get('startup', 'enabled'))
+        assert check_out.threshold == new_layer_check.get('threshold', 10)
+
+
+@pytest.mark.parametrize('layer1_name,layer2_name', [('a-base', 'b-base'), ('b-base', 'a-base')])
+def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, layer2_name: str):
+    layer1 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'replace',
+                'command': '/bin/sleep 10',
+                'summary': 'sum',
+                'description': 'desc',
+                'startup': 'enabled',
+            },
+        },
+        'checks': {
+            'server-ready': {
+                'override': 'replace',
+                'level': 'ready',
+                'startup': 'enabled',
+                'threshold': 10,
+                'period': '1s',
+                'timeout': '28s',
+                'http': {'url': 'http://localhost:5000/version'},
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://loki.example.com',
+                'services': ['server'],
+                'labels': {'foo': 'bar'},
+            }
+        },
+    })
+    layer2 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'merge',
+                'command': '/bin/sleep 20',
+            }
+        },
+        'checks': {
+            'server-ready': {
+                'override': 'merge',
+                'level': 'alive',
+                'http': {'url': 'http://localhost:5050/version'},
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'merge',
+                'location': 'https://loki2.example.com',
+            },
+        },
+    })
+    harness = ops.testing.Harness(
+        ops.CharmBase, meta='name: mycharm\ncontainers:\n  my-container:'
+    )
+    request.addfinalizer(harness.cleanup)
+    harness.set_can_connect('my-container', True)
+    harness.begin()
+    container_in = harness.charm.unit.get_container('my-container')
+    container_in.add_layer(layer1_name, layer1)
+    container_in.add_layer(layer2_name, layer2)
+    container_out = harness.charm.unit.get_container('my-container')
+    plan = container_out.get_plan()
+
+    service = plan.services['server']
+    assert service.summary == 'sum'
+    assert service.description == 'desc'
+    # Service.startup is always a string, even though we have the enum.
+    assert service.startup == pebble.ServiceStartup.ENABLED.value
+    assert service.override == 'merge'
+    assert service.command == '/bin/sleep 20'
+
+    check = plan.checks['server-ready']
+    assert check.startup == pebble.CheckStartup.ENABLED
+    assert check.threshold == 10
+    assert check.period == '1s'
+    assert check.timeout == '28s'
+    assert check.override == 'merge'
+    assert check.level == pebble.CheckLevel.ALIVE
+    assert check.http is not None
+    assert check.http.get('url') == 'http://localhost:5050/version'
+
+    log_target = plan.log_targets['loki']
+    assert log_target.type == 'loki'
+    assert log_target.services == ['server']
+    assert log_target.labels == {'foo': 'bar'}
+    assert log_target.override == 'merge'
+    assert log_target.location == 'https://loki2.example.com'
 
 
 @pytest.mark.skipif(
