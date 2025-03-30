@@ -10,7 +10,6 @@ permissions: {}
 
 jobs:
   zizmor:
-    name: zizmor
     runs-on: ubuntu-latest
     permissions:
       security-events: write
