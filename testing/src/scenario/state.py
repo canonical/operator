@@ -517,7 +517,16 @@ def _next_relation_id(*, update: bool = True):
 
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_max_posargs(2)):
-    """Base class for the various types of relation."""
+    """Base class for the various types of relation.
+
+    The only mandatory argument to `Relation` (and other relation types) is
+    `endpoint`. The `interface` will be derived from the charm's metadata. When
+    fully defaulted, there are no remote units, the remote application is
+    called ``remote``, only has a single unit ``remote/0``, and nobody has
+    written any data to the databags yet (other than the keys that Juju adds to
+    all databags). That is typically the state of a relation when the first unit
+    joins it.
+    """
 
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in the metadata."""
