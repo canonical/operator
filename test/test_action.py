@@ -558,10 +558,36 @@ class DoThisThing(ops.ActionBase): ...
         (DoThisThing, 'do-this-thing'),
     ],
 )
-def test_class_name_to_action_name(cls: ops.ActionBase, action_name: str):
+def test_action_class_name_to_action_name(cls: ops.ActionBase, action_name: str):
     assert cls.class_name_to_action_name() == action_name
 
 
-# TODO:
-# Tests for passing in additional args/kwargs.
-# Tests for custom types.
+def test_action_extra_args(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Action(ops.ActionBase):
+        a: int
+        b: float
+        c: str
+
+        @classmethod
+        def param_names(cls):
+            yield 'b'
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['action'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(Action, 10, c='foo')
+            event.set_results({'params': params})
+
+    schema = Action.to_yaml_schema()
+    actions = ops._private.yaml.safe_dump(schema)
+    harness = testing.Harness(Charm, actions=actions)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params = harness.run_action('action', {'b': 3.14}).results['params']
+    assert params.a == 10
+    assert params.b == 3.14
+    assert params.c == 'foo'

@@ -137,6 +137,11 @@ class ActionBase:
         'list[bool]': 'array',
         'list[int]': 'array',
         'list[float]': 'array',
+        "<class 'str'>": 'string',
+        "<class 'bool'>": 'boolean',
+        "<class 'int'>": 'integer',
+        "<class 'float'>": 'number',
+        "<class 'list'>": 'array',
     }
 
     @classmethod
@@ -191,7 +196,7 @@ class ActionBase:
                 return cls.JSON_TYPES[type(default).__name__]
             raise ValueError(f'{attr!r} type is unknown.') from None
         if hint not in cls.JSON_TYPES:
-            raise ValueError(f'{attr!r} type is unknown.') from None
+            raise ValueError(f'{attr!r} type ({hint!r}) is unknown.') from None
         return cls.JSON_TYPES[hint]
 
     @staticmethod
