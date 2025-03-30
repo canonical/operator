@@ -731,7 +731,16 @@ def _random_model_name():
 
 @dataclasses.dataclass(frozen=True)
 class Model(_max_posargs(1)):
-    """The Juju model in which the charm is deployed."""
+    """The Juju model in which the charm is deployed.
+
+    Charms don't usually need to be aware of the model in which they are
+    deployed, but if you need to set the model name or UUID, you can provide a
+    ``Model`` to the state::
+
+        ctx = Context(MyCharm)
+        state_in = State(model=Model(name="my-model"))
+        state_out = ctx.run(ctx.on.start(), state_in)
+    """
 
     name: str = dataclasses.field(default_factory=_random_model_name)
     """The name of the model."""
@@ -743,7 +752,29 @@ class Model(_max_posargs(1)):
     """The type of Juju model."""
 
     cloud_spec: CloudSpec | None = None
-    """Cloud specification information (metadata) including credentials."""
+    """Cloud specification information (metadata) including credentials.
+
+    You can set CloudSpec information in the model, for example::
+
+        cloud_spec=CloudSpec(
+            type="lxd",
+            endpoint="https://127.0.0.1:8443",
+            credential=CloudCredential(
+                auth_type="clientcertificate",
+                attributes={
+                    "client-cert": "foo",
+                    "client-key": "bar",
+                    "server-cert": "baz",
+                },
+            ),
+        )
+        state_in = State(
+            model=Model(name="my-vm-model", type="lxd", cloud_spec=cloud_spec),
+        )
+
+    The spec will be accessible in the charm via the
+    :attr:`ops.Model.get_cloud_spec` method.
+    """
 
 
 _CHANGE_IDS = 0
@@ -1441,7 +1472,15 @@ class Storage(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Resource(_max_posargs(0)):
-    """Represents a resource made available to the charm."""
+    """Represents a resource made available to the charm.
+
+    From the perspective of a 'real' deployed charm, if your charm _has_
+    resources defined in its metadata, they _must_ be made available to the
+    charm. That is a Juju-enforced constraint: you can't deploy a charm without
+    attaching all resources it needs to it. However, when testing, this
+    constraint is unnecessarily strict since a charm will only notice that a
+    resource is not available when it explicitly asks for it.
+    """
 
     name: str
     """The name of the resource, as found in the charm metadata."""
