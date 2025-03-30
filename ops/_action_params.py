@@ -371,9 +371,9 @@ class ActionBase:
 def generate_yaml_schema():
     """Look for all ActionBase subclasses and generate their YAML schema.
 
-    ```{caution}
-    This imports modules, so is not safe to run on untrusted code.
-    ```
+    .. caution::
+
+        This imports modules, so is not safe to run on untrusted code.
     """
     actions: dict[str, Any] = {}
     for name in pathlib.Path('src').glob('*.py'):
