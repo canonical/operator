@@ -355,6 +355,93 @@ class MyWebserverCharm(ops.CharmBase):
 
 > See more: [](ops.Secret.get_content)
 
-<br>
+
+## Write tests for your charm
+
+Provide mocked secret content to your charm tests using [](ops.testing.Secret)
+objects. For example::
+
+```python
+state_in = testing.State(
+    secrets={
+        testing.Secret(
+            tracked_content={'key': 'public'},
+            latest_content={'key': 'public', 'cert': 'private'},
+        )
+    }
+)
+```
+
+The only mandatory arguments to `Secret` is the `tracked_content` dict: a
+`str:str` mapping representing the content of the revision. If there is a
+newer revision of the content than the one the unit that's handling the event is
+tracking, then `latest_content` should also be provided - if it's not, then
+Ops assumes that `latest_content` is the `tracked_content`. If there are other
+revisions of the content, simply don't include them: the unit has no way of
+knowing about these.
+
+In your charm tests, specify the access that units have been granted to the
+secret. There are three cases:
+
+- the secret is owned by this app but not this unit, in which case this charm
+  can only manage it if we are the leader
+- the secret is owned by this unit, in which case this charm can always manage
+  it (leader or not)
+- (default) the secret is not owned by this app nor unit, which means we can't
+  manage it but only view it (this includes user secrets)
+
+Thus by default, the secret is not owned by **this charm**, but, implicitly, by
+some unknown 'other charm' (or a user), and that other has granted us view
+rights.
+
+```{note}
+If this charm does not own the secret, but also it was not granted view rights
+by the (remote) owner, you model this by _not adding it to State.secrets_! The
+presence of a `Secret` in `State.secrets` means, in other words, that the
+charm has view rights (otherwise, why would we put it there?). If the charm owns
+the secret, or is leader, it will _also_ have manage rights on top of view ones.
+```
+
+To specify a secret owned by this unit (or app):
+
+```python
+rel = testing.Relation("web")
+state_in = testing.State(
+    secrets={
+        testing.Secret(
+            {'key': 'private'},
+            owner='unit',  # or 'app'
+            # The secret owner has granted access to the "remote" app over some relation:
+            remote_grants={rel.id: {"remote"}}
+        )
+    }
+)
+```
+
+When handling the `secret-expired` and `secret-remove` events, the charm must
+remove the specified revision of the secret. For `secret-remove`, the revision
+will no longer be in the `State`, because it's no longer in use (which is why
+the `secret-remove` event was triggered). To ensure that the charm is removing
+the secret, check the context for the history of secret removal:
+
+```python
+class SecretCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.secret_remove, self._on_secret_remove)
+
+    def _on_secret_remove(self, event: ops.SecretRemoveEvent):
+        event.remove_revision()
+
+
+ctx = testing.Context(SecretCharm)
+secret = testing.Secret({"password": "xxxxxxxx"}, owner="app")
+old_revision = 42
+state_out = ctx.run(
+    ctx.on.secret_remove(secret, revision=old_revision),
+    testing.State(leader=True, secrets={secret})
+)
+assert ctx.removed_secret_revisions == [old_revision]
+```
 
 <small>**Contributors:** @ppasotti, @tmihoc, @tony-meyer, @wallyworld </small>
