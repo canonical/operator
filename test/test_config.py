@@ -15,8 +15,9 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import logging
-from typing import Optional, Protocol, Union, cast
+from typing import Any, Optional, Protocol, Union, cast
 
 import pytest
 
@@ -412,8 +413,63 @@ def test_config_yaml_schema(config_class: type[ops.ConfigBase]):
     assert generated_yaml == expected_yaml
 
 
-# TODO:
-# Tests for passing in additional args/kwargs.
-# Tests for custom types.
-# Tests for custom names.
-# Scenario change to generate the YAML if appropriate.
+def test_config_extra_args(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Config(ops.ConfigBase):
+        a: int
+        b: float
+        c: str
+
+        @classmethod
+        def option_names(cls):
+            yield 'b'
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config, 10, c='foo')
+
+    schema = Config.to_yaml_schema()
+    options = ops._private.yaml.safe_dump(schema)
+    harness = testing.Harness(Charm, config=options)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'b': 3.14})
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = cast(Config, typed_config)
+    assert typed_config.a == 10
+    assert typed_config.b == 3.14
+    assert typed_config.c == 'foo'
+
+
+def test_config_custom_type(request: pytest.FixtureRequest):
+    class Config(ops.ConfigBase):
+        x: int
+        y: datetime.date
+
+        def __init__(self, x: int, y: str):
+            self.x = x
+            year, month, day = y.split('-')
+            self.y = datetime.date(int(year), int(month), int(day))
+
+        @classmethod
+        def attr_to_yaml_type(cls, attr: str, default: Any = None) -> str:
+            if attr == 'y':
+                return 'string'
+            return super().attr_to_yaml_type(attr, default)
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config)
+
+    schema = Config.to_yaml_schema()
+    options = ops._private.yaml.safe_dump(schema)
+    harness = testing.Harness(Charm, config=options)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'x': 42, 'y': '2008-08-28'})
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = cast(Config, typed_config)
+    assert typed_config.x == 42
+    assert typed_config.y == datetime.date(2008, 8, 28)

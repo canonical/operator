@@ -107,6 +107,10 @@ class ConfigBase:
         'int': 'int',
         'float': 'float',
         'str': 'string',
+        "<class 'bool'>": 'boolean',
+        "<class 'int'>": 'int',
+        "<class 'float'>": 'float',
+        "<class 'str'>": 'string',
         'ops.Secret': 'secret',
         'ops.model.Secret': 'secret',
     }
@@ -188,11 +192,17 @@ class ConfigBase:
     def option_names(cls) -> Generator[str, None, None]:
         """Iterates over all the option names to include in the config YAML.
 
-        By default, this is ``dir(cls)``, excluding any callables and any names
-        that start with an underscore, and the ``JUJU_TYPES`` name.
+        By default, this is ``dir(cls)``, any keys from ``cls.__annotations``,
+        and any keys from ``cls.__dataclass_fields__``, excluding any callables
+        and any names that start with an underscore, and the ``JUJU_TYPES``
+        name.
         """
-        for attr in dir(cls):
-            if attr.startswith('_') or callable(getattr(cls, attr)):
+        attrs = dir(cls)
+        attrs.extend(cls.__annotations__)
+        if hasattr(cls, '__dataclass_fields__'):
+            attrs.extend(cls.__dataclass_fields__)  # type: ignore
+        for attr in set(attrs):
+            if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
                 continue
             # Perhaps we should ignore anything that's typing.ClassVar?
             if attr == 'JUJU_TYPES':
