@@ -23,7 +23,8 @@ runs:
 
     - run: python -m pip install -r .github/actions/update-charm-pins/requirements.txt
       shell: bash
-    - run: python .github/actions/update-charm-pins/main.py '${{ inputs.workflows }}'
+    - run: python .github/actions/update-charm-pins/main.py '$WORKFLOWS'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.gh-pat }}
+        WORKFLOWS: ${{ inputs.workflows }}
