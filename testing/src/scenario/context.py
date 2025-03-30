@@ -471,15 +471,84 @@ class Context(Generic[CharmType]):
     juju_log: list[JujuLogLine]
     """A record of what the charm has sent to juju-log"""
     app_status_history: list[_EntityStatus]
-    """A record of the app statuses the charm has set"""
+    """A record of the app statuses the charm has set.
+
+    Assert that the charm has followed the expected path by checking the app
+    status history like so::
+
+        ctx = Context(MyCharm)
+        state_out = ctx.run(ctx.on.start(), State())
+        assert ctx.app_status_history == [
+            UnknownStatus(),
+            MaintenanceStatus('...'),
+        ]
+        assert state_out.app_status == ActiveStatus()
+
+    Note that the *current* status is **not** in the app status history.
+    """
     unit_status_history: list[_EntityStatus]
-    """A record of the unit statuses the charm has set"""
+    """A record of the unit statuses the charm has set.
+
+    Assert that the charm has followed the expected path by checking the unit
+    status history like so::
+
+        ctx = Context(MyCharm)
+        state_out = ctx.run(ctx.on.start(), State())
+        assert ctx.unit_status_history == [
+            UnknownStatus(),
+            MaintenanceStatus('...'),
+            WaitingStatus('...'),
+        ]
+        assert state_out.unit_status == ActiveStatus()
+
+    Note that the *current* status is **not** in the unit status history.
+
+    Also note that, unless you initialise the State with a preexisting status,
+    the first status in the history will always be ``unknown``.
+    """
     workload_version_history: list[str]
-    """A record of the workload versions the charm has set"""
+    """A record of the workload versions the charm has set.
+
+    Assert that the charm has set one or more workload versions during a hook
+    execution::
+
+        ctx = Context(MyCharm)
+        ctx.run(ctx.on.start(), State())
+        assert ctx.workload_version_history == ['1', '1.2', '1.5']
+
+    Note that the *current* version is **not** in the version history.
+    """
     removed_secret_revisions: list[int]
     """A record of the secret revisions the charm has removed"""
     emitted_events: list[ops.EventBase]
-    """A record of the events (including custom) that the charm has processed"""
+    """A record of the events (including custom) that the charm has processed.
+
+    You can configure which events will be captured by passing the following
+    arguments to ``Context``:
+
+    -  `capture_deferred_events`: If you want to include re-emitted deferred events.
+    -  `capture_framework_events`: If you want to include Ops framework events.
+
+    For example::
+
+    def test_emitted():
+        ctx = Context(
+            MyCharm,
+            capture_deferred_events=True,
+            capture_framework_events=True,
+        )
+        deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
+        ctx.run(ctx.on.start(), State(deferred=[deferred]))
+
+        assert len(ctx.emitted_events) == 5
+        assert [e.handle.kind for e in ctx.emitted_events] == [
+            "update_status",
+            "start",
+            "collect_unit_status",
+            "pre_commit",
+            "commit",
+        ]
+    """
     requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
     action_logs: list[str]
