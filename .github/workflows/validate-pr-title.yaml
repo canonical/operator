@@ -3,7 +3,7 @@ name: "Validate PR Title"
 # Ensure that the PR title conforms to the Conventional Commits and our choice of types and scopes, so that library version bumps can be detected automatically
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, synchronize]
 
 permissions:
