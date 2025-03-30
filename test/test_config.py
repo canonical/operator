@@ -435,8 +435,7 @@ def test_config_extra_args(request: pytest.FixtureRequest):
     request.addfinalizer(harness.cleanup)
     harness.update_config({'b': 3.14})
     harness.begin()
-    typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast(Config, typed_config)
+    typed_config = harness.charm.typed_config
     assert typed_config.a == 10
     assert typed_config.b == 3.14
     assert typed_config.c == 'foo'
@@ -469,7 +468,6 @@ def test_config_custom_type(request: pytest.FixtureRequest):
     request.addfinalizer(harness.cleanup)
     harness.update_config({'x': 42, 'y': '2008-08-28'})
     harness.begin()
-    typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast(Config, typed_config)
+    typed_config = harness.charm.typed_config
     assert typed_config.x == 42
     assert typed_config.y == datetime.date(2008, 8, 28)
