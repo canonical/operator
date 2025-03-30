@@ -1437,6 +1437,10 @@ class CharmBase(Object):
 
         Returns:
             An instance of the config class with the current config values.
+
+        Raises:
+            _Abort if the configuration is invalid, after setting an appropriate
+            blocked status.
         """
         from ._main import _Abort  # Avoid circular import.
         # We exit with a 'success' code because we don't want Juju to retry
