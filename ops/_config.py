@@ -21,7 +21,7 @@ import importlib
 import inspect
 import logging
 import pathlib
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Generator, cast
 
 from ._private import yaml
 from .model import Secret
@@ -79,16 +79,16 @@ class ConfigBase:
             my_secret: ops.Secret | None = None
             '''A user secret.'''
 
-    ```{note}
-    This is a dataclass, but can be any object that inherits from
-    ``ops.ConfigBase``, and can be initialised with the raw Juju config passed
-    as keyword arguments. Any errors should be indicated by raising
-    ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
+    .. note::
 
-    Inheriting from ``ops.ConfigBase`` is not strictly necessary, but it
-    provides utility methods for translating the class to a YAML schema suitable
-    for use with Juju.
-    ```
+        This is a dataclass, but can be any object that inherits from
+        ``ops.ConfigBase``, and can be initialised with the raw Juju config
+        pass as keyword arguments. Any errors should be indicated by raising
+        ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
+
+        Inheriting from ``ops.ConfigBase`` is not strictly necessary, but it
+        provides utility methods for translating the class to a YAML schema suitable
+        for use with Juju.
 
     Use this in your charm class like so::
 
@@ -111,6 +111,7 @@ class ConfigBase:
         'ops.model.Secret': 'secret',
     }
 
+    # TODO: This could also be factored out into a common helper.
     @classmethod
     def _get_attr_docstrings(cls) -> dict[str, str]:
         docs: dict[str, str] = {}
@@ -179,9 +180,24 @@ class ConfigBase:
 
         Python names are snake_case, but Juju config option names should be
         kebab-case. Override if your config names do not match this pattern, for
-        backwards compatibility, for example.
+        example for backwards compatibility.
         """
         return name.replace('_', '-')
+
+    @classmethod
+    def option_names(cls) -> Generator[str, None, None]:
+        """Iterates over all the option names to include in the config YAML.
+
+        By default, this is ``dir(cls)``, excluding any callables and any names
+        that start with an underscore, and the ``JUJU_TYPES`` name.
+        """
+        for attr in dir(cls):
+            if attr.startswith('_') or callable(getattr(cls, attr)):
+                continue
+            # Perhaps we should ignore anything that's typing.ClassVar?
+            if attr == 'JUJU_TYPES':
+                continue
+            yield attr
 
     @classmethod
     def _yaml_schema_from_basemodel(cls) -> dict[str, Any]:
@@ -205,7 +221,7 @@ class ConfigBase:
     def to_yaml_schema(cls) -> dict[str, Any]:
         """Translate the class to YAML suitable for config.yaml.
 
-        Using :attr:`MyConfig.to_yaml_schema` will generate a YAML schema
+        Using :attr:`ConfigBase.to_yaml_schema` will generate a YAML schema
         suitable for use in ``config.yaml``. For example, with the class from
         the example above::
 
@@ -239,12 +255,7 @@ class ConfigBase:
 
         # Dataclasses, regular classes, etc.
         options: dict[str, dict[str, bool | int | float | str]] = {}
-        for attr in dir(cls):
-            if attr.startswith('_') or callable(getattr(cls, attr)):
-                continue
-            # Perhaps we should ignore anything that's typing.ClassVar?
-            if attr == 'JUJU_TYPES':
-                continue
+        for attr in cls.option_names():
             option = {}
             default = getattr(cls, attr, None)
             if type(default).__name__ in cls.JUJU_TYPES:
@@ -265,9 +276,9 @@ class ConfigBase:
 def generate_yaml_schema():
     """Look for all ConfigBase subclasses and generate their YAML schema.
 
-    ```{caution}
-    This imports modules, so is not safe to run on untrusted code.
-    ```
+    .. caution::
+
+        This imports modules, so is not safe to run on untrusted code.
     """
     config: dict[str, Any] = {}
     for name in pathlib.Path('src').glob('*.py'):
@@ -282,3 +293,5 @@ def generate_yaml_schema():
 
 if __name__ == '__main__':
     generate_yaml_schema()
+
+# TODO: if __future__ annotations is not used.

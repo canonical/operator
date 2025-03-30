@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Optional, Union
+from typing import Optional, Protocol, Union, cast
 
 import pytest
 
@@ -34,6 +34,14 @@ from ops import testing
 logger = logging.getLogger(__name__)
 
 JUJU_TYPES = Union[bool, int, float, str]
+
+
+class _ConfigProtocol(Protocol):
+    my_bool: bool | None
+    my_int: int
+    my_float: float
+    my_str: str
+    my_secret: Optional[ops.Secret]
 
 
 class MyConfig(ops.ConfigBase):
@@ -137,9 +145,7 @@ class MyDataclassCharm(ops.CharmBase):
 
 
 _test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
-_test_class_types = Union[type[MyCharm], type[MyDataclassCharm]]
 _test_config_classes: list[type[ops.ConfigBase]] = [MyConfig, MyDataclassConfig]
-_test_config_classes_types = Union[type[MyConfig], type[MyDataclassConfig]]
 
 if pydantic:
 
@@ -205,26 +211,19 @@ if pydantic:
             logger.info(f'{new_float=}, {new_int=}, {new_str=}, {label=}')
 
     _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
-    _test_class_types = Union[
-        _test_class_types, type[MyPydanticDataclassCharm], type[MyPydanticBaseModelCharm]
-    ]
     _test_config_classes.extend((MyPydanticDataclassConfig, MyPydanticBaseModelConfig))
-    _test_config_classes_types = Union[
-        _test_config_classes_types,
-        type[MyPydanticDataclassConfig],
-        type[MyPydanticBaseModelConfig],
-    ]
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_init(charm_class: _test_class_types, request: pytest.FixtureRequest):
+def test_config_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     # We use the generated schema from the simple class for all variants,
     # because we expect it to be the same.
     config = MyConfig.to_yaml_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    typed_config = harness.charm.typed_config
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = cast(_ConfigProtocol, typed_config)
     assert typed_config.my_bool is None
     assert typed_config.my_float == 3.14
     assert isinstance(typed_config.my_float, float)
@@ -236,7 +235,7 @@ def test_config_init(charm_class: _test_class_types, request: pytest.FixtureRequ
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_init_non_default(charm_class: _test_class_types, request: pytest.FixtureRequest):
+def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     config = MyConfig.to_yaml_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
@@ -247,7 +246,8 @@ def test_config_init_non_default(charm_class: _test_class_types, request: pytest
         'my-str': 'bar',
     })
     harness.begin()
-    typed_config = harness.charm.typed_config
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = cast(_ConfigProtocol, typed_config)
     assert typed_config.my_bool is True
     assert typed_config.my_float == 2.71
     assert typed_config.my_int == 24
@@ -256,7 +256,7 @@ def test_config_init_non_default(charm_class: _test_class_types, request: pytest
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_with_error(charm_class: _test_class_types, request: pytest.FixtureRequest):
+def test_config_with_error(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     config = MyConfig.to_yaml_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
@@ -270,7 +270,7 @@ def test_config_with_error(charm_class: _test_class_types, request: pytest.Fixtu
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_with_secret(charm_class: _test_class_types, request: pytest.FixtureRequest):
+def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     config = MyConfig.to_yaml_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
@@ -281,14 +281,18 @@ def test_config_with_secret(charm_class: _test_class_types, request: pytest.Fixt
         'my-secret': secret_id,
     })
     harness.begin()
-    secret = harness.charm.typed_config.my_secret
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = cast(_ConfigProtocol, typed_config)
+    secret = typed_config.my_secret
     assert secret is not None
     assert secret.id == secret_id
     assert secret.get_content() == content
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_invalid_secret_id(charm_class: _test_class_types, request: pytest.FixtureRequest):
+def test_config_invalid_secret_id(
+    charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
+):
     config = MyConfig.to_yaml_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
@@ -305,7 +309,7 @@ def test_config_invalid_secret_id(charm_class: _test_class_types, request: pytes
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_missing_secret(charm_class: _test_class_types, request: pytest.FixtureRequest):
+def test_config_missing_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     config = MyConfig.to_yaml_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
@@ -376,7 +380,7 @@ def test_config_bad_attr_naming_pattern(request: pytest.FixtureRequest):
 
 
 @pytest.mark.parametrize('config_class', _test_config_classes)
-def test_config_yaml_schema(config_class: _test_config_classes_types):
+def test_config_yaml_schema(config_class: type[ops.ConfigBase]):
     generated_yaml = config_class.to_yaml_schema()
     expected_yaml = {
         'options': {
@@ -411,4 +415,5 @@ def test_config_yaml_schema(config_class: _test_config_classes_types):
 # TODO:
 # Tests for passing in additional args/kwargs.
 # Tests for custom types.
+# Tests for custom names.
 # Scenario change to generate the YAML if appropriate.

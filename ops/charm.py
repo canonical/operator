@@ -1419,8 +1419,8 @@ class CharmBase(Object):
         The object will be instantiated with keyword arguments of all the raw
         Juju config, but with:
 
-        * `secret` type options having a :class:`model.Secret` value rather than
-          the secret ID.
+        * ``secret`` type options having a :class:`model.Secret` value rather
+          than the secret ID.
         * dashes in names converted to underscores, unless a custom conversion
           function is provided.
 
@@ -2007,29 +2007,6 @@ class ActionMeta:
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
         self.additional_properties = raw.get('additionalProperties', True)
-
-
-class ConfigMeta:
-    """Object containing metadata about a config option."""
-
-    name: str
-    """Name of the config option."""
-
-    type: Literal['string', 'int', 'float', 'boolean', 'secret']
-    """Type of the config option."""
-
-    default: Any
-    """Default value of the config option."""
-
-    description: str
-    """Description of the config option."""
-
-    def __init__(self, name: str, raw: Optional[Dict[str, Any]] = None):
-        raw = raw or {}
-        self.name = name
-        self.type = raw['type']
-        self.default = raw.get('default')
-        self.description = raw.get('description', '')
 
 
 @dataclasses.dataclass(frozen=True)
