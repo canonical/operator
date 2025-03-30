@@ -19,12 +19,15 @@ from __future__ import annotations
 import ast
 import dataclasses
 import enum
+import importlib
 import inspect
 import logging
 import pathlib
 import re
 import sys
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Generator, cast
+
+from ._private import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -166,19 +169,6 @@ class ActionBase:
 
         return docs
 
-    @staticmethod
-    def _extract_optional_type(attr: str, hint: str):
-        if 'Optional[' in hint:
-            hint = hint.split('[')[1].split(']')[0]
-        if '|' in hint:
-            parts = [p.strip() for p in hint.split('|')]
-            if 'None' in parts:
-                parts.remove('None')
-            if len(parts) != 1:
-                raise ValueError(f'{attr!r} has multiple types.')
-            hint = parts[0]
-        return hint
-
     @classmethod
     def attr_to_json_type(cls, attr: str, default: Any = None) -> str:
         """Provide the appropriate type for the action JSONSchema for the given attribute.
@@ -194,7 +184,7 @@ class ActionBase:
                 if n not in types:
                     types[n] = t
         try:
-            hint = cls._extract_optional_type(attr, str(types[attr]))
+            hint = str(types[attr])
         except (KeyError, ValueError):
             # If there's a default value, use that object's type.
             if default is not None and type(default).__name__ in cls.JSON_TYPES:
@@ -226,6 +216,27 @@ class ActionBase:
         return re.sub(r'(?<!^)([A-Z])', r'-\1', cls.__name__).lower()
 
     @classmethod
+    def param_names(cls) -> Generator[str, None, None]:
+        """Iterates over all the param names to include in the action YAML.
+
+        By default, this is ``dir(cls)``, any keys from ``cls.__annotations``,
+        and any keys from ``cls.__dataclass_fields``, excluding any callables
+        and any names that start with an underscore, and the ``JSON_TYPES``
+        name.
+        """
+        attrs = dir(cls)
+        attrs.extend(cls.__annotations__)
+        if hasattr(cls, '__dataclass_fields__'):
+            attrs.extend(cls.__dataclass_fields__)  # type: ignore
+        for attr in set(attrs):
+            if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
+                continue
+            # Perhaps we should ignore anything that's typing.ClassVar?
+            if attr == 'JSON_TYPES':
+                continue
+            yield attr
+
+    @classmethod
     def to_json_schema(cls) -> tuple[dict[str, Any], list[str]]:
         """Translate the class to JSONSchema suitable for use in config.yaml.
 
@@ -249,27 +260,14 @@ class ActionBase:
         # require anyone using anything more complicated to subclass this method
         # and provide their own details (or to use a Pydantic class).
 
-        # TODO: is there a 'required' equivalent with Pydantic?
         # Pydantic classes provide this, so we can just get it directly.
         if hasattr(cls, 'schema'):
-            return cls.schema(), []  # type: ignore
-        # Pydantic dataclasses also have the schema, but we need to get it via
-        # the model.
-        if hasattr(cls, '__pydantic_model__'):
-            return cls.__pydantic_model__.schema(), []  # type: ignore
+            schema = cls.schema()  # type: ignore
+            return schema['properties'], schema['required']  # type: ignore
 
         params: dict[str, Any] = {}
         required_params: list[str] = []
-        attrs = dir(cls)
-        attrs.extend(cls.__annotations__)
-        if hasattr(cls, '__dataclass_fields__'):
-            attrs.extend(cls.__dataclass_fields__)  # type: ignore
-        for attr in set(attrs):
-            if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
-                continue
-            # Perhaps we should ignore anything that's typing.ClassVar?
-            if attr == 'JSON_TYPES':
-                continue
+        for attr in cls.param_names():
             required = True
             param = {}
             try:
@@ -293,6 +291,10 @@ class ActionBase:
                     default = None
             else:
                 required = False
+            if hasattr(default, 'default_factory') and callable(default.default_factory):  # type: ignore
+                default = default.default_factory()  # type: ignore
+            if hasattr(default, 'is_required'):  # type: ignore
+                required = default.is_required()  # type: ignore
             if type(default).__name__ in cls.JSON_TYPES:  # type: ignore
                 param['default'] = default
             try:
@@ -321,7 +323,7 @@ class ActionBase:
         suitable for use in ``actions.yaml``. For example, with the class from
         the example above::
 
-            print(RunBackup.to_yaml_schema())
+            print(yaml.safe_dump(RunBackup.to_yaml_schema()))
 
         Will output::
 
@@ -361,18 +363,24 @@ class ActionBase:
 
 
 def generate_yaml_schema():
-    """Look for all ActionBase subclasses and generate their YAML schema."""
-    for name in pathlib.Path('.').glob('src/*.py'):
-        with open(name) as f:
-            code = f.read()
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.ClassDef):
-                continue
-            if not issubclass(node, ActionBase):
-                continue
-            print(node.to_yaml_schema())
+    """Look for all ActionBase subclasses and generate their YAML schema.
+
+    ```{caution}
+    This imports modules, so is not safe to run on untrusted code.
+    ```
+    """
+    actions: dict[str, Any] = {}
+    for name in pathlib.Path('src').glob('*.py'):
+        module_name = name.stem
+        module = importlib.import_module(f'src.{module_name}')
+        for attr_name in dir(module):
+            obj = getattr(module, attr_name)
+            if hasattr(obj, 'to_json_schema'):
+                actions.update(obj.to_yaml_schema())
+    print(yaml.safe_dump(actions))
 
 
 if __name__ == '__main__':
     generate_yaml_schema()
+
+# TODO: if __future__ annotations is not used.

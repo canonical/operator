@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
-from typing import Any, Optional, Union
+from typing import Any
 
 import pytest
 
@@ -41,13 +41,13 @@ class MyAction(ops.ActionBase):
     my_str: str
     """A string value."""
 
-    my_bool: bool | None = None
+    my_bool: bool = False
     """A Boolean value."""
 
     my_int: int = 42
     """A positive integer value."""
 
-    my_float: Optional[float] = 3.14  # 'Optional' and not '| None' to exercise that path.
+    my_float: float = 3.14
     """A floating point value."""
 
     my_list: list[str] = []  # noqa: RUF012
@@ -57,13 +57,13 @@ class MyAction(ops.ActionBase):
         self,
         *,
         my_str: Any,
-        my_bool: Any | None = None,
+        my_bool: Any = False,
         my_int: Any = 42,
-        my_float: Any | None = 3.14,
+        my_float: Any = 3.14,
         my_list: Any = None,
     ):
         super().__init__()
-        if my_bool is not None and not isinstance(my_bool, bool):
+        if not isinstance(my_bool, bool):
             raise ValueError('my_bool must be a boolean')
         self.my_bool = my_bool
         if not isinstance(my_float, float):
@@ -109,13 +109,13 @@ class MyDataclassAction(ops.ActionBase):
     my_str: str
     """A string value."""
 
-    my_bool: bool | None = None
+    my_bool: bool = False
     """A Boolean value."""
 
     my_int: int = 42
     """A positive integer value."""
 
-    my_float: Optional[float] = 3.14  # 'Optional' and not '| None' to exercise that path.
+    my_float: float = 3.14
     """A floating point value."""
 
     my_list: list[str] = dataclasses.field(default_factory=list)
@@ -143,22 +143,26 @@ class MyDataclassCharm(ops.CharmBase):
         event.set_results({'params': params})
 
 
-_test_classes = [
+_test_classes: list[tuple[type[ops.CharmBase], str, type[ops.ActionBase]]] = [
     (MyCharm, 'my-action', MyAction),
     (MyDataclassCharm, 'my-dataclass-action', MyDataclassAction),
 ]
-_test_class_types = Union[type[MyCharm], type[MyDataclassCharm]]
-_test_action_classes = [(MyAction, 'my-action'), (MyDataclassAction, 'my-dataclass-action')]
-_test_action_classes_types = Union[type[MyAction], type[MyDataclassAction]]
+_test_action_classes: list[tuple[type[ops.ActionBase], str]] = [
+    (MyAction, 'my-action'),
+    (MyDataclassAction, 'my-dataclass-action'),
+]
 
 if pydantic:
 
-    @pydantic.dataclasses.dataclass(frozen=True, config={'arbitrary_types_allowed': True})
-    class MyPydanticDataclassConfig(ops.ConfigBase):
-        my_bool: bool | None = pydantic.Field(None, description='A boolean value.')
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class MyPydanticDataclassAction(ops.ActionBase):
+        """An action description."""
+
+        my_str: str = pydantic.Field(description='A string value.')
+        my_bool: bool = pydantic.Field(False, description='A Boolean value.')
         my_int: int = pydantic.Field(42, description='A positive integer value.')
         my_float: float = pydantic.Field(3.14, description='A floating point value.')
-        my_str: str = pydantic.Field('foo', description='A string value.')
+        my_list: list[str] = pydantic.Field(default_factory=list, description='A list value.')
 
         @pydantic.field_validator('my_int')
         @classmethod
@@ -170,18 +174,39 @@ if pydantic:
     class MyPydanticDataclassCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(MyPydanticDataclassConfig)
-            # These should not have any type errors.
-            new_float = self.typed_config.my_float + 2006.8
-            new_int = self.typed_config.my_int + 1979
-            new_str = self.typed_config.my_str + 'bar'
-            logger.info(f'{new_float=}, {new_int=}, {new_str=}')
+            framework.observe(self.on['my-pydantic-dataclass-action'].action, self._on_action)
 
-    class MyPydanticBaseModelConfig(pydantic.BaseModel, ops.ConfigBase):
-        my_bool: Optional[bool] = pydantic.Field(None, description='A boolean value.')
-        my_int: int = pydantic.Field(42, description='A positive integer value.')
-        my_float: float = pydantic.Field(3.14, description='A floating point value.')
-        my_str: str = pydantic.Field('foo', description='A string value.')
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(MyDataclassAction)
+            # These should not have any type errors.
+            assert params.my_float is not None
+            new_float = params.my_float + 2006.8
+            new_int = params.my_int + 1979
+            new_str = params.my_str + 'bar'
+            new_list = params.my_list[:]
+            logger.info(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+            event.set_results({'params': params})
+
+    class MyPydanticBaseModelAction(pydantic.BaseModel, ops.ActionBase):
+        """An action description."""
+
+        my_str: str = pydantic.Field(alias='my-str', description='A string value.')  # type: ignore
+        my_bool: bool = pydantic.Field(
+            False,
+            alias='my-bool',  # type: ignore
+            description='A Boolean value.',
+        )
+        my_int: int = pydantic.Field(42, alias='my-int', description='A positive integer value.')  # type: ignore
+        my_float: float = pydantic.Field(
+            3.14,
+            alias='my-float',  # type: ignore
+            description='A floating point value.',
+        )
+        my_list: list[str] = pydantic.Field(
+            alias='my-list',  # type: ignore
+            default_factory=list,
+            description='A list value.',
+        )
 
         @pydantic.field_validator('my_int')
         @classmethod
@@ -196,30 +221,34 @@ if pydantic:
     class MyPydanticBaseModelCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(MyPydanticBaseModelConfig)
-            # These should not have any type errors.
-            new_float = self.typed_config.my_float + 2006.8
-            new_int = self.typed_config.my_int + 1979
-            new_str = self.typed_config.my_str + 'bar'
-            logger.info(f'{new_float=}, {new_int=}, {new_str=}')
+            framework.observe(self.on['my-pydantic-base-model-action'].action, self._on_action)
 
-    _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
-    _test_class_types = Union[
-        _test_class_types, type[MyPydanticDataclassCharm], type[MyPydanticBaseModelCharm]
-    ]
-    _test_action_classes.extend((MyPydanticDataclassConfig, MyPydanticBaseModelConfig))
-    _test_action_classes_types = Union[
-        _test_action_classes_types,
-        type[MyPydanticDataclassConfig],
-        type[MyPydanticBaseModelConfig],
-    ]
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(MyDataclassAction)
+            # These should not have any type errors.
+            assert params.my_float is not None
+            new_float = params.my_float + 2006.8
+            new_int = params.my_int + 1979
+            new_str = params.my_str + 'bar'
+            new_list = params.my_list[:]
+            logger.info(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+            event.set_results({'params': params})
+
+    _test_classes.extend((
+        (MyPydanticDataclassCharm, 'my-pydantic-dataclass-action', MyPydanticDataclassAction),
+        (MyPydanticBaseModelCharm, 'my-pydantic-base-model-action', MyPydanticBaseModelAction),
+    ))
+    _test_action_classes.extend((
+        (MyPydanticDataclassAction, 'my-pydantic-dataclass-action'),
+        (MyPydanticBaseModelAction, 'my-pydantic-base-model-action'),
+    ))
 
 
 @pytest.mark.parametrize('charm_class,action_name,action_class', _test_classes)
 def test_action_init(
-    charm_class: _test_class_types,
+    charm_class: type[ops.CharmBase],
     action_name: str,
-    action_class: _test_action_classes,
+    action_class: type[ops.ActionBase],
     request: pytest.FixtureRequest,
 ):
     action_yaml = action_class.to_yaml_schema()
@@ -228,7 +257,7 @@ def test_action_init(
     request.addfinalizer(harness.cleanup)
     harness.begin()
     params_out = harness.run_action(action_name, {'my-str': 'foo'}).results['params']
-    assert params_out.my_bool is None
+    assert params_out.my_bool is False
     assert params_out.my_float == 3.14
     assert isinstance(params_out.my_float, float)
     assert params_out.my_int == 42
@@ -241,9 +270,9 @@ def test_action_init(
 
 @pytest.mark.parametrize('charm_class,action_name,action_class', _test_classes)
 def test_action_init_non_default(
-    charm_class: _test_class_types,
+    charm_class: type[ops.CharmBase],
     action_name: str,
-    action_class: _test_action_classes,
+    action_class: type[ops.ActionBase],
     request: pytest.FixtureRequest,
 ):
     action_yaml = action_class.to_yaml_schema()
@@ -268,9 +297,9 @@ def test_action_init_non_default(
 
 @pytest.mark.parametrize('charm_class,action_name,action_class', _test_classes)
 def test_action_with_error(
-    charm_class: _test_class_types,
+    charm_class: type[ops.CharmBase],
     action_name: str,
-    action_class: _test_action_classes,
+    action_class: type[ops.ActionBase],
     request: pytest.FixtureRequest,
 ):
     action_yaml = action_class.to_yaml_schema()
@@ -354,14 +383,24 @@ def test_action_bad_attr_naming_pattern(request: pytest.FixtureRequest):
 
 
 @pytest.mark.parametrize('action_class,action_name', _test_action_classes)
-def test_action_yaml_schema(action_class: _test_action_classes_types, action_name: str):
+def test_action_yaml_schema(action_class: type[ops.ActionBase], action_name: str):
     generated_yaml = action_class.to_yaml_schema()
-    expected_yaml = {
+    if hasattr(action_class, 'schema'):
+        # Remove the 'title' property that Pydantic adds to make the schema more
+        # consistent with the others for simpler testing.
+        for prop in generated_yaml[action_name]['params'].values():
+            prop.pop('title', None)
+        # Also adjust how `my-list` is specified.
+        assert generated_yaml[action_name]['params']['my-list']['items'] == {'type': 'string'}
+        del generated_yaml[action_name]['params']['my-list']['items']
+        generated_yaml[action_name]['params']['my-list']['default'] = []
+    expected_yaml: dict[str, Any] = {
         action_name: {
             'description': 'An action description.',
             'params': {
                 'my-bool': {
                     'type': 'boolean',
+                    'default': False,
                     'description': 'A Boolean value.',
                 },
                 'my-float': {
