@@ -89,16 +89,16 @@ class ActionBase:
 
             username: str
 
-    ```{note}
-    These are dataclasses, but can be any objects that inherit from
-    ``ops.ActionBase``, and can be initialised with the raw Juju action params
-    passed as keyword arguments. Any errors should be indicated by raising
-    ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
+    .. note::
 
-    Inheriting from ``ops.ActionBase`` is not strictly necessary, but it
-    provides utility methods for translating the class to a YAML schema suitable
-    for use with Juju.
-    ```
+        These are dataclasses, but can be any objects that inherit from
+        ``ops.ActionBase``, and can be initialised with the raw Juju action
+        params passed as keyword arguments. Any errors should be indicated by
+        raising ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
+
+        Inheriting from ``ops.ActionBase`` is not strictly necessary, but it
+        provides utility methods for translating the class to a YAML schema
+        suitable for use with Juju.
 
     Use this in your charm class like so::
 
@@ -205,7 +205,7 @@ class ActionBase:
 
         Python names are snake_case, but Juju config option names should be
         kebab-case. Override if your config names do not match this pattern, for
-        backwards compatibility, for example.
+        example for backwards compatibility.
         """
         return name.replace('_', '-')
 
@@ -213,7 +213,7 @@ class ActionBase:
     def class_name_to_action_name(cls):
         """Convert the name of the class to the name of the action.
 
-        The default behaviour is to add a `-` after each A-Z character of the
+        The default behaviour is to add a ``-`` after each A-Z character of the
         class name, and then lower-case the resulting string. If a custom name
         is required, the simplest solution is to replace this method in the
         subclass with a method that just returns the correct name as a string.
@@ -225,7 +225,7 @@ class ActionBase:
         """Iterates over all the param names to include in the action YAML.
 
         By default, this is ``dir(cls)``, any keys from ``cls.__annotations``,
-        and any keys from ``cls.__dataclass_fields``, excluding any callables
+        and any keys from ``cls.__dataclass_fields__``, excluding any callables
         and any names that start with an underscore, and the ``JSON_TYPES``
         name.
         """
@@ -243,7 +243,7 @@ class ActionBase:
 
     @classmethod
     def to_json_schema(cls) -> tuple[dict[str, Any], list[str]]:
-        """Translate the class to JSONSchema suitable for use in config.yaml.
+        """Translate the class to JSONSchema suitable for use in ``actions.yaml``.
 
         This only handles simple types (strings, Booleans, integers, floats,
         and lists).
@@ -324,7 +324,7 @@ class ActionBase:
     def to_yaml_schema(cls) -> dict[str, Any]:
         """Translate the class to a dictionary suitable for actions.yaml.
 
-        Using :attr:`MyAction.to_yaml_schema` will generate a YAML schema
+        Using :attr:`ActionBase.to_yaml_schema` will generate a YAML schema
         suitable for use in ``actions.yaml``. For example, with the class from
         the example above::
 
@@ -343,7 +343,8 @@ class ActionBase:
                         description: The type of compression to use.
                         default: gzip
                         enum: [gzip, bzip2]
-                    required: [filename]
+                required: [filename]
+                additionalProperties: false
         """
         # As of March 2025, there are no known charms that are using
         # execution-group or parallel, so we don't support those here. If any

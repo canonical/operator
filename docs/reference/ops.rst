@@ -5,4 +5,3 @@
 
 .. automodule:: ops
    :exclude-members: main
-
