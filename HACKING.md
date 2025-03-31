@@ -401,8 +401,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
    expected version, use `'3.14.1.dev0'`).
    In this PR, also update the requirements in the respective pyproject.toml files
-   to be >= the latest release rather than == the latest release, to allow the development
-   versions to be used during our tests.
+   to be == the new development versions, to allow these versions to be used during our tests.
 
 ## Release Documentation
 
