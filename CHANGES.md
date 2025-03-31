@@ -2,63 +2,63 @@
 
 ## Features
 
-* Add a `remove_revision()` method to `SecretRemoveEvent` and `SecretExpiredEvent` in (#1624)
-* Add `Relation.remote_model` property in (#1610)
-* Efficient implementation of `RelationDataContent.update` in (#1586)
-* Expose the config metadata in `CharmMeta` in (#1648)
-* Add the ability to emit custom events in unit tests in (#1589)
-* Check that the check-infos in `testing.Container` match the plan in (#1630)
-* `ops.testing.State` components are less mutable in (#1617)
+* Add a `remove_revision()` method to `SecretRemoveEvent` and `SecretExpiredEvent` (#1624)
+* Add `Relation.remote_model` property (#1610)
+* Efficient implementation of `RelationDataContent.update` (#1586)
+* Expose the config metadata in `CharmMeta` (#1648)
+* Add the ability to emit custom events in unit tests (#1589)
+* Check that the check-infos in `testing.Container` match the plan (#1630)
+* `ops.testing.State` components are less mutable (#1617)
 
 ## Fixes
 
-* Assorted fixes for Pebble layer merging in Harness and Scenario in (#1627)
+* Assorted fixes for Pebble layer merging in Harness and Scenario (#1627)
 
 ## Documentation
 
-* Add a docs link to the Harness deprecation warning in (#1513)
-* Add best practices and a "manage charms" how-to in (#1615)
-* Add section about services with long startup time in (#1604)
-* Clarify how to use mounts in ops.testing.Container in (#1637)
-* Fix code snippet indentation in (#1649)
-* Fix Scenario example in (#1616)
-* Move hooks-based charm migration guide in (#1636)
-* Putting test into each chapter of the tutorial in (#1647)
-* Refactor how-to unit test according to comments in (#1642)
-* Refactor test docs to 1 explanation and 2 how-tos in (#1628)
-* Remove the charm-tech@lists.launchpad.net email address in (#1632)
-* Remove tutorial chapters that are covered by the how-to guide in (#1511)
-* Stack args vertically for long signature lines in (#1641)
-* Testing explanation in (#1635)
-* Unify charm test docs how to in (#1639)
+* Add a docs link to the Harness deprecation warning (#1513)
+* Add best practices and a "manage charms" how-to (#1615)
+* Add section about services with long startup time (#1604)
+* Clarify how to use mounts in ops.testing.Container (#1637)
+* Fix code snippet indentation (#1649)
+* Fix Scenario example (#1616)
+* Move hooks-based charm migration guide (#1636)
+* Putting test into each chapter of the tutorial (#1647)
+* Refactor how-to unit test according to comments (#1642)
+* Refactor test docs to 1 explanation and 2 how-tos (#1628)
+* Remove the charm-tech@lists.launchpad.net email address (#1632)
+* Remove tutorial chapters that are covered by the how-to guide (#1511)
+* Stack args vertically for long signature lines (#1641)
+* Testing explanation (#1635)
+* Unify charm test docs how to (#1639)
 
 ## CI
 
-* Exclude vault-k8s-operator until the system can handle monorepos in (#1650)
-* Use the latest version of ops-scenario in the compatibility tests in (#1608)
+* Exclude vault-k8s-operator until the system can handle monorepos (#1650)
+* Use the latest version of ops-scenario in the compatibility tests (#1608)
 
 # 2.19.0 - 27 Feb 2025
 
 ## Features
 
-* Expose the Juju version via Model objects in (#1563)
-* Support starting and stopping Pebble checks, and the checks enabled field in (#1560)
+* Expose the Juju version via Model objects (#1563)
+* Support starting and stopping Pebble checks, and the checks enabled field (#1560)
 
 ## Documentation
 
-* Update logo and readme by @tmihoc in (#1571)
-* Fill out remaining external link placeholders in (#1564)
-* Use noun relation and verb integrate in (#1574)
-* Update ref to charmcraft.yaml reference by @medubelko in (#1580)
-* Add a how-to for setting open ports in (#1579)
-* Fix links that pointed to earlier Juju docs in (#1575)
-* Update links to Charmcraft docs in (#1582)
-* Small updates to machine charm tutorial in (#1583)
+* Update logo and readme by @tmihoc (#1571)
+* Fill out remaining external link placeholders (#1564)
+* Use noun relation and verb integrate (#1574)
+* Update ref to charmcraft.yaml reference by @medubelko (#1580)
+* Add a how-to for setting open ports (#1579)
+* Fix links that pointed to earlier Juju docs (#1575)
+* Update links to Charmcraft docs (#1582)
+* Small updates to machine charm tutorial (#1583)
 
 ## CI
 
-* Update list of charms and handle increasing uv usage in (#1588)
-* Handle presence/absence of "static" and "static-charm" envs in (#1590)
+* Update list of charms and handle increasing uv usage (#1588)
+* Handle presence/absence of "static" and "static-charm" envs (#1590)
 
 # 2.18.1 - 5 Feb 2025
 
