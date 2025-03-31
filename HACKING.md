@@ -397,12 +397,11 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 
 16. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-17. Open a PR to change the version strings to the expected
-   next version, with ".dev0" appended (for example, if 3.14.1 is the next
-   expected version, use `'3.14.1.dev0'`).
-   In this PR, also update the requirements in the respective pyproject.toml files
-   to be ~= the latest release versions, to allow the development versions to be used
-   during our tests.
+17. Open a PR to change the version strings to the expected next version, with ".dev0" appended
+    (for example, if 3.14.0 is the next expected version, use `'3.14.0.dev0'`).
+   In this PR, also update the requirements in the respective pyproject.toml files to be >= the
+   latest release versions, to allow the development versions to be used during our tests.
+   Also cap these to be less than the next major just in case (for example `ops>=3.14,<4`).
 
 ## Release Documentation
 
