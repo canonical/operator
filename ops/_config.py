@@ -304,4 +304,8 @@ def generate_yaml_schema():
 if __name__ == '__main__':
     generate_yaml_schema()
 
-# TODO: if __future__ annotations is not used.
+# TODO: if __future__ annotations is not used, does everything continue to work? Maybe it's a
+# requirement?
+# TODO: if no config is found, have Scenario try to generate it.
+# TODO: test_main check to verify that the _Abort works correctly, maybe also using a charm that
+# generates the config?
