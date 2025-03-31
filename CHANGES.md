@@ -19,7 +19,7 @@
 * Add a docs link to the Harness deprecation warning (#1513)
 * Add best practices and a "manage charms" how-to (#1615)
 * Add section about services with long startup time (#1604)
-* Clarify how to use mounts in ops.testing.Container (#1637)
+* Clarify how to use mounts in `ops.testing.Container` (#1637)
 * Fix code snippet indentation (#1649)
 * Fix Scenario example (#1616)
 * Move hooks-based charm migration guide (#1636)
