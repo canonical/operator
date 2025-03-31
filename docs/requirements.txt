@@ -167,4 +167,5 @@ websocket-client==1.8.0
     # via ops (pyproject.toml)
 websockets==15.0.1
     # via sphinx-autobuild
+.
 ./testing/
