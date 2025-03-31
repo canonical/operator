@@ -21,7 +21,7 @@ license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops==2.21.0.dev0",
+    "ops>=2.20.0,<3",
     "PyYAML>=6.0.1",
 ]
 readme = "README.md"
