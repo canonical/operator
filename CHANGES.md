@@ -1,3 +1,42 @@
+# 2.20.0 - 31 Mar 2025
+
+## Features
+
+* Add a `remove_revision()` method to `SecretRemoveEvent` and `SecretExpiredEvent` in (#1624)
+* Add `Relation.remote_model` property in (#1610)
+* Efficient implementation of `RelationDataContent.update` in (#1586)
+* Expose the config metadata in `CharmMeta` in (#1648)
+* Add the ability to emit custom events in unit tests in (#1589)
+* Check that the check-infos in `testing.Container` match the plan in (#1630)
+* `ops.testing.State` components are less mutable in (#1617)
+
+## Fixes
+
+* Assorted fixes for Pebble layer merging in Harness and Scenario in (#1627)
+
+## Documentation
+
+* Add a docs link to the Harness deprecation warning in (#1513)
+* Add best practices and a "manage charms" how-to in (#1615)
+* Add section about services with long startup time in (#1604)
+* Clarify how to use mounts in ops.testing.Container in (#1637)
+* Fix code snippet indentation in (#1649)
+* Fix Scenario example in (#1616)
+* Move hooks-based charm migration guide in (#1636)
+* Putting test into each chapter of the tutorial in (#1647)
+* Refactor how-to unit test according to comments in (#1642)
+* Refactor test docs to 1 explanation and 2 how-tos in (#1628)
+* Remove the charm-tech@lists.launchpad.net email address in (#1632)
+* Remove tutorial chapters that are covered by the how-to guide in (#1511)
+* Stack args vertically for long signature lines in (#1641)
+* Testing explanation in (#1635)
+* Unify charm test docs how to in (#1639)
+
+## CI
+
+* Exclude vault-k8s-operator until the system can handle monorepos in (#1650)
+* Use the latest version of ops-scenario in the compatibility tests in (#1608)
+
 # 2.19.0 - 27 Feb 2025
 
 ## Features
