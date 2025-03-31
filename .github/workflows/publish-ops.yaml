@@ -11,7 +11,7 @@ on:
 jobs:
   framework-tests:
     uses: ./.github/workflows/framework-tests.yaml
-  # observability-charm-tests:
+  # observability-charm-tests:  # TODO: re-enable when we update to work with lockstep releases
   #   uses: ./.github/workflows/observability-charm-tests.yaml
   hello-charm-tests:
     uses: ./.github/workflows/hello-charm-tests.yaml
@@ -24,7 +24,7 @@ jobs:
       contents: read
     needs: [
       framework-tests,
-      # observability-charm-tests,
+      # observability-charm-tests,  # TODO: re-enable when we update to work with lockstep releases
       hello-charm-tests,
     ]
     steps:
