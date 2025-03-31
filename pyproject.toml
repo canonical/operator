@@ -38,7 +38,7 @@ docs = [
     "sphinxext-opengraph",
 ]
 testing = [
-    "ops-scenario>=7.20.0,<8",
+    "ops-scenario==7.20.1.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
