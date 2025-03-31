@@ -366,7 +366,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    appropriate string. For `ops-scenario`, change the version in
    [testing/pyproject.toml](testing/pyproject.toml). We use both
    [semantic versioning](https://semver.org/) and lockstep releases, so if
-   one library requires a major or minor version bump, the other will too.
+   one library requires a version bump, the other will too.
    The minor and patch versions should therefore be identical.
 11. Bump the `ops-scenario` version required by `ops[testing]` in [pyproject.toml](pyproject.toml)
     to == the new `ops-scenario` version being released. Bump the version of `ops` required by
@@ -398,10 +398,9 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 16. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
 17. Open a PR to change the version strings to the expected next version, with ".dev0" appended
-   (for example, if 3.14.0 is the next expected version, use `'3.14.0.dev0'`).
-   In this PR, also update the requirements in the respective pyproject.toml files to be >= the
-   latest release versions, to allow the development versions to be used during our tests.
-   Also cap these to be less than the next major just in case (for example `ops>=3.14.0,<4`).
+   (for example, if 3.14.0 is the next expected `ops` version, use `'3.14.0.dev0'`).
+   In this PR, also update the requirements in the respective pyproject.toml files to be == these
+   development versions (for example, `ops==3.14.0.dev0` for `ops-scenario`).
 
 ## Release Documentation
 
