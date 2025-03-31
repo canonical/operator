@@ -369,8 +369,8 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    one library requires a major or minor version bump, the other will too.
    The minor and patch versions should therefore be identical.
 11. Bump the `ops-scenario` version required by `ops[testing]` in [pyproject.toml](pyproject.toml)
-    to the new `ops-scenario` version being released. Bump the version of `ops` required by
-    `ops-scenario` in [testing/pyproject.toml](testing/pyproject.toml) to the new `ops` verrsion
+    to == the new `ops-scenario` version being released. Bump the version of `ops` required by
+    `ops-scenario` in [testing/pyproject.toml](testing/pyproject.toml) to == the new `ops` version
     being released.
 12. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
@@ -400,6 +400,9 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 17. Open a PR to change the version strings to the expected
    next version, with ".dev0" appended (for example, if 3.14.1 is the next
    expected version, use `'3.14.1.dev0'`).
+   In this PR, also update the requirements in the respective pyproject.toml files
+   to be >= the latest release rather than == the latest release, to allow the development
+   versions to be used during our tests.
 
 ## Release Documentation
 
