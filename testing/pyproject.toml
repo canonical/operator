@@ -21,7 +21,7 @@ license.text = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops==2.21.0.dev0",
+    "ops==2.21.0.dev0 @ git+https://github.com/canonical/operator@main",
     "PyYAML>=6.0.1",
 ]
 readme = "README.md"
