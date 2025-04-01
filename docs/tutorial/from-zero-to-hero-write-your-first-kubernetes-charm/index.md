@@ -8,12 +8,12 @@ You'll also have learned how to implement typical functionality of a charm, incl
 
 ## What you'll need
 
-- A workstation. For example, a laptop with an amd64 architecture. 
+- A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
+- Familiarity with Linux.
 - Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
 
-It will also help if you are familiar with Juju and have an understanding of
-Kubernetes fundamentals, but don't worry if you're new to these topics. This
-tutorial will guide you though each step.
+It will also help if you're familiar with Juju and Kubernetes, but don't worry if you're new to these topics.
+This tutorial will guide you through each step.
 
 ## What you'll do
 
