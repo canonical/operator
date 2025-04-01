@@ -1752,7 +1752,7 @@ class RelationMeta:
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
         assert isinstance(role, RelationRole), (
-            f'role should be one of {list(RelationRole)!r}, not {role!r}'
+            f'role should be one of {list(RelationRole)}, not {role!r}'
         )
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
