@@ -21,7 +21,7 @@ tox
 
 # Run tests, specifying whole suite or specific files
 tox -e unit
-tox -e unit test/test_charm.py
+tox -e unit -- test/test_charm.py
 
 # Format the code using Ruff
 tox -e fmt
