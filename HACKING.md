@@ -349,16 +349,12 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    charms and ops get tested.
 2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
 3. Click "Draft a new release"
-4. The "Release Title" is the full version numbers of ops and/or ops-scenario,
+4. The "Release Title" is the full version numbers of ops and ops-scenario,
    in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
    For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
-5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for
-   `ops` and `scenario-<major>.<minor>.<patch>` for `ops-scenario`. If releasing
-   both packages, use the ops tag.
-6. If the last release was for both `ops` and `ops-scenario`, leave the previous
-   tag choice on `auto`. If the last release was for only one package, change
-   the previous tag to be the last time the same package(s) were being released.
+5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for `ops`.
+6. Leave the previous tag choice on `auto`.
 7. Use the "Generate Release Notes" button to get a copy of the changes into the
    notes field.
 8. Format the auto-generated release notes according to the 'Release Documentation'
@@ -368,20 +364,24 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    and add it to `CHANGES.md`.
 10. For `ops`, change [version.py](ops/version.py)'s `version` to the
    appropriate string. For `ops-scenario`, change the version in
-   [testing/pyproject.toml](testing/pyproject.toml). Both packages use
-   [semantic versioning](https://semver.org/), and adjust independently
-   (that is: ops 2.18 doesn't imply ops-scenario 2.18, or any other number).
-11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
+   [testing/pyproject.toml](testing/pyproject.toml). We use both
+   [semantic versioning](https://semver.org/) and lockstep releases, so if
+   one library requires a version bump, the other will too.
+   The minor and patch versions should therefore be identical.
+11. Bump the `ops-scenario` version required by `ops[testing]` in [pyproject.toml](pyproject.toml)
+    to == the new `ops-scenario` version being released. Bump the version of `ops` required by
+    `ops-scenario` in [testing/pyproject.toml](testing/pyproject.toml) to == the new `ops` version
+    being released.
+12. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
    using the same Python version as specified in the `.readthedocs.yaml` file.
-12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
+13. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
-13. If the release includes both `ops` and `ops-scenario` packages, then push a
-   new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
+14. Push a new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-14. When you are ready, click "Publish". GitHub will create the additional tag.
+15. When you are ready, click "Publish". GitHub will create the additional tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -395,11 +395,12 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+16. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-16. Open a PR to change the version strings to the expected
-   next version, with ".dev0" appended (for example, if 3.14.1 is the next
-   expected version, use `'3.14.1.dev0'`).
+17. Open a PR to change the version strings to the expected next version, with ".dev0" appended
+   (for example, if 3.14.0 is the next expected `ops` version, use `'3.14.0.dev0'`).
+   In this PR, also update the requirements in the respective pyproject.toml files to be == these
+   development versions (for example, `ops==3.14.0.dev0` for `ops-scenario`).
 
 ## Release Documentation
 
