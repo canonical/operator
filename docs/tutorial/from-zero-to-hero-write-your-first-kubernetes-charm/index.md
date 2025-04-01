@@ -35,7 +35,8 @@ observe-your-charm-with-cos-lite
 (tutorial-kubernetes-next-steps)=
 ## Next steps
 
-By the end of this tutorial you will have built a Kubernetes charm and evolved it in a number of typical ways. But there is a lot more to explore:
+By the end of this tutorial, you'll have written a Kubernetes charm that includes some typical functionality.
+But there's a lot more to explore:
 
 | If you are wondering... | visit...             |
 |-------------------------|----------------------|
