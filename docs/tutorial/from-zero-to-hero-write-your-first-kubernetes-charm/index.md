@@ -9,7 +9,7 @@ This tutorial will introduce you to the official way to write a Kubernetes charm
 
 ```
 
-**What you'll need:** 
+## What you'll need
 
 - A workstation. For example, a laptop with an amd64 architecture. 
 - Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
@@ -18,7 +18,7 @@ It will also help if you are familiar with Juju and have an understanding of
 Kubernetes fundamentals, but don't worry if you're new to these topics. This
 tutorial will guide you though each step.
 
-**What you'll do:**
+## What you'll do
 
 ```{toctree}
 :maxdepth: 1
