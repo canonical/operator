@@ -1,7 +1,10 @@
 (from-zero-to-hero-write-your-first-kubernetes-charm)=
 # From zero to hero: Write your first Kubernetes charm
 
-This tutorial will introduce you to the official way to write a Kubernetes charm --- that is, how to equip an application with all the operational logic that it needs so that you can manage it on any Kubernetes cloud with just a few commands, using Juju. 
+This tutorial will teach you how to write a Kubernetes charm for an application.
+
+By the end of the tutorial, you'll have equipped the application with operational logic and used Juju to deploy the application to a local Kubernetes cluster.
+You'll also have learned how to implement typical functionality of a charm, including configuration, relations, and actions.
 
 ```{important}
 
