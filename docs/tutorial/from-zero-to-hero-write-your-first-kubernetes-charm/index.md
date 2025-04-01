@@ -6,12 +6,6 @@ This tutorial will teach you how to write a Kubernetes charm for an application.
 By the end of the tutorial, you'll have equipped the application with operational logic and used Juju to deploy the application to a local Kubernetes cluster.
 You'll also have learned how to implement typical functionality of a charm, including configuration, relations, and actions.
 
-```{important}
-
-**Did you know?** Writing a charm is also known as 'charming'!
-
-```
-
 ## What you'll need
 
 - A workstation. For example, a laptop with an amd64 architecture. 
@@ -38,11 +32,19 @@ observe-your-charm-with-cos-lite
 (tutorial-kubernetes-next-steps)=
 ## Next steps
 
-By the end of this tutorial, you'll have written a Kubernetes charm that includes some typical functionality.
-But there's a lot more to explore:
+By the end of this tutorial, you'll have written and tested a Kubernetes charm that includes some typical functionality.
+Congratulations!
 
-| If you are wondering... | visit...             |
-|-------------------------|----------------------|
-| "How do I...?"          | {ref}`how-to-guides` |
-| "What is...?"           | {ref}`reference`     |
-| "Why...?", "So what?"   | {ref}`explanation`   |
+```{admonition} Did you know?
+:class: tip
+
+Writing a charm is also known as "charming", and you are now a charmer!
+```
+
+There's plenty more to explore:
+
+| If you're wondering... | visit...             |
+|------------------------|----------------------|
+| How do I...?           | {ref}`how-to-guides` |
+| What is...?            | {ref}`reference`     |
+| Why...? So what?       | {ref}`explanation`   |
