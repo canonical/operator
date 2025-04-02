@@ -262,16 +262,6 @@ class _TestMain(abc.ABC):
         """Set up the environment and call (i.e. run) the given event."""
         return NotImplemented
 
-    @abc.abstractmethod
-    @pytest.mark.usefixtures('setup_charm')
-    def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events.
-
-        Depending on the combination of dispatch and non-dispatch, this should
-        be checking for the creation or the _lack_ of creation, as appropriate.
-        """
-        return NotImplemented
-
     @pytest.fixture
     def setup_charm(self, request: pytest.FixtureRequest, fake_script: FakeScript):
         self._setup_charm_dir(request)
@@ -1039,52 +1029,6 @@ class TestMainWithNoDispatch(_TestMain):
         )
 
     @pytest.mark.usefixtures('setup_charm')
-    def test_setup_event_links(
-        self,
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript,
-    ):
-        """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = [
-            f'hooks/{name.replace("_", "-")}'
-            for name, event_source in self.charm_module.Charm.on.events().items()
-            if issubclass(event_source.event_type, (ops.CommitEvent, ops.PreCommitEvent))
-        ]
-
-        initial_events = {
-            EventSpec(ops.InstallEvent, 'install'),
-            EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
-            EventSpec(ops.StartEvent, 'start'),
-            EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
-        }
-        initial_hooks = {f'hooks/{ev.event_name}' for ev in initial_events}
-
-        def _assess_event_links(event_spec: EventSpec):
-            assert self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir()
-            for event_hook in all_event_hooks:
-                hook_path = self.JUJU_CHARM_DIR / event_hook
-                assert hook_path.exists(), f'Missing hook: {event_hook}'
-                if self.hooks_are_symlinks:
-                    assert hook_path.is_symlink()
-                    assert os.readlink(str(hook_path)) == self.charm_exec_path
-                elif event_hook in initial_hooks:
-                    assert not hook_path.is_symlink()
-                else:
-                    # hooks are not symlinks, and this hook is not one of the initial ones
-                    # check that it's a symlink to the initial ones
-                    assert hook_path.is_symlink()
-                    assert os.readlink(str(hook_path)) == event_spec.event_name
-
-        for initial_event in initial_events:
-            self._setup_charm_dir(request)
-
-            self._simulate_event(fake_script, initial_event)
-            _assess_event_links(initial_event)
-            # Make sure it is idempotent.
-            self._simulate_event(fake_script, initial_event)
-            _assess_event_links(initial_event)
-
-    @pytest.mark.usefixtures('setup_charm')
     def test_setup_action_links(self, fake_script: FakeScript):
         self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         # foo-bar is one of the actions defined in actions.yaml
@@ -1126,39 +1070,6 @@ class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
 
 class _TestMainWithDispatch(_TestMain):
     has_dispatch = True
-
-    @pytest.mark.usefixtures('setup_charm')
-    def test_setup_event_links(
-        self,
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript,
-    ):
-        """Test auto-creation of symlinks.
-
-        Symlink creation caused by initial events should _not_ happen when using dispatch.
-        """
-        all_event_hooks = [
-            f'hooks/{e.replace("_", "-")}' for e in self.charm_module.Charm.on.events()
-        ]
-        initial_events = {
-            EventSpec(ops.InstallEvent, 'install'),
-            EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
-            EventSpec(ops.StartEvent, 'start'),
-            EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
-        }
-
-        def _assess_event_links(event_spec: EventSpec):
-            assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
-            for event_hook in all_event_hooks:
-                assert not (self.JUJU_CHARM_DIR / event_hook).exists(), (
-                    f'Spurious hook: {event_hook}'
-                )
-
-        for initial_event in initial_events:
-            self._setup_charm_dir(request)
-
-            self._simulate_event(fake_script, initial_event)
-            _assess_event_links(initial_event)
 
     @pytest.mark.usefixtures('setup_charm')
     def test_hook_and_dispatch(

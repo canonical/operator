@@ -48,29 +48,6 @@ def _exe_path(path: Path) -> Optional[Path]:
     return Path(p)
 
 
-def _setup_event_links(charm_dir: Path, charm: '_charm.CharmBase', juju_context: _JujuContext):
-    """Set up links for supported events that originate from Juju.
-
-    Whether a charm can handle an event or not can be determined by
-    introspecting which events are defined on it.
-
-    Hooks or actions are created as symlinks to the charm code file
-    which is determined by inspecting symlinks provided by the charm
-    author at hooks/install or hooks/start.
-
-    Args:
-        charm_dir: A root directory of the charm.
-        charm: An instance of the Charm class.
-        juju_context: An instance of the _JujuContext class.
-
-    """
-    link_to = os.path.realpath(juju_context.dispatch_path or sys.argv[0])
-    for bound_event in charm.on.events().values():
-        # Only events that originate from Juju need symlinks.
-        if issubclass(bound_event.event_type, (_charm.HookEvent, _charm.ActionEvent)):
-            pass
-
-
 def _get_event_args(
     charm: '_charm.CharmBase',
     bound_event: '_framework.BoundEvent',
@@ -198,7 +175,7 @@ class _Dispatcher:
         if self.event_name in ('install', 'start', 'upgrade_charm') or self.event_name.endswith(
             '_storage_attached'
         ):
-            _setup_event_links(self._charm_dir, charm, self._juju_context)
+            pass
 
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
