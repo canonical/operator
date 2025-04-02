@@ -48,70 +48,6 @@ def _exe_path(path: Path) -> Optional[Path]:
     return Path(p)
 
 
-def _create_event_link(
-    charm: '_charm.CharmBase',
-    bound_event: '_framework.BoundEvent',
-    link_to: Union[str, Path],
-):
-    """Create a symlink for a particular event.
-
-    Args:
-        charm: A charm object.
-        bound_event: An event for which to create a symlink.
-        link_to: What the event link should point to
-    """
-    # type guard
-    assert bound_event.event_kind, f'unbound BoundEvent {bound_event}'
-
-    if issubclass(bound_event.event_type, _charm.HookEvent):
-        event_dir = charm.framework.charm_dir / 'hooks'
-        event_path = event_dir / bound_event.event_kind.replace('_', '-')
-    elif issubclass(bound_event.event_type, _charm.ActionEvent):
-        if not bound_event.event_kind.endswith('_action'):
-            raise RuntimeError(f'action event name {bound_event.event_kind} needs _action suffix')
-        event_dir = charm.framework.charm_dir / 'actions'
-        # The event_kind is suffixed with "_action" while the executable is not.
-        event_path = event_dir / bound_event.event_kind[: -len('_action')].replace('_', '-')
-    else:
-        raise RuntimeError(
-            f'cannot create a symlink: unsupported event type {bound_event.event_type}'
-        )
-
-    event_dir.mkdir(exist_ok=True)
-    if not event_path.exists():
-        target_path = os.path.relpath(link_to, str(event_dir))
-
-        # Ignore the non-symlink files or directories
-        # assuming the charm author knows what they are doing.
-        logger.debug(
-            'Creating a new relative symlink at %s pointing to %s', event_path, target_path
-        )
-        event_path.symlink_to(target_path)
-
-
-def _setup_event_links(charm_dir: Path, charm: '_charm.CharmBase', juju_context: _JujuContext):
-    """Set up links for supported events that originate from Juju.
-
-    Whether a charm can handle an event or not can be determined by
-    introspecting which events are defined on it.
-
-    Hooks or actions are created as symlinks to the charm code file
-    which is determined by inspecting symlinks provided by the charm
-    author at hooks/install or hooks/start.
-
-    Args:
-        charm_dir: A root directory of the charm.
-        charm: An instance of the Charm class.
-        juju_context: An instance of the _JujuContext class.
-
-    """
-    link_to = os.path.realpath(juju_context.dispatch_path or sys.argv[0])
-    for bound_event in charm.on.events().values():
-        # Only events that originate from Juju need symlinks.
-        if issubclass(bound_event.event_type, (_charm.HookEvent, _charm.ActionEvent)):
-            _create_event_link(charm, bound_event, link_to)
-
-
 def _get_event_args(
     charm: '_charm.CharmBase',
     bound_event: '_framework.BoundEvent',
@@ -221,25 +157,7 @@ class _Dispatcher:
         if self._juju_context.version.is_dispatch_aware() and _exe_path(dispatch) is not None:
             self._init_dispatch()
         else:
-            self._init_legacy()
-
-    def ensure_event_links(self, charm: '_charm.CharmBase'):
-        """Make sure necessary symlinks are present on disk."""
-        if self.is_dispatch_aware:
-            # links aren't needed
-            return
-
-        # When a charm is force-upgraded and a unit is in an error state Juju
-        # does not run upgrade-charm and instead runs the failed hook followed
-        # by config-changed. Given the nature of force-upgrading the hook setup
-        # code is not triggered on config-changed.
-        #
-        # 'start' event is included as Juju does not fire the install event for
-        # K8s charms https://bugs.launchpad.net/juju/+bug/1854635, fixed in juju 2.7.6 and 2.8
-        if self.event_name in ('install', 'start', 'upgrade_charm') or self.event_name.endswith(
-            '_storage_attached'
-        ):
-            _setup_event_links(self._charm_dir, charm, self._juju_context)
+            self._init_legacy()  # TODO(dwilding): Can we remove this whole path?
 
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
@@ -399,18 +317,13 @@ class _Manager:
 
         # Set up dispatcher, framework and charm objects.
         self.dispatcher = _Dispatcher(self._charm_root, self._juju_context)
-        self.dispatcher.run_any_legacy_hook()
+        self.dispatcher.run_any_legacy_hook()  # TODO(dwilding): I guess we need to keep this
 
         self.framework = self._make_framework(self.dispatcher)
-        self.charm = self._make_charm(self.framework, self.dispatcher)
+        self.charm = self._charm_class(self.framework)
 
     def _load_charm_meta(self):
         return _charm.CharmMeta.from_charm_root(self._charm_root)
-
-    def _make_charm(self, framework: '_framework.Framework', dispatcher: _Dispatcher):
-        charm = self._charm_class(framework)
-        dispatcher.ensure_event_links(charm)
-        return charm
 
     def _setup_root_logging(self):
         # For actions, there is a communication channel with the user running the
