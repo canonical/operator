@@ -3347,8 +3347,8 @@ class TestExec:
             process = client.exec(['true'])
             del process
 
-        # GC might collect other warnings. Filter the warnings to only
-        # those from ExecProcess.
+        # GC may trigger unrelated warnings (for example, from TemporaryDirectory).
+        # Filter the warnings to only those from ExecProcess.
         warnings = [r for r in record if 'ExecProcess' in str(r.message)]
         assert len(warnings) == 1
         assert (
