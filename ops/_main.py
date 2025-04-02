@@ -48,47 +48,6 @@ def _exe_path(path: Path) -> Optional[Path]:
     return Path(p)
 
 
-def _create_event_link(
-    charm: '_charm.CharmBase',
-    bound_event: '_framework.BoundEvent',
-    link_to: Union[str, Path],
-):
-    """Create a symlink for a particular event.
-
-    Args:
-        charm: A charm object.
-        bound_event: An event for which to create a symlink.
-        link_to: What the event link should point to
-    """
-    # type guard
-    assert bound_event.event_kind, f'unbound BoundEvent {bound_event}'
-
-    if issubclass(bound_event.event_type, _charm.HookEvent):
-        event_dir = charm.framework.charm_dir / 'hooks'
-        event_path = event_dir / bound_event.event_kind.replace('_', '-')
-    elif issubclass(bound_event.event_type, _charm.ActionEvent):
-        if not bound_event.event_kind.endswith('_action'):
-            raise RuntimeError(f'action event name {bound_event.event_kind} needs _action suffix')
-        event_dir = charm.framework.charm_dir / 'actions'
-        # The event_kind is suffixed with "_action" while the executable is not.
-        event_path = event_dir / bound_event.event_kind[: -len('_action')].replace('_', '-')
-    else:
-        raise RuntimeError(
-            f'cannot create a symlink: unsupported event type {bound_event.event_type}'
-        )
-
-    event_dir.mkdir(exist_ok=True)
-    if not event_path.exists():
-        target_path = os.path.relpath(link_to, str(event_dir))
-
-        # Ignore the non-symlink files or directories
-        # assuming the charm author knows what they are doing.
-        logger.debug(
-            'Creating a new relative symlink at %s pointing to %s', event_path, target_path
-        )
-        event_path.symlink_to(target_path)
-
-
 def _setup_event_links(charm_dir: Path, charm: '_charm.CharmBase', juju_context: _JujuContext):
     """Set up links for supported events that originate from Juju.
 
@@ -109,7 +68,7 @@ def _setup_event_links(charm_dir: Path, charm: '_charm.CharmBase', juju_context:
     for bound_event in charm.on.events().values():
         # Only events that originate from Juju need symlinks.
         if issubclass(bound_event.event_type, (_charm.HookEvent, _charm.ActionEvent)):
-            _create_event_link(charm, bound_event, link_to)
+            pass
 
 
 def _get_event_args(
