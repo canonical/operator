@@ -157,7 +157,7 @@ class _Dispatcher:
         if self._juju_context.version.is_dispatch_aware() and _exe_path(dispatch) is not None:
             self._init_dispatch()
         else:
-            self._init_legacy()
+            self._init_legacy()  # TODO(dwilding): Can we remove this whole path?
 
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
@@ -317,7 +317,7 @@ class _Manager:
 
         # Set up dispatcher, framework and charm objects.
         self.dispatcher = _Dispatcher(self._charm_root, self._juju_context)
-        self.dispatcher.run_any_legacy_hook()
+        self.dispatcher.run_any_legacy_hook()  # TODO(dwilding): I guess we need to keep this
 
         self.framework = self._make_framework(self.dispatcher)
         self.charm = self._charm_class(self.framework)
