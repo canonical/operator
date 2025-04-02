@@ -3346,8 +3346,13 @@ class TestExec:
         with pytest.warns(ResourceWarning) as record:
             process = client.exec(['true'])
             del process
+
+        # GC might collect other warnings. Filter the warnings to only
+        # those from ExecProcess.
+        warnings = [r for r in record if 'ExecProcess' in str(r.message)]
+        assert len(warnings) == 1
         assert (
-            str(record[0].message)
+            str(warnings[0].message)
             == 'ExecProcess instance garbage collected without call to wait() or wait_output()'
         )
 
