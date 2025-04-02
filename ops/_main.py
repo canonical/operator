@@ -159,24 +159,6 @@ class _Dispatcher:
         else:
             self._init_legacy()
 
-    def ensure_event_links(self, charm: '_charm.CharmBase'):
-        """Make sure necessary symlinks are present on disk."""
-        if self.is_dispatch_aware:
-            # links aren't needed
-            return
-
-        # When a charm is force-upgraded and a unit is in an error state Juju
-        # does not run upgrade-charm and instead runs the failed hook followed
-        # by config-changed. Given the nature of force-upgrading the hook setup
-        # code is not triggered on config-changed.
-        #
-        # 'start' event is included as Juju does not fire the install event for
-        # K8s charms https://bugs.launchpad.net/juju/+bug/1854635, fixed in juju 2.7.6 and 2.8
-        if self.event_name in ('install', 'start', 'upgrade_charm') or self.event_name.endswith(
-            '_storage_attached'
-        ):
-            pass
-
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
 
@@ -345,7 +327,6 @@ class _Manager:
 
     def _make_charm(self, framework: '_framework.Framework', dispatcher: _Dispatcher):
         charm = self._charm_class(framework)
-        dispatcher.ensure_event_links(charm)
         return charm
 
     def _setup_root_logging(self):
