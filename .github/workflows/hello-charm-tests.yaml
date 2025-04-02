@@ -7,6 +7,8 @@ on:
   pull_request:
   workflow_call:
 
+permissions: {}
+
 jobs:
   hello-charm-tests:
     runs-on: ubuntu-latest
@@ -28,6 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ matrix.charm-repo }}
+          persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Remove 'ops' from charm requirements.txt

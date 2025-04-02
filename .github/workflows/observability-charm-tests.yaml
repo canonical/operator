@@ -8,6 +8,8 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   o11y-charm-tests:
     runs-on: ubuntu-latest
@@ -27,6 +29,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ matrix.charm-repo }}
+          persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Install dependencies

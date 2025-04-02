@@ -6,6 +6,8 @@ on:
       - main
   pull_request:
 
+permissions: {}
+
 jobs:
   charmcraft-pack:
     runs-on: ubuntu-22.04
@@ -20,21 +22,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ matrix.charm-repo }}
+          persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          if [ -z "${{ github.event.pull_request.head.sha }}" ]
+          if [ -z "$CLONE_SHA" ]
           then
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
             # If on a PR, we need to reference the PR branch's repo and commit (not the GITHUB_SHA
             # temporary merge commit), because charmcraft pack does a git checkout which
             # can't see the temporary merge commit.
-            echo -e "\ngit+${{ github.event.pull_request.head.repo.clone_url }}@${{ github.event.pull_request.head.sha }}#egg=ops" >> requirements.txt
+            echo -e "\ngit+$CLONE_URL@$CLONE_SHA#egg=ops" >> requirements.txt
           fi
           cat requirements.txt
+        env:
+          CLONE_URL: ${{ github.event.pull_request.head.repo.clone_url }}
+          CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up LXD
         uses: canonical/setup-lxd@54a5806e490d92e207b57183cf111ed54bbdeff4

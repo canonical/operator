@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: '0 0 25 * *' # On the 25th of each month
 
+permissions: {}
+
 jobs:
   update-pins:
     runs-on: ubuntu-latest
@@ -14,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
+          persist-credentials: false
 
       - uses: ./.github/actions/update-charm-pins
         with:
