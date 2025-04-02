@@ -320,14 +320,10 @@ class _Manager:
         self.dispatcher.run_any_legacy_hook()
 
         self.framework = self._make_framework(self.dispatcher)
-        self.charm = self._make_charm(self.framework, self.dispatcher)
+        self.charm = self._charm_class(self.framework)
 
     def _load_charm_meta(self):
         return _charm.CharmMeta.from_charm_root(self._charm_root)
-
-    def _make_charm(self, framework: '_framework.Framework', dispatcher: _Dispatcher):
-        charm = self._charm_class(framework)
-        return charm
 
     def _setup_root_logging(self):
         # For actions, there is a communication channel with the user running the
