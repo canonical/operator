@@ -454,6 +454,3 @@ Also, you can reach Prometheus in your web browser (similar to Grafana) at `http
 For the full code see: [05_cos_integration](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/05_cos_integration)
 
 For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/04_create_actions...05_cos_integration)
-
-> **See next: {ref}`Write units tests for your charm <write-unit-tests-for-your-charm>`**
-

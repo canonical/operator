@@ -297,7 +297,7 @@ class Harness(Generic[CharmType]):
         self._charm_cls = charm_cls
         self._charm: Optional[CharmType] = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
-        self._meta = self._create_meta(meta, actions)
+        self._meta = self._create_meta(meta, actions, config)
         self._unit_name: str = f'{self._meta.name}/0'
         self._hooks_enabled: bool = True
         self._relation_id_counter: int = 0
@@ -559,13 +559,15 @@ class Harness(Generic[CharmType]):
         self,
         charm_metadata_yaml: Optional[YAMLStringOrFile],
         action_metadata_yaml: Optional[YAMLStringOrFile],
+        config_metadata_yaml: Optional[YAMLStringOrFile],
     ) -> CharmMeta:
         """Create a CharmMeta object.
 
         Handle the cases where a user doesn't supply explicit metadata snippets.
         This will try to load metadata from ``<charm_dir>/charmcraft.yaml`` first, then
         ``<charm_dir>/metadata.yaml`` if charmcraft.yaml does not include metadata,
-        and ``<charm_dir>/actions.yaml`` if charmcraft.yaml does not include actions.
+        and ``<charm_dir>/actions.yaml`` and ``<charm_dir>/config.yaml`` if
+        charmcraft.yaml does not include actions or config.
         """
         try:
             filename = inspect.getfile(self._charm_cls)
@@ -625,7 +627,25 @@ class Harness(Generic[CharmType]):
                     action_metadata = yaml.safe_load(actions_path.read_text())
                     self._charm_dir = charm_dir
 
-        return CharmMeta(charm_metadata, action_metadata)
+        config_metadata: Optional[Dict[str, Any]] = None
+        # Load config from parameters if provided
+        if config_metadata_yaml is not None:
+            if isinstance(config_metadata_yaml, str):
+                config_metadata_yaml = dedent(config_metadata_yaml)
+            config_metadata = yaml.safe_load(config_metadata_yaml)
+        else:
+            # Check charmcraft.yaml for config if no config is provided
+            if charmcraft_metadata is not None and 'config' in charmcraft_metadata:
+                config_metadata = charmcraft_metadata['config']
+
+            # Still no config, check config.yaml
+            if charm_dir and config_metadata is None:
+                config_path = charm_dir / 'config.yaml'
+                if config_path.is_file():
+                    config_metadata = yaml.safe_load(config_path.read_text())
+                    self._charm_dir = charm_dir
+
+        return CharmMeta(charm_metadata, action_metadata, config_metadata)
 
     def _get_config(self, charm_config_yaml: Optional['YAMLStringOrFile']):
         """If the user passed a config to Harness, use it.

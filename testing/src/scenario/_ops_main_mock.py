@@ -158,8 +158,13 @@ class Ops(_Manager):
             actions_metadata = actions_meta.read_text()
         else:
             actions_metadata = None
+        config_meta = self._charm_root / "config.yaml"
+        if config_meta.exists():
+            config_metadata = config_meta.read_text()
+        else:
+            config_metadata = None
 
-        return ops.CharmMeta.from_yaml(metadata, actions_metadata)
+        return ops.CharmMeta.from_yaml(metadata, actions_metadata, config_metadata)
 
     def _setup_root_logging(self):
         # The warnings module captures this in _showwarning_orig, but we

@@ -257,7 +257,7 @@ def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         event.add_status(ops.WaitingStatus('Waiting for database relation'))
     try:
         status = self.container.get_service(self.pebble_service_name)
-    except (ops.pebble.APIError, ops.ModelError):
+    except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
         event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
     else:
         if not status.is_running():
@@ -358,6 +358,166 @@ This should produce something similar to the output below (of course, with the n
 ```
 
 Congratulations, your relation with PostgreSQL is functional!
+
+## Write unit tests
+
+Now that our charm uses `fetch_postgres_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_postgres_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
+
+```python
+def test_relation_data():
+    ctx = testing.Context(FastAPIDemoCharm)
+    relation = testing.Relation(
+        endpoint="database",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
+        remote_app_data={
+            "endpoints": "example.com:5432",
+            "username": "foo",
+            "password": "bar",
+        },
+    )
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        relations={relation},
+        leader=True,
+    )
+
+    ctx.run(ctx.on.relation_changed(relation), state_in)
+
+    assert container.layers["fastapi_demo"].services["fastapi-service"].environment == {
+        "DEMO_SERVER_DB_HOST": "example.com",
+        "DEMO_SERVER_DB_PORT": "5432",
+        "DEMO_SERVER_DB_USER": "foo",
+        "DEMO_SERVER_DB_PASSWORD": "bar",
+    }
+```
+
+In this chapter, we also defined a new method `_on_collect_status` that checks various things, including whether the required database relation exists. If the relation doesn't exist, we wait and set the unit status to `blocked`. We can also add a test to cover this behaviour:
+
+```python
+def test_no_database_blocked():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        leader=True,
+    )  # We've omitted relation data from the input state.
+
+    state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
+
+    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
+```
+
+Run `tox -e unit` to make sure all test cases pass.
+
+## Write an integration test
+
+Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
+
+```python
+async def test_build_and_deploy(ops_test: OpsTest):
+    """Build the charm-under-test and deploy it together with related charms.
+
+    Assert on the unit status before any relations/configurations take place.
+    """
+    # Build and deploy charm from local source folder
+    charm = await ops_test.build_charm(".")
+    resources = {
+        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
+    }
+
+    # Deploy the charm and wait for blocked/idle status
+    # The app will not be in active status as this requires a database relation
+    await asyncio.gather(
+        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
+        ops_test.model.wait_for_idle(
+            apps=[APP_NAME], status="blocked", raise_on_blocked=False, timeout=300
+        ),
+    )
+```
+
+Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
+
+In your `tests/integration/test_charm.py` file add the following test case:
+
+```python
+@pytest.mark.abort_on_fail
+async def test_database_integration(ops_test: OpsTest):
+    """Verify that the charm integrates with the database.
+
+    Assert that the charm is active if the integration is established.
+    """
+    await ops_test.model.deploy(
+        application_name="postgresql-k8s",
+        entity_url="postgresql-k8s",
+        channel="14/stable",
+    )
+    await ops_test.model.integrate(f"{APP_NAME}", "postgresql-k8s")
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300
+    )
+
+```
+
+```{important}
+
+If you run one test and then the other as separate `pytest ...` invocations, then two separate models will be created unless you pass `--model=some-existing-model` to inform pytest-operator to use a model you provide.
+
+```
+
+In your Multipass Ubuntu VM, run the test again:
+
+```text
+ubuntu@charm-dev:~/fastapi-demo$ tox -e integration
+```
+
+The test may again take some time to run.
+
+```{tip}
+
+To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results.
+
+```
+
+When it's done, the output should show two passing tests:
+
+```text
+...
+  demo-api-charm/0 [idle] waiting: Waiting for database relation
+INFO     juju.model:model.py:2759 Waiting for model:
+  demo-api-charm/0 [idle] active: 
+PASSED
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:783 Model status:
+
+Model            Controller       Cloud/Region        Version  SLA          Timestamp
+test-charm-2ara  main-controller  microk8s/localhost  3.1.5    unsupported  09:45:56+02:00
+
+App             Version  Status  Scale  Charm           Channel    Rev  Address        Exposed  Message
+demo-api-charm  1.0.1    active      1  demo-api-charm               0  10.152.183.99  no       
+postgresql-k8s  14.7     active      1  postgresql-k8s  14/stable   73  10.152.183.50  no       
+
+Unit               Workload  Agent  Address       Ports  Message
+demo-api-charm/0*  active    idle   10.1.208.77          
+postgresql-k8s/0*  active    idle   10.1.208.107         
+
+INFO     pytest_operator.plugin:plugin.py:789 Juju error logs:
+
+
+INFO     pytest_operator.plugin:plugin.py:877 Resetting model test-charm-2ara...
+INFO     pytest_operator.plugin:plugin.py:866    Destroying applications demo-api-charm
+INFO     pytest_operator.plugin:plugin.py:866    Destroying applications postgresql-k8s
+INFO     pytest_operator.plugin:plugin.py:882 Not waiting on reset to complete.
+INFO     pytest_operator.plugin:plugin.py:855 Forgetting main...
+
+
+========================================================================================================================================================================== 2 passed in 290.23s (0:04:50) ==========================================================================================================================================================================
+  integration: OK (291.01=setup[0.04]+cmd[290.97] seconds)
+  congratulations :) (291.05 seconds)
+```
+
+Congratulations, with this integration test you have verified that your charms relation to PostgreSQL works as well!
 
 ## Review the final code
 

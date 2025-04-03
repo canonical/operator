@@ -59,7 +59,6 @@ jobs:
           - charm-repo: canonical/temporal-worker-k8s-operator
           - charm-repo: canonical/traefik-k8s-operator
           - charm-repo: canonical/trino-k8s-operator
-          - charm-repo: canonical/vault-k8s-operator
           - charm-repo: canonical/wordpress-k8s-operator
           - charm-repo: canonical/zookeeper-operator
     steps:

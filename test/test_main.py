@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import dataclasses
 import importlib.util
 import io
 import logging
@@ -56,44 +57,25 @@ class SymlinkTargetError(Exception):
     pass
 
 
+@dataclasses.dataclass(frozen=True)
 class EventSpec:
-    def __init__(
-        self,
-        event_type: typing.Type[ops.EventBase],
-        event_name: str,
-        env_var: typing.Optional[str] = None,
-        relation_id: typing.Optional[int] = None,
-        remote_app: typing.Optional[str] = None,
-        remote_unit: typing.Optional[str] = None,
-        model_name: typing.Optional[str] = None,
-        set_in_env: typing.Optional[typing.Dict[str, str]] = None,
-        workload_name: typing.Optional[str] = None,
-        notice_id: typing.Optional[str] = None,
-        notice_type: typing.Optional[str] = None,
-        notice_key: typing.Optional[str] = None,
-        departing_unit_name: typing.Optional[str] = None,
-        secret_id: typing.Optional[str] = None,
-        secret_label: typing.Optional[str] = None,
-        secret_revision: typing.Optional[str] = None,
-        check_name: typing.Optional[str] = None,
-    ):
-        self.event_type = event_type
-        self.event_name = event_name
-        self.env_var = env_var
-        self.relation_id = relation_id
-        self.remote_app = remote_app
-        self.remote_unit = remote_unit
-        self.departing_unit_name = departing_unit_name
-        self.model_name = model_name
-        self.set_in_env = set_in_env
-        self.workload_name = workload_name
-        self.notice_id = notice_id
-        self.notice_type = notice_type
-        self.notice_key = notice_key
-        self.secret_id = secret_id
-        self.secret_label = secret_label
-        self.secret_revision = secret_revision
-        self.check_name = check_name
+    event_type: typing.Type[ops.EventBase]
+    event_name: str
+    env_var: typing.Optional[str] = None
+    relation_id: typing.Optional[int] = None
+    remote_app: typing.Optional[str] = None
+    remote_unit: typing.Optional[str] = None
+    model_name: typing.Optional[str] = None
+    set_in_env: typing.Optional[typing.Dict[str, str]] = None
+    workload_name: typing.Optional[str] = None
+    notice_id: typing.Optional[str] = None
+    notice_type: typing.Optional[str] = None
+    notice_key: typing.Optional[str] = None
+    departing_unit_name: typing.Optional[str] = None
+    secret_id: typing.Optional[str] = None
+    secret_label: typing.Optional[str] = None
+    secret_revision: typing.Optional[str] = None
+    check_name: typing.Optional[str] = None
 
 
 @patch('ops._main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
@@ -183,7 +165,7 @@ class TestCharmInit:
             juju_backend_available.return_value = False
             with pytest.raises(
                 RuntimeError,
-                match='charm set use_juju_for_storage=True, but Juju .* does not support it',
+                match=r'charm set use_juju_for_storage=True, but Juju .* does not support it',
             ):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
@@ -930,14 +912,14 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script.calls()]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
-        assert re.search('Using local storage: not a Kubernetes podspec charm', calls.pop(0))
-        assert re.search('Initializing SQLite local storage: ', calls.pop(0))
+        assert 'Using local storage: not a Kubernetes podspec charm' in calls.pop(0)
+        assert 'Initializing SQLite local storage: ' in calls.pop(0)
         assert re.search(
-            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
-            'Traceback .most recent call last.:\n'
-            '  .*'
-            "    raise RuntimeError.'failing as requested'.\n"
-            'RuntimeError: failing as requested',
+            r'(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
+            r'Traceback .most recent call last.:\n'
+            r'  .*'
+            r"    raise RuntimeError.'failing as requested'.\n"
+            r'RuntimeError: failing as requested',
             calls[0],
         )
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
@@ -1064,7 +1046,7 @@ class TestMainWithNoDispatch(_TestMain):
     ):
         """Test auto-creation of symlinks caused by initial events."""
         all_event_hooks = [
-            f"hooks/{name.replace('_', '-')}"
+            f'hooks/{name.replace("_", "-")}'
             for name, event_source in self.charm_module.Charm.on.events().items()
             if issubclass(event_source.event_type, (ops.CommitEvent, ops.PreCommitEvent))
         ]
@@ -1156,7 +1138,7 @@ class _TestMainWithDispatch(_TestMain):
         Symlink creation caused by initial events should _not_ happen when using dispatch.
         """
         all_event_hooks = [
-            f"hooks/{e.replace('_', '-')}" for e in self.charm_module.Charm.on.events()
+            f'hooks/{e.replace("_", "-")}' for e in self.charm_module.Charm.on.events()
         ]
         initial_events = {
             EventSpec(ops.InstallEvent, 'install'),
@@ -1168,9 +1150,9 @@ class _TestMainWithDispatch(_TestMain):
         def _assess_event_links(event_spec: EventSpec):
             assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
             for event_hook in all_event_hooks:
-                assert not (
-                    self.JUJU_CHARM_DIR / event_hook
-                ).exists(), f'Spurious hook: {event_hook}'
+                assert not (self.JUJU_CHARM_DIR / event_hook).exists(), (
+                    f'Spurious hook: {event_hook}'
+                )
 
         for initial_event in initial_events:
             self._setup_charm_dir(request)
@@ -1209,7 +1191,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1240,7 +1222,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1331,7 +1313,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected
 

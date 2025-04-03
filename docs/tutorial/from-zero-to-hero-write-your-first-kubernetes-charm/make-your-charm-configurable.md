@@ -104,7 +104,7 @@ def _update_layer_and_restart(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
         self.unit.status = ops.ActiveStatus()
-    except ops.pebble.APIError:
+    except (ops.pebble.APIError, ops.pebble.ConnectionError):
         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
@@ -181,6 +181,44 @@ demo-api-charm/0*  blocked   idle   10.1.157.74         invalid port number, 22 
 ```
 
 Congratulations, you now know how to make your charm configurable!
+
+## Write unit tests
+
+Since we added a new feature to configure `server-port` and use it in the `_pebble_layer` dynamically, we should write tests for the feature.
+
+First, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
+
+```python
+def test_config_changed():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        config={"server-port": 8080},
+        leader=True,
+    )
+    ctx.run(ctx.on.config_changed(), state_in)
+    assert "--port=8080" in container.layers["fastapi_demo"].services["fastapi-service"].command
+```
+
+In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
+
+```python
+def test_config_changed_invalid_port():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        config={"server-port": 22},
+        leader=True,
+    )
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    assert state_out.unit_status == testing.BlockedStatus(
+        "Invalid port number, 22 is reserved for SSH"
+    )
+```
+
+Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 

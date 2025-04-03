@@ -122,9 +122,10 @@ def test_observer_not_referenced_warning(
     assert 'Reference to ops.Object' in caplog.text
 
 
-def test_empty_action():
-    meta = ops.CharmMeta.from_yaml('name: my-charm', '')
+def test_empty_action_and_config():
+    meta = ops.CharmMeta.from_yaml('name: my-charm', '', '')
     assert meta.actions == {}
+    assert meta.config == {}
 
 
 def test_helper_properties(request: pytest.FixtureRequest):
@@ -495,6 +496,85 @@ def test_meta_from_charm_root():
         meta = ops.CharmMeta.from_charm_root(td)
         assert meta.name == 'bob'
         assert meta.requires['foo'].interface_name == 'bar'
+
+
+def test_config_from_charm_root():
+    with tempfile.TemporaryDirectory() as d:
+        td = pathlib.Path(d)
+        (td / 'config.yaml').write_text(
+            yaml.safe_dump({
+                'options': {
+                    'foo': {'type': 'string', 'default': 'bar'},
+                    'baz': {'type': 'int', 'default': 42},
+                    'qux': {'type': 'bool', 'default': True},
+                    'quux': {'type': 'float', 'default': 3.14},
+                    'sssh': {'type': 'secret', 'description': 'a user secret'},
+                }
+            })
+        )
+        (td / 'metadata.yaml').write_text(yaml.safe_dump({'name': 'bob'}))
+        meta = ops.CharmMeta.from_charm_root(td)
+        assert meta.name == 'bob'
+        assert meta.config['foo'].type == 'string'
+        assert meta.config['foo'].default == 'bar'
+        assert meta.config['baz'].type == 'int'
+        assert meta.config['baz'].default == 42
+        assert meta.config['qux'].type == 'bool'
+        assert meta.config['qux'].default  # == True
+        assert meta.config['quux'].type == 'float'
+        assert meta.config['quux'].default == 3.14
+        assert meta.config['sssh'].type == 'secret'
+        assert meta.config['sssh'].description == 'a user secret'
+
+
+def test_config_from_yaml():
+    options = yaml.safe_dump({
+        'options': {
+            'foo': {'type': 'string', 'default': 'bar'},
+            'baz': {'type': 'int', 'default': 42},
+            'qux': {'type': 'bool', 'default': True},
+            'quux': {'type': 'float', 'default': 3.14},
+            'sssh': {'type': 'secret', 'description': 'a user secret'},
+        }
+    })
+    metadata = yaml.safe_dump({'name': 'bob'})
+    meta = ops.CharmMeta.from_yaml(metadata, config=options)
+    assert meta.name == 'bob'
+    assert meta.config['foo'].type == 'string'
+    assert meta.config['foo'].default == 'bar'
+    assert meta.config['baz'].type == 'int'
+    assert meta.config['baz'].default == 42
+    assert meta.config['qux'].type == 'bool'
+    assert meta.config['qux'].default  # == True
+    assert meta.config['quux'].type == 'float'
+    assert meta.config['quux'].default == 3.14
+    assert meta.config['sssh'].type == 'secret'
+    assert meta.config['sssh'].description == 'a user secret'
+
+
+def test_config_from_raw():
+    options = {
+        'options': {
+            'foo': {'type': 'string', 'default': 'bar'},
+            'baz': {'type': 'int', 'default': 42},
+            'qux': {'type': 'bool', 'default': True},
+            'quux': {'type': 'float', 'default': 3.14},
+            'sssh': {'type': 'secret', 'description': 'a user secret'},
+        },
+    }
+    metadata = {'name': 'bob'}
+    meta = ops.CharmMeta(raw=metadata, config_raw=options)
+    assert meta.name == 'bob'
+    assert meta.config['foo'].type == 'string'
+    assert meta.config['foo'].default == 'bar'
+    assert meta.config['baz'].type == 'int'
+    assert meta.config['baz'].default == 42
+    assert meta.config['qux'].type == 'bool'
+    assert meta.config['qux'].default  # == True
+    assert meta.config['quux'].type == 'float'
+    assert meta.config['quux'].default == 3.14
+    assert meta.config['sssh'].type == 'secret'
+    assert meta.config['sssh'].description == 'a user secret'
 
 
 def test_actions_from_charm_root():
