@@ -61,10 +61,9 @@ from typing import (
 
 from . import charm as _charm
 from . import pebble
-from ._private import timeconv, yaml
+from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
-from .version import tracer
 
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.

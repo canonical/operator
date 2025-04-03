@@ -52,7 +52,7 @@ import opentelemetry.trace
 from . import charm
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
-from .version import tracer
+from ._private import tracer
 
 
 class Serializable(typing.Protocol):

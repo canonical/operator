@@ -28,9 +28,10 @@ from . import charm as _charm
 from . import framework as _framework
 from . import model as _model
 from . import storage as _storage
+from ._private import tracer
 from .jujucontext import _JujuContext
 from .log import setup_root_logging
-from .version import tracer, version
+from .version import version
 
 CHARM_STATE_FILE = '.unit-state.db'
 

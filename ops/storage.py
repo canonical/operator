@@ -27,7 +27,7 @@ from typing import Any, Callable, Generator, List, Optional, Tuple, Union, cast
 
 import yaml
 
-from .version import tracer
+from ._private import tracer
 
 logger = logging.getLogger()
 
