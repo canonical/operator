@@ -499,8 +499,7 @@ class RelationEvent(HookEvent):
         self.relation = relation
         if app is None:
             logger.warning(
-                "'app' expected but not received, "
-                'see https://bugs.launchpad.net/juju/+bug/1960934'
+                "'app' expected but not received, see https://bugs.launchpad.net/juju/+bug/1960934"
             )
             # Do an explicit assignment here so that we can contain the type: ignore.
             self.app = None  # type: ignore

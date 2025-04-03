@@ -50,9 +50,9 @@ from typing import (
 import opentelemetry.trace
 
 from . import charm
+from ._private import tracer
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
-from ._private import tracer
 
 
 class Serializable(typing.Protocol):
