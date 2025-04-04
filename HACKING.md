@@ -24,7 +24,7 @@ tox -e unit
 tox -e unit -- test/test_charm.py
 
 # Format the code using Ruff
-tox -e fmt
+tox -e format
 
 # Compile the requirements.txt file for docs
 tox -e docs-deps
