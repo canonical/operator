@@ -131,6 +131,14 @@ class Ops(_Manager):
         self.charm_spec = charm_spec
         self.store = None
 
+        try:
+            import ops_tracing._mock  # break circular import
+
+            self._tracing_mock = ops_tracing._mock.patch_tracing()
+            self._tracing_mock.__enter__()
+        except ImportError:
+            self._tracing_mock = None
+
         model_backend = _MockModelBackend(
             state=state,
             event=event,
@@ -273,3 +281,8 @@ class Ops(_Manager):
         self.state = dataclasses.replace(
             self.state, deferred=deferred, stored_states=stored_state
         )
+
+    def _destroy(self):
+        super()._destroy()
+        if self._tracing_mock:
+            self._tracing_mock.__exit__(None, None, None)

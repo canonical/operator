@@ -15,6 +15,8 @@
 """Representations of Juju's model, application, unit, and other entities."""
 
 import collections
+import contextlib
+import contextvars
 import dataclasses
 import datetime
 import enum
@@ -59,7 +61,7 @@ from typing import (
 
 from . import charm as _charm
 from . import pebble
-from ._private import timeconv, yaml
+from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 
@@ -3379,6 +3381,15 @@ class _ModelBackend:
         self._is_leader: Optional[bool] = None
         self._leader_check_time = None
         self._hook_is_running = ''
+        self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
+
+    @contextlib.contextmanager
+    def _prevent_recursion(self):
+        token = self._is_recursive.set(True)
+        try:
+            yield
+        finally:
+            self._is_recursive.reset(token)
 
     def _run(
         self,
@@ -3387,35 +3398,51 @@ class _ModelBackend:
         use_json: bool = False,
         input_stream: Optional[str] = None,
     ) -> Union[str, Any, None]:
-        kwargs = {
-            'stdout': subprocess.PIPE,
-            'stderr': subprocess.PIPE,
-            'check': True,
-            'encoding': 'utf-8',
-        }
-        if input_stream:
-            kwargs.update({'input': input_stream})
-        which_cmd = shutil.which(args[0])
-        if which_cmd is None:
-            raise RuntimeError(f'command not found: {args[0]}')
-        args = (which_cmd,) + args[1:]
-        if use_json:
-            args += ('--format=json',)
-        # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
-        #                been fighting with Pyright for half an hour now...
-        try:
-            result = subprocess.run(args, **kwargs)  # type: ignore
-        except subprocess.CalledProcessError as e:
-            raise ModelError(e.stderr) from e
-        if return_output:
-            if result.stdout is None:  # type: ignore
-                return ''
-            else:
-                text: str = result.stdout  # type: ignore
-                if use_json:
-                    return json.loads(text)  # type: ignore
+        if self._is_recursive.get():
+            # Either `juju-log` hook tool failed or there's a bug in ops.
+            return
+        # Logs are collected via log integration, omit the subprocess calls that push
+        # the same content to juju from telemetry.
+        mgr = (
+            self._prevent_recursion()
+            if args[0] == 'juju-log'
+            else tracer.start_as_current_span(args[0])
+        )
+        with mgr as span:
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+                'check': True,
+                'encoding': 'utf-8',
+            }
+            if input_stream:
+                kwargs.update({'input': input_stream})
+            which_cmd = shutil.which(args[0])
+            if which_cmd is None:
+                raise RuntimeError(f'command not found: {args[0]}')
+            args = (which_cmd,) + args[1:]
+            if use_json:
+                args += ('--format=json',)
+            if span:
+                span.set_attribute('call', 'subprocess.run')
+                # Some hook tool command line arguments may include sensitive data.
+                truncate = args[0] in ['action-set']
+                span.set_attribute('argv', [args[0], '...'] if truncate else args)
+            # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
+            #                been fighting with Pyright for half an hour now...
+            try:
+                result = subprocess.run(args, **kwargs)  # type: ignore
+            except subprocess.CalledProcessError as e:
+                raise ModelError(e.stderr) from e
+            if return_output:
+                if result.stdout is None:  # type: ignore
+                    return ''
                 else:
-                    return text  # type: ignore
+                    text: str = result.stdout  # type: ignore
+                    if use_json:
+                        return json.loads(text)  # type: ignore
+                    else:
+                        return text  # type: ignore
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
