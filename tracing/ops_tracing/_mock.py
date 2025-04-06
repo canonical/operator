@@ -19,6 +19,7 @@ import logging
 import pathlib
 from typing import Generator
 
+import opentelemetry.trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -29,6 +30,9 @@ from . import _backend
 
 @contextlib.contextmanager
 def patch_tracing() -> Generator[None, None, None]:
+    # OTEL tries hard to prevent tracing provider from being set twice
+    real_otel_provider = opentelemetry.trace._TRACER_PROVIDER
+    real_otel_once_done = opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done
     real_create_provider = _backend._create_provider
     real_log_to_events = _backend.LogsToEvents
     _backend._create_provider = _create_provider
@@ -38,6 +42,8 @@ def patch_tracing() -> Generator[None, None, None]:
     finally:
         _backend._create_provider = real_create_provider
         _backend.LogsToEvents = real_log_to_events
+        opentelemetry.trace._TRACER_PROVIDER = real_otel_provider
+        opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done = real_otel_once_done
 
 
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:

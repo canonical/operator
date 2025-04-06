@@ -14,7 +14,63 @@
 
 from __future__ import annotations
 
+import pathlib
 
-def test_mark_observed(): ...
-def test_mark_observed_no_ids(): ...
-def test_mark_observed_missing_ids(): ...
+from ops_tracing._buffer import Buffer, OBSERVED_PRIORITY  # type: ignore
+
+
+def setup_buffer_with_data(path: pathlib.Path, ids: list[int]) -> Buffer:
+    buf = Buffer(path)
+    buf.observed = False
+
+    with buf.tx() as conn:
+        for i in ids:
+            conn.execute(
+                "INSERT INTO tracing(id, priority, data, mime) VALUES (?, ?, ?, ?)",
+                (i, 0, b'data', 'application/octet-stream'),
+            )
+            buf.ids.add(i)
+    return buf
+
+
+def test_mark_observed(tmp_path: pathlib.Path):
+    buf = setup_buffer_with_data(tmp_path / "db", [1, 2, 3])
+
+    buf.mark_observed()
+
+    with buf.tx(readonly=True) as conn:
+        ids: set[int] = set()
+        for row in conn.execute("SELECT id, priority FROM tracing"):
+            assert row[1] == OBSERVED_PRIORITY
+            ids.add(row[0])
+        assert ids == {1, 2, 3}
+        assert buf.observed is True
+        assert not buf.ids
+
+
+def test_mark_observed_no_ids(tmp_path: pathlib.Path):
+    buf = setup_buffer_with_data(tmp_path / "db", [])
+
+    buf.mark_observed()
+
+    assert buf.observed
+    assert not buf.ids
+
+    with buf.tx(readonly=True) as conn:
+        assert not list(conn.execute("SELECT id FROM tracing"))
+
+
+def test_mark_observed_missing_ids(tmp_path: pathlib.Path):
+    buf = setup_buffer_with_data(tmp_path / "db", [1, 2])
+    buf.ids.add(99)  # does not exist, will be ignored
+
+    buf.mark_observed()
+
+    with buf.tx(readonly=True) as conn:
+        priorities = {
+            row[0]: row[1]
+            for row in conn.execute("SELECT id, priority FROM tracing")
+        }
+        assert priorities == {1: OBSERVED_PRIORITY, 2: OBSERVED_PRIORITY}
+        assert buf.observed is True
+        assert not buf.ids

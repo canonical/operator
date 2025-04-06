@@ -131,4 +131,6 @@ def mark_observed() -> None:
 
 def shutdown_tracing() -> None:
     """Shutdown tracing, which is expected to flush the buffered data out."""
-    get_tracer_provider().shutdown()  # type: ignore
+    provider = get_tracer_provider()
+    if isinstance(provider, TracerProvider):
+        provider.shutdown()
