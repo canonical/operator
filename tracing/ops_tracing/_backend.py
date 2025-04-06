@@ -103,7 +103,9 @@ def set_destination(url: str | None, ca: str | None) -> None:
     """Configure the destination service for tracing data.
 
     Args:
-        url: the URL of the telemetry service to send tracing data to
+        url: the URL of the telemetry service to send tracing data to.
+            An example could be ``http://localhost/v1/traces``.
+            None or empty string disables sending out the data, which is still buffered.
         ca: the CA list (PEM bundle, a multi-line string), only used for HTTPS URLs.
     """
     if url and not url.startswith(('http://', 'https://')):

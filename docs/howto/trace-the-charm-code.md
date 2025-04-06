@@ -47,4 +47,6 @@ When ``ops[tracing]`` is added to your charm's dependencies.
 
 Outline: get the destination URL, call ``ops.tracing.set_destination(...)``.
 
+Notes: the ``url`` is a full URL, not a base URL; CA is a multi-line string.
+
 Details: that the URL is saved in the local database, only needs to be updated on change.

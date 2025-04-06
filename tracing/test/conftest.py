@@ -35,7 +35,7 @@ def http_relation():
             'receivers': json.dumps([
                 {
                     'protocol': {'name': 'otlp_http', 'type': 'http'},
-                    'url': 'http://tracing.example:4318/v1/traces',
+                    'url': 'http://tracing.example:4318/',
                 }
             ]),
         },
@@ -50,7 +50,7 @@ def https_relation():
             'receivers': json.dumps([
                 {
                     'protocol': {'name': 'otlp_http', 'type': 'http'},
-                    'url': 'https://tls.example/v1/traces',
+                    'url': 'https://tls.example/',
                 }
             ]),
         },

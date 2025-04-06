@@ -150,10 +150,8 @@ class Buffer:
         """Update the tracing destination in the database."""
         with self.tx() as conn:
             conn.execute(
-                """REPLACE INTO settings(key, value) VALUES('url', ?)""", (config.url or '',)
-            )
-            conn.execute(
-                """REPLACE INTO settings(key, value) VALUES('ca', ?)""", (config.ca or '',)
+                """REPLACE INTO settings(key, value) VALUES ('url', ?), ('ca', ?)""",
+                (config.url or '', config.ca or ''),
             )
 
     @retry

@@ -195,14 +195,16 @@ class Tracing(ops.Object):
             if not self._tracing.is_ready():
                 return Config(None, None)
 
-            url = self._tracing.get_endpoint('otlp_http')
+            base_url = self._tracing.get_endpoint('otlp_http')
 
-            if not url:
+            if not base_url:
                 return Config(None, None)
 
-            if not url.startswith(('http://', 'https://')):
-                logger.warning(f'The {url=} must be an HTTP or an HTTPS URL')
+            if not base_url.startswith(('http://', 'https://')):
+                logger.warning(f'The {base_url=} must be an HTTP or an HTTPS URL')
                 return Config(None, None)
+
+            url = f'{base_url.rstrip("/")}/v1/traces'
 
             if url.startswith('http://'):
                 return Config(url, None)
