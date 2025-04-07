@@ -24,8 +24,6 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
-import opentelemetry.trace
-
 from . import charm as _charm
 from . import framework as _framework
 from . import model as _model
@@ -399,8 +397,8 @@ class _Manager:
         self._juju_context = juju_context
         self._tracing = tracing._setup(juju_context, name) if tracing else contextlib.nullcontext()
         self._tracing.__enter__()
-        self._root_span = tracer.start_span('ops.main')
-        opentelemetry.trace.set_span_in_context(self._root_span)
+        self._tracing_context = tracer.start_as_current_span('ops.main')
+        self._tracing_context.__enter__()
         self._charm_state_path = charm_state_path
         self._charm_class = charm_class
         if model_backend is None:
@@ -563,8 +561,9 @@ class _Manager:
 
     def _destroy(self):
         """Finalise the manager."""
-        self._root_span.end()
-        self._tracing.__exit__(None, None, None)
+        exc_info = sys.exc_info()
+        self._tracing_context.__exit__(*exc_info)
+        self._tracing.__exit__(*exc_info)
 
     def run(self):
         """Emit and then commit the framework."""
