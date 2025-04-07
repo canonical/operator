@@ -19,7 +19,7 @@ import dataclasses
 EXPORT_TIMEOUT: int | float = 1  # seconds
 """How much time to give OTLP span exporter to push traces to the backend."""
 
-SENDOUT_FACTOR: int = 2
+SENDOUT_FACTOR: int = 10
 """How many buffered chunks to send out for each incoming chunk."""
 
 BUFFER_FILE: str = '.tracing-data.db'
