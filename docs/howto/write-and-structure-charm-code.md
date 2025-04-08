@@ -162,7 +162,8 @@ In your `src/charm.py` file, define a class for managing the charm's interface w
 You'll have a single class that inherits from [](ops.CharmBase).
 Arrange the methods of this class in the following order:
 
-1. An `__init__` method that observes all relevant events and instantiates objects.
+1. An `__init__` method that observes all relevant events and instantiates any objects that
+   the charm needs.
    For example, in a Kubernetes charm:
    ```python
    def __init__(self, framework: ops.Framework):
