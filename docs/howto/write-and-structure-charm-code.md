@@ -157,30 +157,34 @@ control, so that exact versions of charms can be reproduced.
 (design-your-python-modules)=
 ## Design your Python modules
 
-In your `src/charm.py` file, define the charm class and manage the charm's interface
-with Juju: set up the event observation and add the handlers. For each workload
-that the charm manages, add a `{workload}.py` file that contains methods for
-interacting with the workload.
+In your `src/charm.py` file, define a class for managing the charm's interface with Juju.
 
-```{note}
-If there is an existing Python library for managing your workload, use that
-rather than creating a `<workload>.py` file yourself.
+You'll have a single class that inherits from [](ops.CharmBase).
+Arrange the methods of this class in the following order:
+
+1. An `__init__` method that observes all relevant events and instantiates objects.
+   For example, in a Kubernetes charm:
+   ```python
+   framework.observe(self.on["workload_container"].pebble_ready, self._on_pebble_ready)
+   self.container = self.unit.get_container("workload-container")
+   ```
+2. Event handlers, in the order that they're observed in `__init__`.
+   Make the event handlers private.
+   For example, `def _on_pebble_ready(...)` instead of `def on_pebble_ready(...)`.
+3. Other helper methods, which can be public. If you're writing a charm that will be extended
+   by other charms, you could use private helper methods instead.
+
+```{admonition} Best practice
+:class: hint
+
+If an event handler needs to pass event data to a helper method, extract the relevant data
+from the event object and pass that data to the helper method. Don't pass the event object itself.
+This approach will make it easier to write unit tests for the charm.
 ```
 
-In your `src/charm.py` file, you will have a single class inheriting from
-[](ops.CharmBase). Arrange the content of that charm in the following order:
-
-1. An `__init__` that instantiates any needed library objects and then observes
-   all relevant events.
-2. Event handlers, in the order that they are observed in the `__init__` method.
-   Note that these handlers should all be private to the class.
-   For example, `def _on_install(...)` instead of `def on_install(...)`.
-3. Public methods.
-3. Other private methods.
-
-```{tip}
-Use private methods or module-level functions rather than nested functions.
-```
+For each workload that the charm manages, create a file called `src/<workload>.py` that contains
+functions for interacting with the workload. If there's an existing Python library for managing a
+workload, use the existing library instead of creating your own file.
 
 (handle-errors)=
 ## Handle errors
