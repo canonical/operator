@@ -165,8 +165,10 @@ Arrange the methods of this class in the following order:
 1. An `__init__` method that observes all relevant events and instantiates objects.
    For example, in a Kubernetes charm:
    ```python
-   framework.observe(self.on["workload_container"].pebble_ready, self._on_pebble_ready)
-   self.container = self.unit.get_container("workload-container")
+   def __init__(self, framework: ops.Framework):
+       super().__init__(framework)
+       framework.observe(self.on["workload_container"].pebble_ready, self._on_pebble_ready)
+       self.container = self.unit.get_container("workload-container")
    ```
 2. Event handlers, in the order that they're observed in `__init__`.
    Make the event handlers private.
