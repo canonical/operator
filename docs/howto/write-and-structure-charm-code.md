@@ -186,6 +186,84 @@ For each workload that the charm manages, create a file called `src/<workload>.p
 functions for interacting with the workload. If there's an existing Python library for managing a
 workload, use the existing library instead of creating your own file.
 
+### Example
+
+Suppose that you're writing a machine charm to manage a workload called Demo Server.
+Your charm code is in `src/charm.py`:
+
+```python
+#!/usr/bin/env python3
+# Copyright 2025 User
+# See LICENSE file for licensing details.
+
+"""A machine charm that manages the server."""
+
+import logging
+
+import ops
+
+import demo_server  # Provided by src/demo_server.py
+
+logger = logging.getLogger(__name__)
+
+
+class DemoServerCharm(ops.CharmBase):
+    """Manage the server."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_install(self, event: ops.InstallEvent):
+        """Install the server."""
+        demo_server.install()
+
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
+        self.unit.status = ops.MaintenanceStatus("starting server")
+        demo_server.start()
+        version = demo_server.get_version()
+        self.unit.set_workload_version(version)
+        self.unit.status = ops.ActiveStatus()
+
+
+if __name__ == "__main__":  # pragma: nocover
+    ops.main(DemoServerCharm)
+```
+
+Workload-specific logic is in `src/demo_server.py`:
+
+```python
+# Copyright 2025 User
+# See LICENSE file for licensing details.
+
+"""Functions for managing and interacting with the server."""
+
+import logging
+import subprocess
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+
+def install() -> None:
+    """Install the server from a snap."""
+    subprocess.run(["snap", "install", "demo-server"], capture_output=True, check=True)
+
+
+def start() -> None:
+    """Start the server."""
+    subprocess.run(["demo-server", "start"], capture_output=True, check=True)
+
+
+def get_version() -> str:
+    """Get the running version of the server."""
+    response = requests.get("http://localhost:5000/version", timeout=5)
+    return response.text
+```
+
 (handle-errors)=
 ## Handle errors
 
