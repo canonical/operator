@@ -174,8 +174,7 @@ Arrange the methods of this class in the following order:
 2. Event handlers, in the order that they're observed in `__init__`.
    Make the event handlers private.
    For example, `def _on_pebble_ready(...)` instead of `def on_pebble_ready(...)`.
-3. Other helper methods, which can be public. If you're writing a charm that will be extended
-   by other charms, you could use private helper methods instead.
+3. Other helper methods, which may be private or public.
 
 ```{admonition} Best practice
 :class: hint
