@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 from ._buffer import Config
 from ._export import BufferingSpanExporter
 
-BUFFER_FILE: str = '.tracing-data.db'
+BUFFER_FILENAME: str = '.tracing-data.db'
 """Name of the file whither data is buffered, located next to .unit-state.db."""
 
 
@@ -85,7 +85,7 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None, 
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
     """Create the OpenTelemetry tracer provider."""
     # Separate function so that it's easy to override in tests
-    exporter = BufferingSpanExporter(charm_dir / BUFFER_FILE)
+    exporter = BufferingSpanExporter(charm_dir / BUFFER_FILENAME)
     span_processor = BatchSpanProcessor(exporter)
     return TracerProvider(resource=resource, active_span_processor=span_processor)  # type: ignore
 
@@ -96,9 +96,9 @@ def get_exporter() -> BufferingSpanExporter | None:
         exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
     except AttributeError:
         # The global tracer provider was not configured by us and has a wrong processor.
-        return
+        return None
     if not exporter or not isinstance(exporter, BufferingSpanExporter):
-        return
+        return None
     return exporter
 
 

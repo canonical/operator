@@ -76,10 +76,9 @@ def retry(f: Callable[P, R]) -> Callable[P, R]:
                 return f(*args, **kwargs)
             except sqlite3.Error as e:  # noqa: PERF203
                 exc = e
-                continue
-        else:
-            assert exc  # noqa: S101  # we'd have returned otherwise
-            raise exc
+
+        assert exc  # noqa: S101  # we'd have returned otherwise
+        raise exc
 
     return wrapper
 
@@ -103,7 +102,7 @@ class Buffer:
         self._set_db_schema()
 
     @retry
-    def _set_db_schema(self):
+    def _set_db_schema(self) -> None:
         # TODO: measure the cost of this vs two-level approach:
         # - check table and index in read-only mode
         # - if needed, update the DSL
@@ -173,7 +172,7 @@ class Buffer:
             )
 
     @retry
-    def mark_observed(self):
+    def mark_observed(self) -> None:
         """Mark the tracing data collected in this dispatch as higher priority."""
         if self.observed:
             return
