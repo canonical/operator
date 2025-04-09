@@ -103,11 +103,6 @@ class Buffer:
 
     @retry
     def _set_db_schema(self) -> None:
-        # TODO: measure the cost of this vs two-level approach:
-        # - check table and index in read-only mode
-        # - if needed, update the DSL
-        # Note that ops storage sets u+rw, go-rw permissions
-        # should we follow suit?
         with self.tx(timeout=LONG_DB_TIMEOUT) as conn:
             conn.execute(
                 """

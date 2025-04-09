@@ -35,37 +35,6 @@ from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
 
 logger = logging.getLogger(__name__)
 
-# Databag operations can be trivially re-coded in pure Python:
-# - we'd get rid of pydantic dependency
-# - we'd avoid init-time relation listing and databag update (tracing)
-# - it's trivial to read the relation data bags, see below.
-#
-#
-# certificate_transfer:
-# - client doesn't write to the databag
-# - client reads this from the databag:
-# ```
-# {"certificates": list[str]}
-# ```
-#
-#
-# tracing:
-# - client leader sets own app data on every relation:
-# ```
-# {"receivers": ["otlp_http"]}
-# ```
-#
-# - client reads this from remote_app_data:
-# ```
-# {"receivers": [
-#     {
-#         "protocol": {"name": "otlp_http", "type": "http"},
-#         "url": "http//somewhere:4318/v1/traces",
-#     },
-#     ...,
-# ]}
-# ```
-
 
 class Tracing(ops.Object):
     """Initialise the tracing service.
@@ -132,15 +101,18 @@ class Tracing(ops.Object):
         self.ca_data = ca_data
 
         # Validate the arguments manually to raise exceptions with helpful messages.
-        if not (relation := self.charm.meta.relations.get(tracing_relation_name)):
+        relation = self.charm.meta.relations.get(tracing_relation_name)
+        if not relation:
             raise ValueError(f'{tracing_relation_name=} is not declared in charm metadata')
-        if (relation_role := relation.role) is not ops.RelationRole.requires:
+
+        if relation.role is not ops.RelationRole.requires:
             raise ValueError(
-                f"{tracing_relation_name=} {relation_role=} when 'requires' is expected"
+                f"{tracing_relation_name=} {relation.role=} when 'requires' is expected"
             )
-        if (interface_name := relation.interface_name) != 'tracing':
+
+        if relation.interface_name != 'tracing':
             raise ValueError(
-                f"{tracing_relation_name=} {interface_name=} when 'tracing' is expected"
+                f"{tracing_relation_name=} {relation.interface_name=} when 'tracing' is expected"
             )
 
         try:
@@ -166,15 +138,17 @@ class Tracing(ops.Object):
             self.framework.observe(event, self._reconcile)
 
         if ca_relation_name:
-            if not (relation := self.charm.meta.relations.get(ca_relation_name)):
+            relation = self.charm.meta.relations.get(ca_relation_name)
+            if not relation:
                 raise ValueError(f'{ca_relation_name=} is not declared in charm metadata')
-            if (relation_role := relation.role) is not ops.RelationRole.requires:
+
+            if relation.role is not ops.RelationRole.requires:
                 raise ValueError(
-                    f"{ca_relation_name=} {relation_role=} when 'requires' is expected"
+                    f"{ca_relation_name=} {relation.role=} when 'requires' is expected"
                 )
-            if (interface_name := relation.interface_name) != 'certificate_transfer':
+            if relation.interface_name != 'certificate_transfer':
                 raise ValueError(
-                    f"{ca_relation_name=} {interface_name=} when 'certificate_transfer' "
+                    f"{ca_relation_name=} {relation.interface_name=} when 'certificate_transfer' "
                     'is expected'
                 )
 
@@ -214,7 +188,8 @@ class Tracing(ops.Object):
             if not self._certificate_transfer:
                 return Destination(url, self.ca_data)
 
-            if not (ca := self._get_ca()):
+            ca = self._get_ca()
+            if not ca:
                 return Destination(None, None)
 
             return Destination(url, ca)
@@ -232,7 +207,8 @@ class Tracing(ops.Object):
         if not self.ca_relation_name:
             return None
 
-        if not (ca_rel := self.model.get_relation(self.ca_relation_name)):
+        ca_rel = self.model.get_relation(self.ca_relation_name)
+        if not ca_rel:
             return None
 
         if not self._certificate_transfer:
@@ -241,7 +217,8 @@ class Tracing(ops.Object):
         if not self._certificate_transfer.is_ready(ca_rel):
             return None
 
-        if not (ca_list := self._certificate_transfer.get_all_certificates(ca_rel.id)):
+        ca_list = self._certificate_transfer.get_all_certificates(ca_rel.id)
+        if not ca_list:
             return None
 
         return '\n'.join(sorted(ca_list))

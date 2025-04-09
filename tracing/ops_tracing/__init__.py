@@ -31,21 +31,26 @@ interface and optionally the TLS relation with a ``certificate_transfer`` interf
             optional: true
 
 If you're migrating from the ``charm-tracing`` charm lib, you most likely already
-have these relations, but do note their names.
+have relations like these. If the names of the relations differ from this recipe, please
+adjust the code on the rest of this page to your relation names.
 
-Caveat: your ``charmcraft.yaml`` needs to include the Rust build packages, because
-this library pulls in ``pydantic``.::
+.. hint::
+    Make sure to include the Rust build packages in your ``charmcraft.yaml``, because
+    this library depends on ``pydantic-core`` via ``pydantic``.
 
-    parts:
-        charm:
-            plugin: charm
-            source: .
-            build-packages:
-                - cargo
+    .. code-block:: yaml
 
-If you're migrating from the ``charm-tracing`` charm lib, that should already be the case.
+        parts:
+            charm:
+                plugin: charm
+                source: .
+                build-packages:
+                    - cargo
 
-In your charm, add the ``Tracing`` object.::
+    If you're migrating from the ``charm-tracing`` charm lib, this configuration is
+    likely already in place.
+
+In your charm, add and initialise the ``Tracing`` object.::
 
     import ops
 
@@ -59,9 +64,13 @@ In your charm, add the ``Tracing`` object.::
                 ca_relation_name='send-ca-cert',
             )
 
-Note that you don't have to ``import ops.tracing`` or ``import ops_tracing``.
-When ``ops[tracing]`` has been added to your charm's dependencies, the Ops
-library imports this library and re-exports it as ``ops.tracing``.
+The tracing relation name is required, while the CA relation name is optional,
+as it is possible to use a system certificate authority list, provide a custom
+list (for example from the ``certify`` package) or export the trace data over
+HTTP connections only. Declaring both relations is most common.
+
+Note that you don't have to ``import ops.tracing``, that name is automatically
+available when your Python project depends on ``ops[tracing]``.
 """
 
 from ._api import Tracing

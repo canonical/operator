@@ -134,9 +134,8 @@ class Manager(Generic[CharmType]):
                 "Doing so implicitly upon exit...",
             )
             self.run()
-        assert (
-            self.ops
-        )  # guaranteed to be set: run was either called before, or right above
+        # guaranteed to be set: run was either called before, or right above
+        assert self.ops
         self.ops._destroy()
 
 
