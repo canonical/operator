@@ -34,7 +34,6 @@ jobs:
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
-          set -vex  # temp
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
