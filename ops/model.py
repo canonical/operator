@@ -3174,7 +3174,8 @@ class Container:
         Add those identities if they don't exist, or remove them if the map value is None.
 
         Args:
-            identities: A dict mapping identity names to dicts or :class:`Identity` objects.
+            identities: A dict mapping identity names to dicts or :class:`ops.pebble.Identity`
+                objects.
         """
         self._pebble.replace_identities(identities)
 
