@@ -21,7 +21,7 @@ import logging
 
 import ops
 
-from ._const import Config
+from ._buffer import Config
 from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificateTransferRequires,
 )

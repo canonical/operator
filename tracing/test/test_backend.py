@@ -18,7 +18,7 @@ import pytest
 
 import ops_tracing
 from ops_tracing import _backend
-from ops_tracing._const import Config
+from ops_tracing._buffer import Config
 
 
 def test_unset_destination(setup_tracing: None):

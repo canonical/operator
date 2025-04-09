@@ -27,8 +27,11 @@ from opentelemetry.trace import get_current_span, get_tracer_provider, set_trace
 if TYPE_CHECKING:
     from ops.jujucontext import _JujuContext
 
-from ._const import BUFFER_FILE, Config
+from ._buffer import Config
 from ._export import BufferingSpanExporter
+
+BUFFER_FILE: str = '.tracing-data.db'
+"""Name of the file whither data is buffered, located next to .unit-state.db."""
 
 
 class LogsToEvents(logging.Handler):

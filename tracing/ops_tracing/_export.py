@@ -27,8 +27,13 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from ._buffer import Buffer
-from ._const import EXPORT_TIMEOUT, SENDOUT_FACTOR
 from .vendor import otlp_json
+
+EXPORT_TIMEOUT: int | float = 1  # seconds
+"""How much time to give OTLP span exporter to push traces to the backend."""
+
+SENDOUT_FACTOR: int = 10
+"""How many buffered chunks to send out for each incoming chunk."""
 
 logger = logging.getLogger(__name__)
 

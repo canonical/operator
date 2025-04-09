@@ -15,20 +15,11 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import functools
 import pathlib
 import sqlite3
 from typing import TYPE_CHECKING, Callable
-
-from ._const import (
-    BUFFER_SIZE,
-    DB_RETRY,
-    DB_TIMEOUT,
-    DEFAULT_PRIORITY,
-    LONG_DB_TIMEOUT,
-    OBSERVED_PRIORITY,
-    Config,
-)
 
 if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
@@ -44,6 +35,33 @@ if TYPE_CHECKING:
 # Ubuntu 20.04  Python  3.8.2  Sqlite 3.31.1  Adds UPSERT, window functions
 # Ubuntu 22.04  Python 3.10.x  Sqlite 3.37.2  Adds STRICT tables, JSON ops
 # Ubuntu 24.04  Python 3.12.x  Sqlite 3.45.2  Adds math functions
+
+DB_RETRY = 3
+# Must have a short timeout when terminating.
+# May want to have a longer timeout otherwise.
+DB_TIMEOUT = 5
+LONG_DB_TIMEOUT = 3600
+
+# Approximate safety limit for the database file size.
+BUFFER_SIZE = 40 * 1024 * 1024
+
+# Default priority for tracing data.
+# Dispatch invocation where the juju event is not observed by the charm or any charm lib
+# produces data at this priority.
+DEFAULT_PRIORITY = 10
+
+# Higher priority for data from dispatch where the juju event is observed.
+OBSERVED_PRIORITY = 50
+
+
+@dataclasses.dataclass
+class Config:
+    """Tracing destination configuration."""
+
+    url: str | None
+    """The URL to send tracing data to."""
+    ca: str | None
+    """CA list, a PEM bundle."""
 
 
 def retry(f: Callable[P, R]) -> Callable[P, R]:
