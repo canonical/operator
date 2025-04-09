@@ -157,7 +157,7 @@ control, so that exact versions of charms can be reproduced.
 (design-your-python-modules)=
 ## Design your Python modules
 
-In your `src/charm.py` file, define a class for managing the charm's interface with Juju.
+In your `src/charm.py` file, define a class for managing how the charm interacts with Juju.
 
 You'll have a single class that inherits from [](ops.CharmBase).
 Arrange the methods of this class in the following order:
