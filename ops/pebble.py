@@ -3317,7 +3317,7 @@ class Client:
             A dict mapping identity names to :class:`Identity` objects.
 
         Raises:
-            IdentityError: If the server returns null for any identity.
+            :class:`ops.pebble.IdentityError`: If the server returns null for any identity.
         """
         resp = self._request('GET', '/v1/identities')
         result = resp['result']
