@@ -51,13 +51,13 @@ In your charm, add the ``Tracing`` object.::
 
     class SomeCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        ...
-        self.tracing = ops.tracing.Tracing(
-            self,
-            tracing_relation_name='charm-tracing',
-            ca_relation_name='send-ca-cert',
-        )
+            super().__init__(framework)
+            ...
+            self.tracing = ops.tracing.Tracing(
+                self,
+                tracing_relation_name='charm-tracing',
+                ca_relation_name='send-ca-cert',
+            )
 
 Note that you don't have to ``import ops.tracing`` or ``import ops_tracing``.
 When ``ops[tracing]`` has been added to your charm's dependencies, the Ops

@@ -96,6 +96,7 @@ class Tracing(ops.Object):
             def __init__(self, framework: ops.Framework):
                 ...
                 self.tracing = ops.tracing.Tracing(
+                    self,
                     tracing_relation_name="charm-tracing",
                     ca_relation_name="send-ca-cert",
                 )
@@ -120,6 +121,7 @@ class Tracing(ops.Object):
         self,
         charm: ops.CharmBase,
         tracing_relation_name: str,
+        *,
         ca_relation_name: str | None = None,
         ca_data: str | None = None,
     ):
