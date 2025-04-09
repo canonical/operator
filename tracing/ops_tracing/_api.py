@@ -16,12 +16,11 @@
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 
 import ops
 
-from ._buffer import Config
+from ._buffer import Destination
 from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificateTransferRequires,
 )
@@ -104,7 +103,7 @@ class Tracing(ops.Object):
     Args:
         charm: your charm instance
         tracing_relation_name: the name of the relation that provides the
-            destination to send tracing data to.
+            destination to send trace data to.
         ca_relation_name: the name of the relation that provides the CA
             list to validate the tracing destination against.
         ca_data: a fixed CA list (PEM bundle, a multi-line string).
@@ -190,34 +189,35 @@ class Tracing(ops.Object):
             self._certificate_transfer = None
 
     def _reconcile(self, _event: ops.EventBase):
-        ops.tracing.set_destination(**dataclasses.asdict(self._get_config()))
+        dst = self._get_destination()
+        ops.tracing.set_destination(url=dst.url, ca=dst.ca)
 
-    def _get_config(self) -> Config:
+    def _get_destination(self) -> Destination:
         try:
             if not self._tracing.is_ready():
-                return Config(None, None)
+                return Destination(None, None)
 
             base_url = self._tracing.get_endpoint('otlp_http')
 
             if not base_url:
-                return Config(None, None)
+                return Destination(None, None)
 
             if not base_url.startswith(('http://', 'https://')):
                 logger.warning(f'The {base_url=} must be an HTTP or an HTTPS URL')
-                return Config(None, None)
+                return Destination(None, None)
 
             url = f'{base_url.rstrip("/")}/v1/traces'
 
             if url.startswith('http://'):
-                return Config(url, None)
+                return Destination(url, None)
 
             if not self._certificate_transfer:
-                return Config(url, self.ca_data)
+                return Destination(url, self.ca_data)
 
             if not (ca := self._get_ca()):
-                return Config(None, None)
+                return Destination(None, None)
 
-            return Config(url, ca)
+            return Destination(url, ca)
         except (
             ops.TooManyRelatedAppsError,
             AmbiguousRelationUsageError,
@@ -226,7 +226,7 @@ class Tracing(ops.Object):
             # These should not really happen, as we've set up a single relation
             # and requested the protocol explicitly.
             logger.exception('Error getting the tracing destination')
-            return Config(None, None)
+            return Destination(None, None)
 
     def _get_ca(self) -> str | None:
         if not self.ca_relation_name:

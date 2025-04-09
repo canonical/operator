@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class BufferingSpanExporter(SpanExporter):
-    """Buffers and sends out tracing data."""
+    """Buffers and sends out trace data."""
 
     cache: dict[str | None, ssl.SSLContext]
 
@@ -80,7 +80,7 @@ class BufferingSpanExporter(SpanExporter):
 
             return SpanExportResult.SUCCESS
         except Exception:
-            logger.exception('Exporting tracing data')
+            logger.exception('Exporting trace data')
             raise
 
     def ssl_context(self, ca: str | None) -> ssl.SSLContext:
@@ -116,7 +116,7 @@ class BufferingSpanExporter(SpanExporter):
 
     def do_export(self, buffered_id: int, data: bytes, mime: str) -> None:
         """Export buffered data and remove it from the buffer on success."""
-        config = self.buffer.get_destination()
+        config = self.buffer.load_destination()
         if not config.url:
             return
 
@@ -141,9 +141,10 @@ class BufferingSpanExporter(SpanExporter):
             logger.exception(f'Tracing collector rejected our data, {e.code=} {resp=}')
         except OSError:
             # URLError, TimeoutError, SSLError, socket.error
+            # We silence these errors, as a misconfigured system would produce too many.
             pass
         except Exception:
-            logger.exception('Failed to send tracing data out')
+            logger.exception('Failed to send trace data out')
         else:
             self.buffer.remove(buffered_id)
 

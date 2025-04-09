@@ -27,7 +27,7 @@ from opentelemetry.trace import get_current_span, get_tracer_provider, set_trace
 if TYPE_CHECKING:
     from ops.jujucontext import _JujuContext
 
-from ._buffer import Config
+from ._buffer import Destination
 from ._export import BufferingSpanExporter
 
 BUFFER_FILENAME: str = '.tracing-data.db'
@@ -103,10 +103,10 @@ def get_exporter() -> BufferingSpanExporter | None:
 
 
 def set_destination(url: str | None, ca: str | None) -> None:
-    """Configure the destination service for tracing data.
+    """Configure the destination service for trace data.
 
     Args:
-        url: the URL of the telemetry service to send tracing data to.
+        url: the URL of the telemetry service to send trace data to.
             An example could be ``http://localhost/v1/traces``.
             None or empty string disables sending out the data, which is still buffered.
         ca: the CA list (PEM bundle, a multi-line string), only used for HTTPS URLs.
@@ -114,19 +114,19 @@ def set_destination(url: str | None, ca: str | None) -> None:
     if url and not url.startswith(('http://', 'https://')):
         raise ValueError('Only HTTP and HTTPS tracing destinations are supported.')
 
-    config = Config(url, ca)
+    config = Destination(url, ca)
 
     if not (exporter := get_exporter()):
         # Perhaps our tracer provider was never set up.
         return
 
-    if config == exporter.buffer.get_destination():
+    if config == exporter.buffer.load_destination():
         return
-    exporter.buffer.set_destination(config)
+    exporter.buffer.save_destination(config)
 
 
 def mark_observed() -> None:
-    """Mark the tracing data collected in this dispatch as higher priority."""
+    """Mark the trace data collected in this dispatch as higher priority."""
     if not (exporter := get_exporter()):
         return
     exporter.buffer.mark_observed()

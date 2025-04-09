@@ -21,7 +21,7 @@ import ops.testing
 import pytest
 
 from ops_tracing import _backend
-from ops_tracing._buffer import Config
+from ops_tracing._buffer import Destination
 
 _pydantic = pytest.importorskip('pydantic')
 _export = pytest.importorskip('ops._tracing.export')
@@ -41,7 +41,7 @@ def test_https_tracing_destination(
 
     exporter = _backend.get_exporter()
     assert exporter
-    assert exporter.buffer.get_destination() == Config(
+    assert exporter.buffer.load_destination() == Destination(
         'https://tls.example/v1/traces',
         'FIRST\nSECOND',
     )

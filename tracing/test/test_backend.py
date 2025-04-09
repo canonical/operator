@@ -18,21 +18,21 @@ import pytest
 
 import ops_tracing
 from ops_tracing import _backend
-from ops_tracing._buffer import Config
+from ops_tracing._buffer import Destination
 
 
 def test_unset_destination(setup_tracing: None):
     exporter = _backend.get_exporter()
     assert exporter
     ops_tracing.set_destination(None, None)
-    assert exporter.buffer.get_destination() == Config(None, None)
+    assert exporter.buffer.load_destination() == Destination(None, None)
 
 
 def test_set_destination(setup_tracing: None):
     exporter = _backend.get_exporter()
     assert exporter
     ops_tracing.set_destination('http://a.com', None)
-    assert exporter.buffer.get_destination() == Config('http://a.com', None)
+    assert exporter.buffer.load_destination() == Destination('http://a.com', None)
 
 
 def test_set_destination_again(setup_tracing: None):

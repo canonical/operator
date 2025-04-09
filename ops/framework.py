@@ -914,10 +914,12 @@ class Framework(Object):
             from . import tracing  # break circular import
 
             if tracing:
-                # To ensure early events (install, start) are not evicted from the tracing buffer
-                # before the tracing relation is established, we mark any dispatch where the juju
-                # event has an observer as "observed". This increases its data priority within the
-                # buffer, helping preserve those initial pieces of tracing data.
+                # To ensure that the trace data collected during the processing of early events
+                # (such as install or start) are not evicted from the tracing buffer before the
+                # tracing relation is established, we mark any dispatch where the Juju event has an
+                # observer as "observed".
+                # This increases the priority of those trace entries within the buffer, helping charm
+                # developers analyze the charm's behavior during application initialisation.
                 tracing._mark_observed()
             self._reemit(event_path)
 

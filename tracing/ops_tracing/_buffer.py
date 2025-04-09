@@ -10,7 +10,7 @@
 # ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
 
-"""Buffer for tracing data in the ops-tracing extension."""
+"""Buffer for trace data in the ops-tracing extension."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ LONG_DB_TIMEOUT = 3600
 # Approximate safety limit for the database file size.
 BUFFER_SIZE = 40 * 1024 * 1024
 
-# Default priority for tracing data.
+# Default priority for trace data.
 # Dispatch invocation where the juju event is not observed by the charm or any charm lib
 # produces data at this priority.
 DEFAULT_PRIORITY = 10
@@ -55,11 +55,11 @@ OBSERVED_PRIORITY = 50
 
 
 @dataclasses.dataclass
-class Config:
+class Destination:
     """Tracing destination configuration."""
 
     url: str | None
-    """The URL to send tracing data to."""
+    """The URL to send trace data to."""
     ca: str | None
     """CA list, a PEM bundle."""
 
@@ -84,13 +84,13 @@ def retry(f: Callable[P, R]) -> Callable[P, R]:
 
 
 class Buffer:
-    """Buffer for tracing data.
+    """Buffer for trace data.
 
     Access to the buffer attributes is effectively protected by an sqlite transaction.
     """
 
     ids: set[int]
-    """Tracing data ids buffered during this dispatch invocation."""
+    """Trace data ids buffered during this dispatch invocation."""
     observed = False
     """Marks that data from this dispatch invocation has been marked observed."""
     stored: int | None = None
@@ -116,7 +116,7 @@ class Buffer:
                     id INTEGER PRIMARY KEY,
                     -- observed events are more important
                     priority INTEGER NOT NULL,
-                    -- a chunk of tracing data
+                    -- a chunk of trace data
                     data BLOB NOT NULL,
                     -- MIME type for these data
                     mime TEXT NOT NULL
@@ -156,24 +156,24 @@ class Buffer:
                 conn.execute('COMMIT')
 
     @retry
-    def get_destination(self) -> Config:
+    def load_destination(self) -> Destination:
         """Get the tracing destination from the database."""
         with self.tx(readonly=True) as conn:
             settings = {k: v for k, v in conn.execute("""SELECT key, value FROM settings""")}
-            return Config(settings.get('url') or None, settings.get('ca') or None)
+            return Destination(settings.get('url') or None, settings.get('ca') or None)
 
     @retry
-    def set_destination(self, config: Config) -> None:
+    def save_destination(self, destination: Destination) -> None:
         """Update the tracing destination in the database."""
         with self.tx() as conn:
             conn.execute(
                 """REPLACE INTO settings(key, value) VALUES ('url', ?), ('ca', ?)""",
-                (config.url or '', config.ca or ''),
+                (destination.url or '', destination.ca or ''),
             )
 
     @retry
     def mark_observed(self) -> None:
-        """Mark the tracing data collected in this dispatch as higher priority."""
+        """Mark the trace data collected in this dispatch as higher priority."""
         if self.observed:
             return
 
@@ -236,7 +236,7 @@ class Buffer:
                         tuple(collected_ids),
                     )
 
-                # Store the new tracing data.
+                # Store the new trace data.
                 priority = OBSERVED_PRIORITY if self.observed else DEFAULT_PRIORITY
                 cursor = conn.execute(
                     """
