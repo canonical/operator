@@ -229,6 +229,9 @@ class DemoServerCharm(ops.CharmBase):
         self.unit.set_workload_version(version)
         self.unit.status = ops.ActiveStatus()
 
+    # Put helper methods here.
+    # If a method doesn't depend on Ops, put it in src/demo_server.py instead.
+
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(DemoServerCharm)
