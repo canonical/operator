@@ -93,7 +93,10 @@ class BufferingSpanExporter(SpanExporter):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         context.minimum_version = ssl.TLSVersion.TLSv1_3
         context.set_alpn_protocols(['http/1.1'])
-        context.verify_flags |= ssl.VERIFY_X509_STRICT
+        # Can't use strict certificate chain validation until our self-signed ca is fixed
+        # https://github.com/canonical/self-signed-certificates-operator/issues/330
+        # https://github.com/canonical/tls-certificates-interface/pull/333
+        # context.verify_flags |= ssl.VERIFY_X509_STRICT
         if partial_chain := getattr(ssl, 'VERIFY_X509_PARTIAL_CHAIN', None):
             # Available starting from Python 3.10. The partial chain flag allows trusting an
             # intermediate CAs in the CA list without the matching root CA.
