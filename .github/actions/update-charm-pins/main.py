@@ -4,7 +4,7 @@
 
 import logging
 import os
-import sys
+import re
 
 from httpx import Client
 from ruamel.yaml import YAML
@@ -49,5 +49,7 @@ def update_charm_pins(workflow):
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    for workflow in ' '.join(sys.argv[1:]).split():
+    workflows = os.environ['WORKFLOWS'].split()
+    for workflow in workflows:
+        assert re.match(r'^[a-zA-Z\-]+.yaml$', workflow), 'Use a safer name.'
         update_charm_pins(workflow)
