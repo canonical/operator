@@ -181,6 +181,19 @@ PlanDict = typing.TypedDict(
     total=False,
 )
 
+LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
+BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
+
+IdentityDict = typing.TypedDict(
+    'IdentityDict',
+    {
+        'access': str,
+        'local': Optional[LocalIdentityDict],
+        'basic': Optional[BasicIdentityDict],
+    },
+    total=False,
+)
+
 _AuthDict = TypedDict(
     '_AuthDict',
     {
@@ -1969,6 +1982,88 @@ class _WebsocketReader(io.BufferedIOBase):
         return self.read(n)
 
 
+class IdentityAccess(enum.Enum):
+    """Enum of identity access levels."""
+
+    ADMIN = 'admin'
+    READ = 'read'
+    METRICS = 'metrics'
+    UNTRUSTED = 'untrusted'
+
+
+@dataclasses.dataclass
+class LocalIdentity:
+    """Local identity configuration (for ucrednet/UID authentication)."""
+
+    user_id: int
+
+    @classmethod
+    def from_dict(cls, d: LocalIdentityDict) -> LocalIdentity:
+        """Create new LocalIdentity from dict parsed from JSON."""
+        return cls(user_id=d['user-id'])
+
+
+@dataclasses.dataclass
+class BasicIdentity:
+    """Basic identity configuration (for HTTP basic authentication)."""
+
+    password: str  # sha512-crypt-hashed password
+
+    @classmethod
+    def from_dict(cls, d: BasicIdentityDict) -> BasicIdentity:
+        """Create new BasicIdentity from dict parsed from JSON."""
+        return cls(password=d['password'])
+
+
+@dataclasses.dataclass
+class Identity:
+    """Pebble identity configuration."""
+
+    access: Union[IdentityAccess, str]
+    local: Optional[LocalIdentity] = None
+    basic: Optional[BasicIdentity] = None
+
+    def __post_init__(self) -> None:
+        """Validate that at least one of local or basic is provided."""
+        if self.local is None and self.basic is None:
+            raise ValueError('at least one of "local" or "basic" must be provided')
+
+    @classmethod
+    def from_dict(cls, d: IdentityDict) -> Identity:
+        """Create new Identity from dict parsed from JSON."""
+        if 'access' not in d:
+            raise ValueError('"access" key is required in IdentityDict')
+
+        try:
+            access = IdentityAccess(d['access'])
+        except ValueError:
+            access = d['access']
+
+        local = (
+            LocalIdentity.from_dict(d['local'])
+            if 'local' in d and d['local'] is not None
+            else None
+        )
+        basic = (
+            BasicIdentity.from_dict(d['basic'])
+            if 'basic' in d and d['basic'] is not None
+            else None
+        )
+
+        return cls(access=access, local=local, basic=basic)
+
+    def to_dict(self) -> IdentityDict:
+        """Convert this identity its dict representation."""
+        result: Dict[str, Any] = {
+            'access': self.access.value if isinstance(self.access, IdentityAccess) else self.access
+        }
+        if self.local is not None:
+            result['local'] = {'user-id': self.local.user_id}
+        if self.basic is not None:
+            result['basic'] = {'password': self.basic.password}
+        return typing.cast('IdentityDict', result)
+
+
 class Client:
     """Pebble API client.
 
@@ -3210,6 +3305,54 @@ class Client:
             query['keys'] = list(keys)
         resp = self._request('GET', '/v1/notices', query)
         return [Notice.from_dict(info) for info in resp['result']]
+
+    def get_identities(self) -> Dict[str, Identity]:
+        """Get all identities in Pebble.
+
+        Returns:
+            A dict mapping identity names to :class:`Identity` objects.
+
+        Raises:
+            APIError: If the server returns null for any identity.
+        """
+        resp = self._request('GET', '/v1/identities')
+        result = resp['result']
+
+        identities: Dict[str, Identity] = {}
+        for name, identity in result.items():
+            if identity is None:
+                raise APIError(
+                    body=resp,
+                    code=500,
+                    status='Internal Server Error',
+                    message=f'server returned null identity {name!r}',
+                )
+            identities[name] = Identity.from_dict(identity)
+        return identities
+
+    def replace_identities(
+        self, identities: Dict[str, Union[IdentityDict, Identity, None]]
+    ) -> None:
+        """Replace the named identities in Pebble with the given ones.
+
+        Add those identities if they don't exist, or remove them if the map value is None.
+
+        Args:
+            identities: A dict mapping identity names to dicts or :class:`Identity` objects.
+        """
+        identities_dict: Dict[str, Any] = {}
+        for name, identity in identities.items():
+            if identity is None or isinstance(identity, dict):
+                identities_dict[name] = identity
+            elif isinstance(identity, Identity):
+                identities_dict[name] = identity.to_dict()
+            else:
+                raise TypeError(
+                    f'identity must be a dict or pebble.Identity, not {type(identity).__name__}'
+                )
+
+        body = {'action': 'replace', 'identities': identities_dict}
+        self._request('POST', '/v1/identities', body=body)
 
 
 class _FilesParser:

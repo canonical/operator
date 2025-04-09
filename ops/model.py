@@ -3152,6 +3152,32 @@ class Container:
             keys=keys,
         )
 
+    def get_identities(self) -> Dict[str, pebble.Identity]:
+        """Get all identities in Pebble.
+
+        Returns:
+            A dict mapping identity names to :class:`ops.pebble.Identity` objects.
+
+        Raises:
+            :class:`ops.pebble.APIError`: If the server returns null for any identity.
+        """
+        try:
+            return self._pebble.get_identities()
+        except pebble.APIError as e:
+            raise e
+
+    def replace_identities(
+        self, identities: Dict[str, Union[pebble.IdentityDict, pebble.Identity, None]]
+    ) -> None:
+        """Replace the named identities in Pebble with the given ones.
+
+        Add those identities if they don't exist, or remove them if the map value is None.
+
+        Args:
+            identities: A dict mapping identity names to dicts or :class:`Identity` objects.
+        """
+        self._pebble.replace_identities(identities)
+
     # Define this last to avoid clashes with the imported "pebble" module
     @property
     def pebble(self) -> pebble.Client:
