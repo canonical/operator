@@ -918,8 +918,9 @@ class Framework(Object):
                 # (such as install or start) are not evicted from the tracing buffer before the
                 # tracing relation is established, we mark any dispatch where the Juju event has an
                 # observer as "observed".
-                # This increases the priority of those trace entries within the buffer, helping charm
-                # developers analyze the charm's behavior during application initialisation.
+                # This increases the priority of those trace entries within the buffer, preserving
+                # the initial trace data longer and helping charm developers analyze the charm's
+                # behavior during application startup.
                 tracing._mark_observed()
             self._reemit(event_path)
 
