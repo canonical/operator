@@ -576,6 +576,10 @@ class ExecError(Error, Generic[AnyStr]):
         return message
 
 
+class IdentityError(Error):
+    """Raised when Pebble server returns a null identity."""
+
+
 class WarningState(enum.Enum):
     """Enum of states for get_warnings() select parameter."""
 
@@ -3313,7 +3317,7 @@ class Client:
             A dict mapping identity names to :class:`Identity` objects.
 
         Raises:
-            APIError: If the server returns null for any identity.
+            IdentityError: If the server returns null for any identity.
         """
         resp = self._request('GET', '/v1/identities')
         result = resp['result']
@@ -3321,12 +3325,7 @@ class Client:
         identities: Dict[str, Identity] = {}
         for name, identity in result.items():
             if identity is None:
-                raise APIError(
-                    body=resp,
-                    code=500,
-                    status='Internal Server Error',
-                    message=f'server returned null identity {name!r}',
-                )
+                raise IdentityError(f'server returned null identity {name!r}')
             identities[name] = Identity.from_dict(identity)
         return identities
 
@@ -3340,7 +3339,7 @@ class Client:
         Args:
             identities: A dict mapping identity names to dicts or :class:`Identity` objects.
         """
-        identities_dict: Dict[str, Any] = {}
+        identities_dict: Dict[str, Optional[IdentityDict]] = {}
         for name, identity in identities.items():
             if identity is None or isinstance(identity, dict):
                 identities_dict[name] = identity

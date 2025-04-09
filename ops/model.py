@@ -3159,12 +3159,12 @@ class Container:
             A dict mapping identity names to :class:`ops.pebble.Identity` objects.
 
         Raises:
-            :class:`ops.pebble.APIError`: If the server returns null for any identity.
+            :class:`ops.pebble.IdentityError`: If the server returns null for any identity.
         """
         try:
             return self._pebble.get_identities()
-        except pebble.APIError as e:
-            raise e
+        except pebble.IdentityError as e:
+            raise pebble.IdentityError(f'Failed to get identities: {e}') from e
 
     def replace_identities(
         self, identities: Dict[str, Union[pebble.IdentityDict, pebble.Identity, None]]
