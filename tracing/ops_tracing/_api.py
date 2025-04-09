@@ -214,18 +214,34 @@ class Tracing(ops.Object):
             if not self._certificate_transfer:
                 return Config(url, self.ca_data)
 
-            ca_rel = (
-                self.model.get_relation(self.ca_relation_name) if self.ca_relation_name else None
-            )
-            ca_rel_id = ca_rel.id if ca_rel else None
-
-            if ca_rel and self._certificate_transfer.is_ready(ca_rel):
-                ca_list = self._certificate_transfer.get_all_certificates(ca_rel_id)
-                return Config(url, '\n'.join(sorted(ca_list))) if ca_list else Config(None, None)
-            else:
+            if not (ca := self._get_ca()):
                 return Config(None, None)
-        except (AmbiguousRelationUsageError, ProtocolNotRequestedError):
+
+            return Config(url, ca)
+        except (
+            ops.TooManyRelatedAppsError,
+            AmbiguousRelationUsageError,
+            ProtocolNotRequestedError,
+        ):
             # These should not really happen, as we've set up a single relation
             # and requested the protocol explicitly.
             logger.exception('Error getting the tracing destination')
             return Config(None, None)
+
+    def _get_ca(self) -> str | None:
+        if not self.ca_relation_name:
+            return None
+
+        if not (ca_rel := self.model.get_relation(self.ca_relation_name)):
+            return None
+
+        if not self._certificate_transfer:
+            return None
+
+        if not self._certificate_transfer.is_ready(ca_rel):
+            return None
+
+        if not (ca_list := self._certificate_transfer.get_all_certificates(ca_rel.id)):
+            return None
+
+        return '\n'.join(sorted(ca_list))
