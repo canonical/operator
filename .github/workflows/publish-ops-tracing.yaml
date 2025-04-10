@@ -1,5 +1,8 @@
 name: Publish (ops-tracing)
-on: [workflow_call, workflow_dispatch]
+on:
+  push:
+    tags:
+      - '2.*'
 
 jobs:
   framework-tests:

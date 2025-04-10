@@ -362,26 +362,25 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    Charm-Tech team proofread it.
 9. Format the auto-generated release notes according to the `CHANGES.md` section below,
    and add it to `CHANGES.md`.
-10. For `ops`, change [version.py](ops/version.py)'s `version` to the
-   appropriate string. For `ops-scenario`, change the version in
-   [testing/pyproject.toml](testing/pyproject.toml). We use both
-   [semantic versioning](https://semver.org/) and lockstep releases, so if
-   one library requires a version bump, the other will too.
-   The minor and patch versions should therefore be identical.
-11. Bump the `ops-scenario` version required by `ops[testing]` in [pyproject.toml](pyproject.toml)
-    to == the new `ops-scenario` version being released. Bump the version of `ops` required by
-    `ops-scenario` in [testing/pyproject.toml](testing/pyproject.toml) to == the new `ops` version
-    being released.
-12. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
+10. Change the versions for `ops`, `ops-scenario` and `ops-tracing` to the versions
+   being released: `ops==2.xx.y, ops-tracing==2.xx.y, ops-scenario==7.xx.y`.
+   We use both [semantic versioning](https://semver.org/) and lockstep releases, so if
+   one library requires a version bump, the other will too. There will be a total of
+   seven changes:
+   - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
+   - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
+   - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
+   - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
+11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
    using the same Python version as specified in the `.readthedocs.yaml` file.
-13. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
+12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
-14. Push a new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
+13. Push a new tag in the form `scenario-<major>.<minor>.<patch>`. This is done by
    executing `git tag scenario-x.y.z`, then `git push upstream tag scenario-x.y.z` locally
    (assuming you have configured `canonical/operator` as a remote named
    `upstream`).
-15. When you are ready, click "Publish". GitHub will create the additional tag.
+14. When you are ready, click "Publish". GitHub will create the additional tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -394,13 +393,16 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
-
-16. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-
-17. Open a PR to change the version strings to the expected next version, with ".dev0" appended
-   (for example, if 3.14.0 is the next expected `ops` version, use `'3.14.0.dev0'`).
-   In this PR, also update the requirements in the respective pyproject.toml files to be == these
-   development versions (for example, `ops==3.14.0.dev0` for `ops-scenario`).
+15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
+    and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+16. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
+   For example, if 2.90.0 is the next expected `ops` version, use
+   `ops==2.90.0.dev0 ops-tracing==2.90.0.dev0 ops-scenario==7.90.0.dev0`.
+   There will be a total of seven changes:
+   - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
+   - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
+   - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
+   - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
 
 ## Release Documentation
 
