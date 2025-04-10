@@ -4001,6 +4001,12 @@ class TestIdentity:
             pebble.Identity.from_dict(raw)
         assert str(excinfo.value) == '"access" key is required in IdentityDict'
 
+    def test_invalid_access(self):
+        with pytest.raises(ValueError) as excinfo:
+            raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
+            pebble.Identity.from_dict(raw)
+        assert str(excinfo.value) == "'foo' is not a valid IdentityAccess"
+
     def test_no_identity(self):
         with pytest.raises(ValueError) as excinfo:
             pebble.Identity(access=pebble.IdentityAccess.ADMIN)
