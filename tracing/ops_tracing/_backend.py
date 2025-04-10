@@ -14,9 +14,8 @@
 
 from __future__ import annotations
 
-import contextlib
 import pathlib
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -33,8 +32,7 @@ BUFFER_FILENAME: str = '.tracing-data.db'
 """Name of the file whither data is buffered, located next to .unit-state.db."""
 
 
-@contextlib.contextmanager
-def setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None, None, None]:
+def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
     """Control tracing lifespan of tracing.
 
     Args:
@@ -54,10 +52,6 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None, 
         }
     )
     set_tracer_provider(_create_provider(resource, juju_context.charm_dir))
-    try:
-        yield
-    finally:
-        shutdown_tracing()
 
 
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
@@ -110,7 +104,7 @@ def mark_observed() -> None:
     exporter.buffer.mark_observed()
 
 
-def shutdown_tracing() -> None:
+def shutdown() -> None:
     """Shutdown tracing, which is expected to flush the buffered data out."""
     provider = get_tracer_provider()
     if isinstance(provider, TracerProvider):

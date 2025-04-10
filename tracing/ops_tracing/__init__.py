@@ -77,10 +77,12 @@ from ._api import Tracing
 from ._backend import mark_observed as _mark_observed
 from ._backend import set_destination
 from ._backend import setup as _setup
+from ._backend import shutdown as _shutdown
 
 __all__ = [
     'Tracing',
     '_mark_observed',
     '_setup',
+    '_shutdown',
     'set_destination',
 ]

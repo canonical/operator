@@ -29,6 +29,11 @@ from . import _backend
 
 @contextlib.contextmanager
 def patch_tracing() -> Generator[None, None, None]:
+    """Patch ops[tracing] for unit tests.
+
+    Replaces the real buffer and exporter with an in-memory store.
+    This effectively removes the requirement for unique directories for each unit test.
+    """
     # OTEL tries hard to prevent tracing provider from being set twice
     real_otel_provider = opentelemetry.trace._TRACER_PROVIDER
     real_otel_once_done = opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done
@@ -48,6 +53,3 @@ def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvi
         resource=resource,
         active_span_processor=SimpleSpanProcessor(InMemorySpanExporter()),  # type: ignore
     )
-
-
-__all__ = ['_create_provider']

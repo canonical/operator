@@ -14,7 +14,6 @@
 
 """Implement the main entry point to the framework."""
 
-import contextlib
 import logging
 import os
 import shutil
@@ -395,8 +394,8 @@ class _Manager:
             name = str(charm_class)
 
         self._juju_context = juju_context
-        self._tracing = tracing._setup(juju_context, name) if tracing else contextlib.nullcontext()
-        self._tracing.__enter__()
+        if tracing:
+            tracing._setup(juju_context, name)
         self._tracing_context = tracer.start_as_current_span('ops.main')
         self._tracing_context.__enter__()
         self._charm_state_path = charm_state_path
@@ -561,9 +560,11 @@ class _Manager:
 
     def _destroy(self):
         """Finalise the manager."""
-        exc_info = sys.exc_info()
-        self._tracing_context.__exit__(*exc_info)
-        self._tracing.__exit__(*exc_info)
+        from . import tracing  # break circular import
+
+        self._tracing_context.__exit__(*sys.exc_info())
+        if tracing:
+            tracing._shutdown()
 
     def run(self):
         """Emit and then commit the framework."""
