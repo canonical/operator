@@ -27,9 +27,6 @@ from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer impor
 from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
     AmbiguousRelationUsageError,
     ProtocolNotRequestedError,
-    RelationInterfaceMismatchError,
-    RelationNotFoundError,
-    RelationRoleMismatchError,
     TracingEndpointRequirer,
 )
 
@@ -115,19 +112,11 @@ class Tracing(ops.Object):
                 f"{tracing_relation_name=} {relation.interface_name=} when 'tracing' is expected"
             )
 
-        try:
-            self._tracing = TracingEndpointRequirer(
-                self.charm,
-                tracing_relation_name,
-                protocols=['otlp_http'],
-            )
-        except (
-            RelationInterfaceMismatchError,
-            RelationNotFoundError,
-            RelationRoleMismatchError,
-            TypeError,
-        ) as e:
-            raise ValueError(str(e)) from None
+        self._tracing = TracingEndpointRequirer(
+            self.charm,
+            tracing_relation_name,
+            protocols=['otlp_http'],
+        )
 
         for event in (
             self.charm.on.start,

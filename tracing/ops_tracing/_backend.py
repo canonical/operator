@@ -33,7 +33,7 @@ BUFFER_FILENAME: str = '.tracing-data.db'
 
 
 def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
-    """Control tracing lifespan of tracing.
+    """Set up the tracing subsystem and configure OpenTelemetry.
 
     Args:
         juju_context: the context for this dispatch, for annotation
