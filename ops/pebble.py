@@ -187,7 +187,7 @@ BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
 IdentityDict = typing.TypedDict(
     'IdentityDict',
     {
-        'access': str,
+        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
         'local': Optional[LocalIdentityDict],
         'basic': Optional[BasicIdentityDict],
     },
@@ -574,10 +574,6 @@ class ExecError(Error, Generic[AnyStr]):
             message = f'{message}, {name}={out!r}{truncated}'
 
         return message
-
-
-class IdentityError(Error):
-    """Raised when Pebble server returns a null identity."""
 
 
 class WarningState(enum.Enum):
@@ -1986,7 +1982,7 @@ class _WebsocketReader(io.BufferedIOBase):
         return self.read(n)
 
 
-class IdentityAccess(enum.Enum):
+class IdentityAccess(str, enum.Enum):
     """Enum of identity access levels."""
 
     ADMIN = 'admin'
@@ -2006,6 +2002,10 @@ class LocalIdentity:
         """Create new LocalIdentity from dict parsed from JSON."""
         return cls(user_id=d['user-id'])
 
+    def to_dict(self) -> LocalIdentityDict:
+        """Convert this identity its dict representation."""
+        return {'user-id': self.user_id}
+
 
 @dataclasses.dataclass
 class BasicIdentity:
@@ -2018,12 +2018,16 @@ class BasicIdentity:
         """Create new BasicIdentity from dict parsed from JSON."""
         return cls(password=d['password'])
 
+    def to_dict(self) -> BasicIdentityDict:
+        """Convert this identity its dict representation."""
+        return {'password': self.password}
+
 
 @dataclasses.dataclass
 class Identity:
     """Pebble identity configuration."""
 
-    access: Union[IdentityAccess, str]
+    access: IdentityAccess
     local: Optional[LocalIdentity] = None
     basic: Optional[BasicIdentity] = None
 
@@ -2038,10 +2042,7 @@ class Identity:
         if 'access' not in d:
             raise ValueError('"access" key is required in IdentityDict')
 
-        try:
-            access = IdentityAccess(d['access'])
-        except ValueError:
-            access = d['access']
+        access = IdentityAccess(d['access'])
 
         local = (
             LocalIdentity.from_dict(d['local'])
@@ -2058,13 +2059,11 @@ class Identity:
 
     def to_dict(self) -> IdentityDict:
         """Convert this identity its dict representation."""
-        result: Dict[str, Any] = {
-            'access': self.access.value if isinstance(self.access, IdentityAccess) else self.access
-        }
+        result: Dict[str, Any] = {'access': self.access}
         if self.local is not None:
-            result['local'] = {'user-id': self.local.user_id}
+            result['local'] = self.local.to_dict()
         if self.basic is not None:
-            result['basic'] = {'password': self.basic.password}
+            result['basic'] = self.basic.to_dict()
         return typing.cast('IdentityDict', result)
 
 
@@ -3321,13 +3320,7 @@ class Client:
         """
         resp = self._request('GET', '/v1/identities')
         result = resp['result']
-
-        identities: Dict[str, Identity] = {}
-        for name, identity in result.items():
-            if identity is None:
-                raise IdentityError(f'server returned null identity {name!r}')
-            identities[name] = Identity.from_dict(identity)
-        return identities
+        return {name: Identity.from_dict(d) for name, d in result.items()}
 
     def replace_identities(
         self, identities: Dict[str, Union[IdentityDict, Identity, None]]
@@ -3339,16 +3332,10 @@ class Client:
         Args:
             identities: A dict mapping identity names to dicts or :class:`Identity` objects.
         """
-        identities_dict: Dict[str, Optional[IdentityDict]] = {}
-        for name, identity in identities.items():
-            if identity is None or isinstance(identity, dict):
-                identities_dict[name] = identity
-            elif isinstance(identity, Identity):
-                identities_dict[name] = identity.to_dict()
-            else:
-                raise TypeError(
-                    f'identity must be a dict or pebble.Identity, not {type(identity).__name__}'
-                )
+        identities_dict = {
+            name: identity.to_dict() if isinstance(identity, Identity) else identity
+            for name, identity in identities.items()
+        }
 
         body = {'action': 'replace', 'identities': identities_dict}
         self._request('POST', '/v1/identities', body=body)
