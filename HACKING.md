@@ -367,10 +367,10 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    We use both [semantic versioning](https://semver.org/) and lockstep releases, so if
    one library requires a version bump, the other will too. There will be a total of
    seven changes:
-   - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
-   - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
-   - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
-   - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
+    - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
+    - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
+    - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
+    - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
 11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
    using the same Python version as specified in the `.readthedocs.yaml` file.
@@ -399,10 +399,10 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    For example, if 2.90.0 is the next expected `ops` version, use
    `ops==2.90.0.dev0 ops-tracing==2.90.0.dev0 ops-scenario==7.90.0.dev0`.
    There will be a total of seven changes:
-   - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
-   - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
-   - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
-   - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
+    - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
+    - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
+    - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
+    - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
 
 ## Release Documentation
 
