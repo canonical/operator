@@ -2003,7 +2003,7 @@ class LocalIdentity:
         return cls(user_id=d['user-id'])
 
     def to_dict(self) -> LocalIdentityDict:
-        """Convert this identity its dict representation."""
+        """Convert this local identity to its dict representation."""
         return {'user-id': self.user_id}
 
 
@@ -2019,7 +2019,7 @@ class BasicIdentity:
         return cls(password=d['password'])
 
     def to_dict(self) -> BasicIdentityDict:
-        """Convert this identity its dict representation."""
+        """Convert this basic identity to its dict representation."""
         return {'password': self.password}
 
 
@@ -2058,7 +2058,7 @@ class Identity:
         return cls(access=access, local=local, basic=basic)
 
     def to_dict(self) -> IdentityDict:
-        """Convert this identity its dict representation."""
+        """Convert this identity to its dict representation."""
         result: Dict[str, Any] = {'access': self.access}
         if self.local is not None:
             result['local'] = self.local.to_dict()
