@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import pathlib
 from typing import Generator
 
@@ -34,14 +33,11 @@ def patch_tracing() -> Generator[None, None, None]:
     real_otel_provider = opentelemetry.trace._TRACER_PROVIDER
     real_otel_once_done = opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done
     real_create_provider = _backend._create_provider
-    real_log_to_events = _backend.LogsToEvents
     _backend._create_provider = _create_provider
-    _backend.LogsToEvents = LogsToEvents
     try:
         yield
     finally:
         _backend._create_provider = real_create_provider
-        _backend.LogsToEvents = real_log_to_events
         opentelemetry.trace._TRACER_PROVIDER = real_otel_provider
         opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done = real_otel_once_done
 
@@ -52,13 +48,6 @@ def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvi
         resource=resource,
         active_span_processor=SimpleSpanProcessor(InMemorySpanExporter()),  # type: ignore
     )
-
-
-class LogsToEvents(_backend.LogsToEvents):
-    """An mock adaptor that doesn't convert log records to OTEL events."""
-
-    def emit(self, record: logging.LogRecord) -> None:
-        pass
 
 
 __all__ = ['_create_provider']

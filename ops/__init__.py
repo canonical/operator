@@ -341,6 +341,8 @@ from .model import (
 from .version import version as __version__
 
 try:
+    # Note that ops_tracing vendors charm libs that depend on ops.
+    # We import it last, after all re-exported symbols.
     import ops_tracing as tracing
 except ImportError:
     tracing = None

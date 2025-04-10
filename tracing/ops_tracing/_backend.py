@@ -15,14 +15,13 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import pathlib
 from typing import TYPE_CHECKING, Generator
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.trace import get_current_span, get_tracer_provider, set_tracer_provider
+from opentelemetry.trace import get_tracer_provider, set_tracer_provider
 
 if TYPE_CHECKING:
     from ops.jujucontext import _JujuContext
@@ -32,25 +31,6 @@ from ._export import BufferingSpanExporter
 
 BUFFER_FILENAME: str = '.tracing-data.db'
 """Name of the file whither data is buffered, located next to .unit-state.db."""
-
-
-class LogsToEvents(logging.Handler):
-    """An adaptor that convert log records to OTEL events."""
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Emit this log record as OTEL event."""
-        span = get_current_span()
-        if span and span.is_recording():
-            try:
-                message = record.getMessage()
-                level = record.levelname
-            except Exception as e:
-                # This should never happen, except if the charm includes a custom logging
-                # library like structlog that enriches both the format and record attributes,
-                # or if the record format doesn't match the provided arguments.
-                message = f'log {record=} error {e}'
-                level = 'UNKNOWN'
-            span.add_event(message, {'level': level})
 
 
 @contextlib.contextmanager
@@ -74,11 +54,9 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> Generator[None, 
         }
     )
     set_tracer_provider(_create_provider(resource, juju_context.charm_dir))
-    logging.root.addHandler(log_handler := LogsToEvents())
     try:
         yield
     finally:
-        logging.root.handlers.remove(log_handler)
         shutdown_tracing()
 
 
