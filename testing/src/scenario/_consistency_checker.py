@@ -137,7 +137,7 @@ def check_resource_consistency(
     *,
     state: "State",
     charm_spec: "_CharmSpec[CharmType]",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of the resources from metadata and in :class:`scenario.State`."""
     errors: List[str] = []
@@ -159,7 +159,7 @@ def check_event_consistency(
     event: "_Event",
     charm_spec: "_CharmSpec[CharmType]",
     state: "State",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of the ``_Event`` data structure.
 
@@ -201,11 +201,11 @@ def check_event_consistency(
 
 
 def _check_relation_event(
-    charm_spec: _CharmSpec[CharmType],  # noqa: U100
+    charm_spec: _CharmSpec[CharmType],
     event: "_Event",
     state: "State",
     errors: List[str],
-    warnings: List[str],  # noqa: U100
+    warnings: List[str],
 ):
     if not event.relation:
         errors.append(
@@ -227,7 +227,7 @@ def _check_relation_event(
 
 
 def _check_workload_event(
-    charm_spec: _CharmSpec[CharmType],  # noqa: U100
+    charm_spec: _CharmSpec[CharmType],
     event: "_Event",
     state: "State",
     errors: List[str],
@@ -265,7 +265,7 @@ def _check_workload_event(
 def _check_action_event(
     charm_spec: _CharmSpec[CharmType],
     event: "_Event",
-    state: "State",  # noqa: U100
+    state: "State",
     errors: List[str],
     warnings: List[str],
 ):
@@ -297,7 +297,7 @@ def _check_storage_event(
     event: "_Event",
     state: "State",
     errors: List[str],
-    warnings: List[str],  # noqa: U100
+    warnings: List[str],
 ):
     storage = event.storage
     meta = charm_spec.meta
@@ -380,7 +380,7 @@ def check_storages_consistency(
     *,
     state: "State",
     charm_spec: "_CharmSpec[CharmType]",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` storages with the charm_spec metadata."""
     state_storage = state.storages
@@ -418,7 +418,7 @@ def check_config_consistency(
     state: "State",
     charm_spec: "_CharmSpec[CharmType]",
     juju_version: Tuple[int, ...],
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` config with the charm_spec config."""
     state_config = state.config
@@ -477,7 +477,7 @@ def check_secrets_consistency(
     event: "_Event",
     state: "State",
     juju_version: Tuple[int, ...],
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Secret` in the :class:`scenario.State`."""
     errors: List[str] = []
@@ -504,9 +504,9 @@ def check_secrets_consistency(
 def check_network_consistency(
     *,
     state: "State",
-    event: "_Event",  # noqa: U100
+    event: "_Event",
     charm_spec: "_CharmSpec[CharmType]",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Network` in the :class:`scenario.State`."""
     errors: List[str] = []
@@ -542,9 +542,9 @@ def check_network_consistency(
 def check_relation_consistency(
     *,
     state: "State",
-    event: "_Event",  # noqa: U100
+    event: "_Event",
     charm_spec: "_CharmSpec[CharmType]",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any relations in the :class:`scenario.State`."""
     errors: List[str] = []
@@ -614,7 +614,7 @@ def check_containers_consistency(
     state: "State",
     event: "_Event",
     charm_spec: "_CharmSpec[CharmType]",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :class:`scenario.State` containers with the charm_spec metadata."""
 
@@ -700,7 +700,7 @@ def check_cloudspec_consistency(
     state: "State",
     event: "_Event",
     charm_spec: "_CharmSpec[CharmType]",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check that Kubernetes models don't have :attr:`scenario.State.cloud_spec` set."""
 
@@ -719,7 +719,7 @@ def check_cloudspec_consistency(
 def check_storedstate_consistency(
     *,
     state: "State",
-    **_kwargs: Any,  # noqa: U101
+    **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of any :class:`scenario.StoredState` in the :class:`scenario.State`."""
     errors: List[str] = []
