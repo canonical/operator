@@ -1,4 +1,4 @@
-DUMMY CHANGE DONT'T MERGE
+DUMMY CHANGE DON'T MERGE
 
 # Setting up a Dev Environment
 
