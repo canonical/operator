@@ -70,6 +70,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -3324,7 +3325,7 @@ class Client:
         return {name: Identity.from_dict(d) for name, d in result.items()}
 
     def replace_identities(
-        self, identities: Dict[str, Union[IdentityDict, Identity, None]]
+        self, identities: Mapping[str, Union[IdentityDict, Identity, None]]
     ) -> None:
         """Replace the named identities in Pebble with the given ones.
 
