@@ -4048,3 +4048,11 @@ class _TestingPebbleClient:
         if keys is not None and notice.key not in keys:
             return False
         return True
+
+    def get_identities(self) -> Dict[str, pebble.Identity]:
+        raise NotImplementedError(self.get_identities)
+
+    def replace_identities(
+        self, identities: Dict[str, Union[pebble.IdentityDict, pebble.Identity, None]]
+    ) -> None:
+        raise NotImplementedError(self.get_identities)

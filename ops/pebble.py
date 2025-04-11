@@ -70,6 +70,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -177,6 +178,19 @@ PlanDict = typing.TypedDict(
         'services': Dict[str, ServiceDict],
         'checks': Dict[str, CheckDict],
         'log-targets': Dict[str, LogTargetDict],
+    },
+    total=False,
+)
+
+LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
+BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
+
+IdentityDict = typing.TypedDict(
+    'IdentityDict',
+    {
+        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
+        'local': Optional[LocalIdentityDict],
+        'basic': Optional[BasicIdentityDict],
     },
     total=False,
 )
@@ -1969,6 +1983,95 @@ class _WebsocketReader(io.BufferedIOBase):
         return self.read(n)
 
 
+class IdentityAccess(enum.Enum):
+    """Enum of identity access levels."""
+
+    ADMIN = 'admin'
+    READ = 'read'
+    METRICS = 'metrics'
+    UNTRUSTED = 'untrusted'
+
+
+@dataclasses.dataclass
+class LocalIdentity:
+    """Local identity configuration (for ucrednet/UID authentication)."""
+
+    user_id: int
+
+    @classmethod
+    def from_dict(cls, d: LocalIdentityDict) -> LocalIdentity:
+        """Create new LocalIdentity from dict parsed from JSON."""
+        return cls(user_id=d['user-id'])
+
+    def to_dict(self) -> LocalIdentityDict:
+        """Convert this local identity to its dict representation."""
+        return {'user-id': self.user_id}
+
+
+@dataclasses.dataclass
+class BasicIdentity:
+    """Basic identity configuration (for HTTP basic authentication)."""
+
+    password: str
+    """sha512-crypt-hashed password.
+
+    Use ``openssl passwd -6`` to generate a hashed password (sha512-crypt format).
+    """
+
+    @classmethod
+    def from_dict(cls, d: BasicIdentityDict) -> BasicIdentity:
+        """Create new BasicIdentity from dict parsed from JSON."""
+        return cls(password=d['password'])
+
+    def to_dict(self) -> BasicIdentityDict:
+        """Convert this basic identity to its dict representation."""
+        return {'password': self.password}
+
+
+@dataclasses.dataclass
+class Identity:
+    """Pebble identity configuration."""
+
+    access: IdentityAccess
+    local: Optional[LocalIdentity] = None
+    basic: Optional[BasicIdentity] = None
+
+    def __post_init__(self) -> None:
+        """Validate that at least one of local or basic is provided."""
+        if self.local is None and self.basic is None:
+            raise ValueError('at least one of "local" or "basic" must be provided')
+
+    @classmethod
+    def from_dict(cls, d: IdentityDict) -> Identity:
+        """Create new Identity from dict parsed from JSON."""
+        if 'access' not in d:
+            raise ValueError('"access" key is required in IdentityDict')
+
+        access = IdentityAccess(d['access'])
+
+        local = (
+            LocalIdentity.from_dict(d['local'])
+            if 'local' in d and d['local'] is not None
+            else None
+        )
+        basic = (
+            BasicIdentity.from_dict(d['basic'])
+            if 'basic' in d and d['basic'] is not None
+            else None
+        )
+
+        return cls(access=access, local=local, basic=basic)
+
+    def to_dict(self) -> IdentityDict:
+        """Convert this identity to its dict representation."""
+        result: Dict[str, Any] = {'access': self.access.value}
+        if self.local is not None:
+            result['local'] = self.local.to_dict()
+        if self.basic is not None:
+            result['basic'] = self.basic.to_dict()
+        return typing.cast('IdentityDict', result)
+
+
 class Client:
     """Pebble API client.
 
@@ -3210,6 +3313,34 @@ class Client:
             query['keys'] = list(keys)
         resp = self._request('GET', '/v1/notices', query)
         return [Notice.from_dict(info) for info in resp['result']]
+
+    def get_identities(self) -> Dict[str, Identity]:
+        """Get all identities in Pebble.
+
+        Returns:
+            A dict mapping identity names to :class:`Identity` objects.
+        """
+        resp = self._request('GET', '/v1/identities')
+        result = resp['result']
+        return {name: Identity.from_dict(d) for name, d in result.items()}
+
+    def replace_identities(
+        self, identities: Mapping[str, Union[IdentityDict, Identity, None]]
+    ) -> None:
+        """Replace the named identities in Pebble with the given ones.
+
+        Add those identities if they don't exist, or remove them if the dict value is None.
+
+        Args:
+            identities: A dict mapping identity names to dicts or :class:`Identity` objects.
+        """
+        identities_dict = {
+            name: identity.to_dict() if isinstance(identity, Identity) else identity
+            for name, identity in identities.items()
+        }
+
+        body = {'action': 'replace', 'identities': identities_dict}
+        self._request('POST', '/v1/identities', body=body)
 
 
 class _FilesParser:
