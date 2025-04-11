@@ -1982,7 +1982,7 @@ class _WebsocketReader(io.BufferedIOBase):
         return self.read(n)
 
 
-class IdentityAccess(str, enum.Enum):
+class IdentityAccess(enum.Enum):
     """Enum of identity access levels."""
 
     ADMIN = 'admin'
@@ -2011,7 +2011,11 @@ class LocalIdentity:
 class BasicIdentity:
     """Basic identity configuration (for HTTP basic authentication)."""
 
-    password: str  # sha512-crypt-hashed password
+    password: str
+    """sha512-crypt-hashed password.
+
+    Use ``openssl passwd -6`` to generate a hashed password (sha512-crypt format).
+    """
 
     @classmethod
     def from_dict(cls, d: BasicIdentityDict) -> BasicIdentity:
@@ -2059,7 +2063,7 @@ class Identity:
 
     def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
-        result: Dict[str, Any] = {'access': self.access}
+        result: Dict[str, Any] = {'access': self.access.value}
         if self.local is not None:
             result['local'] = self.local.to_dict()
         if self.basic is not None:
@@ -3324,7 +3328,7 @@ class Client:
     ) -> None:
         """Replace the named identities in Pebble with the given ones.
 
-        Add those identities if they don't exist, or remove them if the map value is None.
+        Add those identities if they don't exist, or remove them if the dict value is None.
 
         Args:
             identities: A dict mapping identity names to dicts or :class:`Identity` objects.

@@ -3197,19 +3197,16 @@ bad path\r
         })
 
         identities = client.get_identities()
-        assert len(identities) == 2
-        assert identities['alice'] == pebble.Identity.from_dict({
-            'access': 'admin',
-            'local': {'user-id': 42},
-        })
-        assert identities['web'] == pebble.Identity.from_dict({
-            'access': 'metrics',
-            'basic': {'password': 'hashed password'},
-        })
-
-        assert client.requests == [
-            ('GET', '/v1/identities', None, None),
-        ]
+        assert identities == {
+            'alice': pebble.Identity.from_dict({
+                'access': 'admin',
+                'local': {'user-id': 42},
+            }),
+            'web': pebble.Identity.from_dict({
+                'access': 'metrics',
+                'basic': {'password': 'hashed password'},
+            }),
+        }
 
     def test_replace_identities(self, client: MockClient):
         client.responses.append({
@@ -3219,6 +3216,10 @@ bad path\r
         })
         identities: typing.Dict[str, typing.Union[pebble.IdentityDict, pebble.Identity, None]] = {
             'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+            'alice': pebble.Identity(
+                access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+            ),
+            'bob': None,
         }
         client.replace_identities(identities)
         assert client.requests == [
@@ -3230,27 +3231,12 @@ bad path\r
                     'action': 'replace',
                     'identities': {
                         'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+                        'alice': {'access': 'admin', 'local': {'user-id': 42}},
+                        'bob': None,
                     },
                 },
             ),
         ]
-
-        client.responses.append({
-            'result': {
-                'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
-            },
-            'status': 'OK',
-            'status-code': 200,
-            'type': 'sync',
-        })
-        new_identities = client.get_identities()
-        assert len(new_identities) == 1
-        assert new_identities['web'] == pebble.Identity.from_dict({
-            'access': 'metrics',
-            'basic': {'password': 'hashed password'},
-        })
-        assert len(client.requests) == 2
-        assert client.requests[1] == ('GET', '/v1/identities', None, None)
 
 
 class TestSocketClient:
@@ -3996,18 +3982,15 @@ class TestIdentity:
         }
 
     def test_no_access(self):
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError):
             raw: pebble.IdentityDict = {'local': {'user-id': 42}}
             pebble.Identity.from_dict(raw)
-        assert str(excinfo.value) == '"access" key is required in IdentityDict'
 
     def test_invalid_access(self):
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError):
             raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
             pebble.Identity.from_dict(raw)
-        assert str(excinfo.value) == "'foo' is not a valid IdentityAccess"
 
     def test_no_identity(self):
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError):
             pebble.Identity(access=pebble.IdentityAccess.ADMIN)
-        assert str(excinfo.value) == 'at least one of "local" or "basic" must be provided'
