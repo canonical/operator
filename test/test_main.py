@@ -117,7 +117,7 @@ class TestCharmInit:
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
-            'JUJU_VERSION': '2.7.0',
+            'JUJU_VERSION': '2.8.0',
         }
         if extra_environ is not None:
             fake_environ.update(extra_environ)
