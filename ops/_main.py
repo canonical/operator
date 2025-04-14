@@ -161,16 +161,13 @@ class _Dispatcher:
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
 
-        If there is both a dispatch file and a legacy hook for the
-        current event, run the wanted legacy hook.
+        If there is a legacy hook for the current event, run the wanted legacy hook.
         """
-        if not self.is_dispatch_aware:
-            # we *are* the legacy hook
-            return
-
         dispatch_path = _exe_path(self._charm_dir / self._dispatch_path)
         if dispatch_path is None:
-            return
+            return  # There is no legacy hook.
+
+        # TODO(dwilding): Add a warning that we're running a legacy hook.
 
         # super strange that there isn't an is_executable
         if not os.access(str(dispatch_path), os.X_OK):
