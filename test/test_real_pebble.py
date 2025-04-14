@@ -315,7 +315,9 @@ class TestRealPebble:
         identities = {
             'web': pebble.Identity.from_dict({
                 'access': 'metrics',
-                'basic': {'password': 'hashed password'},
+                'basic': {
+                    'password': '$6$et3kBQywmQQ./htQ$MuUHB8DyxOzZT//NXas0aT.P0j0DJA8fCWvpOJ9kn9O0HIlAvEcAJVGQ6OVr23ndtK9kiNgCnMs2NJtDe/nhC1'  # noqa: E501
+                },
             }),
             'alice': pebble.Identity.from_dict({
                 'access': 'admin',

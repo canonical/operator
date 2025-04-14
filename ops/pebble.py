@@ -1994,7 +1994,7 @@ class IdentityAccess(enum.Enum):
 
 @dataclasses.dataclass
 class LocalIdentity:
-    """Local identity configuration (for ucrednet/UID authentication)."""
+    """Local identity configuration (for Unix socket / UID authentication)."""
 
     user_id: int
 
@@ -2014,6 +2014,9 @@ class BasicIdentity:
 
     password: str
     """sha512-crypt-hashed password.
+
+    When writing, this is a SHA512-crypt hashed password. When reading, it is
+    returned as ``*****``.
 
     Use ``openssl passwd -6`` to generate a hashed password (sha512-crypt format).
     """
