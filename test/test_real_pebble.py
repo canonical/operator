@@ -340,10 +340,7 @@ class TestRealPebble:
         assert identities['alice'].local is not None
         assert identities['alice'].local.user_id == 1000
 
-        identities = typing.cast(typing.Dict[str, typing.Union[pebble.Identity, None]], identities)
-        identities['web'] = None
-        identities['alice'] = None
-        client.replace_identities(identities)
+        client.remove_identities({'web', 'alice'})
         identities = client.get_identities()
         assert len(identities) == 0
 
