@@ -182,7 +182,7 @@ class TestCharmInit:
 @patch('ops._main._Manager._setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestDispatch:
-    def _check(self, *, with_dispatch: bool = False, dispatch_path: str = ''):
+    def _check(self, *, dispatch_path: str = ''):
         """Helper for below tests."""
 
         class MyCharm(ops.CharmBase):
@@ -192,12 +192,9 @@ class TestDispatch:
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
+            'JUJU_DISPATCH_PATH': dispatch_path,
+            'JUJU_VERSION': '2.8.0',
         }
-        if dispatch_path:
-            fake_environ['JUJU_DISPATCH_PATH'] = dispatch_path
-            fake_environ['JUJU_VERSION'] = '2.8.0'
-        else:
-            fake_environ['JUJU_VERSION'] = '2.7.0'
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_environ.update({'JUJU_CHARM_DIR': tmpdir})
@@ -205,10 +202,9 @@ class TestDispatch:
             fake_metadata = tmpdir / 'metadata.yaml'
             with fake_metadata.open('wb') as fh:
                 fh.write(b'name: test')
-            if with_dispatch:
-                dispatch = tmpdir / 'dispatch'
-                dispatch.write_text('', encoding='utf8')
-                dispatch.chmod(0o755)
+            dispatch = tmpdir / 'dispatch'
+            dispatch.write_text('', encoding='utf8')
+            dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops._main._Manager._emit_charm_event') as mock_charm_event:
@@ -217,20 +213,10 @@ class TestDispatch:
         assert mock_charm_event.call_count == 1
         return mock_charm_event.call_args[0][0]
 
-    def test_most_legacy(self):
-        """Without dispatch, sys.argv[0] is used."""
-        event = self._check()
-        assert event == 'config_changed'
-
     def test_with_dispatch(self):
         """With dispatch, dispatch is used."""
-        event = self._check(with_dispatch=True, dispatch_path='hooks/potatos')
+        event = self._check(dispatch_path='hooks/potatos')
         assert event == 'potatos'
-
-    def test_with_dispatch_path_but_no_dispatch(self):
-        """Dispatch path overwrites sys.argv[0] even if no actual dispatch."""
-        event = self._check(with_dispatch=False, dispatch_path='hooks/foo')
-        assert event == 'foo'
 
 
 _event_test = typing.List[typing.Tuple[EventSpec, typing.Dict[str, typing.Union[str, int, None]]]]
