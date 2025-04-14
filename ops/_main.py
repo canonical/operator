@@ -143,8 +143,6 @@ class _Dispatcher:
 
     Attributes:
         event_name: the name of the event to run
-        is_dispatch_aware: are we running under a Juju that knows about the
-            dispatch binary, and is that binary present?
 
     """
 
