@@ -172,8 +172,6 @@ class _Dispatcher:
         if dispatch_path is None:
             return  # There is no legacy hook.
 
-        # TODO(dwilding): Add a warning that we're running a legacy hook.
-
         # super strange that there isn't an is_executable
         if not os.access(str(dispatch_path), os.X_OK):
             logger.warning('Legacy %s exists but is not executable.', self._dispatch_path)
@@ -185,7 +183,7 @@ class _Dispatcher:
 
         argv = sys.argv.copy()
         argv[0] = str(dispatch_path)
-        logger.info('Running legacy %s.', self._dispatch_path)
+        logger.info('Running legacy %s (legacy hooks are deprecated).', self._dispatch_path)
         try:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
@@ -290,7 +288,7 @@ class _Manager:
 
         # Set up dispatcher, framework and charm objects.
         self.dispatcher = _Dispatcher(self._charm_root, self._juju_context)
-        self.dispatcher.run_any_legacy_hook()  # TODO(dwilding): I guess we need to keep this
+        self.dispatcher.run_any_legacy_hook()
 
         self.framework = self._make_framework(self.dispatcher)
         self.charm = self._charm_class(self.framework)
