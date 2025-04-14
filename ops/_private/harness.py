@@ -4056,3 +4056,6 @@ class _TestingPebbleClient:
         self, identities: Dict[str, Union[pebble.IdentityDict, pebble.Identity, None]]
     ) -> None:
         raise NotImplementedError
+
+    def remove_identities(self, identities: Iterable[str]) -> None:
+        raise NotImplementedError
