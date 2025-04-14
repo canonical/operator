@@ -3345,6 +3345,16 @@ class Client:
         body = {'action': 'replace', 'identities': identities_dict}
         self._request('POST', '/v1/identities', body=body)
 
+    def remove_identities(self, identities: Iterable[str]) -> None:
+        """Remove the named identities in Pebble.
+
+        Args:
+            identities: A set of identity names to remove.
+        """
+        identities_dict = {name: None for name in identities}
+        body = {'action': 'remove', 'identities': identities_dict}
+        self._request('POST', '/v1/identities', body=body)
+
 
 class _FilesParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
