@@ -151,7 +151,7 @@ class _Dispatcher:
         self._charm_dir = charm_dir
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
-        # Grab the wanted hook from JUJU_DISPATCH_PATH, e.g. hooks/install.
+        # Grab the correct hook from JUJU_DISPATCH_PATH, e.g. hooks/install.
         self._dispatch_path = Path(self._juju_context.dispatch_path)
 
         if 'OPERATOR_DISPATCH' in os.environ:
@@ -164,7 +164,7 @@ class _Dispatcher:
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
 
-        If there is a legacy hook for the current event, run the wanted legacy hook.
+        If there is a legacy hook for the current event, run it.
         """
         dispatch_path = _exe_path(self._charm_dir / self._dispatch_path)
         if dispatch_path is None:
