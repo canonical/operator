@@ -3238,6 +3238,29 @@ bad path\r
             ),
         ]
 
+    def test_remove_identities(self, client: MockClient):
+        client.responses.append({
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        client.remove_identities({'web', 'alice', 'bob'})
+        assert client.requests == [
+            (
+                'POST',
+                '/v1/identities',
+                None,
+                {
+                    'action': 'remove',
+                    'identities': {
+                        'web': None,
+                        'alice': None,
+                        'bob': None,
+                    },
+                },
+            ),
+        ]
+
 
 class TestSocketClient:
     def test_socket_not_found(self):
