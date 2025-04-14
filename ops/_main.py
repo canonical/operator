@@ -153,8 +153,7 @@ class _Dispatcher:
         self._charm_dir = charm_dir
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
-        dispatch = charm_dir / 'dispatch'
-        if self._juju_context.version.is_dispatch_aware() and _exe_path(dispatch) is not None:
+        if self._juju_context.version.is_dispatch_aware():
             self._init_dispatch()
         else:
             self._init_legacy()  # TODO(dwilding): Can we remove this whole path?
