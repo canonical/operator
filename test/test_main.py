@@ -229,12 +229,11 @@ def fake_script(request: pytest.FixtureRequest):
 
 class _TestMain(abc.ABC):
     @abc.abstractmethod
-    def _setup_entry_point(self, directory: Path, entry_point: str):
+    def _setup_entry_point(self):
         """Set up the given entry point in the given directory.
 
-        If not using dispatch, that would be a symlink <dir>/<entry_point>
-        pointing at src/charm.py; if using dispatch that would be the dispatch
-        symlink. It could also not be a symlink...
+        With dispatch, that would be a symlink pointing at src/charm.py
+        or a script that executes src/charm.py.
         """
         return NotImplemented
 
@@ -292,22 +291,8 @@ class _TestMain(abc.ABC):
         assert charm_spec.loader is not None
         charm_spec.loader.exec_module(self.charm_module)
 
-        self._prepare_initial_hooks()
-
-    def _prepare_initial_hooks(self):
-        initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
-        self.hooks_dir.mkdir()
-        for hook in initial_hooks:
-            self._setup_entry_point(self.hooks_dir, hook)
-
-    def _prepare_actions(self):
-        # TODO: jam 2020-06-16 this same work could be done just triggering the 'install' event
-        #  of the charm, it might be cleaner to not set up entry points directly here.
-        actions_dir_name = 'actions'
-        actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
-        actions_dir.mkdir()
-        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status', 'keyerror'):
-            self._setup_entry_point(actions_dir, action_name)
+        self.hooks_dir.mkdir()  # For testing cases when a charm has a legacy hook.
+        self._setup_entry_point()
 
     def _read_and_clear_state(
         self, event_name: str, env: typing.Dict[str, str]
@@ -476,8 +461,6 @@ class _TestMain(abc.ABC):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_multiple_events_handled(self, fake_script: FakeScript):
-        self._prepare_actions()
-
         fake_script.write('action-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
@@ -902,8 +885,6 @@ class _TestMain(abc.ABC):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_sets_model_name(self, fake_script: FakeScript):
-        self._prepare_actions()
-
         fake_script.write('action-get', "echo '{}'")
         state = self._simulate_event(
             fake_script,
@@ -920,8 +901,6 @@ class _TestMain(abc.ABC):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_has_valid_status(self, fake_script: FakeScript):
-        self._prepare_actions()
-
         fake_script.write('action-get', "echo '{}'")
         fake_script.write('status-get', """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(
@@ -952,8 +931,6 @@ class _TestMain(abc.ABC):
         assert state.status_name == 'blocked'
         assert state.status_message == 'help meeee'
 
-
-class _TestMainWithDispatch(_TestMain):
     @pytest.mark.usefixtures('setup_charm')
     def test_hook_and_dispatch(
         self,
@@ -1112,8 +1089,8 @@ class _TestMainWithDispatch(_TestMain):
         assert calls == expected
 
 
-class TestMainWithDispatch(_TestMainWithDispatch):
-    def _setup_entry_point(self, directory: Path, entry_point: str):
+class TestMainWithDispatchAsSymlink(_TestMain):
+    def _setup_entry_point(self):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
             path.symlink_to(os.path.join('src', 'charm.py'))
@@ -1176,7 +1153,6 @@ class TestMainWithDispatch(_TestMainWithDispatch):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_crash_action(self, request: pytest.FixtureRequest, fake_script: FakeScript):
-        self._prepare_actions()
         self.stderr = tempfile.TemporaryFile('w+t')  # noqa: SIM115
         request.addfinalizer(self.stderr.close)
         fake_script.write('action-get', "echo '{}'")
@@ -1196,10 +1172,10 @@ class TestMainWithDispatch(_TestMainWithDispatch):
         assert "'foo' not found in 'bar'" in stderr
 
 
-class TestMainWithDispatchAsScript(_TestMainWithDispatch):
+class TestMainWithDispatchAsScript(_TestMain):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
-    def _setup_entry_point(self, directory: Path, entry_point: str):
+    def _setup_entry_point(self):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
             path.write_text(
