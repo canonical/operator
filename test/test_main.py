@@ -954,8 +954,6 @@ class _TestMain(abc.ABC):
 
 
 class _TestMainWithDispatch(_TestMain):
-    has_dispatch = True
-
     @pytest.mark.usefixtures('setup_charm')
     def test_hook_and_dispatch(
         self,
@@ -1200,8 +1198,6 @@ class TestMainWithDispatch(_TestMainWithDispatch):
 
 class TestMainWithDispatchAsScript(_TestMainWithDispatch):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
-
-    has_dispatch = True
 
     def _setup_entry_point(self, directory: Path, entry_point: str):
         path = self.JUJU_CHARM_DIR / 'dispatch'
