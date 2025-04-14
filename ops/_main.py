@@ -153,10 +153,15 @@ class _Dispatcher:
         self._charm_dir = charm_dir
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
 
-        if self._juju_context.version.is_dispatch_aware():
-            self._init_dispatch()
-        else:
-            self._init_legacy()  # TODO(dwilding): Can we remove this whole path?
+        # Grab the wanted hook from JUJU_DISPATCH_PATH, e.g. hooks/install.
+        self._dispatch_path = Path(self._juju_context.dispatch_path)
+
+        if 'OPERATOR_DISPATCH' in os.environ:
+            logger.debug('Charm called itself via %s.', self._dispatch_path)
+            raise _Abort(0)
+        os.environ['OPERATOR_DISPATCH'] = '1'
+
+        self._set_name_from_path(self._dispatch_path)
 
     def run_any_legacy_hook(self):
         """Run any extant legacy hook.
@@ -198,34 +203,6 @@ class _Dispatcher:
         if path.parent.name == 'actions':
             name = f'{name}_action'
         self.event_name = name
-
-    def _init_legacy(self):
-        """Set up the 'legacy' dispatcher.
-
-        The current Juju doesn't know about 'dispatch' and calls hooks
-        explicitly.
-        """
-        self.is_dispatch_aware = False
-        self._set_name_from_path(self._exec_path)
-
-    def _init_dispatch(self):
-        """Set up the new 'dispatch' dispatcher.
-
-        The current Juju will run 'dispatch' if it exists, and otherwise fall
-        back to the old behaviour.
-
-        JUJU_DISPATCH_PATH will be set to the wanted hook, e.g. hooks/install,
-        in both cases.
-        """
-        self._dispatch_path = Path(self._juju_context.dispatch_path)
-
-        if 'OPERATOR_DISPATCH' in os.environ:
-            logger.debug('Charm called itself via %s.', self._dispatch_path)
-            raise _Abort(0)
-        os.environ['OPERATOR_DISPATCH'] = '1'
-
-        self.is_dispatch_aware = True
-        self._set_name_from_path(self._dispatch_path)
 
     def is_restricted_context(self):
         """Return True if we are running in a restricted Juju context.
