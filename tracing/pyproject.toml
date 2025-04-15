@@ -119,3 +119,6 @@ ignore = [
 
 [tool.pyright]
 exclude = [".tox", ".venv", "ops_tracing/vendor"]
+extraPaths = ["..", "../testing"]
+pythonVersion = "3.8" # check no python > 3.8 features are used
+pythonPlatform = "All"

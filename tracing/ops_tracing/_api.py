@@ -97,6 +97,9 @@ class Tracing(ops.Object):
         self.ca_relation_name = ca_relation_name
         self.ca_data = ca_data
 
+        if ca_relation_name is not None and ca_data is not None:
+            raise ValueError('At most one of ca_relation_name, ca_data is allowed')
+
         # Validate the arguments manually to raise exceptions with helpful messages.
         relation = self.charm.meta.relations.get(tracing_relation_name)
         if not relation:

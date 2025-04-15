@@ -29,7 +29,7 @@ from ._buffer import Destination
 from ._export import BufferingSpanExporter
 
 BUFFER_FILENAME: str = '.tracing-data.db'
-"""Name of the file whither data is buffered, located next to .unit-state.db."""
+"""Name of the buffer file where the trace data is stored, next to .unit-state.db."""
 
 
 def setup(juju_context: _JujuContext, charm_class_name: str) -> None:

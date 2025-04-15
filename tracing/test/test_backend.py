@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 import ops_tracing
@@ -31,16 +33,23 @@ def test_unset_destination(setup_tracing: None):
 def test_set_destination(setup_tracing: None):
     exporter = _backend.get_exporter()
     assert exporter
-    ops_tracing.set_destination('http://a.com', None)
-    assert exporter.buffer.load_destination() == Destination('http://a.com', None)
+    ops_tracing.set_destination('http://example.com', None)
+    assert exporter.buffer.load_destination() == Destination('http://example.com', None)
 
 
 def test_set_destination_again(setup_tracing: None):
     exporter = _backend.get_exporter()
     assert exporter
-    ops_tracing.set_destination('http://a.com', None)
-    ops_tracing.set_destination('http://a.com', None)
-    # maybe check that the database was written only once?
+
+    with patch.object(
+        exporter.buffer,
+        'save_destination',
+        wraps=exporter.buffer.save_destination,
+    ) as mock_dst:
+        ops_tracing.set_destination('http://example.com/foo', None)
+        ops_tracing.set_destination('http://example.com/foo', None)
+
+    assert mock_dst.call_count == 1
 
 
 @pytest.mark.parametrize('url', ['file:///etc/passwd', 'gopher://aaa'])
