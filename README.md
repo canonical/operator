@@ -2,7 +2,7 @@
 
 ![CI Status](https://github.com/canonical/operator/actions/workflows/framework-tests.yaml/badge.svg)
 
-The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://juju.is/docs/sdk/charmed-operators). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
+The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://charmhub.io/). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
 > - The latest version of `ops` requires Python 3.8 or above.
