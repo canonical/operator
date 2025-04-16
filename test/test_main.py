@@ -954,7 +954,7 @@ class _TestMain(abc.ABC):
                 '--log-level',
                 'INFO',
                 '--',
-                f'Running legacy {hook} (legacy hooks are deprecated).',
+                f'Running legacy {hook}.',
             ],
             ['juju-log', '--log-level', 'DEBUG', '--', f'Legacy {hook} exited with status 0.'],
             [
@@ -1030,7 +1030,7 @@ class _TestMain(abc.ABC):
                 '--log-level',
                 'INFO',
                 '--',
-                f'Running legacy {hook} (legacy hooks are deprecated).',
+                f'Running legacy {hook}.',
             ],
             ['juju-log', '--log-level', 'WARNING', '--', f'Legacy {hook} exited with status 42.'],
         ]
@@ -1086,7 +1086,7 @@ class _TestMain(abc.ABC):
                 '--log-level',
                 'INFO',
                 '--',
-                f'Running legacy {hook} (legacy hooks are deprecated).',
+                f'Running legacy {hook}.',
             ],
             VERSION_LOGLINE,  # because it called itself
             ['juju-log', '--log-level', 'DEBUG', '--', f'Charm called itself via {hook}.'],

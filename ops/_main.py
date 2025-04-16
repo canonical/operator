@@ -170,6 +170,8 @@ class _Dispatcher:
         if dispatch_path is None:
             return  # There is no legacy hook.
 
+        warnings.warn('Legacy hooks are deprecated.', category=DeprecationWarning)
+
         # super strange that there isn't an is_executable
         if not os.access(str(dispatch_path), os.X_OK):
             logger.warning('Legacy %s exists but is not executable.', self._dispatch_path)
@@ -181,7 +183,7 @@ class _Dispatcher:
 
         argv = sys.argv.copy()
         argv[0] = str(dispatch_path)
-        logger.info('Running legacy %s (legacy hooks are deprecated).', self._dispatch_path)
+        logger.info('Running legacy %s.', self._dispatch_path)
         try:
             subprocess.run(argv, check=True)
         except subprocess.CalledProcessError as e:
