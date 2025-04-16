@@ -49,7 +49,7 @@ class Tracing(ops.Object):
                 interface: tracing
                 limit: 1
                 optional: true
-            send-ca-cert:
+            receive-ca-cert:
                 interface: certificate_transfer
                 limit: 1
                 optional: true
@@ -63,7 +63,7 @@ class Tracing(ops.Object):
                 self.tracing = ops.tracing.Tracing(
                     self,
                     tracing_relation_name="charm-tracing",
-                    ca_relation_name="send-ca-cert",
+                    ca_relation_name="receive-ca-cert",
                 )
 
     Args:

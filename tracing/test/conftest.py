@@ -60,7 +60,7 @@ def https_relation():
 @pytest.fixture
 def ca_relation():
     return ops.testing.Relation(
-        'send-ca-cert',
+        'receive-ca-cert',
         remote_app_data={
             'certificates': json.dumps(['FIRST', 'SECOND']),
         },

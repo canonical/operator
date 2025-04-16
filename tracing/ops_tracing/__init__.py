@@ -25,7 +25,7 @@ interface and optionally the TLS relation with a ``certificate_transfer`` interf
             interface: tracing
             limit: 1
             optional: true
-        send-ca-cert:
+        receive-ca-cert:
             interface: certificate_transfer
             limit: 1
             optional: true
@@ -61,7 +61,7 @@ In your charm, add and initialise the ``Tracing`` object.::
             self.tracing = ops.tracing.Tracing(
                 self,
                 tracing_relation_name='charm-tracing',
-                ca_relation_name='send-ca-cert',
+                ca_relation_name='receive-ca-cert',
             )
 
 The tracing relation name is required, while the CA relation name is optional,

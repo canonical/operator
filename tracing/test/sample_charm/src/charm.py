@@ -23,7 +23,7 @@ class SampleCharm(ops.CharmBase):
         self.tracing = ops.tracing.Tracing(
             self,
             tracing_relation_name='charm-tracing',
-            ca_relation_name='send-ca-cert',
+            ca_relation_name='receive-ca-cert',
         )
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
