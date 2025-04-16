@@ -1011,7 +1011,7 @@ class Framework(Object):
                         event_type = 'framework'
                     else:
                         event_type = 'custom'
-                    obs_class = observer_path.split('/')[-1].split('[')[0]
+                    obs_class = observer.__class__.__qualname__
                     with tracer.start_as_current_span(f'{event_handle.kind}: {obs_class}') as span:
                         span.set_attribute('deferred', single_event_path is None)
                         span.set_attribute('event', repr(event))
