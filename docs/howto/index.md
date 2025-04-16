@@ -24,5 +24,6 @@ Manage stored state <manage-stored-state>
 Manage opened ports <manage-opened-ports>
 Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
+Trace the charm code <trace-the-charm-code>
 Legacy how-to guides <legacy/index>
 ```

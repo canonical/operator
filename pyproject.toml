@@ -18,6 +18,9 @@ classifiers = [
 dependencies = [
     "PyYAML==6.*",
     "websocket-client==1.*",
+    # Wide version range to preempt conflicts when charms pin a version.
+    "opentelemetry-api~=1.0",
+    "importlib-metadata",
 ]
 dynamic = ["version"]
 
@@ -39,6 +42,9 @@ docs = [
 ]
 testing = [
     "ops-scenario==7.21.0.dev0",
+]
+tracing = [
+    "ops-tracing==2.21.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -159,6 +165,7 @@ ignore = [
     # `subprocess` call: check for execution of untrusted input
     "S603",
 ]
+exclude = ["tracing/ops_tracing/vendor/*"]
 
 [tool.ruff.lint.pyupgrade]
 # Preserve types, even if a file imports `from __future__ import annotations`.
@@ -206,6 +213,8 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 
 [tool.pyright]
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
+exclude = ["tracing/*"]
+extraPaths = ["testing", "tracing"]
 pythonVersion = "3.8" # check no python > 3.8 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

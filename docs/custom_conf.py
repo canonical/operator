@@ -323,6 +323,7 @@ nitpick_ignore = [
     ('py:class', '_EntityStatus'),
     ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
+    ('py:class', '_JujuContext'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
     ('py:class', '_RawPortProtocolLiteral'),
