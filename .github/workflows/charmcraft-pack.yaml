@@ -14,7 +14,7 @@ jobs:
       matrix:
         include:
           - charm-repo: jnsgruk/hello-kubecon
-            commit: eb3225860cc7db0e071d0ea6cd4a01b47e66b1e5  # 2025-03-27T12:05:21Z
+            commit: dbd133466dde59ee64f20a732a8f3d2e560ec3b8  # 2023-07-03T14:09:38Z
     steps:
       - name: Checkout test charm repository
         uses: actions/checkout@v4

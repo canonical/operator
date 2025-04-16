@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - charm-repo: jnsgruk/hello-kubecon
-            commit: eb3225860cc7db0e071d0ea6cd4a01b47e66b1e5  # 2025-03-27T12:05:21Z
+            commit: dbd133466dde59ee64f20a732a8f3d2e560ec3b8  # 2023-07-03T14:09:38Z
           - charm-repo: juju/hello-juju-charm
             commit: 046b8ce758660d5aa9cf05207e2370fcbab688d0  # 2021-12-16T10:10:24Z
     steps:
