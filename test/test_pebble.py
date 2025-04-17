@@ -3214,7 +3214,7 @@ bad path\r
             'status-code': 200,
             'type': 'sync',
         })
-        identities: typing.Dict[str, typing.Union[pebble._IdentityDict, pebble.Identity, None]] = {
+        identities: typing.Dict[str, typing.Union[pebble.IdentityDict, pebble.Identity, None]] = {
             'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
             'alice': pebble.Identity(
                 access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
@@ -4011,12 +4011,12 @@ class TestIdentity:
 
     def test_no_access(self):
         with pytest.raises(KeyError):
-            raw: pebble._IdentityDict = {'local': {'user-id': 42}}  # type: ignore
+            raw: pebble.IdentityDict = {'local': {'user-id': 42}}  # type: ignore
             pebble.Identity.from_dict(raw)
 
     def test_invalid_access(self):
         with pytest.raises(ValueError):
-            raw: pebble._IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
+            raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
             pebble.Identity.from_dict(raw)
 
     def test_no_identity(self):

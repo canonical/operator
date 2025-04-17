@@ -332,15 +332,15 @@ if TYPE_CHECKING:
         },
     )
 
-    _LocalIdentityDict = typing.TypedDict('_LocalIdentityDict', {'user-id': int})
-    _BasicIdentityDict = typing.TypedDict('_BasicIdentityDict', {'password': str})
+    LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
+    BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
 
-    _IdentityDict = typing.TypedDict(
-        '_IdentityDict',
+    IdentityDict = typing.TypedDict(
+        'IdentityDict',
         {
             'access': Literal['untrusted', 'metrics', 'read', 'admin'],
-            'local': NotRequired[_LocalIdentityDict],
-            'basic': NotRequired[_BasicIdentityDict],
+            'local': NotRequired[LocalIdentityDict],
+            'basic': NotRequired[BasicIdentityDict],
         },
     )
 
@@ -2002,11 +2002,11 @@ class LocalIdentity:
     user_id: int
 
     @classmethod
-    def from_dict(cls, d: _LocalIdentityDict) -> LocalIdentity:
+    def from_dict(cls, d: LocalIdentityDict) -> LocalIdentity:
         """Create new LocalIdentity from dict parsed from JSON."""
         return cls(user_id=d['user-id'])
 
-    def to_dict(self) -> _LocalIdentityDict:
+    def to_dict(self) -> LocalIdentityDict:
         """Convert this local identity to its dict representation."""
         return {'user-id': self.user_id}
 
@@ -2025,11 +2025,11 @@ class BasicIdentity:
     """
 
     @classmethod
-    def from_dict(cls, d: _BasicIdentityDict) -> BasicIdentity:
+    def from_dict(cls, d: BasicIdentityDict) -> BasicIdentity:
         """Create new BasicIdentity from dict parsed from JSON."""
         return cls(password=d['password'])
 
-    def to_dict(self) -> _BasicIdentityDict:
+    def to_dict(self) -> BasicIdentityDict:
         """Convert this basic identity to its dict representation."""
         return {'password': self.password}
 
@@ -2048,7 +2048,7 @@ class Identity:
             raise ValueError('at least one of "local" or "basic" must be provided')
 
     @classmethod
-    def from_dict(cls, d: _IdentityDict) -> Identity:
+    def from_dict(cls, d: IdentityDict) -> Identity:
         """Create new Identity from dict parsed from JSON."""
         access = IdentityAccess(d['access'])
 
@@ -2065,14 +2065,14 @@ class Identity:
 
         return cls(access=access, local=local, basic=basic)
 
-    def to_dict(self) -> _IdentityDict:
+    def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
         result: Dict[str, Any] = {'access': self.access.value}
         if self.local is not None:
             result['local'] = self.local.to_dict()
         if self.basic is not None:
             result['basic'] = self.basic.to_dict()
-        return typing.cast('_IdentityDict', result)
+        return typing.cast('IdentityDict', result)
 
 
 class Client:
@@ -3382,7 +3382,7 @@ class Client:
             return {name: Identity.from_dict(d) for name, d in result.items()}
 
     def replace_identities(
-        self, identities: Mapping[str, Union[_IdentityDict, Identity, None]]
+        self, identities: Mapping[str, Union[IdentityDict, Identity, None]]
     ) -> None:
         """Replace the named identities in Pebble with the given ones.
 
