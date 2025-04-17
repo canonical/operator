@@ -3375,6 +3375,8 @@ class Client:
     def get_identities(self) -> Dict[str, Identity]:
         """Get all identities in Pebble.
 
+        .. jujuadded:: 3.6.4
+
         Returns:
             A dict mapping identity names to :class:`Identity` objects.
         """
@@ -3390,6 +3392,8 @@ class Client:
 
         Add those identities if they don't exist, or remove them if the dict value is None.
 
+        .. jujuadded:: 3.6.4
+
         Args:
             identities: A dict mapping identity names to dicts or :class:`Identity` objects.
         """
@@ -3404,6 +3408,8 @@ class Client:
 
     def remove_identities(self, identities: Iterable[str]) -> None:
         """Remove the named identities in Pebble.
+
+        .. jujuadded:: 3.6.4
 
         Args:
             identities: A set of identity names to remove.
