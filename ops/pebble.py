@@ -3378,9 +3378,10 @@ class Client:
         Returns:
             A dict mapping identity names to :class:`Identity` objects.
         """
-        resp = self._request('GET', '/v1/identities')
-        result = resp['result']
-        return {name: Identity.from_dict(d) for name, d in result.items()}
+        with tracer.start_as_current_span('pebble get_identities'):
+            resp = self._request('GET', '/v1/identities')
+            result = resp['result']
+            return {name: Identity.from_dict(d) for name, d in result.items()}
 
     def replace_identities(
         self, identities: Mapping[str, Union[IdentityDict, Identity, None]]
@@ -3392,13 +3393,14 @@ class Client:
         Args:
             identities: A dict mapping identity names to dicts or :class:`Identity` objects.
         """
-        identities_dict = {
-            name: identity.to_dict() if isinstance(identity, Identity) else identity
-            for name, identity in identities.items()
-        }
+        with tracer.start_as_current_span('pebble replace_identities'):
+            identities_dict = {
+                name: identity.to_dict() if isinstance(identity, Identity) else identity
+                for name, identity in identities.items()
+            }
 
-        body = {'action': 'replace', 'identities': identities_dict}
-        self._request('POST', '/v1/identities', body=body)
+            body = {'action': 'replace', 'identities': identities_dict}
+            self._request('POST', '/v1/identities', body=body)
 
     def remove_identities(self, identities: Iterable[str]) -> None:
         """Remove the named identities in Pebble.
@@ -3406,9 +3408,10 @@ class Client:
         Args:
             identities: A set of identity names to remove.
         """
-        identities_dict = {name: None for name in identities}
-        body = {'action': 'remove', 'identities': identities_dict}
-        self._request('POST', '/v1/identities', body=body)
+        with tracer.start_as_current_span('pebble remove_identities'):
+            identities_dict = {name: None for name in identities}
+            body = {'action': 'remove', 'identities': identities_dict}
+            self._request('POST', '/v1/identities', body=body)
 
 
 class _FilesParser:
