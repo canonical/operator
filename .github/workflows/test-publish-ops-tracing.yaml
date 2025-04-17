@@ -10,7 +10,6 @@ jobs:
     uses: ./.github/workflows/hello-charm-tests.yaml
   release:
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       id-token: write
       attestations: write
