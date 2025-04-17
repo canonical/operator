@@ -127,13 +127,16 @@ class Manager(Generic[CharmType]):
         assert self._ctx._output_state is not None
         return self._ctx._output_state
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # noqa: U100
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         if not self._emitted:
             logger.debug(
                 "user didn't emit the event within the context manager scope. "
                 "Doing so implicitly upon exit...",
             )
             self.run()
+        # guaranteed to be set: run was either called before, or right above
+        assert self.ops
+        self.ops._destroy()
 
 
 def _copy_doc(original_func: Callable[..., Any]):
