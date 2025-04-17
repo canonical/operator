@@ -1,6 +1,8 @@
 name: Test Publish (ops)
 on: [workflow_dispatch, workflow_call]
 
+permissions: {}
+
 jobs:
   framework-tests:
     uses: ./.github/workflows/framework-tests.yaml
@@ -18,6 +20,8 @@ jobs:
     needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@v5
       - name: Install build dependencies

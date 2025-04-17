@@ -5,11 +5,15 @@ on:
   schedule:
     - cron:  '0 7 1 * *'
 
+permissions: {}
+
 jobs:
   TICS:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
         # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
       - name: Set up Python
