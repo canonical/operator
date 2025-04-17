@@ -127,6 +127,14 @@ class JujuVersion:
         """Report whether this Juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
+    def has_pebble_identities(self) -> bool:
+        """Report whether this Juju version supports Pebble identities."""
+        return (self.major, self.minor, self.patch) >= (3, 6, 4)
+
+    def has_pebble_metrics(self) -> bool:
+        """Report whether this Juju version supports Pebble metrics."""
+        return (self.major, self.minor, self.patch) >= (3, 6, 4)
+
     @property
     def has_secrets(self) -> bool:
         """Report whether this Juju version supports the "secrets" feature."""

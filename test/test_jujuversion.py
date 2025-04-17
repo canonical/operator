@@ -77,6 +77,16 @@ def test_has_controller_storage():
     assert not ops.JujuVersion('2.7.9').has_controller_storage()
 
 
+def test_has_pebble_identities():
+    assert ops.JujuVersion('3.6.4').has_pebble_identities()
+    assert not ops.JujuVersion('3.6.3').has_pebble_identities()
+
+
+def test_has_pebble_metrics():
+    assert ops.JujuVersion('3.6.4').has_pebble_metrics()
+    assert not ops.JujuVersion('3.6.3').has_pebble_metrics()
+
+
 def test_has_secrets():
     assert ops.JujuVersion('3.0.3').has_secrets
     assert ops.JujuVersion('3.1.0').has_secrets
