@@ -2,12 +2,6 @@ name: Test Publish (ops-scenario)
 on: [workflow_dispatch, workflow_call]
 
 jobs:
-  framework-tests:
-    uses: ./.github/workflows/framework-tests.yaml
-  observability-charm-tests:
-    uses: ./.github/workflows/observability-charm-tests.yaml
-  hello-charm-tests:
-    uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
     name: Build and Publish ops-scenario to Test PyPI
     runs-on: ubuntu-latest
