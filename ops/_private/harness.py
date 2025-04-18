@@ -4049,11 +4049,11 @@ class _TestingPebbleClient:
             return False
         return True
 
-    def get_identities(self) -> Dict[str, pebble.Identity]:
+    def get_identities(self) -> Dict[str, 'pebble.Identity']:
         raise NotImplementedError
 
     def replace_identities(
-        self, identities: Dict[str, Union[pebble.IdentityDict, pebble.Identity, None]]
+        self, identities: Dict[str, Union['pebble.IdentityDict', 'pebble.Identity', None]]
     ) -> None:
         raise NotImplementedError
 
