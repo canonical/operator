@@ -127,14 +127,6 @@ class JujuVersion:
         """Report whether this Juju version supports controller-side storage."""
         return (self.major, self.minor, self.patch) >= (2, 8, 0)
 
-    def has_pebble_identities(self) -> bool:
-        """Report whether this Juju version supports Pebble identities."""
-        return (self.major, self.minor, self.patch) >= (3, 6, 4)
-
-    def has_pebble_metrics(self) -> bool:
-        """Report whether this Juju version supports Pebble metrics."""
-        return (self.major, self.minor, self.patch) >= (3, 6, 4)
-
     @property
     def has_secrets(self) -> bool:
         """Report whether this Juju version supports the "secrets" feature."""
@@ -171,3 +163,13 @@ class JujuVersion:
         # https://github.com/canonical/pebble/releases/tag/v1.6.0
         # https://github.com/juju/juju/blob/e1b7dcd7390348c37f8b860011e7436e6ed3f4cc/go.mod#L27
         return (self.major, self.minor, self.patch) >= (3, 4, 0)
+
+    @property
+    def supports_pebble_identities(self) -> bool:
+        """Report whether this Juju version supports Pebble identities."""
+        return (self.major, self.minor, self.patch) >= (3, 6, 4)
+
+    @property
+    def supports_pebble_metrics(self) -> bool:
+        """Report whether this Juju version supports Pebble metrics."""
+        return (self.major, self.minor, self.patch) >= (3, 6, 4)
