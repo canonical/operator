@@ -16,12 +16,12 @@
 from __future__ import annotations
 
 import functools
-from typing import Generator, Iterable, Mapping
+from typing import Final, Generator, Iterable, Mapping
 
 import jubilant
 import minio
 import pytest
-from typing_extensions import Final, TypedDict
+from typing_extensions import TypedDict
 
 
 class Deploy(TypedDict, total=False):
@@ -30,7 +30,7 @@ class Deploy(TypedDict, total=False):
     attach_storage: Iterable[str] | None
     base: str | None
     channel: str | None
-    config: Mapping[str, str|int|float|bool] | None
+    config: Mapping[str, str | int | float | bool] | None
     constraints: Mapping[str, str] | None
     force: bool
     num_units: int
@@ -41,28 +41,40 @@ class Deploy(TypedDict, total=False):
     trust: bool
 
 
-TEMPO: Final[Deploy]  = {
-    "charm":"tempo-coordinator-k8s", "app":"tempo", "channel":"edge", "trust":True,
-    "resources":{
-        "nginx-image": "ubuntu/nginx:1.24-24.04_beta",
-        "nginx-prometheus-exporter-image": "nginx/nginx-prometheus-exporter:1.1.0",
-}}
-
-TEMPO_WORKER: Final[Deploy] = {
-    "charm": "tempo-worker-k8s",
-    "app": "tempo-worker", "channel": "edge", "config": {"role-all": True}, "trust": True,
-    "resources": { "tempo-image": "docker.io/ubuntu/tempo:2-22.04" },
+TEMPO: Final[Deploy] = {
+    'charm': 'tempo-coordinator-k8s',
+    'app': 'tempo',
+    'channel': 'edge',
+    'trust': True,
+    'resources': {
+        'nginx-image': 'ubuntu/nginx:1.24-24.04_beta',
+        'nginx-prometheus-exporter-image': 'nginx/nginx-prometheus-exporter:1.1.0',
+    },
 }
 
-MINIO: Final[Deploy] = {"charm":"minio", "channel":"candidate", "trust":True,
-         "config": {"access-key": "accesskey", "secret-key": "mysoverysecretkey"}}
+TEMPO_WORKER: Final[Deploy] = {
+    'charm': 'tempo-worker-k8s',
+    'app': 'tempo-worker',
+    'channel': 'edge',
+    'config': {'role-all': True},
+    'trust': True,
+    'resources': {'tempo-image': 'docker.io/ubuntu/tempo:2-22.04'},
+}
+
+MINIO: Final[Deploy] = {
+    'charm': 'minio',
+    'channel': 'candidate',
+    'trust': True,
+    'config': {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
+}
+
 
 def app_is(s: jubilant.Status, app: str, status: str):
-    return list(s.apps[app].units.values())[0].workload_status.current == status
+    return next(iter(s.apps[app].units.values())).workload_status.current == status
 
-minio_active = functools.partial(app_is, app="minio", status="active")
-s3_integrator_blocked = functools.partial(app_is, app="s3-integrator", status="blocked")
 
+minio_active = functools.partial(app_is, app='minio', status='active')
+s3_integrator_blocked = functools.partial(app_is, app='s3-integrator', status='blocked')
 
 
 @pytest.fixture
@@ -71,27 +83,31 @@ def juju() -> Generator[jubilant.Juju, None, None]:
         j.deploy(**TEMPO)
         j.deploy(**TEMPO_WORKER)
         j.deploy(**MINIO)
-        j.deploy("s3-integrator")
+        j.deploy('s3-integrator')
 
-        j.integrate("tempo:s3", "s3-integrator")
-        j.integrate("tempo:tempo-cluster", "tempo-worker")
+        j.integrate('tempo:s3', 's3-integrator')
+        j.integrate('tempo:tempo-cluster', 'tempo-worker')
 
         j.wait(lambda s: minio_active(s) and s3_integrator_blocked(s))
 
-        address = j.status().apps["minio"].address
+        address = j.status().apps['minio'].address
         mc_client = minio.Minio(
-            f"{address}:9000",
-            access_key="accesskey",
-            secret_key="mysoverysecretkey",
+            f'{address}:9000',
+            access_key='accesskey',
+            secret_key='mysoverysecretkey',
             secure=False,
         )
 
-        found = mc_client.bucket_exists("tempo")
+        found = mc_client.bucket_exists('tempo')
         if not found:
-            mc_client.make_bucket("tempo")
+            mc_client.make_bucket('tempo')
 
-        j.config("s3-integrator", dict(endpoint=f"http://{address}:9000", bucket="tempo"))
-        j.run("s3-integrator/0", "sync-s3-credentials", {"access-key": "accesskey", "secret-key": "mysoverysecretkey"})
+        j.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
+        j.run(
+            's3-integrator/0',
+            'sync-s3-credentials',
+            {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
+        )
 
         # FIXME not ready yet
         j.wait(jubilant.all_active)
