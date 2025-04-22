@@ -15,7 +15,7 @@ jobs:
       matrix:
         juju-channel: ['3/stable']
         charmcraft-channel: ['3.x/stable']
-        preset: ['k8s']
+        preset: ['microk8s']  # ['k8s'] https://github.com/jnsgruk/concierge/issues/51
 
     steps:
       - run: sudo snap install --classic concierge
