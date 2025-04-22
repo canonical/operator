@@ -891,7 +891,7 @@ class LazyMapping(_GenericLazyMapping[str]):
     """
 
 
-class RelationMapping(Mapping[str, 'list[Relation]']):
+class RelationMapping(Mapping[str, List['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
     def __init__(
@@ -1761,7 +1761,7 @@ class Relation:
         return self._remote_model
 
 
-class RelationData(Mapping['Unit | Application', 'RelationDataContent']):
+class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
