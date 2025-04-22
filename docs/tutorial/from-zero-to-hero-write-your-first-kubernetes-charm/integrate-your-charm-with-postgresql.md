@@ -199,7 +199,7 @@ Now, let's define this property such that, every time it is called, it dynamical
 
 ```python
 @property
-def app_environment(self) -> dict[str, str | None]:
+def app_environment(self) -> Dict[str, str]:
     """This property method creates a dictionary containing environment variables
     for the application. It retrieves the database authentication data by calling
     the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
@@ -210,10 +210,14 @@ def app_environment(self) -> dict[str, str | None]:
     if not db_data:
         return {}
     env = {
-        'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
-        'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
-        'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
-        'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
+        key: value
+        for key, value in {
+            "DEMO_SERVER_DB_HOST": db_data.get("db_host", None),
+            "DEMO_SERVER_DB_PORT": db_data.get("db_port", None),
+            "DEMO_SERVER_DB_USER": db_data.get("db_username", None),
+            "DEMO_SERVER_DB_PASSWORD": db_data.get("db_password", None),
+        }.items()
+        if value is not None
     }
     return env
 ```
@@ -383,9 +387,9 @@ def test_relation_data():
         leader=True,
     )
 
-    ctx.run(ctx.on.relation_changed(relation), state_in)
+    state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert container.layers["fastapi_demo"].services["fastapi-service"].environment == {
+    assert state_out.get_container(container.name).layers["fastapi_demo"].services["fastapi-service"].environment == {
         "DEMO_SERVER_DB_HOST": "example.com",
         "DEMO_SERVER_DB_PORT": "5432",
         "DEMO_SERVER_DB_USER": "foo",
