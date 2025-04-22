@@ -1996,6 +1996,9 @@ class IdentityAccess(str, enum.Enum):
     METRICS = 'metrics'
     UNTRUSTED = 'untrusted'
 
+    def __str__(self) -> str:
+        return str.__str__(self)
+
 
 @dataclasses.dataclass
 class LocalIdentity:
