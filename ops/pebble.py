@@ -182,6 +182,19 @@ PlanDict = typing.TypedDict(
     total=False,
 )
 
+LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
+BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
+
+IdentityDict = typing.TypedDict(
+    'IdentityDict',
+    {
+        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
+        'local': Optional[LocalIdentityDict],
+        'basic': Optional[BasicIdentityDict],
+    },
+    total=False,
+)
+
 _AuthDict = TypedDict(
     '_AuthDict',
     {
@@ -329,18 +342,6 @@ if TYPE_CHECKING:
             'last-data': NotRequired[Optional[Dict[str, str]]],
             'repeat-after': NotRequired[str],
             'expire-after': NotRequired[str],
-        },
-    )
-
-    LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
-    BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
-
-    IdentityDict = typing.TypedDict(
-        'IdentityDict',
-        {
-            'access': Literal['untrusted', 'metrics', 'read', 'admin'],
-            'local': NotRequired[LocalIdentityDict],
-            'basic': NotRequired[BasicIdentityDict],
         },
     )
 
@@ -2050,6 +2051,9 @@ class Identity:
     @classmethod
     def from_dict(cls, d: IdentityDict) -> Identity:
         """Create new Identity from dict parsed from JSON."""
+        if 'access' not in d:
+            raise KeyError('"access" key is required in IdentityDict')
+
         access = IdentityAccess(d['access'])
 
         local = (
