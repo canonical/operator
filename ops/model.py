@@ -3951,7 +3951,7 @@ class _ModelBackend:
         port, hyphen, _ = port_range.partition('-')
         if hyphen:
             logger.warning('Ignoring opened-ports port range: %s', port_str)
-        protocol_lit = typing.cast("Literal['tcp', 'udp']", protocol)
+        protocol_lit = typing.cast('Literal["tcp", "udp"]', protocol)
         return Port(protocol_lit, int(port))
 
     def reboot(self, now: bool = False):
