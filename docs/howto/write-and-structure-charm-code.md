@@ -269,6 +269,46 @@ def get_version() -> str:
     return response.text
 ```
 
+(handle-status)=
+## Handle status
+
+Your charm should report its status to Juju. The best approach depends on the charm's complexity:
+
+  - If units don't need to coordinate, use [`self.unit.status`](ops.Unit.status) to report the
+    status of each unit independently. For example:
+
+    ```python
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
+        self.unit.status = ops.MaintenanceStatus("starting server")
+        # ...
+        # Start the workload and wait for it to be ready.
+        # ...
+        self.unit.status = ops.ActiveStatus()
+    ```
+
+    When your charm code sets `self.unit.status`, Ops immediately sends the unit status to Juju.
+
+    Juju aggregates the unit statuses into an overall application status.
+
+    ```{admonition} Best practice
+    :class: hint
+
+    In practice, it's often awkward to decide which status to report. Instead of writing
+    (and duplicating) complex conditional logic to set `self.unit.status`, write a handler for
+    [`collect_unit_status`](ops.CharmEvents.collect_unit_status) that tells Ops about the
+    relevant statuses. Ops will send the highest priority status to Juju. For an example, see
+    [](#integrate-your-charm-with-postgresql-update-unit-status).
+    ```
+
+  - If units need to coordinate, the leader unit should report the application status.
+    In your charm code, observe [`collect_app_status`](ops.CharmEvents.collect_app_status) or set
+    [`self.app.status`](ops.Application.status).
+
+    Each unit should still report its own status, but Juju won't aggregate the unit statuses.
+
+> See also: {external+juju:ref}`Juju | Status <status>`
+
 (handle-errors)=
 ## Handle errors
 
