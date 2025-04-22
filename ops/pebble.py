@@ -2039,7 +2039,7 @@ class BasicIdentity:
 class Identity:
     """Pebble identity configuration."""
 
-    access: Union[IdentityAccess, str]
+    access: IdentityAccess
     local: Optional[LocalIdentity] = None
     basic: Optional[BasicIdentity] = None
 
@@ -2057,7 +2057,7 @@ class Identity:
         try:
             access = IdentityAccess(d['access'])
         except ValueError:
-            access = d['access']
+            access = typing.cast(IdentityAccess, d['access'])
 
         local = (
             LocalIdentity.from_dict(d['local'])

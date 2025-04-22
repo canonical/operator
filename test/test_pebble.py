@@ -3198,15 +3198,16 @@ bad path\r
 
         identities = client.get_identities()
         assert identities == {
-            'alice': pebble.Identity.from_dict({
-                'access': 'admin',
-                'local': {'user-id': 42},
-            }),
-            'web': pebble.Identity.from_dict({
-                'access': 'metrics',
-                'basic': {'password': 'hashed password'},
-            }),
+            'alice': pebble.Identity(
+                access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+            ),
+            'web': pebble.Identity(
+                access=pebble.IdentityAccess.METRICS,
+                basic=pebble.BasicIdentity(password='hashed password'),
+            ),
         }
+        assert identities['alice'].access == 'admin'
+        assert identities['web'].access == 'metrics'
 
     def test_replace_identities(self, client: MockClient):
         client.responses.append({
