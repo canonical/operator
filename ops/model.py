@@ -72,11 +72,19 @@ _ = JujuVersion
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
 K8sSpec = Mapping[str, Any]
 
+_StorageDictType: TypeAlias = 'dict[str, list[Storage] | None]'
+_BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
+
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
 StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
 _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
+
+# mapping from relation name to a list of relation objects
+_RelationMapping_Raw: TypeAlias = 'dict[str, list[Relation] | None]'
+# mapping from container name to container metadata
+_ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
@@ -563,8 +571,7 @@ class Unit:
         self._collected_statuses: list[StatusBase] = []
 
         if self._is_our_unit and hasattr(meta, 'containers'):
-            # mapping from container name to container metadata
-            containers: dict[str, _charm.ContainerMeta] = meta.containers
+            containers: _ContainerMeta_Raw = meta.containers
             self._containers = ContainerMapping(iter(containers), backend)
 
     def _invalidate(self):
@@ -911,8 +918,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
-        # mapping from relation name to a list of relation objects
-        self._data: dict[str, list[Relation] | None] = {r: None for r in relations_meta}
+        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
 
     def __contains__(self, key: str):
         return key in self._data
@@ -989,7 +995,7 @@ class BindingMapping(Mapping[str, 'Binding']):
 
     def __init__(self, backend: _ModelBackend):
         self._backend = backend
-        self._data: dict[str | Relation, Binding] = {}
+        self._data: _BindingDictType = {}
 
     def get(self, binding_key: str | Relation) -> Binding:
         """Get a specific Binding for an endpoint/relation.
@@ -2227,7 +2233,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._storage_map: dict[str, list[Storage] | None] = {
+        self._storage_map: _StorageDictType = {
             storage_name: None for storage_name in storage_names
         }
 
