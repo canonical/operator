@@ -122,3 +122,9 @@ def juju() -> Generator[jubilant.Juju, None, None]:
         yield j
 
         print(j.debug_log())
+
+
+@pytest.fixture
+def setup_tracing():
+    """Stub out the top-level fixture."""
+    pass
