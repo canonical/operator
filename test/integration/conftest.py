@@ -64,7 +64,7 @@ TEMPO_WORKER: Final[Deploy] = {
 MINIO: Final[Deploy] = {
     'charm': 'minio',
     'channel': 'candidate',
-    'trust': True,
+    #'trust': True,
     'config': {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
 }
 
