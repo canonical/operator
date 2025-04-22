@@ -15,33 +15,3 @@ dev = [
     "ops-scenario",
     "ruff",
 ]
-
-[tool.uv.sources]
-ops-scenario = { url = "https://github.com/dimaqq/operator/archive/refs/tags/preview123.zip", subdirectory = "testing" }
-ops-tracing = { url = "https://github.com/dimaqq/operator/archive/refs/tags/preview123.zip", subdirectory = "tracing" }
-ops = { url = "https://github.com/dimaqq/operator/archive/refs/tags/preview123.zip" }
-
-# Linting tools configuration
-[tool.ruff]
-line-length = 99
-select = ["E", "W", "F", "C", "N", "D", "I001"]
-extend-ignore = [
-    "D203",
-    "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
-]
-ignore = ["E501", "D107"]
-extend-exclude = ["__pycache__", "*.egg_info"]
-per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104","D205","D415"], "lib/*" = ["D401"]}
-
-[tool.pyright]
-include = ["src/**.py"]
-extraPaths = ["src"]
