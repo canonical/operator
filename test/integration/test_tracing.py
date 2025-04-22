@@ -15,11 +15,19 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 from __future__ import annotations
 
+from typing import Callable
+
 import jubilant
 
 
-def test_something(juju: jubilant.Juju):
+def test_foo(build_tracing_test_charm: Callable[[], str]):
+    charm_path = build_tracing_test_charm()
+    print(charm_path)
+
+
+def xtest_something(juju: jubilant.Juju):
     pass
+
 
 # Finally get the traces
 # ip: tempo-worker unit ip

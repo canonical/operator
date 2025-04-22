@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 import functools
-from typing import Generator
+import logging
+import subprocess
+from typing import Callable, Generator
 
 import jubilant
 import minio
@@ -70,6 +72,34 @@ def juju() -> Generator[jubilant.Juju, None, None]:
         print(j.debug_log())
 
 
+@pytest.fixture(scope='session')
+def build_tracing_test_charm(
+    pytestconfig: pytest.Config,
+) -> Generator[Callable[[], str], None, None]:
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_integration'
+    proc = subprocess.Popen(
+        ['charmcraft', 'pack'],  # noqa: S607
+        cwd=str(charm_dir),
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    def tracing_test_charm():
+        proc.communicate()
+        assert proc.returncode == 0
+        charm = charm_dir / 'tracing-tester_amd64.charm'
+        assert charm.exists()
+        return str(charm)
+
+    yield tracing_test_charm
+    if proc.returncode is None:
+        proc.kill()
+    out, err = proc.communicate()
+    logging.info('charmcraft pack stdout:\n%s', out)
+    logging.error('charmcraft pack stderr:\n%s', err)
+
+
 def app_is(s: jubilant.Status, app: str, status: str):
     return next(iter(s.apps[app].units.values())).workload_status.current == status
 
@@ -82,9 +112,9 @@ def deploy_tempo(juju: jubilant.Juju):
     juju.deploy(
         'tempo-coordinator-k8s',
         app='tempo',
-        channel= 'edge',
-        trust= True,
-        resources= {
+        channel='edge',
+        trust=True,
+        resources={
             'nginx-image': 'ubuntu/nginx:1.24-24.04_beta',
             'nginx-prometheus-exporter-image': 'nginx/nginx-prometheus-exporter:1.1.0',
         },
@@ -94,18 +124,12 @@ def deploy_tempo(juju: jubilant.Juju):
 def deploy_tempo_worker(juju: jubilant.Juju):
     juju.deploy(
         'tempo-worker-k8s',
-        app= 'tempo-worker',
-        channel= 'edge',
-        config= {'role-all': True},
-        trust= True,
-        resources= {'tempo-image': 'docker.io/ubuntu/tempo:2-22.04'},
+        app='tempo-worker',
+        channel='edge',
+        config={'role-all': True},
+        trust=True,
+        resources={'tempo-image': 'docker.io/ubuntu/tempo:2-22.04'},
     )
-
-
-def deploy_minio(juju: jubilant.Juju):
-    juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
-    #'channel': 'candidate',
-    #'trust': True,
 
 
 @pytest.fixture
