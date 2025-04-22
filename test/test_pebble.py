@@ -4015,9 +4015,9 @@ class TestIdentity:
             pebble.Identity.from_dict(raw)
 
     def test_invalid_access(self):
-        with pytest.raises(ValueError):
-            raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
-            pebble.Identity.from_dict(raw)
+        raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
+        identity = pebble.Identity.from_dict(raw)
+        assert identity.access == 'foo'
 
     def test_no_identity(self):
         with pytest.raises(ValueError):

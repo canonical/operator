@@ -1987,7 +1987,7 @@ class _WebsocketReader(io.BufferedIOBase):
         return self.read(n)
 
 
-class IdentityAccess(enum.Enum):
+class IdentityAccess(str, enum.Enum):
     """Enum of identity access levels."""
 
     ADMIN = 'admin'
@@ -2039,7 +2039,7 @@ class BasicIdentity:
 class Identity:
     """Pebble identity configuration."""
 
-    access: IdentityAccess
+    access: Union[IdentityAccess, str]
     local: Optional[LocalIdentity] = None
     basic: Optional[BasicIdentity] = None
 
@@ -2054,7 +2054,10 @@ class Identity:
         if 'access' not in d:
             raise KeyError('"access" key is required in IdentityDict')
 
-        access = IdentityAccess(d['access'])
+        try:
+            access = IdentityAccess(d['access'])
+        except ValueError:
+            access = d['access']
 
         local = (
             LocalIdentity.from_dict(d['local'])
@@ -2071,7 +2074,7 @@ class Identity:
 
     def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
-        result: Dict[str, Any] = {'access': self.access.value}
+        result: Dict[str, Any] = {'access': self.access}
         if self.local is not None:
             result['local'] = self.local.to_dict()
         if self.basic is not None:
