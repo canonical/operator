@@ -20,3 +20,7 @@ import jubilant
 
 def test_something(juju: jubilant.Juju):
     pass
+
+# Finally get the traces
+# ip: tempo-worker unit ip
+# curl "http://10.152.183.97:3200/api/search?tags=service.name=tracing-tester" | jq .
