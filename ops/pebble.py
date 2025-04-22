@@ -190,7 +190,7 @@ class IdentityDict(typing.TypedDict):
     """TypedDict for Pebble identy."""
 
     # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
-    access: IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']
+    access: Literal['untrusted', 'metrics', 'read', 'admin']
     local: NotRequired[LocalIdentityDict]
     basic: NotRequired[BasicIdentityDict]
 
@@ -2070,7 +2070,9 @@ class Identity:
 
     def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
-        result: IdentityDict = {'access': self.access}
+        result: IdentityDict = {
+            'access': str(self.access)  # pyright: ignore[reportAssignmentType]
+        }
         if self.local is not None:
             result['local'] = self.local.to_dict()
         if self.basic is not None:
