@@ -109,6 +109,16 @@ def juju() -> Generator[jubilant.Juju, None, None]:
             {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
         )
 
-        # FIXME not ready yet
+        # Tempo goes through a cycle of:
+        # - update own stateful set
+        # - kill own pod
+        # - new pod is scheduled by k8s
+        # - check own stateful set
+        #
+        # This process may take a while. I'm unsure about the default timeout.
+
         j.wait(jubilant.all_active)
+
         yield j
+
+        print(j.debug_log())

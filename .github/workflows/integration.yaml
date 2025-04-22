@@ -1,0 +1,23 @@
+name: ops Integration Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron:  '42 7 25 * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        juju-channel: ['3/stable']
+        charmcraft-channel: ['3.x/stable']
+        preset: ['k8s']
+
+    steps:
+      - run: sudo snap install --classic concierge
+      - run: sudo concierge prepare --juju-channel=${{ matrix.juju-channel }} --charmcraft-channel=${{ matrix.charmcraft-channel }} -p "${{ matrix.preset }}"
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uvx tox -e integration
