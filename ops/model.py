@@ -44,7 +44,6 @@ from typing import (
     BinaryIO,
     Callable,
     ClassVar,
-    Dict,
     Generator,
     Iterable,
     List,
@@ -52,7 +51,6 @@ from typing import (
     Mapping,
     MutableMapping,
     TextIO,
-    Type,
     TypedDict,
     Union,
     get_args,
@@ -64,6 +62,9 @@ from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 
+if typing.TYPE_CHECKING:
+    from typing_extensions import TypeAlias
+
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
 _ = JujuVersion
@@ -73,14 +74,14 @@ K8sSpec = Mapping[str, Any]
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-StatusName = Union[_SettableStatusName, _ReadOnlyStatusName]
+StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
 _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
-_RelationDataContent_Raw = Dict[str, str]
-UnitOrApplicationType = Union[Type['Unit'], Type['Application']]
+_RelationDataContent_Raw: TypeAlias = 'dict[str, str]'
+UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 
 _AddressDict = TypedDict(
     '_AddressDict',
