@@ -2761,7 +2761,7 @@ class Container:
 
     def pull_path(
         self,
-        source_path: str | PurePath | Iterable[str | Path],
+        source_path: str | PurePath | Iterable[str | PurePath],
         dest_dir: str | Path,
     ):
         """Recursively pull a remote path or files to the local system.
