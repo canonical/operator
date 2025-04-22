@@ -23,7 +23,6 @@ import socket
 import tempfile
 import typing
 import unittest
-import unittest.mock
 import unittest.util
 
 import pytest
@@ -4012,11 +4011,16 @@ class TestIdentity:
 
     def test_no_access(self):
         with pytest.raises(KeyError):
-            raw: pebble.IdentityDict = {'local': {'user-id': 42}}
+            raw: pebble.IdentityDict = {  # pyright: ignore[reportAssignmentType]
+                'local': {'user-id': 42}
+            }
             pebble.Identity.from_dict(raw)
 
     def test_invalid_access(self):
-        raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
+        raw: pebble.IdentityDict = {
+            'access': 'foo',  # pyright: ignore[reportAssignmentType]
+            'local': {'user-id': 42},
+        }
         identity = pebble.Identity.from_dict(raw)
         assert identity.access == 'foo'
 

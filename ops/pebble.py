@@ -185,15 +185,15 @@ PlanDict = typing.TypedDict(
 LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
 BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
 
-IdentityDict = typing.TypedDict(
-    'IdentityDict',
-    {
-        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
-        'local': Optional[LocalIdentityDict],
-        'basic': Optional[BasicIdentityDict],
-    },
-    total=False,
-)
+
+class IdentityDict(typing.TypedDict):
+    """TypedDict for Pebble identy."""
+
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+    access: IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']
+    local: NotRequired[LocalIdentityDict]
+    basic: NotRequired[BasicIdentityDict]
+
 
 _AuthDict = TypedDict(
     '_AuthDict',
@@ -1990,6 +1990,7 @@ class _WebsocketReader(io.BufferedIOBase):
 class IdentityAccess(str, enum.Enum):
     """Enum of identity access levels."""
 
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
     ADMIN = 'admin'
     READ = 'read'
     METRICS = 'metrics'
@@ -2039,7 +2040,8 @@ class BasicIdentity:
 class Identity:
     """Pebble identity configuration."""
 
-    access: IdentityAccess
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+    access: IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']
     local: Optional[LocalIdentity] = None
     basic: Optional[BasicIdentity] = None
 
@@ -2051,35 +2053,25 @@ class Identity:
     @classmethod
     def from_dict(cls, d: IdentityDict) -> Identity:
         """Create new Identity from dict parsed from JSON."""
-        if 'access' not in d:
-            raise KeyError('"access" key is required in IdentityDict')
-
+        d_access = d['access']
         try:
-            access = IdentityAccess(d['access'])
+            access = IdentityAccess(d_access)
         except ValueError:
-            access = typing.cast(IdentityAccess, d['access'])
-
-        local = (
-            LocalIdentity.from_dict(d['local'])
-            if 'local' in d and d['local'] is not None
-            else None
-        )
-        basic = (
-            BasicIdentity.from_dict(d['basic'])
-            if 'basic' in d and d['basic'] is not None
-            else None
-        )
-
+            # An unknown 'access' value, perhaps from a newer Pebble version
+            # We silently preserve it for roundtrip safety
+            access = typing.cast(IdentityAccess, d_access)
+        local = LocalIdentity.from_dict(d['local']) if 'local' in d else None
+        basic = BasicIdentity.from_dict(d['basic']) if 'basic' in d else None
         return cls(access=access, local=local, basic=basic)
 
     def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
-        result: Dict[str, Any] = {'access': self.access}
+        result: IdentityDict = {'access': self.access}
         if self.local is not None:
             result['local'] = self.local.to_dict()
         if self.basic is not None:
             result['basic'] = self.basic.to_dict()
-        return typing.cast('IdentityDict', result)
+        return result
 
 
 class Client:
