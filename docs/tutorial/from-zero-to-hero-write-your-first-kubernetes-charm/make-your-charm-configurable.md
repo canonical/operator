@@ -197,8 +197,8 @@ def test_config_changed():
         config={"server-port": 8080},
         leader=True,
     )
-    ctx.run(ctx.on.config_changed(), state_in)
-    assert "--port=8080" in container.layers["fastapi_demo"].services["fastapi-service"].command
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    assert "--port=8080" in state_out.get_container(container.name).layers["fastapi_demo"].services["fastapi-service"].command
 ```
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
