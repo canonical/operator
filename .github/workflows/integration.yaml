@@ -23,4 +23,5 @@ jobs:
       - run: sudo concierge prepare --juju-channel=${{ matrix.juju-channel }} --charmcraft-channel=${{ matrix.charmcraft-channel }} -p "${{ matrix.preset }}"
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uvx tox -e integration -- --test-group-count=4 --test-group=${{ matrix-test-group }}
+      # Note that the test group count must match the groups, and there must be enough tests.
+      - run: uvx tox -e integration -- --test-group-count=4 --test-group=${{ matrix.test-group }}
