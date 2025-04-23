@@ -199,7 +199,7 @@ Now, let's define this property such that, every time it is called, it dynamical
 
 ```python
 @property
-def app_environment(self) -> Dict[str, str]:
+def app_environment(self) -> dict[str, str]:
     """This property method creates a dictionary containing environment variables
     for the application. It retrieves the database authentication data by calling
     the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
