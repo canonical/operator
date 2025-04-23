@@ -96,8 +96,8 @@ def build_tracing_test_charm(
     if proc.returncode is None:
         proc.kill()
     out, err = proc.communicate()
-    logging.info('charmcraft pack stdout:\n%s', out)
-    logging.error('charmcraft pack stderr:\n%s', err)
+    logging.info('`charmcraft pack` stdout follows:\n%s', out)
+    logging.info('`charmcraft pack` stderr follows:\n%s', err)
 
 
 def app_is(s: jubilant.Status, app: str, status: str):
