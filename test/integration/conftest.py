@@ -110,6 +110,8 @@ def app_is(s: jubilant.Status, app: str, status: str):
     return next(iter(s.apps[app].units.values())).workload_status.current == status
 
 
+# These could use jubilant.all_active(s, apps=["minio"]).
+# Keeping custom code for now, as the above API may change.
 minio_active = functools.partial(app_is, app='minio', status='active')
 s3_integrator_blocked = functools.partial(app_is, app='s3-integrator', status='blocked')
 
