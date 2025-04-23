@@ -16,73 +16,22 @@
 from __future__ import annotations
 
 import functools
-from typing import Final, Generator, Iterable, Mapping
+import logging
+import subprocess
+from typing import Callable, Generator
 
 import jubilant
 import minio
 import pytest
-from typing_extensions import TypedDict
-
-
-class Deploy(TypedDict, total=False):
-    charm: str
-    app: str | None
-    attach_storage: Iterable[str] | None
-    base: str | None
-    channel: str | None
-    config: Mapping[str, str | int | float | bool] | None
-    constraints: Mapping[str, str] | None
-    force: bool
-    num_units: int
-    resources: Mapping[str, str] | None
-    revision: int | None
-    storage: Mapping[str, str] | None
-    to: str | Iterable[str] | None
-    trust: bool
-
-
-TEMPO: Final[Deploy] = {
-    'charm': 'tempo-coordinator-k8s',
-    'app': 'tempo',
-    'channel': 'edge',
-    'trust': True,
-    'resources': {
-        'nginx-image': 'ubuntu/nginx:1.24-24.04_beta',
-        'nginx-prometheus-exporter-image': 'nginx/nginx-prometheus-exporter:1.1.0',
-    },
-}
-
-TEMPO_WORKER: Final[Deploy] = {
-    'charm': 'tempo-worker-k8s',
-    'app': 'tempo-worker',
-    'channel': 'edge',
-    'config': {'role-all': True},
-    'trust': True,
-    'resources': {'tempo-image': 'docker.io/ubuntu/tempo:2-22.04'},
-}
-
-MINIO: Final[Deploy] = {
-    'charm': 'minio',
-    'channel': 'candidate',
-    'trust': True,
-    'config': {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
-}
-
-
-def app_is(s: jubilant.Status, app: str, status: str):
-    return next(iter(s.apps[app].units.values())).workload_status.current == status
-
-
-minio_active = functools.partial(app_is, app='minio', status='active')
-s3_integrator_blocked = functools.partial(app_is, app='s3-integrator', status='blocked')
 
 
 @pytest.fixture
 def juju() -> Generator[jubilant.Juju, None, None]:
+    """Make a Juju model with the tracing part of COS ready."""
     with jubilant.temp_model() as j:
-        j.deploy(**TEMPO)
-        j.deploy(**TEMPO_WORKER)
-        j.deploy(**MINIO)
+        deploy_tempo(j)
+        deploy_tempo_worker(j)
+        j.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
         j.deploy('s3-integrator')
 
         j.integrate('tempo:s3', 's3-integrator')
@@ -122,6 +71,73 @@ def juju() -> Generator[jubilant.Juju, None, None]:
         yield j
 
         print(j.debug_log())
+
+
+@pytest.fixture(scope='session')
+def build_charm(
+    pytestconfig: pytest.Config,
+) -> Generator[Callable[[], str], None, None]:
+    """Build the test charm and provide the artefact path.
+
+    Starts building the tracing-tester charm early.
+    Call the fixture value to get the built charm file path.
+    """
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_integration'
+    proc = subprocess.Popen(
+        ['charmcraft', 'pack'],  # noqa: S607
+        cwd=str(charm_dir),
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    def tracing_test_charm():
+        proc.communicate()
+        assert proc.returncode == 0
+        charm = charm_dir / 'tracing-tester_amd64.charm'
+        assert charm.exists()
+        return str(charm)
+
+    yield tracing_test_charm
+    if proc.returncode is None:
+        proc.kill()
+    out, err = proc.communicate()
+    logging.info('`charmcraft pack` stdout follows:\n%s', out)
+    logging.info('`charmcraft pack` stderr follows:\n%s', err)
+
+
+def app_is(s: jubilant.Status, app: str, status: str):
+    return next(iter(s.apps[app].units.values())).workload_status.current == status
+
+
+# These could use jubilant.all_active(s, apps=["minio"]).
+# Keeping custom code for now, as the above API may change.
+minio_active = functools.partial(app_is, app='minio', status='active')
+s3_integrator_blocked = functools.partial(app_is, app='s3-integrator', status='blocked')
+
+
+def deploy_tempo(juju: jubilant.Juju):
+    juju.deploy(
+        'tempo-coordinator-k8s',
+        app='tempo',
+        channel='edge',
+        trust=True,
+        resources={
+            'nginx-image': 'ubuntu/nginx:1.24-24.04_beta',
+            'nginx-prometheus-exporter-image': 'nginx/nginx-prometheus-exporter:1.1.0',
+        },
+    )
+
+
+def deploy_tempo_worker(juju: jubilant.Juju):
+    juju.deploy(
+        'tempo-worker-k8s',
+        app='tempo-worker',
+        channel='edge',
+        config={'role-all': True},
+        trust=True,
+        resources={'tempo-image': 'docker.io/ubuntu/tempo:2-22.04'},
+    )
 
 
 @pytest.fixture
