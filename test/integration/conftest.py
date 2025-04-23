@@ -27,6 +27,7 @@ import pytest
 
 @pytest.fixture
 def juju() -> Generator[jubilant.Juju, None, None]:
+    """Make a Juju model with the tracing part of COS ready."""
     with jubilant.temp_model() as j:
         deploy_tempo(j)
         deploy_tempo_worker(j)
@@ -73,9 +74,14 @@ def juju() -> Generator[jubilant.Juju, None, None]:
 
 
 @pytest.fixture(scope='session')
-def build_tracing_test_charm(
+def build_charm(
     pytestconfig: pytest.Config,
 ) -> Generator[Callable[[], str], None, None]:
+    """Build the test charm and provide the artefact path.
+
+    Starts building the tracing-tester charm early.
+    Call the fixture value to get the built charm file path.
+    """
     charm_dir = pytestconfig.rootpath / 'test/charms/test_integration'
     proc = subprocess.Popen(
         ['charmcraft', 'pack'],  # noqa: S607

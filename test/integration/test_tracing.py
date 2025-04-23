@@ -20,12 +20,23 @@ from typing import Callable
 import jubilant
 
 
-def test_foo(build_tracing_test_charm: Callable[[], str]):
-    charm_path = build_tracing_test_charm()
+def test_direct_connection(build_charm: Callable[[], str], juju: jubilant.Juju):
+    charm_path = build_charm()
+    juju.deploy(charm_path)
+    juju.integrate('tracing-tester', 'tempo')
+
+
+def test_with_load_balancer(build_charm: Callable[[], str], juju: jubilant.Juju):
+    charm_path = build_charm()
     print(charm_path)
+    pass
 
 
-def xtest_something(juju: jubilant.Juju):
+def test_with_tls(build_charm: Callable[[], str], juju: jubilant.Juju):
+    pass
+
+
+def test_with_load_balancer_tls(build_charm: Callable[[], str], juju: jubilant.Juju):
     pass
 
 

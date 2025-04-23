@@ -16,10 +16,11 @@ jobs:
         juju-channel: ['3/stable']
         charmcraft-channel: ['3.x/stable']
         preset: ['microk8s']  # ['k8s'] https://github.com/jnsgruk/concierge/issues/51
+        test-group: [1,2,3,4]
 
     steps:
       - run: sudo snap install --classic concierge
       - run: sudo concierge prepare --juju-channel=${{ matrix.juju-channel }} --charmcraft-channel=${{ matrix.charmcraft-channel }} -p "${{ matrix.preset }}"
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uvx tox -e integration
+      - run: uvx tox -e integration -- --test-group-count=4 --test-group=${{ matrix-test-group }}
