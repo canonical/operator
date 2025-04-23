@@ -55,9 +55,9 @@ if TYPE_CHECKING:  # pragma: no cover
         _EntityStatus,
     )
 
-logger = scenario_logger.getChild("runtime")
+logger = scenario_logger.getChild('runtime')
 
-_DEFAULT_JUJU_VERSION = "3.6.4"
+_DEFAULT_JUJU_VERSION = '3.6.4'
 
 
 class Manager(Generic[CharmType]):
@@ -94,7 +94,7 @@ class Manager(Generic[CharmType]):
         """
         if self.ops is None or self.ops.charm is None:
             raise RuntimeError(
-                "you should __enter__ this context manager before accessing this",
+                'you should __enter__ this context manager before accessing this',
             )
         return self.ops.charm
 
@@ -113,10 +113,10 @@ class Manager(Generic[CharmType]):
         This can only be done once.
         """
         if self._emitted:
-            raise AlreadyEmittedError("Can only run once.")
+            raise AlreadyEmittedError('Can only run once.')
         if not self.ops:
             raise RuntimeError(
-                "you should __enter__ this context manager before running it",
+                'you should __enter__ this context manager before running it',
             )
         self._emitted = True
         self.ops.run()
@@ -131,7 +131,7 @@ class Manager(Generic[CharmType]):
         if not self._emitted:
             logger.debug(
                 "user didn't emit the event within the context manager scope. "
-                "Doing so implicitly upon exit...",
+                'Doing so implicitly upon exit...',
             )
             self.run()
         # guaranteed to be set: run was either called before, or right above
@@ -171,109 +171,109 @@ class CharmEvents:
     @staticmethod
     @_copy_doc(ops.InstallEvent)
     def install():
-        return _Event("install")
+        return _Event('install')
 
     @staticmethod
     @_copy_doc(ops.StartEvent)
     def start():
-        return _Event("start")
+        return _Event('start')
 
     @staticmethod
     @_copy_doc(ops.StopEvent)
     def stop():
-        return _Event("stop")
+        return _Event('stop')
 
     @staticmethod
     @_copy_doc(ops.RemoveEvent)
     def remove():
-        return _Event("remove")
+        return _Event('remove')
 
     @staticmethod
     @_copy_doc(ops.UpdateStatusEvent)
     def update_status():
-        return _Event("update_status")
+        return _Event('update_status')
 
     @staticmethod
     @_copy_doc(ops.ConfigChangedEvent)
     def config_changed():
-        return _Event("config_changed")
+        return _Event('config_changed')
 
     @staticmethod
     @_copy_doc(ops.UpgradeCharmEvent)
     def upgrade_charm():
-        return _Event("upgrade_charm")
+        return _Event('upgrade_charm')
 
     @staticmethod
     @_copy_doc(ops.PreSeriesUpgradeEvent)
     def pre_series_upgrade():
-        return _Event("pre_series_upgrade")
+        return _Event('pre_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.PostSeriesUpgradeEvent)
     def post_series_upgrade():
-        return _Event("post_series_upgrade")
+        return _Event('post_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.LeaderElectedEvent)
     def leader_elected():
-        return _Event("leader_elected")
+        return _Event('leader_elected')
 
     @staticmethod
     @_copy_doc(ops.SecretChangedEvent)
     def secret_changed(secret: Secret):
         if secret.owner:
             raise ValueError(
-                "This unit will never receive secret-changed for a secret it owns.",
+                'This unit will never receive secret-changed for a secret it owns.',
             )
-        return _Event("secret_changed", secret=secret)
+        return _Event('secret_changed', secret=secret)
 
     @staticmethod
     @_copy_doc(ops.SecretExpiredEvent)
     def secret_expired(secret: Secret, *, revision: int):
         if not secret.owner:
             raise ValueError(
-                "This unit will never receive secret-expire for a secret it does not own.",
+                'This unit will never receive secret-expire for a secret it does not own.',
             )
-        return _Event("secret_expired", secret=secret, secret_revision=revision)
+        return _Event('secret_expired', secret=secret, secret_revision=revision)
 
     @staticmethod
     @_copy_doc(ops.SecretRotateEvent)
     def secret_rotate(secret: Secret):
         if not secret.owner:
             raise ValueError(
-                "This unit will never receive secret-rotate for a secret it does not own.",
+                'This unit will never receive secret-rotate for a secret it does not own.',
             )
-        return _Event("secret_rotate", secret=secret)
+        return _Event('secret_rotate', secret=secret)
 
     @staticmethod
     @_copy_doc(ops.SecretRemoveEvent)
     def secret_remove(secret: Secret, *, revision: int):
         if not secret.owner:
             raise ValueError(
-                "This unit will never receive secret-removed for a secret it does not own.",
+                'This unit will never receive secret-removed for a secret it does not own.',
             )
-        return _Event("secret_remove", secret=secret, secret_revision=revision)
+        return _Event('secret_remove', secret=secret, secret_revision=revision)
 
     @staticmethod
     def collect_app_status():
         """Event triggered at the end of every hook to collect app statuses for evaluation"""
-        return _Event("collect_app_status")
+        return _Event('collect_app_status')
 
     @staticmethod
     def collect_unit_status():
         """Event triggered at the end of every hook to collect unit statuses for evaluation"""
-        return _Event("collect_unit_status")
+        return _Event('collect_unit_status')
 
     @staticmethod
     @_copy_doc(ops.RelationCreatedEvent)
     def relation_created(relation: RelationBase):
-        return _Event(f"{relation.endpoint}_relation_created", relation=relation)
+        return _Event(f'{relation.endpoint}_relation_created', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.RelationJoinedEvent)
     def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):
         return _Event(
-            f"{relation.endpoint}_relation_joined",
+            f'{relation.endpoint}_relation_joined',
             relation=relation,
             relation_remote_unit_id=remote_unit,
         )
@@ -286,7 +286,7 @@ class CharmEvents:
         remote_unit: int | None = None,
     ):
         return _Event(
-            f"{relation.endpoint}_relation_changed",
+            f'{relation.endpoint}_relation_changed',
             relation=relation,
             relation_remote_unit_id=remote_unit,
         )
@@ -300,7 +300,7 @@ class CharmEvents:
         departing_unit: int | None = None,
     ):
         return _Event(
-            f"{relation.endpoint}_relation_departed",
+            f'{relation.endpoint}_relation_departed',
             relation=relation,
             relation_remote_unit_id=remote_unit,
             relation_departed_unit_id=departing_unit,
@@ -309,28 +309,28 @@ class CharmEvents:
     @staticmethod
     @_copy_doc(ops.RelationBrokenEvent)
     def relation_broken(relation: RelationBase):
-        return _Event(f"{relation.endpoint}_relation_broken", relation=relation)
+        return _Event(f'{relation.endpoint}_relation_broken', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.StorageAttachedEvent)
     def storage_attached(storage: Storage):
-        return _Event(f"{storage.name}_storage_attached", storage=storage)
+        return _Event(f'{storage.name}_storage_attached', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.StorageDetachingEvent)
     def storage_detaching(storage: Storage):
-        return _Event(f"{storage.name}_storage_detaching", storage=storage)
+        return _Event(f'{storage.name}_storage_detaching', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.PebbleReadyEvent)
     def pebble_ready(container: Container):
-        return _Event(f"{container.name}_pebble_ready", container=container)
+        return _Event(f'{container.name}_pebble_ready', container=container)
 
     @staticmethod
     @_copy_doc(ops.PebbleCustomNoticeEvent)
     def pebble_custom_notice(container: Container, notice: Notice):
         return _Event(
-            f"{container.name}_pebble_custom_notice",
+            f'{container.name}_pebble_custom_notice',
             container=container,
             notice=notice,
         )
@@ -339,7 +339,7 @@ class CharmEvents:
     @_copy_doc(ops.PebbleCheckFailedEvent)
     def pebble_check_failed(container: Container, info: CheckInfo):
         return _Event(
-            f"{container.name}_pebble_check_failed",
+            f'{container.name}_pebble_check_failed',
             container=container,
             check_info=info,
         )
@@ -348,7 +348,7 @@ class CharmEvents:
     @_copy_doc(ops.PebbleCheckRecoveredEvent)
     def pebble_check_recovered(container: Container, info: CheckInfo):
         return _Event(
-            f"{container.name}_pebble_check_recovered",
+            f'{container.name}_pebble_check_recovered',
             container=container,
             check_info=info,
         )
@@ -362,10 +362,10 @@ class CharmEvents:
     ):
         kwargs: dict[str, Any] = {}
         if params:
-            kwargs["params"] = params
+            kwargs['params'] = params
         if id:
-            kwargs["id"] = id
-        return _Event(f"{name}_action", action=_Action(name, **kwargs))
+            kwargs['id'] = id
+        return _Event(f'{name}_action', action=_Action(name, **kwargs))
 
     @staticmethod
     def custom(
@@ -401,12 +401,12 @@ class CharmEvents:
         """
         if issubclass(event.event_type, ops.HookEvent):
             raise ValueError(
-                "custom events should subclass EventBase directly - testing events that inherit "
-                "from a Juju hook event must be done by running the underlying Juju event, for "
-                "example: ctx.run(ctx.on.relation_changed(relation), state)"
+                'custom events should subclass EventBase directly - testing events that inherit '
+                'from a Juju hook event must be done by running the underlying Juju event, for '
+                'example: ctx.run(ctx.on.relation_changed(relation), state)'
             )
         return _Event(
-            f"{{custom}}.{type(event.emitter).__name__}.{event.event_kind}",
+            f'{{custom}}.{type(event.emitter).__name__}.{event.event_kind}',
             custom_event=event,
             custom_event_args=args,
             custom_event_kwargs=kwargs,
@@ -545,18 +545,18 @@ class Context(Generic[CharmType]):
         """
 
         if not any((meta, actions, config)):
-            logger.debug("Autoloading charmspec...")
+            logger.debug('Autoloading charmspec...')
             try:
                 spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
-                    f"Cannot setup scenario with `charm_type`={charm_type}. "
-                    f"Did you forget to pass `meta` to this Context?",
+                    f'Cannot setup scenario with `charm_type`={charm_type}. '
+                    f'Did you forget to pass `meta` to this Context?',
                 ) from e
 
         else:
             if not meta:
-                meta = {"name": str(charm_type.__name__)}
+                meta = {'name': str(charm_type.__name__)}
             spec = _CharmSpec(
                 charm_type=charm_type,
                 meta=meta,
@@ -567,9 +567,9 @@ class Context(Generic[CharmType]):
         self.charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
-        if juju_version.split(".")[0] == "2":
+        if juju_version.split('.')[0] == '2':
             logger.warning(
-                "Juju 2.x is closed and unsupported. You may encounter inconsistencies.",
+                'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
         self._app_name = app_name
@@ -607,11 +607,11 @@ class Context(Generic[CharmType]):
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
-        return Path(self._tmp.name) / "containers" / container_name
+        return Path(self._tmp.name) / 'containers' / container_name
 
     def _get_storage_root(self, name: str, index: int) -> Path:
         """Get the path to a tempdir where this storage's simulated root will live."""
-        storage_root = Path(self._tmp.name) / "storages" / f"{name}-{index}"
+        storage_root = Path(self._tmp.name) / 'storages' / f'{name}-{index}'
         # in the case of _get_container_root, _MockPebbleClient will ensure the dir exists.
         storage_root.mkdir(parents=True, exist_ok=True)
         return storage_root
@@ -646,8 +646,8 @@ class Context(Generic[CharmType]):
         :private:
         """
         raise AttributeError(
-            f"call with `ctx.run`, like `ctx.run(ctx.on.action({action!r})` "
-            "and find the results in `ctx.action_results`",
+            f'call with `ctx.run`, like `ctx.run(ctx.on.action({action!r})` '
+            'and find the results in `ctx.action_results`',
         )
 
     def run(self, event: _Event, state: State) -> State:
@@ -663,48 +663,48 @@ class Context(Generic[CharmType]):
         """
         # Help people transition from Scenario 6:
         if isinstance(event, str):
-            event = event.replace("-", "_")  # type: ignore
+            event = event.replace('-', '_')  # type: ignore
             if event in (
-                "install",
-                "start",
-                "stop",
-                "remove",
-                "update_status",
-                "config_changed",
-                "upgrade_charm",
-                "pre_series_upgrade",
-                "post_series_upgrade",
-                "leader_elected",
-                "collect_app_status",
-                "collect_unit_status",
+                'install',
+                'start',
+                'stop',
+                'remove',
+                'update_status',
+                'config_changed',
+                'upgrade_charm',
+                'pre_series_upgrade',
+                'post_series_upgrade',
+                'leader_elected',
+                'collect_app_status',
+                'collect_unit_status',
             ):  # type: ignore
-                suggested = f"{event}()"
-            elif event in ("secret_changed", "secret_rotate"):  # type: ignore
-                suggested = f"{event}(my_secret)"
-            elif event in ("secret_expired", "secret_remove"):  # type: ignore
-                suggested = f"{event}(my_secret, revision=1)"
+                suggested = f'{event}()'
+            elif event in ('secret_changed', 'secret_rotate'):  # type: ignore
+                suggested = f'{event}(my_secret)'
+            elif event in ('secret_expired', 'secret_remove'):  # type: ignore
+                suggested = f'{event}(my_secret, revision=1)'
             elif event in (
-                "relation_created",
-                "relation_joined",
-                "relation_changed",
-                "relation_departed",
-                "relation_broken",
+                'relation_created',
+                'relation_joined',
+                'relation_changed',
+                'relation_departed',
+                'relation_broken',
             ):  # type: ignore
-                suggested = f"{event}(my_relation)"
-            elif event in ("storage_attached", "storage_detaching"):  # type: ignore
-                suggested = f"{event}(my_storage)"
-            elif event == "pebble_ready":
-                suggested = f"{event}(my_container)"
-            elif event == "pebble_custom_notice":
-                suggested = f"{event}(my_container, my_notice)"
+                suggested = f'{event}(my_relation)'
+            elif event in ('storage_attached', 'storage_detaching'):  # type: ignore
+                suggested = f'{event}(my_storage)'
+            elif event == 'pebble_ready':
+                suggested = f'{event}(my_container)'
+            elif event == 'pebble_custom_notice':
+                suggested = f'{event}(my_container, my_notice)'
             else:
-                suggested = "event()"
+                suggested = 'event()'
             raise TypeError(
-                f"call with an event from `ctx.on`, like `ctx.on.{suggested}`",
+                f'call with an event from `ctx.on`, like `ctx.on.{suggested}`',
             )
         if callable(event):
             raise TypeError(
-                "You should call the event method. Did you forget to add parentheses?",
+                'You should call the event method. Did you forget to add parentheses?',
             )
 
         if event.action:
