@@ -66,7 +66,10 @@ def test_ip_get(mycharm):
         assert str(mgr.charm.model.get_binding(rel).network.bind_address) == '192.0.2.0'
 
         # we have a network for a binding without relations on it
-        assert str(mgr.charm.model.get_binding('deadnodead').network.bind_address) == '192.0.2.0'
+        assert (
+            str(mgr.charm.model.get_binding('deadnodead').network.bind_address)
+            == '192.0.2.0'
+        )
 
         # and an extra binding
         assert str(mgr.charm.model.get_binding('foo').network.bind_address) == '4.4.4.4'
@@ -135,7 +138,10 @@ def test_juju_info_network_default(mycharm):
         State(),
     ) as mgr:
         # we have a network for the relation
-        assert str(mgr.charm.model.get_binding('juju-info').network.bind_address) == '192.0.2.0'
+        assert (
+            str(mgr.charm.model.get_binding('juju-info').network.bind_address)
+            == '192.0.2.0'
+        )
 
 
 def test_explicit_juju_info_network_override(mycharm):

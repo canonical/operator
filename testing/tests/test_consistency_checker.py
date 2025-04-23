@@ -94,10 +94,14 @@ def test_check_info_container_matches_event():
         startup=ops.pebble.CheckStartup.UNSET,
         threshold=3,
     )
-    layer = ops.pebble.Layer({'checks': {'http-check': {'override': 'replace', 'threshold': 3}}})
+    layer = ops.pebble.Layer({
+        'checks': {'http-check': {'override': 'replace', 'threshold': 3}}
+    })
     for event in ('foo-pebble-check-failed', 'foo-pebble-check-recovered'):
         assert_consistent(
-            State(containers={Container('foo', check_infos={check}, layers={'base': layer})}),
+            State(
+                containers={Container('foo', check_infos={check}, layers={'base': layer})}
+            ),
             _Event(event, container=Container('foo'), check_info=check),
             _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
         )
@@ -222,7 +226,9 @@ def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
             }
         }
     })
-    state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
+    state = State(
+        containers={Container('foo', check_infos={check}, layers={'base': layer})}
+    )
     asserter = assert_consistent if consistent else assert_inconsistent
     asserter(
         state,
@@ -485,7 +491,9 @@ def test_action_meta_type_inconsistent():
     assert_inconsistent(
         State(),
         ctx.on.action('foo', params={'bar': 'baz'}),
-        _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'zabazaba'}}}}),
+        _CharmSpec(
+            MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'zabazaba'}}}}
+        ),
     )
 
     assert_inconsistent(
@@ -501,7 +509,9 @@ def test_action_name():
     assert_consistent(
         State(),
         ctx.on.action('foo', params={'bar': 'baz'}),
-        _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'string'}}}}),
+        _CharmSpec(
+            MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'string'}}}}
+        ),
     )
     assert_inconsistent(
         State(),
@@ -526,13 +536,17 @@ def test_action_params_type(ptype, good, bad):
     assert_consistent(
         State(),
         ctx.on.action('foo', params={'bar': good}),
-        _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ptype}}}}),
+        _CharmSpec(
+            MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ptype}}}}
+        ),
     )
     if bad is not None:
         assert_inconsistent(
             State(),
             ctx.on.action('foo', params={'bar': bad}),
-            _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ptype}}}}),
+            _CharmSpec(
+                MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ptype}}}}
+            ),
         )
 
 
@@ -574,7 +588,9 @@ def test_storage_event():
     assert_inconsistent(
         State(storages={storage}),
         _Event('foo-storage-attached'),
-        _CharmSpec(MyCharm, meta={'name': 'rupert', 'storage': {'foo': {'type': 'filesystem'}}}),
+        _CharmSpec(
+            MyCharm, meta={'name': 'rupert', 'storage': {'foo': {'type': 'filesystem'}}}
+        ),
     )
 
 
@@ -590,7 +606,9 @@ def test_storage_states():
     assert_consistent(
         State(storages={storage1, dataclasses.replace(storage2, index=2)}),
         _Event('start'),
-        _CharmSpec(MyCharm, meta={'name': 'frank', 'storage': {'foo': {'type': 'filesystem'}}}),
+        _CharmSpec(
+            MyCharm, meta={'name': 'frank', 'storage': {'foo': {'type': 'filesystem'}}}
+        ),
     )
     assert_consistent(
         State(storages={storage1, dataclasses.replace(storage2, name='marx')}),
@@ -759,7 +777,9 @@ def test_storedstate_consistency():
         ),
     )
     assert_inconsistent(
-        State(stored_states={StoredState(owner_path=None, content={'secret': Secret({})})}),
+        State(
+            stored_states={StoredState(owner_path=None, content={'secret': Secret({})})}
+        ),
         _Event('start'),
         _CharmSpec(
             MyCharm,

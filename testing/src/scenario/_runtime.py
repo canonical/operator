@@ -224,7 +224,9 @@ class Runtime:
         actions_yaml = virtual_charm_root / 'actions.yaml'
 
         metadata_files_present: Dict[Path, Optional[str]] = {
-            file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
+            file: file.read_text()
+            if charm_virtual_root_is_custom and file.exists()
+            else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
 

@@ -334,7 +334,9 @@ def test_relation_departed_event():
     state_in = scenario.State(relations=[relation])
     # These look like:
     #   ctx.run(ctx.on.baz_relation_departed(unit=unit_ordinal, departing_unit=unit_ordinal), state)
-    with ctx(ctx.on.relation_departed(relation, remote_unit=2, departing_unit=1), state_in) as mgr:
+    with ctx(
+        ctx.on.relation_departed(relation, remote_unit=2, departing_unit=1), state_in
+    ) as mgr:
         mgr.run()
         relation_event, collect_status = mgr.charm.observed
         assert isinstance(relation_event, ops.RelationDepartedEvent)
@@ -463,7 +465,9 @@ class CustomEventWithScenarioArgs(CustomEvent):
         self.errorstatus = ops.ErrorStatus(message=snapshot['errorstatus'])
         self.activestatus = ops.ActiveStatus(message=snapshot['activestatus'])
         self.blockedstatus = ops.BlockedStatus(message=snapshot['blockedstatus'])
-        self.maintenancestatus = ops.MaintenanceStatus(message=snapshot['maintenancestatus'])
+        self.maintenancestatus = ops.MaintenanceStatus(
+            message=snapshot['maintenancestatus']
+        )
         self.waitingstatus = ops.WaitingStatus(message=snapshot['waitingstatus'])
         self.tcpport = ops.Port(protocol='tcp', port=snapshot['tcpport'])
         self.udpport = ops.Port(protocol='udp', port=snapshot['udpport'])
@@ -544,7 +548,9 @@ def test_custom_event_with_scenario_args():
     subordinaterelation = scenario.SubordinateRelation('sub-endpoint')
     notice = scenario.Notice('key.example.com')
     layer = ops.pebble.Layer({
-        'checks': {'check1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
+        'checks': {
+            'check1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}
+        }
     })
     checkinfo = scenario.CheckInfo('check1', level=ops.pebble.CheckLevel.UNSET)
     container = scenario.Container(

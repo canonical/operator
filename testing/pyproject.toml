@@ -43,3 +43,7 @@ classifiers = [
 
 [bdist_wheel]
 universal = 1
+
+[tool.ruff]
+extend = "../pyproject.toml"
+line-length = 90

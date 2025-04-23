@@ -30,7 +30,9 @@ def test_action_event(mycharm, baz_value):
     ctx = Context(
         mycharm,
         meta={'name': 'foo'},
-        actions={'foo': {'params': {'bar': {'type': 'number'}, 'baz': {'type': 'boolean'}}}},
+        actions={
+            'foo': {'params': {'bar': {'type': 'number'}, 'baz': {'type': 'boolean'}}}
+        },
     )
     state = ctx.run(ctx.on.action('foo', params={'baz': baz_value, 'bar': 10}), State())
 
@@ -135,7 +137,9 @@ def _ops_less_than(wanted_major, wanted_minor):
     return False
 
 
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
+@pytest.mark.skipif(
+    _ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id"
+)
 def test_action_event_has_id(mycharm):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
@@ -148,7 +152,9 @@ def test_action_event_has_id(mycharm):
     ctx.run(ctx.on.action('foo'), State())
 
 
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
+@pytest.mark.skipif(
+    _ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id"
+)
 def test_action_event_has_override_id(mycharm):
     uuid = '0ddba11-cafe-ba1d-5a1e-dec0debad'
 

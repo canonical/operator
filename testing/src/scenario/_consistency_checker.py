@@ -619,7 +619,9 @@ def check_containers_consistency(
     meta_containers = list(map(_normalise_name, meta.get('containers', {})))
     state_containers = [_normalise_name(c.name) for c in state.containers]
     all_notices = {notice.id for c in state.containers for notice in c.notices}
-    all_checks = {(c.name, check.name) for c in state.containers for check in c.check_infos}
+    all_checks = {
+        (c.name, check.name) for c in state.containers for check in c.check_infos
+    }
     errors: List[str] = []
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
@@ -646,7 +648,10 @@ def check_containers_consistency(
                 'notice is not in any of the containers present in the state.',
             )
         # - you're processing a Check event and that check is not in the check's container
-        if event.check_info and (evt_container_name, event.check_info.name) not in all_checks:
+        if (
+            event.check_info
+            and (evt_container_name, event.check_info.name) not in all_checks
+        ):
             errors.append(
                 f'the event being processed concerns check {event.check_info.name}, but that '
                 f'check is not in the {evt_container_name} container.',

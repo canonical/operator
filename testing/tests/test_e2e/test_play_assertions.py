@@ -46,7 +46,9 @@ def test_charm_heals_on_start(mycharm):
 
     mycharm._call = call
 
-    initial_state = State(config={'foo': 'bar'}, leader=True, unit_status=BlockedStatus('foo'))
+    initial_state = State(
+        config={'foo': 'bar'}, leader=True, unit_status=BlockedStatus('foo')
+    )
 
     out = trigger(
         initial_state,

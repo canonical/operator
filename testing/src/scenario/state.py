@@ -163,7 +163,9 @@ def _max_posargs(n: int):
 
         def __new__(cls, *args: Any, **kwargs: Any):
             cls._annotate_class()
-            required_args = [name for name in cls._init_required_args if name not in kwargs]
+            required_args = [
+                name for name in cls._init_required_args if name not in kwargs
+            ]
             n_posargs = len(args)
             max_n_posargs = cls._max_positional_args
             kw_only = cls._init_kw_only
@@ -182,7 +184,9 @@ def _max_posargs(n: int):
                 required_pos = [
                     f"'{arg}'" for arg in required_args[n_posargs:] if arg not in kw_only
                 ]
-                required_kw = {f"'{arg}'" for arg in required_args[n_posargs:] if arg in kw_only}
+                required_kw = {
+                    f"'{arg}'" for arg in required_args[n_posargs:] if arg in kw_only
+                }
                 if required_pos and required_kw:
                     details = f'positional: {", ".join(required_pos)} and keyword: {", ".join(required_kw)} arguments'
                 elif required_pos:
@@ -299,7 +303,9 @@ class CloudSpec(_max_posargs(1)):
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
-    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))
+    secret_id = ''.join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(20)
+    )
     return f'secret:{secret_id}'
 
 
@@ -1515,7 +1521,9 @@ class State(_max_posargs(0)):
             else:
                 raise TypeError(f'Invalid status.{name}: {val!r}')
         normalised_ports = [
-            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
+            Port(protocol=port.protocol, port=port.port)
+            if isinstance(port, ops.Port)
+            else port
             for port in self.opened_ports
         ]
         if self.opened_ports != normalised_ports:
@@ -1684,7 +1692,9 @@ class State(_max_posargs(0)):
 
         normalized_endpoint = _normalise_name(endpoint)
         return tuple(
-            r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
+            r
+            for r in self.relations
+            if _normalise_name(r.endpoint) == normalized_endpoint
         )
 
 
@@ -2088,9 +2098,13 @@ class _Event:  # type: ignore
                 },
             )
             if not self.name.endswith(('_created', '_broken')):
-                snapshot_data['unit_name'] = f'{remote_app}/{self.relation_remote_unit_id}'
+                snapshot_data['unit_name'] = (
+                    f'{remote_app}/{self.relation_remote_unit_id}'
+                )
             if self.name.endswith('_departed'):
-                snapshot_data['departing_unit'] = f'{remote_app}/{self.relation_departed_unit_id}'
+                snapshot_data['departing_unit'] = (
+                    f'{remote_app}/{self.relation_departed_unit_id}'
+                )
 
         elif self._is_storage_event:
             # Enforced by the consistency checker, but for type checkers:
