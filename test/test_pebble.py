@@ -3983,6 +3983,14 @@ class TestIdentity:
             access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
         )
 
+    def test_local_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict(
+            {'access': pebble.IdentityAccess.ADMIN, 'local': {'user-id': 42}}
+        )
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+
     def test_local_identity_to_dict(self):
         identity = pebble.Identity(
             access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
@@ -3992,6 +4000,16 @@ class TestIdentity:
     def test_basic_identity_from_dict(self):
         identity = pebble.Identity.from_dict({
             'access': 'metrics',
+            'basic': {'password': 'hashed password'},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+
+    def test_basic_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.METRICS,
             'basic': {'password': 'hashed password'},
         })
         assert identity == pebble.Identity(
