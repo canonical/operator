@@ -1997,6 +1997,11 @@ class IdentityAccess(str, enum.Enum):
     UNTRUSTED = 'untrusted'
 
     def __str__(self) -> str:
+        """Return the string value of the enum member as if it were really just a string.
+
+        This aligns the behaviour of (str, enum.Enum) with Python 3.11's StrEnum.
+        For example: str(IdentityAccess.ADMIN) -> 'admin'
+        """
         return str.__str__(self)
 
 
