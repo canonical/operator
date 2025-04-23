@@ -184,15 +184,15 @@ PlanDict = typing.TypedDict(
 
 LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
 BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
-
-
-class IdentityDict(typing.TypedDict):
-    """TypedDict for Pebble identy."""
-
-    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
-    access: Literal['untrusted', 'metrics', 'read', 'admin']
-    local: NotRequired[LocalIdentityDict]
-    basic: NotRequired[BasicIdentityDict]
+IdentityDict = typing.TypedDict(
+    'IdentityDict',
+    {
+        # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
+        'local': 'NotRequired[LocalIdentityDict]',
+        'basic': 'NotRequired[BasicIdentityDict]',
+    }
+)
 
 
 _AuthDict = TypedDict(
