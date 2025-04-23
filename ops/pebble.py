@@ -184,16 +184,16 @@ PlanDict = typing.TypedDict(
 
 LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
 BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
-
 IdentityDict = typing.TypedDict(
     'IdentityDict',
     {
+        # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
         'access': Literal['untrusted', 'metrics', 'read', 'admin'],
-        'local': Optional[LocalIdentityDict],
-        'basic': Optional[BasicIdentityDict],
-    },
-    total=False,
+        'local': 'NotRequired[LocalIdentityDict]',
+        'basic': 'NotRequired[BasicIdentityDict]',
+    }
 )
+
 
 _AuthDict = TypedDict(
     '_AuthDict',
@@ -1990,10 +1990,19 @@ class _WebsocketReader(io.BufferedIOBase):
 class IdentityAccess(str, enum.Enum):
     """Enum of identity access levels."""
 
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
     ADMIN = 'admin'
     READ = 'read'
     METRICS = 'metrics'
     UNTRUSTED = 'untrusted'
+
+    def __str__(self) -> str:
+        """Return the string value of the enum member as if it were really just a string.
+
+        This aligns the behaviour of (str, enum.Enum) with Python 3.11's StrEnum.
+        For example: str(IdentityAccess.ADMIN) -> 'admin'
+        """
+        return str.__str__(self)
 
 
 @dataclasses.dataclass
@@ -2039,7 +2048,8 @@ class BasicIdentity:
 class Identity:
     """Pebble identity configuration."""
 
-    access: IdentityAccess
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+    access: IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']
     local: Optional[LocalIdentity] = None
     basic: Optional[BasicIdentity] = None
 
@@ -2053,33 +2063,26 @@ class Identity:
         """Create new Identity from dict parsed from JSON."""
         if 'access' not in d:
             raise KeyError('"access" key is required in IdentityDict')
-
         try:
             access = IdentityAccess(d['access'])
         except ValueError:
+            # An unknown 'access' value, perhaps from a newer Pebble version
+            # We silently preserve it for roundtrip safety
             access = typing.cast(IdentityAccess, d['access'])
-
-        local = (
-            LocalIdentity.from_dict(d['local'])
-            if 'local' in d and d['local'] is not None
-            else None
-        )
-        basic = (
-            BasicIdentity.from_dict(d['basic'])
-            if 'basic' in d and d['basic'] is not None
-            else None
-        )
-
+        local = LocalIdentity.from_dict(d['local']) if 'local' in d else None
+        basic = BasicIdentity.from_dict(d['basic']) if 'basic' in d else None
         return cls(access=access, local=local, basic=basic)
 
     def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
-        result: Dict[str, Any] = {'access': self.access}
+        result: IdentityDict = {
+            'access': str(self.access)  # pyright: ignore[reportAssignmentType]
+        }
         if self.local is not None:
             result['local'] = self.local.to_dict()
         if self.basic is not None:
             result['basic'] = self.basic.to_dict()
-        return typing.cast('IdentityDict', result)
+        return result
 
 
 class Client:

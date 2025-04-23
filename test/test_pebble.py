@@ -23,7 +23,6 @@ import socket
 import tempfile
 import typing
 import unittest
-import unittest.mock
 import unittest.util
 
 import pytest
@@ -3984,6 +3983,14 @@ class TestIdentity:
             access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
         )
 
+    def test_local_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict(
+            {'access': pebble.IdentityAccess.ADMIN, 'local': {'user-id': 42}}
+        )
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+
     def test_local_identity_to_dict(self):
         identity = pebble.Identity(
             access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
@@ -3993,6 +4000,16 @@ class TestIdentity:
     def test_basic_identity_from_dict(self):
         identity = pebble.Identity.from_dict({
             'access': 'metrics',
+            'basic': {'password': 'hashed password'},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+
+    def test_basic_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.METRICS,
             'basic': {'password': 'hashed password'},
         })
         assert identity == pebble.Identity(
@@ -4012,11 +4029,16 @@ class TestIdentity:
 
     def test_no_access(self):
         with pytest.raises(KeyError):
-            raw: pebble.IdentityDict = {'local': {'user-id': 42}}
+            raw: pebble.IdentityDict = {  # pyright: ignore[reportAssignmentType]
+                'local': {'user-id': 42}
+            }
             pebble.Identity.from_dict(raw)
 
     def test_invalid_access(self):
-        raw: pebble.IdentityDict = {'access': 'foo', 'local': {'user-id': 42}}  # type: ignore
+        raw: pebble.IdentityDict = {
+            'access': 'foo',  # pyright: ignore[reportAssignmentType]
+            'local': {'user-id': 42},
+        }
         identity = pebble.Identity.from_dict(raw)
         assert identity.access == 'foo'
 
