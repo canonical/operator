@@ -83,7 +83,5 @@ def test_custom_events_sub_raise(mycharm, evt_name):
     ),
 )
 def test_is_custom_event(mycharm, evt_name, expected):
-    spec = _CharmSpec(
-        charm_type=mycharm, meta={'name': 'mycharm', 'requires': {'foo': {}}}
-    )
+    spec = _CharmSpec(charm_type=mycharm, meta={'name': 'mycharm', 'requires': {'foo': {}}})
     assert _Event(evt_name)._is_builtin_event(spec) is expected

@@ -151,8 +151,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def opened_ports(self) -> Set[Port_Ops]:
         return {
-            Port_Ops(protocol=port.protocol, port=port.port)
-            for port in self._state.opened_ports
+            Port_Ops(protocol=port.protocol, port=port.port) for port in self._state.opened_ports
         }
 
     def open_port(
@@ -384,9 +383,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
-    def relation_set(
-        self, relation_id: int, data: Mapping[str, str], is_app: bool
-    ) -> None:
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         self._check_app_data_access(is_app)
         # NOTE: The code below currently does not have any effect, because
         # the dictionary has already had the same set/delete operations
@@ -729,8 +726,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # ops will not let us get there if the resource name is unknown from metadata.
         # but if the user forgot to add it in State, then we remind you of that.
         raise RuntimeError(
-            f'Inconsistent state: '
-            f'resource {resource_name} not found in State. please pass it.',
+            f'Inconsistent state: resource {resource_name} not found in State. please pass it.',
         )
 
     def credential_get(self) -> CloudSpec_Ops:

@@ -147,9 +147,7 @@ class Ops(_Manager):
             juju_context=juju_context,
         )
 
-        super().__init__(
-            self.charm_spec.charm_type, model_backend, juju_context=juju_context
-        )
+        super().__init__(self.charm_spec.charm_type, model_backend, juju_context=juju_context)
 
     def _load_charm_meta(self):
         metadata = (self._charm_root / 'metadata.yaml').read_text()
@@ -206,19 +204,14 @@ class Ops(_Manager):
                         continue
                     return getattr(sub_attr, self.event.custom_event.event_kind)
 
-        owner = (
-            self._get_owner(self.charm, self.event.owner_path)
-            if self.event
-            else self.charm.on
-        )
+        owner = self._get_owner(self.charm, self.event.owner_path) if self.event else self.charm.on
 
         try:
             event_to_emit = getattr(owner, event_name)
         except AttributeError:
             ops_logger.debug('Event %s not defined for %s.', event_name, self.charm)
             raise NoObserverError(
-                f'Cannot fire {event_name!r} on {owner}: '
-                f'invalid event (not on charm.on).',
+                f'Cannot fire {event_name!r} on {owner}: invalid event (not on charm.on).',
             )
         return event_to_emit
 
@@ -267,8 +260,7 @@ class Ops(_Manager):
                 )
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
-                f'event_owner_path {path!r} invalid: does not lead to '
-                f'an ObjectEvents instance.',
+                f'event_owner_path {path!r} invalid: does not lead to an ObjectEvents instance.',
             )
         return obj
 
@@ -278,9 +270,7 @@ class Ops(_Manager):
         assert self.store is not None
         deferred = self.store.get_deferred_events()
         stored_state = self.store.get_stored_states()
-        self.state = dataclasses.replace(
-            self.state, deferred=deferred, stored_states=stored_state
-        )
+        self.state = dataclasses.replace(self.state, deferred=deferred, stored_states=stored_state)
 
     def _destroy(self):
         super()._destroy()

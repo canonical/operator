@@ -318,9 +318,7 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
     'remote_unit_id',
     (0, 1),
 )
-def test_relation_events_attrs(
-    mycharm, evt_name, has_unit, remote_app_name, remote_unit_id
-):
+def test_relation_events_attrs(mycharm, evt_name, has_unit, remote_app_name, remote_unit_id):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
     def callback(charm: CharmBase, event):
@@ -399,10 +397,7 @@ def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     )
 
     if evt_name not in ('created', 'broken'):
-        assert (
-            'remote unit ID unset, and multiple remote unit IDs are present'
-            in caplog.text
-        )
+        assert 'remote unit ID unset, and multiple remote unit IDs are present' in caplog.text
 
 
 def test_relation_default_unit_data_regular():
@@ -515,12 +510,8 @@ def test_trigger_sub_relation(mycharm):
         },
     }
 
-    sub1 = SubordinateRelation(
-        'foo', remote_unit_data={'1': '2'}, remote_app_name='primary1'
-    )
-    sub2 = SubordinateRelation(
-        'foo', remote_unit_data={'3': '4'}, remote_app_name='primary2'
-    )
+    sub1 = SubordinateRelation('foo', remote_unit_data={'1': '2'}, remote_app_name='primary1')
+    sub2 = SubordinateRelation('foo', remote_unit_data={'3': '4'}, remote_app_name='primary2')
 
     def post_event(charm: CharmBase):
         b_relations = charm.model.relations['foo']
@@ -554,9 +545,7 @@ def test_relation_ids():
 def test_broken_relation_not_in_model_relations(mycharm):
     rel = Relation('foo')
 
-    ctx = Context(
-        mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'foo'}}}
-    )
+    ctx = Context(mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'foo'}}})
     with ctx(ctx.on.relation_broken(rel), state=State(relations={rel})) as mgr:
         charm = mgr.charm
 
@@ -672,9 +661,7 @@ def test_relation_remote_model():
             assert relation is not None
             self.remote_model_uuid = relation.remote_model.uuid
 
-    ctx = Context(
-        MyCharm, meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}}
-    )
+    ctx = Context(MyCharm, meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}})
     state = State(relations={Relation('foo')})
     with ctx(ctx.on.start(), state) as mgr:
         mgr.run()

@@ -107,9 +107,7 @@ def test_deferred_relation_event_from_relation(mycharm):
         State(
             relations={rel},
             deferred=[
-                ctx.on.relation_changed(rel, remote_unit=1).deferred(
-                    handler=mycharm._on_event
-                )
+                ctx.on.relation_changed(rel, remote_unit=1).deferred(handler=mycharm._on_event)
             ],
         ),
         'start',
@@ -143,9 +141,7 @@ def test_deferred_workload_event(mycharm):
         State(
             containers={ctr},
             deferred=[
-                _Event('foo_pebble_ready', container=ctr).deferred(
-                    handler=mycharm._on_event
-                )
+                _Event('foo_pebble_ready', container=ctr).deferred(handler=mycharm._on_event)
             ],
         ),
         'start',

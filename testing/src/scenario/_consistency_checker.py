@@ -209,8 +209,7 @@ def _check_relation_event(
 ):
     if not event.relation:
         errors.append(
-            'cannot construct a relation event without the relation instance. '
-            'Please pass one.',
+            'cannot construct a relation event without the relation instance. Please pass one.',
         )
     else:
         if not event.name.startswith(_normalise_name(event.relation.endpoint)):
@@ -235,8 +234,7 @@ def _check_workload_event(
 ):
     if not event.container:
         errors.append(
-            'cannot construct a workload event without the container instance. '
-            'Please pass one.',
+            'cannot construct a workload event without the container instance. Please pass one.',
         )
     else:
         if not event.name.startswith(_normalise_name(event.container.name)):
@@ -272,8 +270,7 @@ def _check_action_event(
     action = event.action
     if not action:
         errors.append(
-            'cannot construct a workload event without the container instance. '
-            'Please pass one.',
+            'cannot construct a workload event without the container instance. Please pass one.',
         )
         return
 
@@ -304,8 +301,7 @@ def _check_storage_event(
 
     if not storage:
         errors.append(
-            'cannot construct a storage event without the Storage instance. '
-            'Please pass one.',
+            'cannot construct a storage event without the Storage instance. Please pass one.',
         )
     elif not event.name.startswith(_normalise_name(storage.name)):
         errors.append(
@@ -623,9 +619,7 @@ def check_containers_consistency(
     meta_containers = list(map(_normalise_name, meta.get('containers', {})))
     state_containers = [_normalise_name(c.name) for c in state.containers]
     all_notices = {notice.id for c in state.containers for notice in c.notices}
-    all_checks = {
-        (c.name, check.name) for c in state.containers for check in c.check_infos
-    }
+    all_checks = {(c.name, check.name) for c in state.containers for check in c.check_infos}
     errors: List[str] = []
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
@@ -652,10 +646,7 @@ def check_containers_consistency(
                 'notice is not in any of the containers present in the state.',
             )
         # - you're processing a Check event and that check is not in the check's container
-        if (
-            event.check_info
-            and (evt_container_name, event.check_info.name) not in all_checks
-        ):
+        if event.check_info and (evt_container_name, event.check_info.name) not in all_checks:
             errors.append(
                 f'the event being processed concerns check {event.check_info.name}, but that '
                 f'check is not in the {evt_container_name} container.',
@@ -679,8 +670,7 @@ def check_containers_consistency(
                 else:
                     plan_has = 'plan has no checks'
                 errors.append(
-                    f'container {container.name!r} has a check {check.name!r} '
-                    f'but the {plan_has}.',
+                    f'container {container.name!r} has a check {check.name!r} but the {plan_has}.',
                 )
                 continue
             plan_check = plan.checks[check.name]

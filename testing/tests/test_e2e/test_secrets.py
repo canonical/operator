@@ -340,9 +340,7 @@ def test_secret_permission_model(mycharm, leader, owner):
 
 @pytest.mark.parametrize('app', (True, False))
 def test_grant(mycharm, app):
-    ctx = Context(
-        mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'bar'}}}
-    )
+    ctx = Context(mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'bar'}}})
     secret = Secret(
         {'a': 'b'},
         owner='unit',
@@ -415,9 +413,7 @@ def test_grant_after_add(leader):
             secret.grant(self.model.relations['bar'][0])
 
     state = State(leader=leader, relations={Relation('bar')})
-    ctx = Context(
-        GrantingCharm, meta={'name': 'foo', 'provides': {'bar': {'interface': 'bar'}}}
-    )
+    ctx = Context(GrantingCharm, meta={'name': 'foo', 'provides': {'bar': {'interface': 'bar'}}})
     ctx.run(ctx.on.start(), state)
 
 
@@ -454,9 +450,7 @@ def test_add_grant_revoke_remove():
     class GrantingCharm(CharmBase):
         pass
 
-    ctx = Context(
-        GrantingCharm, meta={'name': 'foo', 'provides': {'bar': {'interface': 'bar'}}}
-    )
+    ctx = Context(GrantingCharm, meta={'name': 'foo', 'provides': {'bar': {'interface': 'bar'}}})
     relation_remote_app = 'remote_secret_desirerer'
     relation_id = 42
 

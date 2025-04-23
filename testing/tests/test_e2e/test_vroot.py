@@ -62,9 +62,7 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
     ) as mgr:
         assert meta_file.exists()
         assert meta_file.read_text() == yaml.safe_dump({'name': 'my-charm'})
-        assert (
-            mgr.charm.meta.name == 'my-charm'
-        )  # not karl! Context.meta takes precedence
+        assert mgr.charm.meta.name == 'my-charm'  # not karl! Context.meta takes precedence
         mgr.run()
         assert meta_file.exists()
 
