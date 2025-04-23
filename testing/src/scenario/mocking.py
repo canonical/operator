@@ -729,7 +729,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # ops will not let us get there if the resource name is unknown from metadata.
         # but if the user forgot to add it in State, then we remind you of that.
         raise RuntimeError(
-            f'Inconsistent state: resource {resource_name} not found in State. please pass it.',
+            f'Inconsistent state: '
+            f'resource {resource_name} not found in State. please pass it.',
         )
 
     def credential_get(self) -> CloudSpec_Ops:

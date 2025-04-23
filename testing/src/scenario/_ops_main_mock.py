@@ -217,7 +217,8 @@ class Ops(_Manager):
         except AttributeError:
             ops_logger.debug('Event %s not defined for %s.', event_name, self.charm)
             raise NoObserverError(
-                f'Cannot fire {event_name!r} on {owner}: invalid event (not on charm.on).',
+                f'Cannot fire {event_name!r} on {owner}: '
+                f'invalid event (not on charm.on).',
             )
         return event_to_emit
 
@@ -266,7 +267,8 @@ class Ops(_Manager):
                 )
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
-                f'event_owner_path {path!r} invalid: does not lead to an ObjectEvents instance.',
+                f'event_owner_path {path!r} invalid: does not lead to '
+                f'an ObjectEvents instance.',
             )
         return obj
 

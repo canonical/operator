@@ -580,7 +580,8 @@ class RelationBase(_max_posargs(2)):
         for v in databag.values():
             if not isinstance(v, str):
                 raise StateValidationError(
-                    f'all databags should be Dict[str,str]; found a value of type {type(v)}',
+                    f'all databags should be Dict[str,str]; '
+                    f'found a value of type {type(v)}',
                 )
 
 
@@ -1314,7 +1315,8 @@ class Port(_max_posargs(1)):
     def __post_init__(self):
         if type(self) is Port:
             raise RuntimeError(
-                'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
+                'Port cannot be instantiated directly; '
+                'please use TCPPort, UDPPort, or ICMPPort',
             )
 
     def __eq__(self, other: object) -> bool:
