@@ -3984,9 +3984,10 @@ class TestIdentity:
         )
 
     def test_local_identity_from_dict_with_access_enum(self):
-        identity = pebble.Identity.from_dict(
-            {'access': pebble.IdentityAccess.ADMIN, 'local': {'user-id': 42}}
-        )
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.ADMIN,
+            'local': {'user-id': 42},
+        })
         assert identity == pebble.Identity(
             access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
         )

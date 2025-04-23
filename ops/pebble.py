@@ -191,7 +191,7 @@ IdentityDict = typing.TypedDict(
         'access': Literal['untrusted', 'metrics', 'read', 'admin'],
         'local': 'NotRequired[LocalIdentityDict]',
         'basic': 'NotRequired[BasicIdentityDict]',
-    }
+    },
 )
 
 
