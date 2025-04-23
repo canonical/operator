@@ -2061,14 +2061,12 @@ class Identity:
     @classmethod
     def from_dict(cls, d: IdentityDict) -> Identity:
         """Create new Identity from dict parsed from JSON."""
-        if 'access' not in d:
-            raise KeyError('"access" key is required in IdentityDict')
         try:
             access = IdentityAccess(d['access'])
         except ValueError:
             # An unknown 'access' value, perhaps from a newer Pebble version
             # We silently preserve it for roundtrip safety
-            access = typing.cast(IdentityAccess, d['access'])
+            access = d['access']
         local = LocalIdentity.from_dict(d['local']) if 'local' in d else None
         basic = BasicIdentity.from_dict(d['basic']) if 'basic' in d else None
         return cls(access=access, local=local, basic=basic)
