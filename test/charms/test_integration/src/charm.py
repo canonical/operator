@@ -14,36 +14,39 @@
 # limitations under the License.
 from __future__ import annotations
 
-import ops
-import pathlib
 import time
 
 import opentelemetry.trace
 
+import ops
 
-tracer = opentelemetry.trace.get_tracer("TracingTester")
+tracer = opentelemetry.trace.get_tracer('TracingTester')
+
 
 class TracingTesterCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.tracing = ops.tracing.Tracing(self, "charm-tracing", ca_relation_name="receive-ca-cert")
+        self.tracing = ops.tracing.Tracing(
+            self, 'charm-tracing', ca_relation_name='receive-ca-cert'
+        )
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.one_action, self._on_action)
         self.framework.observe(self.on.two_action, self._on_action)
         self.framework.observe(self.on.one_action, self._on_action)
 
-    @tracer.start_as_current_span("start")
+    @tracer.start_as_current_span('start')
     def _on_start(self, event: ops.StartEvent):
         if self.unit.is_leader():
-            self.app.status = ops.ActiveStatus("ok")
-        self.unit.status = ops.ActiveStatus("ok")
-        print("WAT?")
+            self.app.status = ops.ActiveStatus('ok')
+        self.unit.status = ops.ActiveStatus('ok')
+        print('WAT?')
 
-    @tracer.start_as_current_span("on action")
+    @tracer.start_as_current_span('on action')
     def _on_action(self, event: ops.ActionEvent):
         time.sleep(1)
-        opentelemetry.trace.get_current_span().set_attribute("arg", event.params["arg"])
-        event.set_results({"ok": True})
+        opentelemetry.trace.get_current_span().set_attribute('arg', event.params['arg'])
+        event.set_results({'ok': True})
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     ops.main(TracingTesterCharm)
