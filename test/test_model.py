@@ -2115,7 +2115,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert r'connection error!' in caplog.text
+        assert 'connection error!' in caplog.text
 
     def test_can_connect_file_not_found_error(
         self,
@@ -2129,7 +2129,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert r'file not found!' in caplog.text
+        assert 'file not found!' in caplog.text
 
     def test_can_connect_api_error(
         self,
@@ -2143,7 +2143,7 @@ containers:
         with caplog.at_level(level='WARNING', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert r'api error!' in caplog.text
+        assert 'api error!' in caplog.text
 
     def test_exec(self, container: ops.Container, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(container, '_juju_version', JujuVersion('3.1.6'))
@@ -2856,7 +2856,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
 
@@ -2893,7 +2893,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
 
