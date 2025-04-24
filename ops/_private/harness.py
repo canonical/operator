@@ -2724,14 +2724,14 @@ class _TestingModelBackend:
         raise RelationNotFoundError
 
     def add_metrics(self, metrics, labels=None):  # type:ignore
-        raise NotImplementedError(self.add_metrics)  # type:ignore
+        raise NotImplementedError
 
     @classmethod
     def log_split(cls, message, max_len=model.MAX_LOG_LINE_LEN):  # type:ignore
-        raise NotImplementedError(cls.log_split)  # type:ignore
+        raise NotImplementedError
 
     def juju_log(self, level, msg):  # type:ignore
-        raise NotImplementedError(self.juju_log)  # type:ignore
+        raise NotImplementedError
 
     def get_pebble(self, socket_path: str) -> '_TestingPebbleClient':
         container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
@@ -3170,17 +3170,17 @@ class _TestingPebbleClient:
         self,
         select: pebble.WarningState = pebble.WarningState.PENDING,
     ) -> List['pebble.Warning']:
-        raise NotImplementedError(self.get_warnings)
+        raise NotImplementedError
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
-        raise NotImplementedError(self.ack_warnings)
+        raise NotImplementedError
 
     def get_changes(
         self,
         select: pebble.ChangeState = pebble.ChangeState.IN_PROGRESS,
         service: Optional[str] = None,
     ) -> List[pebble.Change]:
-        raise NotImplementedError(self.get_changes)
+        raise NotImplementedError
 
     def get_change(self, change_id: str) -> pebble.Change:
         self._check_connection()
@@ -3191,7 +3191,7 @@ class _TestingPebbleClient:
             raise self._api_error(404, message) from None
 
     def abort_change(self, change_id: pebble.ChangeID) -> pebble.Change:
-        raise NotImplementedError(self.abort_change)
+        raise NotImplementedError
 
     def autostart_services(self, timeout: float = 30.0, delay: float = 0.1):
         self._check_connection()
@@ -3350,7 +3350,7 @@ class _TestingPebbleClient:
         timeout: float = 30.0,
         delay: float = 0.1,
     ) -> pebble.Change:
-        raise NotImplementedError(self.wait_change)
+        raise NotImplementedError
 
     def _update_check_infos_from_plan(self):
         # In testing, the check info has the level, threshold, and startup
@@ -4048,3 +4048,14 @@ class _TestingPebbleClient:
         if keys is not None and notice.key not in keys:
             return False
         return True
+
+    def get_identities(self) -> Dict[str, 'pebble.Identity']:
+        raise NotImplementedError
+
+    def replace_identities(
+        self, identities: Dict[str, Union['pebble.IdentityDict', 'pebble.Identity', None]]
+    ) -> None:
+        raise NotImplementedError
+
+    def remove_identities(self, identities: Iterable[str]) -> None:
+        raise NotImplementedError

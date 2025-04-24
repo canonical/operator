@@ -23,7 +23,6 @@ import socket
 import tempfile
 import typing
 import unittest
-import unittest.mock
 import unittest.util
 
 import pytest
@@ -3185,6 +3184,83 @@ bad path\r
             ('GET', '/v1/notices', query, None),
         ]
 
+    def test_get_identities(self, client: MockClient):
+        client.responses.append({
+            'result': {
+                'alice': {'access': 'admin', 'local': {'user-id': 42}},
+                'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+            },
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        identities = client.get_identities()
+        assert identities == {
+            'alice': pebble.Identity(
+                access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+            ),
+            'web': pebble.Identity(
+                access=pebble.IdentityAccess.METRICS,
+                basic=pebble.BasicIdentity(password='hashed password'),
+            ),
+        }
+        assert identities['alice'].access == 'admin'
+        assert identities['web'].access == 'metrics'
+
+    def test_replace_identities(self, client: MockClient):
+        client.responses.append({
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        identities: typing.Dict[str, typing.Union[pebble.IdentityDict, pebble.Identity, None]] = {
+            'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+            'alice': pebble.Identity(
+                access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+            ),
+            'bob': None,
+        }
+        client.replace_identities(identities)
+        assert client.requests == [
+            (
+                'POST',
+                '/v1/identities',
+                None,
+                {
+                    'action': 'replace',
+                    'identities': {
+                        'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+                        'alice': {'access': 'admin', 'local': {'user-id': 42}},
+                        'bob': None,
+                    },
+                },
+            ),
+        ]
+
+    def test_remove_identities(self, client: MockClient):
+        client.responses.append({
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        client.remove_identities({'web', 'alice', 'bob'})
+        assert client.requests == [
+            (
+                'POST',
+                '/v1/identities',
+                None,
+                {
+                    'action': 'remove',
+                    'identities': {
+                        'web': None,
+                        'alice': None,
+                        'bob': None,
+                    },
+                },
+            ),
+        ]
+
 
 class TestSocketClient:
     def test_socket_not_found(self):
@@ -3346,8 +3422,13 @@ class TestExec:
         with pytest.warns(ResourceWarning) as record:
             process = client.exec(['true'])
             del process
+
+        # GC may trigger unrelated warnings (for example, from TemporaryDirectory).
+        # Filter the warnings to only those from ExecProcess.
+        warnings = [r for r in record if 'ExecProcess' in str(r.message)]
+        assert len(warnings) == 1
         assert (
-            str(record[0].message)
+            str(warnings[0].message)
             == 'ExecProcess instance garbage collected without call to wait() or wait_output()'
         )
 
@@ -3893,3 +3974,75 @@ class TestExec:
         test_websocket_recv_raises = pytest.mark.filterwarnings(
             'ignore::pytest.PytestUnhandledThreadExceptionWarning'
         )(test_websocket_recv_raises)
+
+
+class TestIdentity:
+    def test_local_identity_from_dict(self):
+        identity = pebble.Identity.from_dict({'access': 'admin', 'local': {'user-id': 42}})
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+
+    def test_local_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.ADMIN,
+            'local': {'user-id': 42},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+
+    def test_local_identity_to_dict(self):
+        identity = pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+        assert identity.to_dict() == {'access': 'admin', 'local': {'user-id': 42}}
+
+    def test_basic_identity_from_dict(self):
+        identity = pebble.Identity.from_dict({
+            'access': 'metrics',
+            'basic': {'password': 'hashed password'},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+
+    def test_basic_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.METRICS,
+            'basic': {'password': 'hashed password'},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+
+    def test_basic_identity_to_dict(self):
+        identity = pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+        assert identity.to_dict() == {
+            'access': 'metrics',
+            'basic': {'password': 'hashed password'},
+        }
+
+    def test_no_access(self):
+        with pytest.raises(KeyError):
+            raw: pebble.IdentityDict = {  # pyright: ignore[reportAssignmentType]
+                'local': {'user-id': 42}
+            }
+            pebble.Identity.from_dict(raw)
+
+    def test_invalid_access(self):
+        raw: pebble.IdentityDict = {
+            'access': 'foo',  # pyright: ignore[reportAssignmentType]
+            'local': {'user-id': 42},
+        }
+        identity = pebble.Identity.from_dict(raw)
+        assert identity.access == 'foo'
+
+    def test_no_identity(self):
+        with pytest.raises(ValueError):
+            pebble.Identity(access=pebble.IdentityAccess.ADMIN)

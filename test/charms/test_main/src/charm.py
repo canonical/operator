@@ -315,4 +315,6 @@ class Charm(ops.CharmBase):
 
 
 if __name__ == '__main__':
+    # While tracing is mocked up in conftest.py for most tests, this is run in a subprocess.
+    ops.tracing = None
     ops.main(Charm)

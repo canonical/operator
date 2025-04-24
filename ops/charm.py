@@ -228,6 +228,9 @@ class ActionEvent(EventBase):
         """
         self.framework.model._backend.action_fail(message)
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
+
 
 class InstallEvent(HookEvent):
     """Event triggered when a charm is installed.
@@ -496,7 +499,9 @@ class RelationEvent(HookEvent):
 
         self.relation = relation
         if app is None:
-            logger.warning("'app' expected but not received.")
+            logger.warning(
+                "'app' expected but not received, see https://bugs.launchpad.net/juju/+bug/1960934"
+            )
             # Do an explicit assignment here so that we can contain the type: ignore.
             self.app = None  # type: ignore
         else:
@@ -546,6 +551,11 @@ class RelationEvent(HookEvent):
             self.unit = self.framework.model.get_unit(unit_name)
         else:
             self.unit = None
+
+    def __repr__(self):
+        app = None if self.app is None else self.app.name
+        unit = None if self.unit is None else self.unit.name
+        return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'
 
 
 class RelationCreatedEvent(RelationEvent):
@@ -735,6 +745,9 @@ class StorageEvent(HookEvent):
 
             self.storage.location = storage_location
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.storage!r} via {self.handle}>'
+
 
 class StorageAttachedEvent(StorageEvent):
     """Event triggered when new storage becomes available.
@@ -806,6 +819,9 @@ class WorkloadEvent(HookEvent):
             self.workload = self.framework.model.unit.get_container(container_name)
         else:
             self.workload = None  # type: ignore
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.workload!r} via {self.handle}>'
 
 
 class PebbleReadyEvent(WorkloadEvent):
