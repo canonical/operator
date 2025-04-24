@@ -70,6 +70,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -180,6 +181,19 @@ PlanDict = typing.TypedDict(
     },
     total=False,
 )
+
+LocalIdentityDict = typing.TypedDict('LocalIdentityDict', {'user-id': int})
+BasicIdentityDict = typing.TypedDict('BasicIdentityDict', {'password': str})
+IdentityDict = typing.TypedDict(
+    'IdentityDict',
+    {
+        # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
+        'local': 'NotRequired[LocalIdentityDict]',
+        'basic': 'NotRequired[BasicIdentityDict]',
+    },
+)
+
 
 _AuthDict = TypedDict(
     '_AuthDict',
@@ -1973,6 +1987,102 @@ class _WebsocketReader(io.BufferedIOBase):
         return self.read(n)
 
 
+class IdentityAccess(str, enum.Enum):
+    """Enum of identity access levels."""
+
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+    ADMIN = 'admin'
+    READ = 'read'
+    METRICS = 'metrics'
+    UNTRUSTED = 'untrusted'
+
+    def __str__(self) -> str:
+        """Return the string value of the enum member as if it were really just a string.
+
+        This aligns the behaviour of (str, enum.Enum) with Python 3.11's StrEnum.
+        For example: str(IdentityAccess.ADMIN) -> 'admin'
+        """
+        return str.__str__(self)
+
+
+@dataclasses.dataclass
+class LocalIdentity:
+    """Local identity configuration (for Unix socket / UID authentication)."""
+
+    user_id: int
+
+    @classmethod
+    def from_dict(cls, d: LocalIdentityDict) -> LocalIdentity:
+        """Create new LocalIdentity from dict parsed from JSON."""
+        return cls(user_id=d['user-id'])
+
+    def to_dict(self) -> LocalIdentityDict:
+        """Convert this local identity to its dict representation."""
+        return {'user-id': self.user_id}
+
+
+@dataclasses.dataclass
+class BasicIdentity:
+    """Basic identity configuration (for HTTP basic authentication)."""
+
+    password: str
+    """sha512-crypt-hashed password.
+
+    When writing, this is a SHA512-crypt hashed password. When reading, it is
+    returned as ``*****``.
+
+    Use ``openssl passwd -6`` to generate a hashed password (sha512-crypt format).
+    """
+
+    @classmethod
+    def from_dict(cls, d: BasicIdentityDict) -> BasicIdentity:
+        """Create new BasicIdentity from dict parsed from JSON."""
+        return cls(password=d['password'])
+
+    def to_dict(self) -> BasicIdentityDict:
+        """Convert this basic identity to its dict representation."""
+        return {'password': self.password}
+
+
+@dataclasses.dataclass
+class Identity:
+    """Pebble identity configuration."""
+
+    # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
+    access: IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']
+    local: Optional[LocalIdentity] = None
+    basic: Optional[BasicIdentity] = None
+
+    def __post_init__(self) -> None:
+        """Validate that at least one of local or basic is provided."""
+        if self.local is None and self.basic is None:
+            raise ValueError('at least one of "local" or "basic" must be provided')
+
+    @classmethod
+    def from_dict(cls, d: IdentityDict) -> Identity:
+        """Create new Identity from dict parsed from JSON."""
+        try:
+            access = IdentityAccess(d['access'])
+        except ValueError:
+            # An unknown 'access' value, perhaps from a newer Pebble version
+            # We silently preserve it for roundtrip safety
+            access = d['access']
+        local = LocalIdentity.from_dict(d['local']) if 'local' in d else None
+        basic = BasicIdentity.from_dict(d['basic']) if 'basic' in d else None
+        return cls(access=access, local=local, basic=basic)
+
+    def to_dict(self) -> IdentityDict:
+        """Convert this identity to its dict representation."""
+        result: IdentityDict = {
+            'access': str(self.access)  # pyright: ignore[reportAssignmentType]
+        }
+        if self.local is not None:
+            result['local'] = self.local.to_dict()
+        if self.basic is not None:
+            result['basic'] = self.basic.to_dict()
+        return result
+
+
 class Client:
     """Pebble API client.
 
@@ -3265,6 +3375,53 @@ class Client:
             span.set_attributes(query)
             resp = self._request('GET', '/v1/notices', query)
             return [Notice.from_dict(info) for info in resp['result']]
+
+    def get_identities(self) -> Dict[str, Identity]:
+        """Get all identities in Pebble.
+
+        .. jujuadded:: 3.6.4
+
+        Returns:
+            A dict mapping identity names to :class:`Identity` objects.
+        """
+        with tracer.start_as_current_span('pebble get_identities'):
+            resp = self._request('GET', '/v1/identities')
+            result = resp['result']
+            return {name: Identity.from_dict(d) for name, d in result.items()}
+
+    def replace_identities(
+        self, identities: Mapping[str, Union[IdentityDict, Identity, None]]
+    ) -> None:
+        """Replace the named identities in Pebble with the given ones.
+
+        Add those identities if they don't exist, or remove them if the dict value is None.
+
+        .. jujuadded:: 3.6.4
+
+        Args:
+            identities: A dict mapping identity names to dicts or :class:`Identity` objects.
+        """
+        with tracer.start_as_current_span('pebble replace_identities'):
+            identities_dict = {
+                name: identity.to_dict() if isinstance(identity, Identity) else identity
+                for name, identity in identities.items()
+            }
+
+            body = {'action': 'replace', 'identities': identities_dict}
+            self._request('POST', '/v1/identities', body=body)
+
+    def remove_identities(self, identities: Iterable[str]) -> None:
+        """Remove the named identities in Pebble.
+
+        .. jujuadded:: 3.6.4
+
+        Args:
+            identities: A set of identity names to remove.
+        """
+        with tracer.start_as_current_span('pebble remove_identities'):
+            identities_dict = {name: None for name in identities}
+            body = {'action': 'remove', 'identities': identities_dict}
+            self._request('POST', '/v1/identities', body=body)
 
 
 class _FilesParser:
