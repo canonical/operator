@@ -115,6 +115,10 @@ logger = logging.getLogger(__name__)
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
+class InvalidSchemaError(Exception):
+    """Raised when a config, action parameter, or databag schema does not match the data."""
+
+
 class Model:
     """Represents the Juju Model as seen from this unit.
 

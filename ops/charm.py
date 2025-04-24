@@ -22,7 +22,6 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
     Dict,
     List,
@@ -1411,7 +1410,6 @@ class CharmBase(Object):
         self,
         cls: Type[_ConfigType],
         *args: Any,
-        convert_name: Optional[Callable[[str], str]] = None,
         **kwargs: Any,
     ) -> _ConfigType:
         """Load the config into an instance of a config class.
@@ -1421,17 +1419,13 @@ class CharmBase(Object):
 
         * ``secret`` type options having a :class:`model.Secret` value rather
           than the secret ID.
-        * dashes in names converted to underscores, unless a custom conversion
-          function is provided.
+        * dashes in names converted to underscores.
 
         Any additional positional or keyword arguments will be passed through to
         the config class.
 
         Args:
             cls: A class that inherits from :class:`ops.ConfigBase`.
-            convert_name: An optional function that takes a string option name
-                as found in the YAML config, and returns the name of the
-                attribute, which must be a valid Python identifier.
             args: positional arguments to pass through to the config class.
             kwargs: keyword arguments to pass through to the config class.
 
@@ -1439,43 +1433,33 @@ class CharmBase(Object):
             An instance of the config class with the current config values.
 
         Raises:
-            _Abort if the configuration is invalid, after setting an appropriate
-            blocked status.
+            :class`InvalidSchemaError` if the configuration is invalid, after
+                setting an appropriate blocked status.
         """
-        from ._main import _Abort  # Avoid circular import.
-        # We exit with a 'success' code because we don't want Juju to retry
-        # the hook - we need the Juju user to fix the config first, at
-        # which point the error will no longer be raised.
-
         # Convert secret IDs to secret objects.
         config: Dict[str, Union[bool, int, float, str, model.Secret]] = kwargs.copy()
         for key, value in self.config.items():
-            if convert_name:
-                attr = convert_name(key)
-                if not attr.isidentifier():
-                    logger.error('Invalid attribute name %r from %s', attr, key)
-                    self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
-                    raise _Abort(0)
-            else:
-                attr = key.replace('-', '_')
+            attr = cls._juju_name_to_attr(key)  # type: ignore
+            assert isinstance(attr, str)
+            if not attr.isidentifier():
+                self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
+                raise model.InvalidSchemaError() from None
             option_type = self.meta.config.get(key)
             if option_type and option_type.type == 'secret' and isinstance(value, str):
                 try:
                     config[attr] = self.model.get_secret(id=value)
                 except model.SecretNotFoundError:
-                    logger.error('secret referenced in option {key} not found')
                     self.unit.status = model.BlockedStatus(
                         f"{key} option refers to a secret that doesn't exist or is not accessible"
                     )
-                    raise _Abort(0) from None
+                    raise model.InvalidSchemaError() from None
             else:
                 config[attr] = value
         try:
             return cls(*args, **config)
         except ValueError as e:
-            logger.error('Invalid configuration for %s: %r (%s)', cls.__name__, config, e)
             self.unit.status = model.BlockedStatus(f'Error in config: {e}')
-            raise _Abort(0) from None
+            raise model.InvalidSchemaError() from None
 
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
@@ -1828,9 +1812,9 @@ class RelationMeta:
     VALID_SCOPES: ClassVar[List[str]] = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(role, RelationRole), (
-            f'role should be one of {list(RelationRole)!r}, not {role!r}'
-        )
+        assert isinstance(
+            role, RelationRole
+        ), f'role should be one of {list(RelationRole)!r}, not {role!r}'
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name

@@ -111,7 +111,7 @@ def test_config_using_configbase_class():
         c: str
 
         @classmethod
-        def option_names(cls):
+        def _option_names(cls):
             yield "b"
 
     class Charm(ops.CharmBase):
@@ -122,7 +122,7 @@ def test_config_using_configbase_class():
         def _on_config_changed(self, event: ops.ConfigChangedEvent):
             self.typed_config = self.load_config(Config, 10, c="foo")
 
-    schema = Config.to_yaml_schema()
+    schema = Config.to_juju_schema()
     ctx = Context(Charm, meta={"name": "foo"}, config=schema)
     with ctx(ctx.on.config_changed(), State(config={"b": 3.14})) as mgr:
         mgr.run()

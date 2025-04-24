@@ -563,5 +563,11 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
         manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
 
         manager.run()
+    except _model.InvalidSchemaError:
+        # We exit with a zero exit code because we don't want Juju to go into
+        # error status (for config and databags, we have set a status ourselves)
+        # and we don't want to automatically retry (the Juju user or another
+        # unit must correct the data to match the schema).
+        sys.exit()
     except _Abort as e:
         sys.exit(e.exit_code)

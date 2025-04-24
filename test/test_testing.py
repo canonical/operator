@@ -1726,9 +1726,9 @@ class TestHarness:
 
         harness.add_storage('test')
         harness.begin()
-        assert len(harness.model.storages['test']) == 0, (
-            'storage should start in detached state and be excluded from storage listing'
-        )
+        assert (
+            len(harness.model.storages['test']) == 0
+        ), 'storage should start in detached state and be excluded from storage listing'
 
     def test_add_storage_without_metadata_key_fails(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -3809,9 +3809,9 @@ class TestTestingModelBackend:
         assert backend._resource_dir is None
         path = backend.resource_get('image')
         assert backend._resource_dir is not None
-        assert str(path).startswith(str(backend._resource_dir.name)), (
-            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
-        )
+        assert str(path).startswith(
+            str(backend._resource_dir.name)
+        ), f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(

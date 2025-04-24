@@ -219,7 +219,7 @@ if pydantic:
 def test_config_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     # We use the generated schema from the simple class for all variants,
     # because we expect it to be the same.
-    config = MyConfig.to_yaml_schema()
+    config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     harness.begin()
@@ -237,7 +237,7 @@ def test_config_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRe
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_yaml_schema()
+    config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     harness.update_config({
@@ -258,21 +258,20 @@ def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pyte
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_config_with_error(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_yaml_schema()
+    config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     harness.update_config({
         'my-int': -1,
     })
-    with pytest.raises(ops._main._Abort) as cm:
+    with pytest.raises(ops.InvalidSchemaError):
         harness.begin()
-        assert cm.value.exit_code == 0
     # TODO: add a test_main check that makes sure that the status is set correctly.
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_yaml_schema()
+    config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     content = {'password': 'admin'}
@@ -294,7 +293,7 @@ def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.Fi
 def test_config_invalid_secret_id(
     charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
 ):
-    config = MyConfig.to_yaml_schema()
+    config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     content = {'password': 'admin'}
@@ -303,15 +302,14 @@ def test_config_invalid_secret_id(
     harness.update_config({
         'my-secret': 'not a secret id',
     })
-    with pytest.raises(ops._main._Abort) as cm:
+    with pytest.raises(ops.InvalidSchemaError):
         harness.begin()
-        assert cm.value.exit_code == 0
     # TODO: add a test_main check that makes sure that the status is set correctly.
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_config_missing_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_yaml_schema()
+    config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
     content = {'password': 'admin'}
@@ -319,9 +317,8 @@ def test_config_missing_secret(charm_class: type[ops.CharmBase], request: pytest
     harness.update_config({
         'my-secret': secret_id,
     })
-    with pytest.raises(ops._main._Abort) as cm:
+    with pytest.raises(ops.InvalidSchemaError):
         harness.begin()
-        assert cm.value.exit_code == 0
     # TODO: add a test_main check that makes sure that the status is set correctly.
 
 
@@ -332,23 +329,23 @@ def test_config_custom_naming_pattern(request: pytest.FixtureRequest):
         other: str = 'baz'
 
         @staticmethod
-        def attr_name_to_yaml_name(name: str):
+        def _attr_to_juju_name(name: str):
             if name == 'foo_bar':
                 return 'fooBar'
             return name.replace('_', '-')
 
-    class Charm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.typed_config = self.load_config(Config, convert_name=self.yaml_name_to_attr_name)
-
         @staticmethod
-        def yaml_name_to_attr_name(name: str):
+        def _juju_name_to_attr(name: str):
             if name == 'fooBar':
                 return 'foo_bar'
             return name.replace('-', '_')
 
-    config = Config.to_yaml_schema()
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config)
+
+    config = Config.to_juju_schema()
     assert 'fooBar' in config['options']
     harness = testing.Harness(Charm, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
@@ -363,26 +360,26 @@ def test_config_bad_attr_naming_pattern(request: pytest.FixtureRequest):
     class BadConfig(ops.ConfigBase):
         foo_bar: int = 42
 
+        @staticmethod
+        def _juju_name_to_attr(attr: str):
+            return attr.replace('_', '-')
+
     class BadCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(
-                BadConfig, convert_name=lambda x: x.replace('_', '-')
-            )
+            self.typed_config = self.load_config(BadConfig)
 
-    config = BadConfig.to_yaml_schema()
+    config = BadConfig.to_juju_schema()
     assert 'foo-bar' in config['options']
     harness = testing.Harness(BadCharm, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
-    with pytest.raises(ops._main._Abort) as cm:
+    with pytest.raises(ops.InvalidSchemaError):
         harness.begin()
-    assert cm.value.exit_code == 0
-    # TODO: add a test_main check that makes sure that the status is set correctly.
 
 
 @pytest.mark.parametrize('config_class', _test_config_classes)
 def test_config_yaml_schema(config_class: type[ops.ConfigBase]):
-    generated_yaml = config_class.to_yaml_schema()
+    generated_yaml = config_class.to_juju_schema()
     expected_yaml = {
         'options': {
             'my-bool': {
@@ -421,7 +418,7 @@ def test_config_extra_args(request: pytest.FixtureRequest):
         c: str
 
         @classmethod
-        def option_names(cls):
+        def _juju_names(cls):
             yield 'b'
 
     class Charm(ops.CharmBase):
@@ -429,7 +426,7 @@ def test_config_extra_args(request: pytest.FixtureRequest):
             super().__init__(framework)
             self.typed_config = self.load_config(Config, 10, c='foo')
 
-    schema = Config.to_yaml_schema()
+    schema = Config.to_juju_schema()
     options = ops._private.yaml.safe_dump(schema)
     harness = testing.Harness(Charm, config=options)
     request.addfinalizer(harness.cleanup)
@@ -452,17 +449,17 @@ def test_config_custom_type(request: pytest.FixtureRequest):
             self.y = datetime.date(int(year), int(month), int(day))
 
         @classmethod
-        def attr_to_yaml_type(cls, attr: str, default: Any = None) -> str:
+        def _attr_to_juju_type(cls, attr: str, default: Any = None) -> str:
             if attr == 'y':
                 return 'string'
-            return super().attr_to_yaml_type(attr, default)
+            return super()._attr_to_juju_type(attr, default)
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.typed_config = self.load_config(Config)
 
-    schema = Config.to_yaml_schema()
+    schema = Config.to_juju_schema()
     options = ops._private.yaml.safe_dump(schema)
     harness = testing.Harness(Charm, config=options)
     request.addfinalizer(harness.cleanup)

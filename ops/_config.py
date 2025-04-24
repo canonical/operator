@@ -16,48 +16,15 @@
 
 from __future__ import annotations
 
-import ast
 import importlib
-import inspect
 import logging
 import pathlib
-from typing import Any, ClassVar, Generator, cast
+from typing import Any, ClassVar, Generator
 
-from ._private import yaml
+from ._private import attrdocs, yaml
 from .model import Secret
 
 logger = logging.getLogger(__name__)
-
-
-# TODO: If we end up with this file, _action_params, and _relation_data, then we
-# should factor out this class into a common helper module.
-class _AttributeDocstringExtractor(ast.NodeVisitor):
-    def __init__(self):
-        self.attribute_docs: dict[str, str] = {}
-        self._last_attr = None
-
-    def visit_ClassDef(self, node: ast.ClassDef):  # noqa: N802
-        # We iterate over the class definition, looking for attribute assignments.
-        # We also track any standalone strings, and when we find one we use it
-        # for the docstring of the most recent attribute assignments.
-        # This isn't perfect - but it should cover the majority of cases.
-        for child in node.body:
-            if isinstance(child, (ast.Assign, ast.AnnAssign)):
-                target = None  # Make the type checker happy.
-                if isinstance(child, ast.Assign):
-                    target = child.targets[0]
-                elif isinstance(child, ast.AnnAssign):
-                    target = child.target
-                assert isinstance(target, ast.Name)
-                self._last_attr = target.id
-            elif (
-                isinstance(child, ast.Expr)
-                and isinstance(child.value, ast.Constant)
-                and self._last_attr
-            ):
-                self.attribute_docs[self._last_attr] = child.value.value
-                self._last_attr = None
-        self.generic_visit(node)
 
 
 class ConfigBase:
@@ -83,7 +50,7 @@ class ConfigBase:
 
         This is a dataclass, but can be any object that inherits from
         ``ops.ConfigBase``, and can be initialised with the raw Juju config
-        pass as keyword arguments. Any errors should be indicated by raising
+        passed as keyword arguments. Any errors should be indicated by raising
         ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
 
         Inheriting from ``ops.ConfigBase`` is not strictly necessary, but it
@@ -93,7 +60,7 @@ class ConfigBase:
     Use this in your charm class like so::
 
         class MyCharm(ops.CharmBase):
-            def __init__(self, framework):
+            def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.typed_config = self.load_config(MyConfig)
 
@@ -102,7 +69,7 @@ class ConfigBase:
     exception raised.
     """
 
-    JUJU_TYPES: ClassVar[dict[str, str]] = {
+    _JUJU_TYPES: ClassVar[dict[str, str]] = {
         'bool': 'boolean',
         'int': 'int',
         'float': 'float',
@@ -115,39 +82,8 @@ class ConfigBase:
         'ops.model.Secret': 'secret',
     }
 
-    # TODO: This could also be factored out into a common helper.
-    @classmethod
-    def _get_attr_docstrings(cls) -> dict[str, str]:
-        docs: dict[str, str] = {}
-        # pydantic stores descriptions in the field object.
-        if hasattr(cls, '__dataclass_fields__'):
-            fields = cast(dict[str, Any], cls.__dataclass_fields__)  # type: ignore
-            for attr, field in fields.items():
-                if (
-                    hasattr(field, 'default')
-                    and hasattr(field.default, 'description')
-                    and field.default.description
-                ):
-                    docs[attr] = field.default.description
-
-        try:
-            source_code = inspect.getsource(cls)
-        except OSError:
-            logger.debug('No source code found for %s', cls.__name__)
-        else:
-            try:
-                tree = ast.parse(source_code)
-            except (SyntaxError, IndentationError):
-                logger.debug('Failed to parse source code for %s', cls.__name__)
-            else:
-                extractor = _AttributeDocstringExtractor()
-                extractor.visit(tree)
-                docs.update(extractor.attribute_docs)
-
-        return docs
-
     @staticmethod
-    def _extract_optional_type(attr: str, hint: str):
+    def __extract_optional_type(attr: str, hint: str):
         if 'Optional[' in hint:
             hint = hint.split('[')[1].split(']')[0]
         if '|' in hint:
@@ -160,36 +96,45 @@ class ConfigBase:
         return hint
 
     @classmethod
-    def attr_to_yaml_type(cls, attr: str, default: Any = None) -> str:
+    def _attr_to_juju_type(cls, name: str, default: Any = None) -> str:
         """Provide the appropriate type for the config YAML for the given attribute.
 
         Raises:
             ValueError: if an appropriate type cannot be found.
         """
+        # TODO: This can probably use dataclasses.fields().
         types = cls.__annotations__
         try:
-            hint = cls._extract_optional_type(attr, str(types[attr]))
+            hint = cls.__extract_optional_type(name, str(types[name]))
         except (KeyError, ValueError):
             # If there's a default value, use that object's type.
-            if default is not None and type(default).__name__ in cls.JUJU_TYPES:
-                return cls.JUJU_TYPES[type(default).__name__]
-            raise ValueError(f'{attr!r} type is unknown.') from None
-        if hint not in cls.JUJU_TYPES:
-            raise ValueError(f'{attr!r} type is unknown.') from None
-        return cls.JUJU_TYPES[hint]
+            if default is not None and type(default).__name__ in cls._JUJU_TYPES:
+                return cls._JUJU_TYPES[type(default).__name__]
+            raise ValueError(f'{name!r} type is unknown.') from None
+        if hint not in cls._JUJU_TYPES:
+            raise ValueError(f'{name!r} type is unknown.') from None
+        return cls._JUJU_TYPES[hint]
 
     @staticmethod
-    def attr_name_to_yaml_name(name: str):
+    def _attr_to_juju_name(attr: str):
         """Convert from the class attribute name to the name used in the schema.
 
         Python names are snake_case, but Juju config option names should be
-        kebab-case. Override if your config names do not match this pattern, for
-        example for backwards compatibility.
+        kebab-case.
         """
-        return name.replace('_', '-')
+        return attr.replace('_', '-')
+
+    @staticmethod
+    def _juju_name_to_attr(attr: str):
+        """Convert from the schema name to the class attribute name.
+
+        Python names are snake_case, but Juju config option names should be
+        kebab-case.
+        """
+        return attr.replace('-', '_')
 
     @classmethod
-    def option_names(cls) -> Generator[str, None, None]:
+    def _juju_names(cls) -> Generator[str, None, None]:
         """Iterates over all the option names to include in the config YAML.
 
         By default, this is ``dir(cls)``, any keys from ``cls.__annotations``,
@@ -210,7 +155,7 @@ class ConfigBase:
             yield attr
 
     @classmethod
-    def _yaml_schema_from_basemodel(cls) -> dict[str, Any]:
+    def __juju_schema_from_basemodel(cls) -> dict[str, Any]:
         options = {}
         for name, field in cls.model_fields.items():  # type: ignore
             option = {}
@@ -220,22 +165,22 @@ class ConfigBase:
                 hint = field.annotation.__name__  # type: ignore
             else:
                 hint = str(field.annotation)  # type: ignore
-                hint = cls._extract_optional_type(name, hint)  # type: ignore
-            option['type'] = cls.JUJU_TYPES[hint]
+                hint = cls.__extract_optional_type(name, hint)  # type: ignore
+            option['type'] = cls._JUJU_TYPES[hint]
             if field.description:  # type: ignore
                 option['description'] = field.description  # type: ignore
-            options[cls.attr_name_to_yaml_name(name)] = option  # type: ignore
+            options[cls._attr_to_juju_name(name)] = option  # type: ignore
         return {'options': options}
 
     @classmethod
-    def to_yaml_schema(cls) -> dict[str, Any]:
+    def to_juju_schema(cls) -> dict[str, Any]:
         """Translate the class to YAML suitable for config.yaml.
 
-        Using :attr:`ConfigBase.to_yaml_schema` will generate a YAML schema
+        Using :attr:`ConfigBase.to_juju_schema` will generate a YAML schema
         suitable for use in ``config.yaml``. For example, with the class from
         the example above::
 
-            print(yaml.safe_dump(MyConfig.to_yaml_schema()))
+            print(yaml.safe_dump(MyConfig.to_juju_schema()))
 
         Will output::
 
@@ -258,32 +203,37 @@ class ConfigBase:
                 my-secret:
                     type: secret
                     description: A user secret.
+
+        To customise, override this method in your subclass. For example::
+
+            @classmethod
+            def to_juju_schema(cls) -> dict[str, Any]:
+                schema = super().to_juju_schema()
+                # Change the key names to upper-case.
+                schema = {key.upper(): value for key, value in schema.items()}
+                return schema
         """
         # Special-case pydantic BaseModel.
         if hasattr(cls, 'model_fields'):
-            return cls._yaml_schema_from_basemodel()
+            return cls.__juju_schema_from_basemodel()
 
         # Dataclasses, regular classes, etc.
+        attr_docstrings = attrdocs.get_attr_docstrings(cls)
         options: dict[str, dict[str, bool | int | float | str]] = {}
-        for attr in cls.option_names():
+        for attr in cls._juju_names():
             option = {}
             default = getattr(cls, attr, None)
-            if type(default).__name__ in cls.JUJU_TYPES:
+            if type(default).__name__ in cls._JUJU_TYPES:
                 option['default'] = default
-            option['type'] = cls.attr_to_yaml_type(attr, default)
-            doc = cls._get_attr_docstrings().get(attr)
+            option['type'] = cls._attr_to_juju_type(attr, default)
+            doc = attr_docstrings.get(attr)
             if doc:
                 option['description'] = doc
-            options[cls.attr_name_to_yaml_name(attr)] = option
+            options[cls._attr_to_juju_name(attr)] = option
         return {'options': options}
 
-    @classmethod
-    def to_starlark_validator(cls) -> str:
-        """Validation code, as a Starlark script."""
-        raise NotImplementedError('To be added at a later point.')
 
-
-def generate_yaml_schema():
+def generate_juju_schema():
     """Look for all ConfigBase subclasses and generate their YAML schema.
 
     .. caution::
@@ -302,10 +252,11 @@ def generate_yaml_schema():
 
 
 if __name__ == '__main__':
-    generate_yaml_schema()
+    generate_juju_schema()
 
-# TODO: if __future__ annotations is not used, does everything continue to work? Maybe it's a
-# requirement?
+# TODO: Verify that if future annotations is not used, everything still works
+# as expected (or make this an explicit requirement).
+
 # TODO: if no config is found, have Scenario try to generate it.
-# TODO: test_main check to verify that the _Abort works correctly, maybe also using a charm that
-# generates the config?
+
+# TODO: test_main check to verify that the clean exit works correctly.
