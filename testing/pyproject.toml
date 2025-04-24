@@ -41,9 +41,5 @@ classifiers = [
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
 
-[tool.ruff.format]
-# Like Black, use double quotes for strings.
-quote-style = "double"
-
 [bdist_wheel]
 universal = 1
