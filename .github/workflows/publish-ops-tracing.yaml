@@ -13,6 +13,7 @@ jobs:
     uses: ./.github/workflows/hello-charm-tests.yaml
   release:
     runs-on: ubuntu-latest
+    environment: publish-pypi
     permissions:
       id-token: write
       attestations: write

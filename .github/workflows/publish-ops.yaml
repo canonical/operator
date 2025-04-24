@@ -18,6 +18,7 @@ jobs:
   build-n-publish:
     name: Build and Publish ops to PyPI
     runs-on: ubuntu-latest
+    environment: publish-pypi
     permissions:
       id-token: write
       attestations: write
