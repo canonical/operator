@@ -144,6 +144,7 @@ class ConfigBase:
         """
         attrs = dir(cls)
         attrs.extend(cls.__annotations__)
+        # TODO: this can probably use dataclasses.fields().
         if hasattr(cls, '__dataclass_fields__'):
             attrs.extend(cls.__dataclass_fields__)  # type: ignore
         for attr in set(attrs):
