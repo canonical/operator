@@ -376,7 +376,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    using the same Python version as specified in the `.readthedocs.yaml` file.
 12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
-13. Wait until the tests pass after the PR is merged. CI should within 10 minutes.
+13. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
    If the tests don't pass at the tip of the main branch, do not release.
 14. When you are ready, click "Publish". GitHub will create the additional tag.
 
