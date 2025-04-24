@@ -214,21 +214,21 @@ def test_action_using_actionbase_class():
 
         @classmethod
         def _param_names(cls):
-            yield "b"
+            yield 'b'
 
     class Charm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
-            framework.observe(self.on["action"].action, self._on_action)
+            framework.observe(self.on['action'].action, self._on_action)
 
         def _on_action(self, event: ActionEvent):
-            params = event.load_params(Action, 10, c="foo")
-            event.set_results({"params": params})
+            params = event.load_params(Action, 10, c='foo')
+            event.set_results({'params': params})
 
     schema = Action.to_juju_schema()
-    ctx = Context(Charm, meta={"name": "foo"}, actions=schema)
-    ctx.run(ctx.on.action("action", params={"b": 3.14}), State())
-    params = ctx.action_results["params"]
+    ctx = Context(Charm, meta={'name': 'foo'}, actions=schema)
+    ctx.run(ctx.on.action('action', params={'b': 3.14}), State())
+    params = ctx.action_results['params']
     assert params.a == 10
     assert params.b == 3.14
-    assert params.c == "foo"
+    assert params.c == 'foo'
