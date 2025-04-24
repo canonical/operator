@@ -301,7 +301,7 @@ maximum_signature_line_length = 80
 # that should be linked to in this documentation.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'juju': ('https://canonical-juju.readthedocs-hosted.com/en/latest', None),
+    'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
 }
@@ -323,6 +323,7 @@ nitpick_ignore = [
     ('py:class', '_EntityStatus'),
     ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
+    ('py:class', '_JujuContext'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
     ('py:class', '_RawPortProtocolLiteral'),
@@ -335,7 +336,10 @@ nitpick_ignore = [
     ('py:class', '_WarningDict'),
     ('py:class', '_Writeable'),
     ('py:class', 'AnyJson'),
+    ('py:class', 'BasicIdentityDict'),
     ('py:class', 'CharmType'),
+    ('py:class', 'LocalIdentityDict'),
+    ('py:class', 'IdentityDict'),
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ActionType'),

@@ -2,7 +2,7 @@
 
 ![CI Status](https://github.com/canonical/operator/actions/workflows/framework-tests.yaml/badge.svg)
 
-The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://juju.is/docs/sdk/charmed-operators). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
+The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://charmhub.io/). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
 > - The latest version of `ops` requires Python 3.8 or above.
@@ -13,7 +13,7 @@ Let's use `ops` to build a Kubernetes charm:
 
 ### Set up
 
-> See [Juju | Set things up](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-your-deployment/manage-your-deployment-environment/#set-things-up). <br> Choose the automatic track and MicroK8s.
+> See [Juju | Set things up](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/manage-your-deployment-environment/#set-things-up). <br> Choose the automatic track and MicroK8s.
 
 
 ### Write your charm
@@ -142,7 +142,7 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ### Clean up
 
-> See [Juju | Tear things down](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-your-deployment/manage-your-deployment-environment/#tear-things-down). <br> Choose the automatic track.
+> See [Juju | Tear things down](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/manage-your-deployment-environment/#tear-things-down). <br> Choose the automatic track.
 
 ## Next steps
 

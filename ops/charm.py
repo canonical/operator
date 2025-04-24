@@ -273,6 +273,9 @@ class ActionEvent(EventBase):
             self.fail(f'Error in action parameters: {e}')
             raise model.InvalidSchemaError() from None
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
+
 
 class InstallEvent(HookEvent):
     """Event triggered when a charm is installed.
@@ -541,7 +544,9 @@ class RelationEvent(HookEvent):
 
         self.relation = relation
         if app is None:
-            logger.warning("'app' expected but not received.")
+            logger.warning(
+                "'app' expected but not received, see https://bugs.launchpad.net/juju/+bug/1960934"
+            )
             # Do an explicit assignment here so that we can contain the type: ignore.
             self.app = None  # type: ignore
         else:
@@ -591,6 +596,11 @@ class RelationEvent(HookEvent):
             self.unit = self.framework.model.get_unit(unit_name)
         else:
             self.unit = None
+
+    def __repr__(self):
+        app = None if self.app is None else self.app.name
+        unit = None if self.unit is None else self.unit.name
+        return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'
 
 
 class RelationCreatedEvent(RelationEvent):
@@ -780,6 +790,9 @@ class StorageEvent(HookEvent):
 
             self.storage.location = storage_location
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.storage!r} via {self.handle}>'
+
 
 class StorageAttachedEvent(StorageEvent):
     """Event triggered when new storage becomes available.
@@ -851,6 +864,9 @@ class WorkloadEvent(HookEvent):
             self.workload = self.framework.model.unit.get_container(container_name)
         else:
             self.workload = None  # type: ignore
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} on {self.workload!r} via {self.handle}>'
 
 
 class PebbleReadyEvent(WorkloadEvent):
@@ -1659,21 +1675,21 @@ class CharmMeta:
     @staticmethod
     def from_charm_root(charm_root: Union[pathlib.Path, str]):
         """Initialise CharmMeta from the path to a charm repository root folder."""
-        _charm_root = pathlib.Path(charm_root)
-        metadata_path = _charm_root / 'metadata.yaml'
+        charm_root = pathlib.Path(charm_root)
+        metadata_path = charm_root / 'metadata.yaml'
 
         with metadata_path.open() as f:
             meta = yaml.safe_load(f.read())
 
         actions = None
 
-        actions_path = _charm_root / 'actions.yaml'
+        actions_path = charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
                 actions = yaml.safe_load(f.read())
 
         options = None
-        config_path = _charm_root / 'config.yaml'
+        config_path = charm_root / 'config.yaml'
         if config_path.exists():
             with config_path.open() as f:
                 options = yaml.safe_load(f.read())
@@ -1797,9 +1813,9 @@ class RelationMeta:
     VALID_SCOPES: ClassVar[List[str]] = ['global', 'container']
 
     def __init__(self, role: RelationRole, relation_name: str, raw: '_RelationMetaDict'):
-        assert isinstance(
-            role, RelationRole
-        ), f'role should be one of {list(RelationRole)!r}, not {role!r}'
+        assert isinstance(role, RelationRole), (
+            f'role should be one of {list(RelationRole)}, not {role!r}'
+        )
         self._default_scope = self.VALID_SCOPES[0]
         self.role = role
         self.relation_name = relation_name
