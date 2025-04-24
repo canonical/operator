@@ -147,6 +147,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'Container',
     'ContainerMapping',
     'ErrorStatus',
+    'InvalidSchemaError',
     'InvalidStatusError',
     'LazyCheckInfo',
     'LazyMapping',
@@ -182,6 +183,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'Unit',
     'UnknownStatus',
     'WaitingStatus',
+    # From _databag.py
+    'DatabagBase',
 ]
 
 # The isort command wants to rearrange the nicely-formatted imports below;
@@ -296,6 +299,7 @@ from .model import (
     Container,
     ContainerMapping,
     ErrorStatus,
+    InvalidSchemaError,
     InvalidStatusError,
     LazyCheckInfo,
     LazyMapping,
@@ -333,6 +337,8 @@ from .model import (
     UnknownStatus,
     WaitingStatus,
 )
+
+from ._databag import DatabagBase
 
 # NOTE: don't import testing or Harness here, as that's a test-time concern
 # rather than a runtime concern.
