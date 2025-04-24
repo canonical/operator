@@ -219,7 +219,7 @@ def test_action_using_actionbase_class():
         c: str
 
         @classmethod
-        def param_names(cls):
+        def _param_names(cls):
             yield "b"
 
     class Charm(CharmBase):
@@ -231,7 +231,7 @@ def test_action_using_actionbase_class():
             params = event.load_params(Action, 10, c="foo")
             event.set_results({"params": params})
 
-    schema = Action.to_yaml_schema()
+    schema = Action.to_juju_schema()
     ctx = Context(Charm, meta={"name": "foo"}, actions=schema)
     ctx.run(ctx.on.action("action", params={"b": 3.14}), State())
     params = ctx.action_results["params"]

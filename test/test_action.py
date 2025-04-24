@@ -251,7 +251,7 @@ def test_action_init(
     action_class: type[ops.ActionBase],
     request: pytest.FixtureRequest,
 ):
-    action_yaml = action_class.to_yaml_schema()
+    action_yaml = action_class.to_juju_schema()
     actions = ops._private.yaml.safe_dump(action_yaml)
     harness = testing.Harness(charm_class, actions=actions)
     request.addfinalizer(harness.cleanup)
@@ -275,7 +275,7 @@ def test_action_init_non_default(
     action_class: type[ops.ActionBase],
     request: pytest.FixtureRequest,
 ):
-    action_yaml = action_class.to_yaml_schema()
+    action_yaml = action_class.to_juju_schema()
     actions = ops._private.yaml.safe_dump(action_yaml)
     harness = testing.Harness(charm_class, actions=actions)
     request.addfinalizer(harness.cleanup)
@@ -302,14 +302,13 @@ def test_action_with_error(
     action_class: type[ops.ActionBase],
     request: pytest.FixtureRequest,
 ):
-    action_yaml = action_class.to_yaml_schema()
+    action_yaml = action_class.to_juju_schema()
     actions = ops._private.yaml.safe_dump(action_yaml)
     harness = testing.Harness(charm_class, actions=actions)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    with pytest.raises(ops._main._Abort) as cm:
+    with pytest.raises(ops.InvalidSchemaError):
         harness.run_action(action_name, params={'my-str': 'foo', 'my-int': -1})
-    assert cm.value.exit_code == 0
     assert 'my_int must be zero or positive' in harness._backend._running_action.failure_message
 
 
@@ -320,10 +319,16 @@ def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
         other: str = 'baz'
 
         @staticmethod
-        def attr_name_to_yaml_name(name: str):
-            if name == 'foo_bar':
+        def _attr_to_juju_name(attr: str):
+            if attr == 'foo_bar':
                 return 'fooBar'
-            return name.replace('_', '-')
+            return attr.replace('_', '-')
+
+        @staticmethod
+        def _juju_name_to_attr(attr: str):
+            if attr == 'fooBar':
+                return 'foo_bar'
+            return attr.replace('-', '_')
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -331,16 +336,10 @@ def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
             framework.observe(self.on['act1'].action, self._on_action)
 
         def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(Act1, convert_name=self.yaml_name_to_attr_name)
+            params = event.load_params(Act1)
             event.set_results({'params': params})
 
-        @staticmethod
-        def yaml_name_to_attr_name(name: str):
-            if name == 'fooBar':
-                return 'foo_bar'
-            return name.replace('-', '_')
-
-    action_yaml = Act1.to_yaml_schema()
+    action_yaml = Act1.to_juju_schema()
     assert 'fooBar' in action_yaml['act1']['params']
     actions = ops._private.yaml.safe_dump(action_yaml)
     harness = testing.Harness(Charm, actions=actions)
@@ -356,6 +355,10 @@ def test_action_bad_attr_naming_pattern(request: pytest.FixtureRequest):
     class BadAction(ops.ActionBase):
         foo_bar: int = 42
 
+        @staticmethod
+        def _juju_name_to_attr(attr: str):
+            return attr.replace('_', '-')
+
     class BadCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -367,24 +370,23 @@ def test_action_bad_attr_naming_pattern(request: pytest.FixtureRequest):
             for name, meta in action_meta.parameters.items():
                 if 'default' in meta:
                     params[name] = meta['default']
-            event.load_params(BadAction, convert_name=lambda x: x.replace('_', '-'))
+            event.load_params(BadAction)
             assert True, 'The event handler should not continue'
 
-    action_schema = BadAction.to_yaml_schema()
+    action_schema = BadAction.to_juju_schema()
     assert 'foo-bar' in action_schema['bad-action']['params']
     actions = ops._private.yaml.safe_dump(action_schema)
     harness = testing.Harness(BadCharm, actions=actions)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    with pytest.raises(ops._main._Abort) as cm:
+    with pytest.raises(ops.InvalidSchemaError):
         harness.run_action('bad-action')
-    assert cm.value.exit_code == 0
     assert 'foo-bar' in harness._backend._running_action.failure_message
 
 
 @pytest.mark.parametrize('action_class,action_name', _test_action_classes)
 def test_action_yaml_schema(action_class: type[ops.ActionBase], action_name: str):
-    generated_yaml = action_class.to_yaml_schema()
+    generated_yaml = action_class.to_juju_schema()
     if hasattr(action_class, 'schema'):
         # Remove the 'title' property that Pydantic adds to make the schema more
         # consistent with the others for simpler testing.
@@ -434,10 +436,15 @@ def test_action_yaml_additional_properties():
     class ActionTrue(ops.ActionBase):
         """An action."""
 
-        _additional_properties = True
         x: int = 42
 
-    generated_yaml = ActionTrue.to_yaml_schema()
+        @classmethod
+        def to_juju_schema(cls):
+            schema = super().to_juju_schema()
+            schema['action-true']['additionalProperties'] = True
+            return schema
+
+    generated_yaml = ActionTrue.to_juju_schema()
     expected_yaml = {
         'action-true': {
             'description': 'An action.',
@@ -447,18 +454,22 @@ def test_action_yaml_additional_properties():
     }
     assert generated_yaml == expected_yaml
 
-    class ActionFalse(ops.ActionBase):
+    class ActionDefault(ops.ActionBase):
         """An action."""
 
-        _additional_properties = False
         x: int = 42
 
-    generated_yaml = ActionFalse.to_yaml_schema()
+        @classmethod
+        def to_juju_schema(cls):
+            schema = super().to_juju_schema()
+            del schema['action-default']['additionalProperties']
+            return schema
+
+    generated_yaml = ActionDefault.to_juju_schema()
     expected_yaml = {
-        'action-false': {
+        'action-default': {
             'description': 'An action.',
             'params': {'x': {'type': 'integer', 'default': 42}},
-            'additionalProperties': False,
         },
     }
     assert generated_yaml == expected_yaml
@@ -471,12 +482,12 @@ def test_action_subclass_modification():
         x: int = 42
 
         @classmethod
-        def to_yaml_schema(cls):
-            yaml = super().to_yaml_schema()
+        def to_juju_schema(cls):
+            yaml = super().to_juju_schema()
             yaml['action-minimum']['params']['x']['minimum'] = 0
             return yaml
 
-    generated_yaml = ActionMinimum.to_yaml_schema()
+    generated_yaml = ActionMinimum.to_juju_schema()
     expected_yaml = {
         'action-minimum': {
             'description': 'An action.',
@@ -503,7 +514,7 @@ class Rebalance(ops.ActionBase):
 
 
 def test_action_enum():
-    generated_yaml = Rebalance.to_yaml_schema()
+    generated_yaml = Rebalance.to_juju_schema()
     expected_yaml = {
         'rebalance': {
             'description': 'Trigger a rebalance of cluster partitions based on configured goals',
@@ -559,7 +570,7 @@ class DoThisThing(ops.ActionBase): ...
     ],
 )
 def test_action_class_name_to_action_name(cls: ops.ActionBase, action_name: str):
-    assert cls.class_name_to_action_name() == action_name
+    assert cls._class_to_action_name() == action_name
 
 
 def test_action_extra_args(request: pytest.FixtureRequest):
@@ -570,7 +581,7 @@ def test_action_extra_args(request: pytest.FixtureRequest):
         c: str
 
         @classmethod
-        def param_names(cls):
+        def _param_names(cls):
             yield 'b'
 
     class Charm(ops.CharmBase):
@@ -582,7 +593,7 @@ def test_action_extra_args(request: pytest.FixtureRequest):
             params = event.load_params(Action, 10, c='foo')
             event.set_results({'params': params})
 
-    schema = Action.to_yaml_schema()
+    schema = Action.to_juju_schema()
     actions = ops._private.yaml.safe_dump(schema)
     harness = testing.Harness(Charm, actions=actions)
     request.addfinalizer(harness.cleanup)
