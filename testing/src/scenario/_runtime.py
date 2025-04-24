@@ -46,7 +46,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
     from .state import CharmType, State, _CharmSpec, _Event
 
-logger = scenario_logger.getChild("runtime")
+logger = scenario_logger.getChild('runtime')
 
 RUNTIME_MODULE = Path(__file__).parent
 
@@ -59,9 +59,9 @@ class Runtime:
 
     def __init__(
         self,
-        charm_spec: "_CharmSpec[CharmType]",
+        charm_spec: '_CharmSpec[CharmType]',
         charm_root: Optional[Union[str, Path]] = None,
-        juju_version: str = "3.0.0",
+        juju_version: str = '3.0.0',
         app_name: Optional[str] = None,
         unit_id: Optional[int] = 0,
     ):
@@ -69,30 +69,30 @@ class Runtime:
         self._juju_version = juju_version
         self._charm_root = charm_root
 
-        app_name = app_name or self._charm_spec.meta.get("name")
+        app_name = app_name or self._charm_spec.meta.get('name')
         if not app_name:
             raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
         self._app_name = app_name
         self._unit_id = unit_id
 
-    def _get_event_env(self, state: "State", event: "_Event", charm_root: Path):
+    def _get_event_env(self, state: 'State', event: '_Event', charm_root: Path):
         """Build the simulated environment the operator framework expects."""
         env = {
-            "JUJU_VERSION": self._juju_version,
-            "JUJU_UNIT_NAME": f"{self._app_name}/{self._unit_id}",
-            "_": "./dispatch",
-            "JUJU_DISPATCH_PATH": f"hooks/{event.name}",
-            "JUJU_MODEL_NAME": state.model.name,
-            "JUJU_MODEL_UUID": state.model.uuid,
-            "JUJU_CHARM_DIR": str(charm_root.absolute()),
+            'JUJU_VERSION': self._juju_version,
+            'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
+            '_': './dispatch',
+            'JUJU_DISPATCH_PATH': f'hooks/{event.name}',
+            'JUJU_MODEL_NAME': state.model.name,
+            'JUJU_MODEL_UUID': state.model.uuid,
+            'JUJU_CHARM_DIR': str(charm_root.absolute()),
         }
 
         if event._is_action_event and (action := event.action):
             env.update(
                 {
-                    "JUJU_ACTION_NAME": action.name.replace("_", "-"),
-                    "JUJU_ACTION_UUID": action.id,
+                    'JUJU_ACTION_NAME': action.name.replace('_', '-'),
+                    'JUJU_ACTION_UUID': action.id,
                 },
             )
 
@@ -102,12 +102,12 @@ class Runtime:
             elif isinstance(relation, (Relation, SubordinateRelation)):
                 remote_app_name = relation.remote_app_name
             else:
-                raise ValueError(f"Unknown relation type: {relation}")
+                raise ValueError(f'Unknown relation type: {relation}')
             env.update(
                 {
-                    "JUJU_RELATION": relation.endpoint,
-                    "JUJU_RELATION_ID": str(relation.id),
-                    "JUJU_REMOTE_APP": remote_app_name,
+                    'JUJU_RELATION': relation.endpoint,
+                    'JUJU_RELATION_ID': str(relation.id),
+                    'JUJU_REMOTE_APP': remote_app_name,
                 },
             )
 
@@ -115,7 +115,7 @@ class Runtime:
 
             # don't check truthiness because remote_unit_id could be 0
             if remote_unit_id is None and not event.name.endswith(
-                ("_relation_created", "relation_broken"),
+                ('_relation_created', 'relation_broken'),
             ):
                 remote_unit_ids = relation._remote_unit_ids
 
@@ -123,70 +123,70 @@ class Runtime:
                     remote_unit_id = remote_unit_ids[0]
                     logger.info(
                         "there's only one remote unit, so we set JUJU_REMOTE_UNIT to it, "
-                        "but you probably should be parametrizing the event with `remote_unit_id` "
-                        "to be explicit.",
+                        'but you probably should be parametrizing the event with `remote_unit_id` '
+                        'to be explicit.',
                     )
                 elif len(remote_unit_ids) > 1:
                     remote_unit_id = remote_unit_ids[0]
                     logger.warning(
-                        "remote unit ID unset, and multiple remote unit IDs are present; "
-                        "We will pick the first one and hope for the best. You should be passing "
-                        "`remote_unit_id` to the Event constructor.",
+                        'remote unit ID unset, and multiple remote unit IDs are present; '
+                        'We will pick the first one and hope for the best. You should be passing '
+                        '`remote_unit_id` to the Event constructor.',
                     )
                 else:
                     logger.warning(
-                        "remote unit ID unset; no remote unit data present. "
-                        "Is this a realistic scenario?",
+                        'remote unit ID unset; no remote unit data present. '
+                        'Is this a realistic scenario?',
                     )
 
             if remote_unit_id is not None:
-                remote_unit = f"{remote_app_name}/{remote_unit_id}"
-                env["JUJU_REMOTE_UNIT"] = remote_unit
-                if event.name.endswith("_relation_departed"):
+                remote_unit = f'{remote_app_name}/{remote_unit_id}'
+                env['JUJU_REMOTE_UNIT'] = remote_unit
+                if event.name.endswith('_relation_departed'):
                     if event.relation_departed_unit_id:
-                        env["JUJU_DEPARTING_UNIT"] = (
-                            f"{remote_app_name}/{event.relation_departed_unit_id}"
+                        env['JUJU_DEPARTING_UNIT'] = (
+                            f'{remote_app_name}/{event.relation_departed_unit_id}'
                         )
                     else:
-                        env["JUJU_DEPARTING_UNIT"] = remote_unit
+                        env['JUJU_DEPARTING_UNIT'] = remote_unit
 
         if container := event.container:
-            env.update({"JUJU_WORKLOAD_NAME": container.name})
+            env.update({'JUJU_WORKLOAD_NAME': container.name})
 
         if notice := event.notice:
-            if hasattr(notice.type, "value"):
+            if hasattr(notice.type, 'value'):
                 notice_type = typing.cast(pebble.NoticeType, notice.type).value
             else:
                 notice_type = str(notice.type)
             env.update(
                 {
-                    "JUJU_NOTICE_ID": notice.id,
-                    "JUJU_NOTICE_TYPE": notice_type,
-                    "JUJU_NOTICE_KEY": notice.key,
+                    'JUJU_NOTICE_ID': notice.id,
+                    'JUJU_NOTICE_TYPE': notice_type,
+                    'JUJU_NOTICE_KEY': notice.key,
                 },
             )
 
         if check_info := event.check_info:
-            env["JUJU_PEBBLE_CHECK_NAME"] = check_info.name
+            env['JUJU_PEBBLE_CHECK_NAME'] = check_info.name
 
         if storage := event.storage:
-            env.update({"JUJU_STORAGE_ID": f"{storage.name}/{storage.index}"})
+            env.update({'JUJU_STORAGE_ID': f'{storage.name}/{storage.index}'})
 
         if secret := event.secret:
             env.update(
                 {
-                    "JUJU_SECRET_ID": secret.id,
-                    "JUJU_SECRET_LABEL": secret.label or "",
+                    'JUJU_SECRET_ID': secret.id,
+                    'JUJU_SECRET_LABEL': secret.label or '',
                 },
             )
             # Don't check truthiness because revision could be 0.
             if event.secret_revision is not None:
-                env["JUJU_SECRET_REVISION"] = str(event.secret_revision)
+                env['JUJU_SECRET_REVISION'] = str(event.secret_revision)
 
         return env
 
     @staticmethod
-    def _wrap(charm_type: Type["CharmType"]) -> Type["CharmType"]:
+    def _wrap(charm_type: Type['CharmType']) -> Type['CharmType']:
         # dark sorcery to work around framework using class attrs to hold on to event sources
         # this should only be needed if we call play multiple times on the same runtime.
         class WrappedEvents(charm_type.on.__class__):
@@ -200,7 +200,7 @@ class Runtime:
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
-        return typing.cast(Type["CharmType"], WrappedCharm)
+        return typing.cast(Type['CharmType'], WrappedCharm)
 
     @contextmanager
     def _virtual_charm_root(self):
@@ -219,14 +219,12 @@ class Runtime:
             virtual_charm_root = Path(charm_virtual_root.name)
             charm_virtual_root_is_custom = False
 
-        metadata_yaml = virtual_charm_root / "metadata.yaml"
-        config_yaml = virtual_charm_root / "config.yaml"
-        actions_yaml = virtual_charm_root / "actions.yaml"
+        metadata_yaml = virtual_charm_root / 'metadata.yaml'
+        config_yaml = virtual_charm_root / 'config.yaml'
+        actions_yaml = virtual_charm_root / 'actions.yaml'
 
         metadata_files_present: Dict[Path, Optional[str]] = {
-            file: file.read_text()
-            if charm_virtual_root_is_custom and file.exists()
-            else None
+            file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
 
@@ -240,22 +238,20 @@ class Runtime:
             # Still, log it for clarity.
             if any_metadata_files_present_in_charm_virtual_root:
                 logger.debug(
-                    f"metadata files found in custom charm_root {charm_virtual_root}. "
-                    f"The spec was autoloaded so the contents should be identical. "
-                    f"Proceeding...",
+                    f'metadata files found in custom charm_root {charm_virtual_root}. '
+                    f'The spec was autoloaded so the contents should be identical. '
+                    f'Proceeding...',
                 )
 
-        elif (
-            not spec.is_autoloaded and any_metadata_files_present_in_charm_virtual_root
-        ):
+        elif not spec.is_autoloaded and any_metadata_files_present_in_charm_virtual_root:
             logger.warning(
-                f"Some metadata files found in custom user-provided charm_root "
-                f"{charm_virtual_root} while you have passed meta, config or actions to "
-                f"Context.run(). "
-                "Single source of truth are the arguments passed to Context.run(). "
-                "charm_root metadata files will be overwritten for the "
-                "duration of this test, and restored afterwards. "
-                "To avoid this, clean any metadata files from the charm_root before calling run.",
+                f'Some metadata files found in custom user-provided charm_root '
+                f'{charm_virtual_root} while you have passed meta, config or actions to '
+                f'Context.run(). '
+                'Single source of truth are the arguments passed to Context.run(). '
+                'charm_root metadata files will be overwritten for the '
+                'duration of this test, and restored afterwards. '
+                'To avoid this, clean any metadata files from the charm_root before calling run.',
             )
 
         metadata_yaml.write_text(yaml.safe_dump(spec.meta))
@@ -276,7 +272,7 @@ class Runtime:
             typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
 
     @contextmanager
-    def _exec_ctx(self, ctx: "Context"):
+    def _exec_ctx(self, ctx: 'Context'):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
             with capture_events(
@@ -288,9 +284,9 @@ class Runtime:
     @contextmanager
     def exec(
         self,
-        state: "State",
-        event: "_Event",
-        context: "Context",
+        state: 'State',
+        event: '_Event',
+        context: 'Context',
     ):
         """Runs an event with this state as initial state on a charm.
 
@@ -305,14 +301,14 @@ class Runtime:
         check_consistency(state, event, self._charm_spec, self._juju_version)
 
         charm_type = self._charm_spec.charm_type
-        logger.info(f"Preparing to fire {event.name} on {charm_type.__name__}")
+        logger.info(f'Preparing to fire {event.name} on {charm_type.__name__}')
 
         # we make a copy to avoid mutating the input state
         output_state = copy.deepcopy(state)
 
-        logger.info(" - generating virtual charm root")
+        logger.info(' - generating virtual charm root')
         with self._exec_ctx(context) as (temporary_charm_root, captured):
-            logger.info(" - preparing env")
+            logger.info(' - preparing env')
             env = self._get_event_env(
                 state=state,
                 event=event,
@@ -326,7 +322,7 @@ class Runtime:
             previous_env = os.environ.copy()
             os.environ.update(env)
 
-            logger.info(" - entering ops.main (mocked)")
+            logger.info(' - entering ops.main (mocked)')
             from ._ops_main_mock import Ops  # noqa: F811
 
             try:
@@ -347,7 +343,7 @@ class Runtime:
                 raise  # propagate along
             except Exception as e:
                 raise UncaughtCharmError(
-                    f"Uncaught exception ({type(e)}) in operator/charm code: {e!r}",
+                    f'Uncaught exception ({type(e)}) in operator/charm code: {e!r}',
                 ) from e
 
             finally:
@@ -355,14 +351,14 @@ class Runtime:
                     if key not in previous_env:
                         del os.environ[key]
                 os.environ.update(previous_env)
-                logger.info(" - exited ops.main")
+                logger.info(' - exited ops.main')
 
         context.emitted_events.extend(captured)
-        logger.info("event dispatched. done.")
+        logger.info('event dispatched. done.')
         context._set_output_state(ops.state)
 
 
-_T = TypeVar("_T", bound=EventBase)
+_T = TypeVar('_T', bound=EventBase)
 
 
 @contextmanager
