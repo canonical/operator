@@ -87,19 +87,18 @@ def wait_spans(
 
 
 def get_spans(address: str, since: float = 0):
+    spans: list[dict[str, Any]] = []
     with httpx.Client(base_url=f'http://{address}:3200/api/', timeout=5) as client:
         r = client.get('search?tags=service.name=tracing-tester')
         r.raise_for_status()
-        spans: list[dict[str, Any]] = []
         for t in r.json()['traces']:
             if float(t['startTimeUnixNano']) / 1e9 < since:
                 continue
-            r = client.get(f'traces/{t["traceID"]}')
+            r = client.get('v2/traces/{t["traceID"]}')
             r.raise_for_status()
-            for batch in r.json()['batches']:
-                for scope in batch['scopeSpans']:
-                    spans.extend(scope['spans'])
-
+            for resource in r.json()["trace"]["resourceSpans"]:
+                for scope in resource["scopeSpans"]:
+                    spans.extend(scope["spans"])
     return spans
 
 
