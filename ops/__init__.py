@@ -190,7 +190,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
 # The isort command wants to rearrange the nicely-formatted imports below;
 # just skip it for this file.
 # isort:skip_file
-from typing import Optional, Type
 
 # Import pebble explicitly. It's the one module we don't import names from below.
 from . import pebble
@@ -352,13 +351,11 @@ except ImportError:
 
 class _Main:
     def __call__(
-        self, charm_class: Type[charm.CharmBase], use_juju_for_storage: Optional[bool] = None
+        self, charm_class: type[charm.CharmBase], use_juju_for_storage: bool | None = None
     ):
         return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
 
-    def main(
-        self, charm_class: Type[charm.CharmBase], use_juju_for_storage: Optional[bool] = None
-    ):
+    def main(self, charm_class: type[charm.CharmBase], use_juju_for_storage: bool | None = None):
         return _legacy_main.main(
             charm_class=charm_class, use_juju_for_storage=use_juju_for_storage
         )

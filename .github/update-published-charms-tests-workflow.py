@@ -26,7 +26,6 @@ import json
 import logging
 import pathlib
 import re
-import typing
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -101,7 +100,7 @@ def get_source_url(charm: str):
     return None
 
 
-def url_to_charm_name(url: typing.Optional[str]):
+def url_to_charm_name(url: str | None):
     """Get the charm name from a URL."""
     if not url:
         return None

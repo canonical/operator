@@ -18,7 +18,6 @@ import os
 import pathlib
 import subprocess
 import sys
-import typing
 
 import pytest
 
@@ -77,7 +76,7 @@ def test_ops_testing_doc():
     # even though the above compatibility_names logic would exclude it.
     expected_names.add('Container')
 
-    found_names: typing.Set[str] = set()
+    found_names: set[str] = set()
     for test_doc in (
         'docs/reference/ops-testing-harness.rst',
         'docs/reference/ops-testing.rst',

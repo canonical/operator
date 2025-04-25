@@ -80,7 +80,7 @@ class StoragePermutations(abc.ABC):
                 self,
                 parent: ops.Object,
                 key: str,
-                content: typing.Dict[str, typing.Any],
+                content: dict[str, typing.Any],
             ):
                 super().__init__(parent, key)
                 self.content = content
@@ -88,7 +88,7 @@ class StoragePermutations(abc.ABC):
             def snapshot(self):
                 return {'content': self.content}
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+            def restore(self, snapshot: dict[str, typing.Any]):
                 self.__dict__.update(snapshot)
 
         f.register_type(Sample, None, Sample.handle_kind)
@@ -137,10 +137,10 @@ class StoragePermutations(abc.ABC):
             def _on_event(self, event: Evt):
                 self.observed_content = event.content
 
-            def snapshot(self) -> typing.Dict[str, typing.Any]:
+            def snapshot(self) -> dict[str, typing.Any]:
                 raise NotImplementedError()
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]) -> None:
+            def restore(self, snapshot: dict[str, typing.Any]) -> None:
                 raise NotImplementedError()
 
         s = Sample(f, 'key')

@@ -51,8 +51,8 @@ def create_model():
 def create_framework(
     request: pytest.FixtureRequest,
     *,
-    model: typing.Optional[ops.Model] = None,
-    tmpdir: typing.Optional[pathlib.Path] = None,
+    model: ops.Model | None = None,
+    tmpdir: pathlib.Path | None = None,
 ):
     """Create a Framework object.
 
@@ -92,10 +92,10 @@ class SimpleEventWithData(ops.EventBase):
         super().__init__(handle)
         self.data: str = data
 
-    def restore(self, snapshot: typing.Dict[str, typing.Any]):
+    def restore(self, snapshot: dict[str, typing.Any]):
         self.data = typing.cast(str, snapshot['data'])
 
-    def snapshot(self) -> typing.Dict[str, typing.Any]:
+    def snapshot(self) -> dict[str, typing.Any]:
         return {'data': self.data}
 
 
@@ -163,10 +163,10 @@ class TestFramework:
                 self.handle = handle
                 self.my_n = n
 
-            def snapshot(self) -> typing.Dict[str, int]:
+            def snapshot(self) -> dict[str, int]:
                 return {'My N!': self.my_n}
 
-            def restore(self, snapshot: typing.Dict[str, int]):
+            def restore(self, snapshot: dict[str, int]):
                 self.my_n = snapshot['My N!'] + 1
 
         handle = ops.Handle(None, 'a_foo', 'some_key')
@@ -214,8 +214,8 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
-                self.reprs: typing.List[str] = []
+                self.seen: list[str] = []
+                self.reprs: list[str] = []
 
             def on_any(self, event: ops.EventBase):
                 self.seen.append(f'on_any:{event.handle.kind}')
@@ -258,8 +258,8 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
-                self.reprs: typing.List[str] = []
+                self.seen: list[str] = []
+                self.reprs: list[str] = []
 
             def on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{event.handle.kind}')
@@ -318,13 +318,13 @@ class TestFramework:
             def _on_baz(
                 self,
                 event: ops.EventBase,
-                extra: typing.Optional[typing.Any] = None,
+                extra: typing.Any | None = None,
                 *,
                 k: typing.Any,
             ):
                 assert False, 'should not be reached'
 
-            def _on_qux(self, event: ops.EventBase, extra: typing.Optional[typing.Any] = None):
+            def _on_qux(self, event: ops.EventBase, extra: typing.Any | None = None):
                 assert False, 'should not be reached'
 
         framework = create_framework(request)
@@ -345,9 +345,9 @@ class TestFramework:
         class PreCommitObserver(ops.Object):
             _stored = ops.StoredState()
 
-            def __init__(self, parent: ops.Object, key: typing.Optional[str]):
+            def __init__(self, parent: ops.Object, key: str | None):
                 super().__init__(parent, key)
-                self.seen: typing.List[typing.Any] = []
+                self.seen: list[typing.Any] = []
                 self._stored.myinitdata = 40
 
             def on_pre_commit(self, event: ops.PreCommitEvent):
@@ -396,8 +396,8 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
-                self.done: typing.Dict[str, bool] = {}
+                self.seen: list[str] = []
+                self.done: dict[str, bool] = {}
 
             def on_any(self, event: ops.EventBase):
                 self.seen.append(event.handle.kind)
@@ -454,7 +454,7 @@ class TestFramework:
         framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
-            data: typing.Optional[str] = None
+            data: str | None = None
 
         class ReleaseEvent(ops.EventBase):
             pass
@@ -555,7 +555,7 @@ class TestFramework:
         class RecordingObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.events: typing.List[str] = []
+                self.events: list[str] = []
 
             def on_event(self, _: SimpleEventWithData):
                 self.events.append(self.__class__.__name__)
@@ -624,7 +624,7 @@ class TestFramework:
             def snapshot(self):
                 return {'My N!': self.my_n}
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+            def restore(self, snapshot: dict[str, typing.Any]):
                 super().restore(snapshot)
                 self.my_n = snapshot['My N!'] + 1
 
@@ -634,7 +634,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: MyEvent):
                 self.seen.append(f'on_foo:{event.handle.kind}={event.my_n}')
@@ -662,7 +662,7 @@ class TestFramework:
     def test_weak_observer(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
-        observed_events: typing.List[str] = []
+        observed_events: list[str] = []
 
         class MyEvent(ops.EventBase):
             pass
@@ -694,10 +694,10 @@ class TestFramework:
         framework = create_framework(request)
 
         class MyObject(ops.Object):
-            def snapshot(self) -> typing.Dict[str, typing.Any]:
+            def snapshot(self) -> dict[str, typing.Any]:
                 raise NotImplementedError()
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]) -> None:
+            def restore(self, snapshot: dict[str, typing.Any]) -> None:
                 raise NotImplementedError()
 
         o1 = MyObject(framework, 'path')
@@ -734,7 +734,7 @@ class TestFramework:
             def snapshot(self):
                 return {'value': self.value}
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+            def restore(self, snapshot: dict[str, typing.Any]):
                 self.value = snapshot['value']
 
         framework.register_type(MyObject, None, MyObject.handle_kind)
@@ -785,7 +785,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{event.handle.kind}')
@@ -858,7 +858,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[typing.Any] = []
+                self.seen: list[typing.Any] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(event.handle)
@@ -904,7 +904,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{type(event).__name__}:{event.handle.kind}')
@@ -944,7 +944,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{type(event).__name__}:{event.handle.kind}')
@@ -1016,7 +1016,7 @@ class TestFramework:
 
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[typing.Any] = []
+                self.seen: list[typing.Any] = []
 
             def _on_foo(self, event: MyEvent):
                 self.seen.append((event.handle.key, event.value))
@@ -1322,7 +1322,7 @@ class TestStoredState:
         self,
         request: pytest.FixtureRequest,
         tmp_path: pathlib.Path,
-        cls: typing.Type[ops.Object],
+        cls: type[ops.Object],
     ):
         @typing.runtime_checkable
         class _StoredProtocol(typing.Protocol):
@@ -1487,7 +1487,7 @@ class TestStoredState:
             with pytest.raises(TypeError):
                 a.add(b)
 
-        test_operations: typing.List[MutableTypesTestCase] = [
+        test_operations: list[MutableTypesTestCase] = [
             (
                 lambda: {},
                 None,
@@ -1668,8 +1668,8 @@ class TestStoredState:
         class WrappedFramework(ops.Framework):
             def __init__(
                 self,
-                store: typing.Union[SQLiteStorage, JujuStorage],
-                charm_dir: typing.Union[str, Path],
+                store: SQLiteStorage | JujuStorage,
+                charm_dir: str | Path,
                 meta: ops.CharmMeta,
                 model: ops.Model,
                 event_name: str,
@@ -1682,9 +1682,9 @@ class TestStoredState:
                     event_name,
                     juju_debug_at=set(),
                 )
-                self.snapshots: typing.List[typing.Any] = []
+                self.snapshots: list[typing.Any] = []
 
-            def save_snapshot(self, value: typing.Union[ops.StoredStateData, ops.EventBase]):
+            def save_snapshot(self, value: ops.StoredStateData | ops.EventBase):
                 if value.handle.path == 'SomeObject[1]/StoredStateData[_stored]':
                     self.snapshots.append((type(value), value.snapshot()))
                 return super().save_snapshot(value)
@@ -1732,7 +1732,7 @@ class TestStoredState:
             framework_copy.close()
 
     def test_comparison_operations(self, request: pytest.FixtureRequest):
-        test_operations: typing.List[ComparisonOperationsTestCase] = [
+        test_operations: list[ComparisonOperationsTestCase] = [
             (
                 {'1'},
                 {'1', '2'},
@@ -1773,7 +1773,7 @@ class TestStoredState:
             assert op(b, obj._stored.a) == op_ba
 
     def test_set_operations(self, request: pytest.FixtureRequest):
-        test_operations: typing.List[SetOperationsTestCase] = [
+        test_operations: list[SetOperationsTestCase] = [
             ({'1'}, lambda a, b: a | b, {'1', 'a', 'b'}, {'1', 'a', 'b'}),
             ({'a', 'c'}, lambda a, b: a - b, {'b'}, {'c'}),
             ({'a', 'c'}, lambda a, b: a & b, {'a'}, {'a'}),
@@ -2032,7 +2032,7 @@ class TestBreakpoint:
         self,
         request: pytest.FixtureRequest,
         envvar_value: str,
-        breakpoint_name: typing.Optional[str],
+        breakpoint_name: str | None,
         call_count: int,
     ):
         """Helper to check the diverse combinations of situations."""

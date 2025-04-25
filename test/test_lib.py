@@ -65,7 +65,7 @@ def _mklib(topdir: str, pkgname: str, libname: str) -> Path:
     return lib / '__init__.py'
 
 
-def _flatten(specgen: typing.Iterable[ModuleSpec]) -> typing.List[str]:
+def _flatten(specgen: typing.Iterable[ModuleSpec]) -> list[str]:
     return sorted([
         os.path.dirname(spec.origin if spec.origin is not None else '') for spec in specgen
     ])
@@ -172,7 +172,7 @@ class TestLibParser:
         self,
         tmp_path: pathlib.Path,
         name: str,
-        content: typing.Optional[str] = None,
+        content: str | None = None,
     ) -> ModuleSpec:
         file = tmp_path / name
         if content is not None:

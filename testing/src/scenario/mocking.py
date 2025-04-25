@@ -17,16 +17,10 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Literal,
     Mapping,
     NoReturn,
-    Optional,
-    Set,
     TextIO,
-    Tuple,
-    Union,
     cast,
     get_args,
 )
@@ -84,9 +78,9 @@ class _MockExecProcess:
         change_id: int,
         args: ExecArgs,
         return_code: int,
-        stdin: Optional[Union[TextIO, io.BytesIO]],
-        stdout: Optional[Union[TextIO, io.BytesIO]],
-        stderr: Optional[Union[TextIO, io.BytesIO]],
+        stdin: TextIO | io.BytesIO | None,
+        stdout: TextIO | io.BytesIO | None,
+        stderr: TextIO | io.BytesIO | None,
     ):
         self._change_id = change_id
         self._args = args
@@ -127,7 +121,7 @@ class _MockExecProcess:
             )
         return stdout, stderr
 
-    def send_signal(self, sig: Union[int, str]) -> NoReturn:  # noqa: U100
+    def send_signal(self, sig: int | str) -> NoReturn:  # noqa: U100
         """Send the given signal to the (mock) process."""
         raise NotImplementedError()
 
@@ -139,11 +133,11 @@ _NOT_GIVEN = object()  # non-None default value sentinel
 class _MockModelBackend(_ModelBackend):  # type: ignore
     def __init__(
         self,
-        state: 'State',
-        event: '_Event',
-        charm_spec: '_CharmSpec[CharmType]',
-        context: 'Context',
-        juju_context: '_JujuContext',
+        state: State,
+        event: _Event,
+        charm_spec: _CharmSpec[CharmType],
+        context: Context,
+        juju_context: _JujuContext,
     ):
         super().__init__(juju_context=juju_context)
         self._state = state
@@ -151,15 +145,15 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self._context = context
         self._charm_spec = charm_spec
 
-    def opened_ports(self) -> Set[Port_Ops]:
+    def opened_ports(self) -> set[Port_Ops]:
         return {
             Port_Ops(protocol=port.protocol, port=port.port) for port in self._state.opened_ports
         }
 
     def open_port(
         self,
-        protocol: '_RawPortProtocolLiteral',
-        port: Optional[int] = None,
+        protocol: _RawPortProtocolLiteral,
+        port: int | None = None,
     ):
         port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
@@ -170,8 +164,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def close_port(
         self,
-        protocol: '_RawPortProtocolLiteral',
-        port: Optional[int] = None,
+        protocol: _RawPortProtocolLiteral,
+        port: int | None = None,
     ):
         _port = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
@@ -180,7 +174,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
-    def get_pebble(self, socket_path: str) -> 'Client':
+    def get_pebble(self, socket_path: str) -> Client:
         container_name = socket_path.split('/')[
             3
         ]  # /charm/containers/<container_name>/pebble.socket
@@ -205,13 +199,13 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             ),
         )
 
-    def _get_relation_by_id(self, rel_id: int) -> 'RelationBase':
+    def _get_relation_by_id(self, rel_id: int) -> RelationBase:
         try:
             return self._state.get_relation(rel_id)
         except KeyError:
             raise RelationNotFoundError() from None
 
-    def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
+    def _get_secret(self, id: str | None = None, label: str | None = None):
         if JujuVersion(self._context.juju_version) < '3.0.2':
             raise ModelError(
                 'secrets are only available in juju >= 3.0.2.'
@@ -274,7 +268,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         unit_id = int(member_name.split('/')[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
 
-    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+    def relation_model_get(self, relation_id: int) -> dict[str, Any]:
         if JujuVersion(self._context.juju_version) < '3.6.2':
             raise ModelError('Relation.remote_model is only available on Juju >= 3.6.2')
 
@@ -296,7 +290,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_ids(self, relation_name: str):
         return [rel.id for rel in self._state.relations if rel.endpoint == relation_name]
 
-    def relation_list(self, relation_id: int) -> Tuple[str, ...]:
+    def relation_list(self, relation_id: int) -> tuple[str, ...]:
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
@@ -321,7 +315,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         return state_config  # full config
 
-    def network_get(self, binding_name: str, relation_id: Optional[int] = None):
+    def network_get(self, binding_name: str, relation_id: int | None = None):
         # validation:
         extra_bindings = self._charm_spec.meta.get('extra-bindings', ())
         all_endpoints = self._charm_spec.get_all_relations()
@@ -407,13 +401,13 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def secret_add(
         self,
-        content: Dict[str, str],
+        content: dict[str, str],
         *,
-        label: Optional[str] = None,
-        description: Optional[str] = None,
-        expire: Optional[datetime.datetime] = None,
-        rotate: Optional[SecretRotate] = None,
-        owner: Optional[Literal['unit', 'app']] = None,
+        label: str | None = None,
+        description: str | None = None,
+        expire: datetime.datetime | None = None,
+        rotate: SecretRotate | None = None,
+        owner: Literal['unit', 'app'] | None = None,
     ) -> str:
         from .state import Secret
 
@@ -432,7 +426,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def _check_can_manage_secret(
         self,
-        secret: 'Secret',
+        secret: Secret,
     ):
         if secret.owner is None:
             raise SecretNotFoundError(
@@ -449,11 +443,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def secret_get(
         self,
         *,
-        id: Optional[str] = None,
-        label: Optional[str] = None,
+        id: str | None = None,
+        label: str | None = None,
         refresh: bool = False,
         peek: bool = False,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
@@ -477,8 +471,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def secret_info_get(
         self,
         *,
-        id: Optional[str] = None,
-        label: Optional[str] = None,
+        id: str | None = None,
+        label: str | None = None,
     ) -> SecretInfo:
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
@@ -502,11 +496,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         id: str,
         *,
-        content: Optional[Dict[str, str]] = None,
-        label: Optional[str] = None,
-        description: Optional[str] = None,
-        expire: Optional[datetime.datetime] = None,
-        rotate: Optional[SecretRotate] = None,
+        content: dict[str, str] | None = None,
+        label: str | None = None,
+        description: str | None = None,
+        expire: datetime.datetime | None = None,
+        rotate: SecretRotate | None = None,
     ):
         secret = self._get_secret(id, label)
         self._check_can_manage_secret(secret)
@@ -528,7 +522,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             rotate=rotate,
         )
 
-    def secret_grant(self, id: str, relation_id: int, *, unit: Optional[str] = None):
+    def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
@@ -542,7 +536,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         secret.remote_grants[relation_id].add(cast(str, grantee))
 
-    def secret_revoke(self, id: str, relation_id: int, *, unit: Optional[str] = None):
+    def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
@@ -554,7 +548,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if not secret.remote_grants[relation_id]:
             del secret.remote_grants[relation_id]
 
-    def secret_remove(self, id: str, *, revision: Optional[int] = None):
+    def secret_remove(self, id: str, *, revision: int | None = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
@@ -589,7 +583,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         relation_id: int,
         _raise_on_error: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         # ops catches RelationNotFoundErrors and returns None:
         try:
             relation = self._get_relation_by_id(relation_id)
@@ -604,7 +598,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             return relation.remote_app_name
         raise TypeError('relation_remote_app_name: unknown relation type')
 
-    def action_set(self, results: Dict[str, Any]):
+    def action_set(self, results: dict[str, Any]):
         if not self._event.action:
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-set',
@@ -652,10 +646,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         self._context.requested_storages[name] = count
 
-    def storage_list(self, name: str) -> List[int]:
+    def storage_list(self, name: str) -> list[int]:
         return [storage.index for storage in self._state.storages if storage.name == name]
 
-    def _storage_event_details(self) -> Tuple[int, str]:
+    def _storage_event_details(self) -> tuple[int, str]:
         storage = self._event.storage
         if not storage:
             # only occurs if this method is called when outside the scope of a storage event
@@ -678,7 +672,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         name, index = storage_name_id.split('/')
         index = int(index)
-        storages: List[Storage] = [
+        storages: list[Storage] = [
             s for s in self._state.storages if s.name == name and s.index == index
         ]
 
@@ -702,7 +696,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def pod_spec_set(
         self,
         spec: Mapping[str, Any],  # noqa: U100
-        k8s_resources: Optional[Mapping[str, Any]] = None,  # noqa: U100
+        k8s_resources: Mapping[str, Any] | None = None,  # noqa: U100
     ) -> NoReturn:
         raise NotImplementedError(
             'pod-spec-set is not implemented in Scenario (and probably never will be: '
@@ -711,8 +705,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def add_metrics(
         self,
-        metrics: Mapping[str, Union[int, float]],  # noqa: U100
-        labels: Optional[Mapping[str, str]] = None,  # noqa: U100
+        metrics: Mapping[str, int | float],  # noqa: U100
+        labels: Mapping[str, str] | None = None,  # noqa: U100
     ) -> NoReturn:
         raise NotImplementedError(
             'add-metrics is not implemented in Scenario (and probably never will be: '
@@ -749,12 +743,12 @@ class _MockPebbleClient(_TestingPebbleClient):
         self,
         socket_path: str,
         container_root: Path,
-        mounts: Dict[str, Mount],
+        mounts: dict[str, Mount],
         *,
-        state: 'State',
-        event: '_Event',
-        charm_spec: '_CharmSpec[CharmType]',
-        context: 'Context',
+        state: State,
+        event: _Event,
+        charm_spec: _CharmSpec[CharmType],
+        context: Context,
         container_name: str,
     ):
         self._state = state
@@ -779,13 +773,13 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         self._root = container_root
 
-        self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
+        self._notices: dict[tuple[str, str], pebble.Notice] = {}
         self._last_notice_id = 0
-        self._changes: Dict[str, pebble.Change] = {}
+        self._changes: dict[str, pebble.Change] = {}
 
         # load any existing notices and check information from the state
-        self._notices: Dict[Tuple[str, str], pebble.Notice] = {}
-        self._check_infos: Dict[str, pebble.CheckInfo] = {}
+        self._notices: dict[tuple[str, str], pebble.Notice] = {}
+        self._check_infos: dict[str, pebble.CheckInfo] = {}
         try:
             container = state.get_container(self._container_name)
         except KeyError:
@@ -855,25 +849,25 @@ class _MockPebbleClient(_TestingPebbleClient):
     def add_layer(
         self,
         label: str,
-        layer: Union[str, 'pebble.LayerDict', pebble.Layer],
+        layer: str | pebble.LayerDict | pebble.Layer,
         *,
         combine: bool = False,
     ):
         super().add_layer(label, layer, combine=combine)
         self._update_state_check_infos()
 
-    def start_checks(self, names: List[str]) -> List[str]:
+    def start_checks(self, names: list[str]) -> list[str]:
         started = super().start_checks(names)
         self._update_state_check_infos()
         return started
 
-    def stop_checks(self, names: List[str]) -> List[str]:
+    def stop_checks(self, names: list[str]) -> list[str]:
         stopped = super().stop_checks(names)
         self._update_state_check_infos()
         return stopped
 
     @property
-    def _container(self) -> 'ContainerSpec':
+    def _container(self) -> ContainerSpec:
         container_name = self.socket_path.split('/')[-2]
         try:
             return next(
@@ -887,15 +881,15 @@ class _MockPebbleClient(_TestingPebbleClient):
             )
 
     @property
-    def _layers(self) -> Dict[str, pebble.Layer]:
+    def _layers(self) -> dict[str, pebble.Layer]:
         return self._container.layers
 
     @property
-    def _service_status(self) -> Dict[str, pebble.ServiceStatus]:
+    def _service_status(self) -> dict[str, pebble.ServiceStatus]:
         return self._container.service_statuses
 
     # Based on a method of the same name from Harness.
-    def _find_exec_handler(self, command: List[str]) -> Optional['Exec']:
+    def _find_exec_handler(self, command: list[str]) -> Exec | None:
         handlers = {exec.command_prefix: exec for exec in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last
         # element, until it matches one of the command prefixes in the execs.
@@ -911,19 +905,19 @@ class _MockPebbleClient(_TestingPebbleClient):
 
     def exec(
         self,
-        command: List[str],
+        command: list[str],
         *,
-        environment: Optional[Dict[str, str]] = None,
-        working_dir: Optional[str] = None,
-        timeout: Optional[float] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO]] = None,
-        stdout: Optional[TextIO] = None,
-        stderr: Optional[TextIO] = None,
-        encoding: Optional[str] = 'utf-8',
+        environment: dict[str, str] | None = None,
+        working_dir: str | None = None,
+        timeout: float | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
+        stdin: str | bytes | TextIO | None = None,
+        stdout: TextIO | None = None,
+        stderr: TextIO | None = None,
+        encoding: str | None = 'utf-8',
         combine_stderr: bool = False,
         **kwargs: Any,
     ):

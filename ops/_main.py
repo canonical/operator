@@ -23,7 +23,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Union, cast
 
 from . import charm as _charm
 from . import framework as _framework
@@ -39,7 +39,7 @@ CHARM_STATE_FILE = '.unit-state.db'
 logger = logging.getLogger()
 
 
-def _exe_path(path: Path) -> Optional[Path]:
+def _exe_path(path: Path) -> Path | None:
     """Find and return the full path to the given binary.
 
     Here path is the absolute path to a binary, but might be missing an extension.
@@ -51,10 +51,10 @@ def _exe_path(path: Path) -> Optional[Path]:
 
 
 def _get_event_args(
-    charm: '_charm.CharmBase',
-    bound_event: '_framework.BoundEvent',
+    charm: _charm.CharmBase,
+    bound_event: _framework.BoundEvent,
     juju_context: _JujuContext,
-) -> Tuple[List[Any], Dict[str, Any]]:
+) -> tuple[list[Any], dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
 
@@ -63,7 +63,7 @@ def _get_event_args(
         workload_name = juju_context.workload_name
         assert workload_name is not None
         container = model.unit.get_container(workload_name)
-        args: List[Any] = [container]
+        args: list[Any] = [container]
         if issubclass(event_type, _charm.PebbleNoticeEvent):
             notice_id = juju_context.notice_id
             notice_type = juju_context.notice_type
@@ -74,7 +74,7 @@ def _get_event_args(
             args.append(check_name)
         return args, {}
     elif issubclass(event_type, _charm.SecretEvent):
-        args: List[Any] = [
+        args: list[Any] = [
             juju_context.secret_id,
             juju_context.secret_label,
         ]
@@ -99,13 +99,13 @@ def _get_event_args(
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, _charm.ActionEvent):
-        args: List[Any] = [juju_context.action_uuid]
+        args: list[Any] = [juju_context.action_uuid]
         return args, {}
     elif issubclass(event_type, _charm.RelationEvent):
         relation_name = juju_context.relation_name
         assert relation_name is not None
         relation_id = juju_context.relation_id
-        relation: Optional[_model.Relation] = model.get_relation(relation_name, relation_id)
+        relation: _model.Relation | None = model.get_relation(relation_name, relation_id)
 
     remote_app_name = juju_context.remote_app_name
     remote_unit_name = juju_context.remote_unit_name
@@ -116,7 +116,7 @@ def _get_event_args(
             raise RuntimeError(f'invalid remote unit name: {remote_unit_name}')
         remote_app_name = remote_unit_name.split('/')[0]
 
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if remote_app_name:
         kwargs['app'] = model.get_app(remote_app_name)
     if remote_unit_name:
@@ -268,11 +268,11 @@ class _Manager:
 
     def __init__(
         self,
-        charm_class: Type['_charm.CharmBase'],
-        model_backend: Optional[_model._ModelBackend] = None,
-        use_juju_for_storage: Optional[bool] = None,
+        charm_class: type[_charm.CharmBase],
+        model_backend: _model._ModelBackend | None = None,
+        use_juju_for_storage: bool | None = None,
         charm_state_path: str = CHARM_STATE_FILE,
-        juju_context: Optional[_JujuContext] = None,
+        juju_context: _JujuContext | None = None,
     ):
         from . import tracing  # break circular import
 
@@ -403,7 +403,7 @@ class _Manager:
         # Emit collect-status events.
         _charm._evaluate_status(self.charm)
 
-    def _get_event_to_emit(self, event_name: str) -> Optional[_framework.BoundEvent]:
+    def _get_event_to_emit(self, event_name: str) -> _framework.BoundEvent | None:
         try:
             return getattr(self.charm.on, event_name)
         except AttributeError:
@@ -411,8 +411,8 @@ class _Manager:
         return None
 
     def _get_event_args(
-        self, bound_event: '_framework.BoundEvent'
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+        self, bound_event: _framework.BoundEvent
+    ) -> tuple[list[Any], dict[str, Any]]:
         # A wrapper so that the testing subclasses can easily override the
         # behaviour.
         return _get_event_args(self.charm, bound_event, self._juju_context)
@@ -462,7 +462,7 @@ class _Manager:
             self.framework.close()
 
 
-def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
+def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None = None):
     """Set up the charm and dispatch the observed event.
 
     See `ops.main() <#ops-main-entry-point>`_ for details.

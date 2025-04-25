@@ -20,7 +20,6 @@ import os
 import re
 import warnings
 from functools import total_ordering
-from typing import Union
 
 
 @total_ordering
@@ -63,7 +62,7 @@ class JujuVersion:
             s += f'.{self.build}'
         return s
 
-    def __eq__(self, other: Union[str, 'JujuVersion']) -> bool:
+    def __eq__(self, other: str | JujuVersion) -> bool:
         if self is other:
             return True
         if isinstance(other, str):
@@ -78,7 +77,7 @@ class JujuVersion:
             and self.patch == other.patch
         )
 
-    def __lt__(self, other: Union[str, 'JujuVersion']) -> bool:
+    def __lt__(self, other: str | JujuVersion) -> bool:
         if self is other:
             return False
         if isinstance(other, str):
@@ -102,7 +101,7 @@ class JujuVersion:
         return False
 
     @classmethod
-    def from_environ(cls) -> 'JujuVersion':
+    def from_environ(cls) -> JujuVersion:
         """Build a version from the ``JUJU_VERSION`` environment variable.
 
         .. deprecated:: 2.19.0 Use :meth:`Model.juju_version` instead.

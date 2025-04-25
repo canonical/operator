@@ -12,12 +12,7 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    FrozenSet,
-    List,
     Sequence,
-    Set,
-    Tuple,
 )
 
 import ops
@@ -61,10 +56,10 @@ class UnitStateDB:
     def __init__(self, underlying_store: ops.storage.SQLiteStorage):
         self._db = underlying_store
 
-    def get_stored_states(self) -> FrozenSet['StoredState']:
+    def get_stored_states(self) -> frozenset[StoredState]:
         """Load any StoredState data structures from the db."""
         db = self._db
-        stored_states: Set[StoredState] = set()
+        stored_states: set[StoredState] = set()
         for handle_path in db.list_snapshots():
             if not EVENT_REGEX.match(handle_path) and (
                 match := STORED_STATE_REGEX.match(handle_path)
@@ -76,10 +71,10 @@ class UnitStateDB:
 
         return frozenset(stored_states)
 
-    def get_deferred_events(self) -> List['DeferredEvent']:
+    def get_deferred_events(self) -> list[DeferredEvent]:
         """Load any DeferredEvent data structures from the db."""
         db = self._db
-        deferred: List[DeferredEvent] = []
+        deferred: list[DeferredEvent] = []
         for handle_path in db.list_snapshots():
             if EVENT_REGEX.match(handle_path):
                 notices = db.notices(handle_path)
@@ -87,7 +82,7 @@ class UnitStateDB:
                     try:
                         snapshot_data = db.load_snapshot(handle)
                     except ops.storage.NoSnapshotError:
-                        snapshot_data: Dict[str, Any] = {}
+                        snapshot_data: dict[str, Any] = {}
 
                     event = DeferredEvent(
                         handle_path=handle,
@@ -99,7 +94,7 @@ class UnitStateDB:
 
         return deferred
 
-    def apply_state(self, state: 'State'):
+    def apply_state(self, state: State):
         """Add DeferredEvent and StoredState from this State instance to the storage."""
         db = self._db
         for event in state.deferred:
@@ -121,10 +116,10 @@ class Ops(_Manager):
 
     def __init__(
         self,
-        state: 'State',
-        event: '_Event',
-        context: 'Context[CharmType]',
-        charm_spec: '_CharmSpec[CharmType]',
+        state: State,
+        event: _Event,
+        context: Context[CharmType],
+        charm_spec: _CharmSpec[CharmType],
         juju_context: ops.jujucontext._JujuContext,
     ):
         self.state = state
@@ -234,7 +229,7 @@ class Ops(_Manager):
 
     def _get_event_args(
         self, bound_event: ops.framework.BoundEvent
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+    ) -> tuple[list[Any], dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
         # Juju events). We also handle converting from Scenario to ops types,

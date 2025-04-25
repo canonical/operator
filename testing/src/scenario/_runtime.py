@@ -14,12 +14,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Dict,
-    List,
-    Optional,
     Type,
     TypeVar,
-    Union,
 )
 
 import yaml
@@ -61,11 +57,11 @@ class Runtime:
 
     def __init__(
         self,
-        charm_spec: '_CharmSpec[CharmType]',
-        charm_root: Optional[Union[str, Path]] = None,
+        charm_spec: _CharmSpec[CharmType],
+        charm_root: str | Path | None = None,
         juju_version: str = '3.0.0',
-        app_name: Optional[str] = None,
-        unit_id: Optional[int] = 0,
+        app_name: str | None = None,
+        unit_id: int | None = 0,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -78,7 +74,7 @@ class Runtime:
         self._app_name = app_name
         self._unit_id = unit_id
 
-    def _get_event_env(self, state: 'State', event: '_Event', charm_root: Path):
+    def _get_event_env(self, state: State, event: _Event, charm_root: Path):
         """Build the simulated environment the operator framework expects."""
         env = {
             'JUJU_VERSION': self._juju_version,
@@ -188,7 +184,7 @@ class Runtime:
         return env
 
     @staticmethod
-    def _wrap(charm_type: Type['CharmType']) -> Type['CharmType']:
+    def _wrap(charm_type: type[CharmType]) -> type[CharmType]:
         # dark sorcery to work around framework using class attrs to hold on to event sources
         # this should only be needed if we call play multiple times on the same runtime.
         class WrappedEvents(charm_type.on.__class__):
@@ -225,7 +221,7 @@ class Runtime:
         config_yaml = virtual_charm_root / 'config.yaml'
         actions_yaml = virtual_charm_root / 'actions.yaml'
 
-        metadata_files_present: Dict[Path, Optional[str]] = {
+        metadata_files_present: dict[Path, str | None] = {
             file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
@@ -274,7 +270,7 @@ class Runtime:
             typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
 
     @contextmanager
-    def _exec_ctx(self, ctx: 'Context'):
+    def _exec_ctx(self, ctx: Context):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
             with capture_events(
@@ -286,9 +282,9 @@ class Runtime:
     @contextmanager
     def exec(
         self,
-        state: 'State',
-        event: '_Event',
-        context: 'Context',
+        state: State,
+        event: _Event,
+        context: Context,
     ):
         """Runs an event with this state as initial state on a charm.
 
@@ -365,7 +361,7 @@ _T = TypeVar('_T', bound=EventBase)
 
 @contextmanager
 def capture_events(
-    *types: Type[EventBase],
+    *types: type[EventBase],
     include_framework: bool = False,
     include_deferred: bool = True,
 ):
@@ -389,7 +385,7 @@ def capture_events(
     """
     allowed_types = types or (EventBase,)
 
-    captured: List[EventBase] = []
+    captured: list[EventBase] = []
     _real_emit = Framework._emit
     _real_reemit = Framework.reemit
 

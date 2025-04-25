@@ -29,14 +29,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Iterable,
-    List,
     NamedTuple,
-    Optional,
-    Set,
-    Tuple,
-    Union,
 )
 
 from .errors import InconsistentScenarioError
@@ -68,9 +62,9 @@ class Results(NamedTuple):
 
 
 def check_consistency(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec[Any]',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec[Any],
     juju_version: str,
 ):
     """Validate the combination of a state, an event, a charm spec, and a Juju version.
@@ -90,16 +84,16 @@ def check_consistency(
     that are not in the charm's ``charmcraft.yaml`` is nonsense, and the
     combination of the two is inconsistent.
     """
-    juju_version_: Tuple[int, ...] = tuple(map(int, juju_version.split('.')))
+    juju_version_: tuple[int, ...] = tuple(map(int, juju_version.split('.')))
 
     if os.getenv('SCENARIO_SKIP_CONSISTENCY_CHECKS'):
         logger.info('skipping consistency checks.')
         return
 
-    errors: List[str] = []
-    warnings: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
-    checks: Tuple[Callable[..., Results]] = (
+    checks: tuple[Callable[..., Results]] = (
         check_containers_consistency,
         check_config_consistency,
         check_resource_consistency,
@@ -137,13 +131,13 @@ def check_consistency(
 
 def check_resource_consistency(
     *,
-    state: 'State',
-    charm_spec: '_CharmSpec[CharmType]',
+    state: State,
+    charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of the resources from metadata and in :class:`scenario.State`."""
-    errors: List[str] = []
-    warnings: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
     resources_from_meta = set(charm_spec.meta.get('resources', {}))
     resources_from_state = {resource.name for resource in state.resources}
@@ -158,9 +152,9 @@ def check_resource_consistency(
 
 def check_event_consistency(
     *,
-    event: '_Event',
-    charm_spec: '_CharmSpec[CharmType]',
-    state: 'State',
+    event: _Event,
+    charm_spec: _CharmSpec[CharmType],
+    state: State,
     **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of the ``_Event`` data structure.
@@ -168,8 +162,8 @@ def check_event_consistency(
     For example, it checks that a relation event has a relation instance, and that
     the relation endpoint name matches the event prefix.
     """
-    errors: List[str] = []
-    warnings: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
     if not event._is_builtin_event(charm_spec):
         # This is a custom event - we can't make assumptions about its name and
@@ -204,10 +198,10 @@ def check_event_consistency(
 
 def _check_relation_event(
     charm_spec: _CharmSpec[CharmType],
-    event: '_Event',
-    state: 'State',
-    errors: List[str],
-    warnings: List[str],
+    event: _Event,
+    state: State,
+    errors: list[str],
+    warnings: list[str],
 ):
     if not event.relation:
         errors.append(
@@ -229,10 +223,10 @@ def _check_relation_event(
 
 def _check_workload_event(
     charm_spec: _CharmSpec[CharmType],
-    event: '_Event',
-    state: 'State',
-    errors: List[str],
-    warnings: List[str],
+    event: _Event,
+    state: State,
+    errors: list[str],
+    warnings: list[str],
 ):
     if not event.container:
         errors.append(
@@ -264,10 +258,10 @@ def _check_workload_event(
 
 def _check_action_event(
     charm_spec: _CharmSpec[CharmType],
-    event: '_Event',
-    state: 'State',
-    errors: List[str],
-    warnings: List[str],
+    event: _Event,
+    state: State,
+    errors: list[str],
+    warnings: list[str],
 ):
     action = event.action
     if not action:
@@ -293,10 +287,10 @@ def _check_action_event(
 
 def _check_storage_event(
     charm_spec: _CharmSpec[CharmType],
-    event: '_Event',
-    state: 'State',
-    errors: List[str],
-    warnings: List[str],
+    event: _Event,
+    state: State,
+    errors: list[str],
+    warnings: list[str],
 ):
     storage = event.storage
     meta = charm_spec.meta
@@ -326,8 +320,8 @@ def _check_storage_event(
 def _check_action_param_types(
     charm_spec: _CharmSpec[CharmType],
     action: _Action,
-    errors: List[str],
-    warnings: List[str],
+    errors: list[str],
+    warnings: list[str],
 ):
     actions = charm_spec.actions
     if not actions:
@@ -341,7 +335,7 @@ def _check_action_param_types(
         'array': Sequence,
         'object': dict,
     }
-    expected_param_type: Dict[str, Any] = {}
+    expected_param_type: dict[str, Any] = {}
     for par_name, par_spec in actions[action.name].get('params', {}).items():
         value = par_spec.get('type')
         if not value:
@@ -376,14 +370,14 @@ def _check_action_param_types(
 
 def check_storages_consistency(
     *,
-    state: 'State',
-    charm_spec: '_CharmSpec[CharmType]',
+    state: State,
+    charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` storages with the charm_spec metadata."""
     state_storage = state.storages
     meta_storage = (charm_spec.meta or {}).get('storage', {})
-    errors: List[str] = []
+    errors: list[str] = []
 
     if missing := {s.name for s in state_storage}.difference(
         set(meta_storage.keys()),
@@ -392,7 +386,7 @@ def check_storages_consistency(
             f'some storages passed to State were not defined in metadata.yaml: {missing}',
         )
 
-    seen: List[Tuple[str, int]] = []
+    seen: list[tuple[str, int]] = []
     for s in state_storage:
         tag = (s.name, s.index)
         if tag in seen:
@@ -405,7 +399,7 @@ def check_storages_consistency(
     return Results(errors, [])
 
 
-def _is_secret_identifier(value: Union[str, int, float, bool]) -> bool:
+def _is_secret_identifier(value: str | int | float | bool) -> bool:
     """Return true iff the value is in the form `secret:{secret id}`."""
     # cf. https://github.com/juju/juju/blob/13eb9df3df16a84fd471af8a3c95ddbd04389b71/core/secrets/secret.go#L48
     return bool(re.match(r'secret:[0-9a-z]{20}$', str(value)))
@@ -413,15 +407,15 @@ def _is_secret_identifier(value: Union[str, int, float, bool]) -> bool:
 
 def check_config_consistency(
     *,
-    state: 'State',
-    charm_spec: '_CharmSpec[CharmType]',
-    juju_version: Tuple[int, ...],
+    state: State,
+    charm_spec: _CharmSpec[CharmType],
+    juju_version: tuple[int, ...],
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` config with the charm_spec config."""
     state_config = state.config
     meta_config = (charm_spec.config or {}).get('options', {})
-    errors: List[str] = []
+    errors: list[str] = []
 
     for key, value in state_config.items():
         if key not in meta_config:
@@ -472,13 +466,13 @@ def check_config_consistency(
 
 def check_secrets_consistency(
     *,
-    event: '_Event',
-    state: 'State',
-    juju_version: Tuple[int, ...],
+    event: _Event,
+    state: State,
+    juju_version: tuple[int, ...],
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Secret` in the :class:`scenario.State`."""
-    errors: List[str] = []
+    errors: list[str] = []
     if not event._is_secret_event:
         return Results(errors, [])
 
@@ -501,13 +495,13 @@ def check_secrets_consistency(
 
 def check_network_consistency(
     *,
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec[CharmType]',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Network` in the :class:`scenario.State`."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     meta_bindings = set(charm_spec.meta.get('extra-bindings', ()))
     # add the implicit juju-info binding so we can override its network without
@@ -539,13 +533,13 @@ def check_network_consistency(
 
 def check_relation_consistency(
     *,
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec[CharmType]',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any relations in the :class:`scenario.State`."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     peer_relations_meta = charm_spec.meta.get('peers', {}).items()
     all_relations_meta = charm_spec.get_all_relations()
@@ -570,7 +564,7 @@ def check_relation_consistency(
         if (ep := relation.endpoint) not in known_endpoints:
             errors.append(f'relation endpoint {ep} is not declared in metadata.')
 
-    seen_ids: Set[int] = set()
+    seen_ids: set[int] = set()
     for endpoint, relation_meta in all_relations_meta:
         expected_sub = relation_meta.get('scope', '') == 'container'
         relations = _get_relations(endpoint)
@@ -597,7 +591,7 @@ def check_relation_consistency(
                 )
 
     # check for duplicate endpoint names
-    seen_endpoints: Set[str] = set()
+    seen_endpoints: set[str] = set()
     for endpoint, _ in all_relations_meta:
         if endpoint in seen_endpoints:
             errors.append('duplicate endpoint name in metadata.')
@@ -609,9 +603,9 @@ def check_relation_consistency(
 
 def check_containers_consistency(
     *,
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec[CharmType]',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :class:`scenario.State` containers with the charm_spec metadata."""
@@ -622,7 +616,7 @@ def check_containers_consistency(
     state_containers = [_normalise_name(c.name) for c in state.containers]
     all_notices = {notice.id for c in state.containers for notice in c.notices}
     all_checks = {(c.name, check.name) for c in state.containers for check in c.check_infos}
-    errors: List[str] = []
+    errors: list[str] = []
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
     # not fine if:
@@ -689,15 +683,15 @@ def check_containers_consistency(
 
 def check_cloudspec_consistency(
     *,
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec[CharmType]',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
     """Check that Kubernetes models don't have :attr:`scenario.State.cloud_spec` set."""
 
-    errors: List[str] = []
-    warnings: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
 
     if state.model.type == 'kubernetes' and state.model.cloud_spec:
         errors.append(
@@ -710,14 +704,14 @@ def check_cloudspec_consistency(
 
 def check_storedstate_consistency(
     *,
-    state: 'State',
+    state: State,
     **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of any :class:`scenario.StoredState` in the :class:`scenario.State`."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     # Attribute names must be unique on each object.
-    names: defaultdict[Optional[str], List[str]] = defaultdict(list)
+    names: defaultdict[str | None, list[str]] = defaultdict(list)
     for ss in state.stored_states:
         names[ss.owner_path].append(ss.name)
     for owner, owner_names in names.items():
