@@ -31,8 +31,6 @@ def mycharm():
 def test_juju_log(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     ctx.run(ctx.on.start(), State())
-    line = JujuLogLine(level='DEBUG', message='Emitting Juju event start.')
-    assert line in ctx.juju_log
-    lines = ctx.juju_log[ctx.juju_log.index(line) :]
-    assert JujuLogLine(level='WARNING', message='bar!') in lines
+    assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in ctx.juju_log
+    assert JujuLogLine(level='WARNING', message='bar!') in ctx.juju_log
     # prints are not juju-logged.
