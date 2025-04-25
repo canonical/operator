@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
@@ -74,7 +73,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .state import Container as ContainerSpec
     from .state import Exec, Secret, State, _CharmSpec, _Event
 
-logger = scenario_logger.getChild("mocking")
+logger = scenario_logger.getChild('mocking')
 
 
 class _MockExecProcess:
@@ -138,11 +137,11 @@ _NOT_GIVEN = object()  # non-None default value sentinel
 class _MockModelBackend(_ModelBackend):  # type: ignore
     def __init__(
         self,
-        state: "State",
-        event: "_Event",
-        charm_spec: "_CharmSpec[CharmType]",
-        context: "Context[CharmType]",
-        juju_context: "_JujuContext",
+        state: 'State',
+        event: '_Event',
+        charm_spec: '_CharmSpec[CharmType]',
+        context: 'Context[CharmType]',
+        juju_context: '_JujuContext',
     ):
         super().__init__(juju_context=juju_context)
         self._state = state
@@ -152,13 +151,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def opened_ports(self) -> Set[Port_Ops]:
         return {
-            Port_Ops(protocol=port.protocol, port=port.port)
-            for port in self._state.opened_ports
+            Port_Ops(protocol=port.protocol, port=port.port) for port in self._state.opened_ports
         }
 
     def open_port(
         self,
-        protocol: "_RawPortProtocolLiteral",
+        protocol: '_RawPortProtocolLiteral',
         port: Optional[int] = None,
     ):
         port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
@@ -170,7 +168,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def close_port(
         self,
-        protocol: "_RawPortProtocolLiteral",
+        protocol: '_RawPortProtocolLiteral',
         port: Optional[int] = None,
     ):
         _port = _port_cls_by_protocol[protocol](port=port)  # type: ignore
@@ -180,8 +178,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
-    def get_pebble(self, socket_path: str) -> "Client":
-        container_name = socket_path.split("/")[
+    def get_pebble(self, socket_path: str) -> 'Client':
+        container_name = socket_path.split('/')[
             3
         ]  # /charm/containers/<container_name>/pebble.socket
         container_root = self._context._get_container_root(container_name)
@@ -204,17 +202,17 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             ),
         )
 
-    def _get_relation_by_id(self, rel_id: int) -> "RelationBase":
+    def _get_relation_by_id(self, rel_id: int) -> 'RelationBase':
         try:
             return self._state.get_relation(rel_id)
         except KeyError:
             raise RelationNotFoundError() from None
 
     def _get_secret(self, id: Optional[str] = None, label: Optional[str] = None):
-        if self._context.juju_version < "3.0.2":
+        if JujuVersion(self._context.juju_version) < '3.0.2':
             raise ModelError(
-                "secrets are only available in juju >= 3.0.2."
-                "Set ``Context.juju_version`` to 3.0.2+ to use them.",
+                'secrets are only available in juju >= 3.0.2.'
+                'Set ``Context.juju_version`` to 3.0.2+ to use them.',
             )
 
         canonicalize_id = Secret_Ops._canonicalize_id
@@ -241,11 +239,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         # if all goes well, this should never be reached. ops.model.Secret will check upon
         # instantiation that either an id or a label are set, and raise a TypeError if not.
-        raise RuntimeError("need id or label.")
+        raise RuntimeError('need id or label.')
 
     def _check_app_data_access(self, is_app: bool):
         if not isinstance(is_app, bool):
-            raise TypeError("is_app parameter to relation_get must be a boolean")
+            raise TypeError('is_app parameter to relation_get must be a boolean')
 
         if not is_app:
             return
@@ -253,7 +251,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         version = JujuVersion(self._context.juju_version)
         if not version.has_app_data():
             raise RuntimeError(
-                f"setting application data is not supported on Juju version {version}",
+                f'setting application data is not supported on Juju version {version}',
             )
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool):
@@ -266,36 +264,42 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 return relation.local_app_data
             if isinstance(relation, (Relation, SubordinateRelation)):
                 return relation.remote_app_data
-            raise TypeError("relation_get: unknown relation type")
+            raise TypeError('relation_get: unknown relation type')
         if member_name == self.unit_name:
             return relation.local_unit_data
 
-        unit_id = int(member_name.split("/")[-1])
+        unit_id = int(member_name.split('/')[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
+
+    def relation_model_get(self, relation_id: int) -> Dict[str, Any]:
+        if JujuVersion(self._context.juju_version) < '3.6.2':
+            raise ModelError('Relation.remote_model is only available on Juju >= 3.6.2')
+
+        relation = self._get_relation_by_id(relation_id)
+        # Only Relation has remote_model_uuid, not the other subclasses of RelationBase.
+        if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
+            uuid = relation.remote_model_uuid
+        else:
+            uuid = self._state.model.uuid
+        return {'uuid': uuid}
 
     def is_leader(self):
         return self._state.leader
 
     def status_get(self, *, is_app: bool = False):
         status = self._state.app_status if is_app else self._state.unit_status
-        return {"status": status.name, "message": status.message}
+        return {'status': status.name, 'message': status.message}
 
     def relation_ids(self, relation_name: str):
-        return [
-            rel.id for rel in self._state.relations if rel.endpoint == relation_name
-        ]
+        return [rel.id for rel in self._state.relations if rel.endpoint == relation_name]
 
     def relation_list(self, relation_id: int) -> Tuple[str, ...]:
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
-            return tuple(
-                f"{self.app_name}/{unit_id}" for unit_id in relation.peers_data
-            )
+            return tuple(f'{self.app_name}/{unit_id}' for unit_id in relation.peers_data)
         remote_name = self.relation_remote_app_name(relation_id)
-        return tuple(
-            f"{remote_name}/{unit_id}" for unit_id in relation._remote_unit_ids
-        )
+        return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
 
     def config_get(self):
         state_config = self._state.config.copy()  # dedup or we'll mutate the state!
@@ -305,10 +309,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if not charm_config:
             return state_config
 
-        for key, value in charm_config["options"].items():
+        for key, value in charm_config['options'].items():
             # if it has a default, and it's not overwritten from State, use it:
             if key not in state_config:
-                default_value = value.get("default", _NOT_GIVEN)
+                default_value = value.get('default', _NOT_GIVEN)
                 if default_value is not _NOT_GIVEN:  # accept False as default value
                     state_config[key] = default_value
 
@@ -316,31 +320,31 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def network_get(self, binding_name: str, relation_id: Optional[int] = None):
         # validation:
-        extra_bindings = self._charm_spec.meta.get("extra-bindings", ())
+        extra_bindings = self._charm_spec.meta.get('extra-bindings', ())
         all_endpoints = self._charm_spec.get_all_relations()
         non_sub_relations = {
-            name for name, meta in all_endpoints if meta.get("scope") != "container"
+            name for name, meta in all_endpoints if meta.get('scope') != 'container'
         }
 
         # - is binding_name a valid binding name?
         if binding_name in extra_bindings:
-            logger.warning("extra-bindings is a deprecated feature")  # fyi
+            logger.warning('extra-bindings is a deprecated feature')  # fyi
 
             # - verify that if the binding is an extra binding, we're not ignoring a relation_id
             if relation_id is not None:
                 # this should not happen
                 logger.error(
-                    "cannot pass relation_id to network_get if the binding name is "
-                    "that of an extra-binding. Extra-bindings are not mapped to relation IDs.",
+                    'cannot pass relation_id to network_get if the binding name is '
+                    'that of an extra-binding. Extra-bindings are not mapped to relation IDs.',
                 )
-        elif binding_name == "juju-info":
+        elif binding_name == 'juju-info':
             # implicit relation that always exists
             pass
         # - verify that the binding is a relation endpoint name, but not a subordinate one
         elif binding_name not in non_sub_relations:
             logger.error(
-                f"cannot get network binding for {binding_name}: is not a valid relation "
-                f"endpoint name nor an extra-binding.",
+                f'cannot get network binding for {binding_name}: is not a valid relation '
+                f'endpoint name nor an extra-binding.',
             )
             raise RelationNotFoundError()
 
@@ -348,7 +352,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         try:
             network = self._state.get_network(binding_name)
         except KeyError:
-            network = Network("default")  # The name is not used in the output.
+            network = Network('default')  # The name is not used in the output.
         return network._hook_tool_output_fmt()
 
     # setter methods: these can mutate the state.
@@ -362,7 +366,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def status_set(
         self,
         status: _SettableStatusName,
-        message: str = "",
+        message: str = '',
         *,
         is_app: bool = False,
     ):
@@ -378,18 +382,25 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
-    def relation_set(self, relation_id: int, key: str, value: str, is_app: bool):
+    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         self._check_app_data_access(is_app)
+        # NOTE: The code below currently does not have any effect, because
+        # the dictionary has already had the same set/delete operations
+        # applied to it by RelationDataContent -- unlike in production,
+        # where this method calls out to Juju's relation-set to operate on
+        # the real databag, this method currently operates on the same
+        # dictionary object that RelationDataContent does.
         relation = self._get_relation_by_id(relation_id)
         if is_app:
             if not self._state.leader:
                 # will in practice not be reached because RelationData will check leadership
                 # and raise RelationDataAccessError upstream on this path
-                raise RuntimeError("needs leadership to set app data")
+                raise RuntimeError('needs leadership to set app data')
             tgt = relation.local_app_data
         else:
             tgt = relation.local_unit_data
-        tgt[key] = value
+        for key, value in data.items():
+            tgt[key] = value
 
     def secret_add(
         self,
@@ -399,7 +410,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         description: Optional[str] = None,
         expire: Optional[datetime.datetime] = None,
         rotate: Optional[SecretRotate] = None,
-        owner: Optional[Literal["unit", "app"]] = None,
+        owner: Optional[Literal['unit', 'app']] = None,
     ) -> str:
         from .state import Secret
 
@@ -418,20 +429,19 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def _check_can_manage_secret(
         self,
-        secret: "Secret",
+        secret: 'Secret',
     ):
         if secret.owner is None:
             raise SecretNotFoundError(
-                "this secret is not owned by this unit/app or granted to it. "
-                "Did you forget passing it to State.secrets?",
+                'this secret is not owned by this unit/app or granted to it. '
+                'Did you forget passing it to State.secrets?',
             )
-        if secret.owner == "app" and not self.is_leader():
+        if secret.owner == 'app' and not self.is_leader():
             understandable_error = SecretNotFoundError(
-                f"App-owned secret {secret.id!r} can only be "
-                f"managed by the leader.",
+                f'App-owned secret {secret.id!r} can only be managed by the leader.',
             )
             # charm-facing side: respect ops error
-            raise ModelError("ERROR permission denied") from understandable_error
+            raise ModelError('ERROR permission denied') from understandable_error
 
     def secret_get(
         self,
@@ -445,8 +455,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
             secret._set_label(label)
-        juju_version = self._context.juju_version
-        if not (juju_version == "3.1.7" or juju_version >= "3.3.1"):
+        juju_version = JujuVersion(self._context.juju_version)
+        if not (juju_version == '3.1.7' or juju_version >= '3.3.1'):
             # In this medieval Juju chapter,
             # secret owners always used to track the latest revision.
             # ref: https://bugs.launchpad.net/juju/+bug/2037120
@@ -504,7 +514,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             # practice.
             # https://bugs.launchpad.net/juju/+bug/2069238
             logger.warning(
-                f"secret {id} contents set to the existing value: new revision not needed",
+                f'secret {id} contents set to the existing value: new revision not needed',
             )
 
         secret._update_metadata(
@@ -560,9 +570,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # is a problem with their code.
         if revision in (secret._tracked_revision, secret._latest_revision):
             raise ValueError(
-                "Charms should not remove the latest revision of a secret. "
-                "Add a new revision with `set_content()` instead, and the previous "
-                "revision will be cleaned up by the secret owner when no longer in use.",
+                'Charms should not remove the latest revision of a secret. '
+                'Add a new revision with `set_content()` instead, and the previous '
+                'revision will be cleaned up by the secret owner when no longer in use.',
             )
 
         # For all other revisions, the content is not visible to the charm
@@ -589,12 +599,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             return self.app_name
         if isinstance(relation, (Relation, SubordinateRelation)):
             return relation.remote_app_name
-        raise TypeError("relation_remote_app_name: unknown relation type")
+        raise TypeError('relation_remote_app_name: unknown relation type')
 
     def action_set(self, results: Dict[str, Any]):
         if not self._event.action:
             raise ActionMissingFromContextError(
-                "not in the context of an action event: cannot action-set",
+                'not in the context of an action event: cannot action-set',
             )
         # let ops validate the results dict
         _format_action_result_dict(results)
@@ -605,17 +615,17 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         else:
             self._context.action_results = results
 
-    def action_fail(self, message: str = ""):
+    def action_fail(self, message: str = ''):
         if not self._event.action:
             raise ActionMissingFromContextError(
-                "not in the context of an action event: cannot action-fail",
+                'not in the context of an action event: cannot action-fail',
             )
         self._context._action_failure_message = message
 
     def action_log(self, message: str):
         if not self._event.action:
             raise ActionMissingFromContextError(
-                "not in the context of an action event: cannot action-log",
+                'not in the context of an action event: cannot action-log',
             )
         self._context.action_logs.append(message)
 
@@ -623,26 +633,24 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         action = self._event.action
         if not action:
             raise ActionMissingFromContextError(
-                "not in the context of an action event: cannot action-get",
+                'not in the context of an action event: cannot action-get',
             )
         return action.params
 
     def storage_add(self, name: str, count: int = 1):
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(
-                f"storage count must be integer, got: {count} ({type(count)})",
+                f'storage count must be integer, got: {count} ({type(count)})',
             )
 
-        if "/" in name:
+        if '/' in name:
             # this error is raised by Harness but not by ops at runtime
             raise ModelError('storage name cannot contain "/"')
 
         self._context.requested_storages[name] = count
 
     def storage_list(self, name: str) -> List[int]:
-        return [
-            storage.index for storage in self._state.storages if storage.name == name
-        ]
+        return [storage.index for storage in self._state.storages if storage.name == name]
 
     def _storage_event_details(self) -> Tuple[int, str]:
         storage = self._event.storage
@@ -656,16 +664,16 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if not len(attribute) > 0:  # assume it's an empty string.
             raise RuntimeError(
                 'calling storage_get with `attribute=""` will return a dict '
-                "and not a string. This usage is not supported.",
+                'and not a string. This usage is not supported.',
             )
 
-        if attribute != "location":
+        if attribute != 'location':
             # this should not happen: in ops it's hardcoded to be "location"
             raise NotImplementedError(
-                f"storage-get not implemented for attribute={attribute}",
+                f'storage-get not implemented for attribute={attribute}',
             )
 
-        name, index = storage_name_id.split("/")
+        name, index = storage_name_id.split('/')
         index = int(index)
         storages: List[Storage] = [
             s for s in self._state.storages if s.name == name and s.index == index
@@ -673,11 +681,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         # should not really happen: sanity checks. In practice, ops will guard against these paths.
         if not storages:
-            raise RuntimeError(f"Storage with name={name} and index={index} not found.")
+            raise RuntimeError(f'Storage with name={name} and index={index} not found.')
         if len(storages) > 1:
             raise RuntimeError(
-                f"Multiple Storage instances with name={name} and index={index} found. "
-                f"Inconsistent state.",
+                f'Multiple Storage instances with name={name} and index={index} found. '
+                f'Inconsistent state.',
             )
 
         storage = storages[0]
@@ -694,7 +702,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         k8s_resources: Optional[Mapping[str, Any]] = None,  # noqa: U100
     ) -> NoReturn:
         raise NotImplementedError(
-            "pod-spec-set is not implemented in Scenario (and probably never will be: "
+            'pod-spec-set is not implemented in Scenario (and probably never will be: '
             "it's deprecated API)",
         )
 
@@ -704,7 +712,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         labels: Optional[Mapping[str, str]] = None,  # noqa: U100
     ) -> NoReturn:
         raise NotImplementedError(
-            "add-metrics is not implemented in Scenario (and probably never will be: "
+            'add-metrics is not implemented in Scenario (and probably never will be: '
             "it's deprecated API)",
         )
 
@@ -717,19 +725,18 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # ops will not let us get there if the resource name is unknown from metadata.
         # but if the user forgot to add it in State, then we remind you of that.
         raise RuntimeError(
-            f"Inconsistent state: "
-            f"resource {resource_name} not found in State. please pass it.",
+            f'Inconsistent state: resource {resource_name} not found in State. please pass it.',
         )
 
     def credential_get(self) -> CloudSpec_Ops:
         if not self._context.app_trusted:
             raise ModelError(
-                "ERROR charm is not trusted, initialise Context with `app_trusted=True`",
+                'ERROR charm is not trusted, initialise Context with `app_trusted=True`',
             )
         if not self._state.model.cloud_spec:
             raise ModelError(
-                "ERROR cloud spec is empty, initialise it with "
-                "`State(model=Model(..., cloud_spec=ops.CloudSpec(...)))`",
+                'ERROR cloud spec is empty, initialise it with '
+                '`State(model=Model(..., cloud_spec=ops.CloudSpec(...)))`',
             )
         return self._state.model.cloud_spec._to_ops()
 
@@ -741,9 +748,9 @@ class _MockPebbleClient(_TestingPebbleClient):
         container_root: Path,
         mounts: Dict[str, Mount],
         *,
-        state: "State",
-        charm_spec: "_CharmSpec[CharmType]",
-        context: "Context[CharmType]",
+        state: 'State',
+        charm_spec: '_CharmSpec[CharmType]',
+        context: 'Context[CharmType]',
         container_name: str,
     ):
         self._state = state
@@ -783,7 +790,7 @@ class _MockPebbleClient(_TestingPebbleClient):
             pass
         else:
             for notice in container.notices:
-                if hasattr(notice.type, "value"):
+                if hasattr(notice.type, 'value'):
                     notice_type = cast(pebble.NoticeType, notice.type).value
                 else:
                     notice_type = str(notice.type)
@@ -835,7 +842,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                 change_id=info.change_id,
             )
             infos.add(check_info)
-        object.__setattr__(self._container, "check_infos", frozenset(infos))
+        object.__setattr__(self._container, 'check_infos', frozenset(infos))
 
     def replan_services(self, timeout: float = 30.0, delay: float = 0.1):
         super().replan_services(timeout=timeout, delay=delay)
@@ -844,7 +851,7 @@ class _MockPebbleClient(_TestingPebbleClient):
     def add_layer(
         self,
         label: str,
-        layer: Union[str, "pebble.LayerDict", pebble.Layer],
+        layer: Union[str, 'pebble.LayerDict', pebble.Layer],
         *,
         combine: bool = False,
     ):
@@ -862,17 +869,17 @@ class _MockPebbleClient(_TestingPebbleClient):
         return stopped
 
     @property
-    def _container(self) -> "ContainerSpec":
-        container_name = self.socket_path.split("/")[-2]
+    def _container(self) -> 'ContainerSpec':
+        container_name = self.socket_path.split('/')[-2]
         try:
             return next(
                 filter(lambda x: x.name == container_name, self._state.containers),
             )
         except StopIteration:
             raise RuntimeError(
-                f"container with name={container_name!r} not found. "
-                f"Did you forget a Container, or is the socket path "
-                f"{self.socket_path!r} wrong?",
+                f'container with name={container_name!r} not found. '
+                f'Did you forget a Container, or is the socket path '
+                f'{self.socket_path!r} wrong?',
             )
 
     @property
@@ -884,7 +891,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         return self._container.service_statuses
 
     # Based on a method of the same name from Harness.
-    def _find_exec_handler(self, command: List[str]) -> Optional["Exec"]:
+    def _find_exec_handler(self, command: List[str]) -> Optional['Exec']:
         handlers = {exec.command_prefix: exec for exec in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last
         # element, until it matches one of the command prefixes in the execs.
@@ -912,7 +919,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         stdin: Optional[Union[str, bytes, TextIO]] = None,
         stdout: Optional[TextIO] = None,
         stderr: Optional[TextIO] = None,
-        encoding: Optional[str] = "utf-8",
+        encoding: Optional[str] = 'utf-8',
         combine_stderr: bool = False,
         **kwargs: Any,
     ):
@@ -921,19 +928,19 @@ class _MockPebbleClient(_TestingPebbleClient):
             raise ExecError(
                 command,
                 127,
-                "",
-                f"mock for cmd {command} not found. Please patch out whatever "
-                f"leads to the call, or pass to the Container {self._container.name} "
-                f"a scenario.Exec mock for the command your charm is attempting "
-                f"to run, such as "
+                '',
+                f'mock for cmd {command} not found. Please patch out whatever '
+                f'leads to the call, or pass to the Container {self._container.name} '
+                f'a scenario.Exec mock for the command your charm is attempting '
+                f'to run, such as '
                 f"'Container(..., execs={{scenario.Exec({list(command)}, ...)}})'",
             )
 
         if stdin is None:
-            proc_stdin = self._transform_exec_handler_output("", encoding)
+            proc_stdin = self._transform_exec_handler_output('', encoding)
         else:
             proc_stdin = None
-            stdin = stdin.read() if hasattr(stdin, "read") else stdin  # type: ignore
+            stdin = stdin.read() if hasattr(stdin, 'read') else stdin  # type: ignore
         if stdout is None:
             proc_stdout = self._transform_exec_handler_output(handler.stdout, encoding)
         else:
@@ -979,7 +986,7 @@ class _MockPebbleClient(_TestingPebbleClient):
     def _check_connection(self):
         if not self._container.can_connect:
             msg = (
-                f"Cannot connect to Pebble; did you forget to set "
-                f"can_connect=True for container {self._container.name}?"
+                f'Cannot connect to Pebble; did you forget to set '
+                f'can_connect=True for container {self._container.name}?'
             )
             raise pebble.ConnectionError(msg)

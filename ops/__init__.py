@@ -55,6 +55,7 @@ This API provides core features to your charm, including:
 __all__ = [  # noqa: RUF022 `__all__` is not sorted
     '__version__',
     'main',
+    'tracing',
     'pebble',
     # From charm.py
     'ActionEvent',
@@ -65,6 +66,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'CollectMetricsEvent',
     'CollectStatusEvent',
     'ConfigChangedEvent',
+    'ConfigMeta',
     'ContainerBase',
     'ContainerMeta',
     'ContainerStorageMeta',
@@ -93,6 +95,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'RelationMeta',
     'RelationRole',
     'RemoveEvent',
+    'RemoteModel',
     'ResourceMeta',
     'SecretChangedEvent',
     'SecretEvent',
@@ -209,6 +212,7 @@ from .charm import (
     CollectMetricsEvent,
     CollectStatusEvent,
     ConfigChangedEvent,
+    ConfigMeta,
     ContainerBase,
     ContainerMeta,
     ContainerStorageMeta,
@@ -314,6 +318,7 @@ from .model import (
     RelationDataTypeError,
     RelationMapping,
     RelationNotFoundError,
+    RemoteModel,
     Resources,
     Secret,
     SecretInfo,
@@ -334,6 +339,13 @@ from .model import (
 # rather than a runtime concern.
 
 from .version import version as __version__
+
+try:
+    # Note that ops_tracing vendors charm libs that depend on ops.
+    # We import it last, after all re-exported symbols.
+    import ops_tracing as tracing
+except ImportError:
+    tracing = None
 
 
 class _Main:

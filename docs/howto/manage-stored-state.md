@@ -11,25 +11,31 @@ the charm machine or (for Kubernetes charms) container - for state that should
 have the same lifetime as the machine or container, and storing state in a Juju
 peer relation - for state that should have the same lifetime as the application.
 
+```{admonition} Best practice
+:class: hint
+
+Write your charm to be stateless, where possible.
+```
+
 ## Storing state for the lifetime of the charm container or machine
 
 Where some state is required, and the state should share the same lifetime as
 the machine or (for Kubernetes charms) container, `ops` provides
-[](ops.StoredState) where data is persisted to the `ops` unit database in the
+[](ops.StoredState), where data is persisted to the `ops` unit database in the
 charm machine or container.
 
-[caution]
+```{caution}
 Note that for Kubernetes charms, container recreation is expected: even if there
 are no errors that require the container to be recreated, the container will be
 recreated with every charm update.
-[/caution]
+```
 
-[note]
+```{note}
 In Kubernetes charms that use the older 'podspec' model, rather than the sidecar
 pattern, or when the `use_juju_for_storage` option is set, this data will be
 stored in Juju instead, and will persist for the life of the application.
 Avoid using `StoredState` objects in these situations.
-[/note]
+```
 
 A `StoredState` object is capable of persisting simple data types, such as
 integers, strings, or floats, and lists, sets, and dictionaries containing those
@@ -71,8 +77,6 @@ def _on_install(self, event: ops.InstallEvent):
 
 ### Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
-
 You'll want to add unit tests.
 
 For integration tests: stored state isn't a feature, it's functionality that
@@ -82,7 +86,7 @@ an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 Add `StoredState` objects to the `State` with any content that you want to mock
 having persisted from a previous event. For example, in your
@@ -143,15 +147,14 @@ def _on_stop(self, event: ops.StopEvent):
     logger.info('Value at stop is: %s', peer.data[self.app]['expensive-value'])
 ```
 
-[caution]
+```{caution}
 Peer relations are not available early in the Charm lifecycle, so you'll need
 to wait until later events, like `start`, to store and retrieve data.
-[/caution]
-
+```
 
 ### Test the feature
 
-> See first: {ref}`get-started-with-charm-testing`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 You'll want to add unit tests.
 
@@ -162,7 +165,7 @@ an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
-> See first: {ref}`write-scenario-tests-for-a-charm`
+> See first: {ref}`write-unit-tests-for-a-charm`
 
 In your `tests/unit/test_charm.py` file, add tests that have an initial state
 that includes a [](ops.testing.PeerRelation) object.

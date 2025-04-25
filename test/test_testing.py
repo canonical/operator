@@ -144,6 +144,25 @@ class TestHarness:
         assert harness.get_relation_data(rel_id, 'postgresql') == {}
         assert harness.get_relation_data(rel_id, 'postgresql/0') == {'a': '1', 'b': '2'}
 
+    def test_relation_remote_model(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'remoteapp1', unit_data={'foo': 'bar'})
+        rel = harness.model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert isinstance(remote_model, ops.RemoteModel)
+        assert remote_model
+        assert remote_model.uuid == harness.model.uuid
+
     def test_can_connect_default(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,
@@ -361,7 +380,7 @@ class TestHarness:
         harness.set_leader(False)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
         assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v3'}
-        assert len(harness.charm.observed_events), 1
+        assert len(harness.charm.observed_events) == 1
         assert isinstance(harness.charm.observed_events[0], ops.RelationEvent)
 
     def test_remove_relation(self, request: pytest.FixtureRequest):
@@ -1707,9 +1726,9 @@ class TestHarness:
 
         harness.add_storage('test')
         harness.begin()
-        assert (
-            len(harness.model.storages['test']) == 0
-        ), 'storage should start in detached state and be excluded from storage listing'
+        assert len(harness.model.storages['test']) == 0, (
+            'storage should start in detached state and be excluded from storage listing'
+        )
 
     def test_add_storage_without_metadata_key_fails(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -2264,7 +2283,10 @@ class TestHarness:
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
             ('relation_get', 0, 'test-charm/0', False),
-            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': test_charm_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
 
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -2278,14 +2300,20 @@ class TestHarness:
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
@@ -3781,9 +3809,9 @@ class TestTestingModelBackend:
         assert backend._resource_dir is None
         path = backend.resource_get('image')
         assert backend._resource_dir is not None
-        assert str(path).startswith(
-            str(backend._resource_dir.name)
-        ), f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        assert str(path).startswith(str(backend._resource_dir.name)), (
+            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        )
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -5192,7 +5220,7 @@ class PebbleStorageAPIsTestMixin:
             client.list_files('/not/existing/file/')
         assert excinfo.value.code == 404
         assert excinfo.value.status == 'Not Found'
-        assert excinfo.value.message == 'stat /not/existing/file/: no ' 'such file or directory'
+        assert excinfo.value.message == 'stat /not/existing/file/: no such file or directory'
 
     def test_list_directory_object_itself(
         self,

@@ -229,7 +229,7 @@ class TestFramework:
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
 
-        with pytest.raises(TypeError, match='^Framework.observe requires a method'):
+        with pytest.raises(TypeError, match=r'^Framework\.observe requires a method'):
             framework.observe(pub.baz, obs)  # type: ignore
 
         pub.foo.emit()
@@ -1982,7 +1982,8 @@ class TestBreakpoint:
             '-',
             '...foo',
             'foo.bar',
-            'bar--' 'FOO',
+            'bar--',
+            'FOO',
             'FooBar',
             'foo bar',
             'foo_bar',

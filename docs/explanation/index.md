@@ -6,7 +6,7 @@
 
 charm-relation-interfaces
 testing
-interface-tests
+tracing
 holistic-vs-delta-charms
 how-and-when-to-defer-events
 storedstate-uses-limitations

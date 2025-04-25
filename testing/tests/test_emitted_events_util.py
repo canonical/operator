@@ -15,7 +15,7 @@ class MyCharmEvents(ops.CharmEvents):
 
 
 class MyCharm(ops.CharmBase):
-    META = {"name": "mycharm"}
+    META = {'name': 'mycharm'}
     on = MyCharmEvents()  # type: ignore
 
     def __init__(self, *args: Any, **kwargs: Any):
@@ -55,7 +55,7 @@ def test_capture_juju_evt():
 
 def test_capture_deferred_evt():
     ctx = Context(MyCharm, meta=MyCharm.META, capture_deferred_events=True)
-    deferred = [_Event("foo").deferred(handler=MyCharm._on_foo)]
+    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
 
     emitted = ctx.emitted_events
@@ -67,7 +67,7 @@ def test_capture_deferred_evt():
 
 def test_capture_no_deferred_evt():
     ctx = Context(MyCharm, meta=MyCharm.META)
-    deferred = [_Event("foo").deferred(handler=MyCharm._on_foo)]
+    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
 
     emitted = ctx.emitted_events
