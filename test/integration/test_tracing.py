@@ -108,12 +108,13 @@ def wait_spans(
     ready: Callable[[list[dict[str, Any]]], bool],
     *,
     since: float = 0,
+    https: bool = False,
     timeout: float = 60,
 ):
     deadline = time.time() + timeout
     spans = []
     while time.time() < deadline:
-        spans = get_spans(address, since)
+        spans = get_spans(address, since=since, https=https)
         if ready(spans):
             return spans
         logging.info('waiting for spans, will retry')
@@ -122,15 +123,17 @@ def wait_spans(
     return spans
 
 
-def get_spans(address: str, since: float = 0):
+def get_spans(address: str, since: float = 0, https: bool = False):
     spans: list[dict[str, Any]] = []
-    with httpx.Client(base_url=f'http://{address}:3200/api/', timeout=5) as client:
+    base_url = f'{ "https" if https else "http" }://{ address }:3200/api/'
+    # Insecure HTTPS because we don't want to fetch CA list from self-signed-certificates
+    with httpx.Client(base_url=base_url, timeout=5, verify=False) as client:  # noqa: S501
         response = client.get('search?tags=service.name=tracing-tester')
         response.raise_for_status()
         for trace in response.json()['traces']:
             if float(trace['startTimeUnixNano']) / 1e9 < since:
                 continue
-            response = client.get(f'v2/traces/{trace["traceID"]}')
+            response = client.get(f'v2/traces/{ trace["traceID"] }')
             response.raise_for_status()
             for resource in response.json()['trace']['resourceSpans']:
                 for scope in resource['scopeSpans']:
