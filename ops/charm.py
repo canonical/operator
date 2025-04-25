@@ -1367,6 +1367,10 @@ class CharmBase(Object):
     def __init__(self, framework: Framework):
         super().__init__(framework, None)
 
+        # These events are present with the same names in all charms, unlike the
+        # ones that are defined below, where the presence and names depend on
+        # the relations, storages, actions, and containers defined in the charm
+        # metadata.
         self._static_events: Set[str] = set(self.on.events())
 
         for relation_name in self.framework.meta.relations:
