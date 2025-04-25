@@ -68,6 +68,8 @@ def test_ops_testing_doc():
     expected_names.update(
         f'errors.{name}' for name in dir(ops.testing.errors) if not name.startswith('_')
     )
+    # we don't document `from __future__ import annotations`
+    expected_names.discard('errors.annotations')
     # ops.testing.UnitID is `int` - we don't document it, but it's hard to fit
     # into the above logic, so we just exclude it here.
     expected_names.discard('UnitID')
