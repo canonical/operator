@@ -338,7 +338,7 @@ class Model:
 if typing.TYPE_CHECKING:
     # (entity type, name): instance.
     _WeakCacheType: TypeAlias = weakref.WeakValueDictionary[
-        tuple[UnitOrApplicationType, str], 'Unit | Application | None'
+        'tuple[UnitOrApplicationType, str]', 'Unit | Application | None'
     ]
 
 
