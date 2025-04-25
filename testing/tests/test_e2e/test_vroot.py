@@ -32,7 +32,7 @@ class MyCharm(CharmBase):
 def charm_virtual_root():
     with tempfile.TemporaryDirectory() as mycharm_virtual_root:
         t = Path(mycharm_virtual_root)
-        (t / "somefile.txt").write_text("foo")
+        (t / 'somefile.txt').write_text('foo')
 
         src = t / 'src'
         src.mkdir()
@@ -107,14 +107,14 @@ def test_charm_virtual_root_autoload(charm_virtual_root):
     from ops.framework import Framework
     from ops.model import ActiveStatus
     """)
-    (charm_virtual_root/'src'/'charm.py').write_text(imports+inspect.getsource(MyCharm))
+    (charm_virtual_root / 'src' / 'charm.py').write_text(imports + inspect.getsource(MyCharm))
 
     # make the temporary charm root importable; avoid messing with sys.path as we have many
     # conflicting 'src' and 'charm' modules lying around here
     cwd = os.getcwd()
     os.chdir(str(charm_virtual_root))
     sys.path.append(str(charm_virtual_root))
-    tmpmodule = importlib.import_module(".charm", "src")
+    tmpmodule = importlib.import_module('.charm', 'src')
     os.chdir(cwd)
 
     # now we import MyCharm from the temporary module
@@ -131,9 +131,8 @@ def test_charm_virtual_root_autoload(charm_virtual_root):
             vroot_copy / 'config.yaml',
             vroot_copy / 'actions.yaml',
             vroot_copy / 'somefile.txt',
-            vroot_copy / 'src'/'foo.bar',
-            vroot_copy / 'src'/'baz'/'qux.kaboodle',
+            vroot_copy / 'src' / 'foo.bar',
+            vroot_copy / 'src' / 'baz' / 'qux.kaboodle',
         ):
             assert file.exists()
         mgr.run()
-

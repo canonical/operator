@@ -1755,8 +1755,8 @@ class _CharmSpec(Generic[CharmType]):
         if not charm_source_path.parts[-2:] == ('src', 'charm.py'):
             # TODO: to support this case, we should allow manually building a _CharmSpec.
             logger.warning(
-                f"Nonstandard charm root for {charm_type=}: {charm_source_path!r}. "
-                "Expecting: src/charm.py. Things may misbehave."
+                f'Nonstandard charm root for {charm_type=}: {charm_source_path!r}. '
+                'Expecting: src/charm.py. Things may misbehave.'
             )
         return charm_source_path.parent.parent
 
