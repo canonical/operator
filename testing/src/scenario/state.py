@@ -1038,8 +1038,8 @@ class Container(_max_posargs(1)):
                     services[name] = service
         return services
 
-    def _render_checks(self) -> Dict[str, pebble.Check]:
-        checks: Dict[str, pebble.Check] = {}
+    def _render_checks(self) -> dict[str, pebble.Check]:
+        checks: dict[str, pebble.Check] = {}
         for layer in self.layers.values():
             for name, check in layer.checks.items():
                 if name in checks and check.override == 'merge':
@@ -1048,8 +1048,8 @@ class Container(_max_posargs(1)):
                     checks[name] = check
         return checks
 
-    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
-        log_targets: Dict[str, pebble.LogTarget] = {}
+    def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
+        log_targets: dict[str, pebble.LogTarget] = {}
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
                 if name in log_targets and log_target.override == 'merge':

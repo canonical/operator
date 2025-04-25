@@ -75,7 +75,6 @@ from typing import (
     Protocol,
     Sequence,
     TextIO,
-    Tuple,
     TypedDict,
     Union,
 )
@@ -355,7 +354,7 @@ class _WebSocket(Protocol):
 
     def send_binary(self, payload: bytes): ...
 
-    def recv(self) -> Union[str, bytes]: ...
+    def recv(self) -> str | bytes: ...
 
 
 logger = logging.getLogger(__name__)
@@ -372,7 +371,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
     def __init__(
-        self, host: str, socket_path: str, timeout: Union[_NotProvidedFlag, float] = _not_provided
+        self, host: str, socket_path: str, timeout: _NotProvidedFlag | float = _not_provided
     ):
         if timeout is _not_provided:
             super().__init__(host)
@@ -466,7 +465,7 @@ class PathError(Error):
 class APIError(Error):
     """Raised when an HTTP API error occurs talking to the Pebble server."""
 
-    body: Dict[str, Any]
+    body: dict[str, Any]
     """Body of the HTTP response, parsed as JSON."""
 
     code: int
@@ -478,7 +477,7 @@ class APIError(Error):
     message: str
     """Human-readable error message from the API."""
 
-    def __init__(self, body: Dict[str, Any], code: int, status: str, message: str):
+    def __init__(self, body: dict[str, Any], code: int, status: str, message: str):
         """This shouldn't be instantiated directly."""
         super().__init__(message)  # Makes str(e) return message
         self.body = body
@@ -529,13 +528,13 @@ class ExecError(Error, Generic[AnyStr]):
     STR_MAX_OUTPUT = 1024
     """Maximum number of characters that stdout/stderr are truncated to in ``__str__``."""
 
-    command: List[str]
+    command: list[str]
     """Command line of command being executed."""
 
     exit_code: int
     """The process's exit code. Because this is an error, this will always be non-zero."""
 
-    stdout: Optional[AnyStr]
+    stdout: AnyStr | None
     """Standard output from the process.
 
     If :meth:`ExecProcess.wait_output` was being called, this is the captured
@@ -543,7 +542,7 @@ class ExecError(Error, Generic[AnyStr]):
     was being called, this is None.
     """
 
-    stderr: Optional[AnyStr]
+    stderr: AnyStr | None
     """Standard error from the process.
 
     If :meth:`ExecProcess.wait_output` was being called and ``combine_stderr``
@@ -554,10 +553,10 @@ class ExecError(Error, Generic[AnyStr]):
 
     def __init__(
         self,
-        command: List[str],
+        command: list[str],
         exit_code: int,
-        stdout: Optional[AnyStr],
-        stderr: Optional[AnyStr],
+        stdout: AnyStr | None,
+        stderr: AnyStr | None,
     ):
         self.command = command
         self.exit_code = exit_code
@@ -615,7 +614,7 @@ class Warning:
         message: str,
         first_added: datetime.datetime,
         last_added: datetime.datetime,
-        last_shown: Optional[datetime.datetime],
+        last_shown: datetime.datetime | None,
         expire_after: str,
         repeat_after: str,
     ):
@@ -696,11 +695,11 @@ class Task:
         kind: str,
         summary: str,
         status: str,
-        log: List[str],
+        log: list[str],
         progress: TaskProgress,
         spawn_time: datetime.datetime,
-        ready_time: Optional[datetime.datetime],
-        data: Optional[Dict[str, Any]] = None,
+        ready_time: datetime.datetime | None,
+        data: dict[str, Any] | None = None,
     ):
         self.id = id
         self.kind = kind
@@ -762,12 +761,12 @@ class Change:
         kind: str,
         summary: str,
         status: str,
-        tasks: List[Task],
+        tasks: list[Task],
         ready: bool,
-        err: Optional[str],
+        err: str | None,
         spawn_time: datetime.datetime,
-        ready_time: Optional[datetime.datetime],
-        data: Optional[Dict[str, Any]] = None,
+        ready_time: datetime.datetime | None,
+        data: dict[str, Any] | None = None,
     ):
         self.id = id
         self.kind = kind
@@ -824,7 +823,7 @@ class Plan:
     https://documentation.ubuntu.com/pebble/reference/layer-specification/
     """
 
-    def __init__(self, raw: Optional[Union[str, PlanDict]] = None):
+    def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore
         else:
@@ -832,18 +831,18 @@ class Plan:
         d = typing.cast('PlanDict', d)
 
         self._raw = raw
-        self._services: Dict[str, Service] = {
+        self._services: dict[str, Service] = {
             name: Service(name, service) for name, service in d.get('services', {}).items()
         }
-        self._checks: Dict[str, Check] = {
+        self._checks: dict[str, Check] = {
             name: Check(name, check) for name, check in d.get('checks', {}).items()
         }
-        self._log_targets: Dict[str, LogTarget] = {
+        self._log_targets: dict[str, LogTarget] = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
 
     @property
-    def services(self) -> Dict[str, Service]:
+    def services(self) -> dict[str, Service]:
         """This plan's services mapping (maps service name to Service).
 
         This property is currently read-only.
@@ -851,7 +850,7 @@ class Plan:
         return self._services
 
     @property
-    def checks(self) -> Dict[str, Check]:
+    def checks(self) -> dict[str, Check]:
         """This plan's checks mapping (maps check name to :class:`Check`).
 
         This property is currently read-only.
@@ -859,7 +858,7 @@ class Plan:
         return self._checks
 
     @property
-    def log_targets(self) -> Dict[str, LogTarget]:
+    def log_targets(self) -> dict[str, LogTarget]:
         """This plan's log targets mapping (maps log target name to :class:`LogTarget`).
 
         This property is currently read-only.
@@ -888,7 +887,7 @@ class Plan:
     def __repr__(self):
         return f'Plan({self.to_dict()!r})'
 
-    def __eq__(self, other: Union[PlanDict, Plan]) -> bool:
+    def __eq__(self, other: PlanDict | Plan) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, Plan):
@@ -908,13 +907,13 @@ class Layer:
     #: Long-form description of this layer.
     description: str
     #: Mapping of name to :class:`Service` defined by this layer.
-    services: Dict[str, Service]
+    services: dict[str, Service]
     #: Mapping of check to :class:`Check` defined by this layer.
-    checks: Dict[str, Check]
+    checks: dict[str, Check]
     #: Mapping of target to :class:`LogTarget` defined by this layer.
-    log_targets: Dict[str, LogTarget]
+    log_targets: dict[str, LogTarget]
 
-    def __init__(self, raw: Optional[Union[str, LayerDict]] = None):
+    def __init__(self, raw: str | LayerDict | None = None):
         if isinstance(raw, str):  # noqa: SIM108
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
@@ -950,7 +949,7 @@ class Layer:
     def __repr__(self) -> str:
         return f'Layer({self.to_dict()!r})'
 
-    def __eq__(self, other: Union[LayerDict, Layer]) -> bool:
+    def __eq__(self, other: LayerDict | Layer) -> bool:
         """Reports whether this layer configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -965,7 +964,7 @@ class Layer:
 class Service:
     """Represents a service description in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional[ServiceDict] = None):
+    def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
         dct: ServiceDict = raw or {}
         self.summary = dct.get('summary', '')
@@ -1037,7 +1036,7 @@ class Service:
     def __repr__(self) -> str:
         return f'Service({self.to_dict()!r})'
 
-    def __eq__(self, other: Union[ServiceDict, Service]) -> bool:
+    def __eq__(self, other: ServiceDict | Service) -> bool:
         """Reports whether this service configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1068,8 +1067,8 @@ class ServiceInfo:
     def __init__(
         self,
         name: str,
-        startup: Union[ServiceStartup, str],
-        current: Union[ServiceStatus, str],
+        startup: ServiceStartup | str,
+        current: ServiceStatus | str,
     ):
         self.name = name
         self.startup = startup
@@ -1103,34 +1102,34 @@ class ServiceInfo:
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional[CheckDict] = None):
+    def __init__(self, name: str, raw: CheckDict | None = None):
         self.name = name
         dct: CheckDict = raw or {}
         self.override: str = dct.get('override', '')
         try:
-            level: Union[CheckLevel, str] = CheckLevel(dct.get('level', ''))
+            level: CheckLevel | str = CheckLevel(dct.get('level', ''))
         except ValueError:
             level = dct.get('level', '')
         self.level = level
         self.startup = CheckStartup(dct.get('startup', ''))
-        self.period: Optional[str] = dct.get('period', '')
-        self.timeout: Optional[str] = dct.get('timeout', '')
-        self.threshold: Optional[int] = dct.get('threshold')
+        self.period: str | None = dct.get('period', '')
+        self.timeout: str | None = dct.get('timeout', '')
+        self.threshold: int | None = dct.get('threshold')
 
         http = dct.get('http')
         if http is not None:
             http = copy.deepcopy(http)
-        self.http: Optional[HttpDict] = http
+        self.http: HttpDict | None = http
 
         tcp = dct.get('tcp')
         if tcp is not None:
             tcp = copy.deepcopy(tcp)
-        self.tcp: Optional[TcpDict] = tcp
+        self.tcp: TcpDict | None = tcp
 
         exec_ = dct.get('exec')
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
-        self.exec: Optional[ExecDict] = exec_
+        self.exec: ExecDict | None = exec_
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
@@ -1152,7 +1151,7 @@ class Check:
     def __repr__(self) -> str:
         return f'Check({self.to_dict()!r})'
 
-    def __eq__(self, other: Union[CheckDict, Check]) -> bool:
+    def __eq__(self, other: CheckDict | Check) -> bool:
         """Reports whether this check configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1264,16 +1263,16 @@ class CheckStartup(enum.Enum):
 class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: Optional[LogTargetDict] = None):
+    def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
         dct: LogTargetDict = raw or {}
         self.override: str = dct.get('override', '')
         self.type = dct.get('type', '')
         self.location = dct.get('location', '')
-        self.services: List[str] = list(dct.get('services', []))
+        self.services: list[str] = list(dct.get('services', []))
         labels = dct.get('labels')
         labels = copy.deepcopy(labels) if labels is not None else {}
-        self.labels: Dict[str, str] = labels
+        self.labels: dict[str, str] = labels
 
     def to_dict(self) -> LogTargetDict:
         """Convert this log target object to its dict representation."""
@@ -1290,7 +1289,7 @@ class LogTarget:
     def __repr__(self):
         return f'LogTarget({self.to_dict()!r})'
 
-    def __eq__(self, other: Union[LogTargetDict, LogTarget]):
+    def __eq__(self, other: LogTargetDict | LogTarget):
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, LogTarget):
@@ -1336,10 +1335,10 @@ class FileInfo:
     name: str
     """Base name of the file."""
 
-    type: Union[FileType, str]
+    type: FileType | str
     """Type of the file ("file", "directory", "symlink", etc)."""
 
-    size: Optional[int]
+    size: int | None
     """Size of the file (will be 0 if ``type`` is not "file")."""
 
     permissions: int
@@ -1348,30 +1347,30 @@ class FileInfo:
     last_modified: datetime.datetime
     """Time file was last modified."""
 
-    user_id: Optional[int]
+    user_id: int | None
     """User ID of the file."""
 
-    user: Optional[str]
+    user: str | None
     """Username of the file."""
 
-    group_id: Optional[int]
+    group_id: int | None
     """Group ID of the file."""
 
-    group: Optional[str]
+    group: str | None
     """Group name of the file."""
 
     def __init__(
         self,
         path: str,
         name: str,
-        type: Union[FileType, str],
-        size: Optional[int],
+        type: FileType | str,
+        size: int | None,
         permissions: int,
         last_modified: datetime.datetime,
-        user_id: Optional[int],
-        user: Optional[str],
-        group_id: Optional[int],
-        group: Optional[str],
+        user_id: int | None,
+        user: str | None,
+        group_id: int | None,
+        group: str | None,
     ):
         self.path = path
         self.name = name
@@ -1429,7 +1428,7 @@ class CheckInfo:
     name: str
     """Name of the check."""
 
-    level: Optional[Union[CheckLevel, str]]
+    level: CheckLevel | str | None
     """Check level.
 
     This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
@@ -1443,7 +1442,7 @@ class CheckInfo:
     started.
     """
 
-    status: Union[CheckStatus, str]
+    status: CheckStatus | str
     """Status of the check.
 
     :attr:`CheckStatus.UP` means the check is healthy (the number of failures
@@ -1464,7 +1463,7 @@ class CheckInfo:
     This is how many consecutive failures for the check to be considered "down".
     """
 
-    change_id: Optional[ChangeID]
+    change_id: ChangeID | None
     """Change ID of ``perform-check`` or ``recover-check`` change driving this check.
 
     This will be None on older versions of Pebble, which did not use changes
@@ -1474,11 +1473,11 @@ class CheckInfo:
     def __init__(
         self,
         name: str,
-        level: Optional[Union[CheckLevel, str]],
-        status: Union[CheckStatus, str],
+        level: CheckLevel | str | None,
+        status: CheckStatus | str,
         failures: int = 0,
         threshold: int = 0,
-        change_id: Optional[ChangeID] = None,
+        change_id: ChangeID | None = None,
         startup: CheckStartup = CheckStartup.ENABLED,
     ):
         self.name = name
@@ -1605,10 +1604,10 @@ class Notice:
     id: str
     """Server-generated unique ID for this notice."""
 
-    user_id: Optional[int]
+    user_id: int | None
     """UID of the user who may view this notice (None means notice is public)."""
 
-    type: Union[NoticeType, str]
+    type: NoticeType | str
     """Type of the notice."""
 
     key: str
@@ -1633,13 +1632,13 @@ class Notice:
     occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: Dict[str, str] = dataclasses.field(default_factory=dict)
+    last_data: dict[str, str] = dataclasses.field(default_factory=dict)
     """Additional data captured from the last occurrence of one of these notices."""
 
-    repeat_after: Optional[datetime.timedelta] = None
+    repeat_after: datetime.timedelta | None = None
     """Minimum time after one of these was last repeated before Pebble will repeat it again."""
 
-    expire_after: Optional[datetime.timedelta] = None
+    expire_after: datetime.timedelta | None = None
     """How long since one of these last occurred until Pebble will drop the notice."""
 
     @classmethod
@@ -1680,7 +1679,7 @@ class ExecProcess(Generic[AnyStr]):
     :meth:`Client.exec`.
     """
 
-    stdin: Optional[IO[AnyStr]]
+    stdin: IO[AnyStr] | None
     """Standard input for the process.
 
     If the stdin argument was not passed to :meth:`Client.exec`, this is a
@@ -1688,7 +1687,7 @@ class ExecProcess(Generic[AnyStr]):
     process. It is None if stdin was passed to :meth:`Client.exec`.
     """
 
-    stdout: Optional[IO[AnyStr]]
+    stdout: IO[AnyStr] | None
     """Standard output from the process.
 
     If the stdout argument was not passed to :meth:`Client.exec`, this is a
@@ -1696,7 +1695,7 @@ class ExecProcess(Generic[AnyStr]):
     process. It is None if stdout was passed to :meth:`Client.exec`.
     """
 
-    stderr: Optional[IO[AnyStr]]
+    stderr: IO[AnyStr] | None
     """Standard error from the process.
 
     If the stderr argument was not passed to :meth:`Client.exec` and
@@ -1707,20 +1706,20 @@ class ExecProcess(Generic[AnyStr]):
 
     def __init__(
         self,
-        stdin: Optional[IO[AnyStr]],
-        stdout: Optional[IO[AnyStr]],
-        stderr: Optional[IO[AnyStr]],
+        stdin: IO[AnyStr] | None,
+        stdout: IO[AnyStr] | None,
+        stderr: IO[AnyStr] | None,
         client: Client,
-        timeout: Optional[float],
+        timeout: float | None,
         control_ws: _WebSocket,
         stdio_ws: _WebSocket,
-        stderr_ws: Optional[_WebSocket],
-        command: List[str],
-        encoding: Optional[str],
+        stderr_ws: _WebSocket | None,
+        command: list[str],
+        encoding: str | None,
         change_id: ChangeID,
-        cancel_stdin: Optional[Callable[[], None]],
-        cancel_reader: Optional[int],
-        threads: List[threading.Thread],
+        cancel_stdin: Callable[[], None] | None,
+        cancel_reader: int | None,
+        threads: list[threading.Thread],
     ):
         self.stdin = stdin
         self.stdout = stdout
@@ -1793,7 +1792,7 @@ class ExecProcess(Generic[AnyStr]):
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
-    def wait_output(self) -> Tuple[AnyStr, Optional[AnyStr]]:
+    def wait_output(self) -> tuple[AnyStr, AnyStr | None]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
@@ -1835,7 +1834,7 @@ class ExecProcess(Generic[AnyStr]):
 
             return (out_value, err_value)
 
-    def send_signal(self, sig: Union[int, str]):
+    def send_signal(self, sig: int | str):
         """Send the given signal to the running process.
 
         Args:
@@ -1869,7 +1868,7 @@ def _reader_to_websocket(
     reader: _WebsocketReader,
     ws: _WebSocket,
     encoding: str,
-    cancel_reader: Optional[int] = None,
+    cancel_reader: int | None = None,
     bufsize: int = 16 * 1024,
 ):
     """Read reader through to EOF and send each chunk read to the websocket."""
@@ -1890,7 +1889,7 @@ def _reader_to_websocket(
     ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
 
 
-def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: Optional[str]):
+def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
         chunk = ws.recv()
@@ -1925,7 +1924,7 @@ class _WebsocketWriter(io.BufferedIOBase):
         """Denote this file-like object as writable."""
         return True
 
-    def write(self, chunk: Union[str, bytes]) -> int:
+    def write(self, chunk: str | bytes) -> int:
         """Write chunk to the websocket."""
         if not isinstance(chunk, bytes):
             raise TypeError(f'value to write must be bytes, not {type(chunk).__name__}')
@@ -1949,7 +1948,7 @@ class _WebsocketReader(io.BufferedIOBase):
         """Denote this file-like object as readable."""
         return True
 
-    def read(self, n: int = -1) -> Union[str, bytes]:
+    def read(self, n: int = -1) -> str | bytes:
         """Read up to n bytes from the websocket (or one message if n<0)."""
         if self.eof:
             # Calling read() multiple times after EOF should still return EOF
@@ -1978,11 +1977,11 @@ class _WebsocketReader(io.BufferedIOBase):
 
         if n < 0:
             n = len(self.remaining)
-        result: Union[str, bytes] = self.remaining[:n]
+        result: str | bytes = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
 
-    def read1(self, n: int = -1) -> Union[str, bytes]:
+    def read1(self, n: int = -1) -> str | bytes:
         """An alias for read."""
         return self.read(n)
 
@@ -2050,8 +2049,8 @@ class Identity:
 
     # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
     access: IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']
-    local: Optional[LocalIdentity] = None
-    basic: Optional[BasicIdentity] = None
+    local: LocalIdentity | None = None
+    basic: BasicIdentity | None = None
 
     def __post_init__(self) -> None:
         """Validate that at least one of local or basic is provided."""
@@ -2109,7 +2108,7 @@ class Client:
     def __init__(
         self,
         socket_path: str,
-        opener: Optional[urllib.request.OpenerDirector] = None,
+        opener: urllib.request.OpenerDirector | None = None,
         base_url: str = 'http://localhost',
         timeout: float = 5.0,
     ):
@@ -2137,9 +2136,9 @@ class Client:
         self,
         method: str,
         path: str,
-        query: Optional[Dict[str, Any]] = None,
-        body: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        query: dict[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Make a JSON request to the Pebble server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -2155,7 +2154,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp: Dict[str, Any] = json.loads(response.read())
+        raw_resp: dict[str, Any] = json.loads(response.read())
         return raw_resp
 
     @staticmethod
@@ -2178,9 +2177,9 @@ class Client:
         self,
         method: str,
         path: str,
-        query: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, Any]] = None,
-        data: Optional[Union[bytes, Generator[bytes, Any, Any]]] = None,
+        query: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        data: bytes | Generator[bytes, Any, Any] | None = None,
     ) -> http.client.HTTPResponse:
         """Make a request to the Pebble server; return the raw HTTPResponse object."""
         url = self.base_url + path
@@ -2197,11 +2196,11 @@ class Client:
             code = e.code
             status = e.reason
             try:
-                body: Dict[str, Any] = json.loads(e.read())
+                body: dict[str, Any] = json.loads(e.read())
                 message: str = body['result']['message']
             except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
-                body: Dict[str, Any] = {}
+                body: dict[str, Any] = {}
                 message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
@@ -2220,7 +2219,7 @@ class Client:
             resp = self._request('GET', '/v1/system-info')
             return SystemInfo.from_dict(resp['result'])
 
-    def get_warnings(self, select: WarningState = WarningState.PENDING) -> List[Warning]:
+    def get_warnings(self, select: WarningState = WarningState.PENDING) -> list[Warning]:
         """Get list of warnings in given state (pending or all)."""
         with tracer.start_as_current_span('pebble get_warnings') as span:
             query = {'select': select.value}
@@ -2238,11 +2237,11 @@ class Client:
     def get_changes(
         self,
         select: ChangeState = ChangeState.IN_PROGRESS,
-        service: Optional[str] = None,
-    ) -> List[Change]:
+        service: str | None = None,
+    ) -> list[Change]:
         """Get list of changes in given state, filter by service name if given."""
         with tracer.start_as_current_span('pebble get_changes') as span:
-            query: Dict[str, Union[str, int]] = {'select': select.value}
+            query: dict[str, str | int] = {'select': select.value}
             if service is not None:
                 query['for'] = service
             span.set_attributes(query)
@@ -2378,7 +2377,7 @@ class Client:
         self,
         action: str,
         services: Iterable[str],
-        timeout: Optional[float],
+        timeout: float | None,
         delay: float,
     ) -> ChangeID:
         with tracer.start_as_current_span(f'pebble {action}_services') as span:
@@ -2405,7 +2404,7 @@ class Client:
     def wait_change(
         self,
         change_id: ChangeID,
-        timeout: Optional[float] = 30.0,
+        timeout: float | None = 30.0,
         delay: float = 0.1,
     ) -> Change:
         """Wait for the given change to be ready.
@@ -2433,7 +2432,7 @@ class Client:
                 # Pebble server doesn't support wait endpoint, fall back to polling
                 return self._wait_change_using_polling(change_id, timeout, delay)
 
-    def _wait_change_using_wait(self, change_id: ChangeID, timeout: Optional[float]):
+    def _wait_change_using_wait(self, change_id: ChangeID, timeout: float | None):
         """Wait for a change to be ready using the wait-change API."""
         deadline = time.time() + timeout if timeout is not None else 0
 
@@ -2458,9 +2457,9 @@ class Client:
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
-    def _wait_change(self, change_id: ChangeID, timeout: Optional[float] = None) -> Change:
+    def _wait_change(self, change_id: ChangeID, timeout: float | None = None) -> Change:
         """Call the wait-change API endpoint directly."""
-        query: Dict[str, Any] = {}
+        query: dict[str, Any] = {}
         if timeout is not None:
             query['timeout'] = _format_timeout(timeout)
 
@@ -2479,9 +2478,7 @@ class Client:
 
         return Change.from_dict(resp['result'])
 
-    def _wait_change_using_polling(
-        self, change_id: ChangeID, timeout: Optional[float], delay: float
-    ):
+    def _wait_change_using_polling(self, change_id: ChangeID, timeout: float | None, delay: float):
         """Wait for a change to be ready by polling the get-change API."""
         deadline = time.time() + timeout if timeout is not None else 0
 
@@ -2494,7 +2491,7 @@ class Client:
 
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
-    def _checks_action(self, action: str, checks: Iterable[str]) -> List[str]:
+    def _checks_action(self, action: str, checks: Iterable[str]) -> list[str]:
         with tracer.start_as_current_span(f'pebble {action}_checks') as span:
             if isinstance(checks, str) or not hasattr(checks, '__iter__'):
                 raise TypeError(
@@ -2511,7 +2508,7 @@ class Client:
             resp = self._request('POST', '/v1/checks', body=body)
             return resp['result']['changed']
 
-    def add_layer(self, label: str, layer: Union[str, LayerDict, Layer], *, combine: bool = False):
+    def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is False (the default), append the new layer as the top
@@ -2551,7 +2548,7 @@ class Client:
             resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
             return Plan(resp['result'])
 
-    def get_services(self, names: Optional[Iterable[str]] = None) -> List[ServiceInfo]:
+    def get_services(self, names: Iterable[str] | None = None) -> list[ServiceInfo]:
         """Get the service status for the configured services.
 
         If names is specified, only fetch the service status for the services
@@ -2572,7 +2569,7 @@ class Client:
     @typing.overload
     def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO: ...
 
-    def pull(self, path: str, *, encoding: Optional[str] = 'utf-8') -> Union[BinaryIO, TextIO]:
+    def pull(self, path: str, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
         """Read a file's content from the remote system.
 
         Args:
@@ -2648,11 +2645,11 @@ class Client:
         *,
         encoding: str = 'utf-8',
         make_dirs: bool = False,
-        permissions: Optional[int] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
     ):
         """Write content to a given file path on the remote system.
 
@@ -2702,11 +2699,11 @@ class Client:
 
     @staticmethod
     def _make_auth_dict(
-        permissions: Optional[int],
-        user_id: Optional[int],
-        user: Optional[str],
-        group_id: Optional[int],
-        group: Optional[str],
+        permissions: int | None,
+        user_id: int | None,
+        user: str | None,
+        group_id: int | None,
+        group: str | None,
     ) -> _AuthDict:
         d: _AuthDict = {}
         if permissions is not None:
@@ -2722,7 +2719,7 @@ class Client:
         return d
 
     def _encode_multipart(
-        self, metadata: Dict[str, Any], path: str, source: _IOSource, encoding: str
+        self, metadata: dict[str, Any], path: str, source: _IOSource, encoding: str
     ):
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
@@ -2756,7 +2753,7 @@ class Client:
                 b'\r\n',
             ])
 
-            content: Union[str, bytes] = source_io.read(self._chunk_size)
+            content: str | bytes = source_io.read(self._chunk_size)
             while content:
                 if isinstance(content, str):
                     content = content.encode(encoding)
@@ -2773,8 +2770,8 @@ class Client:
         return generator(), content_type
 
     def list_files(
-        self, path: str, *, pattern: Optional[str] = None, itself: bool = False
-    ) -> List[FileInfo]:
+        self, path: str, *, pattern: str | None = None, itself: bool = False
+    ) -> list[FileInfo]:
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -2801,7 +2798,7 @@ class Client:
             span.set_attributes(query)
             query['action'] = 'list'
             resp = self._request('GET', '/v1/files', query)
-            result: List[_FileInfoDict] = resp['result'] or []  # in case it's null instead of []
+            result: list[_FileInfoDict] = resp['result'] or []  # in case it's null instead of []
             return [FileInfo.from_dict(d) for d in result]
 
     def make_dir(
@@ -2809,11 +2806,11 @@ class Client:
         path: str,
         *,
         make_parents: bool = False,
-        permissions: Optional[int] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
     ):
         """Create a directory on the remote system with the given attributes.
 
@@ -2861,7 +2858,7 @@ class Client:
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         with tracer.start_as_current_span('pebble remove_path') as span:
-            info: Dict[str, Any] = {'path': path}
+            info: dict[str, Any] = {'path': path}
             if recursive:
                 info['recursive'] = True
             span.set_attributes(info)
@@ -2876,19 +2873,19 @@ class Client:
     @typing.overload
     def exec(
         self,
-        command: List[str],
+        command: list[str],
         *,
-        service_context: Optional[str] = None,
-        environment: Optional[Dict[str, str]] = None,
-        working_dir: Optional[str] = None,
-        timeout: Optional[float] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
-        stdin: Optional[Union[str, TextIO]] = None,
-        stdout: Optional[TextIO] = None,
-        stderr: Optional[TextIO] = None,
+        service_context: str | None = None,
+        environment: dict[str, str] | None = None,
+        working_dir: str | None = None,
+        timeout: float | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
+        stdin: str | TextIO | None = None,
+        stdout: TextIO | None = None,
+        stderr: TextIO | None = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False,
     ) -> ExecProcess[str]: ...
@@ -2897,39 +2894,39 @@ class Client:
     @typing.overload
     def exec(
         self,
-        command: List[str],
+        command: list[str],
         *,
-        service_context: Optional[str] = None,
-        environment: Optional[Dict[str, str]] = None,
-        working_dir: Optional[str] = None,
-        timeout: Optional[float] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
-        stdin: Optional[Union[bytes, BinaryIO]] = None,
-        stdout: Optional[BinaryIO] = None,
-        stderr: Optional[BinaryIO] = None,
+        service_context: str | None = None,
+        environment: dict[str, str] | None = None,
+        working_dir: str | None = None,
+        timeout: float | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
+        stdin: bytes | BinaryIO | None = None,
+        stdout: BinaryIO | None = None,
+        stderr: BinaryIO | None = None,
         encoding: None = None,
         combine_stderr: bool = False,
     ) -> ExecProcess[bytes]: ...
 
     def exec(
         self,
-        command: List[str],
+        command: list[str],
         *,
-        service_context: Optional[str] = None,
-        environment: Optional[Dict[str, str]] = None,
-        working_dir: Optional[str] = None,
-        timeout: Optional[float] = None,
-        user_id: Optional[int] = None,
-        user: Optional[str] = None,
-        group_id: Optional[int] = None,
-        group: Optional[str] = None,
-        stdin: Optional[Union[str, bytes, TextIO, BinaryIO]] = None,
-        stdout: Optional[Union[TextIO, BinaryIO]] = None,
-        stderr: Optional[Union[TextIO, BinaryIO]] = None,
-        encoding: Optional[str] = 'utf-8',
+        service_context: str | None = None,
+        environment: dict[str, str] | None = None,
+        working_dir: str | None = None,
+        timeout: float | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
+        stdin: str | bytes | TextIO | BinaryIO | None = None,
+        stdout: TextIO | BinaryIO | None = None,
+        stderr: TextIO | BinaryIO | None = None,
+        encoding: str | None = 'utf-8',
         combine_stderr: bool = False,
     ) -> ExecProcess[Any]:
         r"""Execute the given command on the remote system.
@@ -3094,7 +3091,7 @@ class Client:
             change_id = resp['change']
             task_id = resp['result']['task-id']
 
-            stderr_ws: Optional[_WebSocket] = None
+            stderr_ws: _WebSocket | None = None
             try:
                 control_ws = self._connect_websocket(task_id, 'control')
                 stdio_ws = self._connect_websocket(task_id, 'stdio')
@@ -3108,9 +3105,9 @@ class Client:
                     raise ChangeError(change.err, change) from e
                 raise ConnectionError(f'unexpected error connecting to websockets: {e}') from e
 
-            cancel_stdin: Optional[Callable[[], None]] = None
-            cancel_reader: Optional[int] = None
-            threads: List[threading.Thread] = []
+            cancel_stdin: Callable[[], None] | None = None
+            cancel_reader: int | None = None
+            threads: list[threading.Thread] = []
 
             if stdin is not None:
                 if _has_fileno(stdin):
@@ -3199,7 +3196,7 @@ class Client:
         url = f'{base_url}/v1/tasks/{task_id}/websocket/{websocket_id}'
         return url
 
-    def send_signal(self, sig: Union[int, str], services: Iterable[str]):
+    def send_signal(self, sig: int | str, services: Iterable[str]):
         """Send the given signal to the list of services named.
 
         Args:
@@ -3232,8 +3229,8 @@ class Client:
             self._request('POST', '/v1/signals', body=body)
 
     def get_checks(
-        self, level: Optional[CheckLevel] = None, names: Optional[Iterable[str]] = None
-    ) -> List[CheckInfo]:
+        self, level: CheckLevel | None = None, names: Iterable[str] | None = None
+    ) -> list[CheckInfo]:
         """Get the check status for the configured checks.
 
         Args:
@@ -3246,7 +3243,7 @@ class Client:
             List of :class:`CheckInfo` objects.
         """
         with tracer.start_as_current_span('pebble get_checks') as span:
-            query: Dict[str, Any] = {}
+            query: dict[str, Any] = {}
             if level is not None:
                 query['level'] = level.value
             if names:
@@ -3255,7 +3252,7 @@ class Client:
             resp = self._request('GET', '/v1/checks', query)
             return [CheckInfo.from_dict(info) for info in resp['result']]
 
-    def start_checks(self, checks: Iterable[str]) -> List[str]:
+    def start_checks(self, checks: Iterable[str]) -> list[str]:
         """Start checks by name.
 
         .. jujuadded:: 3.6.4
@@ -3269,7 +3266,7 @@ class Client:
         """
         return self._checks_action('start', checks)
 
-    def stop_checks(self, checks: Iterable[str]) -> List[str]:
+    def stop_checks(self, checks: Iterable[str]) -> list[str]:
         """Stop checks by name.
 
         .. jujuadded:: 3.6.4
@@ -3288,8 +3285,8 @@ class Client:
         type: NoticeType,
         key: str,
         *,
-        data: Optional[Dict[str, str]] = None,
-        repeat_after: Optional[datetime.timedelta] = None,
+        data: dict[str, str] | None = None,
+        repeat_after: datetime.timedelta | None = None,
     ) -> str:
         """Record an occurrence of a notice with the specified options.
 
@@ -3305,7 +3302,7 @@ class Client:
         """
         with tracer.start_as_current_span('pebble notify') as span:
             span.set_attributes({'type': type.value, 'key': key})
-            body: Dict[str, Any] = {
+            body: dict[str, Any] = {
                 'action': 'add',
                 'type': type.value,
                 'key': key,
@@ -3332,11 +3329,11 @@ class Client:
     def get_notices(
         self,
         *,
-        users: Optional[NoticesUsers] = None,
-        user_id: Optional[int] = None,
-        types: Optional[Iterable[Union[NoticeType, str]]] = None,
-        keys: Optional[Iterable[str]] = None,
-    ) -> List[Notice]:
+        users: NoticesUsers | None = None,
+        user_id: int | None = None,
+        types: Iterable[NoticeType | str] | None = None,
+        keys: Iterable[str] | None = None,
+    ) -> list[Notice]:
         """Query for notices that match all of the provided filters.
 
         Pebble returns notices that match all of the filters, for example, if
@@ -3361,7 +3358,7 @@ class Client:
             keys: Filter for notices with any of the specified keys.
         """
         with tracer.start_as_current_span('pebble get_notices') as span:
-            query: Dict[str, Union[str, List[str]]] = {}
+            query: dict[str, str | list[str]] = {}
             if users is not None:
                 query['users'] = users.value
             if user_id is not None:
@@ -3376,7 +3373,7 @@ class Client:
             resp = self._request('GET', '/v1/notices', query)
             return [Notice.from_dict(info) for info in resp['result']]
 
-    def get_identities(self) -> Dict[str, Identity]:
+    def get_identities(self) -> dict[str, Identity]:
         """Get all identities in Pebble.
 
         .. jujuadded:: 3.6.4
@@ -3389,9 +3386,7 @@ class Client:
             result = resp['result']
             return {name: Identity.from_dict(d) for name, d in result.items()}
 
-    def replace_identities(
-        self, identities: Mapping[str, Union[IdentityDict, Identity, None]]
-    ) -> None:
+    def replace_identities(self, identities: Mapping[str, IdentityDict | Identity | None]) -> None:
         """Replace the named identities in Pebble with the given ones.
 
         Add those identities if they don't exist, or remove them if the dict value is None.
@@ -3427,11 +3422,11 @@ class Client:
 class _FilesParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
-    def __init__(self, boundary: Union[bytes, str]):
-        self._response: Optional[_FilesResponse] = None  # externally managed
-        self._part_type: Optional[Literal['response', 'files']] = None  # externally managed
-        self._headers: Optional[email.message.Message] = None  # externally managed
-        self._files: Dict[str, _Tempfile] = {}
+    def __init__(self, boundary: bytes | str):
+        self._response: _FilesResponse | None = None  # externally managed
+        self._part_type: Literal['response', 'files'] | None = None  # externally managed
+        self._headers: email.message.Message | None = None  # externally managed
+        self._files: dict[str, _Tempfile] = {}
 
         # Prepare the MIME multipart boundary line patterns.
         if isinstance(boundary, str):
@@ -3510,7 +3505,7 @@ class _FilesParser:
     def _get_open_tempfile(self):
         return self._files[self.current_filename]
 
-    def get_response(self) -> Optional[_FilesResponse]:
+    def get_response(self) -> _FilesResponse | None:
         """Return the deserialized JSON object from the multipart "response" field."""
         return self._response
 
@@ -3518,7 +3513,7 @@ class _FilesParser:
         """Return a list of filenames from the "files" parts of the response."""
         return list(self._files.keys())
 
-    def get_file(self, path: str, encoding: Optional[str]) -> _TextOrBinaryIO:
+    def get_file(self, path: str, encoding: str | None) -> _TextOrBinaryIO:
         """Return an open file object containing the data."""
         mode = 'r' if encoding else 'rb'
         # We're using text-based file I/O purely for file encoding purposes, not for
@@ -3630,7 +3625,7 @@ class _MultipartParser:
                     return  # waiting for more data
 
 
-def _next_part_boundary(buf: bytes, marker: bytes, start: int = 0) -> Tuple[int, int, bool]:
+def _next_part_boundary(buf: bytes, marker: bytes, start: int = 0) -> tuple[int, int, bool]:
     """Returns the index of the next boundary marker in buf beginning at start.
 
     Returns:
