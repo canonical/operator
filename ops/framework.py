@@ -487,7 +487,7 @@ class ObjectEvents(Object):
         """
         event_descriptor = getattr(cls, event_kind)
         if (framework := getattr(event_descriptor, 'framework', None)) is not None:
-            event_descriptor.framework._unregister_type(
+            framework._unregister_type(
                 event_descriptor.event_type, event_descriptor.emitter, event_descriptor.event_kind
             )
         try:

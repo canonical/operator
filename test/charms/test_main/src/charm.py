@@ -136,10 +136,10 @@ class Charm(ops.CharmBase):
         if hasattr(self, 'charm_attribute'):
             raise RuntimeError('charm instance was reused')
 
-    def _on_any_event(self, _: ops.EventBase):
+    def _on_any_event(self, event: ops.EventBase):
         # Note that doing this is bad behaviour: we're doing it here to make
         # sure that the value is *not* retained.
-        self.charm_attribute = 'config-changed'
+        self.charm_attribute = str(event)
 
     def _on_install(self, event: ops.InstallEvent):
         self._stored.on_install.append(type(event).__name__)
