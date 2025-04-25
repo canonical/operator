@@ -335,13 +335,6 @@ class Model:
         return self._backend.credential_get()
 
 
-if typing.TYPE_CHECKING:
-    # (entity type, name): instance.
-    _WeakCacheType: TypeAlias = weakref.WeakValueDictionary[
-        'tuple[UnitOrApplicationType, str]', 'Unit | Application | None'
-    ]
-
-
 class _ModelCache:
     def __init__(self, meta: _charm.CharmMeta, backend: _ModelBackend):
         self._meta = meta
@@ -349,7 +342,10 @@ class _ModelCache:
         self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
             collections.defaultdict(dict)
         )
-        self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
+        # (entity type, name): instance.
+        self._weakrefs: weakref.WeakValueDictionary[
+            tuple[UnitOrApplicationType, str], Unit | Application | None
+        ] = weakref.WeakValueDictionary()
 
     @typing.overload
     def get(self, entity_type: type[Unit], name: str) -> Unit: ...
