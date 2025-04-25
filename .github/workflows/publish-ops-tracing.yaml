@@ -1,0 +1,35 @@
+name: Publish (ops-tracing)
+on:
+  push:
+    tags:
+      - '2.*'
+
+jobs:
+  framework-tests:
+    uses: ./.github/workflows/framework-tests.yaml
+  observability-charm-tests:
+    uses: ./.github/workflows/observability-charm-tests.yaml
+  hello-charm-tests:
+    uses: ./.github/workflows/hello-charm-tests.yaml
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      attestations: write
+    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          cd tracing
+          uv build --sdist --wheel
+          rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
+      # This step is expected to fail until the trusted publisher configuration
+      # is updated in the PYPI settings.
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          skip-existing: true
+          verbose: true
+

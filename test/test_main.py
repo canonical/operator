@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import dataclasses
 import importlib.util
 import io
 import logging
@@ -56,44 +57,25 @@ class SymlinkTargetError(Exception):
     pass
 
 
+@dataclasses.dataclass(frozen=True)
 class EventSpec:
-    def __init__(
-        self,
-        event_type: typing.Type[ops.EventBase],
-        event_name: str,
-        env_var: typing.Optional[str] = None,
-        relation_id: typing.Optional[int] = None,
-        remote_app: typing.Optional[str] = None,
-        remote_unit: typing.Optional[str] = None,
-        model_name: typing.Optional[str] = None,
-        set_in_env: typing.Optional[typing.Dict[str, str]] = None,
-        workload_name: typing.Optional[str] = None,
-        notice_id: typing.Optional[str] = None,
-        notice_type: typing.Optional[str] = None,
-        notice_key: typing.Optional[str] = None,
-        departing_unit_name: typing.Optional[str] = None,
-        secret_id: typing.Optional[str] = None,
-        secret_label: typing.Optional[str] = None,
-        secret_revision: typing.Optional[str] = None,
-        check_name: typing.Optional[str] = None,
-    ):
-        self.event_type = event_type
-        self.event_name = event_name
-        self.env_var = env_var
-        self.relation_id = relation_id
-        self.remote_app = remote_app
-        self.remote_unit = remote_unit
-        self.departing_unit_name = departing_unit_name
-        self.model_name = model_name
-        self.set_in_env = set_in_env
-        self.workload_name = workload_name
-        self.notice_id = notice_id
-        self.notice_type = notice_type
-        self.notice_key = notice_key
-        self.secret_id = secret_id
-        self.secret_label = secret_label
-        self.secret_revision = secret_revision
-        self.check_name = check_name
+    event_type: typing.Type[ops.EventBase]
+    event_name: str
+    env_var: typing.Optional[str] = None
+    relation_id: typing.Optional[int] = None
+    remote_app: typing.Optional[str] = None
+    remote_unit: typing.Optional[str] = None
+    model_name: typing.Optional[str] = None
+    set_in_env: typing.Optional[typing.Dict[str, str]] = None
+    workload_name: typing.Optional[str] = None
+    notice_id: typing.Optional[str] = None
+    notice_type: typing.Optional[str] = None
+    notice_key: typing.Optional[str] = None
+    departing_unit_name: typing.Optional[str] = None
+    secret_id: typing.Optional[str] = None
+    secret_label: typing.Optional[str] = None
+    secret_revision: typing.Optional[str] = None
+    check_name: typing.Optional[str] = None
 
 
 @patch('ops._main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
@@ -135,7 +117,7 @@ class TestCharmInit:
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
-            'JUJU_VERSION': '2.7.0',
+            'JUJU_VERSION': '2.8.0',
         }
         if extra_environ is not None:
             fake_environ.update(extra_environ)
@@ -183,7 +165,7 @@ class TestCharmInit:
             juju_backend_available.return_value = False
             with pytest.raises(
                 RuntimeError,
-                match='charm set use_juju_for_storage=True, but Juju .* does not support it',
+                match=r'charm set use_juju_for_storage=True, but Juju .* does not support it',
             ):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
@@ -200,7 +182,7 @@ class TestCharmInit:
 @patch('ops._main._Manager._setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
 @patch('ops.charm._evaluate_status', new=lambda *a, **kw: None)  # type: ignore
 class TestDispatch:
-    def _check(self, *, with_dispatch: bool = False, dispatch_path: str = ''):
+    def _check(self, *, dispatch_path: str = ''):
         """Helper for below tests."""
 
         class MyCharm(ops.CharmBase):
@@ -210,12 +192,9 @@ class TestDispatch:
         fake_environ = {
             'JUJU_UNIT_NAME': 'test_main/0',
             'JUJU_MODEL_NAME': 'mymodel',
+            'JUJU_DISPATCH_PATH': dispatch_path,
+            'JUJU_VERSION': '2.8.0',
         }
-        if dispatch_path:
-            fake_environ['JUJU_DISPATCH_PATH'] = dispatch_path
-            fake_environ['JUJU_VERSION'] = '2.8.0'
-        else:
-            fake_environ['JUJU_VERSION'] = '2.7.0'
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_environ.update({'JUJU_CHARM_DIR': tmpdir})
@@ -223,10 +202,9 @@ class TestDispatch:
             fake_metadata = tmpdir / 'metadata.yaml'
             with fake_metadata.open('wb') as fh:
                 fh.write(b'name: test')
-            if with_dispatch:
-                dispatch = tmpdir / 'dispatch'
-                dispatch.write_text('', encoding='utf8')
-                dispatch.chmod(0o755)
+            dispatch = tmpdir / 'dispatch'
+            dispatch.write_text('', encoding='utf8')
+            dispatch.chmod(0o755)
 
             with patch.dict(os.environ, fake_environ):
                 with patch('ops._main._Manager._emit_charm_event') as mock_charm_event:
@@ -235,20 +213,10 @@ class TestDispatch:
         assert mock_charm_event.call_count == 1
         return mock_charm_event.call_args[0][0]
 
-    def test_most_legacy(self):
-        """Without dispatch, sys.argv[0] is used."""
-        event = self._check()
-        assert event == 'config_changed'
-
     def test_with_dispatch(self):
         """With dispatch, dispatch is used."""
-        event = self._check(with_dispatch=True, dispatch_path='hooks/potatos')
+        event = self._check(dispatch_path='hooks/potatos')
         assert event == 'potatos'
-
-    def test_with_dispatch_path_but_no_dispatch(self):
-        """Dispatch path overwrites sys.argv[0] even if no actual dispatch."""
-        event = self._check(with_dispatch=False, dispatch_path='hooks/foo')
-        assert event == 'foo'
 
 
 _event_test = typing.List[typing.Tuple[EventSpec, typing.Dict[str, typing.Union[str, int, None]]]]
@@ -261,12 +229,11 @@ def fake_script(request: pytest.FixtureRequest):
 
 class _TestMain(abc.ABC):
     @abc.abstractmethod
-    def _setup_entry_point(self, directory: Path, entry_point: str):
+    def _setup_entry_point(self):
         """Set up the given entry point in the given directory.
 
-        If not using dispatch, that would be a symlink <dir>/<entry_point>
-        pointing at src/charm.py; if using dispatch that would be the dispatch
-        symlink. It could also not be a symlink...
+        With dispatch, that would be a symlink pointing at src/charm.py
+        or a script that executes src/charm.py.
         """
         return NotImplemented
 
@@ -278,16 +245,6 @@ class _TestMain(abc.ABC):
         env: typing.Dict[str, str],
     ):
         """Set up the environment and call (i.e. run) the given event."""
-        return NotImplemented
-
-    @abc.abstractmethod
-    @pytest.mark.usefixtures('setup_charm')
-    def test_setup_event_links(self):
-        """Test auto-creation of symlinks caused by initial events.
-
-        Depending on the combination of dispatch and non-dispatch, this should
-        be checking for the creation or the _lack_ of creation, as appropriate.
-        """
         return NotImplemented
 
     @pytest.fixture
@@ -334,22 +291,8 @@ class _TestMain(abc.ABC):
         assert charm_spec.loader is not None
         charm_spec.loader.exec_module(self.charm_module)
 
-        self._prepare_initial_hooks()
-
-    def _prepare_initial_hooks(self):
-        initial_hooks = ('install', 'start', 'upgrade-charm', 'disks-storage-attached')
-        self.hooks_dir.mkdir()
-        for hook in initial_hooks:
-            self._setup_entry_point(self.hooks_dir, hook)
-
-    def _prepare_actions(self):
-        # TODO: jam 2020-06-16 this same work could be done just triggering the 'install' event
-        #  of the charm, it might be cleaner to not set up entry points directly here.
-        actions_dir_name = 'actions'
-        actions_dir = self.JUJU_CHARM_DIR / actions_dir_name
-        actions_dir.mkdir()
-        for action_name in ('start', 'foo-bar', 'get-model-name', 'get-status', 'keyerror'):
-            self._setup_entry_point(actions_dir, action_name)
+        self.hooks_dir.mkdir()  # For testing cases when a charm has a legacy hook.
+        self._setup_entry_point()
 
     def _read_and_clear_state(
         self, event_name: str, env: typing.Dict[str, str]
@@ -518,8 +461,6 @@ class _TestMain(abc.ABC):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_multiple_events_handled(self, fake_script: FakeScript):
-        self._prepare_actions()
-
         fake_script.write('action-get', "echo '{}'")
 
         # Sample events with a different amount of dashes used
@@ -930,22 +871,20 @@ class _TestMain(abc.ABC):
         calls = [' '.join(i) for i in fake_script.calls()]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
-        assert re.search('Using local storage: not a Kubernetes podspec charm', calls.pop(0))
-        assert re.search('Initializing SQLite local storage: ', calls.pop(0))
+        assert 'Using local storage: not a Kubernetes podspec charm' in calls.pop(0)
+        assert 'Initializing SQLite local storage: ' in calls.pop(0)
         assert re.search(
-            '(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
-            'Traceback .most recent call last.:\n'
-            '  .*'
-            "    raise RuntimeError.'failing as requested'.\n"
-            'RuntimeError: failing as requested',
+            r'(?ms)juju-log --log-level ERROR -- Uncaught exception while in charm code:\n'
+            r'Traceback .most recent call last.:\n'
+            r'  .*'
+            r"    raise RuntimeError.'failing as requested'.\n"
+            r'RuntimeError: failing as requested',
             calls[0],
         )
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
 
     @pytest.mark.usefixtures('setup_charm')
     def test_sets_model_name(self, fake_script: FakeScript):
-        self._prepare_actions()
-
         fake_script.write('action-get', "echo '{}'")
         state = self._simulate_event(
             fake_script,
@@ -962,8 +901,6 @@ class _TestMain(abc.ABC):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_has_valid_status(self, fake_script: FakeScript):
-        self._prepare_actions()
-
         fake_script.write('action-get', "echo '{}'")
         fake_script.write('status-get', """echo '{"status": "unknown", "message": ""}'""")
         state = self._simulate_event(
@@ -994,190 +931,6 @@ class _TestMain(abc.ABC):
         assert state.status_name == 'blocked'
         assert state.status_message == 'help meeee'
 
-
-class TestMainWithNoDispatch(_TestMain):
-    has_dispatch = False
-    hooks_are_symlinks = True
-
-    def _setup_entry_point(self, directory: Path, entry_point: str):
-        path = directory / entry_point
-        path.symlink_to(self.charm_exec_path)
-
-    def _call_event(
-        self,
-        fake_script: FakeScript,
-        rel_path: Path,
-        env: typing.Dict[str, str],
-    ):
-        env['JUJU_VERSION'] = '2.7.0'
-        event_file = self.JUJU_CHARM_DIR / rel_path
-        # Note that sys.executable is used to make sure we are using the same
-        # interpreter for the child process to support virtual environments.
-        fake_script.write(
-            'storage-get',
-            """
-            if [ "$1" = "-s" ]; then
-                id=${2#*/}
-                key=${2%/*}
-                echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
-            elif [ "$1" = '--help' ]; then
-                printf '%s\\n' \\
-                'Usage: storage-get [options] [<key>]' \\
-                '   ' \\
-                'Summary:' \\
-                'print information for storage instance with specified id' \\
-                '   ' \\
-                'Options:' \\
-                '--format  (= smart)' \\
-                '    Specify output format (json|smart|yaml)' \\
-                '-o, --output (= "")' \\
-                '    Specify an output file' \\
-                '-s  (= test-stor/0)' \\
-                '    specify a storage instance by id' \\
-                '   ' \\
-                'Details:' \\
-                'When no <key> is supplied, all keys values are printed.'
-            else
-                # Return the same path for all disks since `storage-get`
-                # on attach and detach takes no parameters and is not
-                # deterministically faked with fake_script
-                exit 1
-            fi
-            """,
-        )
-
-        fake_script.write(
-            'storage-list',
-            """
-            echo '["disks/0"]'
-            """,
-        )
-        subprocess.run(
-            [sys.executable, str(event_file)], check=True, env=env, cwd=str(self.JUJU_CHARM_DIR)
-        )
-
-    @pytest.mark.usefixtures('setup_charm')
-    def test_setup_event_links(
-        self,
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript,
-    ):
-        """Test auto-creation of symlinks caused by initial events."""
-        all_event_hooks = [
-            f"hooks/{name.replace('_', '-')}"
-            for name, event_source in self.charm_module.Charm.on.events().items()
-            if issubclass(event_source.event_type, (ops.CommitEvent, ops.PreCommitEvent))
-        ]
-
-        initial_events = {
-            EventSpec(ops.InstallEvent, 'install'),
-            EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
-            EventSpec(ops.StartEvent, 'start'),
-            EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
-        }
-        initial_hooks = {f'hooks/{ev.event_name}' for ev in initial_events}
-
-        def _assess_event_links(event_spec: EventSpec):
-            assert self.hooks_dir / event_spec.event_name in self.hooks_dir.iterdir()
-            for event_hook in all_event_hooks:
-                hook_path = self.JUJU_CHARM_DIR / event_hook
-                assert hook_path.exists(), f'Missing hook: {event_hook}'
-                if self.hooks_are_symlinks:
-                    assert hook_path.is_symlink()
-                    assert os.readlink(str(hook_path)) == self.charm_exec_path
-                elif event_hook in initial_hooks:
-                    assert not hook_path.is_symlink()
-                else:
-                    # hooks are not symlinks, and this hook is not one of the initial ones
-                    # check that it's a symlink to the initial ones
-                    assert hook_path.is_symlink()
-                    assert os.readlink(str(hook_path)) == event_spec.event_name
-
-        for initial_event in initial_events:
-            self._setup_charm_dir(request)
-
-            self._simulate_event(fake_script, initial_event)
-            _assess_event_links(initial_event)
-            # Make sure it is idempotent.
-            self._simulate_event(fake_script, initial_event)
-            _assess_event_links(initial_event)
-
-    @pytest.mark.usefixtures('setup_charm')
-    def test_setup_action_links(self, fake_script: FakeScript):
-        self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
-        # foo-bar is one of the actions defined in actions.yaml
-        action_hook = self.JUJU_CHARM_DIR / 'actions' / 'foo-bar'
-        assert action_hook.exists()
-
-
-class TestMainWithNoDispatchButJujuIsDispatchAware(TestMainWithNoDispatch):
-    def _call_event(
-        self,
-        fake_script: FakeScript,
-        rel_path: Path,
-        env: typing.Dict[str, str],
-    ):
-        env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        env['JUJU_VERSION'] = '2.8.0'
-        super()._call_event(fake_script, rel_path, env)
-
-
-class TestMainWithNoDispatchButDispatchPathIsSet(TestMainWithNoDispatch):
-    def _call_event(
-        self,
-        fake_script: FakeScript,
-        rel_path: Path,
-        env: typing.Dict[str, str],
-    ):
-        env['JUJU_DISPATCH_PATH'] = str(rel_path)
-        super()._call_event(fake_script, rel_path, env)
-
-
-class TestMainWithNoDispatchButScriptsAreCopies(TestMainWithNoDispatch):
-    hooks_are_symlinks = False
-
-    def _setup_entry_point(self, directory: Path, entry_point: str):
-        charm_path = str(self.JUJU_CHARM_DIR / 'src/charm.py')
-        path = directory / entry_point
-        shutil.copy(charm_path, str(path))
-
-
-class _TestMainWithDispatch(_TestMain):
-    has_dispatch = True
-
-    @pytest.mark.usefixtures('setup_charm')
-    def test_setup_event_links(
-        self,
-        request: pytest.FixtureRequest,
-        fake_script: FakeScript,
-    ):
-        """Test auto-creation of symlinks.
-
-        Symlink creation caused by initial events should _not_ happen when using dispatch.
-        """
-        all_event_hooks = [
-            f"hooks/{e.replace('_', '-')}" for e in self.charm_module.Charm.on.events()
-        ]
-        initial_events = {
-            EventSpec(ops.InstallEvent, 'install'),
-            EventSpec(ops.StorageAttachedEvent, 'disks-storage-attached'),
-            EventSpec(ops.StartEvent, 'start'),
-            EventSpec(ops.UpgradeCharmEvent, 'upgrade-charm'),
-        }
-
-        def _assess_event_links(event_spec: EventSpec):
-            assert self.hooks_dir / event_spec.event_name not in self.hooks_dir.iterdir()
-            for event_hook in all_event_hooks:
-                assert not (
-                    self.JUJU_CHARM_DIR / event_hook
-                ).exists(), f'Spurious hook: {event_hook}'
-
-        for initial_event in initial_events:
-            self._setup_charm_dir(request)
-
-            self._simulate_event(fake_script, initial_event)
-            _assess_event_links(initial_event)
-
     @pytest.mark.usefixtures('setup_charm')
     def test_hook_and_dispatch(
         self,
@@ -1196,7 +949,13 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', '--', f'Running legacy {hook}.'],
+            [
+                'juju-log',
+                '--log-level',
+                'INFO',
+                '--',
+                f'Running legacy {hook}.',
+            ],
             ['juju-log', '--log-level', 'DEBUG', '--', f'Legacy {hook} exited with status 0.'],
             [
                 'juju-log',
@@ -1209,7 +968,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1240,7 +999,7 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1266,7 +1025,13 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', '--', f'Running legacy {hook}.'],
+            [
+                'juju-log',
+                '--log-level',
+                'INFO',
+                '--',
+                f'Running legacy {hook}.',
+            ],
             ['juju-log', '--log-level', 'WARNING', '--', f'Legacy {hook} exited with status 42.'],
         ]
         assert calls == expected
@@ -1316,7 +1081,13 @@ class _TestMainWithDispatch(_TestMain):
         hook = Path('hooks/install')
         expected = [
             VERSION_LOGLINE,
-            ['juju-log', '--log-level', 'INFO', '--', f'Running legacy {hook}.'],
+            [
+                'juju-log',
+                '--log-level',
+                'INFO',
+                '--',
+                f'Running legacy {hook}.',
+            ],
             VERSION_LOGLINE,  # because it called itself
             ['juju-log', '--log-level', 'DEBUG', '--', f'Charm called itself via {hook}.'],
             ['juju-log', '--log-level', 'DEBUG', '--', f'Legacy {hook} exited with status 0.'],
@@ -1331,13 +1102,13 @@ class _TestMainWithDispatch(_TestMain):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert re.search('Initializing SQLite local storage: ', ' '.join(calls.pop(-3)))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected
 
 
-class TestMainWithDispatch(_TestMainWithDispatch):
-    def _setup_entry_point(self, directory: Path, entry_point: str):
+class TestMainWithDispatchAsSymlink(_TestMain):
+    def _setup_entry_point(self):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
             path.symlink_to(os.path.join('src', 'charm.py'))
@@ -1400,7 +1171,6 @@ class TestMainWithDispatch(_TestMainWithDispatch):
 
     @pytest.mark.usefixtures('setup_charm')
     def test_crash_action(self, request: pytest.FixtureRequest, fake_script: FakeScript):
-        self._prepare_actions()
         self.stderr = tempfile.TemporaryFile('w+t')  # noqa: SIM115
         request.addfinalizer(self.stderr.close)
         fake_script.write('action-get', "echo '{}'")
@@ -1420,12 +1190,10 @@ class TestMainWithDispatch(_TestMainWithDispatch):
         assert "'foo' not found in 'bar'" in stderr
 
 
-class TestMainWithDispatchAsScript(_TestMainWithDispatch):
+class TestMainWithDispatchAsScript(_TestMain):
     """Here dispatch is a script that execs the charm.py instead of a symlink."""
 
-    has_dispatch = True
-
-    def _setup_entry_point(self, directory: Path, entry_point: str):
+    def _setup_entry_point(self):
         path = self.JUJU_CHARM_DIR / 'dispatch'
         if not path.exists():
             path.write_text(

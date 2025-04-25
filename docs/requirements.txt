@@ -29,6 +29,8 @@ click==8.1.8
     # via uvicorn
 colorama==0.4.6
     # via sphinx-autobuild
+deprecated==1.2.15
+    # via opentelemetry-api
 docutils==0.21.2
     # via
     #   canonical-sphinx-extensions
@@ -51,6 +53,10 @@ idna==3.10
     #   requests
 imagesize==1.4.1
     # via sphinx
+importlib-metadata==8.5.0
+    # via
+    #   opentelemetry-api
+    #   ops (pyproject.toml)
 jinja2==3.1.6
     # via
     #   myst-parser
@@ -72,6 +78,8 @@ mdit-py-plugins==0.4.2
 mdurl==0.1.2
     # via markdown-it-py
 myst-parser==4.0.1
+    # via ops (pyproject.toml)
+opentelemetry-api==1.30.0
     # via ops (pyproject.toml)
 packaging==24.2
     # via sphinx
@@ -167,4 +175,10 @@ websocket-client==1.8.0
     # via ops (pyproject.toml)
 websockets==15.0.1
     # via sphinx-autobuild
+wrapt==1.17.2
+    # via deprecated
+zipp==3.21.0
+    # via importlib-metadata
+.
 ./testing/
+./tracing/

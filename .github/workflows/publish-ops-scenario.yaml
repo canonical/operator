@@ -2,7 +2,7 @@ name: Publish (ops-scenario)
 on:
   push:
     tags:
-      - 'scenario-7.*'
+      - '2.*'
 
 permissions: {}
 
@@ -33,7 +33,7 @@ jobs:
         run: python -m build
         working-directory: ./testing
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2.2.2
+        uses: actions/attest-build-provenance@v2.2.3
         with:
           subject-path: 'testing/dist/*'
       - name: Publish

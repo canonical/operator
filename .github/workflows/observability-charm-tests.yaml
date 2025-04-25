@@ -43,8 +43,11 @@ jobs:
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
           elif [ -e "uv.lock" ]; then
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --raw-sources
+            uv remove ops --optional dev --frozen || echo "maybe ops[testing] is not a dev dependency"
+            uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
+            uv remove ops --frozen
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no requirements.txt or uv.lock file found"
             exit 1
