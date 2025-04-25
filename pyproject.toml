@@ -127,8 +127,16 @@ select = [
     "D",
     # flake8-future-annotations
     "FA",
+    # flake8-type-checking
+    "TC",
 ]
 ignore = [
+    # Move application import into a type-checking block
+    "TC001",
+    # Move third-party import into a type-checking block
+    "TC002",
+    # Move standard library import into a type-checking block
+    "TC003",
     # Use of `assert` detected
     "S101",
     # Do not `assert False`
