@@ -95,7 +95,7 @@ def _get_event_args(
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
             storage = next((s for s in storages if s.index == index), None)
-        storage = cast(Union[_storage.JujuStorage, _storage.SQLiteStorage], storage)
+        storage = cast('Union[_storage.JujuStorage, _storage.SQLiteStorage]', storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, _charm.ActionEvent):

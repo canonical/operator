@@ -153,7 +153,7 @@ class Runtime:
 
         if notice := event.notice:
             if hasattr(notice.type, 'value'):
-                notice_type = typing.cast(pebble.NoticeType, notice.type).value
+                notice_type = typing.cast('pebble.NoticeType', notice.type).value
             else:
                 notice_type = str(notice.type)
             env.update(
@@ -198,7 +198,7 @@ class Runtime:
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
-        return typing.cast(Type['CharmType'], WrappedCharm)
+        return typing.cast('Type[CharmType]', WrappedCharm)
 
     @contextmanager
     def _virtual_charm_root(self):
@@ -267,7 +267,7 @@ class Runtime:
 
         else:
             # charm_virtual_root is a tempdir
-            typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
+            typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
 
     @contextmanager
     def _exec_ctx(self, ctx: Context):
@@ -417,7 +417,7 @@ def capture_events(
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
                 continue
-            event = typing.cast(EventBase, event)
+            event = typing.cast('EventBase', event)
             event.deferred = False
             self._forget(event)  # prevent tracking conflicts
 

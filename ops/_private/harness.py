@@ -474,7 +474,7 @@ class Harness(Generic[CharmType]):
         """
         self.begin()
 
-        charm = cast(CharmBase, self._charm)
+        charm = cast('CharmBase', self._charm)
         # Checking if disks have been added
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
@@ -2445,7 +2445,7 @@ class _TestingModelBackend:
             # $AGENT_DIR/resources/$RESOURCE_NAME/$RESOURCE_FILENAME
             # However, charms shouldn't depend on this.
             self._resource_dir = tempfile.TemporaryDirectory(prefix='tmp-ops-test-resource-')
-        res_dir_name = cast(str, self._resource_dir.name)
+        res_dir_name = cast('str', self._resource_dir.name)
         return pathlib.Path(res_dir_name)
 
     def relation_ids(self, relation_name: str) -> list[int]:
@@ -3024,12 +3024,12 @@ class _TestingModelBackend:
 
     def open_port(self, protocol: str, port: int | None = None):
         self._check_protocol_and_port(protocol, port)
-        protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
+        protocol_lit = cast('Literal["tcp", "udp", "icmp"]', protocol)
         self._opened_ports.add(model.Port(protocol_lit, port))
 
     def close_port(self, protocol: str, port: int | None = None):
         self._check_protocol_and_port(protocol, port)
-        protocol_lit = cast(Literal['tcp', 'udp', 'icmp'], protocol)
+        protocol_lit = cast('Literal["tcp", "udp", "icmp"]', protocol)
         self._opened_ports.discard(model.Port(protocol_lit, port))
 
     def opened_ports(self) -> set[model.Port]:
@@ -3100,7 +3100,7 @@ class _TestingExecProcess:
         if self._is_timeout:
             raise pebble.TimeoutError(f'timed out waiting for change ({self._timeout} seconds)')
         if self._exit_code != 0:
-            raise pebble.ExecError(self._command, cast(int, self._exit_code), None, None)
+            raise pebble.ExecError(self._command, cast('int', self._exit_code), None, None)
 
     def wait_output(self) -> tuple[AnyStr, AnyStr | None]:
         if self._is_timeout:
@@ -3110,11 +3110,11 @@ class _TestingExecProcess:
         if self._exit_code != 0:
             raise pebble.ExecError[AnyStr](
                 self._command,
-                cast(int, self._exit_code),
-                cast(Union[AnyStr, None], out_value),
-                cast(Union[AnyStr, None], err_value),
+                cast('int', self._exit_code),
+                cast('Union[AnyStr, None]', out_value),
+                cast('Union[AnyStr, None]', err_value),
             )
-        return cast(AnyStr, out_value), cast(Union[AnyStr, None], err_value)
+        return cast('AnyStr', out_value), cast('Union[AnyStr, None]', err_value)
 
     def send_signal(self, sig: int | str):
         # the process is always terminated when ExecProcess is return in the simulation.
@@ -3559,7 +3559,7 @@ class _TestingPebbleClient:
         file_path = self._root / path[1:]
         try:
             return cast(
-                Union[BinaryIO, TextIO],
+                'Union[BinaryIO, TextIO]',
                 file_path.open('rb' if encoding is None else 'r', encoding=encoding),
             )
         except FileNotFoundError:
@@ -3613,7 +3613,7 @@ class _TestingPebbleClient:
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
                 with file_path.open(open_mode, encoding=open_encoding) as f:
-                    shutil.copyfileobj(cast(IOBase, source), cast(IOBase, f))
+                    shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
             os.chmod(file_path, permissions)
         except FileNotFoundError as e:
             raise pebble.PathError(
@@ -3738,7 +3738,7 @@ class _TestingPebbleClient:
                     f'not {data.__class__.__name__}'
                 )
             else:
-                return io.StringIO(typing.cast(str, data))
+                return io.StringIO(typing.cast('str', data))
 
     def exec(
         self,
@@ -3789,7 +3789,7 @@ class _TestingPebbleClient:
             user=user,
             group_id=group_id,
             group=group,
-            stdin=cast(Union[str, bytes, None], stdin),
+            stdin=cast('Union[str, bytes, None]', stdin),
             encoding=encoding,
             combine_stderr=combine_stderr,
         )
@@ -3811,7 +3811,7 @@ class _TestingPebbleClient:
                     stderr=proc_stderr,
                     is_timeout=True,
                 )
-                return cast(pebble.ExecProcess[Any], exec_process)
+                return cast('pebble.ExecProcess[Any]', exec_process)
             else:
                 raise RuntimeError(
                     'a TimeoutError occurred in the execution handler, '
@@ -3833,10 +3833,10 @@ class _TestingPebbleClient:
                 'even though combine_stderr is enabled.'
             )
         if stdout is not None:
-            shutil.copyfileobj(cast(io.IOBase, proc_stdout), cast(io.IOBase, stdout))
+            shutil.copyfileobj(cast('io.IOBase', proc_stdout), cast('io.IOBase', stdout))
             proc_stdout = None
         if stderr is not None:
-            shutil.copyfileobj(cast(io.IOBase, proc_stderr), cast(io.IOBase, stderr))
+            shutil.copyfileobj(cast('io.IOBase', proc_stderr), cast('io.IOBase', stderr))
             proc_stderr = None
         exec_process = _TestingExecProcess(
             command=command,
@@ -3847,7 +3847,7 @@ class _TestingPebbleClient:
             stderr=proc_stderr,
             is_timeout=False,
         )
-        return cast(pebble.ExecProcess[Any], exec_process)
+        return cast('pebble.ExecProcess[Any]', exec_process)
 
     def send_signal(self, sig: int | str, service_names: Iterable[str]):
         if not service_names:

@@ -93,7 +93,7 @@ class SimpleEventWithData(ops.EventBase):
         self.data: str = data
 
     def restore(self, snapshot: dict[str, typing.Any]):
-        self.data = typing.cast(str, snapshot['data'])
+        self.data = typing.cast('str', snapshot['data'])
 
     def snapshot(self) -> dict[str, typing.Any]:
         return {'data': self.data}
@@ -181,14 +181,14 @@ class TestFramework:
         framework2 = create_framework(request, tmpdir=tmp_path)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
-        event2 = typing.cast(Foo, event2)
+        event2 = typing.cast('Foo', event2)
         assert event2.my_n == 2
 
         framework2.save_snapshot(event2)  # type: ignore
         del event2
         gc.collect()
         event3 = framework2.load_snapshot(handle)
-        event3 = typing.cast(Foo, event3)
+        event3 = typing.cast('Foo', event3)
         assert event3.my_n == 3
 
         framework2.drop_snapshot(event.handle)
@@ -745,14 +745,14 @@ class TestFramework:
         del o1
         gc.collect()
         o2 = framework.load_snapshot(o_handle)
-        o2 = typing.cast(MyObject, o2)
+        o2 = typing.cast('MyObject', o2)
         # Trying to load_snapshot a second object at the same path should fail with RuntimeError
         with pytest.raises(RuntimeError):
             framework.load_snapshot(o_handle)
         # Unless we _forget the object first
         framework._forget(o2)
         o3 = framework.load_snapshot(o_handle)
-        o3 = typing.cast(MyObject, o3)
+        o3 = typing.cast('MyObject', o3)
         assert o2.value == o3.value
         # A loaded object also prevents direct creation of an object
         with pytest.raises(RuntimeError):
@@ -766,7 +766,7 @@ class TestFramework:
         framework_copy2 = create_framework(request, tmpdir=tmp_path)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
-        o_copy2 = typing.cast(MyObject, o_copy2)
+        o_copy2 = typing.cast('MyObject', o_copy2)
         assert o_copy2.value == 'path'
 
     def test_events_base(self, request: pytest.FixtureRequest):
@@ -1632,14 +1632,14 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast(typing.Set[str], set()),
+                lambda: typing.cast('typing.Set[str]', set()),
                 None,
                 set(),
                 lambda a, b: None,
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast(typing.Set[str], set()),
+                lambda: typing.cast('typing.Set[str]', set()),
                 'a',
                 {'a'},
                 lambda a, b: a.add(b),
@@ -1653,7 +1653,7 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast(typing.Set[str], set()),
+                lambda: typing.cast('typing.Set[str]', set()),
                 {'a'},
                 set(),
                 # Nested sets are not allowed as sets themselves are not hashable.
@@ -2132,7 +2132,7 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast(io.StringIO, fake_stderr)
+            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
 
@@ -2281,7 +2281,7 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast(io.StringIO, fake_stderr)
+            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
                 assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE

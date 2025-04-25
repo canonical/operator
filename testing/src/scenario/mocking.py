@@ -186,7 +186,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             mounts = {}
 
         return cast(
-            Client,
+            'Client',
             _MockPebbleClient(
                 socket_path=socket_path,
                 container_root=container_root,
@@ -534,7 +534,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if not secret.remote_grants.get(relation_id):
             secret.remote_grants[relation_id] = set()
 
-        secret.remote_grants[relation_id].add(cast(str, grantee))
+        secret.remote_grants[relation_id].add(cast('str', grantee))
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
@@ -544,7 +544,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             relation_id,
             _raise_on_error=True,
         )
-        secret.remote_grants[relation_id].remove(cast(str, grantee))
+        secret.remote_grants[relation_id].remove(cast('str', grantee))
         if not secret.remote_grants[relation_id]:
             del secret.remote_grants[relation_id]
 
@@ -790,7 +790,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         else:
             for notice in container.notices:
                 if hasattr(notice.type, 'value'):
-                    notice_type = cast(pebble.NoticeType, notice.type).value
+                    notice_type = cast('pebble.NoticeType', notice.type).value
                 else:
                     notice_type = str(notice.type)
                 self._notices[notice_type, notice.key] = notice._to_ops()
@@ -970,7 +970,7 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         change_id = handler._run()
         return cast(
-            pebble.ExecProcess[Any],
+            'pebble.ExecProcess[Any]',
             _MockExecProcess(
                 change_id=change_id,
                 args=args,

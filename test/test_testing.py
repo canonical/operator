@@ -5057,12 +5057,12 @@ class PebbleStorageAPIsTestMixin:
 
         # We also support file-like objects as input, so let's test that case as well.
         if encoding is None:
-            stream_class = typing.cast(typing.Type[io.BytesIO], stream_class)
-            small_file = stream_class(typing.cast(bytes, original_data))
+            stream_class = typing.cast('typing.Type[io.BytesIO]', stream_class)
+            small_file = stream_class(typing.cast('bytes', original_data))
             client.push(f'{pebble_dir}/test', small_file)
         else:
-            stream_class = typing.cast(typing.Type[io.StringIO], stream_class)
-            small_file = stream_class(typing.cast(str, original_data))
+            stream_class = typing.cast('typing.Type[io.StringIO]', stream_class)
+            small_file = stream_class(typing.cast('str', original_data))
             client.push(f'{pebble_dir}/test', small_file, encoding=encoding)
         with client.pull(f'{pebble_dir}/test', encoding=encoding) as infile:
             received_data = infile.read()

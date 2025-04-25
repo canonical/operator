@@ -152,7 +152,7 @@ class ActionEvent(EventBase):
 
         Not meant to be called directly by charm code.
         """
-        self.id = cast(str, snapshot['id'])
+        self.id = cast('str', snapshot['id'])
         # Params are loaded at restore rather than __init__ because
         # the model is not available in __init__.
         self.params = self.framework.model._backend.action_get()
@@ -978,8 +978,8 @@ class SecretEvent(HookEvent):
 
         Not meant to be called by charm code.
         """
-        self._id = cast(str, snapshot['id'])
-        self._label = cast(Optional[str], snapshot['label'])
+        self._id = cast('str', snapshot['id'])
+        self._label = cast('Optional[str]', snapshot['label'])
 
 
 class SecretChangedEvent(SecretEvent):
@@ -1067,7 +1067,7 @@ class SecretRemoveEvent(SecretEvent):
         Not meant to be called by charm code.
         """
         super().restore(snapshot)
-        self._revision = cast(int, snapshot['revision'])
+        self._revision = cast('int', snapshot['revision'])
 
 
 class SecretExpiredEvent(SecretEvent):
@@ -1113,7 +1113,7 @@ class SecretExpiredEvent(SecretEvent):
         Not meant to be called by charm code.
         """
         super().restore(snapshot)
-        self._revision = cast(int, snapshot['revision'])
+        self._revision = cast('int', snapshot['revision'])
 
     def defer(self) -> NoReturn:
         """Secret expiration events are not deferrable (Juju handles re-invocation).
@@ -1697,12 +1697,12 @@ class CharmMeta:
         meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = cast(Optional[Dict[str, Any]], yaml.safe_load(actions))
+            raw_actions = cast('Optional[Dict[str, Any]]', yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         raw_config = {}
         if config is not None:
-            raw_config = cast(Optional[Dict[str, Any]], yaml.safe_load(config))
+            raw_config = cast('Optional[Dict[str, Any]]', yaml.safe_load(config))
             if raw_config is None:
                 raw_config = {}
         return cls(meta, raw_actions, raw_config)

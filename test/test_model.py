@@ -4269,7 +4269,7 @@ class TestLazyNotice:
                     last_data={'key': 'val'},
                 )
 
-        workload = typing.cast(ops.Container, FakeWorkload())
+        workload = typing.cast('ops.Container', FakeWorkload())
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         assert n.id == '123'
         assert n.type == ops.pebble.NoticeType.CUSTOM
@@ -4287,7 +4287,7 @@ class TestLazyNotice:
             assert n.not_exist
 
     def test_repr(self):
-        workload = typing.cast(ops.Container, None)
+        workload = typing.cast('ops.Container', None)
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         assert repr(n) == "LazyNotice(id='123', type=NoticeType.CUSTOM, key='example.com/a')"
 

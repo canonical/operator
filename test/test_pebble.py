@@ -2641,7 +2641,7 @@ bad path\r
         for part in message.walk():
             name = part.get_param('name', header='Content-Disposition')
             if name == 'request':
-                req = json.loads(typing.cast(str, part.get_payload()))
+                req = json.loads(typing.cast('str', part.get_payload()))
             elif name == 'files':
                 # decode=True, ironically, avoids decoding bytes to str
                 content = part.get_payload(decode=True)

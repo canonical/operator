@@ -171,7 +171,7 @@ class Handle:
             if not good:
                 raise RuntimeError(f'attempted to restore invalid handle path {path}')
             handle = Handle(handle, kind, key)  # type: ignore
-        return typing.cast(Handle, handle)
+        return typing.cast('Handle', handle)
 
 
 class EventBase:
@@ -311,7 +311,7 @@ class EventSource:
         framework = getattr(emitter, 'framework', None)
         if framework is not None:
             framework.register_type(self.event_type, emitter, self.event_kind)
-        return BoundEvent(emitter, self.event_type, typing.cast(str, self.event_kind))
+        return BoundEvent(emitter, self.event_type, typing.cast('str', self.event_kind))
 
 
 class BoundEvent:
@@ -359,7 +359,7 @@ class HandleKind:
     """
 
     def __get__(self, obj: Object, obj_type: type[Object]) -> str:
-        kind = typing.cast(str, obj_type.__dict__.get('handle_kind'))
+        kind = typing.cast('str', obj_type.__dict__.get('handle_kind'))
         if kind:
             return kind
         return obj_type.__name__
@@ -403,10 +403,10 @@ class Object:
             # Avoid Framework instances having a circular reference to themselves.
             if self.framework is self:
                 self.framework = weakref.proxy(self.framework)
-            self.handle = Handle(None, kind, typing.cast(str, key))
+            self.handle = Handle(None, kind, typing.cast('str', key))
         else:
             self.framework = parent.framework
-            self.handle = Handle(parent, kind, typing.cast(str, key))
+            self.handle = Handle(parent, kind, typing.cast('str', key))
         self.framework._track(self)  # type: ignore
 
         # TODO Detect conflicting handles here.
@@ -652,7 +652,7 @@ class Framework(Object):
         self.register_type(StoredStateData, None, StoredStateData.handle_kind)
         stored_handle = Handle(None, StoredStateData.handle_kind, '_stored')
         try:
-            self._stored = typing.cast(StoredStateData, self.load_snapshot(stored_handle))
+            self._stored = typing.cast('StoredStateData', self.load_snapshot(stored_handle))
         except NoSnapshotError:
             self._stored = StoredStateData(self, '_stored')
             self._stored['event_count'] = 0
@@ -980,7 +980,7 @@ class Framework(Object):
                 self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 
-            event = typing.cast(EventBase, event)
+            event = typing.cast('EventBase', event)
             event.deferred = False
             observer = self._observer.get(observer_path)
 

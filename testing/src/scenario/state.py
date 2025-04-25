@@ -195,7 +195,7 @@ def _max_posargs(n: int):
         def __reduce__(self):
             # The default __reduce__ doesn't understand that some arguments have
             # to be passed as keywords, so using the copy module fails.
-            attrs = cast(Dict[str, Any], super().__reduce__()[2])
+            attrs = cast('Dict[str, Any]', super().__reduce__()[2])
             return (lambda: self.__class__(**attrs), ())
 
     return _MaxPositionalArgs
@@ -1954,7 +1954,7 @@ class _Event:  # type: ignore
     @property
     def _path(self) -> _EventPath:
         # we converted it in __post_init__, but the type checker doesn't know about that
-        return cast(_EventPath, self.path)
+        return cast('_EventPath', self.path)
 
     @property
     def name(self) -> str:
@@ -2054,7 +2054,7 @@ class _Event:  # type: ignore
             snapshot_data['container_name'] = self.container.name
             if self.notice:
                 if hasattr(self.notice.type, 'value'):
-                    notice_type = cast(pebble.NoticeType, self.notice.type).value
+                    notice_type = cast('pebble.NoticeType', self.notice.type).value
                 else:
                     notice_type = str(self.notice.type)
                 snapshot_data.update(

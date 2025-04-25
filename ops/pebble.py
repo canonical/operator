@@ -1827,8 +1827,8 @@ class ExecProcess(Generic[AnyStr]):
 
             exit_code: int = self._wait()
 
-            out_value = typing.cast(AnyStr, out.getvalue())
-            err_value = typing.cast(AnyStr, err.getvalue()) if err is not None else None
+            out_value = typing.cast('AnyStr', out.getvalue())
+            err_value = typing.cast('AnyStr', err.getvalue()) if err is not None else None
             if exit_code != 0:
                 raise ExecError[AnyStr](self._command, exit_code, out_value, err_value)
 
@@ -1910,7 +1910,7 @@ def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str
             break
 
         if encoding is not None:
-            chunk = typing.cast(bytes, chunk).decode(encoding)
+            chunk = typing.cast('bytes', chunk).decode(encoding)
         writer.write(chunk)
 
 

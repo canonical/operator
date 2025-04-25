@@ -217,7 +217,7 @@ class SQLiteStorage:
             if not rows:
                 break
             for row in rows:
-                yield cast(_Notice, tuple(row))
+                yield cast('_Notice', tuple(row))
 
 
 class JujuStorage:
