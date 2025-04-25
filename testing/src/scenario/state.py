@@ -1746,13 +1746,27 @@ class _CharmSpec(Generic[CharmType]):
         return meta, config, actions
 
     @staticmethod
+    def get_charm_root(charm_type: type[CharmBase]) -> pathlib.Path:
+        """Obtain the charm repository root, given a charm type.
+
+        ASSUMES that the charm type is defined in `charm-root/src/charm.py`.
+        """
+        charm_source_path = pathlib.Path(inspect.getfile(charm_type))
+        if not charm_source_path.parts[-2:] == ('src', 'charm.py'):
+            # TODO: to support this case, we should allow manually building a _CharmSpec.
+            logger.warning(
+                f"Nonstandard charm root for {charm_type=}: {charm_source_path!r}. "
+                "Expecting: src/charm.py. Things may misbehave."
+            )
+        return charm_source_path.parent.parent
+
+    @staticmethod
     def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmType]:
         """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
 
         Will attempt to load the metadata off the ``charmcraft.yaml`` file
         """
-        charm_source_path = pathlib.Path(inspect.getfile(charm_type))
-        charm_root = charm_source_path.parent.parent
+        charm_root = _CharmSpec.get_charm_root(charm_type)
 
         # attempt to load metadata from unified charmcraft.yaml
         meta, config, actions = _CharmSpec._load_metadata(charm_root)

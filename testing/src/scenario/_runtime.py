@@ -6,9 +6,10 @@
 import copy
 import dataclasses
 import os
+import shutil
 import tempfile
 import typing
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -212,12 +213,17 @@ class Runtime:
         spec = self._charm_spec
 
         if charm_virtual_root := self._charm_root:
+            ctx = nullcontext()
             charm_virtual_root_is_custom = True
             virtual_charm_root = Path(charm_virtual_root)
         else:
-            charm_virtual_root = tempfile.TemporaryDirectory()
-            virtual_charm_root = Path(charm_virtual_root.name)
+            ctx = tempfile.TemporaryDirectory()
+            virtual_charm_root = Path(ctx.name)
             charm_virtual_root_is_custom = False
+
+            if spec.is_autoloaded:
+                # initialize the virtual charm root by making a recursive copy of the real charm root.
+                shutil.copytree(spec.get_charm_root(spec.charm_type), virtual_charm_root)
 
         metadata_yaml = virtual_charm_root / 'metadata.yaml'
         config_yaml = virtual_charm_root / 'config.yaml'
@@ -258,7 +264,8 @@ class Runtime:
         config_yaml.write_text(yaml.safe_dump(spec.config or {}))
         actions_yaml.write_text(yaml.safe_dump(spec.actions or {}))
 
-        yield virtual_charm_root
+        with ctx:
+            yield virtual_charm_root
 
         if charm_virtual_root_is_custom:
             for file, previous_content in metadata_files_present.items():
@@ -266,10 +273,6 @@ class Runtime:
                     file.unlink()
                 else:
                     file.write_text(previous_content)
-
-        else:
-            # charm_virtual_root is a tempdir
-            typing.cast(tempfile.TemporaryDirectory, charm_virtual_root).cleanup()  # type: ignore
 
     @contextmanager
     def _exec_ctx(self, ctx: 'Context'):

@@ -1,5 +1,11 @@
+import ast
+import importlib
+import inspect
+import os
+import sys
 import tempfile
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 import yaml
@@ -26,6 +32,8 @@ class MyCharm(CharmBase):
 def charm_virtual_root():
     with tempfile.TemporaryDirectory() as mycharm_virtual_root:
         t = Path(mycharm_virtual_root)
+        (t / "somefile.txt").write_text("foo")
+
         src = t / 'src'
         src.mkdir()
         foobar = src / 'foo.bar'
@@ -50,7 +58,7 @@ def test_charm_virtual_root(charm_virtual_root):
     assert out.unit_status == ActiveStatus('hello world')
 
 
-def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
+def test_charm_virtual_root_cleanup_if_metadata_file_exists(charm_virtual_root):
     meta_file = charm_virtual_root / 'metadata.yaml'
     raw_ori_meta = yaml.safe_dump({'name': 'karl'})
     meta_file.write_text(raw_ori_meta)
@@ -71,7 +79,7 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
     assert meta_file.exists()
 
 
-def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
+def test_charm_virtual_root_cleanup_if_not_metadata_file_exists(charm_virtual_root):
     meta_file = charm_virtual_root / 'metadata.yaml'
 
     assert not meta_file.exists()
@@ -87,3 +95,45 @@ def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
         assert not meta_file.exists()
 
     assert not meta_file.exists()
+
+
+def test_charm_virtual_root_autoload(charm_virtual_root):
+    # given a "real charm root"
+    meta_file = charm_virtual_root / 'metadata.yaml'
+    raw_ori_meta = yaml.safe_dump({'name': 'marx'})
+    meta_file.write_text(raw_ori_meta)
+    imports = dedent("""
+    from ops.charm import CharmBase
+    from ops.framework import Framework
+    from ops.model import ActiveStatus
+    """)
+    (charm_virtual_root/'src'/'charm.py').write_text(imports+inspect.getsource(MyCharm))
+
+    # make the temporary charm root importable; avoid messing with sys.path as we have many
+    # conflicting 'src' and 'charm' modules lying around here
+    cwd = os.getcwd()
+    os.chdir(str(charm_virtual_root))
+    sys.path.append(str(charm_virtual_root))
+    tmpmodule = importlib.import_module(".charm", "src")
+    os.chdir(cwd)
+
+    # now we import MyCharm from the temporary module
+    ctx = Context(tmpmodule.MyCharm, charm_root=charm_virtual_root)
+    with ctx(
+        ctx.on.start(),
+        State(),
+    ) as mgr:
+        # verify all of the tempdir's contents are in the vroot copy created by the runtime
+        vroot_copy = mgr.charm.framework.charm_dir
+        for file in (
+            # IRL, charmcraft shreds charmcraft.yaml in metadata/config/actions.yaml while packing.
+            vroot_copy / 'metadata.yaml',
+            vroot_copy / 'config.yaml',
+            vroot_copy / 'actions.yaml',
+            vroot_copy / 'somefile.txt',
+            vroot_copy / 'src'/'foo.bar',
+            vroot_copy / 'src'/'baz'/'qux.kaboodle',
+        ):
+            assert file.exists()
+        mgr.run()
+
