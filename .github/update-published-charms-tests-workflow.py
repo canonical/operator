@@ -20,6 +20,8 @@ Charms that are not hosted on GitHub are skipped, as well as any charms where
 the source URL could not be found.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import pathlib

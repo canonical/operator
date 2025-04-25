@@ -14,6 +14,8 @@
 
 """Implement the main entry point to the framework."""
 
+from __future__ import annotations
+
 import logging
 import os
 import shutil

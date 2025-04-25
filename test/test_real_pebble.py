@@ -27,6 +27,8 @@ $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_real_pebble.py -v
 $ deactivate
 """
 
+from __future__ import annotations
+
 import json
 import os
 import shutil

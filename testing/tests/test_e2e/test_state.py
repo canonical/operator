@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 from dataclasses import asdict, replace
 from typing import Any, Dict, Optional, Type

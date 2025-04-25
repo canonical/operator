@@ -14,6 +14,8 @@
 
 """A helper to work with the Juju version."""
 
+from __future__ import annotations
+
 import os
 import re
 import warnings

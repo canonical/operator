@@ -14,6 +14,8 @@
 
 """Fake (partial) Pebble server to allow testing the HTTP-over-Unix-socket protocol."""
 
+from __future__ import annotations
+
 import http.server
 import json
 import os

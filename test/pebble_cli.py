@@ -21,6 +21,8 @@ python -m test.pebble_cli --socket=pebble_dir/.pebble.socket system-info
 PEBBLE=pebble_dir python -m test.pebble_cli system-info
 """
 
+from __future__ import annotations
+
 import argparse
 import datetime
 import os

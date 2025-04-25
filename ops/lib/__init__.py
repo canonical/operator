@@ -20,6 +20,8 @@
     We now prefer to do version selection at build (charmcraft pack) time.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import re

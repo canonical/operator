@@ -14,6 +14,8 @@
 
 """Base objects for the Charm, events and metadata."""
 
+from __future__ import annotations
+
 import dataclasses
 import enum
 import logging

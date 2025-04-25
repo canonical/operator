@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from ops import __version__ as ops_version
 from ops.charm import ActionEvent, CharmBase

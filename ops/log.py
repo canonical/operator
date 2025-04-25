@@ -14,6 +14,8 @@
 
 """Interface to emit messages to the Juju logging system."""
 
+from __future__ import annotations
+
 import logging
 import sys
 import types

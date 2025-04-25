@@ -14,6 +14,8 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+from __future__ import annotations
+
 import grp
 import logging
 import os

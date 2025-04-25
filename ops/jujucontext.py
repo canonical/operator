@@ -14,6 +14,8 @@
 
 """A helper to work with the Juju context and version."""
 
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 from typing import Any, Mapping, Optional, Set

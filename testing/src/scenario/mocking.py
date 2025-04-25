@@ -7,6 +7,8 @@ This module contains mocks for the Juju and Pebble APIs that are used by ops
 to interact with the Juju controller and the Pebble service manager.
 """
 
+from __future__ import annotations
+
 import datetime
 import io
 import shutil

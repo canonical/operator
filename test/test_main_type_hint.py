@@ -17,6 +17,8 @@ This file doesn't contain any run-time tests, rather we rely on pyright to run o
 Assignment to a variable declared to follow a protocol is equivalent to backwards compatibility.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional, Protocol, Type
 

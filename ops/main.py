@@ -14,6 +14,8 @@
 
 """Support legacy ops.main.main() import."""
 
+from __future__ import annotations
+
 from typing import Optional, Type
 
 from . import _main

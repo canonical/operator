@@ -14,6 +14,8 @@
 
 """Structures to offer storage to the charm (through Juju or locally)."""
 
+from __future__ import annotations
+
 import logging
 import os
 import pickle

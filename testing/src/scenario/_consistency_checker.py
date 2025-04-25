@@ -17,6 +17,8 @@ can set the ``SCENARIO_SKIP_CONSISTENCY_CHECKS`` environment variable and skip
 it altogether.
 """
 
+from __future__ import annotations
+
 import marshal
 import os
 import re

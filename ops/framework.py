@@ -14,6 +14,8 @@
 
 """The ops library's infrastructure."""
 
+from __future__ import annotations
+
 import collections
 import collections.abc
 import inspect

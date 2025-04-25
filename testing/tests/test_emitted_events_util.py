@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
