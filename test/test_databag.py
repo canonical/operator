@@ -523,3 +523,5 @@ def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest
 
 # TODO: pydantic model with pydantic types that need to serialise down to a string
 # TODO: Add back some Scenario tests.
+# TODO: Add a test that verifies that the order of dictionary keys does not change
+# on read then write (this would trigger relation-changed unnecessarily).
