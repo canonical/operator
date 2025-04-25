@@ -125,7 +125,7 @@ class _MockExecProcess:
             )
         return stdout, stderr
 
-    def send_signal(self, sig: Union[int, str]) -> NoReturn:  # noqa: U100
+    def send_signal(self, sig: Union[int, str]) -> NoReturn:
         """Send the given signal to the (mock) process."""
         raise NotImplementedError()
 
@@ -698,8 +698,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     # legacy ops API that we don't intend to mock:
     def pod_spec_set(
         self,
-        spec: Mapping[str, Any],  # noqa: U100
-        k8s_resources: Optional[Mapping[str, Any]] = None,  # noqa: U100
+        spec: Mapping[str, Any],
+        k8s_resources: Optional[Mapping[str, Any]] = None,
     ) -> NoReturn:
         raise NotImplementedError(
             'pod-spec-set is not implemented in Scenario (and probably never will be: '
@@ -708,8 +708,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def add_metrics(
         self,
-        metrics: Mapping[str, Union[int, float]],  # noqa: U100
-        labels: Optional[Mapping[str, str]] = None,  # noqa: U100
+        metrics: Mapping[str, Union[int, float]],
+        labels: Optional[Mapping[str, str]] = None,
     ) -> NoReturn:
         raise NotImplementedError(
             'add-metrics is not implemented in Scenario (and probably never will be: '
