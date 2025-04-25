@@ -319,10 +319,6 @@ class _Manager:
         # available for pre-emit adjustments when being used in testing.
         self.charm = self._make_charm(self._dispatcher.event_name)
 
-        # This is with the charm used for the Juju event, but it's being removed
-        # later this cycle anyway, so we want minimum tweaking.
-        self._dispatcher.ensure_event_links(self.charm)
-
     def _load_charm_meta(self):
         return _charm.CharmMeta.from_charm_root(self._charm_root)
 
