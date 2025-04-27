@@ -7,25 +7,25 @@ from scenario.state import State, _CharmSpec, _Event, _EventType
 
 
 @pytest.mark.parametrize(
-    "evt, expected_type",
+    'evt, expected_type',
     (
-        ("foo_relation_changed", _EventType.RELATION),
-        ("foo_relation_created", _EventType.RELATION),
-        ("foo_bar_baz_relation_created", _EventType.RELATION),
-        ("foo_storage_attached", _EventType.STORAGE),
-        ("foo_storage_detaching", _EventType.STORAGE),
-        ("foo_bar_baz_storage_detaching", _EventType.STORAGE),
-        ("foo_pebble_ready", _EventType.WORKLOAD),
-        ("foo_bar_baz_pebble_ready", _EventType.WORKLOAD),
-        ("foo_pebble_custom_notice", _EventType.WORKLOAD),
-        ("foo_bar_baz_pebble_custom_notice", _EventType.WORKLOAD),
-        ("secret_remove", _EventType.SECRET),
-        ("pre_commit", _EventType.FRAMEWORK),
-        ("commit", _EventType.FRAMEWORK),
-        ("collect_unit_status", _EventType.FRAMEWORK),
-        ("collect_app_status", _EventType.FRAMEWORK),
-        ("foo", _EventType.CUSTOM),
-        ("kaboozle_bar_baz", _EventType.CUSTOM),
+        ('foo_relation_changed', _EventType.RELATION),
+        ('foo_relation_created', _EventType.RELATION),
+        ('foo_bar_baz_relation_created', _EventType.RELATION),
+        ('foo_storage_attached', _EventType.STORAGE),
+        ('foo_storage_detaching', _EventType.STORAGE),
+        ('foo_bar_baz_storage_detaching', _EventType.STORAGE),
+        ('foo_pebble_ready', _EventType.WORKLOAD),
+        ('foo_bar_baz_pebble_ready', _EventType.WORKLOAD),
+        ('foo_pebble_custom_notice', _EventType.WORKLOAD),
+        ('foo_bar_baz_pebble_custom_notice', _EventType.WORKLOAD),
+        ('secret_remove', _EventType.SECRET),
+        ('pre_commit', _EventType.FRAMEWORK),
+        ('commit', _EventType.FRAMEWORK),
+        ('collect_unit_status', _EventType.FRAMEWORK),
+        ('collect_app_status', _EventType.FRAMEWORK),
+        ('foo', _EventType.CUSTOM),
+        ('kaboozle_bar_baz', _EventType.CUSTOM),
     ),
 )
 def test_event_type(evt, expected_type):
@@ -44,15 +44,15 @@ def test_event_type(evt, expected_type):
     spec = _CharmSpec(
         MyCharm,
         meta={
-            "requires": {
-                "foo": {"interface": "bar"},
-                "foo_bar_baz": {"interface": "bar"},
+            'requires': {
+                'foo': {'interface': 'bar'},
+                'foo_bar_baz': {'interface': 'bar'},
             },
-            "storage": {
-                "foo": {"type": "filesystem"},
-                "foo_bar_baz": {"type": "filesystem"},
+            'storage': {
+                'foo': {'type': 'filesystem'},
+                'foo_bar_baz': {'type': 'filesystem'},
             },
-            "containers": {"foo": {}, "foo_bar_baz": {}},
+            'containers': {'foo': {}, 'foo_bar_baz': {}},
         },
     )
     assert event._is_builtin_event(spec) is (expected_type is not _EventType.CUSTOM)
@@ -60,7 +60,7 @@ def test_event_type(evt, expected_type):
 
 def test_emitted_framework():
     class MyCharm(CharmBase):
-        META = {"name": "joop"}
+        META = {'name': 'joop'}
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
@@ -75,7 +75,7 @@ def test_emitted_framework():
 
 def test_emitted_deferred():
     class MyCharm(CharmBase):
-        META = {"name": "joop"}
+        META = {'name': 'joop'}
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -97,9 +97,9 @@ def test_emitted_deferred():
 
     assert len(ctx.emitted_events) == 5
     assert [e.handle.kind for e in ctx.emitted_events] == [
-        "update_status",
-        "start",
-        "collect_unit_status",
-        "pre_commit",
-        "commit",
+        'update_status',
+        'start',
+        'collect_unit_status',
+        'pre_commit',
+        'commit',
     ]
