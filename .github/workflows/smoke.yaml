@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         # pylibjuju does not currently support Juju 4.x
         juju-channel: ['2.9/stable', '3/stable']
