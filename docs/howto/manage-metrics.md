@@ -2,25 +2,14 @@
 
 Pebble provides services and health check [metrics](https://documentation.ubuntu.com/pebble/reference/api/#/metrics/get_v1_metrics) in OpenMetrics format. Access this endpoint requires HTTP basic authentication with a "basic" type [identity](https://documentation.ubuntu.com/pebble/reference/identities/).
 
-## Create a "basic" type identity
+Charms should use {external+juju:ref}`Juju secrets <secret>` to manage sensitive information such as authentication credentials.
 
-To create an identity in Pebble, use the [`pebble.Client.replace_identities`](ops.pebble.Client.replace_identities) method:
+This guide demonstrates how to:
 
-```python
-from passlib.hash import sha512_crypt
-
-class MyCharm(ops.CharmBase):
-  def _replace_identities(self, username: str, password: str) -> None:
-    identities = {
-      username: ops.pebble.Identity(
-        access="metrics", basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password))
-      ),
-    }
-    self.container.pebble.replace_identities(identities)
-    logger.debug("New metrics username: %s", username)
-```
-
-Hash the password using `sha512-crypt`. Import `sha512_crypt` from `passlib.hash` and generate the hash with `sha512_crypt.hash()`.
+- As an admin, create a Juju user secret that stores the username and password.
+- Add a configuration to pass the secret ID to a charm.
+- In the charm code, get the username and password from the secret, then create a {external+pebble:doc}`Pebble identity <reference/identities>` to allow access to the metrics endpoint using the username and password.
+- As a user, access the metrics endpoint after deploying the charm.
 
 ## Create a Juju user secret
 
@@ -30,7 +19,7 @@ Use {external+juju:ref}`Juju secret <secret>` to manage sensitive information li
 juju add-secret metrics-user-password username=test password=test
 ```
 
-For more details, see:
+See more:
 
 - {external+juju:ref}`juju add-secret <command-juju-add-secret>`.
 
@@ -42,37 +31,61 @@ The `juju add-secret` command returns the secret ID. Pass this ID to the charm u
 config:
   options:
     metrics-secret-id:
-      default: <your-secret-id-here>
+      default: <secret-id-here>
       description: Default secret ID for the metrics username and password
       type: string
 ```
 
-On the `config-changed` event, retrieve the secret content and use it to create a "basic" type identity:
+## Create a "basic" type Pebble identity
+
+The charm code will use the configuration option to determine the ID of the secret that stores the username and password.
+
+In the handler for the `config-changed` event, retrieve the contents of the secret and create a Pebble identity. We should also handle the `secret-changed` event, in case admin users change the contents of the secret.
+
+With the secret content, we can create a "basic" type identity in Pebble using the [`pebble.Client.replace_identities`](ops.pebble.Client.replace_identities) method:
 
 ```python
+from passlib.hash import sha512_crypt
+
+class MyCharm(ops.CharmBase):
+  ...
+
   def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+    # The user must have:
+    # - Created a secret with keys 'username' and 'password'
+    # - Stored the secret ID in the 'metrics-secret-id' configuration option
     secret_id = str(self.config["metrics-secret-id"])
     secret = self.model.get_secret(id=secret_id)
     content = secret.get_content()
     username, password = content["username"], content["password"]
     self._replace_identities(username, password)
-```
 
-For more configuration details, see:
-
-- {ref}`make-your-charm-configurable`
-- {ref}`manage-configurations`.
-
-Observe the `secret-changed` event to handle updates:
-
-```python
   def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
     content = event.secret.peek_content()
     username, password = content["username"], content["password"]
     self._replace_identities(username, password)
+
+  def _replace_identities(self, username: str, password: str) -> None:
+    identities = {
+      username: ops.pebble.Identity(
+        access="metrics", basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password))
+      ),
+    }
+    self.container.pebble.replace_identities(identities)
+    logger.debug("New metrics username: %s", username)
+
+  ...
 ```
 
-For more information on secrets, see {ref}`manage-secrets`.
+Note that the identity's password is stored as a hash. Hash the password using `sha512-crypt`. Import `sha512_crypt` from `passlib.hash` and generate the hash with `sha512_crypt.hash()`.
+
+When Pebble receives a request to access the metrics endpoint, Pebble will verify that the basic authentication credentials in the request match the identity's username and password.
+
+See more:
+
+- {ref}`make-your-charm-configurable`
+- {ref}`manage-configurations`
+- {ref}`manage-secrets`
 
 ## Grant access to the user secret
 
@@ -82,31 +95,36 @@ After deploying the charm, grant access to the user secret:
 juju grant-secret metrics-user-password <charm-name>
 ```
 
-For more details, see: {external+juju:ref}`juju grant-secret <command-juju-grant-secret>`.
+See more: 
+
+- {external+juju:ref}`juju grant-secret <command-juju-grant-secret>`.
+- {external+juju:ref}`Juju | config <command-juju-config>`
 
 ## Access the metrics endpoint
 
 ### Within the same Kubernetes cluster
 
-A Kubernetes service `<charm-name>-endpoints` is created by default, and the first workload container's Pebble HTTP port is `38813`.
+When you deploy the charm, Juju automatically creates a Kubernetes service named `<charm-name>-endpoints` within the Kubernetes cluster. Use this service to connect to Pebble within each workload container. The HTTP port for Pebble in the first workload container is `38813`.
 
-For example, if the charm is named `my-charm` and deployed in the namespace `test`, access the metrics endpoint with HTTP basic authentication at `my-charm-endpoints.test.svc.cluster.local:38813/v1/metrics`.
+For example, if the charm is named `my-charm` and deployed in the namespace `test`, access the metrics endpoint at `my-charm-endpoints.test.svc.cluster.local:38813/v1/metrics`. You'll need to use HTTP basic authentication with the username and password that you specified in the `juju add-secret` command.
 
-Read more about service discovery within a Kubernetes cluster [here](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/).
+See more:
 
-### Via an Ingress
+- [Service discovery within a Kubernetes cluster](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 
-To expose the service externally, use an Ingress.
+### Through an Ingress
 
-We should not use an Ingress with the `<charm-name>-endpoints` service because it is a [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) and doesn't have a ClusterIP.
+To access the metrics endpoint from outside the Kubernetes cluster, use an Ingress.
 
-We will use the other automatically created service `<charm-name>` instead, and expose the Pebble HTTP port on it with the following code:
+Don't use an Ingress with the `<charm-name>-endpoints` service because it is a [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) and doesn't have a ClusterIP. Instead, use the other automatically-created service, `<charm-name>`.
+
+- To expose the Pebble HTTP port, use [`ops.Unit.set_ports`](ops.Unit.set_ports) in your charm code:
 
 ```python
   self.unit.set_ports(38813)
 ```
 
-Create an Ingress (assuming the charm and service name is "my-charm"):
+- To create an Ingress, use the following example (assuming the charm and service name is `my-charm`):
 
 ```yaml
 apiVersion: networking.k8s.io/v1
