@@ -4,6 +4,8 @@ on:
     tags:
       - '2.*'
 
+permissions: {}
+
 jobs:
   framework-tests:
     uses: ./.github/workflows/framework-tests.yaml
@@ -20,7 +22,11 @@ jobs:
     needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
       - run: |
           cd tracing
           uv build --sdist --wheel
@@ -32,4 +38,3 @@ jobs:
           packages-dir: ./tracing/dist/
           skip-existing: true
           verbose: true
-
