@@ -15,7 +15,6 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 from __future__ import annotations
 
-import functools
 import logging
 import subprocess
 from typing import Callable, Generator
@@ -28,18 +27,21 @@ import pytest
 @pytest.fixture
 def juju() -> Generator[jubilant.Juju, None, None]:
     """Make a Juju model with the tracing part of COS ready."""
-    with jubilant.temp_model() as j:
-        deploy_tempo(j)
-        deploy_tempo_worker(j)
-        j.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
-        j.deploy('s3-integrator')
+    with jubilant.temp_model() as juju:
+        deploy_tempo(juju)
+        deploy_tempo_worker(juju)
+        juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
+        juju.deploy('s3-integrator')
 
-        j.integrate('tempo:s3', 's3-integrator')
-        j.integrate('tempo:tempo-cluster', 'tempo-worker')
+        juju.integrate('tempo:s3', 's3-integrator')
+        juju.integrate('tempo:tempo-cluster', 'tempo-worker')
 
-        j.wait(lambda s: minio_active(s) and s3_integrator_blocked(s))
+        juju.wait(
+            lambda status: jubilant.all_active(status, 'minio')
+            and jubilant.all_blocked(status, 's3-integrator')
+        )
 
-        address = j.status().apps['minio'].address
+        address = juju.status().apps['minio'].address
         mc_client = minio.Minio(
             f'{address}:9000',
             access_key='accesskey',
@@ -51,8 +53,8 @@ def juju() -> Generator[jubilant.Juju, None, None]:
         if not found:
             mc_client.make_bucket('tempo')
 
-        j.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
-        j.run(
+        juju.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
+        juju.run(
             's3-integrator/0',
             'sync-s3-credentials',
             {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
@@ -64,13 +66,13 @@ def juju() -> Generator[jubilant.Juju, None, None]:
         # - new pod is scheduled by k8s
         # - check own stateful set
         #
-        # This process may take a while. I'm unsure about the default timeout.
+        # This process may take a while.
 
-        j.wait(jubilant.all_active)
+        juju.wait(jubilant.all_active)
 
-        yield j
+        yield juju
 
-        print(j.debug_log())
+        print(juju.debug_log())
 
 
 @pytest.fixture(scope='session')
@@ -84,7 +86,7 @@ def build_charm(
     """
     charm_dir = pytestconfig.rootpath / 'test/charms/test_integration'
     proc = subprocess.Popen(
-        ['charmcraft', 'pack'],  # noqa: S607
+        ['charmcraft', 'pack', '--verbose'],  # noqa: S607
         cwd=str(charm_dir),
         universal_newlines=True,
         stdout=subprocess.PIPE,
@@ -99,21 +101,13 @@ def build_charm(
         return str(charm)
 
     yield tracing_test_charm
+
     if proc.returncode is None:
         proc.kill()
-    out, err = proc.communicate()
-    logging.info('`charmcraft pack` stdout follows:\n%s', out)
-    logging.info('`charmcraft pack` stderr follows:\n%s', err)
 
-
-def app_is(s: jubilant.Status, app: str, status: str):
-    return next(iter(s.apps[app].units.values())).workload_status.current == status
-
-
-# These could use jubilant.all_active(s, apps=["minio"]).
-# Keeping custom code for now, as the above API may change.
-minio_active = functools.partial(app_is, app='minio', status='active')
-s3_integrator_blocked = functools.partial(app_is, app='s3-integrator', status='blocked')
+    stdout, stderr = proc.communicate()
+    logging.info('`charmcraft pack` stdout follows:\n%s', stdout)
+    logging.info('`charmcraft pack` stderr follows:\n%s', stderr)
 
 
 def deploy_tempo(juju: jubilant.Juju):
