@@ -51,16 +51,6 @@ def test_direct_connection(build_charm: Callable[[], str], juju: jubilant.Juju):
 
 
 def test_with_load_balancer(build_charm: Callable[[], str], juju: jubilant.Juju):
-    # juju.deploy("traefik-k8s", "traefik", trust=True)
-    # juju.integrate("tempo:ingress", "traefik:traefik-route")
-    # juju.config("traefik", {"juju-external-hostname": "cos.local"})
-    # juju.cli("expose", "traefik")
-
-    # juju.deploy("self-signed-certificates")
-    # juju.integrate("traefik:certificates", "self-signed-certificattes")
-
-    # charm_path = build_charm()
-    # juju.deploy(charm_path)
     pass
 
 
@@ -84,22 +74,6 @@ def test_with_tls(build_charm: Callable[[], str], juju: jubilant.Juju):
 
 
 def test_with_load_balancer_tls(build_charm: Callable[[], str], juju: jubilant.Juju):
-    # juju deploy self-signed-certificates
-    # juju relate traefik:certificates self-signed-certificates
-
-    # juju expose traefik
-
-    # helper
-    # juju run traefik/0 show-proxied-endpoints
-
-    # juju integrate tempo:ingress traefik:traefik-route
-
-    # not sure
-    # juju integrate self-signed-certificates tls-certificates-requirer
-    # juju deploy tls-certificates-requirer --channel=edge
-
-    # juju relate traefik:certificates self-signed-certificates
-    # juju config traefik juju-external-hostname=bb.local
     pass
 
 
