@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: release
+    environment: publish-pypi
     permissions:
       id-token: write
       attestations: write

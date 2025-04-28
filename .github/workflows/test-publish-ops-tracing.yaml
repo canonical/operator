@@ -6,7 +6,6 @@ permissions: {}
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       id-token: write
       attestations: write
