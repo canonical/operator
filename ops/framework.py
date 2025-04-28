@@ -759,9 +759,7 @@ class Framework(Object):
         del self._type_registry[parent_path, kind_]
         self._type_known.remove(cls)
 
-    def _validate_snapshot_data(
-        self, value: StoredStateData | EventBase, data: dict[str, Any]
-    ):
+    def _validate_snapshot_data(self, value: StoredStateData | EventBase, data: dict[str, Any]):
         if type(value) not in self._type_known:
             raise RuntimeError(
                 f'cannot save {type(value).__name__} values before registering that type'
