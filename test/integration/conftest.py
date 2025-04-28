@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 import subprocess
 from typing import Callable, Generator
 
@@ -76,15 +77,55 @@ def juju() -> Generator[jubilant.Juju, None, None]:
 
 
 @pytest.fixture(scope='session')
-def build_charm(
-    pytestconfig: pytest.Config,
-) -> Generator[Callable[[], str], None, None]:
+def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None]:
+    def cleanup():
+        for path in charm_dir.glob("ops*.tar.gz"):
+            path.unlink()
+        for path in charm_dir.glob("*.charm"):
+            path.unlink()
+        if requirements_file.exists():
+            requirements_file.unlink()
+
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'
+    requirements_file = charm_dir / "requirements.txt"
+
+    cleanup()
+
+    subprocess.run([  # noqa: S607
+        "uv",
+        "build",
+        "--sdist",
+        "--directory",
+        pytestconfig.rootpath,
+        "--out-dir",
+        charm_dir])
+
+    subprocess.run([  # noqa: S607
+        "uv",
+        "build",
+        "--sdist",
+        "--directory",
+        pytestconfig.rootpath / 'tracing',
+        "--out-dir",
+        charm_dir])
+
+    requirements_file.write_text(
+        "".join(f"./{ path.name }\n" for path in charm_dir.glob("ops*.tar.gz"))
+    )
+
+    yield charm_dir
+
+    cleanup()
+
+
+@pytest.fixture(scope='session')
+def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str], None, None]:
     """Build the test charm and provide the artefact path.
 
-    Starts building the tracing-tester charm early.
+    Starts building the test-tracing charm early.
     Call the fixture value to get the built charm file path.
     """
-    charm_dir = pytestconfig.rootpath / 'test/charms/test_integration'
+    __import__("pdb").set_trace()  # FIXME
     proc = subprocess.Popen(
         ['charmcraft', 'pack', '--verbose'],  # noqa: S607
         cwd=str(charm_dir),
@@ -93,14 +134,14 @@ def build_charm(
         stderr=subprocess.PIPE,
     )
 
-    def tracing_test_charm():
+    def wait_for_build_to_complete():
         proc.communicate()
         assert proc.returncode == 0
-        charm = charm_dir / 'tracing-tester_amd64.charm'
+        charm = charm_dir / 'test-tracing_amd64.charm'
         assert charm.exists()
         return str(charm)
 
-    yield tracing_test_charm
+    yield wait_for_build_to_complete
 
     if proc.returncode is None:
         proc.kill()
