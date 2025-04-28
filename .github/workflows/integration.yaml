@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron:  '42 7 25 * *'
-  # Temporary, don't merge the PR trigger
-  pull_request:
 
 jobs:
   test:
