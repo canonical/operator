@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import os
 import pathlib
 import shutil
 import subprocess
 import tempfile
-import typing
 import unittest
 
 import pytest
@@ -41,7 +42,7 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
         test_case.addCleanup(cleanup)
         test_case.fake_script_path = pathlib.Path(fake_script_path)  # type: ignore
 
-    template_args: typing.Dict[str, str] = {
+    template_args: dict[str, str] = {
         'name': name,
         'path': test_case.fake_script_path.as_posix(),  # type: ignore
         'content': content,
@@ -64,9 +65,7 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
     )
 
 
-def fake_script_calls(
-    test_case: unittest.TestCase, clear: bool = False
-) -> typing.List[typing.List[str]]:
+def fake_script_calls(test_case: unittest.TestCase, clear: bool = False) -> list[list[str]]:
     calls_file: pathlib.Path = test_case.fake_script_path / 'calls.txt'  # type: ignore
     if not calls_file.exists():  # type: ignore
         return []
@@ -80,9 +79,7 @@ def fake_script_calls(
     return calls  # type: ignore
 
 
-def create_framework(
-    request: pytest.FixtureRequest, *, meta: typing.Optional[ops.CharmMeta] = None
-):
+def create_framework(request: pytest.FixtureRequest, *, meta: ops.CharmMeta | None = None):
     env_backup = os.environ.copy()
     os.environ['PATH'] = os.pathsep.join([
         str(pathlib.Path(__file__).parent / 'bin'),
@@ -131,7 +128,7 @@ class FakeScript:
     def __init__(
         self,
         request: pytest.FixtureRequest,
-        path: typing.Optional[pathlib.Path] = None,
+        path: pathlib.Path | None = None,
     ):
         if path is None:
             fake_script_path = tempfile.mkdtemp('-fake_script')
@@ -148,7 +145,7 @@ class FakeScript:
             self.path = path
 
     def write(self, name: str, content: str):
-        template_args: typing.Dict[str, str] = {
+        template_args: dict[str, str] = {
             'name': name,
             'path': self.path.as_posix(),
             'content': content,
@@ -179,7 +176,7 @@ done
             f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n'
         )
 
-    def calls(self, clear: bool = False) -> typing.List[typing.List[str]]:
+    def calls(self, clear: bool = False) -> list[list[str]]:
         calls_file: pathlib.Path = self.path / 'calls.txt'
         if not calls_file.exists():
             return []
@@ -192,7 +189,7 @@ done
                 f.truncate(0)
         return calls
 
-    def secrets(self) -> typing.Dict[str, str]:
+    def secrets(self) -> dict[str, str]:
         return {p.stem: p.read_text() for p in self.path.iterdir() if p.suffix == '.secret'}
 
 

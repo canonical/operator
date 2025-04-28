@@ -195,7 +195,7 @@ def _max_posargs(n: int):
         def __reduce__(self):
             # The default __reduce__ doesn't understand that some arguments have
             # to be passed as keywords, so using the copy module fails.
-            attrs = cast(Dict[str, Any], super().__reduce__()[2])
+            attrs = cast('Dict[str, Any]', super().__reduce__()[2])
             return (lambda: self.__class__(**attrs), ())
 
     return _MaxPositionalArgs
@@ -1038,8 +1038,8 @@ class Container(_max_posargs(1)):
                     services[name] = service
         return services
 
-    def _render_checks(self) -> Dict[str, pebble.Check]:
-        checks: Dict[str, pebble.Check] = {}
+    def _render_checks(self) -> dict[str, pebble.Check]:
+        checks: dict[str, pebble.Check] = {}
         for layer in self.layers.values():
             for name, check in layer.checks.items():
                 if name in checks and check.override == 'merge':
@@ -1048,8 +1048,8 @@ class Container(_max_posargs(1)):
                     checks[name] = check
         return checks
 
-    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
-        log_targets: Dict[str, pebble.LogTarget] = {}
+    def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
+        log_targets: dict[str, pebble.LogTarget] = {}
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
                 if name in log_targets and log_target.override == 'merge':
@@ -1954,7 +1954,7 @@ class _Event:  # type: ignore
     @property
     def _path(self) -> _EventPath:
         # we converted it in __post_init__, but the type checker doesn't know about that
-        return cast(_EventPath, self.path)
+        return cast('_EventPath', self.path)
 
     @property
     def name(self) -> str:
@@ -2058,7 +2058,7 @@ class _Event:  # type: ignore
             snapshot_data['container_name'] = self.container.name
             if self.notice:
                 if hasattr(self.notice.type, 'value'):
-                    notice_type = cast(pebble.NoticeType, self.notice.type).value
+                    notice_type = cast('pebble.NoticeType', self.notice.type).value
                 else:
                     notice_type = str(self.notice.type)
                 snapshot_data.update(

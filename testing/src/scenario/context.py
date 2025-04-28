@@ -48,7 +48,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from ._ops_main_mock import Ops
     from .state import (
         AnyJson,
-        CharmType,
         JujuLogLine,
         RelationBase,
         State,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Type
-
 import pytest
 from ops.charm import (
     CharmBase,
@@ -33,7 +31,7 @@ from tests.helpers import trigger
 def mycharm():
     class MyCharmEvents(CharmEvents):
         @classmethod
-        def define_event(cls, event_kind: str, event_type: 'Type[EventBase]'):
+        def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
             if getattr(cls, event_kind, None):
                 delattr(cls, event_kind)
             return super().define_event(event_kind, event_type)

@@ -1,5 +1,7 @@
 """pytest configuration for testing the README"""
 
+from __future__ import annotations
+
 import ops
 
 import scenario

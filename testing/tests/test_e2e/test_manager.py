@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from ops import ActiveStatus
 from ops.charm import CharmBase, CollectStatusEvent

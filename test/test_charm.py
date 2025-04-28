@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import annotations
+
 import functools
 import pathlib
 import tempfile
@@ -45,7 +48,7 @@ def test_basic(request: pytest.FixtureRequest):
 
     framework = create_framework(request)
 
-    events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
+    events: list[str] = list(MyCharm.on.events())  # type: ignore
     assert 'install' in events
     assert 'custom' in events
 
@@ -65,13 +68,13 @@ def test_observe_decorated_method(request: pytest.FixtureRequest):
     # is more careful and it still works, this test is here to ensure that
     # it keeps working in future releases, as this is presently the only
     # way we know of to cleanly decorate charm event observers.
-    events: typing.List[ops.EventBase] = []
+    events: list[ops.EventBase] = []
 
     def dec(fn: typing.Any) -> typing.Callable[..., None]:
         # simple decorator that appends to the nonlocal
         # `events` list all events it receives
         @functools.wraps(fn)
-        def wrapper(charm: 'MyCharm', evt: ops.EventBase):
+        def wrapper(charm: MyCharm, evt: ops.EventBase):
             events.append(evt)
             fn(charm, evt)
 
@@ -145,7 +148,7 @@ def test_relation_events(request: pytest.FixtureRequest):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             for rel in ('req1', 'req-2', 'pro1', 'pro-2', 'peer1', 'peer-2'):
                 # Hook up relation events to generic handler.
                 self.framework.observe(self.on[rel].relation_joined, self.on_any_relation)
@@ -213,7 +216,7 @@ def test_storage_events(request: pytest.FixtureRequest, fake_script: FakeScript)
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             self.framework.observe(self.on['stor1'].storage_attached, self._on_stor1_attach)
             self.framework.observe(self.on['stor2'].storage_detaching, self._on_stor2_detach)
             self.framework.observe(self.on['stor3'].storage_attached, self._on_stor3_attach)
@@ -339,8 +342,8 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
 
     def mock_check_info(
         self: ops.pebble.Client,
-        level: typing.Optional[ops.pebble.CheckLevel] = None,
-        names: typing.Optional[typing.Iterable[str]] = None,
+        level: ops.pebble.CheckLevel | None = None,
+        names: typing.Iterable[str] | None = None,
     ):
         assert names is not None
         names = list(names)
@@ -359,7 +362,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             for workload in ('container-a', 'containerb'):
                 # Hook up relation events to generic handler.
                 self.framework.observe(self.on[workload].pebble_ready, self.on_any_pebble_ready)
@@ -381,7 +384,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
             self.seen.append(type(event).__name__)
 
         def on_any_pebble_check_event(
-            self, event: typing.Union[ops.PebbleCheckFailedEvent, ops.PebbleCheckRecoveredEvent]
+            self, event: ops.PebbleCheckFailedEvent | ops.PebbleCheckRecoveredEvent
         ):
             self.seen.append(type(event).__name__)
             info = event.info
@@ -647,7 +650,7 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     framework = create_framework(request, meta=meta)
     charm = MyCharm(framework)
 
-    events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
+    events: list[str] = list(MyCharm.on.events())  # type: ignore
     assert 'foo_bar_action' in events
     assert 'start_action' in events
 
@@ -673,12 +676,12 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     ],
 )
 def test_invalid_action_results(
-    request: pytest.FixtureRequest, fake_script: FakeScript, bad_res: typing.Dict[str, typing.Any]
+    request: pytest.FixtureRequest, fake_script: FakeScript, bad_res: dict[str, typing.Any]
 ):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.res: typing.Dict[str, typing.Any] = {}
+            self.res: dict[str, typing.Any] = {}
             framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
 
         def _on_foo_bar_action(self, event: ops.ActionEvent):
@@ -709,7 +712,7 @@ def test_inappropriate_event_defer_fails(
     monkeypatch: pytest.MonkeyPatch,
     fake_script: FakeScript,
     event: str,
-    kwargs: typing.Dict[str, typing.Any],
+    kwargs: dict[str, typing.Any],
 ):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -834,7 +837,7 @@ def test_secret_events(request: pytest.FixtureRequest):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             self.framework.observe(self.on.secret_changed, self.on_secret_changed)
             self.framework.observe(self.on.secret_rotate, self.on_secret_rotate)
             self.framework.observe(self.on.secret_remove, self.on_secret_remove)
@@ -887,9 +890,7 @@ def test_secret_event_remove_revision(
             super().__init__(framework)
             self.framework.observe(getattr(self.on, event), self.on_secret_event)
 
-        def on_secret_event(
-            self, event: typing.Union[ops.SecretRemoveEvent, ops.SecretExpiredEvent]
-        ):
+        def on_secret_event(self, event: ops.SecretRemoveEvent | ops.SecretExpiredEvent):
             event.remove_revision()
 
     framework = create_framework(request)
@@ -909,7 +910,7 @@ def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_scr
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.secrets: typing.List[ops.Secret] = []
+            self.secrets: list[ops.Secret] = []
             self.framework.observe(self.on.secret_changed, self.on_secret_changed)
 
         def on_secret_changed(self, event: ops.SecretChangedEvent):
@@ -1098,11 +1099,11 @@ def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: Fake
 def test_collect_status_priority_valid(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
-    statuses: typing.List[StatusName],
+    statuses: list[StatusName],
     expected: str,
 ):
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework, statuses: typing.List[StatusName]):
+        def __init__(self, framework: ops.Framework, statuses: list[StatusName]):
             super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
             self.statuses = statuses
@@ -1133,10 +1134,10 @@ def test_collect_status_priority_valid(
 def test_collect_status_priority_invalid(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
-    statuses: typing.List[StatusName],
+    statuses: list[StatusName],
 ):
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework, statuses: typing.List[StatusName]):
+        def __init__(self, framework: ops.Framework, statuses: list[StatusName]):
             super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
             self.statuses = statuses

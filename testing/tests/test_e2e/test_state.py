@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import copy
 from dataclasses import asdict, replace
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 import ops
 import pytest
@@ -49,7 +51,7 @@ CUSTOM_EVT_SUFFIXES = {
 def mycharm():
     class MyCharmEvents(CharmEvents):
         @classmethod
-        def define_event(cls, event_kind: str, event_type: 'Type[EventBase]'):
+        def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
             if getattr(cls, event_kind, None):
                 delattr(cls, event_kind)
             return super().define_event(event_kind, event_type)
@@ -270,7 +272,7 @@ def test_checkinfo_changeid_none():
 
 
 @pytest.mark.parametrize('id', ('', '28'))
-def test_checkinfo_changeid(id: Optional[str]):
+def test_checkinfo_changeid(id: str | None):
     info = CheckInfo('foo', change_id=ops.pebble.ChangeID(id))
     assert info.change_id == ops.pebble.ChangeID(id)
 
@@ -376,7 +378,7 @@ def test_replace_state():
     ],
 )
 def test_immutable_content_dict(
-    component: Type[object], attribute: str, required_args: Dict[str, Any]
+    component: type[object], attribute: str, required_args: dict[str, Any]
 ):
     content = {'foo': 'bar'}
     obj1 = component(**required_args, **{attribute: content})
@@ -404,7 +406,7 @@ def test_immutable_content_dict(
     ],
 )
 def test_immutable_content_list(
-    component: Type[object], attribute: str, required_args: Dict[str, Any]
+    component: type[object], attribute: str, required_args: dict[str, Any]
 ):
     content = ['foo', 'bar']
     obj1 = component(**required_args, **{attribute: content})
@@ -428,7 +430,7 @@ def test_immutable_content_list(
     ],
 )
 def test_immutable_content_dict_of_dicts(
-    component: Type[object], attribute: str, required_args: Dict[str, Any]
+    component: type[object], attribute: str, required_args: dict[str, Any]
 ):
     content = {0: {'foo': 'bar'}, 1: {'baz': 'qux'}}
     obj1 = component(**required_args, **{attribute: content})
