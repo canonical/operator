@@ -20,10 +20,10 @@ import opentelemetry.trace
 
 import ops
 
-tracer = opentelemetry.trace.get_tracer('TracingTester')
+tracer = opentelemetry.trace.get_tracer('TestTracing')
 
 
-class TracingTesterCharm(ops.CharmBase):
+class TestTracingCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.tracing = ops.tracing.Tracing(
@@ -41,7 +41,7 @@ class TracingTesterCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus('ok')
         print('WAT?')
 
-    @tracer.start_as_current_span('on action')
+    @tracer.start_as_current_span('custom trace on any action')
     def _on_action(self, event: ops.ActionEvent):
         time.sleep(1)
         opentelemetry.trace.get_current_span().set_attribute('arg', event.params.get('arg') or '')
@@ -49,4 +49,4 @@ class TracingTesterCharm(ops.CharmBase):
 
 
 if __name__ == '__main__':
-    ops.main(TracingTesterCharm)
+    ops.main(TestTracingCharm)

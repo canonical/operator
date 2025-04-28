@@ -8,6 +8,8 @@ used by the framework to signal errors or inconsistencies in the charm tests
 themselves.
 """
 
+from __future__ import annotations
+
 
 class ContextSetupError(RuntimeError):
     """Raised by Context when setup fails."""

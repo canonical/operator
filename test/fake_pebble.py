@@ -14,6 +14,8 @@
 
 """Fake (partial) Pebble server to allow testing the HTTP-over-Unix-socket protocol."""
 
+from __future__ import annotations
+
 import http.server
 import json
 import os
@@ -47,7 +49,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def __init__(
         self,
         request: socket.socket,
-        client_address: typing.Tuple[str, int],
+        client_address: tuple[str, int],
         server: socketserver.BaseServer,
     ):
         self.routes: Handler._route = [
@@ -124,7 +126,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         path = path[3:]
 
-        allowed: typing.List[str] = []
+        allowed: list[str] = []
         for method, regex, func in self.routes:
             match = regex.match(path)
             if match:
@@ -144,7 +146,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         self.not_found()
 
-    def read_body_json(self) -> typing.Dict[str, str]:
+    def read_body_json(self) -> dict[str, str]:
         try:
             content_len = int(self.headers.get('Content-Length', ''))
         except ValueError:
@@ -156,9 +158,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = body.decode('utf-8')
         return json.loads(body)
 
-    def get_system_info(
-        self, match: typing.Any, query: typing.Dict[str, str], data: typing.Dict[str, str]
-    ):
+    def get_system_info(self, match: typing.Any, query: dict[str, str], data: dict[str, str]):
         self.respond({
             'result': {'version': '3.14.159'},
             'status': 'OK',
@@ -166,9 +166,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             'type': 'sync',
         })
 
-    def services_action(
-        self, match: typing.Any, query: typing.Dict[str, str], data: typing.Dict[str, str]
-    ):
+    def services_action(self, match: typing.Any, query: dict[str, str], data: dict[str, str]):
         action = data['action']
         services = data['services']
         if action == 'start':
@@ -187,7 +185,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.bad_request(f'action "{action}" not implemented')
 
 
-def start_server() -> typing.Tuple[typing.Callable[[], None], str]:
+def start_server() -> tuple[typing.Callable[[], None], str]:
     socket_dir = tempfile.mkdtemp(prefix='test-ops.pebble')
     socket_path = os.path.join(socket_dir, 'test.socket')
 

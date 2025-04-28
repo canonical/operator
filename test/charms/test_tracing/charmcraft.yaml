@@ -1,7 +1,7 @@
 ---
-name: tracing-tester
+name: test-tracing
 type: charm
-title: Tracing tester
+title: Test tracing
 summary: Test tracing
 description: Test tracing
 
@@ -11,7 +11,7 @@ platforms:
     amd64:
 
 parts:
-    tracing-tester:
+    test-tracing:
         plugin: charm
         source: .
         build-packages:

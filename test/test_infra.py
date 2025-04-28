@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import os
 import pathlib
 import subprocess
 import sys
-import typing
 
 import pytest
 
@@ -67,6 +68,8 @@ def test_ops_testing_doc():
     expected_names.update(
         f'errors.{name}' for name in dir(ops.testing.errors) if not name.startswith('_')
     )
+    # we don't document `from __future__ import annotations`
+    expected_names.discard('errors.annotations')
     # ops.testing.UnitID is `int` - we don't document it, but it's hard to fit
     # into the above logic, so we just exclude it here.
     expected_names.discard('UnitID')
@@ -75,7 +78,7 @@ def test_ops_testing_doc():
     # even though the above compatibility_names logic would exclude it.
     expected_names.add('Container')
 
-    found_names: typing.Set[str] = set()
+    found_names: set[str] = set()
     for test_doc in (
         'docs/reference/ops-testing-harness.rst',
         'docs/reference/ops-testing.rst',

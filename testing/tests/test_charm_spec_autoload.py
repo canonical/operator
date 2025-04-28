@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import importlib
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Type
 
 import pytest
 import yaml
@@ -19,7 +20,7 @@ class MyCharm(CharmBase): pass
 
 
 @contextmanager
-def import_name(name: str, source: Path) -> Type[CharmType]:
+def import_name(name: str, source: Path) -> type[CharmType]:
     pkg_path = str(source.parent)
     sys.path.append(pkg_path)
     charm = importlib.import_module('mycharm')
