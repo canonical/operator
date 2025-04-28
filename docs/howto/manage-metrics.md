@@ -61,9 +61,10 @@ class MyCharm(ops.CharmBase):
     self._replace_identities(username, password)
 
   def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
-    content = event.secret.peek_content()
-    username, password = content["username"], content["password"]
-    self._replace_identities(username, password)
+    if event.secret.id == self.config['metrics-secret-id']:
+      content = event.secret.peek_content()
+      username, password = content["username"], content["password"]
+      self._replace_identities(username, password)
 
   def _replace_identities(self, username: str, password: str) -> None:
     identities = {
