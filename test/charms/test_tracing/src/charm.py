@@ -20,7 +20,7 @@ import opentelemetry.trace
 
 import ops
 
-tracer = opentelemetry.trace.get_tracer('TracingTester')
+tracer = opentelemetry.trace.get_tracer('TestTracing')
 
 
 class TestTracingCharm(ops.CharmBase):
