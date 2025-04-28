@@ -744,7 +744,7 @@ class Framework(Object):
 
     def _unregister_type(
         self,
-        cls: Type[Serializable],
+        cls: type[Serializable],
         parent: Handle | Object | None,
         kind: str | None = None,
     ):
