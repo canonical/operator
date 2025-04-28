@@ -25,7 +25,6 @@ import jubilant
 
 
 def test_direct_connection(build_charm: Callable[[], str], juju: jubilant.Juju):
-    __import__('pdb').set_trace()
     charm_path = build_charm()
     juju.deploy(charm_path)
     juju.integrate('test-tracing', 'tempo')
@@ -56,7 +55,6 @@ def test_with_load_balancer(build_charm: Callable[[], str], juju: jubilant.Juju)
 
 
 def test_with_tls(build_charm: Callable[[], str], juju: jubilant.Juju):
-    __import__('pdb').set_trace()
     charm_path = build_charm()
     juju.deploy('self-signed-certificates')
     juju.integrate('tempo:certificates', 'self-signed-certificates')
