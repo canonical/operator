@@ -14,10 +14,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        preset: ['microk8s']  # ['k8s'] https://github.com/jnsgruk/concierge/issues/51
+        preset: ['k8s, 'microk8s']
         test-group: [1, 2, 3, 4]
 
     steps:
+      - run: |
+           # Work around https://github.com/jnsgruk/concierge/issues/30
+           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io 
+           sudo rm -rf /run/containerd 
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
