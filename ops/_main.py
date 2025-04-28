@@ -426,6 +426,8 @@ class _Manager:
         self._emit_charm_event(charm, event_name)
         # Emit collect-status events.
         _charm._evaluate_status(charm)
+        # Send any relation data stored in databag objects through to Juju.
+        _charm._send_databag_to_juju(self.charm)
 
     def _get_event_to_emit(
         self, charm: _charm.CharmBase, event_name: str
@@ -533,3 +535,6 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
     finally:
         if manager:
             manager._destroy()
+
+
+# TODO: add in support for Scenario automatically JSON'ing the relation content.

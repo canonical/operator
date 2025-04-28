@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import contextvars
+import copy
 import dataclasses
 import datetime
 import enum
@@ -52,6 +53,7 @@ from typing import (
     MutableMapping,
     TextIO,
     TypedDict,
+    TypeVar,
     Union,
     get_args,
 )
@@ -115,6 +117,13 @@ _NetworkDict = TypedDict(
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+
+
+_InterfaceType = TypeVar('_InterfaceType')
+
+
+class InvalidSchemaError(Exception):
+    """Raised when a config, action parameter, or databag schema does not match the data."""
 
 
 class Model:
@@ -349,6 +358,7 @@ class _ModelCache:
         self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
             collections.defaultdict(dict)
         )
+        self._databag_obj_cache: dict[tuple[int, Union[Application, Unit]], Any] = {}
         self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
 
     @typing.overload
@@ -922,7 +932,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
-        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
+        self._data: _RelationMapping_Raw = dict.fromkeys(relations_meta)
 
     def __contains__(self, key: str):
         return key in self._data
@@ -1725,6 +1735,7 @@ class Relation:
         self.units: set[Unit] = set()
         self.active = active
         self._backend = backend
+        self._cache = cache
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1748,8 +1759,8 @@ class Relation:
                 app = cache.get(Application, app_name)
 
         # self.app will not be None and always be set because of the fallback mechanism above.
-        self.app = typing.cast('Application', app)
-        self.data = RelationData(self, our_unit, backend)
+        self.app = typing.cast(Application, app)
+        self.data = RelationData(self, our_unit, backend, cache)
 
         self._remote_model: RemoteModel | None = None
 
@@ -1771,6 +1782,71 @@ class Relation:
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
 
+    def load_data(
+        self,
+        cls: type[_InterfaceType],
+        app_or_unit: Union[Unit, Application],
+        *args: Any,
+        decoder: Callable[[Any], Any] | None = None,
+        encoder: Callable[[Any], Any] | None = None,
+        **kwargs: Any,
+    ) -> _InterfaceType:
+        """Load the data for this relation into an instance of a databag class.
+
+        The object will be instantiated with the data from the relation databag.
+        If the app or unit data has already been loaded into an object, then the
+        same object is returned (and the decoder, encoder and positional and
+        keyword arguments passed in this call are not used).
+
+        Any additional positional or keyword arguments will be passed through to
+        the databag class.
+
+        Args:
+            cls: A class that inherits from :class:`ops.DatabagBase`.
+            app_or_unit: The databag to load. This can be either a :class:`Unit`
+                or :class:`Application` instance.
+            decoder: An optional callable that will be used to decode each field
+                before loading into the class. If not provided, json.loads will
+                be used.
+            encoder: An optional callable that will be used to encode each field
+                before passing to Juju. If not provided, json.dumps will be
+                used.
+            args: positional arguments to pass through to the databag class.
+            kwargs: keyword arguments to pass through to the databag class.
+
+        Returns:
+            An instance of the databag class with the current relation data values.
+
+        Raises:
+            TypeError: if the same app or unit data is already loaded into a
+                different databag class.
+            InvalidSchemaError: if the databag class cannot be instantiated with the
+                provided data.
+        """
+        # If we have already created an object connected to the databag, then
+        # we need to return the same object, so that users can't make conflicting
+        # changes that we would need to resolve when sending the data to Juju.
+        if (self.id, app_or_unit) in self._cache._databag_obj_cache:
+            obj = self._cache._databag_obj_cache[self.id, app_or_unit][0]
+            if type(obj) is not cls:
+                raise TypeError(
+                    f'Cannot load data for {app_or_unit} into {cls.__name__}, '
+                    f'it is already loaded into {type(obj).__name__}'
+                )
+            return obj
+        data = copy.deepcopy(kwargs)
+        if decoder is None:
+            decoder = json.loads
+        content = {k: decoder(v) for k, v in self.data[app_or_unit].items()}
+        data.update(**content)
+        try:
+            obj = cls(*args, **data)
+        except ValueError as e:
+            self._backend.status_set('waiting', f'Error in relation data: {e}')
+            raise InvalidSchemaError() from e
+        self._cache._databag_obj_cache[self.id, app_or_unit] = obj, decoder, encoder
+        return obj
+
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
@@ -1787,19 +1863,28 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     :attr:`Relation.data`
     """
 
-    def __init__(self, relation: Relation, our_unit: Unit, backend: _ModelBackend):
+    def __init__(
+        self,
+        relation: Relation,
+        our_unit: Unit,
+        backend: _ModelBackend,
+        cache: _ModelCache | None = None,
+    ):
         self.relation = weakref.proxy(relation)
-        self._data: dict[Unit | Application, RelationDataContent] = {
-            our_unit: RelationDataContent(self.relation, our_unit, backend),
-            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
+        self._data: dict[Union[Unit, Application], RelationDataContent] = {
+            our_unit: RelationDataContent(self.relation, our_unit, backend, cache),
+            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend, cache),
         }
         self._data.update({
-            unit: RelationDataContent(self.relation, unit, backend) for unit in self.relation.units
+            unit: RelationDataContent(self.relation, unit, backend, cache)
+            for unit in self.relation.units
         })
         # The relation might be dead so avoid a None key here.
         if self.relation.app is not None:
             self._data.update({
-                self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
+                self.relation.app: RelationDataContent(
+                    self.relation, self.relation.app, backend, cache
+                ),
             })
 
     def __contains__(self, key: Unit | Application):
@@ -1823,10 +1908,17 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(self, relation: Relation, entity: Unit | Application, backend: _ModelBackend):
+    def __init__(
+        self,
+        relation: Relation,
+        entity: Union[Unit, Application],
+        backend: _ModelBackend,
+        cache: _ModelCache | None = None,
+    ):
         self.relation = relation
         self._entity = entity
         self._backend = backend
+        self._cache = cache
         self._is_app: bool = isinstance(entity, Application)
 
     @property
@@ -1943,6 +2035,20 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend.update_relation_data(
             relation_id=self.relation.id, entity=self._entity, data=data
         )
+        # If there is also a databag object bound to this set of data, then
+        # update that as well.
+        if not self._cache:
+            return
+        try:
+            databag = self._cache._databag_obj_cache[self.relation.id, self._entity][0]
+        except KeyError:
+            return
+        # Note that the databag doesn't support removing attributes. Note also
+        # that the value here is not automatically encoded - doing that via the
+        # relation.data approach would be too magic and likely unexpected. The
+        # caller is responsible for encoding the value if necessary.
+        for key, value in data.items():
+            setattr(databag, key, value)
 
     def _update_cache(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
@@ -1959,6 +2065,15 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __getitem__(self, key: str) -> str:
         self._validate_read()
+        # If there is also a databag object bound to this set of data, then
+        # prefer its value over our own cache.
+        if self._cache:
+            try:
+                databag = self._cache._databag_obj_cache[self.relation.id, self._entity][0]
+            except KeyError:
+                pass
+            else:
+                return getattr(databag, key, self._data[key])
         return super().__getitem__(key)
 
     def update(
@@ -2186,7 +2301,7 @@ class Resources:
 
     def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._paths: dict[str, Path | None] = {name: None for name in names}
+        self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
@@ -2237,9 +2352,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._storage_map: _StorageDictType = {
-            storage_name: None for storage_name in storage_names
-        }
+        self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
     def __contains__(self, key: str):
         return key in self._storage_map
