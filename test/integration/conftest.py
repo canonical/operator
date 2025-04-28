@@ -79,38 +79,49 @@ def juju() -> Generator[jubilant.Juju, None, None]:
 @pytest.fixture(scope='session')
 def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None]:
     def cleanup():
-        for path in charm_dir.glob("ops*.tar.gz"):
+        for path in charm_dir.glob('ops*.tar.gz'):
             path.unlink()
-        for path in charm_dir.glob("*.charm"):
+        for path in charm_dir.glob('*.charm'):
             path.unlink()
         if requirements_file.exists():
             requirements_file.unlink()
 
     charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'
-    requirements_file = charm_dir / "requirements.txt"
+    requirements_file = charm_dir / 'requirements.txt'
 
     cleanup()
 
-    subprocess.run([  # noqa: S607
-        "uv",
-        "build",
-        "--sdist",
-        "--directory",
-        pytestconfig.rootpath,
-        "--out-dir",
-        charm_dir])
+    try:
+        subprocess.run(
+            [  # noqa: S607
+                'uv',
+                'build',
+                '--sdist',
+                '--directory',
+                pytestconfig.rootpath,
+                '--out-dir',
+                charm_dir,
+            ],
+            stderr=subprocess.PIPE,
+        )
 
-    subprocess.run([  # noqa: S607
-        "uv",
-        "build",
-        "--sdist",
-        "--directory",
-        pytestconfig.rootpath / 'tracing',
-        "--out-dir",
-        charm_dir])
+        subprocess.run(
+            [  # noqa: S607
+                'uv',
+                'build',
+                '--sdist',
+                '--directory',
+                pytestconfig.rootpath / 'tracing',
+                '--out-dir',
+                charm_dir,
+            ],
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as e:
+        logging.error('%s stderr:\n%s', e.cmd, e.stderr)
 
     requirements_file.write_text(
-        "".join(f"./{ path.name }\n" for path in charm_dir.glob("ops*.tar.gz"))
+        ''.join(f'./{path.name}\n' for path in charm_dir.glob('ops*.tar.gz'))
     )
 
     yield charm_dir
@@ -125,7 +136,6 @@ def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str], None, N
     Starts building the test-tracing charm early.
     Call the fixture value to get the built charm file path.
     """
-    __import__("pdb").set_trace()  # FIXME
     proc = subprocess.Popen(
         ['charmcraft', 'pack', '--verbose'],  # noqa: S607
         cwd=str(charm_dir),

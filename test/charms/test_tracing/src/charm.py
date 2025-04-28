@@ -23,7 +23,7 @@ import ops
 tracer = opentelemetry.trace.get_tracer('TracingTester')
 
 
-class TracingTesterCharm(ops.CharmBase):
+class TestTracingCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.tracing = ops.tracing.Tracing(
@@ -49,4 +49,4 @@ class TracingTesterCharm(ops.CharmBase):
 
 
 if __name__ == '__main__':
-    ops.main(TracingTesterCharm)
+    ops.main(TestTracingCharm)
