@@ -5,23 +5,12 @@
 
 ## Prepare your environment
 
-Hit the ground running with Ops by setting up standard project structure and tools.
+You'll need the following tools:
 
-> See more: {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`
+- Charmcraft. See {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`.
+- tox. See the [tox installation instructions](https://tox.wiki/en/stable/installation.html#as-tool).
 
-Other useful tools:
-
-```{tip}
-To prepare an environment for running integration tests, such as in CI, use
-the `concierge tool <https://github.com/jnsgruk/concierge>`_ or the
-`actions-operator <https://github.com/charmed-kubernetes/actions-operator>`_.
-```
-
-```{tip}
-The `charming-actions <https://github.com/canonical/charming-actions>`_
-repository includes actions to ensure that libraries are up-to-date, publish
-charms and libraries, and more.
-```
+Instead of installing these tools manually, consider using the `charm-dev` [Multipass](https://canonical.com/multipass) blueprint or [`concierge`](https://github.com/jnsgruk/concierge) to prepare your environment.
 
 ## Initialise your charm project
 
@@ -29,28 +18,18 @@ Use Charmcraft to quickly initialise your charm project. This generates the
 folder structure, creates placeholder configuration and code files, and
 configures development tooling.
 
-The Charmcraft profiles also all provide the recommended tooling and
-configuration for developing charms. You'll need to install
-[`tox`](https://tox.wiki/en/stable/), and can then run ``tox list`` in the root
-folder to see the available commands.
-
 > See more:
 >
 > * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
 > * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
 
+<!--
+TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
+-->
+
 ## Develop your charm
 
-The Charmcraft profile you've chosen has configured a number of recommended
-tools for developing charms. To use these, [install
-`tox`](https://tox.wiki/en/stable/installation.html#as-tool) on your development
-server.
-
-```{tip}
-If you use the `charm-dev` [Multipass](https://canonical.com/multipass)
-blueprint or the [`concierge`](https://github.com/jnsgruk/concierge) tool to
-configure your development environment, you'll already have `tox` installed.
-```
+The Charmcraft profile has configured some commands to help you develop your charm:
 
 - Run `tox` to format and lint the code, and run static type checking and the
   charm unit tests.
@@ -60,11 +39,16 @@ configure your development environment, you'll already have `tox` installed.
 ```{admonition} Best practice
 :class: hint
 
-All charms should provide the commands configured by the charmcraft profiles, to
-allow easily testing across the charm ecosystem. It's fine to tweak the
+All charms should provide the commands configured by the Charmcraft profile, to
+allow easy testing across the charm ecosystem. It's fine to tweak the
 configuration of individual tools, or to add additional commands, but keep the
-command names and meanings that the profiles provide.
+command names and meanings that the profile provides.
 ```
+
+The following tools can also be useful during development:
+
+- To prepare an environment for running integration tests, such as in continuous integration, use [`concierge`](https://github.com/jnsgruk/concierge) or [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator).
+- The [`charming-actions`](https://github.com/canonical/charming-actions) repository includes actions to ensure that libraries are up-to-date, publish charms and libraries, and more.
 
 ```{admonition} Best practice
 :class: hint
@@ -73,19 +57,21 @@ The quality assurance pipeline of a charm should be automated using a
 continuous integration (CI) system.
 ```
 
-<!--
-TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
--->
-
 The essence of a charm is the ``src/charm.py`` file. This is the entry point for
 your code whenever Juju emits an event, and defines the interface between Juju
 and the charm workflow.
 
-> See more: {ref}`run-workloads-with-a-charm-kubernetes`, {ref}`run-workloads-with-a-charm-machines`, {ref}`write-and-structure-charm-code`, {ref}`write-unit-tests-for-a-charm`, {ref}`write-integration-tests-for-a-charm`, {ref}`manage-logs`
+> See more:
+>
+> - {ref}`run-workloads-with-a-charm-kubernetes`
+> - {ref}`run-workloads-with-a-charm-machines`
+> - {ref}`write-and-structure-charm-code`
+> - {ref}`write-unit-tests-for-a-charm`
+> - {ref}`write-integration-tests-for-a-charm`
+> - {ref}`manage-logs`
 
 The next thing to do is add functionality to your charm.
 As you do that, you'll frequently pack, test, and debug your charm.
-Finally, when you're ready, you'll publish your charm on Charmhub.
 
 ```{admonition} Best practice
 :class: hint
