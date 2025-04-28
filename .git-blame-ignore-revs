@@ -15,3 +15,6 @@ eea8d273a6cc3717f495507d556b2e24a6e6ae79
 
 # drop quote-style double from testing and run format
 54f03272439e1e7c450afc5e6b65222f640351fa
+
+# from __future__ import annotations
+425eae45307338f353279d7ae788581195393290
