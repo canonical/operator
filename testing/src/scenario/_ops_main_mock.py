@@ -12,13 +12,8 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    FrozenSet,
     Generic,
-    List,
     Sequence,
-    Set,
-    Tuple,
     cast,
 )
 
@@ -138,7 +133,7 @@ class Ops(_Manager, Generic[CharmType]):
         self.charm_spec = charm_spec
         self.store = None
         self._juju_context = juju_context
-        self.captured_events: List[ops.EventBase] = []
+        self.captured_events: list[ops.EventBase] = []
 
         try:
             import ops_tracing._mock  # break circular import
@@ -248,7 +243,7 @@ class Ops(_Manager, Generic[CharmType]):
 
     def _get_event_args(
         self, charm: ops.CharmBase, bound_event: ops.framework.BoundEvent
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+    ) -> tuple[list[Any], dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
         # Juju events). We also handle converting from Scenario to ops types,
@@ -321,7 +316,7 @@ class CapturingFramework(ops.Framework):
                 event = self.load_snapshot(event_handle)
             except ops.NoTypeError:
                 continue
-            event = cast(ops.EventBase, event)
+            event = cast('ops.EventBase', event)
             event.deferred = False
             self._forget(event)  # prevent tracking conflicts
 

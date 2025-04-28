@@ -31,7 +31,6 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
-    Set,
     TextIO,
     TypedDict,
     cast,
@@ -1371,7 +1370,7 @@ class CharmBase(Object):
         # ones that are defined below, where the presence and names depend on
         # the relations, storages, actions, and containers defined in the charm
         # metadata.
-        self._static_events: Set[str] = set(self.on.events())
+        self._static_events: set[str] = set(self.on.events())
 
         for relation_name in self.framework.meta.relations:
             relation_name = relation_name.replace('-', '_')

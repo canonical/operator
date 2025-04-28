@@ -495,8 +495,8 @@ class ObjectEvents(Object):
         except AttributeError:
             raise RuntimeError(f'no event with event_kind {event_kind} to undefine') from None
 
-    def _event_kinds(self) -> List[str]:
-        event_kinds: List[str] = []
+    def _event_kinds(self) -> list[str]:
+        event_kinds: list[str] = []
         # We have to iterate over the class rather than instance to allow for properties which
         # might call this method (e.g., event views), leading to infinite recursion.
         for attr_name, attr_value in inspect.getmembers(type(self)):
@@ -745,11 +745,11 @@ class Framework(Object):
     def _unregister_type(
         self,
         cls: Type[Serializable],
-        parent: Optional[Union['Handle', 'Object']],
-        kind: Optional[str] = None,
+        parent: Handle | Object | None,
+        kind: str | None = None,
     ):
         """Unregister a type from a handle."""
-        parent_path: Optional[str] = None
+        parent_path: str | None = None
         if isinstance(parent, Object):
             parent_path = parent.handle.path
         elif isinstance(parent, Handle):
@@ -760,7 +760,7 @@ class Framework(Object):
         self._type_known.remove(cls)
 
     def _validate_snapshot_data(
-        self, value: Union['StoredStateData', 'EventBase'], data: Dict[str, Any]
+        self, value: StoredStateData | EventBase, data: dict[str, Any]
     ):
         if type(value) not in self._type_known:
             raise RuntimeError(
@@ -1001,7 +1001,7 @@ class Framework(Object):
     def _reemit_single_path(self, single_event_path: str):
         self._reemit(single_event_path, emitting_deferred=True)
 
-    def _reemit(self, single_event_path: Optional[str] = None, emitting_deferred: bool = False):
+    def _reemit(self, single_event_path: str | None = None, emitting_deferred: bool = False):
         last_event_path = None
         deferred = True
         for event_path, observer_path, method_name in self._storage.notices(single_event_path):

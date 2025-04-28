@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import sys
 import warnings
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Union, cast
 
 from . import charm as _charm
 from . import framework as _framework
@@ -39,7 +39,7 @@ CHARM_STATE_FILE = '.unit-state.db'
 logger = logging.getLogger()
 
 
-def _exe_path(path: pathlib.Path) -> Optional[pathlib.Path]:
+def _exe_path(path: pathlib.Path) -> pathlib.Path | None:
     """Find and return the full path to the given binary.
 
     Here path is the absolute path to a binary, but might be missing an extension.
@@ -272,9 +272,9 @@ class _Manager:
 
     def __init__(
         self,
-        charm_class: Type['_charm.CharmBase'],
+        charm_class: type[_charm.CharmBase],
         juju_context: _JujuContext,
-        use_juju_for_storage: Optional[bool] = None,
+        use_juju_for_storage: bool | None = None,
         charm_state_path: str = CHARM_STATE_FILE,
     ):
         # The context is shared across deferred events and the Juju event. Any
@@ -431,7 +431,7 @@ class _Manager:
 
     def _get_event_to_emit(
         self, charm: _charm.CharmBase, event_name: str
-    ) -> Optional[_framework.BoundEvent]:
+    ) -> _framework.BoundEvent | None:
         try:
             return getattr(charm.on, event_name)
         except AttributeError:
@@ -439,8 +439,8 @@ class _Manager:
         return None
 
     def _get_event_args(
-        self, charm: _charm.CharmBase, bound_event: '_framework.BoundEvent'
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+        self, charm: _charm.CharmBase, bound_event: _framework.BoundEvent
+    ) -> tuple[list[Any], dict[str, Any]]:
         # A wrapper so that the testing subclasses can easily override the
         # behaviour.
         return _get_event_args(charm, bound_event, self._juju_context)

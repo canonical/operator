@@ -14,10 +14,7 @@ import tempfile
 import typing
 from typing import (
     TYPE_CHECKING,
-    Dict,
-    Optional,
     Type,
-    Union,
 )
 
 import yaml
@@ -50,8 +47,8 @@ class Runtime:
 
     def __init__(
         self,
-        charm_spec: '_CharmSpec[CharmType]',
-        charm_root: Optional[Union[str, pathlib.Path]] = None,
+        charm_spec: _CharmSpec[CharmType],
+        charm_root: str | pathlib.Path | None = None,
         juju_version: str = '3.0.0',
         app_name: str | None = None,
         unit_id: int | None = 0,
@@ -67,7 +64,7 @@ class Runtime:
         self._app_name = app_name
         self._unit_id = unit_id
 
-    def _get_event_env(self, state: 'State', event: '_Event', charm_root: pathlib.Path):
+    def _get_event_env(self, state: State, event: _Event, charm_root: pathlib.Path):
         """Build the simulated environment the operator framework expects."""
         env = {
             'JUJU_VERSION': self._juju_version,
@@ -214,7 +211,7 @@ class Runtime:
         config_yaml = virtual_charm_root / 'config.yaml'
         actions_yaml = virtual_charm_root / 'actions.yaml'
 
-        metadata_files_present: Dict[pathlib.Path, Optional[str]] = {
+        metadata_files_present: dict[pathlib.Path, str | None] = {
             file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
@@ -263,7 +260,7 @@ class Runtime:
             typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
 
     @contextlib.contextmanager
-    def _exec_ctx(self, ctx: 'Context[CharmType]'):
+    def _exec_ctx(self, ctx: Context[CharmType]):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
             yield temporary_charm_root
@@ -271,9 +268,9 @@ class Runtime:
     @contextlib.contextmanager
     def exec(
         self,
-        state: 'State',
-        event: '_Event',
-        context: 'Context[CharmType]',
+        state: State,
+        event: _Event,
+        context: Context[CharmType],
     ):
         """Runs an event with this state as initial state on a charm.
 

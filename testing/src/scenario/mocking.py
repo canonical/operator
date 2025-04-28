@@ -133,11 +133,11 @@ _NOT_GIVEN = object()  # non-None default value sentinel
 class _MockModelBackend(_ModelBackend):  # type: ignore
     def __init__(
         self,
-        state: 'State',
-        event: '_Event',
-        charm_spec: '_CharmSpec[CharmType]',
-        context: 'Context[CharmType]',
-        juju_context: '_JujuContext',
+        state: State,
+        event: _Event,
+        charm_spec: _CharmSpec[CharmType],
+        context: Context[CharmType],
+        juju_context: _JujuContext,
     ):
         super().__init__(juju_context=juju_context)
         self._state = state
@@ -744,9 +744,9 @@ class _MockPebbleClient(_TestingPebbleClient):
         container_root: Path,
         mounts: dict[str, Mount],
         *,
-        state: 'State',
-        charm_spec: '_CharmSpec[CharmType]',
-        context: 'Context[CharmType]',
+        state: State,
+        charm_spec: _CharmSpec[CharmType],
+        context: Context[CharmType],
         container_name: str,
     ):
         self._state = state
