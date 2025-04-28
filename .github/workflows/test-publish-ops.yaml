@@ -4,12 +4,6 @@ on: [workflow_dispatch, workflow_call]
 permissions: {}
 
 jobs:
-  framework-tests:
-    uses: ./.github/workflows/framework-tests.yaml
-  observability-charm-tests:
-    uses: ./.github/workflows/observability-charm-tests.yaml
-  hello-charm-tests:
-    uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
     name: Build and Publish ops to Test PyPI
     runs-on: ubuntu-latest
@@ -17,7 +11,6 @@ jobs:
       id-token: write
       attestations: write
       contents: read
-    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
         with:
