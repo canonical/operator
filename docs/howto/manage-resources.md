@@ -5,7 +5,7 @@
 
 ## Implement the feature
 
-<!--COMMENT: MOVE TO HOW TO UPLOAD 
+<!--COMMENT: MOVE TO HOW TO UPLOAD
 Because resources are defined in a charm’s `charmcraft.yaml`, they are intrinsically linked to a charm. As such, there is no need to register them separately in Charmhub. Other charms may have resources with the same name, but this is not a problem; references to resources always contain the charm name and resource name.
 -->
 
@@ -38,7 +38,7 @@ def _on_config_changed(self, event):
         self.unit.status = ops.BlockedStatus(
             "Something went wrong when claiming resource 'my-resource; "
             "run `juju debug-log` for more info'"
-        ) 
+        )
        # might actually be worth it to just reraise this exception and let the charm error out;
        # depends on whether we can recover from this.
         logger.error(e)
@@ -60,6 +60,9 @@ def _on_config_changed(self, event):
 The [`fetch()`](ops.Resources.fetch) method will raise a [`NameError`](https://docs.python.org/3/library/exceptions.html#NameError) if the resource does not exist, and returns a Python [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) object to the resource if it does.
 
 Note: During development, it may be useful to specify the resource at deploy time to facilitate faster testing without the need to publish a new charm/resource in between minor fixes. In the below snippet, we create a simple file with some text content, and pass it to the Juju controller to use in place of any published `my-resource` resource:
+
+For resources that are binary files, make sure that you provide binaries for all
+the CPU architectures you intend to support.
 
 ```text
 echo "TEST" > /tmp/somefile.txt
