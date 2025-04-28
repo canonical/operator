@@ -31,7 +31,6 @@ The `juju add-secret` command returns the secret ID. Provide this ID to the char
 config:
   options:
     metrics-secret-id:
-      default: <secret-id-here>
       description: Default secret ID for the metrics username and password
       type: string
 ```
@@ -88,7 +87,20 @@ See more:
 - {ref}`manage-configurations`
 - {ref}`manage-secrets`
 
-## Grant access to the user secret
+## Deploy the charm and grant access to the user secret
+
+Create a config file with the secret ID and pass it to the `metrics-secret-id` config option. For example, the file `mycfg.yaml` might look like:
+
+```yaml
+metrics-charm:
+  metrics-secret-id: <secret-id-here>
+```
+
+Then, when deploying the charm, use the `--config` option to pass in the YAML config file:
+
+```bash
+juju deploy <charm-name> --config mycfg.yaml
+```
 
 After deploying the charm, grant access to the user secret:
 
@@ -98,8 +110,9 @@ juju grant-secret metrics-user-password <charm-name>
 
 For more information, refer to:
 
-- {external+juju:ref}`juju grant-secret <command-juju-grant-secret>`.
+- {external+juju:ref}`Juju | deploy <command-juju-deploy>`
 - {external+juju:ref}`Juju | config <command-juju-config>`
+- {external+juju:ref}`juju grant-secret <command-juju-grant-secret>`
 
 ## Access the metrics endpoint
 
