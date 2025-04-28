@@ -27,6 +27,8 @@ jobs:
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
       # Note that the test group count must match the groups, and there must be enough tests.
       - run: >
