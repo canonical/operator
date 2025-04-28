@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import datetime
 import io
@@ -159,23 +161,23 @@ def test_fs_pull(charm_cls, make_dirs):
 
 
 LS = """
-.rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml    
-.rw-rw-r--  497 ubuntu ubuntu 18 jan 12:05 -- config.yaml        
-.rw-rw-r--  900 ubuntu ubuntu 18 jan 12:05 -- CONTRIBUTING.md    
-drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib                
-.rw-rw-r--  11k ubuntu ubuntu 18 jan 12:05 -- LICENSE            
-.rw-rw-r-- 1,6k ubuntu ubuntu 18 jan 12:05 -- metadata.yaml      
-.rw-rw-r--  845 ubuntu ubuntu 18 jan 12:05 -- pyproject.toml     
-.rw-rw-r--  831 ubuntu ubuntu 18 jan 12:05 -- README.md          
-.rw-rw-r--   13 ubuntu ubuntu 18 jan 12:05 -- requirements.txt   
-drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- src                
-drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- tests              
-.rw-rw-r-- 1,9k ubuntu ubuntu 18 jan 12:05 -- tox.ini            
+.rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml
+.rw-rw-r--  497 ubuntu ubuntu 18 jan 12:05 -- config.yaml
+.rw-rw-r--  900 ubuntu ubuntu 18 jan 12:05 -- CONTRIBUTING.md
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib
+.rw-rw-r--  11k ubuntu ubuntu 18 jan 12:05 -- LICENSE
+.rw-rw-r-- 1,6k ubuntu ubuntu 18 jan 12:05 -- metadata.yaml
+.rw-rw-r--  845 ubuntu ubuntu 18 jan 12:05 -- pyproject.toml
+.rw-rw-r--  831 ubuntu ubuntu 18 jan 12:05 -- README.md
+.rw-rw-r--   13 ubuntu ubuntu 18 jan 12:05 -- requirements.txt
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- src
+drwxrwxr-x    - ubuntu ubuntu 18 jan 12:05 -- tests
+.rw-rw-r-- 1,9k ubuntu ubuntu 18 jan 12:05 -- tox.ini
 """
 PS = """
-    PID TTY          TIME CMD    
- 298238 pts/3    00:00:04 zsh    
-1992454 pts/3    00:00:00 ps     
+    PID TTY          TIME CMD
+ 298238 pts/3    00:00:04 zsh
+1992454 pts/3    00:00:00 ps
 """
 
 

@@ -42,7 +42,7 @@ ACTIONS = {
 class ContextCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.observed: typing.List[ops.EventBase] = []
+        self.observed: list[ops.EventBase] = []
         for event in self.on.events().values():
             framework.observe(event, self._on_event)
 
@@ -63,7 +63,7 @@ class ContextCharm(ops.CharmBase):
         ('leader_elected', ops.LeaderElectedEvent),
     ],
 )
-def test_simple_events(event_name: str, event_kind: typing.Type[ops.EventBase]):
+def test_simple_events(event_name: str, event_kind: type[ops.EventBase]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run(ctx.on.install(), state)

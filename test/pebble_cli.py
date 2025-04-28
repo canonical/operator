@@ -21,6 +21,8 @@ python -m test.pebble_cli --socket=pebble_dir/.pebble.socket system-info
 PEBBLE=pebble_dir python -m test.pebble_cli system-info
 """
 
+from __future__ import annotations
+
 import argparse
 import datetime
 import os
@@ -195,7 +197,7 @@ def main():
             result = client.get_checks(level=pebble.CheckLevel(args.level), names=args.name)
         elif args.command == 'exec':
             environment = {}
-            for env in typing.cast(typing.List[str], args.env) or []:
+            for env in typing.cast('typing.List[str]', args.env) or []:
                 key, _, value = env.partition('=')
                 environment[key] = value
 
@@ -235,7 +237,7 @@ def main():
             # However, for the use we are making of it - particularly of `.stdout` and `.stderr` -
             # it does not make any difference. Unfortunately, pyright complains when we call
             # `wait()` and `wait_output()` if we do not make the generic concrete here.
-            process = typing.cast(pebble.ExecProcess[str], process)
+            process = typing.cast('pebble.ExecProcess[str]', process)
 
             try:
                 if args.io_mode == 'passthrough':

@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import io
 import logging
 import re
 import sys
-import typing
 import unittest
 from unittest.mock import patch
 
@@ -28,7 +29,7 @@ from ops.model import MAX_LOG_LINE_LEN, _ModelBackend
 
 class FakeModelBackend(_ModelBackend):
     def __init__(self):
-        self._calls: typing.List[typing.Tuple[str, str]] = []
+        self._calls: list[tuple[str, str]] = []
 
     def calls(self, clear: bool = False):
         calls = self._calls
@@ -70,7 +71,7 @@ class TestLogging:
         backend: FakeModelBackend,
         logger: logging.Logger,
         message: str,
-        result: typing.Tuple[str, str],
+        result: tuple[str, str],
     ):
         ops.log.setup_root_logging(backend)
         assert logger.level == logging.DEBUG
