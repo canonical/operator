@@ -121,7 +121,7 @@ class _MockExecProcess:
             )
         return stdout, stderr
 
-    def send_signal(self, sig: int | str) -> NoReturn:  # noqa: U100
+    def send_signal(self, sig: Union[int, str]) -> NoReturn:
         """Send the given signal to the (mock) process."""
         raise NotImplementedError()
 
@@ -133,11 +133,11 @@ _NOT_GIVEN = object()  # non-None default value sentinel
 class _MockModelBackend(_ModelBackend):  # type: ignore
     def __init__(
         self,
-        state: State,
-        event: _Event,
-        charm_spec: _CharmSpec[CharmType],
-        context: Context,
-        juju_context: _JujuContext,
+        state: 'State',
+        event: '_Event',
+        charm_spec: '_CharmSpec[CharmType]',
+        context: 'Context[CharmType]',
+        juju_context: '_JujuContext',
     ):
         super().__init__(juju_context=juju_context)
         self._state = state
@@ -192,7 +192,6 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 container_root=container_root,
                 mounts=mounts,
                 state=self._state,
-                event=self._event,
                 charm_spec=self._charm_spec,
                 context=self._context,
                 container_name=container_name,
@@ -695,8 +694,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     # legacy ops API that we don't intend to mock:
     def pod_spec_set(
         self,
-        spec: Mapping[str, Any],  # noqa: U100
-        k8s_resources: Mapping[str, Any] | None = None,  # noqa: U100
+        spec: Mapping[str, Any],
+        k8s_resources: Optional[Mapping[str, Any]] = None,
     ) -> NoReturn:
         raise NotImplementedError(
             'pod-spec-set is not implemented in Scenario (and probably never will be: '
@@ -705,8 +704,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def add_metrics(
         self,
-        metrics: Mapping[str, int | float],  # noqa: U100
-        labels: Mapping[str, str] | None = None,  # noqa: U100
+        metrics: Mapping[str, Union[int, float]],
+        labels: Optional[Mapping[str, str]] = None,
     ) -> NoReturn:
         raise NotImplementedError(
             'add-metrics is not implemented in Scenario (and probably never will be: '
@@ -745,15 +744,13 @@ class _MockPebbleClient(_TestingPebbleClient):
         container_root: Path,
         mounts: dict[str, Mount],
         *,
-        state: State,
-        event: _Event,
-        charm_spec: _CharmSpec[CharmType],
-        context: Context,
+        state: 'State',
+        charm_spec: '_CharmSpec[CharmType]',
+        context: 'Context[CharmType]',
         container_name: str,
     ):
         self._state = state
         self.socket_path = socket_path
-        self._event = event
         self._charm_spec = charm_spec
         self._context = context
         self._container_name = container_name
@@ -813,6 +810,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                     spawn_time=now,
                     ready_time=now,
                 )
+                assert check.change_id is not None
                 self._changes[check.change_id] = change
 
     def get_plan(self) -> pebble.Plan:
