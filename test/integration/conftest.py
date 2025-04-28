@@ -108,7 +108,9 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None
                 '--out-dir',
                 charm_dir,
             ],
-            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            capture_output=True,
         )
 
         subprocess.run(
@@ -121,10 +123,13 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None
                 '--out-dir',
                 charm_dir,
             ],
-            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            capture_output=True,
         )
     except subprocess.CalledProcessError as e:
         logging.error('%s stderr:\n%s', e.cmd, e.stderr)
+        raise
 
     requirements_file.write_text(
         ''.join(f'./{path.name}\n' for path in charm_dir.glob('ops*.tar.gz'))
@@ -145,7 +150,7 @@ def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str], None, N
     proc = subprocess.Popen(
         ['charmcraft', 'pack', '--verbose'],  # noqa: S607
         cwd=str(charm_dir),
-        universal_newlines=True,
+        text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
