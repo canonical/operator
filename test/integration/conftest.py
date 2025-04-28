@@ -83,6 +83,7 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None
     Builds and injects `ops` and `ops-tracing` from the local checkout in to the
     charm's dependencies. Cleans up afterwards.
     """
+
     def cleanup():
         for path in charm_dir.glob('ops*.tar.gz'):
             path.unlink()
