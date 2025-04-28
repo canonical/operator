@@ -3,25 +3,13 @@
 
 > See first: {external+juju:ref}`Juju | Build a charm <build-a-charm>`, {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`
 
+## Prepare your environment
+
 Hit the ground running with Ops by setting up standard project structure and tools.
 
 > See more: {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`
 
-Use Charmcraft to quickly initialise your charm project. This generates the
-folder structure, creates placeholder configuration and code files, and
-configures development tooling.
-
-The Charmcraft profiles also all provide the recommended tooling and
-configuration for developing charms. You'll need to install
-[`tox`](https://tox.wiki/en/stable/), and can then run ``tox list`` in the root
-folder to see the available commands.
-
-```{admonition} Best practice
-:class: hint
-
-The quality assurance pipeline of a charm should be automated using a
-continuous integration (CI) system.
-```
+Other useful tools:
 
 ```{tip}
 To prepare an environment for running integration tests, such as in CI, use
@@ -35,7 +23,23 @@ repository includes actions to ensure that libraries are up-to-date, publish
 charms and libraries, and more.
 ```
 
-## Use the provided tooling to maintain style and detect issues early
+## Initialise your charm project
+
+Use Charmcraft to quickly initialise your charm project. This generates the
+folder structure, creates placeholder configuration and code files, and
+configures development tooling.
+
+The Charmcraft profiles also all provide the recommended tooling and
+configuration for developing charms. You'll need to install
+[`tox`](https://tox.wiki/en/stable/), and can then run ``tox list`` in the root
+folder to see the available commands.
+
+> See more:
+>
+> * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
+> * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
+
+## Develop your charm
 
 The Charmcraft profile you've chosen has configured a number of recommended
 tools for developing charms. To use these, [install
@@ -62,10 +66,12 @@ configuration of individual tools, or to add additional commands, but keep the
 command names and meanings that the profiles provide.
 ```
 
-> See more:
->
-> * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
-> * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
+```{admonition} Best practice
+:class: hint
+
+The quality assurance pipeline of a charm should be automated using a
+continuous integration (CI) system.
+```
 
 <!--
 TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
@@ -108,6 +114,13 @@ do it well.
 > * {external+charmcraft:ref}`Charmcraft | Manage charms > Pack a charm <pack-a-charm>`
 > * {external+juju:ref}`Juju | Manage charms > Deploy a charm <deploy-a-charm>` (you'll need to follow the "Deploy a local charm" example)
 > * {external+juju:ref}`Juju | Manage charms > Debug a charm <debug-a-charm>`
+
+## Publish your charm
+
+When you're ready, you'll publish your charm on Charmhub.
+
+> See more:
+>
 > * {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>` (see especially the note on requesting formal review for your charm)
 
 A charm is software: while there can be milestones, there is never a finish
