@@ -41,7 +41,7 @@ class TestTracingCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus('ok')
         print('WAT?')
 
-    @tracer.start_as_current_span('on action')
+    @tracer.start_as_current_span('custom trace on any action')
     def _on_action(self, event: ops.ActionEvent):
         time.sleep(1)
         opentelemetry.trace.get_current_span().set_attribute('arg', event.params.get('arg') or '')
