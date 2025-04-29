@@ -4,23 +4,22 @@ on:
     tags:
       - '2.*'
 
+permissions: {}
+
 jobs:
-  framework-tests:
-    uses: ./.github/workflows/framework-tests.yaml
-  observability-charm-tests:
-    uses: ./.github/workflows/observability-charm-tests.yaml
-  hello-charm-tests:
-    uses: ./.github/workflows/hello-charm-tests.yaml
   release:
     runs-on: ubuntu-latest
-    environment: release
+    environment: publish-pypi
     permissions:
       id-token: write
       attestations: write
-    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
       - run: |
           cd tracing
           uv build --sdist --wheel
@@ -32,4 +31,3 @@ jobs:
           packages-dir: ./tracing/dist/
           skip-existing: true
           verbose: true
-

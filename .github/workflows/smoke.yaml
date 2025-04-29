@@ -5,11 +5,14 @@ on:
   schedule:
     - cron:  '0 7 25 * *'
 
+permissions: {}
+
 jobs:
   test:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         # pylibjuju does not currently support Juju 4.x
         juju-channel: ['2.9/stable', '3/stable']
@@ -25,6 +28,8 @@ jobs:
 
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
