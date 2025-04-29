@@ -61,9 +61,6 @@ The [`fetch()`](ops.Resources.fetch) method will raise a [`NameError`](https://d
 
 Note: During development, it may be useful to specify the resource at deploy time to facilitate faster testing without the need to publish a new charm/resource in between minor fixes. In the below snippet, we create a simple file with some text content, and pass it to the Juju controller to use in place of any published `my-resource` resource:
 
-For resources that are binary files, make sure that you provide binaries for all
-the CPU architectures you intend to support.
-
 ```text
 echo "TEST" > /tmp/somefile.txt
 charmcraft pack

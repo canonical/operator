@@ -109,6 +109,8 @@ When you're ready, you'll publish your charm on Charmhub.
 >
 > * {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>` (see especially the note on requesting formal review for your charm)
 
+If your charm depends on resources that are binary files, make sure to provide binaries for all the CPU architectures you intend to support.
+
 A charm is software: while there can be milestones, there is never a finish
 line. So, keep investing in every bit of your charm so that it looks and feels
 professional – from polishing metadata (including an icon, a website, docs, and
