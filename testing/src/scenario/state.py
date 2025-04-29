@@ -1019,6 +1019,26 @@ class Container(_max_posargs(1)):
     check_infos: frozenset[CheckInfo] = frozenset()
     """All Pebble health checks that have been added to the container."""
 
+    identities: Mapping[str, pebble.Identity] = dataclasses.field(default_factory=dict)
+    """Simulate Pebble identities.
+
+    For example::
+
+        identities = {
+            'web': Identity(
+                access='metrics',
+                basic=BasicIdentity(password='hashed password'),
+            ),
+        }
+        container = Container(name='foo', can_connect=True, identities=identities)
+        state = State(containers={container})
+        ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
+        with ctx(ctx.on.start(), state=state) as mgr:
+            container = mgr.charm.unit.get_container('foo')
+            assert container.pebble.get_identities() == identities
+
+    """
+
     def __hash__(self) -> int:
         return hash(self.name)
 

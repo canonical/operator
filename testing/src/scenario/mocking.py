@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Iterable,
     List,
     Literal,
     Mapping,
@@ -992,3 +993,21 @@ class _MockPebbleClient(_TestingPebbleClient):
                 f'can_connect=True for container {self._container.name}?'
             )
             raise pebble.ConnectionError(msg)
+
+    def get_identities(self) -> Dict[str, pebble.Identity]:
+        return self._container.identities
+
+    def replace_identities(
+        self, identities: Mapping[str, Union[pebble.IdentityDict, pebble.Identity, None]]
+    ) -> None:
+        for name, identity in identities.items():
+            if identity is None:
+                del self._container.identities[name]
+            elif isinstance(identity, pebble.Identity):
+                self._container.identities[name] = identity
+            elif isinstance(identity, dict):
+                self._container.identities[name] = pebble.Identity.from_dict(identity)
+
+    def remove_identities(self, identities: Iterable[str]) -> None:
+        for identity in identities:
+            del self._container.identities[identity]
