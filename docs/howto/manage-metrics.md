@@ -1,47 +1,47 @@
-# How to Manage Metrics
+# How to manage metrics
 
-Pebble provides services and health check [metrics](https://documentation.ubuntu.com/pebble/reference/api/#/metrics/get_v1_metrics) in OpenMetrics format. Access this endpoint requires HTTP basic authentication with a "basic" type Pebble [identity](https://documentation.ubuntu.com/pebble/reference/identities/).
+Pebble provides [metrics](https://documentation.ubuntu.com/pebble/reference/api/#/metrics/get_v1_metrics) for services and health checks in OpenMetrics format. Access to the Pebble metrics endpoint requires HTTP basic authentication with a username and password.
 
 Charms should use {external+juju:ref}`Juju secrets <secret>` to manage sensitive information such as authentication credentials.
 
 This guide demonstrates how to:
 
-- As an admin, create a Juju user secret that stores the username and password.
-- Add a configuration to pass the secret ID to a charm.
+- Create a Juju user secret that stores the username and password. Users who deploy the charm will also need to do this.
+- Add a configuration option to pass the secret ID to the charm.
 - In the charm code, get the username and password from the secret, then create a {external+pebble:doc}`Pebble identity <reference/identities>` to allow access to the metrics endpoint using the username and password.
-- As a user, access the metrics endpoint after deploying the charm.
+- Access the metrics endpoint after deploying the charm. Users who deploy the charm will also be able to do this.
 
 ## Create a Juju user secret
 
-Use {external+juju:ref}`Juju secret <secret>` to manage sensitive information like HTTP basic authentication credentials. Run the following command to create a Juju user secret:
+Run the following command to create a Juju user secret:
 
 ```bash
 juju add-secret metrics-user-password username=test password=test
 ```
 
-See more:
+This command returns a secret ID, which you'll need in the following steps.
 
-- {external+juju:ref}`juju add-secret <command-juju-add-secret>`.
+> See more: {external+juju:ref}`juju add-secret <command-juju-add-secret>`.
 
-## Pass the secret ID to the charm via configurations
+## Add a configuration option for the secret ID
 
-The `juju add-secret` command returns the secret ID. Provide this ID to the charm via a configuration option. For example, define an option named `metrics-secret-id` in `charmcraft.yaml`:
+To pass the secret ID to the charm, define a configuration option named `metrics-secret-id` in `charmcraft.yaml`:
 
 ```yaml
 config:
   options:
     metrics-secret-id:
-      description: Default secret ID for the metrics username and password
+      description: Secret ID for the metrics username and password
       type: string
 ```
 
-## Create a "basic" type Pebble identity
+## Create a Pebble identity
 
 The charm retrieves the ID of the secret that stores the username and password from the configuration option.
 
-In the handler for the `config-changed` event, retrieve the contents of the secret and create a Pebble identity. We should also handle the `secret-changed` event, in case admin users change the contents of the secret.
+In the handler for the `config-changed` event, we'll retrieve the contents of the secret and create a Pebble identity. We'll also handle the `secret-changed` event, in case the charm user changes the contents of the secret.
 
-With the secret content, we can create a "basic" type Pebble identity in Pebble using the [`pebble.Client.replace_identities`](ops.pebble.Client.replace_identities) method:
+After retrieving the contents of the secret, we'll use the [`replace_identities`](ops.pebble.Client.replace_identities) method to create a "basic" type identity in Pebble:
 
 ```python
 from passlib.hash import sha512_crypt
@@ -77,29 +77,30 @@ class MyCharm(ops.CharmBase):
   ...
 ```
 
-Note that the identity's password is stored as a hash. Use `sha512-crypt` to hash the password. Import `sha512_crypt` from `passlib.hash` and generate the hash with `sha512_crypt.hash()`.
+The password of the Pebble identity is stored as a hash, which we generate using `sha512_crypt.hash()` from `passlib.hash`.
 
 When Pebble receives a request to access the metrics endpoint, Pebble will verify that the basic authentication credentials in the request match the identity's username and password.
 
-See more:
-
-- {ref}`make-your-charm-configurable`
-- {ref}`manage-configurations`
-- {ref}`manage-secrets`
+> See more:
+> - {ref}`make-your-charm-configurable`
+> - {ref}`manage-configurations`
+> - {ref}`manage-secrets`
 
 ## Deploy the charm and grant access to the user secret
 
-Create a config file with the secret ID and pass it to the `metrics-secret-id` config option. For example, the file `mycfg.yaml` might look like:
+We'll use a configuration file to set `metrics-secret-id` to the secret ID.
+
+First, create a configuration file named `metrics-config.yaml`:
 
 ```yaml
 metrics-charm:
   metrics-secret-id: <secret-id-here>
 ```
 
-Then, when deploying the charm, use the `--config` option to pass in the YAML config file:
+Then, when deploying the charm, use the `--config` option to pass the configuration file:
 
 ```bash
-juju deploy <charm-name> --config mycfg.yaml
+juju deploy <charm-name> --config metrics-config.yaml
 ```
 
 After deploying the charm, grant access to the user secret:
@@ -108,37 +109,40 @@ After deploying the charm, grant access to the user secret:
 juju grant-secret metrics-user-password <charm-name>
 ```
 
-For more information, refer to:
-
-- {external+juju:ref}`Juju | deploy <command-juju-deploy>`
-- {external+juju:ref}`Juju | config <command-juju-config>`
-- {external+juju:ref}`juju grant-secret <command-juju-grant-secret>`
+> See more:
+> - {external+juju:ref}`Juju | config <command-juju-config>`
+> - {external+juju:ref}`Juju | deploy <command-juju-deploy>`
+> - {external+juju:ref}`Juju | grant-secret <command-juju-grant-secret>`
 
 ## Access the metrics endpoint
 
 ### Within the same Kubernetes cluster
 
-Deploying the charm causes Juju to automatically create a Kubernetes service named `<charm-name>-endpoints` within the Kubernetes cluster. Use this service to connect to Pebble within each workload container. Pebble's HTTP port for the first workload container is `38813`.
+Deploying the charm causes Juju to create a Kubernetes service named `<charm-name>-endpoints` within the Kubernetes cluster. Use this service to connect to Pebble within each workload container. Pebble's HTTP port for the first workload container is `38813`.
 
-For example, if you deploy a charm named `my-charm` in the `test` namespace, access the metrics endpoint at `my-charm-endpoints.test.svc.cluster.local:38813/v1/metrics`. You'll need to use HTTP basic authentication with the username and password that you specified in the `juju add-secret` command.
+For example, if you deploy a charm named `my-charm` in the `test` namespace, access the metrics endpoint at:
 
-See more:
+```text
+my-charm-endpoints.test.svc.cluster.local:38813/v1/metrics
+```
 
-- [Service discovery within a Kubernetes cluster](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+You'll need to use HTTP basic authentication with the username and password that you specified in the `juju add-secret` command.
+
+> See more: [Service discovery within a Kubernetes cluster](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 
 ### Through an Ingress
 
 To access the metrics endpoint from outside the Kubernetes cluster, use an Ingress.
 
-Use the service `<charm-name>` service in the Ingress (which is also automatically created) instead of the `<charm-name>-endpoints` service, as the latter is a [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) and doesn't have a ClusterIP.
+Use the service `<charm-name>` service in the Ingress (which is also created by Juju) instead of the `<charm-name>-endpoints` service, as the latter is a [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) and doesn't have a ClusterIP.
 
-- To expose the Pebble HTTP port, use [`ops.Unit.set_ports`](ops.Unit.set_ports) in your charm code:
+- To expose the Pebble HTTP port, use [`set_ports`](ops.Unit.set_ports) in your charm code:
 
 ```python
   self.unit.set_ports(38813)
 ```
 
-- To create an Ingress, use the following example (assuming the charm and service name is `my-charm`):
+- To create an Ingress, use the following Ingress resource example (assuming the charm and service name is `my-charm`):
 
 ```yaml
 apiVersion: networking.k8s.io/v1
