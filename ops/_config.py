@@ -95,6 +95,10 @@ class ConfigBase:
             hint = parts[0]
         return hint
 
+    # TODO: now that we're not really exposing these methods, maybe they should
+    # not raise? We could fall back to string maybe? We want someone to be able
+    # to subclass and use to_juju_schema with super and then change things.
+
     @classmethod
     def _attr_to_juju_type(cls, name: str, default: Any = None) -> str:
         """Provide the appropriate type for the config YAML for the given attribute.
