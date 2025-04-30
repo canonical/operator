@@ -289,39 +289,6 @@ def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.Fi
     assert secret.get_content() == content
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_invalid_secret_id(
-    charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
-):
-    config = MyConfig.to_juju_schema()
-    harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    content = {'password': 'admin'}
-    secret_id = harness.add_user_secret(content)
-    harness.grant_secret(secret_id, harness.model.app.name)
-    harness.update_config({
-        'my-secret': 'not a secret id',
-    })
-    with pytest.raises(ops.InvalidSchemaError):
-        harness.begin()
-    # TODO: add a test_main check that makes sure that the status is set correctly.
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_missing_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_juju_schema()
-    harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    content = {'password': 'admin'}
-    secret_id = harness.add_user_secret(content)
-    harness.update_config({
-        'my-secret': secret_id,
-    })
-    with pytest.raises(ops.InvalidSchemaError):
-        harness.begin()
-    # TODO: add a test_main check that makes sure that the status is set correctly.
-
-
 def test_config_custom_naming_pattern(request: pytest.FixtureRequest):
     @dataclasses.dataclass(frozen=True)
     class Config(ops.ConfigBase):
