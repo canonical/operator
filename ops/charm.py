@@ -239,9 +239,9 @@ class ActionEvent(EventBase):
     ) -> _ActionType:
         """Load the action parameters into an instance of an action class.
 
-        The object will be instantiated with keyword arguments of all the raw
-        Juju action parameters, but with dashes in names converted to
-        underscores.
+        The object will be instantiated with keyword arguments of the raw Juju
+        action parameters for all the options that are found in the class, but
+        with dashes in names converted to underscores.
 
         Any additional positional or keyword arguments will be passed through to
         the action class.
@@ -259,6 +259,7 @@ class ActionEvent(EventBase):
                 exception is not caught, then an appropriate event failure message
                 is set.
         """
+        fields = set(cls._param_names())  # type: ignore
         params: dict[str, Any] = kwargs.copy()
         for key, value in self.params.items():
             attr = cls._juju_name_to_attr(key)  # type: ignore
@@ -267,6 +268,8 @@ class ActionEvent(EventBase):
                 raise model.InvalidSchemaError(
                     action_failure=f'Invalid attribute name {attr}',
                 ) from None
+            if attr not in fields:
+                continue
             params[attr] = value
         try:
             return cls(*args, **params)
