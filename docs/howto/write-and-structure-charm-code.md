@@ -272,42 +272,79 @@ def get_version() -> str:
 (handle-status)=
 ## Handle status
 
-Your charm should report its status to Juju. The best approach depends on the charm's complexity:
+> See first: {external+juju:ref}`Juju | Status <status>`
 
-  - If units don't need to coordinate, use [`self.unit.status`](ops.Unit.status) to report the
-    status of each unit independently. For example:
+### Unit status
 
-    ```python
+Your charm should report the status of each unit to Juju.
+
+To report the unit status, observe the `collect_unit_status` event. This event is triggered by Ops at the end of each hook and provides a callback method for reporting the unit status. For example:
+
+```python
+class DemoServerCharm(ops.CharmBase):
+    """Manage the server."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on_collect_unit_status, self._on_collect_status)
+        # Observe other events...
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
+        if "port" not in self.config:
+            event.add_status(ops.BlockedStatus("no port specified"))
+            return
+        event.add_status(ops.ActiveStatus())
+```
+
+In your handler for `collect_unit_status`, you can call `add_status()` multiple times. Ops will send the highest priority status to Juju. This reduces the amount of logic you need to write to decide which status to report. For more information, see [`CollectStatusEvent`](ops.CollectStatusEvent).
+
+Your handler for `collect_unit_status` won't have access to data about the event that was handled before Ops triggered `collect_unit_status`.
+
+To report the unit status while handling an event, set [`self.unit.status`](ops.Unit.status). When your charm code sets `self.unit.status`, Ops immediately sends the unit status to Juju. For example:
+
+```python
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
         self.unit.status = ops.MaintenanceStatus("starting server")
-        # ...
-        # Start the workload and wait for it to be ready.
-        # ...
-        self.unit.status = ops.ActiveStatus()
-    ```
+        demo_server.start()
+        # At the end of the handler, Ops triggers collect_unit_status.
+```
 
-    When your charm code sets `self.unit.status`, Ops immediately sends the unit status to Juju.
+### Application status
 
-    Juju aggregates the unit statuses into an overall application status.
+If you expect to have more than one unit, you should also report the application status to Juju.
 
-    ```{admonition} Best practice
-    :class: hint
+To report the application status, observe the `collect_app_status` event. This event is triggered by Ops at the end of each hook, for the leader unit only. For example:
 
-    In practice, it's often awkward to decide which status to report. Instead of writing
-    (and duplicating) complex conditional logic to set `self.unit.status`, write a handler for
-    [`collect_unit_status`](ops.CharmEvents.collect_unit_status) that tells Ops about the
-    relevant statuses. Ops will send the highest priority status to Juju. For an example, see
-    [](#integrate-your-charm-with-postgresql-update-unit-status).
-    ```
+```python
+class DemoServerCharm(ops.CharmBase):
+    """Manage the server."""
 
-  - If units need to coordinate, the leader unit should report the application status.
-    In your charm code, observe [`collect_app_status`](ops.CharmEvents.collect_app_status) or set
-    [`self.app.status`](ops.Application.status).
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on_collect_app_status, self._on_collect_app_status)
+        framework.observe(self.on_collect_unit_status, self._on_collect_unit_status)
+        # Observe other events...
 
-    Each unit should still report its own status, but Juju won't aggregate the unit statuses.
+    def _on_collect_app_status(self, event: ops.CollectStatusEvent):
+        # This is triggered for the leader unit only.
+        num_degraded = ...  # Inspect peer unit databags to find degraded units.
+        if num_degraded:
+            event.add_status(ops.ActiveStatus(f"degraded units: {num_degraded}"))
+            return
+        event.add_status(ops.ActiveStatus())
 
-> See also: {external+juju:ref}`Juju | Status <status>`
+    def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
+        # This is triggered for each unit.
+        if self.is_degraded():  # Use a custom helper method to determine status.
+            event.add_status(ops.ActiveStatus("degraded"))
+            return
+        event.add_status(ops.ActiveStatus())
+```
+
+As with `collect_unit_status`, you can call `add_status()` multiple times and Ops will send the highest priority status to Juju.
+
+If you need to report the application status while handling an event, you can use [`self.app.status`](ops.Application.status). However, your charm code will first need to use [`self.unit.is_leader()`](ops.Unit.is_leader) to check that it's running as the leader unit.
 
 (handle-errors)=
 ## Handle errors
