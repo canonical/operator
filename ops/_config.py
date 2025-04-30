@@ -65,8 +65,9 @@ class ConfigBase:
                 super().__init__(framework)
                 self.typed_config = self.load_config(MyConfig)
 
-    If the config provided by Juju is not valid, the charm will exit after
-    setting a blocked status with an error message based on the ``str()`` of the
+    If the config provided by Juju is not valid, a :class:`ops.InvalidSchemaError`
+    will be raised, and if not caught the charm will exit after setting a
+    blocked status with an error message based on the ``str()`` of the original
     exception raised.
     """
 

@@ -1463,9 +1463,10 @@ class CharmBase(Object):
             An instance of the config class with the current config values.
 
         Raises:
-            :class`InvalidSchemaError` if the configuration is invalid. If the
-            exception is not caught by the charm code, the hook will exit with a
-            zero exit code, after setting an appropriate blocked status.
+            InvalidSchemaError: if the configuration is invalid. If the
+                exception is not caught by the charm code, the hook will exit
+                with a zero exit code, after setting an appropriate blocked
+                status.
         """
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
         fields = set(cls._juju_names())  # type: ignore
