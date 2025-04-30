@@ -1430,8 +1430,8 @@ class CharmBase(Object):
     ) -> _ConfigType:
         """Load the config into an instance of a config class.
 
-        The object will be instantiated with keyword arguments of all the raw
-        Juju config, but with:
+        The object will be instantiated with keyword arguments of the raw Juju
+        config for all the options that are found in the class, but with:
 
         * ``secret`` type options having a :class:`model.Secret` value rather
           than the secret ID.
@@ -1453,14 +1453,17 @@ class CharmBase(Object):
             exception is not caught by the charm code, the hook will exit with a
             zero exit code, after setting an appropriate blocked status.
         """
-        # Convert secret IDs to secret objects.
         config: Dict[str, Union[bool, int, float, str, model.Secret]] = kwargs.copy()
+        fields = set(cls._juju_names)  # type: ignore
         for key, value in self.config.items():
+            if key not in fields:
+                continue
             attr = cls._juju_name_to_attr(key)  # type: ignore
             assert isinstance(attr, str)
             if not attr.isidentifier():
                 raise model.InvalidSchemaError(status=f'Invalid attribute name {attr}') from None
             option_type = self.meta.config.get(key)
+            # Convert secret IDs to secret objects.
             if option_type and option_type.type == 'secret' and isinstance(value, str):
                 try:
                     config[attr] = self.model.get_secret(id=value)
