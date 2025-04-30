@@ -20,7 +20,7 @@ import dataclasses
 import importlib
 import logging
 import pathlib
-from typing import Any, ClassVar, Generator, get_origin
+from typing import Any, ClassVar, Generator, get_args, get_origin, get_type_hints
 
 from ._private import attrdocs, yaml
 from .model import Secret
@@ -81,44 +81,41 @@ class ConfigBase:
         "<class 'str'>": 'string',
         'ops.Secret': 'secret',
         'ops.model.Secret': 'secret',
+        "<class 'ops.Secret'>": 'secret',
+        "<class 'ops.model.Secret'>": 'secret',
     }
-
-    @staticmethod
-    def __extract_optional_type(attr: str, hint: str):
-        if 'Optional[' in hint:
-            hint = hint.split('[')[1].split(']')[0]
-        if '|' in hint:
-            parts = [p.strip() for p in hint.split('|')]
-            if 'None' in parts:
-                parts.remove('None')
-            if len(parts) != 1:
-                raise ValueError(f'{attr!r} has multiple types.')
-            hint = parts[0]
-        return hint
-
-    # TODO: now that we're not really exposing these methods, maybe they should
-    # not raise? We could fall back to string maybe? We want someone to be able
-    # to subclass and use to_juju_schema with super and then change things.
 
     @classmethod
     def _attr_to_juju_type(cls, name: str, default: Any = None) -> str:
         """Provide the appropriate type for the config YAML for the given attribute.
 
-        Raises:
-            ValueError: if an appropriate type cannot be found.
+        If an appropriate type cannot be determined, fall back to "string".
         """
-        # TODO: This can probably use dataclasses.fields().
-        types = cls.__annotations__
         try:
-            hint = cls.__extract_optional_type(name, str(types[name]))
-        except (KeyError, ValueError):
-            # If there's a default value, use that object's type.
-            if default is not None and type(default).__name__ in cls._JUJU_TYPES:
-                return cls._JUJU_TYPES[type(default).__name__]
-            raise ValueError(f'{name!r} type is unknown.') from None
-        if hint not in cls._JUJU_TYPES:
-            raise ValueError(f'{name!r} type is unknown.') from None
-        return cls._JUJU_TYPES[hint]
+            raw_hint = get_type_hints(cls)[name]
+        except KeyError:
+            pass
+        else:
+            # Collapse Optional[] and Union[] and so on to the simpler form.
+            if get_origin(raw_hint):
+                hints = {arg for arg in get_args(raw_hint) if str(arg) in cls._JUJU_TYPES}
+            else:
+                hints = {raw_hint}
+            # If there are multiple types -- for example, the type annotation is
+            # `int | str` -- then we can't determine the type, and we fall back
+            # to "string", even if `str` is not in the type hint, because our
+            # "we can't determine the type" choice is always "string".
+            if len(hints) > 1:
+                return 'string'
+            elif hints:
+                return cls._JUJU_TYPES[str(hints.pop())]
+        # If there's a default value, use that object's type.
+        if default is not None:
+            return cls._JUJU_TYPES.get(type(default).__name__, 'string')
+        # If we can't figure it out, then use "string", which should be the most
+        # compatible, and most likely to be used for arbitrary types. Charms can
+        # override `to_juju_schema` to adjust this if required.
+        return 'string'
 
     @staticmethod
     def _attr_to_juju_name(attr: str):
@@ -159,18 +156,24 @@ class ConfigBase:
             yield attr
 
     @classmethod
-    def __juju_schema_from_basemodel(cls) -> dict[str, Any]:
+    def __juju_schema_from_model_fields(cls) -> dict[str, Any]:
         options = {}
         for name, field in cls.model_fields.items():  # type: ignore
             option = {}
             if field.default is not None:  # type: ignore
                 option['default'] = field.default  # type: ignore
             if field.annotation in (bool, int, float, str, Secret):  # type: ignore
-                hint = field.annotation.__name__  # type: ignore
+                hint = cls._JUJU_TYPES[field.annotation.__name__]  # type: ignore
             else:
-                hint = str(field.annotation)  # type: ignore
-                hint = cls.__extract_optional_type(name, hint)  # type: ignore
-            option['type'] = cls._JUJU_TYPES[hint]
+                hint = field.annotation  # type: ignore
+                if get_origin(hint):
+                    hints = {arg for arg in get_args(hint) if str(arg) in cls._JUJU_TYPES}
+                    if len(hints) > 1:
+                        hint = type(str)
+                    elif hints:
+                        hint = hints.pop()
+                hint = cls._JUJU_TYPES.get(str(hint), 'string')  # type: ignore
+            option['type'] = hint
             if field.description:  # type: ignore
                 option['description'] = field.description  # type: ignore
             options[cls._attr_to_juju_name(name)] = option  # type: ignore
@@ -208,6 +211,10 @@ class ConfigBase:
                     type: secret
                     description: A user secret.
 
+        Options with a default value of ``None`` will not have a ``default`` key
+        in the output. If the type of the option cannot be determined, it will
+        be set to ``string``.
+
         To customise, override this method in your subclass. For example::
 
             @classmethod
@@ -217,9 +224,10 @@ class ConfigBase:
                 schema = {key.upper(): value for key, value in schema.items()}
                 return schema
         """
-        # Special-case pydantic BaseModel.
+        # Special-case pydantic BaseModel or anything else with a compatible
+        # `model_fields`` attribute.
         if hasattr(cls, 'model_fields'):
-            return cls.__juju_schema_from_basemodel()
+            return cls.__juju_schema_from_model_fields()
 
         # Dataclasses, regular classes, etc.
         attr_docstrings = attrdocs.get_attr_docstrings(cls)
@@ -227,7 +235,7 @@ class ConfigBase:
         for attr in cls._juju_names():
             option = {}
             default = getattr(cls, attr, None)
-            if type(default).__name__ in cls._JUJU_TYPES:
+            if default is not None and type(default).__name__ in cls._JUJU_TYPES:
                 option['default'] = default
             option['type'] = cls._attr_to_juju_type(attr, default)
             doc = attr_docstrings.get(attr)
@@ -250,16 +258,13 @@ def generate_juju_schema():
         module = importlib.import_module(f'src.{module_name}')
         for attr_name in dir(module):
             obj = getattr(module, attr_name)
-            if hasattr(obj, 'to_yaml_schema'):
-                config.update(obj.to_yaml_schema())
+            if isinstance(obj, ConfigBase):
+                config.update(obj.to_juju_schema())
     print(yaml.safe_dump(config))
 
 
 if __name__ == '__main__':
     generate_juju_schema()
-
-# TODO: Verify that if future annotations is not used, everything still works
-# as expected (or make this an explicit requirement).
 
 # TODO: if no config is found, have Scenario try to generate it.
 
