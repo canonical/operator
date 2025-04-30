@@ -1,6 +1,6 @@
 [project]
 name = "ops-tracing"
-version = "2.21.0.dev0"
+version = "2.21.0"
 description = "The tracing facility for the Ops library."
 requires-python = ">=3.8"
 readme = "README.md"
@@ -33,7 +33,7 @@ classifiers = [
 dependencies = [
     "otlp-json>=0.9.7",
     "opentelemetry-sdk~=1.30",
-    "ops==2.21.0.dev0",  # pin to the exact version before release
+    "ops==2.21.0",  # pin to the exact version before release
     "pydantic",
 ]
 
