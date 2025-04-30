@@ -266,6 +266,4 @@ def generate_juju_schema():
 if __name__ == '__main__':
     generate_juju_schema()
 
-# TODO: if no config is found, have Scenario try to generate it.
-
 # TODO: test_main check to verify that the clean exit works correctly.
