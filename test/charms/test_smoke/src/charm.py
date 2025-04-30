@@ -22,6 +22,8 @@ develop a new k8s charm using the ops library:
     https://discourse.charmhub.io/t/4208
 """
 
+from __future__ import annotations
+
 import logging
 
 import ops

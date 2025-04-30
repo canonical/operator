@@ -8,6 +8,8 @@ Note that this is named benchmark_charm rather than charm as is typical to
 avoid conflicts with ops.charm in the testing runs.
 """
 
+from __future__ import annotations
+
 import logging
 
 import ops

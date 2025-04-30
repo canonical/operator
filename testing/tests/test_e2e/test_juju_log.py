@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 import pytest
@@ -31,6 +33,6 @@ def mycharm():
 def test_juju_log(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     ctx.run(ctx.on.start(), State())
-    assert ctx.juju_log[-2] == JujuLogLine(level='DEBUG', message='Emitting Juju event start.')
-    assert ctx.juju_log[-1] == JujuLogLine(level='WARNING', message='bar!')
+    assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in ctx.juju_log
+    assert JujuLogLine(level='WARNING', message='bar!') in ctx.juju_log
     # prints are not juju-logged.

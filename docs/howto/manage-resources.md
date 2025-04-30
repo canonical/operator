@@ -5,7 +5,7 @@
 
 ## Implement the feature
 
-<!--COMMENT: MOVE TO HOW TO UPLOAD 
+<!--COMMENT: MOVE TO HOW TO UPLOAD
 Because resources are defined in a charm’s `charmcraft.yaml`, they are intrinsically linked to a charm. As such, there is no need to register them separately in Charmhub. Other charms may have resources with the same name, but this is not a problem; references to resources always contain the charm name and resource name.
 -->
 
@@ -38,7 +38,7 @@ def _on_config_changed(self, event):
         self.unit.status = ops.BlockedStatus(
             "Something went wrong when claiming resource 'my-resource; "
             "run `juju debug-log` for more info'"
-        ) 
+        )
        # might actually be worth it to just reraise this exception and let the charm error out;
        # depends on whether we can recover from this.
         logger.error(e)

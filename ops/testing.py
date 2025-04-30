@@ -35,6 +35,8 @@ The module includes:
 # ruff: noqa: F401 (unused import)
 # pyright: reportUnusedImport=false
 
+from __future__ import annotations
+
 import importlib.metadata
 
 from . import charm, framework, model, pebble, storage

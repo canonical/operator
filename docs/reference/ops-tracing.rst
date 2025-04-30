@@ -14,6 +14,16 @@ Open Telemetry resource attributes
 - ``service.instance.id`` the unit number, like ``0``.
 - ``service.charm`` the charm class name, like ``DbCharm``.
 
+
+Security considerations
+-----------------------
+
+The trace data can be sent out over HTTP or HTTPS. If your charm uses the
+``ops.tracing.Tracing()`` object, the protocol is determined by the URL that
+the charm tracing integration counterpart posts in the databag.
+
+This release supports TLS 1.2 and 1.3 for HTTPS connections.
+
 Tracing behaviour across test frameworks
 ----------------------------------------
 

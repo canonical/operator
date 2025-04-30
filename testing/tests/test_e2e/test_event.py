@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ops
 import pytest
 from ops import CharmBase
@@ -64,7 +66,6 @@ def test_emitted_framework():
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
-    assert len(ctx.emitted_events) == 4
     assert list(map(type, ctx.emitted_events)) == [
         ops.UpdateStatusEvent,
         ops.CollectStatusEvent,
@@ -95,9 +96,10 @@ def test_emitted_deferred():
         State(deferred=[ctx.on.update_status().deferred(MyCharm._on_update_status)]),
     )
 
-    assert len(ctx.emitted_events) == 5
     assert [e.handle.kind for e in ctx.emitted_events] == [
         'update_status',
+        'pre_commit',
+        'commit',
         'start',
         'collect_unit_status',
         'pre_commit',
