@@ -230,7 +230,6 @@ The diagram below illustrates the workflow for the case where the database relat
 
 ![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png) 
 
-(integrate-your-charm-with-postgresql-update-unit-status)=
 ## Update the unit status to reflect the relation state
 
 Now that the charm is getting more complex, there are many more cases where the unit status needs to be set. It's often convenient to do this in a more declarative fashion, which is where the collect-status event can be used.
