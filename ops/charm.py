@@ -1449,8 +1449,9 @@ class CharmBase(Object):
             An instance of the config class with the current config values.
 
         Raises:
-            :class`InvalidSchemaError` if the configuration is invalid, after
-                setting an appropriate blocked status.
+            :class`InvalidSchemaError` if the configuration is invalid. If the
+            exception is not caught by the charm code, the hook will exit with a
+            zero exit code, after setting an appropriate blocked status.
         """
         # Convert secret IDs to secret objects.
         config: Dict[str, Union[bool, int, float, str, model.Secret]] = kwargs.copy()
@@ -1458,24 +1459,24 @@ class CharmBase(Object):
             attr = cls._juju_name_to_attr(key)  # type: ignore
             assert isinstance(attr, str)
             if not attr.isidentifier():
-                self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
-                raise model.InvalidSchemaError() from None
+                raise model.InvalidSchemaError(status=f'Invalid attribute name {attr}') from None
             option_type = self.meta.config.get(key)
             if option_type and option_type.type == 'secret' and isinstance(value, str):
                 try:
                     config[attr] = self.model.get_secret(id=value)
                 except model.SecretNotFoundError:
-                    self.unit.status = model.BlockedStatus(
-                        f"{key} option refers to a secret that doesn't exist or is not accessible"
-                    )
-                    raise model.InvalidSchemaError() from None
+                    raise model.InvalidSchemaError(
+                        status=(
+                            f"{key} option refers to a secret that doesn't exist "
+                            f'or is not accessible'
+                        )
+                    ) from None
             else:
                 config[attr] = value
         try:
             return cls(*args, **config)
         except ValueError as e:
-            self.unit.status = model.BlockedStatus(f'Error in config: {e}')
-            raise model.InvalidSchemaError() from None
+            raise model.InvalidSchemaError(status=f'Error in config: {e}') from None
 
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]

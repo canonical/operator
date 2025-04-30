@@ -456,6 +456,15 @@ class _Manager:
             self._emit()
             self._commit()
             self._close()
+        except _model.InvalidSchemaError as e:
+            # Optionally set a status message on the unit.
+            if e.status:
+                self._model_backend.status_set('blocked', e.status)
+            # We exit with a zero exit code because we don't want Juju to go into
+            # error status (for config and databags, we have set a status ourselves)
+            # and we don't want to automatically retry (the Juju user or another
+            # unit must correct the data to match the schema).
+            raise _Abort(0) from e
         finally:
             self.framework.close()
 
@@ -468,14 +477,7 @@ def main(charm_class: Type[_charm.CharmBase], use_juju_for_storage: Optional[boo
     manager = None
     try:
         manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
-
         manager.run()
-    except _model.InvalidSchemaError:
-        # We exit with a zero exit code because we don't want Juju to go into
-        # error status (for config and databags, we have set a status ourselves)
-        # and we don't want to automatically retry (the Juju user or another
-        # unit must correct the data to match the schema).
-        sys.exit()
     except _Abort as e:
         sys.exit(e.exit_code)
     finally:
