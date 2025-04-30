@@ -16,10 +16,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import logging
 import pathlib
-from typing import Any, ClassVar, Generator
+from typing import Any, ClassVar, Generator, get_origin
 
 from ._private import attrdocs, yaml
 from .model import Secret
@@ -138,24 +139,22 @@ class ConfigBase:
         return attr.replace('-', '_')
 
     @classmethod
-    def _juju_names(cls) -> Generator[str, None, None]:
-        """Iterates over all the option names to include in the config YAML.
-
-        By default, this is ``dir(cls)``, any keys from ``cls.__annotations``,
-        and any keys from ``cls.__dataclass_fields__``, excluding any callables
-        and any names that start with an underscore, and the ``JUJU_TYPES``
-        name.
-        """
+    def _juju_names(cls) -> Generator[str]:
+        """Iterates over all the option names to include in the config YAML."""
+        try:
+            yield from (field.name for field in dataclasses.fields(cls))  # type: ignore
+        except TypeError:
+            pass
+        else:
+            return
+        if hasattr(cls, 'model_fields'):
+            yield from iter(cls.model_fields)  # type: ignore
+            return
+        # Fall back to using dir() and __annotations__.
         attrs = dir(cls)
-        attrs.extend(cls.__annotations__)
-        # TODO: this can probably use dataclasses.fields().
-        if hasattr(cls, '__dataclass_fields__'):
-            attrs.extend(cls.__dataclass_fields__)  # type: ignore
+        attrs.extend((a for a, t in cls.__annotations__.items() if get_origin(t) is not ClassVar))
         for attr in set(attrs):
             if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
-                continue
-            # Perhaps we should ignore anything that's typing.ClassVar?
-            if attr == 'JUJU_TYPES':
                 continue
             yield attr
 
