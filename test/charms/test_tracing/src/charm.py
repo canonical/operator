@@ -39,7 +39,6 @@ class TestTracingCharm(ops.CharmBase):
         if self.unit.is_leader():
             self.app.status = ops.ActiveStatus('ok')
         self.unit.status = ops.ActiveStatus('ok')
-        print('WAT?')
 
     @tracer.start_as_current_span('custom trace on any action')
     def _on_action(self, event: ops.ActionEvent):

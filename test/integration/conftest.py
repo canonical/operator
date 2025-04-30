@@ -83,17 +83,17 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None
     Builds and injects `ops` and `ops-tracing` from the local checkout in to the
     charm's dependencies. Cleans up afterwards.
     """
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'
+    requirements_file = charm_dir / 'requirements.txt'
 
     def cleanup():
+        """Ensure pristine test charm directory."""
         for path in charm_dir.glob('ops*.tar.gz'):
             path.unlink()
         for path in charm_dir.glob('*.charm'):
             path.unlink()
         if requirements_file.exists():
             requirements_file.unlink()
-
-    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'
-    requirements_file = charm_dir / 'requirements.txt'
 
     cleanup()
 

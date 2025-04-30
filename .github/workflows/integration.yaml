@@ -15,7 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         preset: ['k8s', 'microk8s']
-        test-group: [1, 2, 3, 4]
 
     steps:
       - run: |
@@ -32,11 +31,4 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v5
-      # Note that the test group count must match the groups, and there must be enough tests.
-      - run: >
-          uvx tox -e integration
-          --
-          --log-cli-level=INFO -s
-          --test-group-random-seed=0
-          --test-group-count=4
-          --test-group=${{ matrix.test-group }}
+      - run: uvx tox -e integration -- --log-cli-level=INFO -s

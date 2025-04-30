@@ -72,16 +72,6 @@ def test_with_tls(build_charm: Callable[[], str], juju: jubilant.Juju):
     assert 'StartEvent' in event_names
 
 
-def test_with_load_balancer():
-    """There's a load balancer in front of the trace data collector."""
-    pass
-
-
-def test_with_load_balancer_tls():
-    """There's a load balancer in front of the trace data collector and TLS is enabled."""
-    pass
-
-
 def wait_spans(
     address: str,
     ready: Callable[[list[dict[str, Any]]], bool],
