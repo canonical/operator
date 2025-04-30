@@ -12,3 +12,9 @@ d8148ab41869f6119683cf42b7e6e574f1a99bf1
 
 # bump ruff version to 0.11.2 and codespell version to 2.4.1
 eea8d273a6cc3717f495507d556b2e24a6e6ae79
+
+# drop quote-style double from testing and run format
+54f03272439e1e7c450afc5e6b65222f640351fa
+
+# from __future__ import annotations
+425eae45307338f353279d7ae788581195393290

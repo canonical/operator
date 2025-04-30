@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ops
 import pytest
 
@@ -16,54 +18,52 @@ class MyCharm(ops.CharmBase):
 
 def test_get_cloud_spec():
     scenario_cloud_spec = scenario.CloudSpec(
-        type="lxd",
-        name="localhost",
-        endpoint="https://127.0.0.1:8443",
+        type='lxd',
+        name='localhost',
+        endpoint='https://127.0.0.1:8443',
         credential=scenario.CloudCredential(
-            auth_type="clientcertificate",
+            auth_type='clientcertificate',
             attributes={
-                "client-cert": "foo",
-                "client-key": "bar",
-                "server-cert": "baz",
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz',
             },
         ),
     )
     expected_cloud_spec = ops.CloudSpec(
-        type="lxd",
-        name="localhost",
-        endpoint="https://127.0.0.1:8443",
+        type='lxd',
+        name='localhost',
+        endpoint='https://127.0.0.1:8443',
         credential=ops.CloudCredential(
-            auth_type="clientcertificate",
+            auth_type='clientcertificate',
             attributes={
-                "client-cert": "foo",
-                "client-key": "bar",
-                "server-cert": "baz",
+                'client-cert': 'foo',
+                'client-key': 'bar',
+                'server-cert': 'baz',
             },
         ),
     )
-    ctx = scenario.Context(MyCharm, meta={"name": "foo"}, app_trusted=True)
+    ctx = scenario.Context(MyCharm, meta={'name': 'foo'}, app_trusted=True)
     state = scenario.State(
-        model=scenario.Model(
-            name="lxd-model", type="lxd", cloud_spec=scenario_cloud_spec
-        ),
+        model=scenario.Model(name='lxd-model', type='lxd', cloud_spec=scenario_cloud_spec),
     )
     with ctx(ctx.on.start(), state=state) as mgr:
         assert mgr.charm.model.get_cloud_spec() == expected_cloud_spec
 
 
 def test_get_cloud_spec_error():
-    ctx = scenario.Context(MyCharm, meta={"name": "foo"})
-    state = scenario.State(model=scenario.Model(name="lxd-model", type="lxd"))
+    ctx = scenario.Context(MyCharm, meta={'name': 'foo'})
+    state = scenario.State(model=scenario.Model(name='lxd-model', type='lxd'))
     with ctx(ctx.on.start(), state) as mgr:
         with pytest.raises(ops.ModelError):
             mgr.charm.model.get_cloud_spec()
 
 
 def test_get_cloud_spec_untrusted():
-    cloud_spec = ops.CloudSpec(type="lxd", name="localhost")
-    ctx = scenario.Context(MyCharm, meta={"name": "foo"})
+    cloud_spec = ops.CloudSpec(type='lxd', name='localhost')
+    ctx = scenario.Context(MyCharm, meta={'name': 'foo'})
     state = scenario.State(
-        model=scenario.Model(name="lxd-model", type="lxd", cloud_spec=cloud_spec),
+        model=scenario.Model(name='lxd-model', type='lxd', cloud_spec=cloud_spec),
     )
     with ctx(ctx.on.start(), state) as mgr:
         with pytest.raises(ops.ModelError):

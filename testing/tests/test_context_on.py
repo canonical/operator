@@ -11,28 +11,28 @@ import scenario
 
 
 META = {
-    "name": "context-charm",
-    "containers": {
-        "bar": {},
+    'name': 'context-charm',
+    'containers': {
+        'bar': {},
     },
-    "requires": {
-        "baz": {
-            "interface": "charmlink",
+    'requires': {
+        'baz': {
+            'interface': 'charmlink',
         }
     },
-    "storage": {
-        "foo": {
-            "type": "filesystem",
+    'storage': {
+        'foo': {
+            'type': 'filesystem',
         }
     },
 }
 ACTIONS = {
-    "act": {
-        "params": {
-            "param": {
-                "description": "some parameter",
-                "type": "string",
-                "default": "",
+    'act': {
+        'params': {
+            'param': {
+                'description': 'some parameter',
+                'type': 'string',
+                'default': '',
             }
         }
     },
@@ -42,7 +42,7 @@ ACTIONS = {
 class ContextCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.observed: typing.List[ops.EventBase] = []
+        self.observed: list[ops.EventBase] = []
         for event in self.on.events().values():
             framework.observe(event, self._on_event)
 
@@ -51,19 +51,19 @@ class ContextCharm(ops.CharmBase):
 
 
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("install", ops.InstallEvent),
-        ("start", ops.StartEvent),
-        ("stop", ops.StopEvent),
-        ("remove", ops.RemoveEvent),
-        ("update_status", ops.UpdateStatusEvent),
-        ("config_changed", ops.ConfigChangedEvent),
-        ("upgrade_charm", ops.UpgradeCharmEvent),
-        ("leader_elected", ops.LeaderElectedEvent),
+        ('install', ops.InstallEvent),
+        ('start', ops.StartEvent),
+        ('stop', ops.StopEvent),
+        ('remove', ops.RemoveEvent),
+        ('update_status', ops.UpdateStatusEvent),
+        ('config_changed', ops.ConfigChangedEvent),
+        ('upgrade_charm', ops.UpgradeCharmEvent),
+        ('leader_elected', ops.LeaderElectedEvent),
     ],
 )
-def test_simple_events(event_name: str, event_kind: typing.Type[ops.EventBase]):
+def test_simple_events(event_name: str, event_kind: type[ops.EventBase]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run(ctx.on.install(), state)
@@ -75,10 +75,10 @@ def test_simple_events(event_name: str, event_kind: typing.Type[ops.EventBase]):
 
 
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("pre_series_upgrade", ops.PreSeriesUpgradeEvent),
-        ("post_series_upgrade", ops.PostSeriesUpgradeEvent),
+        ('pre_series_upgrade', ops.PreSeriesUpgradeEvent),
+        ('post_series_upgrade', ops.PostSeriesUpgradeEvent),
     ],
 )
 def test_simple_deprecated_events(event_name, event_kind):
@@ -93,17 +93,17 @@ def test_simple_deprecated_events(event_name, event_kind):
             assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
-@pytest.mark.parametrize("as_kwarg", [True, False])
+@pytest.mark.parametrize('as_kwarg', [True, False])
 @pytest.mark.parametrize(
-    "event_name,event_kind,owner",
+    'event_name,event_kind,owner',
     [
-        ("secret_changed", ops.SecretChangedEvent, None),
-        ("secret_rotate", ops.SecretRotateEvent, "app"),
+        ('secret_changed', ops.SecretChangedEvent, None),
+        ('secret_rotate', ops.SecretRotateEvent, 'app'),
     ],
 )
 def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    secret = scenario.Secret({"password": "xxxx"}, owner=owner)
+    secret = scenario.Secret({'password': 'xxxx'}, owner=owner)
     state_in = scenario.State(secrets={secret})
     # These look like:
     #   ctx.run(ctx.on.secret_changed(secret=secret), state)
@@ -111,7 +111,7 @@ def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
     # all secrets.
     if as_kwarg:
         args = ()
-        kwargs = {"secret": secret}
+        kwargs = {'secret': secret}
     else:
         args = (secret,)
         kwargs = {}
@@ -124,18 +124,18 @@ def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
 
 
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("secret_expired", ops.SecretExpiredEvent),
-        ("secret_remove", ops.SecretRemoveEvent),
+        ('secret_expired', ops.SecretExpiredEvent),
+        ('secret_remove', ops.SecretRemoveEvent),
     ],
 )
 def test_revision_secret_events(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
-        tracked_content={"password": "yyyy"},
-        latest_content={"password": "xxxx"},
-        owner="app",
+        tracked_content={'password': 'yyyy'},
+        latest_content={'password': 'xxxx'},
+        owner='app',
     )
     state_in = scenario.State(secrets={secret})
     # These look like:
@@ -151,12 +151,12 @@ def test_revision_secret_events(event_name, event_kind):
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
-@pytest.mark.parametrize("event_name", ["secret_expired", "secret_remove"])
+@pytest.mark.parametrize('event_name', ['secret_expired', 'secret_remove'])
 def test_revision_secret_events_as_positional_arg(event_name):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
-        tracked_content={"password": "yyyy"},
-        latest_content={"password": "xxxx"},
+        tracked_content={'password': 'yyyy'},
+        latest_content={'password': 'xxxx'},
         owner=None,
     )
     state_in = scenario.State(secrets={secret})
@@ -165,15 +165,15 @@ def test_revision_secret_events_as_positional_arg(event_name):
 
 
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("storage_attached", ops.StorageAttachedEvent),
-        ("storage_detaching", ops.StorageDetachingEvent),
+        ('storage_attached', ops.StorageAttachedEvent),
+        ('storage_detaching', ops.StorageDetachingEvent),
     ],
 )
 def test_storage_events(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    storage = scenario.Storage("foo")
+    storage = scenario.Storage('foo')
     state_in = scenario.State(storages=[storage])
     # These look like:
     #   ctx.run(ctx.on.storage_attached(storage), state)
@@ -190,7 +190,7 @@ def test_action_event_no_params():
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run(ctx.on.action(action_name), state)
-    with ctx(ctx.on.action("act"), scenario.State()) as mgr:
+    with ctx(ctx.on.action('act'), scenario.State()) as mgr:
         mgr.run()
         action_event, collect_status = mgr.charm.observed
         assert isinstance(action_event, ops.ActionEvent)
@@ -202,19 +202,19 @@ def test_action_event_with_params():
     # These look like:
     #   ctx.run(ctx.on.action(action=action), state)
     # So that any parameters can be included and the ID can be customised.
-    call_event = ctx.on.action("act", params={"param": "hello"})
+    call_event = ctx.on.action('act', params={'param': 'hello'})
     with ctx(call_event, scenario.State()) as mgr:
         mgr.run()
         action_event, collect_status = mgr.charm.observed
         assert isinstance(action_event, ops.ActionEvent)
         assert action_event.id == call_event.action.id
-        assert action_event.params["param"] == call_event.action.params["param"]
+        assert action_event.params['param'] == call_event.action.params['param']
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
 def test_pebble_ready_event():
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    container = scenario.Container("bar", can_connect=True)
+    container = scenario.Container('bar', can_connect=True)
     state_in = scenario.State(containers=[container])
     # These look like:
     #   ctx.run(ctx.on.pebble_ready(container), state)
@@ -226,23 +226,23 @@ def test_pebble_ready_event():
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
-@pytest.mark.parametrize("as_kwarg", [True, False])
+@pytest.mark.parametrize('as_kwarg', [True, False])
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("relation_created", ops.RelationCreatedEvent),
-        ("relation_broken", ops.RelationBrokenEvent),
+        ('relation_created', ops.RelationCreatedEvent),
+        ('relation_broken', ops.RelationBrokenEvent),
     ],
 )
 def test_relation_app_events(as_kwarg, event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    relation = scenario.Relation("baz")
+    relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])
     # These look like:
     #   ctx.run(ctx.on.relation_created(relation), state)
     if as_kwarg:
         args = ()
-        kwargs = {"relation": relation}
+        kwargs = {'relation': relation}
     else:
         args = (relation,)
         kwargs = {}
@@ -258,9 +258,9 @@ def test_relation_app_events(as_kwarg, event_name, event_kind):
 
 def test_relation_complex_name():
     meta = copy.deepcopy(META)
-    meta["requires"]["foo-bar-baz"] = {"interface": "another-one"}
+    meta['requires']['foo-bar-baz'] = {'interface': 'another-one'}
     ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
-    relation = scenario.Relation("foo-bar-baz")
+    relation = scenario.Relation('foo-bar-baz')
     state_in = scenario.State(relations=[relation])
     with ctx(ctx.on.relation_created(relation), state_in) as mgr:
         mgr.run()
@@ -272,25 +272,25 @@ def test_relation_complex_name():
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
-@pytest.mark.parametrize("event_name", ["relation_created", "relation_broken"])
+@pytest.mark.parametrize('event_name', ['relation_created', 'relation_broken'])
 def test_relation_events_as_positional_arg(event_name):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    relation = scenario.Relation("baz")
+    relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])
     with pytest.raises(TypeError):
         ctx.run(getattr(ctx.on, event_name)(relation, 0), state_in)
 
 
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("relation_joined", ops.RelationJoinedEvent),
-        ("relation_changed", ops.RelationChangedEvent),
+        ('relation_joined', ops.RelationJoinedEvent),
+        ('relation_changed', ops.RelationChangedEvent),
     ],
 )
 def test_relation_unit_events_default_unit(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    relation = scenario.Relation("baz", remote_units_data={1: {"x": "y"}})
+    relation = scenario.Relation('baz', remote_units_data={1: {'x': 'y'}})
     state_in = scenario.State(relations=[relation])
     # These look like:
     #   ctx.run(ctx.on.baz_relation_changed, state)
@@ -301,22 +301,20 @@ def test_relation_unit_events_default_unit(event_name, event_kind):
         assert isinstance(relation_event, event_kind)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
-        assert relation_event.unit.name == "remote/1"
+        assert relation_event.unit.name == 'remote/1'
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
 @pytest.mark.parametrize(
-    "event_name, event_kind",
+    'event_name, event_kind',
     [
-        ("relation_joined", ops.RelationJoinedEvent),
-        ("relation_changed", ops.RelationChangedEvent),
+        ('relation_joined', ops.RelationJoinedEvent),
+        ('relation_changed', ops.RelationChangedEvent),
     ],
 )
 def test_relation_unit_events(event_name, event_kind):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    relation = scenario.Relation(
-        "baz", remote_units_data={1: {"x": "y"}, 2: {"x": "z"}}
-    )
+    relation = scenario.Relation('baz', remote_units_data={1: {'x': 'y'}, 2: {'x': 'z'}})
     state_in = scenario.State(relations=[relation])
     # These look like:
     #   ctx.run(ctx.on.baz_relation_changed(unit=unit_ordinal), state)
@@ -326,26 +324,24 @@ def test_relation_unit_events(event_name, event_kind):
         assert isinstance(relation_event, event_kind)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
-        assert relation_event.unit.name == "remote/2"
+        assert relation_event.unit.name == 'remote/2'
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
 def test_relation_departed_event():
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
-    relation = scenario.Relation("baz")
+    relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])
     # These look like:
     #   ctx.run(ctx.on.baz_relation_departed(unit=unit_ordinal, departing_unit=unit_ordinal), state)
-    with ctx(
-        ctx.on.relation_departed(relation, remote_unit=2, departing_unit=1), state_in
-    ) as mgr:
+    with ctx(ctx.on.relation_departed(relation, remote_unit=2, departing_unit=1), state_in) as mgr:
         mgr.run()
         relation_event, collect_status = mgr.charm.observed
         assert isinstance(relation_event, ops.RelationDepartedEvent)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
-        assert relation_event.unit.name == "remote/2"
-        assert relation_event.departing_unit.name == "remote/1"
+        assert relation_event.unit.name == 'remote/2'
+        assert relation_event.departing_unit.name == 'remote/1'
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
@@ -357,20 +353,20 @@ class CustomEventWithArgs(CustomEvent):
     arg0: str
     arg1: int
 
-    def __init__(self, handle: ops.Handle, arg0: str = "", arg1: int = 0):
+    def __init__(self, handle: ops.Handle, arg0: str = '', arg1: int = 0):
         super().__init__(handle)
         self.arg0 = arg0
         self.arg1 = arg1
 
     def snapshot(self):
         base = super().snapshot()
-        base.update({"arg0": self.arg0, "arg1": self.arg1})
+        base.update({'arg0': self.arg0, 'arg1': self.arg1})
         return base
 
     def restore(self, snapshot: dict[str, typing.Any]):
         super().restore(snapshot)
-        self.arg0 = snapshot["arg0"]
-        self.arg1 = snapshot["arg1"]
+        self.arg0 = snapshot['arg0']
+        self.arg1 = snapshot['arg1']
 
 
 class CustomRelationEvent(ops.RelationChangedEvent):
@@ -406,78 +402,74 @@ class CustomEventWithScenarioArgs(CustomEvent):
         base = super().snapshot()
         # This loses a lot of the details, but for the test all we care about is
         # that the type and the 'primary key' are correct.
-        base["cloudcredential"] = self.cloudcredential.auth_type
-        base["cloudspec"] = self.cloudspec.name
-        base["secret"] = self.secret.id
-        base["relation"] = self.relation.name
-        base["peerrelation"] = self.peerrelation.name
-        base["subordinaterelation"] = self.subordinaterelation.name
-        base["relation_id"] = self.relation.id
-        base["peerrelation_id"] = self.peerrelation.id
-        base["subordinaterelation_id"] = self.subordinaterelation.id
-        base["notice_id"] = self.notice.id
-        base["notice_key"] = self.notice.key
-        base["checkinfo"] = self.checkinfo.name
-        base["container"] = self.container.name
-        base["errorstatus"] = self.errorstatus.message
-        base["activestatus"] = self.activestatus.message
-        base["blockedstatus"] = self.blockedstatus.message
-        base["maintenancestatus"] = self.maintenancestatus.message
-        base["waitingstatus"] = self.waitingstatus.message
-        base["tcpport"] = self.tcpport.port
-        base["udpport"] = self.udpport.port
-        base["storage_name"] = self.storage.name
-        base["storage_index"] = self.storage.index
+        base['cloudcredential'] = self.cloudcredential.auth_type
+        base['cloudspec'] = self.cloudspec.name
+        base['secret'] = self.secret.id
+        base['relation'] = self.relation.name
+        base['peerrelation'] = self.peerrelation.name
+        base['subordinaterelation'] = self.subordinaterelation.name
+        base['relation_id'] = self.relation.id
+        base['peerrelation_id'] = self.peerrelation.id
+        base['subordinaterelation_id'] = self.subordinaterelation.id
+        base['notice_id'] = self.notice.id
+        base['notice_key'] = self.notice.key
+        base['checkinfo'] = self.checkinfo.name
+        base['container'] = self.container.name
+        base['errorstatus'] = self.errorstatus.message
+        base['activestatus'] = self.activestatus.message
+        base['blockedstatus'] = self.blockedstatus.message
+        base['maintenancestatus'] = self.maintenancestatus.message
+        base['waitingstatus'] = self.waitingstatus.message
+        base['tcpport'] = self.tcpport.port
+        base['udpport'] = self.udpport.port
+        base['storage_name'] = self.storage.name
+        base['storage_index'] = self.storage.index
         return base
 
     def restore(self, snapshot: dict[str, typing.Any]):
         super().restore(snapshot)
-        self.cloudcredential = ops.CloudCredential(
-            auth_type=snapshot["cloudcredential"]
-        )
-        self.cloudspec = ops.CloudSpec("", snapshot["cloudspec"])
-        self.secret = self.framework.model.get_secret(id=snapshot["secret"])
+        self.cloudcredential = ops.CloudCredential(auth_type=snapshot['cloudcredential'])
+        self.cloudspec = ops.CloudSpec('', snapshot['cloudspec'])
+        self.secret = self.framework.model.get_secret(id=snapshot['secret'])
         relation = self.framework.model.get_relation(
-            snapshot["relation"], relation_id=snapshot["relation_id"]
+            snapshot['relation'], relation_id=snapshot['relation_id']
         )
         assert relation is not None
         self.relation = relation
         peerrelation = self.framework.model.get_relation(
-            snapshot["peerrelation"], relation_id=snapshot["peerrelation_id"]
+            snapshot['peerrelation'], relation_id=snapshot['peerrelation_id']
         )
         assert peerrelation is not None
         self.peerrelation = peerrelation
         subordinaterelation = self.framework.model.get_relation(
-            snapshot["subordinaterelation"],
-            relation_id=snapshot["subordinaterelation_id"],
+            snapshot['subordinaterelation'],
+            relation_id=snapshot['subordinaterelation_id'],
         )
         assert subordinaterelation is not None
         self.subordinaterelation = subordinaterelation
         now = datetime.datetime.now()
         self.notice = ops.pebble.Notice(
-            snapshot["notice_id"],
+            snapshot['notice_id'],
             None,
-            "",
-            snapshot["notice_key"],
+            '',
+            snapshot['notice_key'],
             now,
             now,
             now,
             1,
         )
-        self.checkinfo = ops.pebble.CheckInfo(snapshot["checkinfo"], None, "")
-        self.container = self.framework.model.unit.get_container(snapshot["container"])
-        self.errorstatus = ops.ErrorStatus(message=snapshot["errorstatus"])
-        self.activestatus = ops.ActiveStatus(message=snapshot["activestatus"])
-        self.blockedstatus = ops.BlockedStatus(message=snapshot["blockedstatus"])
-        self.maintenancestatus = ops.MaintenanceStatus(
-            message=snapshot["maintenancestatus"]
-        )
-        self.waitingstatus = ops.WaitingStatus(message=snapshot["waitingstatus"])
-        self.tcpport = ops.Port(protocol="tcp", port=snapshot["tcpport"])
-        self.udpport = ops.Port(protocol="udp", port=snapshot["udpport"])
-        self.icmpport = ops.Port(protocol="icmp", port=None)
-        for storage in self.framework.model.storages[snapshot["storage_name"]]:
-            if storage.index == snapshot["storage_index"]:
+        self.checkinfo = ops.pebble.CheckInfo(snapshot['checkinfo'], None, '')
+        self.container = self.framework.model.unit.get_container(snapshot['container'])
+        self.errorstatus = ops.ErrorStatus(message=snapshot['errorstatus'])
+        self.activestatus = ops.ActiveStatus(message=snapshot['activestatus'])
+        self.blockedstatus = ops.BlockedStatus(message=snapshot['blockedstatus'])
+        self.maintenancestatus = ops.MaintenanceStatus(message=snapshot['maintenancestatus'])
+        self.waitingstatus = ops.WaitingStatus(message=snapshot['waitingstatus'])
+        self.tcpport = ops.Port(protocol='tcp', port=snapshot['tcpport'])
+        self.udpport = ops.Port(protocol='udp', port=snapshot['udpport'])
+        self.icmpport = ops.Port(protocol='icmp', port=None)
+        for storage in self.framework.model.storages[snapshot['storage_name']]:
+            if storage.index == snapshot['storage_index']:
                 self.storage = storage
                 break
 
@@ -493,7 +485,7 @@ class MyConsumer(ops.Object):
     on = CustomEvents()  # type: ignore
 
     def __init__(self, charm: ops.CharmBase):
-        super().__init__(charm, "my-consumer")
+        super().__init__(charm, 'my-consumer')
 
 
 class CustomCharm(ContextCharm):
@@ -518,14 +510,14 @@ def test_custom_event_no_args():
 def test_custom_event_with_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with ctx(
-        ctx.on.custom(MyConsumer.on.foo_changed, "foo", arg1=42),
+        ctx.on.custom(MyConsumer.on.foo_changed, 'foo', arg1=42),
         scenario.State(),
     ) as mgr:
         mgr.run()
         custom_event, collect_status = mgr.charm.observed
         assert isinstance(collect_status, ops.CollectStatusEvent)
         assert isinstance(custom_event, CustomEventWithArgs)
-        assert custom_event.arg0 == "foo"
+        assert custom_event.arg0 == 'foo'
         assert custom_event.arg1 == 42
 
 
@@ -537,38 +529,36 @@ def test_custom_event_is_hookevent():
 
 def test_custom_event_with_scenario_args():
     meta = META.copy()
-    meta["requires"]["endpoint"] = {"interface": "int1"}
-    meta["requires"]["sub-endpoint"] = {"interface": "int2", "scope": "container"}
-    meta["peers"] = {"peer-endpoint": {"interface": "int3"}}
-    meta["containers"]["container"] = {}
-    meta["storage"]["store"] = {"type": "filesystem"}
+    meta['requires']['endpoint'] = {'interface': 'int1'}
+    meta['requires']['sub-endpoint'] = {'interface': 'int2', 'scope': 'container'}
+    meta['peers'] = {'peer-endpoint': {'interface': 'int3'}}
+    meta['containers']['container'] = {}
+    meta['storage']['store'] = {'type': 'filesystem'}
     ctx = scenario.Context(CustomCharm, meta=meta, actions=ACTIONS)
 
-    cloudcredential = scenario.CloudCredential(auth_type="auth")
-    cloudspec = scenario.CloudSpec("cloud")
-    secret = scenario.Secret({"password": "xxxx"})
-    relation = scenario.Relation("endpoint")
-    peerrelation = scenario.PeerRelation("peer-endpoint")
-    subordinaterelation = scenario.SubordinateRelation("sub-endpoint")
-    notice = scenario.Notice("key.example.com")
+    cloudcredential = scenario.CloudCredential(auth_type='auth')
+    cloudspec = scenario.CloudSpec('cloud')
+    secret = scenario.Secret({'password': 'xxxx'})
+    relation = scenario.Relation('endpoint')
+    peerrelation = scenario.PeerRelation('peer-endpoint')
+    subordinaterelation = scenario.SubordinateRelation('sub-endpoint')
+    notice = scenario.Notice('key.example.com')
     layer = ops.pebble.Layer({
-        "checks": {
-            "check1": {"override": "replace", "startup": "enabled", "threshold": 3}
-        }
+        'checks': {'check1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
-    checkinfo = scenario.CheckInfo("check1", level=ops.pebble.CheckLevel.UNSET)
+    checkinfo = scenario.CheckInfo('check1', level=ops.pebble.CheckLevel.UNSET)
     container = scenario.Container(
-        "container", notices=[notice], check_infos={checkinfo}, layers={"layer": layer}
+        'container', notices=[notice], check_infos={checkinfo}, layers={'layer': layer}
     )
-    errorstatus = scenario.ErrorStatus("error")
-    activestatus = scenario.ActiveStatus("working")
-    blockedstatus = scenario.BlockedStatus("blocked")
-    maintenancestatus = scenario.MaintenanceStatus("maintaining")
-    waitingstatus = scenario.WaitingStatus("waiting")
+    errorstatus = scenario.ErrorStatus('error')
+    activestatus = scenario.ActiveStatus('working')
+    blockedstatus = scenario.BlockedStatus('blocked')
+    maintenancestatus = scenario.MaintenanceStatus('maintaining')
+    waitingstatus = scenario.WaitingStatus('waiting')
     tcpport = scenario.TCPPort(8000)
     udpport = scenario.UDPPort(8001)
     icmpport = scenario.ICMPPort()
-    storage = scenario.Storage("store")
+    storage = scenario.Storage('store')
 
     state = scenario.State(
         secrets={secret},
@@ -634,13 +624,13 @@ def test_custom_event_with_scenario_args():
         assert isinstance(evt.waitingstatus, ops.WaitingStatus)
         assert evt.waitingstatus.message == waitingstatus.message
         assert isinstance(evt.tcpport, ops.Port)
-        assert evt.tcpport.protocol == "tcp"
+        assert evt.tcpport.protocol == 'tcp'
         assert evt.tcpport.port == tcpport.port
         assert isinstance(evt.udpport, ops.Port)
-        assert evt.udpport.protocol == "udp"
+        assert evt.udpport.protocol == 'udp'
         assert evt.udpport.port == udpport.port
         assert isinstance(evt.icmpport, ops.Port)
-        assert evt.icmpport.protocol == "icmp"
+        assert evt.icmpport.protocol == 'icmp'
         assert isinstance(evt.storage, ops.Storage)
         assert evt.storage.name == storage.name
 
@@ -664,7 +654,7 @@ class TwoLibraryCharm(ContextCharm):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.consumer1 = MyConsumer(self)
-        self.consumer2 = OtherConsumer(self, "some-relation")
+        self.consumer2 = OtherConsumer(self, 'some-relation')
         framework.observe(self.consumer1.on.foo_changed, self._on_event)
         framework.observe(self.consumer2.on.foo_changed, self._on_event)
 

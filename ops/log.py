@@ -14,6 +14,8 @@
 
 """Interface to emit messages to the Juju logging system."""
 
+from __future__ import annotations
+
 import logging
 import sys
 import types
@@ -62,12 +64,12 @@ def setup_root_logging(
     logger.addHandler(JujuLogHandler(model_backend))
 
     def custom_showwarning(
-        message: typing.Union[Warning, str],
-        category: typing.Type[Warning],
+        message: Warning | str,
+        category: type[Warning],
         filename: str,
         lineno: int,
-        file: typing.Optional[typing.TextIO] = None,
-        line: typing.Optional[str] = None,
+        file: typing.TextIO | None = None,
+        line: str | None = None,
     ):
         """Direct the warning to Juju's debug-log, and don't include the code."""
         logger.warning('%s:%s: %s: %s', filename, lineno, category.__name__, message)
@@ -80,9 +82,7 @@ def setup_root_logging(
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    def except_hook(
-        etype: typing.Type[BaseException], value: BaseException, tb: types.TracebackType
-    ):
+    def except_hook(etype: type[BaseException], value: BaseException, tb: types.TracebackType):
         logger.error('Uncaught exception while in charm code:', exc_info=(etype, value, tb))
         if exc_stderr:
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)

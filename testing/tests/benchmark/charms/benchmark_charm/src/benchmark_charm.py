@@ -8,11 +8,13 @@ Note that this is named benchmark_charm rather than charm as is typical to
 avoid conflicts with ops.charm in the testing runs.
 """
 
+from __future__ import annotations
+
 import logging
 
 import ops
 
-logger = logging.getLogger("__name__")
+logger = logging.getLogger('__name__')
 
 
 class BenchmarkCharm(ops.CharmBase):
@@ -28,9 +30,9 @@ class BenchmarkCharm(ops.CharmBase):
 
     def _on_update_status(self, _: ops.UpdateStatusEvent):
         # Say a bunch of things.
-        for level in ("debug", "info", "warning", "error"):
+        for level in ('debug', 'info', 'warning', 'error'):
             for i in range(50):
-                getattr(logger, level)("This is message %s", i)
+                getattr(logger, level)('This is message %s', i)
 
     def _on_stop(self, _: ops.StopEvent):
         """Do nothing - this exists to benchmark having an observer."""
@@ -39,5 +41,5 @@ class BenchmarkCharm(ops.CharmBase):
         event.defer()
 
 
-if __name__ == "__main__":  # pragma: nocover
+if __name__ == '__main__':  # pragma: nocover
     ops.main(BenchmarkCharm)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ops
 import pytest
 from ops.charm import CharmBase
@@ -17,7 +19,7 @@ from scenario.errors import UncaughtCharmError
 from ..helpers import trigger
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
@@ -37,9 +39,9 @@ def test_initial_status(mycharm):
 
     out = trigger(
         State(leader=True),
-        "update_status",
+        'update_status',
         mycharm,
-        meta={"name": "local"},
+        meta={'name': 'local'},
         post_event=post_event,
     )
 
@@ -54,29 +56,29 @@ def test_status_history(mycharm):
 
         def _on_update_status(self, _):
             for obj in (self.unit, self.app):
-                obj.status = ops.ActiveStatus("1")
-                obj.status = ops.BlockedStatus("2")
-                obj.status = ops.WaitingStatus("3")
+                obj.status = ops.ActiveStatus('1')
+                obj.status = ops.BlockedStatus('2')
+                obj.status = ops.WaitingStatus('3')
 
     ctx = Context(
         StatusCharm,
-        meta={"name": "local"},
+        meta={'name': 'local'},
     )
 
     out = ctx.run(ctx.on.update_status(), State(leader=True))
 
-    assert out.unit_status == WaitingStatus("3")
+    assert out.unit_status == WaitingStatus('3')
     assert ctx.unit_status_history == [
         UnknownStatus(),
-        ActiveStatus("1"),
-        BlockedStatus("2"),
+        ActiveStatus('1'),
+        BlockedStatus('2'),
     ]
 
-    assert out.app_status == ops.WaitingStatus("3")
+    assert out.app_status == ops.WaitingStatus('3')
     assert ctx.app_status_history == [
         UnknownStatus(),
-        ActiveStatus("1"),
-        BlockedStatus("2"),
+        ActiveStatus('1'),
+        BlockedStatus('2'),
     ]
 
 
@@ -88,27 +90,27 @@ def test_status_history_preservation(mycharm):
 
         def _on_update_status(self, _):
             for obj in (self.unit, self.app):
-                obj.status = WaitingStatus("3")
+                obj.status = WaitingStatus('3')
 
     ctx = Context(
         StatusCharm,
-        meta={"name": "local"},
+        meta={'name': 'local'},
     )
 
     out = ctx.run(
         ctx.on.update_status(),
         State(
             leader=True,
-            unit_status=ActiveStatus("foo"),
-            app_status=ActiveStatus("bar"),
+            unit_status=ActiveStatus('foo'),
+            app_status=ActiveStatus('bar'),
         ),
     )
 
-    assert out.unit_status == WaitingStatus("3")
-    assert ctx.unit_status_history == [ActiveStatus("foo")]
+    assert out.unit_status == WaitingStatus('3')
+    assert ctx.unit_status_history == [ActiveStatus('foo')]
 
-    assert out.app_status == WaitingStatus("3")
-    assert ctx.app_status_history == [ActiveStatus("bar")]
+    assert out.app_status == WaitingStatus('3')
+    assert ctx.app_status_history == [ActiveStatus('bar')]
 
 
 def test_workload_history(mycharm):
@@ -120,35 +122,35 @@ def test_workload_history(mycharm):
             framework.observe(self.on.update_status, self._on_update_status)
 
         def _on_install(self, _):
-            self.unit.set_workload_version("1")
+            self.unit.set_workload_version('1')
 
         def _on_start(self, _):
-            self.unit.set_workload_version("1.1")
+            self.unit.set_workload_version('1.1')
 
         def _on_update_status(self, _):
-            self.unit.set_workload_version("1.2")
+            self.unit.set_workload_version('1.2')
 
     ctx = Context(
         WorkloadCharm,
-        meta={"name": "local"},
+        meta={'name': 'local'},
     )
 
     out = ctx.run(ctx.on.install(), State(leader=True))
     out = ctx.run(ctx.on.start(), out)
     out = ctx.run(ctx.on.update_status(), out)
 
-    assert ctx.workload_version_history == ["1", "1.1"]
-    assert out.workload_version == "1.2"
+    assert ctx.workload_version_history == ['1', '1.1']
+    assert out.workload_version == '1.2'
 
 
 @pytest.mark.parametrize(
-    "status",
+    'status',
     (
-        ActiveStatus("foo"),
-        WaitingStatus("bar"),
-        BlockedStatus("baz"),
-        MaintenanceStatus("qux"),
-        ErrorStatus("fiz"),
+        ActiveStatus('foo'),
+        WaitingStatus('bar'),
+        BlockedStatus('baz'),
+        MaintenanceStatus('qux'),
+        ErrorStatus('fiz'),
         UnknownStatus(),
     ),
 )
@@ -173,12 +175,12 @@ def test_status_comparison(status):
 
 
 @pytest.mark.parametrize(
-    "status",
+    'status',
     (
-        ActiveStatus("foo"),
-        WaitingStatus("bar"),
-        BlockedStatus("baz"),
-        MaintenanceStatus("qux"),
+        ActiveStatus('foo'),
+        WaitingStatus('bar'),
+        BlockedStatus('baz'),
+        MaintenanceStatus('qux'),
     ),
 )
 def test_status_success(status: ops.StatusBase):
@@ -190,14 +192,14 @@ def test_status_success(status: ops.StatusBase):
         def _on_update_status(self, _):
             self.unit.status = status
 
-    ctx = Context(MyCharm, meta={"name": "foo"})
+    ctx = Context(MyCharm, meta={'name': 'foo'})
     ctx.run(ctx.on.update_status(), State())
 
 
 @pytest.mark.parametrize(
-    "status",
+    'status',
     (
-        ErrorStatus("fiz"),
+        ErrorStatus('fiz'),
         UnknownStatus(),
     ),
 )
@@ -210,7 +212,7 @@ def test_status_error(status: ops.StatusBase):
         def _on_update_status(self, _):
             self.unit.status = status
 
-    ctx = Context(MyCharm, meta={"name": "foo"})
+    ctx = Context(MyCharm, meta={'name': 'foo'})
     with pytest.raises(UncaughtCharmError) as excinfo:
         ctx.run(ctx.on.update_status(), State())
     assert isinstance(excinfo.value.__cause__, ops.ModelError)

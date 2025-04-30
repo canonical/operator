@@ -48,65 +48,65 @@ from .logger import logger as scenario_logger
 if TYPE_CHECKING:  # pragma: no cover
     from . import Context
 
-AnyJson = Union[str, bool, Dict[str, "AnyJson"], int, float, List["AnyJson"]]
+AnyJson = Union[str, bool, Dict[str, 'AnyJson'], int, float, List['AnyJson']]
 RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
 UnitID = int
 
-CharmType = TypeVar("CharmType", bound=CharmBase)
+CharmType = TypeVar('CharmType', bound=CharmBase)
 
-logger = scenario_logger.getChild("state")
+logger = scenario_logger.getChild('state')
 
-ATTACH_ALL_STORAGES = "ATTACH_ALL_STORAGES"
-CREATE_ALL_RELATIONS = "CREATE_ALL_RELATIONS"
-BREAK_ALL_RELATIONS = "BREAK_ALL_RELATIONS"
-DETACH_ALL_STORAGES = "DETACH_ALL_STORAGES"
+ATTACH_ALL_STORAGES = 'ATTACH_ALL_STORAGES'
+CREATE_ALL_RELATIONS = 'CREATE_ALL_RELATIONS'
+BREAK_ALL_RELATIONS = 'BREAK_ALL_RELATIONS'
+DETACH_ALL_STORAGES = 'DETACH_ALL_STORAGES'
 
-_ACTION_EVENT_SUFFIX = "_action"
+_ACTION_EVENT_SUFFIX = '_action'
 # all builtin events except secret events. They're special because they carry secret metadata.
 _BUILTIN_EVENTS = {
-    "start",
-    "stop",
-    "install",
-    "install",
-    "start",
-    "stop",
-    "remove",
-    "update_status",
-    "config_changed",
-    "upgrade_charm",
-    "pre_series_upgrade",
-    "post_series_upgrade",
-    "leader_elected",
-    "leader_settings_changed",
-    "collect_metrics",
+    'start',
+    'stop',
+    'install',
+    'install',
+    'start',
+    'stop',
+    'remove',
+    'update_status',
+    'config_changed',
+    'upgrade_charm',
+    'pre_series_upgrade',
+    'post_series_upgrade',
+    'leader_elected',
+    'leader_settings_changed',
+    'collect_metrics',
 }
 _FRAMEWORK_EVENTS = {
-    "pre_commit",
-    "commit",
-    "collect_app_status",
-    "collect_unit_status",
+    'pre_commit',
+    'commit',
+    'collect_app_status',
+    'collect_unit_status',
 }
-_PEBBLE_READY_EVENT_SUFFIX = "_pebble_ready"
-_PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = "_pebble_custom_notice"
-_PEBBLE_CHECK_FAILED_EVENT_SUFFIX = "_pebble_check_failed"
-_PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX = "_pebble_check_recovered"
+_PEBBLE_READY_EVENT_SUFFIX = '_pebble_ready'
+_PEBBLE_CUSTOM_NOTICE_EVENT_SUFFIX = '_pebble_custom_notice'
+_PEBBLE_CHECK_FAILED_EVENT_SUFFIX = '_pebble_check_failed'
+_PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX = '_pebble_check_recovered'
 _RELATION_EVENTS_SUFFIX = {
-    "_relation_changed",
-    "_relation_broken",
-    "_relation_joined",
-    "_relation_departed",
-    "_relation_created",
+    '_relation_changed',
+    '_relation_broken',
+    '_relation_joined',
+    '_relation_departed',
+    '_relation_created',
 }
 _STORAGE_EVENTS_SUFFIX = {
-    "_storage_detaching",
-    "_storage_attached",
+    '_storage_detaching',
+    '_storage_attached',
 }
 
 _SECRET_EVENTS = {
-    "secret_changed",
-    "secret_remove",
-    "secret_rotate",
-    "secret_expired",
+    'secret_changed',
+    'secret_remove',
+    'secret_rotate',
+    'secret_expired',
 }
 
 
@@ -138,7 +138,7 @@ def _max_posargs(n: int):
         @classmethod
         def _annotate_class(cls):
             """Record information about which parameters are positional vs. keyword-only."""
-            if hasattr(cls, "_init_parameters"):
+            if hasattr(cls, '_init_parameters'):
                 # We don't support dynamically changing the signature of a
                 # class, so we assume here it's the same as previously.
                 # In addition, the class and the function that provides it
@@ -149,62 +149,53 @@ def _max_posargs(n: int):
             # declared, which aligns with dataclasses. Simpler ways of
             # getting the arguments (like __annotations__) do not have that
             # guarantee, although in practice it is the case.
-            cls._init_parameters = parameters = inspect.signature(
-                cls.__init__
-            ).parameters
+            cls._init_parameters = parameters = inspect.signature(cls.__init__).parameters
             cls._init_kw_only = {
                 name
                 for name in tuple(parameters)[cls._max_positional_args :]
-                if not name.startswith("_")
+                if not name.startswith('_')
             }
             cls._init_required_args = [
                 name
                 for name in tuple(parameters)
-                if name != "self"
-                and parameters[name].default is inspect.Parameter.empty
+                if name != 'self' and parameters[name].default is inspect.Parameter.empty
             ]
 
         def __new__(cls, *args: Any, **kwargs: Any):
             cls._annotate_class()
-            required_args = [
-                name for name in cls._init_required_args if name not in kwargs
-            ]
+            required_args = [name for name in cls._init_required_args if name not in kwargs]
             n_posargs = len(args)
             max_n_posargs = cls._max_positional_args
             kw_only = cls._init_kw_only
             if n_posargs > max_n_posargs:
                 raise TypeError(
-                    f"{cls.__name__} takes {max_n_posargs} positional "
-                    f"argument{'' if max_n_posargs == 1 else 's'} but "
-                    f"{n_posargs} {'was' if n_posargs == 1 else 'were'} "
-                    f"given. The following arguments are keyword-only: "
-                    f"{', '.join(kw_only)}",
+                    f'{cls.__name__} takes {max_n_posargs} positional '
+                    f'argument{"" if max_n_posargs == 1 else "s"} but '
+                    f'{n_posargs} {"was" if n_posargs == 1 else "were"} '
+                    f'given. The following arguments are keyword-only: '
+                    f'{", ".join(kw_only)}',
                 ) from None
             # Also check if there are just not enough arguments at all, because
             # the default TypeError message will incorrectly describe some of
             # the arguments as positional.
             if n_posargs < len(required_args):
                 required_pos = [
-                    f"'{arg}'"
-                    for arg in required_args[n_posargs:]
-                    if arg not in kw_only
+                    f"'{arg}'" for arg in required_args[n_posargs:] if arg not in kw_only
                 ]
-                required_kw = {
-                    f"'{arg}'" for arg in required_args[n_posargs:] if arg in kw_only
-                }
+                required_kw = {f"'{arg}'" for arg in required_args[n_posargs:] if arg in kw_only}
                 if required_pos and required_kw:
-                    details = f"positional: {', '.join(required_pos)} and keyword: {', '.join(required_kw)} arguments"
+                    details = f'positional: {", ".join(required_pos)} and keyword: {", ".join(required_kw)} arguments'
                 elif required_pos:
-                    details = f"positional argument{'' if len(required_pos) == 1 else 's'}: {', '.join(required_pos)}"
+                    details = f'positional argument{"" if len(required_pos) == 1 else "s"}: {", ".join(required_pos)}'
                 else:
-                    details = f"keyword argument{'' if len(required_kw) == 1 else 's'}: {', '.join(required_kw)}"
-                raise TypeError(f"{cls.__name__} missing required {details}") from None
+                    details = f'keyword argument{"" if len(required_kw) == 1 else "s"}: {", ".join(required_kw)}'
+                raise TypeError(f'{cls.__name__} missing required {details}') from None
             return super().__new__(cls)
 
         def __reduce__(self):
             # The default __reduce__ doesn't understand that some arguments have
             # to be passed as keywords, so using the copy module fails.
-            attrs = cast(Dict[str, Any], super().__reduce__()[2])
+            attrs = cast('Dict[str, Any]', super().__reduce__()[2])
             return (lambda: self.__class__(**attrs), ())
 
     return _MaxPositionalArgs
@@ -260,7 +251,7 @@ class CloudSpec(_max_posargs(1)):
     type: str
     """Type of the cloud."""
 
-    name: str = "localhost"
+    name: str = 'localhost'
     """Juju cloud name."""
 
     region: str | None = None
@@ -308,10 +299,8 @@ class CloudSpec(_max_posargs(1)):
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
-    secret_id = "".join(
-        random.choice(string.ascii_lowercase + string.digits) for _ in range(20)
-    )
-    return f"secret:{secret_id}"
+    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))
+    return f'secret:{secret_id}'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -338,7 +327,7 @@ class Secret(_max_posargs(1)):
     This is automatically assigned and should not usually need to be explicitly set.
     """
 
-    owner: Literal["unit", "app", None] = None
+    owner: Literal['unit', 'app', None] = None
     """Indicates if the secret is owned by *this* unit, *this* application, or
     another application/unit.
 
@@ -374,18 +363,18 @@ class Secret(_max_posargs(1)):
     def __post_init__(self):
         if self.latest_content is None:
             # bypass frozen dataclass
-            object.__setattr__(self, "latest_content", self.tracked_content)
+            object.__setattr__(self, 'latest_content', self.tracked_content)
         _deepcopy_mutable_fields(self)
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
-        object.__setattr__(self, "label", label)
+        object.__setattr__(self, 'label', label)
 
     def _track_latest_revision(self):
         """Set the current revision to the tracked revision."""
         # bypass frozen dataclass
-        object.__setattr__(self, "_tracked_revision", self._latest_revision)
-        object.__setattr__(self, "tracked_content", self.latest_content)
+        object.__setattr__(self, '_tracked_revision', self._latest_revision)
+        object.__setattr__(self, 'tracked_content', self.latest_content)
 
     def _update_metadata(
         self,
@@ -397,24 +386,24 @@ class Secret(_max_posargs(1)):
     ):
         """Update the metadata."""
         # bypass frozen dataclass
-        object.__setattr__(self, "_latest_revision", self._latest_revision + 1)
+        object.__setattr__(self, '_latest_revision', self._latest_revision + 1)
         if content:
-            object.__setattr__(self, "latest_content", content)
+            object.__setattr__(self, 'latest_content', content)
         if label:
-            object.__setattr__(self, "label", label)
+            object.__setattr__(self, 'label', label)
         if description:
-            object.__setattr__(self, "description", description)
+            object.__setattr__(self, 'description', description)
         if expire:
             if isinstance(expire, datetime.timedelta):
                 expire = datetime.datetime.now() + expire
-            object.__setattr__(self, "expire", expire)
+            object.__setattr__(self, 'expire', expire)
         if rotate:
-            object.__setattr__(self, "rotate", rotate)
+            object.__setattr__(self, 'rotate', rotate)
 
 
 def _normalise_name(s: str):
     """Event names, in Scenario, uniformly use underscores instead of dashes."""
-    return s.replace("-", "_")
+    return s.replace('-', '_')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -423,9 +412,9 @@ class Address(_max_posargs(1)):
 
     value: str
     """The IP address in the space."""
-    hostname: str = ""
+    hostname: str = ''
     """A host name that maps to the address in :attr:`value`."""
-    cidr: str = ""
+    cidr: str = ''
     """The CIDR of the address in :attr:`value`."""
 
     @property
@@ -435,7 +424,7 @@ class Address(_max_posargs(1)):
 
     @address.setter
     def address(self, value: str):
-        object.__setattr__(self, "value", value)
+        object.__setattr__(self, 'value', value)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -444,7 +433,7 @@ class BindAddress(_max_posargs(1)):
 
     addresses: Sequence[Address]
     """The addresses in the space."""
-    interface_name: str = ""
+    interface_name: str = ''
     """The name of the network interface."""
     mac_address: str | None = None
     """The MAC address of the interface."""
@@ -455,11 +444,11 @@ class BindAddress(_max_posargs(1)):
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook tool would."""
         dct = {
-            "interface-name": self.interface_name,
-            "addresses": [dataclasses.asdict(addr) for addr in self.addresses],
+            'interface-name': self.interface_name,
+            'addresses': [dataclasses.asdict(addr) for addr in self.addresses],
         }
         if self.mac_address:
-            dct["mac-address"] = self.mac_address
+            dct['mac-address'] = self.mac_address
         return dct
 
 
@@ -470,15 +459,15 @@ class Network(_max_posargs(2)):
     binding_name: str
     """The name of the network space."""
     bind_addresses: Sequence[BindAddress] = dataclasses.field(
-        default_factory=lambda: [BindAddress([Address("192.0.2.0")])],
+        default_factory=lambda: [BindAddress([Address('192.0.2.0')])],
     )
     """Addresses that the charm's application should bind to."""
     ingress_addresses: Sequence[str] = dataclasses.field(
-        default_factory=lambda: ["192.0.2.0"],
+        default_factory=lambda: ['192.0.2.0'],
     )
     """Addresses other applications should use to connect to the unit."""
     egress_subnets: Sequence[str] = dataclasses.field(
-        default_factory=lambda: ["192.0.2.0/24"],
+        default_factory=lambda: ['192.0.2.0/24'],
     )
     """Subnets that other units will see the charm connecting from."""
 
@@ -491,11 +480,9 @@ class Network(_max_posargs(2)):
     def _hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook tool would
         return {
-            "bind-addresses": [
-                ba._hook_tool_output_fmt() for ba in self.bind_addresses
-            ],
-            "egress-subnets": self.egress_subnets,
-            "ingress-addresses": self.ingress_addresses,
+            'bind-addresses': [ba._hook_tool_output_fmt() for ba in self.bind_addresses],
+            'egress-subnets': self.egress_subnets,
+            'ingress-addresses': self.ingress_addresses,
         }
 
 
@@ -544,7 +531,7 @@ class RelationBase(_max_posargs(2)):
 
         :private:
         """
-        raise AttributeError("use .id instead of .relation_id")
+        raise AttributeError('use .id instead of .relation_id')
 
     @property
     def _databags(self):
@@ -567,8 +554,8 @@ class RelationBase(_max_posargs(2)):
     def __post_init__(self):
         if type(self) is RelationBase:
             raise RuntimeError(
-                "RelationBase cannot be instantiated directly; "
-                "please use Relation, PeerRelation, or SubordinateRelation",
+                'RelationBase cannot be instantiated directly; '
+                'please use Relation, PeerRelation, or SubordinateRelation',
             )
 
         for databag in self._databags:
@@ -582,21 +569,20 @@ class RelationBase(_max_posargs(2)):
     def _validate_databag(self, databag: dict[str, str]):
         if not isinstance(databag, dict):
             raise StateValidationError(
-                f"all databags should be dicts, not {type(databag)}",
+                f'all databags should be dicts, not {type(databag)}',
             )
         for v in databag.values():
             if not isinstance(v, str):
                 raise StateValidationError(
-                    f"all databags should be Dict[str,str]; "
-                    f"found a value of type {type(v)}",
+                    f'all databags should be Dict[str,str]; found a value of type {type(v)}',
                 )
 
 
-_DEFAULT_IP = "192.0.2.0"
+_DEFAULT_IP = '192.0.2.0'
 _DEFAULT_JUJU_DATABAG = {
-    "egress-subnets": _DEFAULT_IP,
-    "ingress-address": _DEFAULT_IP,
-    "private-address": _DEFAULT_IP,
+    'egress-subnets': _DEFAULT_IP,
+    'ingress-address': _DEFAULT_IP,
+    'private-address': _DEFAULT_IP,
 }
 
 
@@ -604,7 +590,7 @@ _DEFAULT_JUJU_DATABAG = {
 class Relation(RelationBase):
     """A relation between the charm and another application."""
 
-    remote_app_name: str = "remote"
+    remote_app_name: str = 'remote'
     """The name of the remote application, as in the charm's metadata."""
 
     # local limit
@@ -658,7 +644,7 @@ class SubordinateRelation(RelationBase):
     )
     """The current content of the remote unit databag."""
 
-    remote_app_name: str = "remote"
+    remote_app_name: str = 'remote'
     """The name of the remote application that *this unit* is attached to."""
     remote_unit_id: int = 0
     """The ID of the remote unit that *this unit* is attached to."""
@@ -675,8 +661,8 @@ class SubordinateRelation(RelationBase):
         """Return the databag for some remote unit ID."""
         if unit_id is not self.remote_unit_id:
             raise ValueError(
-                f"invalid unit id ({unit_id}): subordinate relation only has one "
-                f"remote and that has id {self.remote_unit_id}",
+                f'invalid unit id ({unit_id}): subordinate relation only has one '
+                f'remote and that has id {self.remote_unit_id}',
             )
         return self.remote_unit_data
 
@@ -691,7 +677,7 @@ class SubordinateRelation(RelationBase):
     @property
     def remote_unit_name(self) -> str:
         """The full name of the remote unit, in the form ``remote/0``."""
-        return f"{self.remote_app_name}/{self.remote_unit_id}"
+        return f'{self.remote_app_name}/{self.remote_unit_id}'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -726,7 +712,7 @@ class PeerRelation(RelationBase):
 
 def _random_model_name():
     space = string.ascii_letters + string.digits
-    return "".join(random.choice(space) for _ in range(20))
+    return ''.join(random.choice(space) for _ in range(20))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -739,7 +725,7 @@ class Model(_max_posargs(1)):
     """A unique identifier for the model, typically generated by Juju."""
 
     # whatever juju models --format=json | jq '.models[<current-model-index>].type' gives back.
-    type: Literal["kubernetes", "lxd"] = "kubernetes"
+    type: Literal['kubernetes', 'lxd'] = 'kubernetes'
     """The type of Juju model."""
 
     cloud_spec: CloudSpec | None = None
@@ -753,8 +739,8 @@ def _generate_new_change_id():
     global _CHANGE_IDS
     _CHANGE_IDS += 1  # type: ignore
     logger.info(
-        f"change ID unset; automatically assigning {_CHANGE_IDS}. "
-        f"If there are problems, pass one manually.",
+        f'change ID unset; automatically assigning {_CHANGE_IDS}. '
+        f'If there are problems, pass one manually.',
     )
     return _CHANGE_IDS
 
@@ -769,13 +755,13 @@ class Exec(_max_posargs(1)):
 
     Use 0 to mock the process ending successfully, and other values for failure.
     """
-    stdout: str = ""
+    stdout: str = ''
     """Any content written to stdout by the process.
 
     Provide content that the real process would write to stdout, which can be
     read by the charm.
     """
-    stderr: str = ""
+    stderr: str = ''
     """Any content written to stderr by the process.
 
     Provide content that the real process would write to stderr, which can be
@@ -790,7 +776,7 @@ class Exec(_max_posargs(1)):
         # write when there's only one string. However, this object needs to be
         # hashable, so can't contain a list. We 'freeze' the sequence to a tuple
         # to support that.
-        object.__setattr__(self, "command_prefix", tuple(self.command_prefix))
+        object.__setattr__(self, 'command_prefix', tuple(self.command_prefix))
 
     def _run(self) -> int:
         return self._change_id
@@ -932,10 +918,10 @@ class CheckInfo(_max_posargs(1)):
     def __post_init__(self):
         if self.change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
-                change_id = ""
+                change_id = ''
             else:
                 change_id = pebble.ChangeID(_generate_new_change_id())
-            object.__setattr__(self, "change_id", change_id)
+            object.__setattr__(self, 'change_id', change_id)
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -1039,34 +1025,34 @@ class Container(_max_posargs(1)):
     def __post_init__(self):
         if not isinstance(self.execs, frozenset):
             # Allow passing a regular set (or other iterable) of Execs.
-            object.__setattr__(self, "execs", frozenset(self.execs))
+            object.__setattr__(self, 'execs', frozenset(self.execs))
         _deepcopy_mutable_fields(self)
 
     def _render_services(self):
         services: dict[str, pebble.Service] = {}
         for layer in self.layers.values():
             for name, service in layer.services.items():
-                if name in services and service.override == "merge":
+                if name in services and service.override == 'merge':
                     services[name]._merge(service)
                 else:
                     services[name] = service
         return services
 
-    def _render_checks(self) -> Dict[str, pebble.Check]:
-        checks: Dict[str, pebble.Check] = {}
+    def _render_checks(self) -> dict[str, pebble.Check]:
+        checks: dict[str, pebble.Check] = {}
         for layer in self.layers.values():
             for name, check in layer.checks.items():
-                if name in checks and check.override == "merge":
+                if name in checks and check.override == 'merge':
                     checks[name]._merge(check)
                 else:
                     checks[name] = check
         return checks
 
-    def _render_log_targets(self) -> Dict[str, pebble.LogTarget]:
-        log_targets: Dict[str, pebble.LogTarget] = {}
+    def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
+        log_targets: dict[str, pebble.LogTarget] = {}
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
-                if name in log_targets and log_target.override == "merge":
+                if name in log_targets and log_target.override == 'merge':
                     log_targets[name]._merge(log_target)
                 else:
                     log_targets[name] = log_target
@@ -1108,7 +1094,7 @@ class Container(_max_posargs(1)):
                 # but it ignores services it doesn't recognize
                 continue
             status = self.service_statuses.get(name, pebble.ServiceStatus.INACTIVE)
-            if service.startup == "":
+            if service.startup == '':
                 startup = pebble.ServiceStartup.DISABLED
             else:
                 startup = pebble.ServiceStartup(service.startup)
@@ -1134,16 +1120,16 @@ class Container(_max_posargs(1)):
         for check_info in self.check_infos:
             if check_info.name == name:
                 return check_info
-        raise KeyError(f"check-info: {name} not found in the Container")
+        raise KeyError(f'check-info: {name} not found in the Container')
 
 
 _RawStatusLiteral = Literal[
-    "waiting",
-    "blocked",
-    "active",
-    "unknown",
-    "error",
-    "maintenance",
+    'waiting',
+    'blocked',
+    'active',
+    'unknown',
+    'error',
+    'maintenance',
 ]
 
 
@@ -1155,7 +1141,7 @@ class _EntityStatus:
     # dataclasses.asdict to then be JSON-serializable.
 
     name: _RawStatusLiteral
-    message: str = ""
+    message: str = ''
 
     _entity_statuses: ClassVar[dict[str, type[_EntityStatus]]] = {}
 
@@ -1165,16 +1151,16 @@ class _EntityStatus:
         return super().__eq__(other)
 
     def __repr__(self):
-        status_type_name = self.name.title() + "Status"
-        if self.name == "unknown":
-            return f"{status_type_name}()"
+        status_type_name = self.name.title() + 'Status'
+        if self.name == 'unknown':
+            return f'{status_type_name}()'
         return f"{status_type_name}('{self.message}')"
 
     @classmethod
     def from_status_name(
         cls,
         name: _RawStatusLiteral,
-        message: str = "",
+        message: str = '',
     ) -> _EntityStatus:
         """Convert the status name, such as 'active', to the class, such as ActiveStatus."""
         # Note that this won't work for UnknownStatus.
@@ -1195,7 +1181,7 @@ class _EntityStatus:
 class UnknownStatus(_EntityStatus, ops.UnknownStatus):
     __doc__ = ops.UnknownStatus.__doc__
 
-    name: Literal["unknown"] = "unknown"
+    name: Literal['unknown'] = 'unknown'
 
     def __init__(self):
         super().__init__(name=self.name)
@@ -1205,50 +1191,50 @@ class UnknownStatus(_EntityStatus, ops.UnknownStatus):
 class ErrorStatus(_EntityStatus, ops.ErrorStatus):
     __doc__ = ops.ErrorStatus.__doc__
 
-    name: Literal["error"] = "error"
+    name: Literal['error'] = 'error'
 
-    def __init__(self, message: str = ""):
-        super().__init__(name="error", message=message)
+    def __init__(self, message: str = ''):
+        super().__init__(name='error', message=message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
 class ActiveStatus(_EntityStatus, ops.ActiveStatus):
     __doc__ = ops.ActiveStatus.__doc__
 
-    name: Literal["active"] = "active"
+    name: Literal['active'] = 'active'
 
-    def __init__(self, message: str = ""):
-        super().__init__(name="active", message=message)
+    def __init__(self, message: str = ''):
+        super().__init__(name='active', message=message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
 class BlockedStatus(_EntityStatus, ops.BlockedStatus):
     __doc__ = ops.BlockedStatus.__doc__
 
-    name: Literal["blocked"] = "blocked"
+    name: Literal['blocked'] = 'blocked'
 
-    def __init__(self, message: str = ""):
-        super().__init__(name="blocked", message=message)
+    def __init__(self, message: str = ''):
+        super().__init__(name='blocked', message=message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
 class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):
     __doc__ = ops.MaintenanceStatus.__doc__
 
-    name: Literal["maintenance"] = "maintenance"
+    name: Literal['maintenance'] = 'maintenance'
 
-    def __init__(self, message: str = ""):
-        super().__init__(name="maintenance", message=message)
+    def __init__(self, message: str = ''):
+        super().__init__(name='maintenance', message=message)
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
 class WaitingStatus(_EntityStatus, ops.WaitingStatus):
     __doc__ = ops.WaitingStatus.__doc__
 
-    name: Literal["waiting"] = "waiting"
+    name: Literal['waiting'] = 'waiting'
 
-    def __init__(self, message: str = ""):
-        super().__init__(name="waiting", message=message)
+    def __init__(self, message: str = ''):
+        super().__init__(name='waiting', message=message)
 
 
 _EntityStatus._entity_statuses.update(
@@ -1265,7 +1251,7 @@ _EntityStatus._entity_statuses.update(
 class StoredState(_max_posargs(1)):
     """Represents unit-local state that persists across events."""
 
-    name: str = "_stored"
+    name: str = '_stored'
     """The attribute in the parent Object where the state is stored.
 
     For example, ``_stored`` in this class::
@@ -1289,11 +1275,11 @@ class StoredState(_max_posargs(1)):
     content: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     """The content of the :class:`ops.StoredState` instance."""
 
-    _data_type_name: str = "StoredStateData"
+    _data_type_name: str = 'StoredStateData'
 
     @property
     def _handle_path(self):
-        return f"{self.owner_path or ''}/{self._data_type_name}[{self.name}]"
+        return f'{self.owner_path or ""}/{self._data_type_name}[{self.name}]'
 
     def __post_init__(self):
         _deepcopy_mutable_fields(self)
@@ -1302,7 +1288,7 @@ class StoredState(_max_posargs(1)):
         return hash(self._handle_path)
 
 
-_RawPortProtocolLiteral = Literal["tcp", "udp", "icmp"]
+_RawPortProtocolLiteral = Literal['tcp', 'udp', 'icmp']
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1316,14 +1302,13 @@ class Port(_max_posargs(1)):
     port: int | None = None
     """The port to open. Required for TCP and UDP; not allowed for ICMP."""
 
-    protocol: _RawPortProtocolLiteral = "tcp"
+    protocol: _RawPortProtocolLiteral = 'tcp'
     """The protocol that data transferred over the port will use."""
 
     def __post_init__(self):
         if type(self) is Port:
             raise RuntimeError(
-                "Port cannot be instantiated directly; "
-                "please use TCPPort, UDPPort, or ICMPPort",
+                'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
 
     def __eq__(self, other: object) -> bool:
@@ -1341,7 +1326,7 @@ class TCPPort(Port):
 
     port: int  # type: ignore
     """The port to open."""
-    protocol: _RawPortProtocolLiteral = "tcp"
+    protocol: _RawPortProtocolLiteral = 'tcp'
     """The protocol that data transferred over the port will use.
 
     :meta private:
@@ -1351,7 +1336,7 @@ class TCPPort(Port):
         super().__post_init__()
         if not (1 <= self.port <= 65535):
             raise StateValidationError(
-                f"`port` outside bounds [1:65535], got {self.port}",
+                f'`port` outside bounds [1:65535], got {self.port}',
             )
 
 
@@ -1361,7 +1346,7 @@ class UDPPort(Port):
 
     port: int  # type: ignore
     """The port to open."""
-    protocol: _RawPortProtocolLiteral = "udp"
+    protocol: _RawPortProtocolLiteral = 'udp'
     """The protocol that data transferred over the port will use.
 
     :meta private:
@@ -1371,7 +1356,7 @@ class UDPPort(Port):
         super().__post_init__()
         if not (1 <= self.port <= 65535):
             raise StateValidationError(
-                f"`port` outside bounds [1:65535], got {self.port}",
+                f'`port` outside bounds [1:65535], got {self.port}',
             )
 
 
@@ -1379,7 +1364,7 @@ class UDPPort(Port):
 class ICMPPort(Port):
     """Represents an ICMP port on the charm host."""
 
-    protocol: _RawPortProtocolLiteral = "icmp"
+    protocol: _RawPortProtocolLiteral = 'icmp'
     """The protocol that data transferred over the port will use.
 
     :meta private:
@@ -1390,13 +1375,13 @@ class ICMPPort(Port):
     def __post_init__(self):
         super().__post_init__()
         if self.port is not None:
-            raise StateValidationError("`port` cannot be set for `ICMPPort`")
+            raise StateValidationError('`port` cannot be set for `ICMPPort`')
 
 
 _port_cls_by_protocol = {
-    "tcp": TCPPort,
-    "udp": UDPPort,
-    "icmp": ICMPPort,
+    'tcp': TCPPort,
+    'udp': UDPPort,
+    'icmp': ICMPPort,
 }
 
 
@@ -1516,27 +1501,25 @@ class State(_max_posargs(0)):
     """Status of the application."""
     unit_status: _EntityStatus = UnknownStatus()
     """Status of the unit."""
-    workload_version: str = ""
+    workload_version: str = ''
     """Workload version."""
 
     def __post_init__(self):
         # Let people pass in the ops classes, and convert them to the appropriate Scenario classes.
-        for name in ["app_status", "unit_status"]:
+        for name in ['app_status', 'unit_status']:
             val = getattr(self, name)
             if isinstance(val, _EntityStatus):
                 pass
             elif isinstance(val, StatusBase):
                 object.__setattr__(self, name, _EntityStatus.from_ops(val))
             else:
-                raise TypeError(f"Invalid status.{name}: {val!r}")
+                raise TypeError(f'Invalid status.{name}: {val!r}')
         normalised_ports = [
-            Port(protocol=port.protocol, port=port.port)
-            if isinstance(port, ops.Port)
-            else port
+            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
             for port in self.opened_ports
         ]
         if self.opened_ports != normalised_ports:
-            object.__setattr__(self, "opened_ports", normalised_ports)
+            object.__setattr__(self, 'opened_ports', normalised_ports)
         normalised_storage = [
             Storage(name=storage.name, index=storage.index)
             if isinstance(storage, ops.Storage)
@@ -1544,7 +1527,7 @@ class State(_max_posargs(0)):
             for storage in self.storages
         ]
         if self.storages != normalised_storage:
-            object.__setattr__(self, "storages", normalised_storage)
+            object.__setattr__(self, 'storages', normalised_storage)
 
         # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by charmers.
         # ops.Network does not have the relation name, so cannot be converted.
@@ -1554,14 +1537,14 @@ class State(_max_posargs(0)):
         # It's convenient to pass a set, but we really want the attributes to be
         # frozen sets to increase the immutability of State objects.
         for name in [
-            "relations",
-            "containers",
-            "storages",
-            "networks",
-            "opened_ports",
-            "secrets",
-            "resources",
-            "stored_states",
+            'relations',
+            'containers',
+            'storages',
+            'networks',
+            'opened_ports',
+            'secrets',
+            'resources',
+            'stored_states',
         ]:
             val = getattr(self, name)
             # It's ok to pass any iterable (of hashable objects), but you'll get
@@ -1578,21 +1561,21 @@ class State(_max_posargs(0)):
         # reduce method as well.
         # TODO: When we require Python 3.10+ this method should be removed.
         new_state = copy.copy(self)
-        object.__setattr__(new_state, "config", self.config.copy())
+        object.__setattr__(new_state, 'config', self.config.copy())
         for attr in (
-            "relations",
-            "networks",
-            "containers",
-            "storages",
-            "opened_ports",
-            "secrets",
-            "resources",
-            "stored_states",
+            'relations',
+            'networks',
+            'containers',
+            'storages',
+            'opened_ports',
+            'secrets',
+            'resources',
+            'stored_states',
         ):
             value = getattr(self, attr)
             new_value = frozenset(copy.deepcopy(v, memo) for v in value)
             object.__setattr__(new_state, attr, new_value)
-        object.__setattr__(new_state, "deferred", self.deferred[:])
+        object.__setattr__(new_state, 'deferred', self.deferred[:])
         return new_state
 
     def _update_workload_version(self, new_workload_version: str):
@@ -1601,7 +1584,7 @@ class State(_max_posargs(0)):
         # than once per hook.
 
         # bypass frozen dataclass
-        object.__setattr__(self, "workload_version", new_workload_version)
+        object.__setattr__(self, 'workload_version', new_workload_version)
 
     def _update_status(
         self,
@@ -1609,33 +1592,33 @@ class State(_max_posargs(0)):
         is_app: bool = False,
     ):
         """Update the current app/unit status."""
-        name = "app_status" if is_app else "unit_status"
+        name = 'app_status' if is_app else 'unit_status'
         # bypass frozen dataclass
         object.__setattr__(self, name, new_status)
 
     def _update_opened_ports(self, new_ports: frozenset[Port]):
         """Update the current opened ports."""
         # bypass frozen dataclass
-        object.__setattr__(self, "opened_ports", new_ports)
+        object.__setattr__(self, 'opened_ports', new_ports)
 
     def _update_secrets(self, new_secrets: frozenset[Secret]):
         """Update the current secrets."""
         # bypass frozen dataclass
-        object.__setattr__(self, "secrets", new_secrets)
+        object.__setattr__(self, 'secrets', new_secrets)
 
     def get_container(self, container: str, /) -> Container:
         """Get container from this State, based on its name."""
         for state_container in self.containers:
             if state_container.name == container:
                 return state_container
-        raise KeyError(f"container: {container} not found in the State")
+        raise KeyError(f'container: {container} not found in the State')
 
     def get_network(self, binding_name: str, /) -> Network:
         """Get network from this State, based on its binding name."""
         for network in self.networks:
             if network.binding_name == binding_name:
                 return network
-        raise KeyError(f"network: {binding_name} not found in the State")
+        raise KeyError(f'network: {binding_name} not found in the State')
 
     def get_secret(
         self,
@@ -1645,7 +1628,7 @@ class State(_max_posargs(0)):
     ) -> Secret:
         """Get secret from this State, based on the secret's id or label."""
         if id is None and label is None:
-            raise ValueError("An id or label must be provided.")
+            raise ValueError('An id or label must be provided.')
 
         for secret in self.secrets:
             if (
@@ -1654,7 +1637,7 @@ class State(_max_posargs(0)):
                 or (id is None and label and secret.label == label)
             ):
                 return secret
-        raise KeyError("secret: not found in the State")
+        raise KeyError('secret: not found in the State')
 
     def get_stored_state(
         self,
@@ -1667,7 +1650,7 @@ class State(_max_posargs(0)):
         for ss in self.stored_states:
             if ss.name == stored_state and ss.owner_path == owner_path:
                 return ss
-        raise ValueError(f"stored state: {stored_state} not found in the State")
+        raise ValueError(f'stored state: {stored_state} not found in the State')
 
     def get_storage(
         self,
@@ -1681,7 +1664,7 @@ class State(_max_posargs(0)):
             if state_storage.name == storage and state_storage.index == index:
                 return state_storage
         raise ValueError(
-            f"storage: name={storage}, index={index} not found in the State",
+            f'storage: name={storage}, index={index} not found in the State',
         )
 
     def get_relation(self, relation: int, /) -> RelationBase:
@@ -1689,7 +1672,7 @@ class State(_max_posargs(0)):
         for state_relation in self.relations:
             if state_relation.id == relation:
                 return state_relation
-        raise KeyError(f"relation: id={relation} not found in the State")
+        raise KeyError(f'relation: id={relation} not found in the State')
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
@@ -1701,22 +1684,20 @@ class State(_max_posargs(0)):
 
         normalized_endpoint = _normalise_name(endpoint)
         return tuple(
-            r
-            for r in self.relations
-            if _normalise_name(r.endpoint) == normalized_endpoint
+            r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
         )
 
 
 def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     # Check whether this dict has the expected mandatory metadata fields according to the
     # charmcraft >2.5 charmcraft.yaml schema
-    if (config_type := meta.get("type")) != "charm":
+    if (config_type := meta.get('type')) != 'charm':
         logger.debug(
-            f"Not a charm: charmcraft yaml config ``.type`` is {config_type!r}.",
+            f'Not a charm: charmcraft yaml config ``.type`` is {config_type!r}.',
         )
         return False
-    if not all(field in meta for field in {"name", "summary", "description"}):
-        logger.debug("Not a charm: charmcraft yaml misses some required fields")
+    if not all(field in meta for field in {'name', 'summary', 'description'}):
+        logger.debug('Not a charm: charmcraft yaml misses some required fields')
         return False
     return True
 
@@ -1739,29 +1720,29 @@ class _CharmSpec(Generic[CharmType]):
         """Load metadata from charm projects created with Charmcraft < 2.5."""
         # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
         # files for charm metadata.
-        metadata_path = charm_root / "metadata.yaml"
+        metadata_path = charm_root / 'metadata.yaml'
         meta: dict[str, Any] = (
             yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
         )
 
-        config_path = charm_root / "config.yaml"
+        config_path = charm_root / 'config.yaml'
         config = yaml.safe_load(config_path.open()) if config_path.exists() else None
 
-        actions_path = charm_root / "actions.yaml"
+        actions_path = charm_root / 'actions.yaml'
         actions = yaml.safe_load(actions_path.open()) if actions_path.exists() else None
         return meta, config, actions
 
     @staticmethod
     def _load_metadata(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
-        metadata_path = charm_root / "charmcraft.yaml"
+        metadata_path = charm_root / 'charmcraft.yaml'
         meta: dict[str, Any] = (
             yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
         )
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
-        config = meta.pop("config", None)
-        actions = meta.pop("actions", None)
+        config = meta.pop('config', None)
+        actions = meta.pop('actions', None)
         return meta, config, actions
 
     @staticmethod
@@ -1783,8 +1764,8 @@ class _CharmSpec(Generic[CharmType]):
         if not meta:
             # still no metadata? bug out
             raise MetadataNotFoundError(
-                f"invalid charm root {charm_root!r}; "
-                f"expected to contain at least a `charmcraft.yaml` file "
+                f'invalid charm root {charm_root!r}; '
+                f'expected to contain at least a `charmcraft.yaml` file '
                 f"(or a `metadata.yaml` file if it's an old charm).",
             )
 
@@ -1800,9 +1781,9 @@ class _CharmSpec(Generic[CharmType]):
         """A list of all relation endpoints defined in the metadata."""
         return list(
             chain(
-                self.meta.get("requires", {}).items(),
-                self.meta.get("provides", {}).items(),
-                self.meta.get("peers", {}).items(),
+                self.meta.get('requires', {}).items(),
+                self.meta.get('provides', {}).items(),
+                self.meta.get('peers', {}).items(),
             ),
         )
 
@@ -1835,18 +1816,18 @@ class DeferredEvent:
     @property
     def name(self):
         """A comparable name for the event."""
-        return self.handle_path.split("/")[-1].split("[")[0]
+        return self.handle_path.split('/')[-1].split('[')[0]
 
 
 class _EventType(str, Enum):
-    FRAMEWORK = "framework"
-    BUILTIN = "builtin"
-    RELATION = "relation"
-    ACTION = "action"
-    SECRET = "secret"
-    STORAGE = "storage"
-    WORKLOAD = "workload"
-    CUSTOM = "custom"
+    FRAMEWORK = 'framework'
+    BUILTIN = 'builtin'
+    RELATION = 'relation'
+    ACTION = 'action'
+    SECRET = 'secret'
+    STORAGE = 'storage'
+    WORKLOAD = 'workload'
+    CUSTOM = 'custom'
 
 
 class _EventPath(str):
@@ -1862,8 +1843,8 @@ class _EventPath(str):
         string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
-        instance.name = name = string.split(".")[-1]
-        instance.owner_path = string.split(".")[:-1] or ["on"]
+        instance.name = name = string.split('.')[-1]
+        instance.owner_path = string.split('.')[:-1] or ['on']
 
         instance.suffix, instance.type = suffix, _ = _EventPath._get_suffix_and_type(
             name,
@@ -1873,7 +1854,7 @@ class _EventPath(str):
         else:
             instance.prefix = string
 
-        instance.is_custom = suffix == ""
+        instance.is_custom = suffix == ''
         return instance
 
     @staticmethod
@@ -1907,9 +1888,9 @@ class _EventPath(str):
             return _PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.WORKLOAD
 
         if s in _BUILTIN_EVENTS:
-            return "", _EventType.BUILTIN
+            return '', _EventType.BUILTIN
 
-        return "", _EventType.CUSTOM
+        return '', _EventType.CUSTOM
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1968,12 +1949,12 @@ class _Event:  # type: ignore
     def __post_init__(self):
         path = _EventPath(self.path)
         # bypass frozen dataclass
-        object.__setattr__(self, "path", path)
+        object.__setattr__(self, 'path', path)
 
     @property
     def _path(self) -> _EventPath:
         # we converted it in __post_init__, but the type checker doesn't know about that
-        return cast(_EventPath, self.path)
+        return cast('_EventPath', self.path)
 
     @property
     def name(self) -> str:
@@ -2048,16 +2029,20 @@ class _Event:  # type: ignore
         return self._path.type is not _EventType.CUSTOM
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
-        """Construct a DeferredEvent from this Event."""
+        """Construct a DeferredEvent from this Event.
+
+        The charm class passed to the :class:`Context` must be observing the
+        event this DeferredEvent is based on.
+        """
         handler_repr = repr(handler)
-        handler_re = re.compile(r"<function (.*) at .*>")
+        handler_re = re.compile(r'<function (.*) at .*>')
         match = handler_re.match(handler_repr)
         if not match:
             raise ValueError(
-                f"cannot construct DeferredEvent from {handler}; please create one manually.",
+                f'cannot construct DeferredEvent from {handler}; please create one manually.',
             )
-        owner_name, handler_name = match.groups()[0].split(".")[-2:]
-        handle_path = f"{owner_name}/on/{self.name}[{event_id}]"
+        owner_name, handler_name = match.groups()[0].split('.')[-2:]
+        handle_path = f'{owner_name}/on/{self.name}[{event_id}]'
 
         # Many events have no snapshot data: install, start, stop, remove, config-changed,
         # upgrade-charm, pre-series-upgrade, post-series-upgrade, leader-elected,
@@ -2070,21 +2055,21 @@ class _Event:  # type: ignore
         if self._is_workload_event:
             # Enforced by the consistency checker, but for type checkers:
             assert self.container is not None
-            snapshot_data["container_name"] = self.container.name
+            snapshot_data['container_name'] = self.container.name
             if self.notice:
-                if hasattr(self.notice.type, "value"):
-                    notice_type = cast(pebble.NoticeType, self.notice.type).value
+                if hasattr(self.notice.type, 'value'):
+                    notice_type = cast('pebble.NoticeType', self.notice.type).value
                 else:
                     notice_type = str(self.notice.type)
                 snapshot_data.update(
                     {
-                        "notice_id": self.notice.id,
-                        "notice_key": self.notice.key,
-                        "notice_type": notice_type,
+                        'notice_id': self.notice.id,
+                        'notice_key': self.notice.key,
+                        'notice_type': notice_type,
                     },
                 )
             elif self.check_info:
-                snapshot_data["check_name"] = self.check_info.name
+                snapshot_data['check_name'] = self.check_info.name
 
         elif self._is_relation_event:
             # Enforced by the consistency checker, but for type checkers:
@@ -2093,35 +2078,31 @@ class _Event:  # type: ignore
             if isinstance(relation, PeerRelation):
                 # FIXME: relation.unit for peers should point to <this unit>, but we
                 #  don't have access to the local app name in this context.
-                remote_app = "local"
+                remote_app = 'local'
             elif isinstance(relation, (Relation, SubordinateRelation)):
                 remote_app = relation.remote_app_name
             else:
-                raise RuntimeError(f"unexpected relation type: {relation!r}")
+                raise RuntimeError(f'unexpected relation type: {relation!r}')
 
             snapshot_data.update(
                 {
-                    "relation_name": relation.endpoint,
-                    "relation_id": relation.id,
-                    "app_name": remote_app,
+                    'relation_name': relation.endpoint,
+                    'relation_id': relation.id,
+                    'app_name': remote_app,
                 },
             )
-            if not self.name.endswith(("_created", "_broken")):
-                snapshot_data["unit_name"] = (
-                    f"{remote_app}/{self.relation_remote_unit_id}"
-                )
-            if self.name.endswith("_departed"):
-                snapshot_data["departing_unit"] = (
-                    f"{remote_app}/{self.relation_departed_unit_id}"
-                )
+            if not self.name.endswith(('_created', '_broken')):
+                snapshot_data['unit_name'] = f'{remote_app}/{self.relation_remote_unit_id}'
+            if self.name.endswith('_departed'):
+                snapshot_data['departing_unit'] = f'{remote_app}/{self.relation_departed_unit_id}'
 
         elif self._is_storage_event:
             # Enforced by the consistency checker, but for type checkers:
             assert self.storage is not None
             snapshot_data.update(
                 {
-                    "storage_name": self.storage.name,
-                    "storage_index": self.storage.index,
+                    'storage_name': self.storage.name,
+                    'storage_index': self.storage.index,
                     # "storage_location": str(self.storage.get_filesystem(self._context)),
                 },
             )
@@ -2130,15 +2111,15 @@ class _Event:  # type: ignore
             # Enforced by the consistency checker, but for type checkers:
             assert self.secret is not None
             snapshot_data.update(
-                {"secret_id": self.secret.id, "secret_label": self.secret.label},
+                {'secret_id': self.secret.id, 'secret_label': self.secret.label},
             )
-            if self.name.endswith(("_remove", "_expired")):
-                snapshot_data["secret_revision"] = self.secret_revision
+            if self.name.endswith(('_remove', '_expired')):
+                snapshot_data['secret_revision'] = self.secret_revision
 
         elif self._is_action_event:
             # Enforced by the consistency checker, but for type checkers:
             assert self.action is not None
-            snapshot_data["id"] = self.action.id
+            snapshot_data['id'] = self.action.id
 
         return DeferredEvent(
             handle_path,

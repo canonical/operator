@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import logging
 from pathlib import Path
@@ -5,12 +7,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    List,
-    Optional,
     Type,
     TypeVar,
-    Union,
 )
 
 import jsonpatch
@@ -20,23 +18,23 @@ from scenario.context import _DEFAULT_JUJU_VERSION, Context
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State, _Event
 
-    _CT = TypeVar("_CT", bound=Type[CharmType])
+    _CT = TypeVar('_CT', bound=Type[CharmType])
 
 logger = logging.getLogger()
 
 
 def trigger(
-    state: "State",
-    event: Union[str, "_Event"],
-    charm_type: Type["CharmType"],
-    pre_event: Optional[Callable[["CharmType"], None]] = None,
-    post_event: Optional[Callable[["CharmType"], None]] = None,
-    meta: Optional[Dict[str, Any]] = None,
-    actions: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict[str, Any]] = None,
-    charm_root: Optional[Union[str, Path]] = None,
+    state: 'State',
+    event: str | '_Event',
+    charm_type: type['CharmType'],
+    pre_event: Callable[['CharmType'], None] | None = None,
+    post_event: Callable[['CharmType'], None] | None = None,
+    meta: dict[str, Any] | None = None,
+    actions: dict[str, Any] | None = None,
+    config: dict[str, Any] | None = None,
+    charm_root: str | Path | None = None,
     juju_version: str = _DEFAULT_JUJU_VERSION,
-) -> "State":
+) -> 'State':
     ctx = Context(
         charm_type=charm_type,
         meta=meta,
@@ -46,11 +44,11 @@ def trigger(
         juju_version=juju_version,
     )
     if isinstance(event, str):
-        if event.startswith("relation_"):
-            assert len(state.relations) == 1, "shortcut only works with one relation"
+        if event.startswith('relation_'):
+            assert len(state.relations) == 1, 'shortcut only works with one relation'
             event = getattr(ctx.on, event)(tuple(state.relations)[0])
-        elif event.startswith("pebble_"):
-            assert len(state.containers) == 1, "shortcut only works with one container"
+        elif event.startswith('pebble_'):
+            assert len(state.containers) == 1, 'shortcut only works with one container'
             event = getattr(ctx.on, event)(tuple(state.containers)[0])
         else:
             event = getattr(ctx.on, event)()
@@ -63,18 +61,18 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self, other: "State"):
+def jsonpatch_delta(self, other: 'State'):
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
-        "relations",
-        "containers",
-        "storages",
-        "opened_ports",
-        "secrets",
-        "resources",
-        "stored_states",
-        "networks",
+        'relations',
+        'containers',
+        'storages',
+        'opened_ports',
+        'secrets',
+        'resources',
+        'stored_states',
+        'networks',
     ):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
@@ -82,5 +80,5 @@ def jsonpatch_delta(self, other: "State"):
     return sort_patch(patch)
 
 
-def sort_patch(patch: List[Dict], key=lambda obj: obj["path"] + obj["op"]):
+def sort_patch(patch: list[dict], key=lambda obj: obj['path'] + obj['op']):
     return sorted(patch, key=key)

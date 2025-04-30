@@ -14,9 +14,11 @@
 
 """A helper to work with the Juju context and version."""
 
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
-from typing import Any, Mapping, Optional, Set
+from typing import Any, Mapping
 
 from .jujuversion import JujuVersion
 
@@ -30,13 +32,13 @@ class _JujuContext:
     Only a subset of the above source, because these are what are used in ops.
     """
 
-    action_name: Optional[str] = None
+    action_name: str | None = None
     """The action's name.
 
     For example 'backup' (from JUJU_ACTION_NAME).
     """
 
-    action_uuid: Optional[str] = None
+    action_uuid: str | None = None
     """The action's uuid.
 
     For example '1' (from JUJU_ACTION_UUID).
@@ -59,7 +61,7 @@ class _JujuContext:
     If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
     """
 
-    debug_at: Set[str] = dataclasses.field(default_factory=set)
+    debug_at: set[str] = dataclasses.field(default_factory=set)
     """Where you want to stop when debugging.
 
     For example 'all' (from JUJU_DEBUG_AT).
@@ -83,80 +85,80 @@ class _JujuContext:
     For example 'cdac5656-2423-4388-8f30-41854b4cca7d' (from JUJU_MODEL_UUID).
     """
 
-    notice_id: Optional[str] = None
+    notice_id: str | None = None
     """The ID of the notice.
 
     For example '1', (from JUJU_NOTICE_ID).
     """
 
-    notice_key: Optional[str] = None
+    notice_key: str | None = None
     """The key of the notice.
 
     For example 'example.com/a', (from JUJU_NOTICE_KEY).
     """
 
-    notice_type: Optional[str] = None
+    notice_type: str | None = None
     """The type of the notice.
 
     For example 'custom' (from JUJU_NOTICE_TYPE).
     """
 
-    pebble_check_name: Optional[str] = None
+    pebble_check_name: str | None = None
     """The name of the pebble check.
 
     For example 'http-check' (from JUJU_PEBBLE_CHECK_NAME).
     """
 
-    relation_departing_unit_name: Optional[str] = None
+    relation_departing_unit_name: str | None = None
     """The unit that is departing a relation.
 
     For example 'remote/42' (from JUJU_DEPARTING_UNIT).
     """
 
-    relation_name: Optional[str] = None
+    relation_name: str | None = None
     """The name of the relation.
 
     For example 'database' (from JUJU_RELATION).
     """
 
-    relation_id: Optional[int] = None
+    relation_id: int | None = None
     """The id of the relation.
 
     For example 1 (integer) if the original environment variable's value is 'database:1'
     (from JUJU_RELATION_ID).
     """
 
-    remote_app_name: Optional[str] = None
+    remote_app_name: str | None = None
     """The name of the remote app.
 
     For example 'remoteapp1' (from JUJU_REMOTE_APP).
     """
 
-    remote_unit_name: Optional[str] = None
+    remote_unit_name: str | None = None
     """The name of the remote unit.
 
     For example 'remoteapp1/0' (from JUJU_REMOTE_UNIT).
     """
 
-    secret_id: Optional[str] = None
+    secret_id: str | None = None
     """The ID of the secret.
 
     For example 'secret:dcc7aa9c-7202-4da6-8d5f-0fbbaa4e1a41' (from JUJU_SECRET_ID).
     """
 
-    secret_label: Optional[str] = None
+    secret_label: str | None = None
     """The label of the secret.
 
     For example 'db-password' (from JUJU_SECRET_LABEL).
     """
 
-    secret_revision: Optional[int] = None
+    secret_revision: int | None = None
     """The revision of the secret.
 
     For example 42 (integer) (from JUJU_SECRET_REVISION).
     """
 
-    storage_name: Optional[str] = None
+    storage_name: str | None = None
     """The storage name.
 
     For example 'my-storage' if the original environment variable's value is 'my-storage/1'
@@ -175,14 +177,14 @@ class _JujuContext:
     For example '3.4.0' (from JUJU_VERSION).
     """
 
-    workload_name: Optional[str] = None
+    workload_name: str | None = None
     """The name of the workload.
 
     For example 'workload' (from JUJU_WORKLOAD_NAME).
     """
 
     @classmethod
-    def from_dict(cls, env: Mapping[str, Any]) -> '_JujuContext':
+    def from_dict(cls, env: Mapping[str, Any]) -> _JujuContext:
         return _JujuContext(
             action_name=env.get('JUJU_ACTION_NAME') or None,
             action_uuid=env.get('JUJU_ACTION_UUID') or None,
