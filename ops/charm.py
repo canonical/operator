@@ -1434,7 +1434,10 @@ class CharmBase(Object):
         config for all the options that are found in the class, but with:
 
         * ``secret`` type options having a :class:`model.Secret` value rather
-          than the secret ID.
+          than the secret ID. Note that the secret object is not validated by
+          Juju at this time, so may raise :class:`SecretNotFoundError` when it
+          is later used if the secret does not exist or the unit does not have
+          permission to access it.
         * dashes in names converted to underscores.
 
         Any additional positional or keyword arguments will be passed through to
@@ -1454,7 +1457,7 @@ class CharmBase(Object):
             zero exit code, after setting an appropriate blocked status.
         """
         config: Dict[str, Union[bool, int, float, str, model.Secret]] = kwargs.copy()
-        fields = set(cls._juju_names)  # type: ignore
+        fields = set(cls._juju_names())  # type: ignore
         for key, value in self.config.items():
             if key not in fields:
                 continue
@@ -1463,17 +1466,16 @@ class CharmBase(Object):
             if not attr.isidentifier():
                 raise model.InvalidSchemaError(status=f'Invalid attribute name {attr}') from None
             option_type = self.meta.config.get(key)
-            # Convert secret IDs to secret objects.
+            # Convert secret IDs to secret objects. We create the object rather
+            # that using model.get_secret so that it's entirely lazy, in the
+            # same way that SecretEvent.secret is.
             if option_type and option_type.type == 'secret' and isinstance(value, str):
-                try:
-                    config[attr] = self.model.get_secret(id=value)
-                except model.SecretNotFoundError:
-                    raise model.InvalidSchemaError(
-                        status=(
-                            f"{key} option refers to a secret that doesn't exist "
-                            f'or is not accessible'
-                        )
-                    ) from None
+                secret = model.Secret(
+                    backend=self.model._backend,
+                    id=value,
+                    _secret_set_cache=self.model._cache._secret_set_cache,
+                )
+                config[attr] = secret
             else:
                 config[attr] = value
         try:
