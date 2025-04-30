@@ -41,7 +41,7 @@ class _ConfigProtocol(Protocol):
     my_int: int
     my_float: float
     my_str: str
-    my_secret: Optional[ops.Secret]
+    my_secret: Optional[ops.Secret]  # noqa: UP045
 
 
 class MyConfig(ops.ConfigBase):
@@ -57,7 +57,7 @@ class MyConfig(ops.ConfigBase):
     my_str: str = 'foo'
     """A string value."""
 
-    my_secret: Optional[ops.Secret] = None  # 'Optional' and not '| None' to exercise that path.
+    my_secret: Optional[ops.Secret] = None  # noqa: UP045 'Optional' and not '| None' to exercise that path.
     """A user secret."""
 
     def __init__(
@@ -121,7 +121,7 @@ class MyDataclassConfig(ops.ConfigBase):
     my_str: str = 'foo'
     """A string value."""
 
-    my_secret: Optional[ops.Secret] = None  # 'Optional' and not '| None' to exercise that path.
+    my_secret: Optional[ops.Secret] = None  # noqa: UP045 'Optional' and not '| None' to exercise that path.
     """A user secret."""
 
     def __post_init__(self):
@@ -155,7 +155,10 @@ if pydantic:
         my_int: int = pydantic.Field(42, description='A positive integer value.')
         my_float: float = pydantic.Field(3.14, description='A floating point value.')
         my_str: str = pydantic.Field('foo', description='A string value.')
-        my_secret: Optional[ops.Secret] = pydantic.Field(None, description='A user secret.')
+        my_secret: Optional[ops.Secret] = pydantic.Field(  # noqa: UP045
+            None,
+            description='A user secret.',
+        )
 
         @pydantic.field_validator('my_int')
         @classmethod
@@ -179,11 +182,17 @@ if pydantic:
             logger.info(f'{new_float=}, {new_int=}, {new_str=}, {label=}')
 
     class MyPydanticBaseModelConfig(pydantic.BaseModel, ops.ConfigBase):
-        my_bool: Optional[bool] = pydantic.Field(None, description='A Boolean value.')
+        my_bool: Optional[bool] = pydantic.Field(  # noqa: UP045
+            None,
+            description='A Boolean value.',
+        )
         my_int: int = pydantic.Field(42, description='A positive integer value.')
         my_float: float = pydantic.Field(3.14, description='A floating point value.')
         my_str: str = pydantic.Field('foo', description='A string value.')
-        my_secret: Optional[ops.Secret] = pydantic.Field(None, description='A user secret.')
+        my_secret: Optional[ops.Secret] = pydantic.Field(  # noqa: UP045
+            None,
+            description='A user secret.',
+        )
 
         @pydantic.field_validator('my_int')
         @classmethod
@@ -223,7 +232,7 @@ def test_config_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRe
     request.addfinalizer(harness.cleanup)
     harness.begin()
     typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast(_ConfigProtocol, typed_config)
+    typed_config = cast('_ConfigProtocol', typed_config)
     assert typed_config.my_bool is None
     assert typed_config.my_float == 3.14
     assert isinstance(typed_config.my_float, float)
@@ -247,7 +256,7 @@ def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pyte
     })
     harness.begin()
     typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast(_ConfigProtocol, typed_config)
+    typed_config = cast('_ConfigProtocol', typed_config)
     assert typed_config.my_bool is True
     assert typed_config.my_float == 2.71
     assert typed_config.my_int == 24
@@ -281,7 +290,7 @@ def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.Fi
     })
     harness.begin()
     typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast(_ConfigProtocol, typed_config)
+    typed_config = cast('_ConfigProtocol', typed_config)
     secret = typed_config.my_secret
     assert secret is not None
     assert secret.id == secret_id

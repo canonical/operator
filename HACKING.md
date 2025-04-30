@@ -376,7 +376,9 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
    using the same Python version as specified in the `.readthedocs.yaml` file.
 12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
-13. When you are ready, click "Publish". GitHub will create the additional tag.
+13. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
+   If the tests don't pass at the tip of the main branch, do not release.
+14. When you are ready, click "Publish". GitHub will create the additional tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -389,9 +391,9 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
-14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
+15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
     and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-15. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
+16. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
    For example, if 2.90.0 is the next expected `ops` version, use
    `ops==2.90.0.dev0 ops-tracing==2.90.0.dev0 ops-scenario==7.90.0.dev0`.
    There will be a total of seven changes:

@@ -27,13 +27,14 @@ $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_real_pebble.py -v
 $ deactivate
 """
 
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import tempfile
 import threading
 import time
-import typing
 import urllib.error
 import urllib.request
 import uuid
@@ -250,7 +251,7 @@ class TestRealPebble:
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[str] = list(process.stdout)
+        reads: list[str] = list(process.stdout)
 
         process.wait()
 
@@ -272,7 +273,7 @@ class TestRealPebble:
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[bytes] = list(process.stdout)
+        reads: list[bytes] = list(process.stdout)
 
         process.wait()
 

@@ -14,7 +14,9 @@
 
 """Internal YAML helpers."""
 
-from typing import Any, Optional, TextIO, Union
+from __future__ import annotations
+
+from typing import Any, TextIO
 
 import yaml
 
@@ -23,11 +25,11 @@ _safe_loader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 _safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
 
 
-def safe_load(stream: Union[str, TextIO]) -> Any:
+def safe_load(stream: str | TextIO) -> Any:
     """Same as yaml.safe_load, but use fast C loader if available."""
     return yaml.load(stream, Loader=_safe_loader)  # noqa: S506
 
 
-def safe_dump(data: Any, stream: Optional[TextIO] = None) -> str:
+def safe_dump(data: Any, stream: TextIO | None = None) -> str:
     """Same as yaml.safe_dump, but use fast C dumper if available."""
     return yaml.dump(data, stream=stream, Dumper=_safe_dumper)  # type: ignore

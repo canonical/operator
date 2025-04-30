@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import dataclasses
 
 import pytest
+
 import ops
 
 from scenario.context import Context

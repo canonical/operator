@@ -67,7 +67,7 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
     docs: dict[str, str] = {}
     # pydantic stores descriptions in the field object.
     if hasattr(cls, '__dataclass_fields__'):
-        fields = cast(dict[str, Any], cls.__dataclass_fields__)  # type: ignore
+        fields = cast('dict[str, Any]', cls.__dataclass_fields__)  # type: ignore
         for attr, field in fields.items():
             if (
                 hasattr(field, 'default')
