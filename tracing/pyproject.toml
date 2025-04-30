@@ -31,7 +31,6 @@ classifiers = [
     "Framework :: OpenTelemetry",
 ]
 dependencies = [
-    "otlp-json>=0.9.7",
     "opentelemetry-sdk~=1.30",
     "ops==2.22.0.dev0",
     "pydantic",
