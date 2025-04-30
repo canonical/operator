@@ -298,7 +298,7 @@ class DemoServerCharm(ops.CharmBase):
 
 In your handler for `collect_unit_status`, you can call `add_status()` multiple times. Ops will send the highest priority status to Juju. This reduces the amount of logic you need to write to decide which status to report. For more information, see [`CollectStatusEvent`](ops.CollectStatusEvent).
 
-Your handler for `collect_unit_status` won't have access to data about the event that was handled before Ops triggered `collect_unit_status`.
+Your handler for `collect_unit_status` won't have access to data about the main Juju event (hook) being handled.
 
 To report the unit status while handling an event, set [`self.unit.status`](ops.Unit.status). When your charm code sets `self.unit.status`, Ops immediately sends the unit status to Juju. For example:
 
