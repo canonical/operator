@@ -1459,12 +1459,12 @@ class CharmBase(Object):
         config: Dict[str, Union[bool, int, float, str, model.Secret]] = kwargs.copy()
         fields = set(cls._juju_names())  # type: ignore
         for key, value in self.config.items():
-            if key not in fields:
-                continue
             attr = cls._juju_name_to_attr(key)  # type: ignore
             assert isinstance(attr, str)
             if not attr.isidentifier():
                 raise model.InvalidSchemaError(status=f'Invalid attribute name {attr}') from None
+            if attr not in fields:
+                continue
             option_type = self.meta.config.get(key)
             # Convert secret IDs to secret objects. We create the object rather
             # that using model.get_secret so that it's entirely lazy, in the

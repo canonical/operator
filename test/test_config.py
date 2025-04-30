@@ -28,7 +28,6 @@ except ImportError:
     pydantic = None
 
 import ops
-import ops._main
 import ops._private.yaml
 from ops import testing
 
@@ -435,3 +434,30 @@ def test_config_custom_type(request: pytest.FixtureRequest):
     typed_config = harness.charm.typed_config
     assert typed_config.x == 42
     assert typed_config.y == datetime.date(2008, 8, 28)
+
+
+def test_config_partial_init(request: pytest.FixtureRequest):
+    @dataclasses.dataclass(frozen=True)
+    class Config(ops.ConfigBase):
+        x: int
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config)
+
+    schema = Config.to_juju_schema()
+    # Harness needs to know about *all* the options, even though the charm does
+    # not.
+    schema['options']['y'] = {
+        'type': 'string',
+        'description': 'An int not used in the class',
+    }
+    options = ops._private.yaml.safe_dump(schema)
+    harness = testing.Harness(Charm, config=options)
+    request.addfinalizer(harness.cleanup)
+    # The raw config contains more fields than the class requires.
+    harness.update_config({'x': 42, 'y': 'foo'})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert typed_config.x == 42
