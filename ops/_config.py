@@ -265,5 +265,3 @@ def generate_juju_schema():
 
 if __name__ == '__main__':
     generate_juju_schema()
-
-# TODO: test_main check to verify that the clean exit works correctly.
