@@ -29,6 +29,7 @@ import pytest
 def juju() -> Generator[jubilant.Juju, None, None]:
     """Make a Juju model with the tracing part of COS ready."""
     with jubilant.temp_model() as juju:
+        juju.wait_timeout = 360
         deploy_tempo(juju)
         deploy_tempo_worker(juju)
         juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
