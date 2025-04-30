@@ -117,10 +117,6 @@ logger = logging.getLogger(__name__)
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
-class InvalidSchemaError(Exception):
-    """Raised when a config, action parameter, or databag schema does not match the data."""
-
-
 class Model:
     """Represents the Juju Model as seen from this unit.
 
@@ -3271,6 +3267,14 @@ class InvalidStatusError(ModelError):
 
 class SecretNotFoundError(ModelError):
     """Raised when the specified secret does not exist."""
+
+
+class InvalidSchemaError(Exception):
+    """Raised when a config, action parameter, or databag schema does not match the data."""
+
+    def __init__(self, message: str = '', action_failure: str | None = None):
+        super().__init__(message)
+        self.action_failure = action_failure
 
 
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')

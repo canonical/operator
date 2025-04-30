@@ -33,6 +33,8 @@ get-status:
   description: Return the Status of the unit
 keyerror:
   description: Raise a KeyError (to see crash output)
+invalid-schema:
+  description: Raise an InvalidSchemaError
 log-critical:
   description: log a message at Critical level
 log-error:

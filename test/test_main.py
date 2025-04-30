@@ -1116,6 +1116,51 @@ class _TestMain(abc.ABC):
 
         assert calls == expected
 
+    @pytest.mark.usefixtures('setup_charm')
+    def test_invalid_schema_clean_exit(self, fake_script: FakeScript):
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
+        assert isinstance(state, ops.BoundStoredState)
+        assert list(state.observed_event_types) == ['InstallEvent']
+
+        fake_script.write('config-get', 'echo \'{"invalid": "invalid"}\'')
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(
+                ops.ConfigChangedEvent,
+                'config-changed',
+            ),
+        )
+        assert isinstance(state, ops.BoundStoredState)
+        expected = [['is-leader', '--format=json'], ['is-leader', '--format=json']]
+        assert [call for call in fake_script.calls() if call[0] != 'juju-log'] == expected
+
+    @pytest.mark.usefixtures('setup_charm')
+    def test_invalid_schema_set_failure(self, fake_script: FakeScript):
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
+        assert isinstance(state, ops.BoundStoredState)
+        assert list(state.observed_event_types) == ['InstallEvent']
+
+        fake_script.write('action-get', "echo '{}'")
+        fake_script.write('action-fail', 'exit 0')
+        state = self._simulate_event(
+            fake_script,
+            EventSpec(
+                ops.ActionEvent,
+                'invalid_schema_action',
+                env_var='JUJU_ACTION_NAME',
+                set_in_env={'JUJU_ACTION_UUID': '1'},
+            ),
+        )
+        assert isinstance(state, ops.BoundStoredState)
+        expected = [
+            ['is-leader', '--format=json'],
+            ['action-get', '--format=json'],
+            ['action-fail', 'bad schema'],
+        ]
+        assert [call for call in fake_script.calls() if call[0] != 'juju-log'] == expected
+
 
 class TestMainWithDispatchAsSymlink(_TestMain):
     def _setup_entry_point(self):

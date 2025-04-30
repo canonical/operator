@@ -255,22 +255,25 @@ class ActionEvent(EventBase):
             An instance of the action class with the provided parameter values.
 
         Raises:
-            :class:`InvalidSchemaError` if the configuration is invalid, after
-            setting an appropriate event failure.
+            :class:`InvalidSchemaError` if the configuration is invalid. If this
+                exception is not caught, then an appropriate event failure message
+                is set.
         """
         params: dict[str, Any] = kwargs.copy()
         for key, value in self.params.items():
             attr = cls._juju_name_to_attr(key)  # type: ignore
             assert isinstance(attr, str)
             if not attr.isidentifier():
-                self.fail(f'Invalid attribute name {attr}')
-                raise model.InvalidSchemaError() from None
+                raise model.InvalidSchemaError(
+                    action_failure=f'Invalid attribute name {attr}',
+                ) from None
             params[attr] = value
         try:
             return cls(*args, **params)
         except ValueError as e:
-            self.fail(f'Error in action parameters: {e}')
-            raise model.InvalidSchemaError() from None
+            raise model.InvalidSchemaError(
+                action_failure=f'Error in action parameters: {e}',
+            ) from None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'

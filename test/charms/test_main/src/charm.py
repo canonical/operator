@@ -117,6 +117,7 @@ class Charm(ops.CharmBase):
             self.framework.observe(self.on.get_model_name_action, self._on_get_model_name_action)
             self.framework.observe(self.on.get_status_action, self._on_get_status_action)
             self.framework.observe(self.on.keyerror_action, self._on_keyerror_action)
+            self.framework.observe(self.on.invalid_schema_action, self._on_invalid_schema_action)
 
             self.framework.observe(self.on.log_critical_action, self._on_log_critical_action)
             self.framework.observe(self.on.log_error_action, self._on_log_error_action)
@@ -302,6 +303,11 @@ class Charm(ops.CharmBase):
         # Deliberately raise an uncaught exception, so that we can observe the
         # behaviour when an action crashes.
         raise KeyError("'foo' not found in 'bar'")
+
+    def _on_invalid_schema_action(self, event: ops.ActionEvent):
+        raise ops.InvalidSchemaError(
+            action_failure='bad schema',
+        )
 
     def _on_collect_metrics(self, event: ops.CollectMetricsEvent):
         self._stored.on_collect_metrics.append(type(event).__name__)

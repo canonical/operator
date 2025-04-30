@@ -309,7 +309,6 @@ def test_action_with_error(
     harness.begin()
     with pytest.raises(ops.InvalidSchemaError):
         harness.run_action(action_name, params={'my-str': 'foo', 'my-int': -1})
-    assert 'my_int must be zero or positive' in harness._backend._running_action.failure_message
 
 
 def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
@@ -381,7 +380,6 @@ def test_action_bad_attr_naming_pattern(request: pytest.FixtureRequest):
     harness.begin()
     with pytest.raises(ops.InvalidSchemaError):
         harness.run_action('bad-action')
-    assert 'foo-bar' in harness._backend._running_action.failure_message
 
 
 @pytest.mark.parametrize('action_class,action_name', _test_action_classes)
