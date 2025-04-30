@@ -13,15 +13,20 @@ This guide demonstrates how to:
 
 ## Create a Juju user secret
 
-Run the following command to create a Juju user secret:
+Run {external+juju:ref}`juju add-secret <command-juju-add-secret>` to create a Juju user secret:
 
 ```bash
 juju add-secret metrics-user-password username=test password=test
 ```
 
-This command returns a secret ID, which you'll need in the following steps.
+```{caution}
 
-> See more: {external+juju:ref}`juju add-secret <command-juju-add-secret>`.
+- Use a random password generator to create a password. You can use your preferred password manager to generate one and store it securely in the password manager as the single source of truth.
+- Do not use this password for anything else other than metrics, because it will be sent over unencrypted HTTP as basic authentication.
+
+```
+
+This command returns a secret ID, which you'll need in the following steps.
 
 ## Add a configuration option for the secret ID
 
@@ -53,13 +58,16 @@ class MyCharm(ops.CharmBase):
     # The user must have:
     # - Created a secret with keys 'username' and 'password'
     # - Stored the secret ID in the 'metrics-secret-id' configuration option
+    if not self.config.get('metrics-secret-id'):
+      return
     secret_id = str(self.config["metrics-secret-id"])
     secret = self.model.get_secret(id=secret_id)
     content = secret.get_content()
-    username, password = content["username"], content["password"]
-    self._replace_identities(username, password)
+    self._replace_identities(content["username"], content["password"])
 
   def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
+    if not self.config.get('metrics-secret-id'):
+      return
     if event.secret.id == self.config['metrics-secret-id']:
       content = event.secret.peek_content()
       username, password = content["username"], content["password"]
@@ -68,7 +76,8 @@ class MyCharm(ops.CharmBase):
   def _replace_identities(self, username: str, password: str) -> None:
     identities = {
       username: ops.pebble.Identity(
-        access="metrics", basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password))
+        access="metrics",
+        basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password))
       ),
     }
     self.container.pebble.replace_identities(identities)
@@ -77,7 +86,7 @@ class MyCharm(ops.CharmBase):
   ...
 ```
 
-The password of the Pebble identity is stored as a hash, which we generate using `sha512_crypt.hash()` from `passlib.hash`.
+The password of the Pebble identity is stored as a hash, which we generate using [`sha512_crypt.hash()`](https://passlib.readthedocs.io/en/stable/lib/passlib.hash.sha512_crypt.html) from [`passlib.hash`](https://passlib.readthedocs.io/en/stable/lib/passlib.hash.html).
 
 When Pebble receives a request to access the metrics endpoint, Pebble will verify that the basic authentication credentials in the request match the identity's username and password.
 
@@ -103,16 +112,11 @@ Then, when deploying the charm, use the `--config` option to pass the configurat
 juju deploy <charm-name> --config metrics-config.yaml
 ```
 
-After deploying the charm, grant access to the user secret:
+After deploying the charm, {external+juju:ref}`grant access <command-juju-grant-secret>` to the user secret:
 
 ```bash
 juju grant-secret metrics-user-password <charm-name>
 ```
-
-> See more:
-> - {external+juju:ref}`Juju | config <command-juju-config>`
-> - {external+juju:ref}`Juju | deploy <command-juju-deploy>`
-> - {external+juju:ref}`Juju | grant-secret <command-juju-grant-secret>`
 
 ## Access the metrics endpoint
 
@@ -132,7 +136,7 @@ You'll need to use HTTP basic authentication with the username and password that
 
 ### Through an Ingress
 
-To access the metrics endpoint from outside the Kubernetes cluster, use an Ingress.
+To access the metrics endpoint from outside the Kubernetes cluster, use an [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 
 Use the service `<charm-name>` service in the Ingress (which is also created by Juju) instead of the `<charm-name>-endpoints` service, as the latter is a [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) and doesn't have a ClusterIP.
 
