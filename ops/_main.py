@@ -461,9 +461,9 @@ class _Manager:
             if e.status:
                 self._model_backend.status_set('blocked', e.status)
             # We exit with a zero exit code because we don't want Juju to go into
-            # error status (for config and databags, we have set a status ourselves)
-            # and we don't want to automatically retry (the Juju user or another
-            # unit must correct the data to match the schema).
+            # error status (for config we have set a status ourselves) and we
+            # don't want to automatically retry (the Juju user must correct the
+            # data to match the schema).
             raise _Abort(0) from e
         finally:
             self.framework.close()
