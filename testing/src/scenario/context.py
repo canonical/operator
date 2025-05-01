@@ -468,11 +468,6 @@ class Context(Generic[CharmType]):
             with ctx(ctx.on.start(), State()) as manager:
                 manager.charm._some_private_setup()
                 manager.run()
-
-    Note that the manager provides access to the charm that is used for the
-    primary event (the one passed as the first argument to ``Context``) but not
-    to the charm instances that are used to handle any events
-    in :attr:`State.deferred`.
     """
 
     juju_log: list[JujuLogLine]

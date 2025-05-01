@@ -3695,8 +3695,10 @@ class _ModelBackend:
     def application_version_set(self, version: str) -> None:
         self._run('application-version-set', '--', version)
 
-    @staticmethod
-    def log_split(message: str, max_len: int = MAX_LOG_LINE_LEN) -> Generator[str, None, None]:
+    @classmethod
+    def log_split(
+        cls, message: str, max_len: int = MAX_LOG_LINE_LEN
+    ) -> Generator[str, None, None]:
         """Helper to handle log messages that are potentially too long.
 
         This is a generator that splits a message string into multiple chunks if it is too long

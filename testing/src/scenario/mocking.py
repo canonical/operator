@@ -136,7 +136,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         state: State,
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
-        context: Context[CharmType],
+        context: Context,
         juju_context: _JujuContext,
     ):
         super().__init__(juju_context=juju_context)
@@ -192,6 +192,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 container_root=container_root,
                 mounts=mounts,
                 state=self._state,
+                event=self._event,
                 charm_spec=self._charm_spec,
                 context=self._context,
                 container_name=container_name,
@@ -745,12 +746,14 @@ class _MockPebbleClient(_TestingPebbleClient):
         mounts: dict[str, Mount],
         *,
         state: State,
+        event: _Event,
         charm_spec: _CharmSpec[CharmType],
-        context: Context[CharmType],
+        context: Context,
         container_name: str,
     ):
         self._state = state
         self.socket_path = socket_path
+        self._event = event
         self._charm_spec = charm_spec
         self._context = context
         self._container_name = container_name
@@ -810,7 +813,6 @@ class _MockPebbleClient(_TestingPebbleClient):
                     spawn_time=now,
                     ready_time=now,
                 )
-                assert check.change_id is not None
                 self._changes[check.change_id] = change
 
     def get_plan(self) -> pebble.Plan:
