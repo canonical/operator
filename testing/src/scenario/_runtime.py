@@ -5,20 +5,30 @@
 
 from __future__ import annotations
 
-import contextlib
 import copy
 import dataclasses
 import os
-import pathlib
 import tempfile
 import typing
+from contextlib import contextmanager
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Type,
+    TypeVar,
 )
 
 import yaml
-from ops import pebble
+from ops import (
+    CollectStatusEvent,
+    pebble,
+    CommitEvent,
+    EventBase,
+    Framework,
+    Handle,
+    NoTypeError,
+    PreCommitEvent,
+)
 from ops.jujucontext import _JujuContext
 from ops._private.harness import ActionFailed
 
@@ -36,7 +46,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = scenario_logger.getChild('runtime')
 
-RUNTIME_MODULE = pathlib.Path(__file__).parent
+RUNTIME_MODULE = Path(__file__).parent
 
 
 class Runtime:
@@ -48,7 +58,7 @@ class Runtime:
     def __init__(
         self,
         charm_spec: _CharmSpec[CharmType],
-        charm_root: str | pathlib.Path | None = None,
+        charm_root: str | Path | None = None,
         juju_version: str = '3.0.0',
         app_name: str | None = None,
         unit_id: int | None = 0,
@@ -64,7 +74,7 @@ class Runtime:
         self._app_name = app_name
         self._unit_id = unit_id
 
-    def _get_event_env(self, state: State, event: _Event, charm_root: pathlib.Path):
+    def _get_event_env(self, state: State, event: _Event, charm_root: Path):
         """Build the simulated environment the operator framework expects."""
         env = {
             'JUJU_VERSION': self._juju_version,
@@ -190,7 +200,7 @@ class Runtime:
         WrappedCharm.__name__ = charm_type.__name__
         return typing.cast('Type[CharmType]', WrappedCharm)
 
-    @contextlib.contextmanager
+    @contextmanager
     def _virtual_charm_root(self):
         # If we are using runtime on a real charm, we can make some assumptions about the
         # directory structure we are going to find.
@@ -201,17 +211,17 @@ class Runtime:
 
         if charm_virtual_root := self._charm_root:
             charm_virtual_root_is_custom = True
-            virtual_charm_root = pathlib.Path(charm_virtual_root)
+            virtual_charm_root = Path(charm_virtual_root)
         else:
             charm_virtual_root = tempfile.TemporaryDirectory()
-            virtual_charm_root = pathlib.Path(charm_virtual_root.name)
+            virtual_charm_root = Path(charm_virtual_root.name)
             charm_virtual_root_is_custom = False
 
         metadata_yaml = virtual_charm_root / 'metadata.yaml'
         config_yaml = virtual_charm_root / 'config.yaml'
         actions_yaml = virtual_charm_root / 'actions.yaml'
 
-        metadata_files_present: dict[pathlib.Path, str | None] = {
+        metadata_files_present: dict[Path | str | None] = {
             file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
@@ -259,18 +269,22 @@ class Runtime:
             # charm_virtual_root is a tempdir
             typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
 
-    @contextlib.contextmanager
-    def _exec_ctx(self, ctx: Context[CharmType]):
+    @contextmanager
+    def _exec_ctx(self, ctx: Context):
         """python 3.8 compatibility shim"""
         with self._virtual_charm_root() as temporary_charm_root:
-            yield temporary_charm_root
+            with capture_events(
+                include_deferred=ctx.capture_deferred_events,
+                include_framework=ctx.capture_framework_events,
+            ) as captured:
+                yield (temporary_charm_root, captured)
 
-    @contextlib.contextmanager
+    @contextmanager
     def exec(
         self,
         state: State,
         event: _Event,
-        context: Context[CharmType],
+        context: Context,
     ):
         """Runs an event with this state as initial state on a charm.
 
@@ -291,7 +305,7 @@ class Runtime:
         output_state = copy.deepcopy(state)
 
         logger.info(' - generating virtual charm root')
-        with self._exec_ctx(context) as temporary_charm_root:
+        with self._exec_ctx(context) as (temporary_charm_root, captured):
             logger.info(' - preparing env')
             env = self._get_event_env(
                 state=state,
@@ -337,5 +351,91 @@ class Runtime:
                 os.environ.update(previous_env)
                 logger.info(' - exited ops.main')
 
+        context.emitted_events.extend(captured)
         logger.info('event dispatched. done.')
         context._set_output_state(ops.state)
+
+
+_T = TypeVar('_T', bound=EventBase)
+
+
+@contextmanager
+def capture_events(
+    *types: type[EventBase],
+    include_framework: bool = False,
+    include_deferred: bool = True,
+):
+    """Capture all events of type `*types` (using instance checks).
+
+    Arguments exposed so that you can define your own fixtures if you want to.
+
+    Example::
+    >>> from ops import StartEvent
+    >>> from scenario import Event, State
+    >>> from charm import MyCustomEvent, MyCharm  # noqa
+    >>>
+    >>> def test_my_event():
+    >>>     with capture_events(StartEvent, MyCustomEvent) as captured:
+    >>>         trigger(State(), ("start", MyCharm, meta=MyCharm.META)
+    >>>
+    >>>     assert len(captured) == 2
+    >>>     e1, e2 = captured
+    >>>     assert isinstance(e2, MyCustomEvent)
+    >>>     assert e2.custom_attr == 'foo'
+    """
+    allowed_types = types or (EventBase,)
+
+    captured: list[EventBase] = []
+    _real_emit = Framework._emit
+    _real_reemit = Framework.reemit
+
+    def _wrapped_emit(self: Framework, evt: EventBase):
+        if not include_framework and isinstance(
+            evt,
+            (PreCommitEvent, CommitEvent, CollectStatusEvent),
+        ):
+            return _real_emit(self, evt)
+
+        if isinstance(evt, allowed_types):
+            # dump/undump the event to ensure any custom attributes are (re)set by restore()
+            evt.restore(evt.snapshot())
+            captured.append(evt)
+
+        return _real_emit(self, evt)
+
+    def _wrapped_reemit(self: Framework):
+        # Framework calls reemit() before emitting the main juju event. We intercept that call
+        # and capture all events in storage.
+
+        if not include_deferred:
+            return _real_reemit(self)
+
+        # load all notices from storage as events.
+        for event_path, _, _ in self._storage.notices():
+            event_handle = Handle.from_path(event_path)
+            try:
+                event = self.load_snapshot(event_handle)
+            except NoTypeError:
+                continue
+            event = typing.cast('EventBase', event)
+            event.deferred = False
+            self._forget(event)  # prevent tracking conflicts
+
+            if not include_framework and isinstance(
+                event,
+                (PreCommitEvent, CommitEvent),
+            ):
+                continue
+
+            if isinstance(event, allowed_types):
+                captured.append(event)
+
+        return _real_reemit(self)
+
+    Framework._emit = _wrapped_emit  # type: ignore
+    Framework.reemit = _wrapped_reemit
+
+    yield captured
+
+    Framework._emit = _real_emit
+    Framework.reemit = _real_reemit
