@@ -1,0 +1,42 @@
+---
+name: test-tracing
+type: charm
+title: Test tracing
+summary: Test tracing
+description: Test tracing
+
+base: ubuntu@24.04
+build-base: ubuntu@24.04
+platforms:
+    amd64:
+
+parts:
+    test-tracing:
+        plugin: charm
+        source: .
+        build-packages:
+            - cargo
+
+requires:
+    charm-tracing:
+        interface: tracing
+        limit: 1
+        optional: true
+    receive-ca-cert:
+        interface: certificate_transfer
+        limit: 1
+        optional: true
+
+actions:
+  one:
+    params:
+      arg:
+        type: string
+  two:
+    params:
+      arg:
+        type: string
+  three:
+    params:
+      arg:
+        type: string
