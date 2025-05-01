@@ -28,12 +28,6 @@ sys.path.append('lib')
 
 logger = logging.getLogger()
 
-# Note for ops developers: juju-log doesn't go anywhere useful much of the time
-# during unit tests, and test_main failures that subprocess out are often
-# difficult to debug. Uncomment this line to get more informative errors when
-# running the tests.
-# logger.addHandler(logging.StreamHandler(sys.stderr))
-
 
 class CustomEvent(ops.EventBase):
     pass
@@ -130,18 +124,6 @@ class Charm(ops.CharmBase):
 
         if os.getenv('TRY_EXCEPTHOOK', False):
             raise RuntimeError('failing as requested')
-
-        for name, event in self.on.events().items():
-            if isinstance(event, ops.LifecycleEvent) or name == 'custom':
-                continue
-            self.framework.observe(event, self._on_any_event)
-        if hasattr(self, 'charm_attribute'):
-            raise RuntimeError('charm instance was reused')
-
-    def _on_any_event(self, event: ops.EventBase):
-        # Note that doing this is bad behaviour: we're doing it here to make
-        # sure that the value is *not* retained.
-        self.charm_attribute = str(event)
 
     def _on_install(self, event: ops.InstallEvent):
         self._stored.on_install.append(type(event).__name__)
