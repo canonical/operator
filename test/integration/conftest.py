@@ -26,7 +26,7 @@ import pytest
 
 
 @pytest.fixture
-def juju() -> Generator[jubilant.Juju, None, None]:
+def juju() -> Generator[jubilant.Juju]:
     """Make a Juju model with the tracing part of COS ready."""
     with jubilant.temp_model() as juju:
         juju.wait_timeout = 360
@@ -78,7 +78,7 @@ def juju() -> Generator[jubilant.Juju, None, None]:
 
 
 @pytest.fixture(scope='session')
-def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None]:
+def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
     """Prepare and return the test charm directory.
 
     Builds and injects `ops` and `ops-tracing` from the local checkout in to the
@@ -142,7 +142,7 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path, None, None
 
 
 @pytest.fixture(scope='session')
-def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str], None, None]:
+def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
     """Build the test charm and provide the artefact path.
 
     Starts building the test-tracing charm early.
