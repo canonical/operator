@@ -52,38 +52,37 @@ After retrieving the contents of the secret, we'll use the [`replace_identities`
 from passlib.hash import sha512_crypt
 
 class MyCharm(ops.CharmBase):
-  ...
+    ...
 
-  def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-    # The user must have:
-    # - Created a secret with keys 'username' and 'password'
-    # - Stored the secret ID in the 'metrics-secret-id' configuration option
-    if not self.config.get('metrics-secret-id'):
-      return
-    secret_id = str(self.config["metrics-secret-id"])
-    secret = self.model.get_secret(id=secret_id)
-    content = secret.get_content()
-    self._replace_identities(content["username"], content["password"])
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        # The user must have:
+        # - Created a secret with keys 'username' and 'password'
+        # - Stored the secret ID in the 'metrics-secret-id' configuration option
+        if not self.config.get('metrics-secret-id'):
+            return
+        secret_id = str(self.config["metrics-secret-id"])
+        secret = self.model.get_secret(id=secret_id)
+        content = secret.get_content()
+        self._replace_identities(content["username"], content["password"])
 
-  def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
-    if not self.config.get('metrics-secret-id'):
-      return
-    if event.secret.id == self.config['metrics-secret-id']:
-      content = event.secret.peek_content()
-      username, password = content["username"], content["password"]
-      self._replace_identities(username, password)
+    def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
+        if not self.config.get('metrics-secret-id'):
+            return
+        if event.secret.id == self.config['metrics-secret-id']:
+            content = event.secret.peek_content()
+            self._replace_identities(content["username"], content["password"])
 
-  def _replace_identities(self, username: str, password: str) -> None:
-    identities = {
-      username: ops.pebble.Identity(
-        access="metrics",
-        basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password))
-      ),
-    }
-    self.container.pebble.replace_identities(identities)
-    logger.debug("New metrics username: %s", username)
+    def _replace_identities(self, username: str, password: str) -> None:
+        identities = {
+            username: ops.pebble.Identity(
+                access="metrics",
+                basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password))
+            ),
+        }
+        self.container.pebble.replace_identities(identities)
+        logger.debug("New metrics username: %s", username)
 
-  ...
+    ...
 ```
 
 The password of the Pebble identity is stored as a hash, which we generate using [`sha512_crypt.hash()`](https://passlib.readthedocs.io/en/stable/lib/passlib.hash.sha512_crypt.html) from [`passlib.hash`](https://passlib.readthedocs.io/en/stable/lib/passlib.hash.html).
@@ -143,7 +142,7 @@ Use the service `<charm-name>` service in the Ingress (which is also created by 
 - To expose the Pebble HTTP port, use [`set_ports`](ops.Unit.set_ports) in your charm code:
 
 ```python
-  self.unit.set_ports(38813)
+    self.unit.set_ports(38813)
 ```
 
 - To create an Ingress, use the following Ingress resource example (assuming the charm and service name is `my-charm`):
