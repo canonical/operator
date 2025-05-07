@@ -92,7 +92,7 @@ resources:
     description: OCI image from GitHub Container Repository
     # The upstream-source field is ignored by Juju. It is included here as a reference
     # so the integration testing suite knows which image to deploy during testing. This field
-    # is also used by the 'canonical/charming-actions' Github action for automated releasing.
+    # is also used by the 'canonical/charming-actions' GitHub action for automated releasing.
     upstream-source: ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
