@@ -137,9 +137,4 @@ if status is not pebble.ServiceStatus.ACTIVE:
 
 It's a bit less clear when we're dealing with code and APIs, as those normally use US English, for example, `pytest.mark.parametrize`, and `color: #fff`.
 
-
-### Spell out abbreviations
-
-Abbreviations and acronyms in docstrings should usually be spelled out, for example, "for example" rather than "e.g.", "that is" rather than "i.e.", "and so on" rather than "etc", and "unit testing" rather than UT.
-
-However, it's okay to use acronyms that are very well known in our domain, like HTTP or JSON or RPC.
+See more doc style guide [here](https://github.com/canonical/pebble/blob/master/STYLE.md#docs-and-docstrings).
