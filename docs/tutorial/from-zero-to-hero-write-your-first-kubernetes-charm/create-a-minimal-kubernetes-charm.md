@@ -527,7 +527,10 @@ def test_pebble_layer():
     # Check the unit status is active
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
-    assert state_out.get_container(container.name).service_statuses["fastapi-service"] == ops.pebble.ServiceStatus.ACTIVE
+    assert (
+        state_out.get_container(container.name).service_statuses["fastapi-service"]
+        == ops.pebble.ServiceStatus.ACTIVE
+    )
 ```
 
 ### Run the test
