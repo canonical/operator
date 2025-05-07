@@ -492,15 +492,15 @@ mkdir -p tests/unit
 In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
 
 ```python
+from charm import FastAPIDemoCharm
+
 import ops
 from ops import testing
-
-from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -508,12 +508,12 @@ def test_pebble_layer():
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
     expected_plan = {
-        "services": {
-            "fastapi-service": {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": "uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000",
-                "startup": "enabled",
+        'services': {
+            'fastapi-service': {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': 'uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000',
+                'startup': 'enabled',
                 # Since the environment is empty, Layer.to_dict() will not
                 # include it.
             }
@@ -525,7 +525,11 @@ def test_pebble_layer():
     # Check the unit status is active
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
-    assert state_out.get_container(container.name).service_statuses["fastapi-service"] == ops.pebble.ServiceStatus.ACTIVE
+    assert (
+        state_out.get_container(container.name).service_statuses['fastapi-service']
+        == ops.pebble.ServiceStatus.ACTIVE
+    )
+
 ```
 
 ### Run the test
@@ -623,8 +627,8 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
+METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+APP_NAME = METADATA['name']
 
 
 @pytest.mark.abort_on_fail
@@ -634,23 +638,17 @@ async def test_build_and_deploy(ops_test: OpsTest):
     Assert on the unit status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+    charm = await ops_test.build_charm('.')
     resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
+        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
     await asyncio.gather(
         ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
         ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300
+            apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
         ),
     )
-```
-
-In your Multipass Ubuntu VM, run the test:
-
-```bash
-tox -e integration
 ```
 
 The test takes some time to run as the `pytest-operator` running in the background will add a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
