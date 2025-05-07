@@ -402,9 +402,9 @@ To inspect your deployment further:
     You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
 
     ```text
-    NAME                             READY   STATUS    RESTARTS        AGE
-    modeloperator-5df6588d89-ghxtz   1/1     Running   3 (7d2h ago)    13d
-    demo-api-charm-0                 2/2     Running   0               7d2h
+    NAME                             READY   STATUS    RESTARTS   AGE
+    modeloperator-5df6588d89-ghxtz   1/1     Running   2          19m
+    demo-api-charm-0                 2/2     Running   0          39m
     ```
 
 3. Run:
