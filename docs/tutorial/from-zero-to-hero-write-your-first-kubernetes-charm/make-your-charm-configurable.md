@@ -170,8 +170,8 @@ juju status
 As expected, the application is indeed in the `blocked` state: 
 
 ```text
-Model        Controller           Cloud/Region        Version  SLA          Timestamp
-charm-model  tutorial-controller  microk8s/localhost  3.0.0    unsupported  18:19:24+01:00
+Model        Controller  Cloud/Region        Version  SLA          Timestamp
+charm-model  microk8s    microk8s/localhost  3.0.0    unsupported  18:19:24+01:00
 
 App             Version  Status   Scale  Charm           Channel  Rev  Address         Exposed  Message
 demo-api-charm           blocked      1  demo-api-charm             2  10.152.183.215  no       invalid port number, 22 is reserved for SSH

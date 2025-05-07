@@ -302,10 +302,10 @@ juju find-offers cos-lite
 You should something similar to the output below:
 
 ```text
-Store                 URL                        Access  Interfaces
-tutorial-controller  admin/cos-lite.loki        admin   loki_push_api:logging
-tutorial-controller  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
-tutorial-controller  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
+Store     URL                        Access  Interfaces
+microk8s  admin/cos-lite.loki        admin   loki_push_api:logging
+microk8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
+microk8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
 As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `charm-model` model. 
@@ -337,8 +337,8 @@ juju status -m cos-lite
 This should result in an output similar to the one below:
 
 ```text
-Model     Controller            Cloud/Region        Version  SLA          Timestamp
-cos-lite  tutorial-controller  microk8s/localhost  3.0.0    unsupported  18:05:07+01:00
+Model     Controller  Cloud/Region        Version  SLA          Timestamp
+cos-lite  microk8s    microk8s/localhost  3.0.0    unsupported  18:05:07+01:00
 
 App           Version  Status   Scale  Charm             Channel  Rev  Address         Exposed  Message
 alertmanager  0.23.0   active       1  alertmanager-k8s  stable    36  10.152.183.70   no       
