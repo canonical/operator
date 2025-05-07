@@ -1,0 +1,35 @@
+name: Example Charm Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  test-tutorial-k8s:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - examples/k8s-1-minimal
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tox
+        run: pip install tox~=4.2
+      - name: Run unit tests
+        run: |
+          cd ${{ matrix.dir }}
+          tox -e unit
