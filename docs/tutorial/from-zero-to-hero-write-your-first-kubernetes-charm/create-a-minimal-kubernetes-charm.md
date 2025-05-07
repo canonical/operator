@@ -192,13 +192,14 @@ In case it helps, the definition of a Pebble layer is very similar to the defini
 
 
 ```python
-def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent)  -> None:
+def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     """Define and start a workload using the Pebble API.
 
     Change this example to suit your needs. You'll need to specify the right entrypoint and
     environment configuration for your specific workload.
 
-    Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble
+    Learn more about interacting with Pebble at
+        https://ops.readthedocs.io/en/latest/reference/pebble.html
     Learn more about Pebble layers at
         https://documentation.ubuntu.com/pebble/how-to/use-layers/
     """
@@ -208,8 +209,8 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent)  -> None:
     container.add_layer("fastapi_demo", self._pebble_layer, combine=True)
     # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
     container.replan()
-    # Learn more about statuses in the SDK docs:
-    # https://juju.is/docs/sdk/status
+    # Learn more about statuses at
+    # https://documentation.ubuntu.com/juju/3.6/reference/status/
     self.unit.status = ops.ActiveStatus()
 ```
 
@@ -227,23 +228,23 @@ Finally, define  the `pebble_layer` function as below. The `command` variable re
 @property
 def _pebble_layer(self) -> ops.pebble.Layer:
     """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join(
+    command = " ".join(
         [
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            '--port=8000',
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            "--port=8000",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
-        'summary': 'FastAPI demo service',
-        'description': 'pebble config layer for FastAPI demo server',
-        'services': {
+        "summary": "FastAPI demo service",
+        "description": "pebble config layer for FastAPI demo server",
+        "services": {
             self.pebble_service_name: {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': command,
-                'startup': 'enabled',
+                "override": "replace",
+                "summary": "fastapi demo",
+                "command": command,
+                "startup": "enabled",
             }
         },
     }
