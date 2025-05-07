@@ -130,7 +130,10 @@ First, add a shebang to ensure that the file is directly executable. Then, impor
 ```python
 #!/usr/bin/env python3
 
+"""Kubernetes charm for a demo app."""
+
 import ops
+
 
 class FastAPIDemoCharm(ops.CharmBase):
     """Charm the service."""
@@ -138,9 +141,9 @@ class FastAPIDemoCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
 
-if __name__ == "__main__":  # pragma: nocover
-    ops.main(FastAPIDemoCharm)
 
+if __name__ == '__main__':  # pragma: nocover
+    ops.main(FastAPIDemoCharm)
 ```
 
 
@@ -192,24 +195,25 @@ In case it helps, the definition of a Pebble layer is very similar to the defini
 
 
 ```python
-def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent)  -> None:
+def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     """Define and start a workload using the Pebble API.
 
     Change this example to suit your needs. You'll need to specify the right entrypoint and
     environment configuration for your specific workload.
 
-    Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble
+    Learn more about interacting with Pebble at
+        https://ops.readthedocs.io/en/latest/reference/pebble.html
     Learn more about Pebble layers at
         https://documentation.ubuntu.com/pebble/how-to/use-layers/
     """
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload
     # Add initial Pebble config layer using the Pebble API
-    container.add_layer("fastapi_demo", self._pebble_layer, combine=True)
+    container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
     # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
     container.replan()
-    # Learn more about statuses in the SDK docs:
-    # https://juju.is/docs/sdk/status
+    # Learn more about statuses at
+    # https://documentation.ubuntu.com/juju/3.6/reference/status/
     self.unit.status = ops.ActiveStatus()
 ```
 
@@ -217,8 +221,8 @@ The custom Pebble layer that you just added is defined in the  `self._pebble_lay
 
 In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute :
 
-```
-self.pebble_service_name = "fastapi-service"
+```python
+self.pebble_service_name = 'fastapi-service'
 ```
 
 Finally, define  the `pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
@@ -227,14 +231,12 @@ Finally, define  the `pebble_layer` function as below. The `command` variable re
 @property
 def _pebble_layer(self) -> ops.pebble.Layer:
     """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join(
-        [
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            '--port=8000',
-        ]
-    )
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        '--port=8000',
+    ])
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
         'description': 'pebble config layer for FastAPI demo server',
@@ -256,7 +258,7 @@ def _pebble_layer(self) -> ops.pebble.Layer:
 
 In the `src/charm.py` file, in the imports section, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
 
-```
+```python
 import logging
 
 # Log messages can be retrieved using juju debug-log
