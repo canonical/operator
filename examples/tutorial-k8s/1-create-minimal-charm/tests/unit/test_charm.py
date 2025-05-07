@@ -1,7 +1,7 @@
+from charm import FastAPIDemoCharm
+
 import ops
 from ops import testing
-
-from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():

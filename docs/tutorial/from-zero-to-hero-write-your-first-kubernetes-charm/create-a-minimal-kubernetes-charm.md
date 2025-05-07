@@ -494,10 +494,10 @@ mkdir -p tests/unit
 In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
 
 ```python
+from charm import FastAPIDemoCharm
+
 import ops
 from ops import testing
-
-from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():
