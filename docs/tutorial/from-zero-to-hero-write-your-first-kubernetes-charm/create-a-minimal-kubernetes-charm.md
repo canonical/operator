@@ -130,6 +130,8 @@ First, add a shebang to ensure that the file is directly executable. Then, impor
 ```python
 #!/usr/bin/env python3
 
+"""Kubernetes charm for a demo app."""
+
 import ops
 
 class FastAPIDemoCharm(ops.CharmBase):

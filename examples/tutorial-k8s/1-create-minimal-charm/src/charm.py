@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Kubernetes charm for a demo app."""
+
 import logging
 
 import ops
