@@ -662,55 +662,58 @@ The test takes some time to run as the `pytest-operator` running in the backgrou
 
 The result should be similar to the following output:
 
-```bash
-integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/juju-sdk-tutorial-k8s/tests/integration
-=================================================================== test session starts ===================================================================
-platform linux -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- /home/ubuntu/juju-sdk-tutorial-k8s/.tox/integration/bin/python
+```text
+integration: install_deps> python -I -m pip install juju pytest pytest-operator -r /home/ubuntu/fastapi-demo/requirements.txt
+integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
+========================================================= test session starts ==========================================================
+platform linux -- Python 3.12.3, pytest-8.3.5, pluggy-1.5.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python
 cachedir: .tox/integration/.pytest_cache
-rootdir: /home/ubuntu/juju-sdk-tutorial-k8s
-configfile: pyproject.toml
-plugins: operator-0.41.0, asyncio-0.21.2
+rootdir: /home/ubuntu/fastapi-demo
+plugins: operator-0.42.0, asyncio-0.21.2
 asyncio: mode=Mode.STRICT
 collected 1 item
 
-tests/integration/test_charm.py::test_build_and_deploy
---------------------------------------------------------------------- live log setup ----------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:753 Adding model microk8s:test-charm-7zn0 on cloud microk8s
+tests/integration/test_charm.py::test_build_and_deploy 
+------------------------------------------------------------ live log setup ------------------------------------------------------------
 WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
----------------------------------------------------------------------- live log call ----------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:612 Using tmp_path: /home/ubuntu/juju-sdk-tutorial-k8s/.tox/integration/tmp/pytest/test-charm-7zn00
+INFO     pytest_operator.plugin:plugin.py:753 Adding model microk8s:test-charm-wkh4 on cloud microk8s
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHSession received from the controller
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHTunneler received from the controller
+------------------------------------------------------------ live log call -------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:612 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-wkh40
 INFO     pytest_operator.plugin:plugin.py:1199 Building charm demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1204 Built charm demo-api-charm in 11.60s
+INFO     pytest_operator.plugin:plugin.py:1204 Built charm demo-api-charm in 149.88s
 INFO     juju.model:__init__.py:3254 Waiting for model:
   demo-api-charm (missing)
 INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
 INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm/0 [idle] active:
+  demo-api-charm/0 [idle] active: 
 PASSED
--------------------------------------------------------------------- live log teardown --------------------------------------------------------------------
+---------------------------------------------------------- live log teardown -----------------------------------------------------------
 INFO     pytest_operator.plugin:plugin.py:937 Model status:
 
 Model            Controller  Cloud/Region        Version  SLA          Timestamp
-test-charm-7zn0  microk8s    microk8s/localhost  3.6.4    unsupported  12:07:36+08:00
+test-charm-wkh4  microk8s    microk8s/localhost  3.6.5    unsupported  10:22:21+08:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address        Exposed  Message
-demo-api-charm           active      1  demo-api-charm             0  10.152.183.60  no
+demo-api-charm           active      1  demo-api-charm             0  10.152.183.64  no       
 
 Unit               Workload  Agent  Address       Ports  Message
-demo-api-charm/0*  active    idle   10.1.226.162
+demo-api-charm/0*  active    idle   10.1.157.108         
 
 INFO     pytest_operator.plugin:plugin.py:943 Juju error logs:
 
 
-INFO     pytest_operator.plugin:plugin.py:1049 Resetting model test-charm-7zn0...
+INFO     pytest_operator.plugin:plugin.py:1049 Resetting model test-charm-wkh4...
 INFO     pytest_operator.plugin:plugin.py:1038    Destroying applications demo-api-charm
 INFO     pytest_operator.plugin:plugin.py:1054 Not waiting on reset to complete.
 INFO     pytest_operator.plugin:plugin.py:1025 Forgetting model main...
 
 
-=================================================================== 1 passed in 49.30s ====================================================================
-  integration: OK (49.69=setup[0.02]+cmd[49.67] seconds)
-  congratulations :) (49.71 seconds)
+==================================================== 1 passed in 196.32s (0:03:16) =====================================================
+  integration: OK (351.07=setup[149.06]+cmd[202.01] seconds)
+  congratulations :) (351.13 seconds)
 ```
 
 ## Review the final code
