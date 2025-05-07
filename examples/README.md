@@ -1,7 +1,4 @@
-This directory contains charms that are used as examples in the Ops documentation.
-
-> [!NOTE]  
-> This directory is a work in progress.
+This directory contains charms that are used as examples in the Ops documentation. **It's currently a work in progress.**
 
 Contents:
 
