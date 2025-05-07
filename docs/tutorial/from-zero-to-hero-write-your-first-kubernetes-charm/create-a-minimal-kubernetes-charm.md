@@ -543,27 +543,27 @@ ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
 
 The result should be similar to the following output:
 
-```text                                             
-unit: install_deps> python -I -m pip install 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/juju-sdk-tutorial-k8s/requirements.txt
-unit: commands[0]> coverage run --source=/home/ubuntu/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/ubuntu/juju-sdk-tutorial-k8s/tests/unit
-=================================================================== test session starts ===================================================================
-platform linux -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- /home/ubuntu/juju-sdk-tutorial-k8s/.tox/unit/bin/python
+```text
+unit: install_deps> python -I -m pip install cosl 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/fastapi-demo/requirements.txt
+unit: commands[0]> coverage run --source=/home/ubuntu/fastapi-demo/src -m pytest --tb native -v -s /home/ubuntu/fastapi-demo/tests/unit
+========================================================= test session starts ==========================================================
+platform linux -- Python 3.12.3, pytest-8.3.5, pluggy-1.5.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python
 cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/juju-sdk-tutorial-k8s
-configfile: pyproject.toml
+rootdir: /home/ubuntu/fastapi-demo
+plugins: anyio-4.9.0
 collected 1 item
 
 tests/unit/test_charm.py::test_pebble_layer PASSED
 
-==================================================================== 1 passed in 0.11s ====================================================================
+========================================================== 1 passed in 0.72s ===========================================================
 unit: commands[1]> coverage report
-Name           Stmts   Miss Branch BrPart  Cover   Missing
-----------------------------------------------------------
-src/charm.py      18      0      0      0   100%
-----------------------------------------------------------
-TOTAL             18      0      0      0   100%
-  unit: OK (2.12=setup[1.82]+cmd[0.26,0.04] seconds)
-  congratulations :) (2.14 seconds)
+Name           Stmts   Miss  Cover
+----------------------------------
+src/charm.py      18      0   100%
+----------------------------------
+TOTAL             18      0   100%
+  unit: OK (54.15=setup[51.46]+cmd[2.33,0.36] seconds)
+  congratulations :) (54.21 seconds)
 ```
 
 Congratulations, you have written your first unit test!
