@@ -30,4 +30,6 @@ jobs:
       - name: Install tox
         run: pip install tox~=4.2
       - name: Run unit tests
-        run: tox -e unit
+        run: |
+          cd ${{ matrix.dir }}
+          tox -e unit
