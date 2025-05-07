@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         dir:
-          - examples/tutorial-k8s/1-create-minimal-charm
+          - examples/k8s-1-minimal
 
     steps:
       - uses: actions/checkout@v4
