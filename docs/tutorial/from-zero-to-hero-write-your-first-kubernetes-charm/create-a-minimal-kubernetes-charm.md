@@ -426,7 +426,11 @@ For example, you'll want to check that the various components -- relation data, 
 
 You can ensure all this by writing a rich battery of unit tests. In the context of a charm, we recommended using [`pytest`](https://pytest.org/) ([`unittest`](https://docs.python.org/3/library/unittest.html) can also be used) with [](ops_testing), the framework for state-transition testing in Ops.
 
-We'll also use the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
+We'll also use the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment. To install tox, run:
+
+```text
+sudo apt install tox
+```
 
 In this section we'll write a test to check that Pebble is configured as expected.
 
