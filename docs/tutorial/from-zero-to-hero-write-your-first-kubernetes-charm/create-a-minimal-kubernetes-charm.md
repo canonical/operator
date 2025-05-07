@@ -383,38 +383,37 @@ You should see a JSON string with the version of the application:
 {"version":"1.0.0"}
 ```
 
-
-```{dropdown} Expand if you wish to inspect your deployment further
-
+To inspect your deployment further:
 
 1. Run:
 
-```text
-kubectl get namespaces
-```
+    ```text
+    kubectl get namespaces
+    ```
 
-You should see that Juju has created a namespace called `welcome-k8s`.
+    You should see that Juju has created a namespace called `welcome-k8s`.
 
-2. Try:
+2. Run:
 
-```text
-kubectl -n welcome-k8s get pods
-```
+    ```text
+    kubectl -n welcome-k8s get pods
+    ```
 
-You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
+    You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
 
-```text
-NAME                             READY   STATUS    RESTARTS        AGE
-modeloperator-5df6588d89-ghxtz   1/1     Running   3 (7d2h ago)    13d
-demo-api-charm-0                 2/2     Running   0               7d2h
-```
+    ```text
+    NAME                             READY   STATUS    RESTARTS        AGE
+    modeloperator-5df6588d89-ghxtz   1/1     Running   3 (7d2h ago)    13d
+    demo-api-charm-0                 2/2     Running   0               7d2h
+    ```
 
-3. Check also:
+3. Run:
 
-```text
-kubectl -n welcome-k8s describe pod demo-api-charm-0
-```
-In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
+    ```text
+    kubectl -n welcome-k8s describe pod demo-api-charm-0
+    ```
+
+    In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
 
 **Congratulations, you've successfully created a minimal Kubernetes charm!** 
 
