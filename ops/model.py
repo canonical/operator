@@ -3269,8 +3269,8 @@ class SecretNotFoundError(ModelError):
     """Raised when the specified secret does not exist."""
 
 
-class InvalidSchemaError(Exception):
-    """Raised when a config, action parameter, or databag schema does not match the data."""
+class _InvalidSchemaError(Exception):  # pyright: ignore[reportUnusedClass]
+    """Raised when a config option or action parameter schema does not match the data."""
 
     def __init__(self, message: str = '', status: str | None = None):
         super().__init__(message)

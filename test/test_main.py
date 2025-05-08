@@ -1157,7 +1157,7 @@ class _TestMain(abc.ABC):
         expected = [
             ['is-leader', '--format=json'],
             ['config-get', '--format=json'],
-            ['status-set', '--application=False', 'blocked', 'status message'],
+            ['status-set', '--application=False', 'blocked', 'Error in config: status message'],
         ]
         assert [call for call in fake_script.calls() if call[0] != 'juju-log'] == expected
 

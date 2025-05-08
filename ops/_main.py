@@ -513,7 +513,7 @@ class _Manager:
             self._emit(self.charm, self._dispatcher.event_name)
             self._commit(self.charm.framework)
             self._close()
-        except _model.InvalidSchemaError as e:
+        except _model._InvalidSchemaError as e:
             # Optionally set a status message on the unit.
             if e.status:
                 backend = self._make_model_backend()

@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from typing import Any, Optional, Protocol, Union, cast
+from typing import Any, Literal, Optional, Protocol, Union, cast
 
 import pytest
 
@@ -29,6 +29,7 @@ except ImportError:
 
 import ops
 import ops._private.yaml
+import ops.model as _model
 from ops import testing
 
 logger = logging.getLogger(__name__)
@@ -91,9 +92,14 @@ class MyConfig(ops.ConfigBase):
 
 
 class MyCharm(ops.CharmBase):
+    _config_errors: Literal['blocked', 'raise'] | None = None
+
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.typed_config = self.load_config(MyConfig)
+        if self._config_errors:
+            self.typed_config = self.load_config(MyConfig, errors=self._config_errors)
+        else:
+            self.typed_config = self.load_config(MyConfig)
         # These should not have any type errors.
         new_float = self.typed_config.my_float + 2006.8
         new_int = self.typed_config.my_int + 1979
@@ -130,9 +136,14 @@ class MyDataclassConfig(ops.ConfigBase):
 
 
 class MyDataclassCharm(ops.CharmBase):
+    _config_errors: Literal['blocked', 'raise'] | None = None
+
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.typed_config = self.load_config(MyDataclassConfig)
+        if self._config_errors:
+            self.typed_config = self.load_config(MyDataclassConfig, errors=self._config_errors)
+        else:
+            self.typed_config = self.load_config(MyDataclassConfig)
         # These should not have any type errors.
         new_float = self.typed_config.my_float + 2006.8
         new_int = self.typed_config.my_int + 1979
@@ -168,9 +179,16 @@ if pydantic:
             return my_int
 
     class MyPydanticDataclassCharm(ops.CharmBase):
+        _config_errors: Literal['blocked', 'raise'] | None = None
+
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(MyPydanticDataclassConfig)
+            if self._config_errors:
+                self.typed_config = self.load_config(
+                    MyPydanticDataclassConfig, errors=self._config_errors
+                )
+            else:
+                self.typed_config = self.load_config(MyPydanticDataclassConfig)
             # These should not have any type errors.
             new_float = self.typed_config.my_float + 2006.8
             new_int = self.typed_config.my_int + 1979
@@ -206,9 +224,16 @@ if pydantic:
             frozen = True
 
     class MyPydanticBaseModelCharm(ops.CharmBase):
+        _config_errors: Literal['blocked', 'raise'] | None = None
+
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(MyPydanticBaseModelConfig)
+            if self._config_errors:
+                self.typed_config = self.load_config(
+                    MyPydanticBaseModelConfig, errors=self._config_errors
+                )
+            else:
+                self.typed_config = self.load_config(MyPydanticBaseModelConfig)
             # These should not have any type errors.
             new_float = self.typed_config.my_float + 2006.8
             new_int = self.typed_config.my_int + 1979
@@ -264,17 +289,27 @@ def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pyte
     assert typed_config.my_secret is None
 
 
+@pytest.mark.parametrize(
+    'errors,exc',
+    (('raise', ValueError), ('blocked', _model._InvalidSchemaError), (None, ValueError)),
+)
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_with_error(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
+def test_config_with_error_blocked(
+    charm_class: type[ops.CharmBase],
+    errors: Literal['blocked', 'raise'] | None,
+    exc: type[Exception],
+    request: pytest.FixtureRequest,
+):
     config = MyConfig.to_juju_schema()
     harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
+    charm_class._config_errors = errors  # type: ignore
+    request.addfinalizer(lambda: setattr(charm_class, '_config_errors', None))
     harness.update_config({
         'my-int': -1,
     })
-    with pytest.raises(ops.InvalidSchemaError):
+    with pytest.raises(exc):
         harness.begin()
-    # TODO: add a test_main check that makes sure that the status is set correctly.
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
@@ -330,7 +365,15 @@ def test_config_custom_naming_pattern(request: pytest.FixtureRequest):
     assert typed_config.other == 'baz'
 
 
-def test_config_bad_attr_naming_pattern(request: pytest.FixtureRequest):
+@pytest.mark.parametrize(
+    'errors,exc',
+    (('raise', ValueError), ('blocked', _model._InvalidSchemaError), (None, ValueError)),
+)
+def test_config_bad_attr_naming_pattern(
+    errors: Literal['blocked', 'raise'] | None,
+    exc: type[Exception],
+    request: pytest.FixtureRequest,
+):
     @dataclasses.dataclass(frozen=True)
     class BadConfig(ops.ConfigBase):
         foo_bar: int = 42
@@ -342,13 +385,16 @@ def test_config_bad_attr_naming_pattern(request: pytest.FixtureRequest):
     class BadCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(BadConfig)
+            if errors:
+                self.typed_config = self.load_config(BadConfig, errors=errors)
+            else:
+                self.typed_config = self.load_config(BadConfig)
 
     config = BadConfig.to_juju_schema()
     assert 'foo-bar' in config['options']
     harness = testing.Harness(BadCharm, config=ops._private.yaml.safe_dump(config))
     request.addfinalizer(harness.cleanup)
-    with pytest.raises(ops.InvalidSchemaError):
+    with pytest.raises(exc):
         harness.begin()
 
 
@@ -456,8 +502,7 @@ def test_config_partial_init(request: pytest.FixtureRequest):
             self.typed_config = self.load_config(Config)
 
     schema = Config.to_juju_schema()
-    # Harness needs to know about *all* the options, even though the charm does
-    # not.
+    # Harness needs to know about *all* the options, even though the charm does not.
     schema['options']['y'] = {
         'type': 'string',
         'description': 'An int not used in the class',

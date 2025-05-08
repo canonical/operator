@@ -1437,6 +1437,7 @@ class CharmBase(Object):
         self,
         cls: type[_ConfigType],
         *args: Any,
+        errors: Literal['raise', 'blocked'] = 'raise',
         **kwargs: Any,
     ) -> _ConfigType:
         """Load the config into an instance of a config class.
@@ -1456,6 +1457,12 @@ class CharmBase(Object):
 
         Args:
             cls: A class that inherits from :class:`ops.ConfigBase`.
+            errors: what to do if the config is invalid. If ``blocked``, the
+                charm will exit successfully (note that this informs Juju that
+                the event was handled and it will not be retried) after setting
+                an appropriate blocked status. If ``raise``, ``load_config``
+                will not catch any exceptions, leaving the charm to handle
+                errors.
             args: positional arguments to pass through to the config class.
             kwargs: keyword arguments to pass through to the config class.
 
@@ -1463,10 +1470,8 @@ class CharmBase(Object):
             An instance of the config class with the current config values.
 
         Raises:
-            InvalidSchemaError: if the configuration is invalid. If the
-                exception is not caught by the charm code, the hook will exit
-                with a zero exit code, after setting an appropriate blocked
-                status.
+            ValueError: if the configuration is invalid and ``errors`` is set to
+                ``raise``.
         """
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
         fields = set(cls._juju_names())  # type: ignore
@@ -1474,7 +1479,9 @@ class CharmBase(Object):
             attr = cls._juju_name_to_attr(key)  # type: ignore
             assert isinstance(attr, str)
             if not attr.isidentifier():
-                raise model.InvalidSchemaError(status=f'Invalid attribute name {attr}') from None
+                if errors == 'raise':
+                    raise ValueError(f'Invalid attribute name {attr}')
+                raise model._InvalidSchemaError(status=f'Invalid attribute name {attr}')
             if attr not in fields:
                 continue
             option_type = self.meta.config.get(key)
@@ -1493,7 +1500,9 @@ class CharmBase(Object):
         try:
             return cls(*args, **config)
         except ValueError as e:
-            raise model.InvalidSchemaError(status=f'Error in config: {e}') from None
+            if errors == 'raise':
+                raise
+            raise model._InvalidSchemaError(status=f'Error in config: {e}') from e
 
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]

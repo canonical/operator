@@ -17,12 +17,10 @@
 from __future__ import annotations
 
 import dataclasses
-import importlib
 import logging
-import pathlib
 from typing import Any, ClassVar, Generator, get_args, get_origin, get_type_hints
 
-from ._private import attrdocs, yaml
+from ._private import attrdocs
 from .model import Secret
 
 logger = logging.getLogger(__name__)
@@ -31,8 +29,8 @@ logger = logging.getLogger(__name__)
 class ConfigBase:
     """Base class for strongly typed charm config.
 
-    Use :class:`ConfigBase` as a base class for your config class, and define
-    the attributes as you would in ``charmcraft.yaml``. For example::
+    Use ``ConfigBase`` as a base class for your config class, and define the
+    attributes as you would in ``charmcraft.yaml``. For example::
 
         @dataclasses.dataclass(frozen=True)
         class MyConfig(ops.ConfigBase):
@@ -49,14 +47,14 @@ class ConfigBase:
 
     .. note::
 
-        This is a dataclass, but can be any object that inherits from
-        ``ops.ConfigBase``, and can be initialised with the raw Juju config
+        That is a dataclass, but the class can be any that inherits from
+        ``ops.ConfigBase``, and that can be initialised with the raw Juju config
         passed as keyword arguments. Any errors should be indicated by raising
         ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
 
         Inheriting from ``ops.ConfigBase`` is not strictly necessary, but it
-        provides utility methods for translating the class to a YAML schema suitable
-        for use with Juju.
+        provides a utility method for translating the class to a YAML schema
+        suitable for use with Juju.
 
     Use this in your charm class like so::
 
@@ -64,11 +62,6 @@ class ConfigBase:
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.typed_config = self.load_config(MyConfig)
-
-    If the config provided by Juju is not valid, a :class:`ops.InvalidSchemaError`
-    will be raised, and if not caught the charm will exit after setting a
-    blocked status with an error message based on the ``str()`` of the original
-    exception raised.
     """
 
     _JUJU_TYPES: ClassVar[dict[str, str]] = {
@@ -188,7 +181,7 @@ class ConfigBase:
         suitable for use in ``config.yaml``. For example, with the class from
         the example above::
 
-            print(yaml.safe_dump(MyConfig.to_juju_schema()))
+            print(yaml.dump(MyConfig.to_juju_schema()))
 
         Will output::
 
@@ -244,25 +237,3 @@ class ConfigBase:
                 option['description'] = doc
             options[cls._attr_to_juju_name(attr)] = option
         return {'options': options}
-
-
-def generate_juju_schema():
-    """Look for all ConfigBase subclasses and generate their YAML schema.
-
-    .. caution::
-
-        This imports modules, so is not safe to run on untrusted code.
-    """
-    config: dict[str, Any] = {}
-    for name in pathlib.Path('src').glob('*.py'):
-        module_name = name.stem
-        module = importlib.import_module(f'src.{module_name}')
-        for attr_name in dir(module):
-            obj = getattr(module, attr_name)
-            if isinstance(obj, ConfigBase):
-                config.update(obj.to_juju_schema())
-    print(yaml.safe_dump(config))
-
-
-if __name__ == '__main__':
-    generate_juju_schema()
