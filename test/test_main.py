@@ -213,7 +213,7 @@ class TestDispatch:
                     ops.main(MyCharm)
 
         assert mock_charm_event.call_count == 1
-        return mock_charm_event.call_args[0][1]
+        return mock_charm_event.call_args[0][0]
 
     def test_with_dispatch(self):
         """With dispatch, dispatch is used."""
@@ -425,7 +425,6 @@ class _TestMain(abc.ABC):
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['InstallEvent']
 
-        # The config-changed handler always defers.
         state = self._simulate_event(
             fake_script, EventSpec(ops.ConfigChangedEvent, 'config-changed')
         )
@@ -755,13 +754,6 @@ class _TestMain(abc.ABC):
 
         expected = [
             VERSION_LOGLINE,
-            [
-                'juju-log',
-                '--log-level',
-                'DEBUG',
-                '--',
-                'Skipping re-emission of deferred events in restricted context.',
-            ],
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
             ['is-leader', '--format=json'],

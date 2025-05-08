@@ -2029,11 +2029,7 @@ class _Event:  # type: ignore
         return self._path.type is not _EventType.CUSTOM
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
-        """Construct a DeferredEvent from this Event.
-
-        The charm class passed to the :class:`Context` must be observing the
-        event this DeferredEvent is based on.
-        """
+        """Construct a DeferredEvent from this Event."""
         handler_repr = repr(handler)
         handler_re = re.compile(r'<function (.*) at .*>')
         match = handler_re.match(handler_repr)

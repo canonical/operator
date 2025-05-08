@@ -185,8 +185,12 @@ Pull requests should have a short title that follows the
 
 At present, we only add a scope in these cases:
 
-* If the PR is limited to changes in ops/_private/harness.py, also include the scope `(harness)`
-* If the PR is limited to changes in testing/, also include the scope `(testing)`
+* If the PR is limited to optional features, use one of these scopes to clarify context:
+  * `(harness)` for changes in `ops/_private/harness.py`
+  * `(testing)` for changes in `testing/`
+  * `(tracing)` for changes in `tracing/`
+
+Use of these scopes makes it clear when a change is limited to test tooling or optional features, rather than core runtime behavior.
 
 For example:
 

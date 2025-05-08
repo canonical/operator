@@ -6,6 +6,7 @@ The `ops` library is a Python framework for developing and testing Kubernetes an
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
 > - The latest version of `ops` requires Python 3.8 or above.
+> - Read our [docs](https://ops.readthedocs.io/en/latest/) for tutorials, how-to guides, the library reference, and more.
 
 ## Give it a try
 

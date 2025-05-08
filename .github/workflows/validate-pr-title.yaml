@@ -34,4 +34,6 @@ jobs:
             test
           scopes: |
             harness
+            testing
+            tracing
           requireScope: false
