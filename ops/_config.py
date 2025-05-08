@@ -89,6 +89,23 @@ class ConfigBase:
             raw_hint = get_type_hints(cls)[name]
         except KeyError:
             pass
+        except TypeError:
+            # In Python 3.8, this fails even though __future__ annotations is
+            # used. Provide a reasonable effort fallback.
+            hint = cls.__annotations__.get(name)
+            if hint and '|' in hint:
+                hints = {h.strip() for h in hint.split('|')}
+                try:
+                    hints.remove('None')
+                except ValueError:
+                    pass
+                if len(hints) > 1:
+                    return 'string'
+                hint = hints.pop()
+            if hint and hint.startswith('Optional['):
+                hint = hint[9:-1]
+            if hint:
+                return cls._JUJU_TYPES[str(hint)]
         else:
             # Collapse Optional[] and Union[] and so on to the simpler form.
             if get_origin(raw_hint):
