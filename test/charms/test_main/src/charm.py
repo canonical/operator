@@ -22,11 +22,19 @@ import typing
 import warnings
 
 import ops
+import ops.model
 
 sys.path.append('lib')
 
 
 logger = logging.getLogger()
+
+# Note for ops developers: juju-log doesn't go anywhere useful much of the time
+# during unit tests, and test_main failures that subprocess out are often
+# difficult to debug. Uncomment this line to get more informative errors when
+# running the tests.
+# When uncommented the test_hook_and_dispatch_with_failing_hook test will fail.
+# logger.addHandler(logging.StreamHandler(sys.stderr))
 
 
 class CustomEvent(ops.EventBase):
@@ -134,6 +142,17 @@ class Charm(ops.CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        if 'invalid' in self.config:
+            if self.config['invalid'] == 'invalid':
+                raise ops.model._InvalidSchemaError()
+
+            status = str(self.config['invalid'])
+
+            class Config(ops.ConfigBase):
+                def __init__(self, **_):
+                    raise ValueError(status)
+
+            self.load_config(Config, errors='blocked')
         self._stored.on_config_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         event.defer()
