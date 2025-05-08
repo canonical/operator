@@ -1,78 +1,85 @@
 from __future__ import annotations
 
-from typing import Any
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
+from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
-import ops
-
-from scenario import Context, State
+from scenario import State
 from scenario.state import _Event
+from scenario._runtime import capture_events
+from .helpers import trigger
 
 
-class Foo(ops.EventBase):
+class Foo(EventBase):
     pass
 
 
-class MyCharmEvents(ops.CharmEvents):
-    foo = ops.EventSource(Foo)
+class MyCharmEvents(CharmEvents):
+    foo = EventSource(Foo)
 
 
-class MyCharm(ops.CharmBase):
+class MyCharm(CharmBase):
     META = {'name': 'mycharm'}
-    on = MyCharmEvents()  # type: ignore
+    on = MyCharmEvents()
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.foo, self._on_foo)
 
-    def _on_start(self, _: ops.StartEvent):
+    def _on_start(self, e):
         self.on.foo.emit()
 
-    def _on_foo(self, _: Foo):
+    def _on_foo(self, e):
         pass
 
 
 def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
-    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
-    ctx.run(ctx.on.start(), State())
+    with capture_events(include_framework=True) as emitted:
+        trigger(State(), 'start', MyCharm, meta=MyCharm.META)
 
-    emitted = ctx.emitted_events
     assert len(emitted) == 5
-    assert isinstance(emitted[0], ops.StartEvent)
+    assert isinstance(emitted[0], StartEvent)
     assert isinstance(emitted[1], Foo)
-    assert isinstance(emitted[2], ops.CollectStatusEvent)
-    assert isinstance(emitted[3], ops.PreCommitEvent)
-    assert isinstance(emitted[4], ops.CommitEvent)
+    assert isinstance(emitted[2], CollectStatusEvent)
+    assert isinstance(emitted[3], PreCommitEvent)
+    assert isinstance(emitted[4], CommitEvent)
 
 
 def test_capture_juju_evt():
-    ctx = Context(MyCharm, meta=MyCharm.META)
-    ctx.run(ctx.on.start(), State())
+    with capture_events() as emitted:
+        trigger(State(), 'start', MyCharm, meta=MyCharm.META)
 
-    emitted = ctx.emitted_events
     assert len(emitted) == 2
-    assert isinstance(emitted[0], ops.StartEvent)
+    assert isinstance(emitted[0], StartEvent)
     assert isinstance(emitted[1], Foo)
 
 
 def test_capture_deferred_evt():
-    ctx = Context(MyCharm, meta=MyCharm.META, capture_deferred_events=True)
-    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
-    ctx.run(ctx.on.start(), State(deferred=deferred))
+    # todo: this test should pass with ops < 2.1 as well
+    with capture_events() as emitted:
+        trigger(
+            State(deferred=[_Event('foo').deferred(handler=MyCharm._on_foo)]),
+            'start',
+            MyCharm,
+            meta=MyCharm.META,
+        )
 
-    emitted = ctx.emitted_events
     assert len(emitted) == 3
     assert isinstance(emitted[0], Foo)
-    assert isinstance(emitted[1], ops.StartEvent)
+    assert isinstance(emitted[1], StartEvent)
     assert isinstance(emitted[2], Foo)
 
 
 def test_capture_no_deferred_evt():
-    ctx = Context(MyCharm, meta=MyCharm.META)
-    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
-    ctx.run(ctx.on.start(), State(deferred=deferred))
+    # todo: this test should pass with ops < 2.1 as well
+    with capture_events(include_deferred=False) as emitted:
+        trigger(
+            State(deferred=[_Event('foo').deferred(handler=MyCharm._on_foo)]),
+            'start',
+            MyCharm,
+            meta=MyCharm.META,
+        )
 
-    emitted = ctx.emitted_events
     assert len(emitted) == 2
-    assert isinstance(emitted[0], ops.StartEvent)
+    assert isinstance(emitted[0], StartEvent)
     assert isinstance(emitted[1], Foo)
