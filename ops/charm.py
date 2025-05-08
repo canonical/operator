@@ -33,6 +33,7 @@ from typing import (
     Optional,
     TextIO,
     TypedDict,
+    TypeVar,
     cast,
 )
 
@@ -110,6 +111,9 @@ class HookEvent(EventBase):
     - Storage events
     - Metric events
     """
+
+
+_ActionType = TypeVar('_ActionType')
 
 
 class ActionEvent(EventBase):
@@ -226,6 +230,53 @@ class ActionEvent(EventBase):
             message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
+
+    def load_params(
+        self,
+        cls: type[_ActionType],
+        *args: Any,
+        **kwargs: Any,
+    ) -> _ActionType:
+        """Load the action parameters into an instance of an action class.
+
+        The object will be instantiated with keyword arguments of the raw Juju
+        action parameters for all the options that are found in the class, but
+        with dashes in names converted to underscores.
+
+        Any additional positional or keyword arguments will be passed through to
+        the action class.
+
+        Args:
+            cls: A class that inherits from :class:`ops.ActionBase`.
+            args: positional arguments to pass through to the action class.
+            kwargs: keyword arguments to pass through to the action class.
+
+        Returns:
+            An instance of the action class with the provided parameter values.
+
+        Raises:
+            :class:`InvalidSchemaError` if the configuration is invalid. If this
+                exception is not caught, then an appropriate event failure message
+                is set.
+        """
+        fields = set(cls._param_names())  # type: ignore
+        params: dict[str, Any] = kwargs.copy()
+        for key, value in self.params.items():
+            attr = cls._juju_name_to_attr(key)  # type: ignore
+            assert isinstance(attr, str)
+            if not attr.isidentifier():
+                raise model.InvalidSchemaError(
+                    action_failure=f'Invalid attribute name {attr}',
+                ) from None
+            if attr not in fields:
+                continue
+            params[attr] = value
+        try:
+            return cls(*args, **params)
+        except ValueError as e:
+            raise model.InvalidSchemaError(
+                action_failure=f'Error in action parameters: {e}',
+            ) from None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
