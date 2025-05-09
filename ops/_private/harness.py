@@ -2284,8 +2284,8 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
             raise RuntimeError(
                 f'Unknown config option {key}; '
                 'not declared in `config.yaml`.'
-                'Check https://juju.is/docs/sdk/config for the '
-                'spec.'
+                'For help, see:'
+                'https://ops.readthedocs.io/en/latest/howto/manage-configurations.html'
             )
 
         declared_type = option.get('type')
