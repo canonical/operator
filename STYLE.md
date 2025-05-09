@@ -131,10 +131,188 @@ if status is not pebble.ServiceStatus.ACTIVE:
 
 ## Docs and docstrings
 
-See the [Pebble doc style guide](https://github.com/canonical/pebble/blob/master/STYLE.md#docs-and-docstrings).
+### Tones
 
-### Use British English
+#### Avoid negative, be positive
+
+State conditions positively as what should happen, rather than what shouldn't. Focus on desired behaviour, and frame instructions and conditions around the expected or successful outcome, not failure cases.
+
+Example:
+
+- Avoid: "If the command doesn’t exit within 1 second, the start is considered successful." (Netagive)
+- Prefer: "If the command stays running for the 1-second window, the start is considered successful." (Positive)
+
+Exceptions: Only use negative phrasing (e.g., "if X does not happen") when:
+
+- The failure case is the primary concern (e.g., error handling).
+- The positive phrasing is awkward or less clear.
+
+#### Avoid passive, be active
+
+Use the active voice as much as possible.
+
+We should only use the passive voice when we don't know or care about who performed the action.
+
+Example:
+
+- Avoid: "A minimum check is created using the default values"
+- Prefer: "We create a minimum check, using the default values"
+
+#### Avoid subjective, be objective
+
+Instead of using words like "easy," "simple," or "just," which are very subjective and assume the reader's skill level, describe the action directly by stating what to do and focusing on concrete steps.
+
+Examples:
+
+- Avoid: "This can be done easily using ..."
+- Prefer: "This can be done using ..."
+
+- Avoid: "This can be easily configured by ..."
+- Prefer: "We can configure this using ..."
+
+- Avoid: "Simply run the command ..."
+- Prefer: "Run the command ..."
+
+### Structure
+
+#### Be short
+
+For example, a very long introduction part of a how-to guide or a tutorial probably isn't necessary; it's good if we are writing a blog post or a book, but not so much for a tutorial/how-to guide type of doc.
+
+#### Be concise and reduce repetition
+
+Trim repetitive titles: Avoid repeating the name if the surrounding content already provides context.
+
+For example, in the doc "how to use pebble", the section names can simply be "API", "CLI commands", "Features", etc., instead of "Pebble API", "Pebble CLI commands", "Pebble features".
+
+#### Order: alphanumeric or logical
+
+We can either use an alphanumeric order, or a logical order, depending on the context.
+
+Alphanumeric order is better in the case of a reference doc or a list (e.g., an Enum).
+
+Example (Enum):
+
+- Prefer: `["autostart", "replan", "restart", "start", "stop"]`
+- Avoid: `["start", "stop", "restart", "replan", "autostart"]`
+
+Example (A list of commands):
+
+Avoid:
+
+- `pebble ls`
+- `pebble mkdir`
+- `pebble rm`
+- `pebble push`
+- `pebble pull`
+
+Prefer:
+
+- `pebble ls`
+- `pebble mkdir`
+- `pebble pull`
+- `pebble push`
+- `pebble rm`
+
+Exceptions:
+
+- If there's a strong logical progression (e.g., "low", "medium", "high"; or a list of things that you should read in that particular order).
+- If there is already an exception in the current documentation, follow existing conventions.
+
+### Content
+
+#### Use British English
 
 [Canonical's documentation style](https://docs.ubuntu.com/styleguide/en/) uses British spelling, which we try to follow here. For example: "colour" rather than "color", "labelled" rather than "labeled", "serialise" rather than "serialize", and so on.
 
 It's a bit less clear when we're dealing with code and APIs, as those normally use US English, for example, `pytest.mark.parametrize`, and `color: #fff`.
+
+#### Spell out abbreviations
+
+Abbreviations and acronyms in docstrings should usually be spelled out:
+
+- "for example" rather than "e.g."
+- "that is" rather than "i.e."
+- "and so on" rather than "etc"
+- "unit testing" rather than UT, and so on
+
+However, it's okay to use acronyms that are very well known in our domain, like HTTP or JSON or RPC.
+
+#### Use sentence case in headings
+
+`## Use sentence case for headings`, instead of `## Use Title Case for Headings`.
+
+#### Be consistent
+
+Be consistent in every possible way as much as possible, and stay context-consistent.
+
+Choice of words: For example, if the whole document uses "mandatory", you probably shouldn't use "required" in a newly added paragraph. For another example, if the whole doc uses "list foo" when adding new content, don't use "get a list of bar".
+
+Headings/lists: For example, if a doc is called "How to use Pebble", with sections "API", "CLI commands", "Health checks", and "Specification", use the heading "Environment variables" for a new section about environment variables, instead of the heading "Pebble environment variables".
+
+#### Be precise
+
+Be precise in names and verbs. Use precise verbs to describe the behaviour. For example, the appropriate description of `/v1/services` is "list services", while "get a service" is probably a better fit for `/v1/services/{name}`.
+
+Split distinct ideas: Use separate sentences/clauses and avoid cramming. Don’t merge unrelated details (e.g., parameter format + default behaviour) into a single phrase.
+
+Example:
+
+- Avoid: "The names of the services to get, a comma-separated string. If empty, get all services."
+- Prefer: "The names of the services to get. Specify multiple times for multiple values. If omitted, the method returns all services." (In three short precise sentences we've covered what the parameter does, usage details, and behavioral details.)
+
+Example:
+
+- Avoid: "For reference information about the API, see [API and clients] and [API]." (What's the difference of these two?)
+- Prefer: "For an explanation of API access levels, see [API and clients]. For the full API reference, see [API reference]." (Clear)
+
+#### Don't over-promote
+
+Avoid overstatement: Only use adjectives like "comprehensive", "powerful", or "robust" when the feature truly meets the description.
+
+Example:
+
+- Avoid: "Pebble provides a comprehensive health check feature"
+- Prefer: "Pebble provides a health check feature"
+
+Let features speak for themselves, describe actual capabilities and use measurable terms when possible (e.g., "supports 3 types of checks" instead of "versatile checking")
+
+Future-proofing:
+
+- Avoid absolute terms unless permanently true
+- Qualify with "currently" when describing evolving features
+
+#### Avoid implementation-specific terminology
+
+Use generic descriptions instead of what's specific to the code. Focus on behaviour, not internal implementation: Describe what it does (e.g., "returns an error message") rather than how a particular implementation works.
+
+Example:
+
+- Avoid: "`Change.Err` will be non-empty if the change had an error." (Code-specific)
+- Prefer: "The `err` field in the response will contain an error message if the operation failed." (General)
+
+Exception: If documenting a client library (e.g., Go/Python SDKs), implementation details are appropriate.
+
+#### Articles
+
+"a" or "the", generic or specific, choose carefully. When describing generic parameters or behavior:
+
+- Avoid: "The format of the duration string is a sequence of decimal numbers"
+- Prefer: "The format of a duration string is a sequence of decimal numbers." (Describing a generic parameter, not a specific one.)
+
+- Avoid: "Restart the service when the health check fails."
+- Prefer: "Restart a service when the health check fails." (When describing a generic behaviour, no specific service is implied.)
+
+
+### Code blocks
+
+- Consistency: the styles of code blocks and terminal output samples should be the same, at least within the same document.
+- Preferred style: Use `{code-block}` when showing files. Use `{terminal}` (`.rst` style) when showing commands or terminal output. Avoid using `{code-block}` for commands or terminal output, unless it's consistent with the existing content in the same document.
+- Highlighting: Use `:emphasize-lines: 8-10` with `{code-block}` for highlighting lines in files when necessary. Don't add an inconsistent `{code-block}` so that you can highlight lines in commands or terminal output. Instead, use `{terminal}` along with helpful words and comments.
+
+### YAML
+
+- Types: Handle strings and integers carefully. For example, if the field "change" is a string in the code, use `change: "1"` in the YAML example, not `change: 1`.
+- Use quotes for strings: This is especially important if a string contains special characters or starts with a number.
+- Indentation: Always use spaces and be consistent with the number of spaces throughout the same file (usually, this should be two or four).
+- Use comments: Comments will help you and others understand what that data is used for.
