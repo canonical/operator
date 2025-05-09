@@ -72,7 +72,8 @@ class OpsExampleCharm(ops.CharmBase):
         Change this example to suit your needs. You'll need to specify the right entrypoint and
         environment configuration for your specific workload.
 
-        Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble.
+        Learn more about interacting with Pebble at
+            https://ops.readthedocs.io/en/latest/reference/pebble.html
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
