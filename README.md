@@ -80,8 +80,8 @@ class OpsExampleCharm(ops.CharmBase):
         container.add_layer("httpbin", self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
-        # Learn more about statuses in the SDK docs:
-        # https://juju.is/docs/sdk/constructs#heading--statuses
+        # Learn more about statuses at
+        # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.ActiveStatus()
 ```
 
