@@ -2,7 +2,7 @@
 
 This document explains the processes and practices recommended for contributing enhancements to Ops.
 
-- Generally, before developing enhancements, you should consider [opening an issue](https://github.com/canonical/operator) explaining your use case.
+- Generally, before developing enhancements, you should consider [opening an issue](https://github.com/canonical/operator/issues) explaining your use case.
 
 - If you would like to chat with us about your use-cases or proposed implementation, you can reach us at [Charm Development on Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
 
