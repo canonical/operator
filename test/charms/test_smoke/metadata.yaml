@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # For a complete list of supported options, see:
-# https://juju.is/docs/sdk/metadata-reference
+# https://canonical-charmcraft.readthedocs-hosted.com/en/latest/reference/files/metadata-yaml-file/
 name: smoke
 display-name: |
   smoke

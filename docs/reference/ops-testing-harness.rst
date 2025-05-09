@@ -28,7 +28,7 @@ The Harness API includes:
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+    on testing charms, see :doc:`/explanation/testing`.
 
 
 .. autoclass:: ops.testing.ActionFailed

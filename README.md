@@ -72,7 +72,8 @@ class OpsExampleCharm(ops.CharmBase):
         Change this example to suit your needs. You'll need to specify the right entrypoint and
         environment configuration for your specific workload.
 
-        Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble.
+        Learn more about interacting with Pebble at
+            https://ops.readthedocs.io/en/latest/reference/pebble.html
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
@@ -80,8 +81,8 @@ class OpsExampleCharm(ops.CharmBase):
         container.add_layer("httpbin", self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
-        # Learn more about statuses in the SDK docs:
-        # https://juju.is/docs/sdk/constructs#heading--statuses
+        # Learn more about statuses at
+        # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.ActiveStatus()
 ```
 
