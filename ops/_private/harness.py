@@ -2281,10 +2281,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         # has the expected type.
         option = self._spec.get('options', {}).get(key)
         if not option:
-            raise RuntimeError(
-                f'Unknown config option {key}; '
-                'not declared in `config.yaml`.'
-            )
+            raise RuntimeError(f'Unknown config option {key}; not declared in `config.yaml`.')
 
         declared_type = option.get('type')
         if not declared_type:
