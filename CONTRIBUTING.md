@@ -1,6 +1,6 @@
 # Contributing
 
-This documents explains the processes and practices recommended for contributing enhancements to Ops.
+This document explains the processes and practices recommended for contributing enhancements to Ops.
 
 - Generally, before developing enhancements, you should consider [opening an issue](https://github.com/canonical/operator) explaining your use case.
 
