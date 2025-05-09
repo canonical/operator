@@ -1911,8 +1911,8 @@ class JujuAssumesCondition(enum.Enum):
 class JujuAssumes:
     """Juju model features that are required by the charm.
 
-    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
-    list of available features.
+    See the `Charmcraft docs <https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#assumes>`_
+    for a list of available features.
     """
 
     features: list[str | JujuAssumes]
