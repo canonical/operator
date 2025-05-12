@@ -235,6 +235,7 @@ class ActionEvent(EventBase):
         self,
         cls: type[_ActionType],
         *args: Any,
+        errors: Literal['raise', 'fail'] = 'raise',
         **kwargs: Any,
     ) -> _ActionType:
         """Load the action parameters into an instance of an action class.
@@ -248,6 +249,10 @@ class ActionEvent(EventBase):
 
         Args:
             cls: A class that inherits from :class:`ops.ActionBase`.
+            errors: determines how errors instantiating the class are handled.
+                If set to ``raise``, a ValueError will be raised if the class
+                cannot be instantiated. If set to ``fail``, the action will be
+                marked as failed with an appropriate failure message.
             args: positional arguments to pass through to the action class.
             kwargs: keyword arguments to pass through to the action class.
 
@@ -255,9 +260,8 @@ class ActionEvent(EventBase):
             An instance of the action class with the provided parameter values.
 
         Raises:
-            :class:`InvalidSchemaError` if the configuration is invalid. If this
-                exception is not caught, then an appropriate event failure message
-                is set.
+            ValueError: if ``errors`` is set to ``raise`` and instantiating the
+                action class raises a ValueError.
         """
         fields = set(cls._param_names())  # type: ignore
         params: dict[str, Any] = kwargs.copy()
@@ -265,18 +269,24 @@ class ActionEvent(EventBase):
             attr = cls._juju_name_to_attr(key)  # type: ignore
             assert isinstance(attr, str)
             if not attr.isidentifier():
-                raise model.InvalidSchemaError(
+                if errors == 'raise':
+                    raise ValueError(
+                        f'Invalid attribute name {attr}',
+                    )
+                raise model._InvalidSchemaError(
                     action_failure=f'Invalid attribute name {attr}',
-                ) from None
+                )
             if attr not in fields:
                 continue
             params[attr] = value
         try:
             return cls(*args, **params)
         except ValueError as e:
-            raise model.InvalidSchemaError(
+            if errors == 'raise':
+                raise
+            raise model._InvalidSchemaError(
                 action_failure=f'Error in action parameters: {e}',
-            ) from None
+            ) from e
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'

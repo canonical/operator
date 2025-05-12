@@ -17,6 +17,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
+import sys
 from typing import Any
 
 import pytest
@@ -28,7 +29,6 @@ except ImportError:
     pydantic = None
 
 import ops
-import ops._main
 import ops._private.yaml
 from ops import testing
 
@@ -89,7 +89,7 @@ class MyCharm(ops.CharmBase):
         framework.observe(self.on['my-action'].action, self._on_action)
 
     def _on_action(self, event: ops.ActionEvent):
-        params = event.load_params(MyAction)
+        params = event.load_params(MyAction, errors='fail')
         # These should not have any type errors.
         assert params.my_float is not None
         new_float = params.my_float + 2006.8
@@ -132,7 +132,7 @@ class MyDataclassCharm(ops.CharmBase):
         framework.observe(self.on['my-dataclass-action'].action, self._on_action)
 
     def _on_action(self, event: ops.ActionEvent):
-        params = event.load_params(MyDataclassAction)
+        params = event.load_params(MyDataclassAction, errors='fail')
         # These should not have any type errors.
         assert params.my_float is not None
         new_float = params.my_float + 2006.8
@@ -177,7 +177,7 @@ if pydantic:
             framework.observe(self.on['my-pydantic-dataclass-action'].action, self._on_action)
 
         def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(MyDataclassAction)
+            params = event.load_params(MyDataclassAction, errors='fail')
             # These should not have any type errors.
             assert params.my_float is not None
             new_float = params.my_float + 2006.8
@@ -224,7 +224,7 @@ if pydantic:
             framework.observe(self.on['my-pydantic-base-model-action'].action, self._on_action)
 
         def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(MyDataclassAction)
+            params = event.load_params(MyDataclassAction, errors='fail')
             # These should not have any type errors.
             assert params.my_float is not None
             new_float = params.my_float + 2006.8
@@ -307,8 +307,9 @@ def test_action_with_error(
     harness = testing.Harness(charm_class, actions=actions)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    with pytest.raises(ops.InvalidSchemaError):
+    with pytest.raises(ops.model._InvalidSchemaError) as cm:
         harness.run_action(action_name, params={'my-str': 'foo', 'my-int': -1})
+    assert cm.value.action_failure
 
 
 def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
@@ -364,13 +365,8 @@ def test_action_bad_attr_naming_pattern(request: pytest.FixtureRequest):
             framework.observe(self.on['bad-action'].action, self._on_action)
 
         def _on_action(self, event: ops.ActionEvent):
-            params = {}
-            action_meta = self.meta.actions['bad-action']
-            for name, meta in action_meta.parameters.items():
-                if 'default' in meta:
-                    params[name] = meta['default']
             event.load_params(BadAction)
-            assert True, 'The event handler should not continue'
+            assert False, 'The event handler should not continue'
 
     action_schema = BadAction.to_juju_schema()
     assert 'foo-bar' in action_schema['bad-action']['params']
@@ -378,7 +374,7 @@ def test_action_bad_attr_naming_pattern(request: pytest.FixtureRequest):
     harness = testing.Harness(BadCharm, actions=actions)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    with pytest.raises(ops.InvalidSchemaError):
+    with pytest.raises(ValueError):
         harness.run_action('bad-action')
 
 
@@ -511,6 +507,7 @@ class Rebalance(ops.ActionBase):
     """The operation to issue to the balancer."""
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason='Requires Python 3.9 or higher')
 def test_action_enum():
     generated_yaml = Rebalance.to_juju_schema()
     expected_yaml = {

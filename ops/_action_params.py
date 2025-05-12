@@ -18,13 +18,10 @@ from __future__ import annotations
 
 import dataclasses
 import enum
-import importlib
-import pathlib
 import re
-import sys
-from typing import Any, ClassVar, Generator
+from typing import Any, ClassVar, Generator, get_args, get_origin, get_type_hints
 
-from ._private import attrdocs, yaml
+from ._private import attrdocs
 
 
 class ActionBase:
@@ -79,10 +76,6 @@ class ActionBase:
             def _on_add_admin_user(self, event: ops.ActionEvent):
                 params = event.load_params(AddAdminUser)
                 ...
-
-    If the params provided by Juju are not valid, the action will fail and exit
-    the hook when the class is initialised, using the ``str()`` of the exception
-    raised as the failure message.
     """
 
     # We currently only handle the basic types that we expect to see in real
@@ -92,48 +85,84 @@ class ActionBase:
         'bool': 'boolean',
         'int': 'integer',
         'float': 'number',
-        'list': 'array',
-        'list[str]': 'array',
-        'list[bool]': 'array',
-        'list[int]': 'array',
-        'list[float]': 'array',
         "<class 'str'>": 'string',
         "<class 'bool'>": 'boolean',
         "<class 'int'>": 'integer',
         "<class 'float'>": 'number',
         "<class 'list'>": 'array',
+        "<class 'tuple'>": 'array',
+        'list[bool]': 'array',
+        'list[int]': 'array',
+        'list[float]': 'array',
+        'list[str]': 'array',
     }
 
     @classmethod
-    def _attr_to_json_type(cls, attr: str, default: Any = None) -> str:
-        """Provide the appropriate type for the action JSONSchema for the given attribute.
+    def __python_38_attr_to_json_type(cls, name: str) -> str | None:
+        """Like _attr_to_json_type, but for Python 3.8.
 
-        Raises:
-            ValueError: if an appropriate type cannot be found.
+        In Python 3.8, get_type_hints() fails with new-style type annotations,
+        even with __future__ annotations is used. This provides a reasonable
+        effort fallback.
         """
-        types = cls.__annotations__.copy()
-        for parent in cls.__mro__:
-            if not hasattr(parent, '__annotations__'):
-                continue
-            for n, t in parent.__annotations__.items():
-                if n not in types:
-                    types[n] = t
+        hint = cls.__annotations__.get(name)
+        if hint and '|' in hint:
+            hints = {h.strip() for h in hint.split('|')}
+            try:
+                hints.remove('None')
+            except ValueError:
+                pass
+            if len(hints) > 1:
+                return 'string'
+            hint = hints.pop()
+        if hint and hint.startswith('Optional['):
+            hint = hint[9:-1]
+        return hint
+
+    @classmethod
+    def _attr_to_json_type(cls, name: str, default: Any = None) -> str:
+        """Provide the appropriate type for the config YAML for the given attribute.
+
+        If an appropriate type cannot be determined, fall back to "string".
+        """
         try:
-            hint = str(types[attr])
-        except (KeyError, ValueError):
-            # If there's a default value, use that object's type.
-            if default is not None and type(default).__name__ in cls._JSON_TYPES:
-                return cls._JSON_TYPES[type(default).__name__]
-            raise ValueError(f'{attr!r} type is unknown.') from None
-        if hint not in cls._JSON_TYPES:
-            raise ValueError(f'{attr!r} type ({hint!r}) is unknown.') from None
-        return cls._JSON_TYPES[hint]
+            raw_hint = get_type_hints(cls)[name]
+        except KeyError:
+            pass
+        except TypeError:
+            hint = cls.__python_38_attr_to_json_type(name)
+            if hint:
+                return cls._JSON_TYPES[str(hint)]
+        else:
+            # Collapse Optional[] and Union[] and so on to the simpler form.
+            origin = get_origin(raw_hint)
+            if origin in (list, tuple):
+                return cls._JSON_TYPES[str(origin)]
+            elif origin:
+                hints = {arg for arg in get_args(raw_hint) if str(arg) in cls._JSON_TYPES}
+            else:
+                hints = {raw_hint}
+            # If there are multiple types -- for example, the type annotation is
+            # `int | str` -- then we can't determine the type, and we fall back
+            # to "string", even if `str` is not in the type hint, because our
+            # "we can't determine the type" choice is always "string".
+            if len(hints) > 1:
+                return 'string'
+            elif hints:
+                return cls._JSON_TYPES[str(hints.pop())]
+        # If there's a default value, use that object's type.
+        if default is not None:
+            return cls._JSON_TYPES.get(type(default).__name__, 'string')
+        # If we can't figure it out, then use "string", which should be the most
+        # compatible, and most likely to be used for arbitrary types. Charms can
+        # override `to_juju_schema` to adjust this if required.
+        return 'string'
 
     @staticmethod
     def _attr_to_juju_name(attr: str):
         """Convert from the class attribute name to the name used in the schema.
 
-        Python names are snake_case, but Juju config option names should be
+        Python names are snake_case, but Juju action parameter names should be
         kebab-case.
         """
         return attr.replace('_', '-')
@@ -142,7 +171,7 @@ class ActionBase:
     def _juju_name_to_attr(attr: str):
         """Convert from the name used in the schema to the class attribute name.
 
-        Python names are snake_case, but Juju config option names should be
+        Python names are snake_case, but Juju action parameter names should be
         kebab-case.
         """
         return attr.replace('-', '_')
@@ -157,26 +186,62 @@ class ActionBase:
         return re.sub(r'(?<!^)([A-Z])', r'-\1', cls.__name__).lower()
 
     @classmethod
-    def _param_names(cls) -> Generator[str, None, None]:
-        """Iterates over all the param names to include in the action YAML.
-
-        By default, this is ``dir(cls)``, any keys from ``cls.__annotations``,
-        and any keys from ``cls.__dataclass_fields__``, excluding any callables
-        and any names that start with an underscore, and the ``JSON_TYPES``
-        name.
-        """
+    def _param_names(cls) -> Generator[str]:
+        """Iterates over all the param names to include in the action YAML."""
+        try:
+            yield from (field.name for field in dataclasses.fields(cls))  # type: ignore
+        except TypeError:
+            pass
+        else:
+            return
+        if hasattr(cls, 'model_fields'):
+            yield from iter(cls.model_fields)  # type: ignore
+            return
+        # Fall back to using dir() and __annotations__.
         attrs = dir(cls)
-        attrs.extend(cls.__annotations__)
-        # TODO: this can probably be dataclasses.fields().
-        if hasattr(cls, '__dataclass_fields__'):
-            attrs.extend(cls.__dataclass_fields__)  # type: ignore
+        attrs.extend((a for a, t in cls.__annotations__.items() if get_origin(t) is not ClassVar))
         for attr in set(attrs):
             if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
                 continue
-            # Perhaps we should ignore anything that's typing.ClassVar?
-            if attr == 'JSON_TYPES':
-                continue
             yield attr
+
+    @classmethod
+    def _attr_to_default(cls, name: str) -> tuple[Any, bool]:
+        """Get the default value for the attribute.
+
+        Return an appropriate default value for the attribute, and whether it is
+        required.
+        """
+        required = True
+        try:
+            default = getattr(cls, name)
+        except AttributeError:
+            try:
+                fields = {field.name: field for field in dataclasses.fields(cls)}  # type: ignore
+            except TypeError:
+                default = None
+            else:
+                field = fields[name]
+                if field.default != dataclasses.MISSING:
+                    default = field.default
+                    required = False
+                elif field.default_factory != dataclasses.MISSING:
+                    default = field.default_factory()
+                    required = False
+                else:
+                    default = None
+        else:
+            if default is not None:
+                required = False
+        if hasattr(default, 'default_factory') and callable(default.default_factory):  # type: ignore
+            default = default.default_factory()  # type: ignore
+        if hasattr(default, 'is_required'):
+            required = default.is_required()  # type: ignore
+            assert isinstance(required, bool)
+        if str(type(default)) not in cls._JSON_TYPES:  # type: ignore
+            default = None
+            required = True
+        return default, required
 
     @classmethod
     def _to_json_schema(cls) -> tuple[dict[str, Any], list[str]]:
@@ -199,8 +264,9 @@ class ActionBase:
         #   * 'object': 1
         # Only one charm has a `properties' field that further defines the
         # parameter. It seems reasonable to handle all of the simple cases and
-        # require anyone using anything more complicated to subclass this method
-        # and provide their own details (or to use a Pydantic class).
+        # require anyone using anything more complicated to subclass
+        # to_juju_schema and provide their own details (or to use a Pydantic
+        # class).
 
         # Pydantic classes provide this, so we can just get it directly.
         if hasattr(cls, 'schema'):
@@ -211,44 +277,22 @@ class ActionBase:
         params: dict[str, Any] = {}
         required_params: list[str] = []
         for attr in cls._param_names():
-            required = True
             param = {}
-            try:
-                default = getattr(cls, attr)
-            except AttributeError:
-                # TODO: probably this can use dataclasses.fields() instead.
-                if hasattr(cls, '__dataclass_fields__'):
-                    try:
-                        field = cls.__dataclass_fields__[attr]  # type: ignore
-                    except KeyError:
-                        default = None
-                    else:
-                        if field.default != dataclasses.MISSING:  # type: ignore
-                            default = field.default  # type: ignore
-                            required = False
-                        elif field.default_factory != dataclasses.MISSING:  # type: ignore
-                            default = field.default_factory()  # type: ignore
-                            required = False
-                        else:
-                            default = None
-                else:
-                    default = None
-            else:
-                required = False
-            if hasattr(default, 'default_factory') and callable(default.default_factory):  # type: ignore
-                default = default.default_factory()  # type: ignore
-            if hasattr(default, 'is_required'):  # type: ignore
-                required = default.is_required()  # type: ignore
-            if type(default).__name__ in cls._JSON_TYPES:  # type: ignore
+            default, required = cls._attr_to_default(attr)
+            if default is not None:
                 param['default'] = default
+
             try:
-                hint_obj = sys.modules[cls.__module__].__dict__[cls.__annotations__[attr]]
-            except KeyError:
-                param['type'] = cls._attr_to_json_type(attr, default)
+                hint_obj = get_type_hints(cls)[attr]
+            except TypeError:
+                # We can't handle enums in Python 3.8.
+                hint_obj = None
+            if isinstance(hint_obj, type) and issubclass(hint_obj, enum.Enum):
+                param['type'] = 'string'
+                param['enum'] = [m.value for m in hint_obj.__members__.values()]
             else:
-                if issubclass(hint_obj, enum.Enum):
-                    param['type'] = 'string'
-                    param['enum'] = [m.value for m in hint_obj.__members__.values()]
+                param['type'] = cls._attr_to_json_type(attr, default)
+
             doc = attr_docs.get(attr)
             if doc:
                 param['description'] = doc
@@ -309,28 +353,3 @@ class ActionBase:
         action['additionalProperties'] = False
         action_name = cls._class_to_action_name()
         return {action_name: action}
-
-
-def generate_juju_schema():
-    """Look for all ActionBase subclasses and generate their YAML schema.
-
-    .. caution::
-
-        This imports modules, so is not safe to run on untrusted code.
-    """
-    actions: dict[str, Any] = {}
-    for name in pathlib.Path('src').glob('*.py'):
-        module_name = name.stem
-        module = importlib.import_module(f'src.{module_name}')
-        for attr_name in dir(module):
-            obj = getattr(module, attr_name)
-            if hasattr(obj, '_to_json_schema'):
-                actions.update(obj.to_juju_schema())
-    print(yaml.safe_dump(actions))
-
-
-if __name__ == '__main__':
-    generate_juju_schema()
-
-# TODO: if __future__ annotations is not used, check if everything works, or
-# make that an explicit requirement.
