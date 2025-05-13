@@ -525,3 +525,7 @@ def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest
 # TODO: Add back some Scenario tests.
 # TODO: Add a test that verifies that the order of dictionary keys does not change
 # on read then write (this would trigger relation-changed unnecessarily).
+# TODO: add a test that has the common Pydantic types: AnyHttpUrl or HttpUrl,
+# IPvAnyAddress (ipaddress.IPv4Address|ipaddress.IPv6Address) for non-Pydantic, IPvAnyNetwork.
+# TODO: add a test that uses enums.
+# TODO: add a test that validates a combination of fields.
