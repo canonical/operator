@@ -58,8 +58,8 @@ from typing import (
     get_args,
 )
 
+from . import _relationdata, pebble
 from . import charm as _charm
-from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
@@ -351,7 +351,6 @@ class _ModelCache:
         self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
             collections.defaultdict(dict)
         )
-        self._databag_obj_cache: dict[tuple[int, Application | Unit], Any] = {}
         # (entity type, name): instance.
         self._weakrefs: weakref.WeakValueDictionary[
             tuple[UnitOrApplicationType, str], Unit | Application | None
@@ -1778,70 +1777,83 @@ class Relation:
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
 
-    def load_data(
+    def load(
         self,
         cls: type[_InterfaceType],
         app_or_unit: Unit | Application,
         *args: Any,
         decoder: Callable[[Any], Any] | None = None,
-        encoder: Callable[[Any], Any] | None = None,
         **kwargs: Any,
     ) -> _InterfaceType:
-        """Load the data for this relation into an instance of a databag class.
+        """Load the data for this relation into an instance of a data class.
 
-        The object will be instantiated with the data from the relation databag.
-        If the app or unit data has already been loaded into an object, then the
-        same object is returned (and the decoder, encoder and positional and
-        keyword arguments passed in this call are not used).
+        The object will be instantiated with the Juju relation data, passed as
+        keyword arguments.
 
         Any additional positional or keyword arguments will be passed through to
-        the databag class.
+        the data class.
 
         Args:
-            cls: A class that inherits from :class:`ops.DatabagBase`.
-            app_or_unit: The databag to load. This can be either a :class:`Unit`
+            cls: A class that inherits from :class:`ops.RelationDataBase`.
+            app_or_unit: The data to load. This can be either a :class:`Unit`
                 or :class:`Application` instance.
             decoder: An optional callable that will be used to decode each field
                 before loading into the class. If not provided, json.loads will
                 be used.
-            encoder: An optional callable that will be used to encode each field
-                before passing to Juju. If not provided, json.dumps will be
-                used.
-            args: positional arguments to pass through to the databag class.
-            kwargs: keyword arguments to pass through to the databag class.
+            args: positional arguments to pass through to the data class.
+            kwargs: keyword arguments to pass through to the data class.
 
         Returns:
-            An instance of the databag class with the current relation data values.
-
-        Raises:
-            TypeError: if the same app or unit data is already loaded into a
-                different databag class.
-            InvalidSchemaError: if the databag class cannot be instantiated with the
-                provided data.
+            An instance of the data class with the current relation data values.
         """
-        # If we have already created an object connected to the databag, then
-        # we need to return the same object, so that users can't make conflicting
-        # changes that we would need to resolve when sending the data to Juju.
-        if (self.id, app_or_unit) in self._cache._databag_obj_cache:
-            obj = self._cache._databag_obj_cache[self.id, app_or_unit][0]
-            if type(obj) is not cls:
-                raise TypeError(
-                    f'Cannot load data for {app_or_unit} into {cls.__name__}, '
-                    f'it is already loaded into {type(obj).__name__}'
-                )
-            return obj
         data = copy.deepcopy(kwargs)
         if decoder is None:
             decoder = json.loads
         content = {k: decoder(v) for k, v in self.data[app_or_unit].items()}
         data.update(**content)
-        try:
-            obj = cls(*args, **data)
-        except ValueError as e:
-            self._backend.status_set('waiting', f'Error in relation data: {e}')
-            raise InvalidSchemaError() from e
-        self._cache._databag_obj_cache[self.id, app_or_unit] = obj, decoder, encoder
-        return obj
+        return cls(*args, **data)
+
+    def save(
+        self,
+        obj: _relationdata.RelationDataBase,
+        app_or_unit: Unit | Application,
+        encoder: Callable[[Any], Any] | None = None,
+    ):
+        """Save the data for the provided class to Juju relation data.
+
+        Args:
+            obj: A object of a class that inherits from :class:`ops.RelationDataBase`.
+            app_or_unit: The data to load. This can be either a :class:`Unit`
+                or :class:`Application` instance.
+            encoder: An optional callable that will be used to encode each field
+                before passing to Juju. If not provided, json.dumps will be
+                used.
+        """
+        if encoder is None:
+            encoder = json.dumps
+        if hasattr(obj, '__dataclass_fields__'):
+            # A standard library dataclass or Pydantic dataclass.
+            fields = (field.name for field in dataclasses.fields(obj))  # type: ignore
+            values = dataclasses.asdict(obj)  # type: ignore
+        elif hasattr(obj, 'model_fields'):
+            # A Pydantic model.
+            fields = obj.model_fields  # type: ignore
+            values = obj.model_dump()  # type: ignore
+        else:
+            # We're not sure, so do a best guess.
+            fields = [attr for attr in dir(obj) if not attr.startswith('_') and not callable(attr)]
+            fields.extend(obj.__annotations__)
+            values = {field: getattr(obj, field) for field in fields}
+        data: dict[str, str] = {}
+        for field in fields:  # type: ignore
+            assert isinstance(field, str)
+            value = encoder(values[field])
+            if not isinstance(field, str):
+                raise ValueError(
+                    f'The value for "{field}" must be a string, not {type(field).__name__}'
+                )
+            data[field] = value
+        self._backend.update_relation_data(self.id, app_or_unit, data)
 
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
@@ -2031,20 +2043,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend.update_relation_data(
             relation_id=self.relation.id, entity=self._entity, data=data
         )
-        # If there is also a databag object bound to this set of data, then
-        # update that as well.
-        if not self._cache:
-            return
-        try:
-            databag = self._cache._databag_obj_cache[self.relation.id, self._entity][0]
-        except KeyError:
-            return
-        # Note that the databag doesn't support removing attributes. Note also
-        # that the value here is not automatically encoded - doing that via the
-        # relation.data approach would be too magic and likely unexpected. The
-        # caller is responsible for encoding the value if necessary.
-        for key, value in data.items():
-            setattr(databag, key, value)
 
     def _update_cache(self, data: Mapping[str, str]) -> None:
         """Cache key:value in our local lazy data."""
@@ -2061,15 +2059,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __getitem__(self, key: str) -> str:
         self._validate_read()
-        # If there is also a databag object bound to this set of data, then
-        # prefer its value over our own cache.
-        if self._cache:
-            try:
-                databag = self._cache._databag_obj_cache[self.relation.id, self._entity][0]
-            except KeyError:
-                pass
-            else:
-                return getattr(databag, key, self._data[key])
         return super().__getitem__(key)
 
     def update(

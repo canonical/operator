@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import dataclasses
 import enum
-import json
 import logging
 import pathlib
 import warnings
@@ -1434,29 +1433,6 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     unit = charm.unit
     if unit._collected_statuses:
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
-
-
-def _send_databag_to_juju(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
-    for (relation_id, entity), (obj, _, encoder) in charm.model._cache._databag_obj_cache.items():
-        if encoder is None:
-            encoder = json.dumps
-        if hasattr(obj, '__dataclass_fields__'):
-            # A standard library dataclass or Pydantic dataclass.
-            fields = (field.name for field in dataclasses.fields(obj))
-            values = dataclasses.asdict(obj)
-        elif hasattr(obj, 'model_fields'):
-            # A Pydantic model.
-            fields = obj.model_fields
-            values = obj.model_dump()
-        else:
-            # We're not sure, so do a best guess.
-            fields = [attr for attr in dir(obj) if not attr.startswith('_') and not callable(attr)]
-            fields.extend(obj.__annotations__)
-            values = {field: getattr(obj, field) for field in fields}
-        data = {field: encoder(values[field]) for field in fields}
-        charm.model._backend.update_relation_data(
-            relation_id=relation_id, entity=entity, data=data
-        )
 
 
 class CharmMeta:

@@ -17,23 +17,22 @@
 from __future__ import annotations
 
 
-class DatabagBase:
-    """Base class for strongly typed relation databags.
+class RelationDataBase:
+    """Base class for strongly typed relation data.
 
-    Use :class:`DatabagBase` as a base class for your databag class. For example::
+    Use ``RelationDataBase`` as a base class for your data class. For example::
 
         @dataclasses.dataclass
-        class MyDatabag(DatabagBase):
-            foo: str
-            bar: int
-            baz: list[str] = dataclasses.field(default_factory=list)
+        class UUCPData(RelationDataBase):
+            protocol: str
+            identification: str
+            retry_limit: int
 
     .. note::
 
-        This is a dataclass, but can be any object that inherits from
-        ``ops.DatabagBase``, and can be initialised with the raw Juju databag
-        content passed as keyword arguments. Any errors should be indicated by
-        raising ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
+        The class will be initialised with the raw Juju databag content passed
+        as keyword arguments. Any errors should be indicated by raising
+        ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
 
     Use this in your charm class like so::
 
@@ -41,15 +40,7 @@ class DatabagBase:
             ...
             def _on_relation_event(self, event: ops.RelationEvent):
                 relation = event.relation
-                data = relation.load_data(MyDatabag, self.app)
-
-    If the data provided by Juju is not valid, the charm will exit after setting
-    a waiting status with an error message based on the ``str()`` of the
-    exception raised. Charms may catch :class:`InvalidSchemaError` to provide
-    custom handling.
-
-    At the end of the hook, the updated values are automatically sent through to
-    Juju. The databag class is responsible for ensuring that the data is valid.
+                data = relation.load(UUCPData, self.app)
     """
 
     # This class does not currently provide any functionality - any class that

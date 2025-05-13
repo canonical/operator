@@ -44,7 +44,7 @@ class DatabagProtocol(Protocol):
     quux: Nested | None
 
 
-class MyDatabag(ops.DatabagBase):
+class MyDatabag(ops.RelationDataBase):
     # These need to be class attributes to be picked up and sent to Juju.
     foo: str
     baz: list[str] | None = None
@@ -91,7 +91,7 @@ class BaseTestCharm(ops.CharmBase):
         framework.observe(self.on['db'].relation_joined, self._on_relation_joined)
 
     @property
-    def databag_class(self) -> type[ops.DatabagBase]:
+    def databag_class(self) -> type[ops.RelationDataBase]:
         raise NotImplementedError('databag_class must be set in the subclass')
 
     @property
@@ -121,7 +121,7 @@ class BaseTestCharm(ops.CharmBase):
         modern = rel.load_data(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
-        modern = cast(DatabagProtocol, modern)
+        modern = cast('DatabagProtocol', modern)
         classic['foo'] = json.dumps('one')
         assert modern.foo == json.dumps('one')
         modern.foo = 'two'
@@ -137,14 +137,14 @@ class BaseTestCharm(ops.CharmBase):
         data = rel.load_data(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
-        data = cast(DatabagProtocol, data)
+        data = cast('DatabagProtocol', data)
         data.bar = -42
 
     def _on_relation_changed(self, event: ops.RelationChangedEvent):
         data = event.relation.load_data(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
-        data = cast(DatabagProtocol, data)
+        data = cast('DatabagProtocol', data)
         self.newfoo = len(data.foo)
         assert data.baz is not None
         self.newbaz = [*data.baz, 'new']
@@ -157,7 +157,7 @@ class BaseTestCharm(ops.CharmBase):
         data = event.relation.load_data(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
-        data = cast(DatabagProtocol, data)
+        data = cast('DatabagProtocol', data)
         data.foo = 'newfoo'
         data.baz = ['new']
         data.bar = 42
@@ -183,7 +183,7 @@ nested_decode = functools.partial(json.loads, object_hook=json_nested_hook)
 
 class MyCharm(BaseTestCharm):
     @property
-    def databag_class(self) -> type[ops.DatabagBase]:
+    def databag_class(self) -> type[ops.RelationDataBase]:
         return MyDatabag
 
     @property
@@ -196,7 +196,7 @@ class MyCharm(BaseTestCharm):
 
 
 @dataclasses.dataclass
-class MyDataclassDatabag(ops.DatabagBase):
+class MyDataclassDatabag(ops.RelationDataBase):
     foo: str
     baz: list[str] = dataclasses.field(default_factory=list)
     bar: int = dataclasses.field(default=0)
@@ -220,7 +220,7 @@ class MyDataclassDatabag(ops.DatabagBase):
 
 class MyDataclassCharm(BaseTestCharm):
     @property
-    def databag_class(self) -> type[ops.DatabagBase]:
+    def databag_class(self) -> type[ops.RelationDataBase]:
         return MyDataclassDatabag
 
 
@@ -229,7 +229,7 @@ _test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
 if pydantic:
 
     @pydantic.dataclasses.dataclass
-    class MyPydanticDataclassDatabag(ops.DatabagBase):
+    class MyPydanticDataclassDatabag(ops.RelationDataBase):
         foo: str
         baz: list[str] = pydantic.Field(default_factory=list)
         bar: int = pydantic.Field(default=0)
@@ -253,10 +253,10 @@ if pydantic:
 
     class MyPydanticDataclassCharm(BaseTestCharm):
         @property
-        def databag_class(self) -> type[ops.DatabagBase]:
+        def databag_class(self) -> type[ops.RelationDataBase]:
             return MyPydanticDataclassDatabag
 
-    class MyPydanticDatabag(pydantic.BaseModel, ops.DatabagBase):
+    class MyPydanticDatabag(pydantic.BaseModel, ops.RelationDataBase):
         foo: str
         baz: list[str] = pydantic.Field(default_factory=list)
         bar: int = pydantic.Field(default=0, ge=0)
@@ -267,7 +267,7 @@ if pydantic:
 
     class MyPydanticBaseModelCharm(BaseTestCharm):
         @property
-        def databag_class(self) -> type[ops.DatabagBase]:
+        def databag_class(self) -> type[ops.RelationDataBase]:
             return MyPydanticDatabag
 
     _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
@@ -404,7 +404,7 @@ def test_databag_single_object_different_databag(
     charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
 ):
     @dataclasses.dataclass
-    class OtherDatabag(ops.DatabagBase):
+    class OtherDatabag(ops.RelationDataBase):
         foo: str = 'foo'
 
     class BadCharmClass(charm_class):
@@ -441,7 +441,7 @@ def test_databag_no_encode(charm_class: type[ops.CharmBase], request: pytest.Fix
                 encoder=lambda x: x,
                 decoder=lambda x: x,
             )
-            data = cast(DatabagProtocol, data)
+            data = cast('DatabagProtocol', data)
             data.foo = data.foo + '1'
 
     harness = testing.Harness(
@@ -494,7 +494,7 @@ def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest
                 encoder=self.encoder,
                 decoder=self.decoder,
             )
-            data = cast(DatabagProtocol, data)
+            data = cast('DatabagProtocol', data)
             data.foo = data.foo + '1'
 
     harness = testing.Harness(
@@ -529,3 +529,4 @@ def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest
 # IPvAnyAddress (ipaddress.IPv4Address|ipaddress.IPv6Address) for non-Pydantic, IPvAnyNetwork.
 # TODO: add a test that uses enums.
 # TODO: add a test that validates a combination of fields.
+# TODO: add in support for Scenario automatically JSON'ing the relation content.
