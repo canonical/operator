@@ -1,6 +1,8 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from __future__ import annotations
+
 import pathlib
 
 import ops

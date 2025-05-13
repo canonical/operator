@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import typing
 
 import ops
@@ -257,27 +256,3 @@ def test_defer_custom_event(mycharm):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
-
-
-def test_juju_log_over_deferred(mycharm):
-    # A backend is created for each charm, so one for a deferred event and one
-    # for the primary event. We want to ensure that all the logs end up in the
-    # context.
-    logger = logging.getLogger(__name__)
-
-    class MyCharm(mycharm):
-        def _on_event(self, event: ops.EventBase):
-            super()._on_event(event)
-            logger.info('Handled event %s', event.__class__.__name__)
-
-    ctx = Context(MyCharm, meta=mycharm.META)
-    mycharm.defer_next = 1
-    ctx.run(
-        ctx.on.start(),
-        State(deferred=[ctx.on.update_status().deferred(MyCharm._on_event)]),
-    )
-    logs = [log.message for log in ctx.juju_log if log.level == 'INFO']
-    assert logs == [
-        'Handled event UpdateStatusEvent',
-        'Handled event StartEvent',
-    ]

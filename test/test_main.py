@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import abc
 import dataclasses
 import importlib.util
@@ -59,23 +61,23 @@ class SymlinkTargetError(Exception):
 
 @dataclasses.dataclass(frozen=True)
 class EventSpec:
-    event_type: typing.Type[ops.EventBase]
+    event_type: type[ops.EventBase]
     event_name: str
-    env_var: typing.Optional[str] = None
-    relation_id: typing.Optional[int] = None
-    remote_app: typing.Optional[str] = None
-    remote_unit: typing.Optional[str] = None
-    model_name: typing.Optional[str] = None
-    set_in_env: typing.Optional[typing.Dict[str, str]] = None
-    workload_name: typing.Optional[str] = None
-    notice_id: typing.Optional[str] = None
-    notice_type: typing.Optional[str] = None
-    notice_key: typing.Optional[str] = None
-    departing_unit_name: typing.Optional[str] = None
-    secret_id: typing.Optional[str] = None
-    secret_label: typing.Optional[str] = None
-    secret_revision: typing.Optional[str] = None
-    check_name: typing.Optional[str] = None
+    env_var: str | None = None
+    relation_id: int | None = None
+    remote_app: str | None = None
+    remote_unit: str | None = None
+    model_name: str | None = None
+    set_in_env: dict[str, str] | None = None
+    workload_name: str | None = None
+    notice_id: str | None = None
+    notice_type: str | None = None
+    notice_key: str | None = None
+    departing_unit_name: str | None = None
+    secret_id: str | None = None
+    secret_label: str | None = None
+    secret_revision: str | None = None
+    check_name: str | None = None
 
 
 @patch('ops._main.setup_root_logging', new=lambda *a, **kw: None)  # type: ignore
@@ -108,9 +110,9 @@ class TestCharmInit:
 
     def _check(
         self,
-        charm_class: typing.Type[ops.CharmBase],
+        charm_class: type[ops.CharmBase],
         *,
-        extra_environ: typing.Optional[typing.Dict[str, str]] = None,
+        extra_environ: dict[str, str] | None = None,
         **kwargs: typing.Any,
     ):
         """Helper for below tests."""
@@ -211,7 +213,7 @@ class TestDispatch:
                     ops.main(MyCharm)
 
         assert mock_charm_event.call_count == 1
-        return mock_charm_event.call_args[0][1]
+        return mock_charm_event.call_args[0][0]
 
     def test_with_dispatch(self):
         """With dispatch, dispatch is used."""
@@ -242,7 +244,7 @@ class _TestMain(abc.ABC):
         self,
         fake_script: FakeScript,
         rel_path: Path,
-        env: typing.Dict[str, str],
+        env: dict[str, str],
     ):
         """Set up the environment and call (i.e. run) the given event."""
         return NotImplemented
@@ -295,8 +297,8 @@ class _TestMain(abc.ABC):
         self._setup_entry_point()
 
     def _read_and_clear_state(
-        self, event_name: str, env: typing.Dict[str, str]
-    ) -> typing.Union[ops.BoundStoredState, ops.StoredStateData]:
+        self, event_name: str, env: dict[str, str]
+    ) -> ops.BoundStoredState | ops.StoredStateData:
         if self._charm_state_file.stat().st_size:
             storage = SQLiteStorage(self._charm_state_file)
             with (self.JUJU_CHARM_DIR / 'metadata.yaml').open() as m:
@@ -423,7 +425,6 @@ class _TestMain(abc.ABC):
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['InstallEvent']
 
-        # The config-changed handler always defers.
         state = self._simulate_event(
             fake_script, EventSpec(ops.ConfigChangedEvent, 'config-changed')
         )
@@ -753,13 +754,6 @@ class _TestMain(abc.ABC):
 
         expected = [
             VERSION_LOGLINE,
-            [
-                'juju-log',
-                '--log-level',
-                'DEBUG',
-                '--',
-                'Skipping re-emission of deferred events in restricted context.',
-            ],
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
             ['is-leader', '--format=json'],
@@ -1125,7 +1119,7 @@ class TestMainWithDispatchAsSymlink(_TestMain):
         self,
         fake_script: FakeScript,
         rel_path: Path,
-        env: typing.Dict[str, str],
+        env: dict[str, str],
     ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'
@@ -1215,7 +1209,7 @@ class TestMainWithDispatchAsScript(_TestMain):
         self,
         fake_script: FakeScript,
         rel_path: Path,
-        env: typing.Dict[str, str],
+        env: dict[str, str],
     ):
         env['JUJU_DISPATCH_PATH'] = str(rel_path)
         env['JUJU_VERSION'] = '2.8.0'

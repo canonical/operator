@@ -1,3 +1,50 @@
+# 2.21.1 - 1 May 2025
+
+## Reverted
+
+* Reverting "run deferred events with fresh charm instances" (#1711)
+
+## Documentation
+
+* Add best practices about status (#1689)
+
+# 2.21.0 - 30 Apr 2025
+
+## Features
+
+* Ops[tracing] (with a first-party charm lib) (#1612)
+* Pebble identities (#1672)
+* Run deferred events with fresh charm instances (#1631)
+
+## Fixes
+
+* Allow TLS 1.2 in ops-tracing (#1705)
+* Try to fix flaky pebble exec test (#1664)
+
+## Documentation
+
+* Add best practice note around using tooling provided by the charmcraft profile (#1700)
+* Clarify guidance about designing python modules (#1670)
+* Fix a bug in the k8s tutorial doc about unit test (#1688)
+* Fix broken link in readme (#1679)
+* Fix links to juju docs (#1681)
+* Fix tox command in hacking.md (#1661)
+* Improve landing page of kubernetes charm tutorial (#1660)
+
+## CI
+
+* Add zizmor to static check github workflows (#1656)
+* Change prerelease setting used to add latest ops and scenario (#1682)
+* Don't pin release jobs to github environments (#1683)
+* Don't run tests within the publish job (#1684)
+* Fix smoke test (#1698)
+* Post-release versioning, release process update + workflow fix (#1658)
+* Rename "tox -e fmt" to "tox -e format" (#1668)
+
+## Tests
+
+* Fix overly specific test that fails sometimes with tracing (#1695)
+
 # 2.20.0 - 31 Mar 2025
 
 ## Features

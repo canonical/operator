@@ -17,8 +17,10 @@ This file doesn't contain any run-time tests, rather we rely on pyright to run o
 Assignment to a variable declared to follow a protocol is equivalent to backwards compatibility.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional, Protocol, Type
+from typing import Protocol
 
 import ops
 
@@ -31,7 +33,7 @@ class CallableWithCharmClassOnly(Protocol):
     - ops.main(charm_class=SomeCharm)
     """
 
-    def __call__(self, charm_class: Type[ops.charm.CharmBase]): ...
+    def __call__(self, charm_class: type[ops.charm.CharmBase]): ...
 
 
 class CallableWithCharmClassAndStorageFlag(Protocol):
@@ -43,7 +45,7 @@ class CallableWithCharmClassAndStorageFlag(Protocol):
     """
 
     def __call__(
-        self, charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None
+        self, charm_class: type[ops.charm.CharmBase], use_juju_for_storage: bool | None = None
     ): ...
 
 

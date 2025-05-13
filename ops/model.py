@@ -344,13 +344,6 @@ class Model:
         return self._backend.credential_get()
 
 
-if typing.TYPE_CHECKING:
-    # (entity type, name): instance.
-    _WeakCacheType: TypeAlias = weakref.WeakValueDictionary[
-        'tuple[UnitOrApplicationType, str]', 'Unit | Application | None'
-    ]
-
-
 class _ModelCache:
     def __init__(self, meta: _charm.CharmMeta, backend: _ModelBackend):
         self._meta = meta
@@ -358,8 +351,11 @@ class _ModelCache:
         self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
             collections.defaultdict(dict)
         )
-        self._databag_obj_cache: dict[tuple[int, Union[Application, Unit]], Any] = {}
-        self._weakrefs: _WeakCacheType = weakref.WeakValueDictionary()
+        self._databag_obj_cache: dict[tuple[int, Application | Unit], Any] = {}
+        # (entity type, name): instance.
+        self._weakrefs: weakref.WeakValueDictionary[
+            tuple[UnitOrApplicationType, str], Unit | Application | None
+        ] = weakref.WeakValueDictionary()
 
     @typing.overload
     def get(self, entity_type: type[Unit], name: str) -> Unit: ...
@@ -1759,7 +1755,7 @@ class Relation:
                 app = cache.get(Application, app_name)
 
         # self.app will not be None and always be set because of the fallback mechanism above.
-        self.app = typing.cast(Application, app)
+        self.app = typing.cast('Application', app)
         self.data = RelationData(self, our_unit, backend, cache)
 
         self._remote_model: RemoteModel | None = None
@@ -1785,7 +1781,7 @@ class Relation:
     def load_data(
         self,
         cls: type[_InterfaceType],
-        app_or_unit: Union[Unit, Application],
+        app_or_unit: Unit | Application,
         *args: Any,
         decoder: Callable[[Any], Any] | None = None,
         encoder: Callable[[Any], Any] | None = None,
@@ -1871,7 +1867,7 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
         cache: _ModelCache | None = None,
     ):
         self.relation = weakref.proxy(relation)
-        self._data: dict[Union[Unit, Application], RelationDataContent] = {
+        self._data: dict[Unit | Application, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend, cache),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend, cache),
         }
@@ -1911,7 +1907,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def __init__(
         self,
         relation: Relation,
-        entity: Union[Unit, Application],
+        entity: Unit | Application,
         backend: _ModelBackend,
         cache: _ModelCache | None = None,
     ):
@@ -3812,8 +3808,10 @@ class _ModelBackend:
     def application_version_set(self, version: str) -> None:
         self._run('application-version-set', '--', version)
 
-    @staticmethod
-    def log_split(message: str, max_len: int = MAX_LOG_LINE_LEN) -> Generator[str, None, None]:
+    @classmethod
+    def log_split(
+        cls, message: str, max_len: int = MAX_LOG_LINE_LEN
+    ) -> Generator[str, None, None]:
         """Helper to handle log messages that are potentially too long.
 
         This is a generator that splits a message string into multiple chunks if it is too long

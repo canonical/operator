@@ -37,6 +37,19 @@ SENDOUT_FACTOR: int = 10
 
 logger = logging.getLogger(__name__)
 
+# We should really be using TLSv1_3.
+# However at least this deployment option doesn't support 1.3 yet
+# https://github.com/canonical/tempo-coordinator-k8s-operator/issues/146
+#
+# Integration provider                   Requirer                           Interface
+# s3-integrator:s3-credentials           tempo:s3                           s3
+# s3-integrator:s3-integrator-peers      s3-integrator:s3-integrator-peers  s3-integrator-peers
+# self-signed-certificates:certificates  tempo:certificates                 tls-certificates
+# self-signed-certificates:send-ca-cert  tracing-tester:receive-ca-cert     certificate_transfer
+# tempo:peers                            tempo:peers                        tempo_peers
+# tempo:tempo-cluster                    tempo-worker:tempo-cluster         tempo_cluster
+# tempo:tracing                          tracing-tester:charm-tracing       tracing
+
 
 class BufferingSpanExporter(SpanExporter):
     """Buffers and sends out trace data."""
@@ -96,7 +109,7 @@ class BufferingSpanExporter(SpanExporter):
         # Note that ssl.create_default_context() doesn't allow setting the context.protocol in a
         # way that's the same across Python 3.8 and 3.10 onwards. Whip the context up by hand.
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        context.minimum_version = ssl.TLSVersion.TLSv1_3
+        context.minimum_version = ssl.TLSVersion.TLSv1_2  # See comment at the top of module
         context.set_alpn_protocols(['http/1.1'])
         # Can't use strict certificate chain validation until our self-signed ca is fixed
         # https://github.com/canonical/self-signed-certificates-operator/issues/330

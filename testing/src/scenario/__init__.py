@@ -59,6 +59,8 @@ status is `unknown`. With that, we can write the simplest possible test:
         assert out.unit_status == UnknownStatus()
 """
 
+from __future__ import annotations
+
 from ops._private.harness import ActionFailed  # For backwards compatibility.
 
 from .context import CharmEvents, Context, Manager
