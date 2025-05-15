@@ -254,6 +254,10 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
 ]
+"examples/*/tests/*" = [
+    # All documentation linting.
+    "D",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
