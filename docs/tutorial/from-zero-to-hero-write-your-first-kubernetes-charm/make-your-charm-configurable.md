@@ -60,7 +60,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
     if port == 22:
         self.unit.status = ops.BlockedStatus('invalid port number, 22 is reserved for SSH')
         return
-    
+
     logger.debug('New application port is requested: %s', port)
     self._update_layer_and_restart()
 ```
@@ -86,12 +86,12 @@ def _update_layer_and_restart(self) -> None:
     You'll need to specify the right entrypoint and environment
     configuration for your specific workload. Tip: you can see the
     standard entrypoint of an existing container using docker inspect
-    Learn more about interacting with Pebble at https://juju.is/docs/sdk/pebble
+    Learn more about interacting with Pebble at
+        https://ops.readthedocs.io/en/latest/reference/pebble.html
     Learn more about Pebble layers at
         https://documentation.ubuntu.com/pebble/how-to/use-layers/
     """
-
-    # Learn more about statuses at:
+    # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
     self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
     try:
@@ -111,14 +111,12 @@ def _update_layer_and_restart(self) -> None:
 Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={self.config['server-port']}"`.
 
 ```python
-command = ' '.join(
-    [
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        f"--port={self.config['server-port']}",
-    ]
-)
+command = ' '.join([
+    'uvicorn',
+    'api_demo_server.app:app',
+    '--host=0.0.0.0',
+    f'--port={self.config["server-port"]}',
+])
 ```
 
 As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
