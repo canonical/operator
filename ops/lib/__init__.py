@@ -16,7 +16,7 @@
 
 .. deprecated:: 2.1.0
     The ops.lib functionality is deprecated, and is superseded by
-    `charm libraries and regular Python imports.
+    charm libraries and regular Python imports.
     We now prefer to do version selection at build (charmcraft pack) time.
 """
 
