@@ -573,7 +573,8 @@ _BREAKPOINT_WELCOME_MESSAGE = """
 Starting pdb to debug charm operator.
 Run `h` for help, `c` to continue, or `exit`/CTRL-d to abort.
 Future breakpoints may interrupt execution again.
-More details at https://juju.is/docs/sdk/debugging
+For more information, see:
+https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/debug-code/
 
 """
 
