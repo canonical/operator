@@ -93,6 +93,9 @@ extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 # Ruff formatter configuration
 [tool.ruff.format]
 quote-style = "single"
+exclude = [
+    "examples/*/lib/*",
+]
 
 [tool.ruff.lint]
 select = [
@@ -177,7 +180,7 @@ ignore = [
 ]
 exclude = [
     "tracing/ops_tracing/vendor/*",
-    "examples/*lib/*",
+    "examples/*/lib/*",
 ]
 
 [tool.ruff.lint.per-file-ignores]
