@@ -175,7 +175,10 @@ ignore = [
     # `subprocess` call: check for execution of untrusted input
     "S603",
 ]
-exclude = ["tracing/ops_tracing/vendor/*"]
+exclude = [
+    "tracing/ops_tracing/vendor/*",
+    "examples/*lib/*",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = [
