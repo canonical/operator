@@ -189,14 +189,20 @@ First, we'll add a test that sets the port in the input state and asserts that t
 ```python
 def test_config_changed():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={"server-port": 8080},
+        config={'server-port': 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert "--port=8080" in state_out.get_container(container.name).layers["fastapi_demo"].services["fastapi-service"].command
+    assert (
+        '--port=8080'
+        in state_out.get_container(container.name)
+        .layers['fastapi_demo']
+        .services['fastapi-service']
+        .command
+    )
 ```
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
@@ -204,15 +210,15 @@ In `_on_config_changed`, we specifically don't allow port 22 to be used. If port
 ```python
 def test_config_changed_invalid_port():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={"server-port": 22},
+        config={'server-port': 22},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert state_out.unit_status == testing.BlockedStatus(
-        "Invalid port number, 22 is reserved for SSH"
+        'invalid port number, 22 is reserved for SSH'
     )
 ```
 
