@@ -73,7 +73,7 @@ A charm does not know which configuration option has been changed. Thus, make su
 In the `__init__` function, add a new attribute to define a container object for your workload:
 
 ```python
-# see 'containers' in charmcraft.yaml
+# See 'containers' in charmcraft.yaml.
 self.container = self.unit.get_container('demo-server')
 ```
 

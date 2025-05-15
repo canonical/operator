@@ -31,7 +31,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         super().__init__(framework)
         framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
-        # see 'containers' in charmcraft.yaml
+        # See 'containers' in charmcraft.yaml.
         self.container = self.unit.get_container('demo-server')
         self.pebble_service_name = 'fastapi-service'
 
