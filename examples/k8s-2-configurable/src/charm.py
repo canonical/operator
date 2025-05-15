@@ -16,6 +16,8 @@
 
 """Kubernetes charm for a demo app."""
 
+from __future__ import annotations
+
 import logging
 
 import ops
@@ -29,11 +31,11 @@ class FastAPIDemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
-        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
-        framework.observe(self.on.config_changed, self._on_config_changed)
         # See 'containers' in charmcraft.yaml.
         self.container = self.unit.get_container('demo-server')
         self.pebble_service_name = 'fastapi-service'
+        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
+        framework.observe(self.on.config_changed, self._on_config_changed)
 
     def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
         self._update_layer_and_restart()

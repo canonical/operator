@@ -16,14 +16,16 @@
 
 """Kubernetes charm for a demo app."""
 
-import logging
+from __future__ import annotations
 
-import ops
+import logging
 
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
 from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
+
+import ops
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -34,18 +36,18 @@ class FastAPIDemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
-        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
-        framework.observe(self.on.config_changed, self._on_config_changed)
-        # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
-        framework.observe(self.database.on.database_created, self._on_database_created)
-        framework.observe(self.database.on.endpoints_changed, self._on_database_created)
-        framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # See 'containers' in charmcraft.yaml.
         self.container = self.unit.get_container('demo-server')
         self.pebble_service_name = 'fastapi-service'
+        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # The 'relation_name' comes from the 'charmcraft.yaml file'.
         # The 'database_name' is the name of the database that our application requires.
         self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
+        framework.observe(self.database.on.database_created, self._on_database_created)
+        framework.observe(self.database.on.endpoints_changed, self._on_database_created)
 
     def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
         self._update_layer_and_restart()
@@ -59,10 +61,6 @@ class FastAPIDemoCharm(ops.CharmBase):
             return
 
         logger.debug('New application port is requested: %s', port)
-        self._update_layer_and_restart()
-
-    def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
-        """Event is fired when postgres database is created."""
         self._update_layer_and_restart()
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
@@ -84,6 +82,10 @@ class FastAPIDemoCharm(ops.CharmBase):
                 event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
+
+    def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
+        """Event is fired when postgres database is created."""
+        self._update_layer_and_restart()
 
     def _update_layer_and_restart(self) -> None:
         """Define and start a workload using the Pebble API.
