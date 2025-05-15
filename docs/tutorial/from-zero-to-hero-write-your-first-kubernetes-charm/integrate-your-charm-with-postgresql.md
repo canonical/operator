@@ -251,20 +251,20 @@ And define a method that does the various checks, adding appropriate statuses. T
 def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
     port = self.config['server-port']
     if port == 22:
-        event.add_status(ops.BlockedStatus('Invalid port number, 22 is reserved for SSH'))
+        event.add_status(ops.BlockedStatus('invalid port number, 22 is reserved for SSH'))
     if not self.model.get_relation('database'):
         # We need the user to do 'juju integrate'.
-        event.add_status(ops.BlockedStatus('Waiting for database relation'))
+        event.add_status(ops.BlockedStatus('waiting for database relation'))
     elif not self.database.fetch_relation_data():
         # We need the charms to finish integrating.
-        event.add_status(ops.WaitingStatus('Waiting for database relation'))
+        event.add_status(ops.WaitingStatus('waiting for database relation'))
     try:
         status = self.container.get_service(self.pebble_service_name)
     except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-        event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
+        event.add_status(ops.MaintenanceStatus('waiting for Pebble in workload container'))
     else:
         if not status.is_running():
-            event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
+            event.add_status(ops.MaintenanceStatus('waiting for the service to start up'))
     # If nothing is wrong, then the status is active.
     event.add_status(ops.ActiveStatus())
 ```
@@ -278,7 +278,15 @@ We also want to clean up the code to remove the places where we're setting the s
         return
 ```
 
-And remove the `self.unit.status = MaintenanceStatus` line from `_update_layer_and_restart`.
+And remove the following lines from `_update_layer_and_restart`:
+
+```python
+    self.unit.status = ops.ActiveStatus()
+```
+
+```python
+    self.unit.status = ops.MaintenanceStatus('waiting for Pebble in workload container')
+```
 
 ## Validate your charm
 
@@ -371,16 +379,16 @@ Now that our charm uses `fetch_postgres_relation_data` to extract database authe
 def test_relation_data():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint="database",
-        interface="postgresql_client",
-        remote_app_name="postgresql-k8s",
+        endpoint='database',
+        interface='postgresql_client',
+        remote_app_name='postgresql-k8s',
         remote_app_data={
-            "endpoints": "example.com:5432",
-            "username": "foo",
-            "password": "bar",
+            'endpoints': 'example.com:5432',
+            'username': 'foo',
+            'password': 'bar',
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -389,11 +397,13 @@ def test_relation_data():
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services["fastapi-service"].environment == {
-        "DEMO_SERVER_DB_HOST": "example.com",
-        "DEMO_SERVER_DB_PORT": "5432",
-        "DEMO_SERVER_DB_USER": "foo",
-        "DEMO_SERVER_DB_PASSWORD": "bar",
+    assert state_out.get_container(container.name).layers['fastapi_demo'].services[
+        'fastapi-service'
+    ].environment == {
+        'DEMO_SERVER_DB_HOST': 'example.com',
+        'DEMO_SERVER_DB_PORT': '5432',
+        'DEMO_SERVER_DB_USER': 'foo',
+        'DEMO_SERVER_DB_PASSWORD': 'bar',
     }
 ```
 
@@ -402,7 +412,7 @@ In this chapter, we also defined a new method `_on_collect_status` that checks v
 ```python
 def test_no_database_blocked():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -410,10 +420,19 @@ def test_no_database_blocked():
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
-    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
+    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
 ```
 
-Run `tox -e unit` to make sure all test cases pass.
+Then remove the following assertion from `test_pebble_layer`:
+
+```python
+    # Check the unit status is active
+    assert state_out.unit_status == testing.ActiveStatus()
+```
+
+This assertion is no longer applicable, because `test_pebble_layer` doesn't arrange any relation data.
+
+Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 

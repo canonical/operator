@@ -93,7 +93,7 @@ def _update_layer_and_restart(self) -> None:
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    self.unit.status = ops.MaintenanceStatus('assembling Pebble layers')
     try:
         self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
         logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
@@ -106,7 +106,7 @@ def _update_layer_and_restart(self) -> None:
         self.unit.status = ops.ActiveStatus()
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info('Unable to connect to Pebble: %s', e)
-        self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+        self.unit.status = ops.MaintenanceStatus('waiting for Pebble in workload container')
 ```
 
 Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={self.config['server-port']}"`.
