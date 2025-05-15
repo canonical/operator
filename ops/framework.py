@@ -51,7 +51,7 @@ import opentelemetry.trace
 
 from . import charm
 from ._private import tracer
-from .model import Model, _ModelBackend
+from .model import Model
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
 
