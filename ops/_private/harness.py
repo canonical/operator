@@ -2858,7 +2858,7 @@ class _TestingModelBackend:
         # https://discourse.charmhub.io/t/secret-access-permissions/12627
         # For user secrets the secret owner is the model, that is,
         # when `secret.owner_name == self.model.uuid`, only model admins have
-        # manage permissions: https://juju.is/docs/juju/secret.
+        # manage permissions: https://documentation.ubuntu.com/juju/3.6/reference/secret/.
 
         unit_secret = secret.owner_name == self.unit_name
         app_secret = secret.owner_name == self.app_name
