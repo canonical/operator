@@ -72,7 +72,8 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
             self.unit.status = ops.ActiveStatus()
-        except (ops.pebble.APIError, ops.pebble.ConnectionError):
+        except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
+            logger.info('Unable to connect to Pebble: %s', e)
             self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 
     @property

@@ -79,10 +79,9 @@ First, at the top of the file, import the database interfaces library:
 
 ```python
 # Import the 'data_interfaces' library.
-# The import statement omits the top-level 'lib' directory 
+# The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent
-from charms.data_platform_libs.v0.data_interfaces import DatabaseRequires
+from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
 ```
 
 ````{important}
@@ -119,9 +118,8 @@ Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' 
 
 ```python
 # The 'relation_name' comes from the 'charmcraft.yaml file'.
-# The 'database_name' is the name of the database that our application requires. 
-# See the application documentation in the GitHub repository.
-self.database = DatabaseRequires(self, relation_name="database", database_name="names_db")
+# The 'database_name' is the name of the database that our application requires.
+self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
 ```
 
 Now, add event observers for all the database events:
@@ -145,7 +143,8 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
     then logged for debugging purposes, and any non-empty data is processed to extract
     endpoint information, username, and password. This processed data is then returned as
     a dictionary. If no data is retrieved, the unit is set to waiting status and
-    the program exits with a zero status code."""
+    the program exits with a zero status code.
+    """
     relations = self.database.fetch_relation_data()
     logger.debug('Got following database data: %s', relations)
     for data in relations.values():
@@ -168,31 +167,29 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
 Our application consumes database authentication information in the form of environment variables. Let's update the Pebble service definition with an `environment` key and let's set this key to a dynamic value -- the class property `self.app_environment`. Your `_pebble_layer` property should look as below:
 
 ```python
-    @property
-    def _pebble_layer(self) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join(
-            [
-                'uvicorn',
-                'api_demo_server.app:app',
-                '--host=0.0.0.0',
-                f"--port={self.config['server-port']}",
-            ]
-        )
-        pebble_layer: ops.pebble.LayerDict = {
-            'summary': 'FastAPI demo service',
-            'description': 'pebble config layer for FastAPI demo server',
-            'services': {
-                self.pebble_service_name: {
-                    'override': 'replace',
-                    'summary': 'fastapi demo',
-                    'command': command,
-                    'startup': 'enabled',
-                    'environment': self.app_environment,
-                }
-            },
-        }
-        return ops.pebble.Layer(pebble_layer)
+@property
+def _pebble_layer(self) -> ops.pebble.Layer:
+    """A Pebble layer for the FastAPI demo services."""
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        f'--port={self.config["server-port"]}',
+    ])
+    pebble_layer: ops.pebble.LayerDict = {
+        'summary': 'FastAPI demo service',
+        'description': 'pebble config layer for FastAPI demo server',
+        'services': {
+            self.pebble_service_name: {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': command,
+                'startup': 'enabled',
+                'environment': self.app_environment,
+            }
+        },
+    }
+    return ops.pebble.Layer(pebble_layer)
 ```
 
 Now, let's define this property such that, every time it is called, it dynamically fetches database authentication data and also prepares the output in a form that our application can consume, as below:
@@ -200,7 +197,9 @@ Now, let's define this property such that, every time it is called, it dynamical
 ```python
 @property
 def app_environment(self) -> dict[str, str]:
-    """This property method creates a dictionary containing environment variables
+    """Prepare environment variables for the application.
+
+    This property method creates a dictionary containing environment variables
     for the application. It retrieves the database authentication data by calling
     the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
     If any of the values are not present, it will be set to None.
@@ -212,10 +211,10 @@ def app_environment(self) -> dict[str, str]:
     env = {
         key: value
         for key, value in {
-            "DEMO_SERVER_DB_HOST": db_data.get("db_host", None),
-            "DEMO_SERVER_DB_PORT": db_data.get("db_port", None),
-            "DEMO_SERVER_DB_USER": db_data.get("db_username", None),
-            "DEMO_SERVER_DB_PASSWORD": db_data.get("db_password", None),
+            'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
+            'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
+            'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
+            'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
         }.items()
         if value is not None
     }
@@ -276,9 +275,10 @@ We also want to clean up the code to remove the places where we're setting the s
     if port == 22:
         # The collect-status handler will set the status to blocked.
         logger.debug('Invalid port number: 22 is reserved for SSH')
+        return
 ```
 
-And remove the `self.unit.status = WaitingStatus` line from `_update_layer_and_restart` (similarly replacing it with a logging line if you prefer).
+And remove the `self.unit.status = MaintenanceStatus` line from `_update_layer_and_restart`.
 
 ## Validate your charm
 
