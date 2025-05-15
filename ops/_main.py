@@ -458,6 +458,15 @@ class _Manager:
             self._emit()
             self._commit()
             self._close()
+        except _model._InvalidSchemaError as e:
+            # Optionally set a status message on the unit.
+            if e.status:
+                self._model_backend.status_set('blocked', e.status)
+            # We exit with a zero exit code because we don't want Juju to go into
+            # error status (for config we have set a status ourselves) and we
+            # don't want to automatically retry (the Juju user must correct the
+            # data to match the schema).
+            raise _Abort(0) from e
         finally:
             self.framework.close()
 

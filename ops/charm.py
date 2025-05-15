@@ -33,6 +33,7 @@ from typing import (
     Optional,
     TextIO,
     TypedDict,
+    TypeVar,
     cast,
 )
 
@@ -1322,6 +1323,9 @@ class CharmEvents(ObjectEvents):
     """
 
 
+_ConfigType = TypeVar('_ConfigType')
+
+
 class CharmBase(Object):
     """Base class that represents the charm overall.
 
@@ -1417,6 +1421,77 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
+    def load_config(
+        self,
+        cls: type[_ConfigType],
+        *args: Any,
+        errors: Literal['raise', 'blocked'] = 'raise',
+        **kwargs: Any,
+    ) -> _ConfigType:
+        """Load the config into an instance of a config class.
+
+        The object will be instantiated with keyword arguments of the raw Juju
+        config for all the options that are found in the class, but with:
+
+        * ``secret`` type options having a :class:`model.Secret` value rather
+          than the secret ID. Note that the secret object is not validated by
+          Juju at this time, so may raise :class:`SecretNotFoundError` when it
+          is later used if the secret does not exist or the unit does not have
+          permission to access it.
+        * dashes in names converted to underscores.
+
+        Any additional positional or keyword arguments will be passed through to
+        the config class.
+
+        Args:
+            cls: A class that inherits from :class:`ops.ConfigBase`.
+            errors: what to do if the config is invalid. If ``blocked``, the
+                charm will exit successfully (note that this informs Juju that
+                the event was handled and it will not be retried) after setting
+                an appropriate blocked status. If ``raise``, ``load_config``
+                will not catch any exceptions, leaving the charm to handle
+                errors.
+            args: positional arguments to pass through to the config class.
+            kwargs: keyword arguments to pass through to the config class.
+
+        Returns:
+            An instance of the config class with the current config values.
+
+        Raises:
+            ValueError: if the configuration is invalid and ``errors`` is set to
+                ``raise``.
+        """
+        config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
+        fields = set(cls._juju_names())  # type: ignore
+        for key, value in self.config.items():
+            attr = cls._juju_name_to_attr(key)  # type: ignore
+            assert isinstance(attr, str)
+            if not attr.isidentifier():
+                if errors == 'raise':
+                    raise ValueError(f'Invalid attribute name {attr}')
+                raise model._InvalidSchemaError(status=f'Invalid attribute name {attr}')
+            if attr not in fields:
+                continue
+            option_type = self.meta.config.get(key)
+            # Convert secret IDs to secret objects. We create the object rather
+            # that using model.get_secret so that it's entirely lazy, in the
+            # same way that SecretEvent.secret is.
+            if option_type and option_type.type == 'secret' and isinstance(value, str):
+                secret = model.Secret(
+                    backend=self.model._backend,
+                    id=value,
+                    _secret_set_cache=self.model._cache._secret_set_cache,
+                )
+                config[attr] = secret
+            else:
+                config[attr] = value
+        try:
+            return cls(*args, **config)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            raise model._InvalidSchemaError(status=f'Error in config: {e}') from e
+
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
@@ -1438,13 +1513,15 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from ``metadata.yaml`` and ``actions.yaml``. Generally
-    charms will define this information, rather than reading it at runtime. This
-    class is mostly for the framework to understand what the charm has defined.
+    This is read from ``metadata.yaml``, ``config.yaml``, and ``actions.yaml``.
+    Generally charms will define this information, rather than reading it at
+    runtime. This class is mostly for the framework to understand what the charm
+    has defined.
 
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
+        config_raw: a mapping containing the contents of config.yaml
     """
 
     name: str
@@ -1636,7 +1713,6 @@ class CharmMeta:
             meta = yaml.safe_load(f.read())
 
         actions = None
-
         actions_path = charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
