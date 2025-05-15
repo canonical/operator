@@ -2329,6 +2329,7 @@ class _Secret:
     grants: dict[int, set[str]] = dataclasses.field(default_factory=dict)
     user_secrets_grants: set[str] = dataclasses.field(default_factory=set)
 
+
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -2473,8 +2474,9 @@ class _TestingModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
-        if 'relation_broken' in self._juju_context.dispatch_path and not self.relation_remote_app_name(
-            relation_id
+        if (
+            'relation_broken' in self._juju_context.dispatch_path
+            and not self.relation_remote_app_name(relation_id)
         ):
             raise RuntimeError(
                 'remote-side relation data cannot be accessed during a relation-broken event'
