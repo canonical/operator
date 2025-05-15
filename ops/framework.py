@@ -935,31 +935,14 @@ class Framework(Object):
 
     @contextmanager
     def _event_context(self, event_name: str):
-        """Handles toggling the hook-is-running state in backends.
-
-        This allows e.g. harness logic to know if it is executing within a running hook context
-        or not.  It sets backend._hook_is_running equal to the name of the currently running
-        hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
-        is completed.
-
-        Usage:
-            >>> with harness._event_context('db-relation-changed'):
-            >>>     print('Harness thinks it is running an event hook.')
-            >>> with harness._event_context(''):
-            >>>     print('harness thinks it is not running an event hook.')
-        """
-        backend: _ModelBackend | None = self.model._backend if self.model else None
-        if not backend:
+        if self.model is None:
             yield  # context does nothing in this case
             return
 
         old_event_name = self._event_name
         self._event_name = event_name
 
-        old_hook_is_running = backend._hook_is_running
-        backend._hook_is_running = event_name
         yield
-        backend._hook_is_running = old_hook_is_running
 
         self._event_name = old_event_name
 

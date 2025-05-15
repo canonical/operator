@@ -1825,13 +1825,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         self._backend = backend
         self._is_app: bool = isinstance(entity, Application)
 
-    @property
-    def _hook_is_running(self) -> bool:
-        # this flag controls whether the access we have to RelationDataContent
-        # is 'strict' aka the same as a deployed charm would have, or whether it is
-        # unrestricted, allowing test code to read/write databags at will.
-        return bool(self._backend._hook_is_running)
-
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
         try:
@@ -1842,10 +1835,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _validate_read(self):
         """Return if the data content can be read."""
-        # if we're not in production (we're testing): we skip access control rules
-        if not self._hook_is_running:
-            return
-
         # Only remote units (and the leader unit) can read *this* app databag.
 
         # is this an app databag?
@@ -1903,10 +1892,6 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             raise RelationDataTypeError(f'relation data values must be strings, not {type(value)}')
 
     def _validate_write_access(self) -> None:
-        # if we're not in production (we're testing): we skip access control rules
-        if not self._hook_is_running:
-            return
-
         # finally, we check whether we have permissions to write this databag
         if self._is_app:
             is_our_app: bool = self._backend.app_name == self._entity.name
@@ -3368,7 +3353,6 @@ class _ModelBackend:
 
         self._is_leader: bool | None = None
         self._leader_check_time = None
-        self._hook_is_running = ''
         self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
 
     @contextlib.contextmanager

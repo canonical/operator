@@ -2203,7 +2203,6 @@ class TestHarness:
         assert harness.get_relation_data(rel_id, 'test-charm') == {'foo': 'bar'}
 
         # now we're outside of the hook context:
-        assert not harness._backend._hook_is_running
         assert rel.data[harness.charm.app]['foo'] == 'bar'
 
     def test_relation_set_deletes(self, request: pytest.FixtureRequest):

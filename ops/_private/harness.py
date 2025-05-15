@@ -2329,7 +2329,6 @@ class _Secret:
     grants: dict[int, set[str]] = dataclasses.field(default_factory=dict)
     user_secrets_grants: set[str] = dataclasses.field(default_factory=set)
 
-
 @_copy_docstrings(model._ModelBackend)
 @_record_calls
 class _TestingModelBackend:
@@ -2395,7 +2394,6 @@ class _TestingModelBackend:
         self._pebble_clients: dict[str, _TestingPebbleClient] = {}
         self._pebble_clients_can_connect: dict[_TestingPebbleClient, bool] = {}
         self._planned_units: int | None = None
-        self._hook_is_running = ''
         self._secrets: list[_Secret] = []
         self._opened_ports: set[model.Port] = set()
         self._networks: dict[tuple[str | None, int | None], _NetworkDict] = {}
@@ -2475,7 +2473,7 @@ class _TestingModelBackend:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
 
-        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
+        if 'relation_broken' in self._juju_context.dispatch_path and not self.relation_remote_app_name(
             relation_id
         ):
             raise RuntimeError(
