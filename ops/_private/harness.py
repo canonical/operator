@@ -2310,20 +2310,6 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         raise TypeError("'ConfigData' object does not support item assignment")
 
 
-class _TestingRelationDataContents(Dict[str, str]):
-    def __setitem__(self, key: str, value: str):
-        if not isinstance(key, str):
-            raise model.RelationDataError(f'relation data keys must be strings, not {type(key)}')
-        if not isinstance(value, str):
-            raise model.RelationDataError(
-                f'relation data values must be strings, not {type(value)}'
-            )
-        super().__setitem__(key, value)
-
-    def copy(self):
-        return _TestingRelationDataContents(super().copy())
-
-
 @dataclasses.dataclass
 class _SecretRevision:
     revision: int
