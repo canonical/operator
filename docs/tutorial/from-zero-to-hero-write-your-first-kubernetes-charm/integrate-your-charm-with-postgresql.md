@@ -430,7 +430,7 @@ Then remove the following assertion from `test_pebble_layer`:
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-This assertion is no longer applicable, because `test_pebble_layer` doesn't arrange any relation data.
+Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`.
 
 Now run `tox -e unit` to make sure all test cases pass.
 
