@@ -134,7 +134,7 @@ class Model:
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: dict[str, _charm.RelationMeta] = meta.relations
-        self._relations = RelationMapping(
+        self._relations = self._relation_mapping_class(
             relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
         )
         self._config = ConfigData(self._backend)
@@ -144,6 +144,10 @@ class Model:
         storages: Iterable[str] = meta.storages
         self._storages = StorageMapping(list(storages), self._backend)
         self._bindings = BindingMapping(self._backend)
+
+    @property
+    def _relation_mapping_class(self) -> type[RelationMapping]:
+        return RelationMapping
 
     @property
     def unit(self) -> Unit:
@@ -920,6 +924,10 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._broken_relation_id = broken_relation_id
         self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
 
+    @property
+    def _relation_class(self) -> type[Relation]:
+        return Relation
+
     def __contains__(self, key: str):
         return key in self._data
 
@@ -937,7 +945,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
             for rid in self._backend.relation_ids(relation_name):
                 if rid == self._broken_relation_id:
                     continue
-                relation = Relation(
+                relation = self._relation_class(
                     relation_name, rid, is_peer, self._our_unit, self._backend, self._cache
                 )
                 relation_list.append(relation)
@@ -965,7 +973,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
             else:
                 # The relation may be dead, but it is not forgotten.
                 is_peer = relation_name in self._peers
-                return Relation(
+                return self._relation_class(
                     relation_name,
                     relation_id,
                     is_peer,
@@ -1745,9 +1753,13 @@ class Relation:
 
         # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast('Application', app)
-        self.data = RelationData(self, our_unit, backend)
+        self.data = self._relation_data_class(self, our_unit, backend)
 
         self._remote_model: RemoteModel | None = None
+
+    @property
+    def _relation_data_class(self) -> type[RelationData]:
+        return RelationData
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.name}:{self.id}>'
@@ -1786,17 +1798,24 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     def __init__(self, relation: Relation, our_unit: Unit, backend: _ModelBackend):
         self.relation = weakref.proxy(relation)
         self._data: dict[Unit | Application, RelationDataContent] = {
-            our_unit: RelationDataContent(self.relation, our_unit, backend),
-            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
+            our_unit: self._relation_data_content_class(self.relation, our_unit, backend),
+            our_unit.app: self._relation_data_content_class(self.relation, our_unit.app, backend),
         }
         self._data.update({
-            unit: RelationDataContent(self.relation, unit, backend) for unit in self.relation.units
+            unit: self._relation_data_content_class(self.relation, unit, backend)
+            for unit in self.relation.units
         })
         # The relation might be dead so avoid a None key here.
         if self.relation.app is not None:
             self._data.update({
-                self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
+                self.relation.app: self._relation_data_content_class(
+                    self.relation, self.relation.app, backend
+                ),
             })
+
+    @property
+    def _relation_data_content_class(self) -> type[RelationDataContent]:
+        return RelationDataContent
 
     def __contains__(self, key: Unit | Application):
         return key in self._data

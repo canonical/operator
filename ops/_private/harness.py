@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import fnmatch
+import functools
 import http
 import inspect
 import io
@@ -305,7 +306,7 @@ class Harness(Generic[CharmType]):
         self._backend = _TestingModelBackend(
             self._unit_name, self._meta, config_, self._juju_context
         )
-        self._model = model.Model(self._meta, self._backend)
+        self._model = _TestingModel(self._meta, self._backend, harness=self)
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
             self._storage,
@@ -438,7 +439,8 @@ class Harness(Generic[CharmType]):
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
-        self._charm = TestCharm(self._framework)  # type: ignore
+        with self._framework._event_context('__init__'):
+            self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
         """Fire the same hooks that Juju would fire at startup.
@@ -3042,6 +3044,60 @@ class _TestingModelBackend:
                 'ERROR cloud spec is empty, set it with `Harness.set_cloud_spec()` first'
             )
         return self._cloud_spec
+
+
+class _TestingModel(model.Model):
+    def __init__(self, *args: Any, harness: Harness[Any], **kwargs: Any):
+        self._harness = harness
+        super().__init__(*args, **kwargs)
+
+    @property
+    def _relation_mapping_class(self) -> type[model.RelationMapping]:
+        return functools.partial(_TestingRelationMapping, harness=self._harness)  # type: ignore
+
+
+class _TestingRelationMapping(model.RelationMapping):
+    def __init__(self, *args: Any, harness: Harness[Any], **kwargs: Any):
+        self._harness = harness
+        super().__init__(*args, **kwargs)
+
+    @property
+    def _relation_class(self) -> type[model.Relation]:
+        return functools.partial(_TestingRelation, harness=self._harness)  # type: ignore
+
+
+class _TestingRelation(model.Relation):
+    def __init__(self, *args: Any, harness: Harness[Any], **kwargs: Any):
+        self._harness = harness
+        super().__init__(*args, **kwargs)
+
+    @property
+    def _relation_data_class(self) -> type[model.RelationData]:
+        return functools.partial(_TestingRelationData, harness=self._harness)  # type: ignore
+
+
+class _TestingRelationData(model.RelationData):
+    def __init__(self, *args: Any, harness: Harness[Any], **kwargs: Any):
+        self._harness = harness
+        super().__init__(*args, **kwargs)
+
+    @property
+    def _relation_data_content_class(self) -> type[model.RelationDataContent]:
+        return functools.partial(_TestingRelationDataContent, harness=self._harness)  # type: ignore
+
+
+class _TestingRelationDataContent(model.RelationDataContent):
+    def __init__(self, *args: Any, harness: Harness[Any], **kwargs: Any):
+        self._harness = harness
+        super().__init__(*args, **kwargs)
+
+    def _validate_read(self) -> None:
+        if self._harness._framework._event_name:
+            super()._validate_read()
+
+    def _validate_write_access(self) -> None:
+        if self._harness._framework._event_name:
+            super()._validate_write_access()
 
 
 @_copy_docstrings(pebble.ExecProcess)
