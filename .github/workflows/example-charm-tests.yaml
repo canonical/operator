@@ -34,9 +34,8 @@ jobs:
         run: pip install tox~=4.2
       - name: Install Charmcraft
         run: sudo snap install charmcraft --classic
-      - name: Fetch data_interfaces lib
-        run: charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
-      - name: Run unit tests
+      - name: Fetch lib and run unit tests
         run: |
           cd ${{ matrix.dir }}
+          charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
           tox -e unit
