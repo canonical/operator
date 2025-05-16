@@ -66,7 +66,7 @@ A test consists of three broad steps:
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+    on testing charms, see :doc:`/explanation/testing`.
 
 
 ..
