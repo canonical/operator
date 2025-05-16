@@ -184,7 +184,8 @@ def test_relation_get(mycharm):
                 local_unit_data={'c': 'd'},
                 remote_units_data={0: {}, 1: {'e': 'f'}, 2: {}},
             )
-        }
+        },
+        leader=True,
     )
     trigger(
         state,
