@@ -51,7 +51,7 @@ tracing = [
 harness = []
 
 [project.urls]
-"Homepage" = "https://juju.is/docs/sdk"
+"Homepage" = "https://ops.readthedocs.io/en/latest/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
 "Documentation" = "https://ops.readthedocs.io"
@@ -254,7 +254,7 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
 ]
-"examples/tutorial-k8s/*/tests/*" = [
+"examples/*/tests/*" = [
     # All documentation linting.
     "D",
 ]

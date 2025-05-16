@@ -653,12 +653,6 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 ```
 
-In your Multipass Ubuntu VM, run the test:
-
-```bash
-tox -e integration
-```
-
 The test takes some time to run as the `pytest-operator` running in the background will add a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
 
 The result should be similar to the following output:
