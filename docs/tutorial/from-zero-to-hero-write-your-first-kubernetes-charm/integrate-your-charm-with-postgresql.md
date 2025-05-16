@@ -423,11 +423,11 @@ def test_no_database_blocked():
     assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
 ```
 
-Then remove the following assertion from `test_pebble_layer`:
+Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`. Replace the `assert state_out.unit_status` line by:
 
 ```python
-    # Check the unit status is active
-    assert state_out.unit_status == testing.ActiveStatus()
+    # Check the unit is blocked:
+    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
 ```
 
 Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`.
