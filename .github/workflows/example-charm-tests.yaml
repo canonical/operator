@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  test-tutorial-k8s:
+  charm-unit-tests:
     runs-on: ubuntu-latest
 
     strategy:
@@ -19,6 +19,8 @@ jobs:
         python-version: ["3.10", "3.12"]
         dir:
           - examples/k8s-1-minimal
+          - examples/k8s-2-configurable
+          - examples/k8s-3-postgresql
 
     steps:
       - uses: actions/checkout@v4
