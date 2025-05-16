@@ -79,10 +79,9 @@ First, at the top of the file, import the database interfaces library:
 
 ```python
 # Import the 'data_interfaces' library.
-# The import statement omits the top-level 'lib' directory 
+# The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent
-from charms.data_platform_libs.v0.data_interfaces import DatabaseRequires
+from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
 ```
 
 ````{important}
@@ -119,9 +118,8 @@ Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' 
 
 ```python
 # The 'relation_name' comes from the 'charmcraft.yaml file'.
-# The 'database_name' is the name of the database that our application requires. 
-# See the application documentation in the GitHub repository.
-self.database = DatabaseRequires(self, relation_name="database", database_name="names_db")
+# The 'database_name' is the name of the database that our application requires.
+self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
 ```
 
 Now, add event observers for all the database events:
@@ -145,7 +143,8 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
     then logged for debugging purposes, and any non-empty data is processed to extract
     endpoint information, username, and password. This processed data is then returned as
     a dictionary. If no data is retrieved, the unit is set to waiting status and
-    the program exits with a zero status code."""
+    the program exits with a zero status code.
+    """
     relations = self.database.fetch_relation_data()
     logger.debug('Got following database data: %s', relations)
     for data in relations.values():
@@ -168,31 +167,29 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
 Our application consumes database authentication information in the form of environment variables. Let's update the Pebble service definition with an `environment` key and let's set this key to a dynamic value -- the class property `self.app_environment`. Your `_pebble_layer` property should look as below:
 
 ```python
-    @property
-    def _pebble_layer(self) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join(
-            [
-                'uvicorn',
-                'api_demo_server.app:app',
-                '--host=0.0.0.0',
-                f"--port={self.config['server-port']}",
-            ]
-        )
-        pebble_layer: ops.pebble.LayerDict = {
-            'summary': 'FastAPI demo service',
-            'description': 'pebble config layer for FastAPI demo server',
-            'services': {
-                self.pebble_service_name: {
-                    'override': 'replace',
-                    'summary': 'fastapi demo',
-                    'command': command,
-                    'startup': 'enabled',
-                    'environment': self.app_environment,
-                }
-            },
-        }
-        return ops.pebble.Layer(pebble_layer)
+@property
+def _pebble_layer(self) -> ops.pebble.Layer:
+    """A Pebble layer for the FastAPI demo services."""
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        f'--port={self.config["server-port"]}',
+    ])
+    pebble_layer: ops.pebble.LayerDict = {
+        'summary': 'FastAPI demo service',
+        'description': 'pebble config layer for FastAPI demo server',
+        'services': {
+            self.pebble_service_name: {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': command,
+                'startup': 'enabled',
+                'environment': self.app_environment,
+            }
+        },
+    }
+    return ops.pebble.Layer(pebble_layer)
 ```
 
 Now, let's define this property such that, every time it is called, it dynamically fetches database authentication data and also prepares the output in a form that our application can consume, as below:
@@ -200,7 +197,9 @@ Now, let's define this property such that, every time it is called, it dynamical
 ```python
 @property
 def app_environment(self) -> dict[str, str]:
-    """This property method creates a dictionary containing environment variables
+    """Prepare environment variables for the application.
+
+    This property method creates a dictionary containing environment variables
     for the application. It retrieves the database authentication data by calling
     the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
     If any of the values are not present, it will be set to None.
@@ -212,10 +211,10 @@ def app_environment(self) -> dict[str, str]:
     env = {
         key: value
         for key, value in {
-            "DEMO_SERVER_DB_HOST": db_data.get("db_host", None),
-            "DEMO_SERVER_DB_PORT": db_data.get("db_port", None),
-            "DEMO_SERVER_DB_USER": db_data.get("db_username", None),
-            "DEMO_SERVER_DB_PASSWORD": db_data.get("db_password", None),
+            'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
+            'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
+            'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
+            'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
         }.items()
         if value is not None
     }
@@ -252,20 +251,20 @@ And define a method that does the various checks, adding appropriate statuses. T
 def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
     port = self.config['server-port']
     if port == 22:
-        event.add_status(ops.BlockedStatus('Invalid port number, 22 is reserved for SSH'))
+        event.add_status(ops.BlockedStatus('invalid port number, 22 is reserved for SSH'))
     if not self.model.get_relation('database'):
         # We need the user to do 'juju integrate'.
-        event.add_status(ops.BlockedStatus('Waiting for database relation'))
+        event.add_status(ops.BlockedStatus('waiting for database relation'))
     elif not self.database.fetch_relation_data():
         # We need the charms to finish integrating.
-        event.add_status(ops.WaitingStatus('Waiting for database relation'))
+        event.add_status(ops.WaitingStatus('waiting for database relation'))
     try:
         status = self.container.get_service(self.pebble_service_name)
     except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-        event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
+        event.add_status(ops.MaintenanceStatus('waiting for Pebble in workload container'))
     else:
         if not status.is_running():
-            event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
+            event.add_status(ops.MaintenanceStatus('waiting for the service to start up'))
     # If nothing is wrong, then the status is active.
     event.add_status(ops.ActiveStatus())
 ```
@@ -276,9 +275,18 @@ We also want to clean up the code to remove the places where we're setting the s
     if port == 22:
         # The collect-status handler will set the status to blocked.
         logger.debug('Invalid port number: 22 is reserved for SSH')
+        return
 ```
 
-And remove the `self.unit.status = WaitingStatus` line from `_update_layer_and_restart` (similarly replacing it with a logging line if you prefer).
+And remove the following lines from `_update_layer_and_restart`:
+
+```python
+    self.unit.status = ops.ActiveStatus()
+```
+
+```python
+    self.unit.status = ops.MaintenanceStatus('waiting for Pebble in workload container')
+```
 
 ## Validate your charm
 
@@ -371,16 +379,16 @@ Now that our charm uses `fetch_postgres_relation_data` to extract database authe
 def test_relation_data():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint="database",
-        interface="postgresql_client",
-        remote_app_name="postgresql-k8s",
+        endpoint='database',
+        interface='postgresql_client',
+        remote_app_name='postgresql-k8s',
         remote_app_data={
-            "endpoints": "example.com:5432",
-            "username": "foo",
-            "password": "bar",
+            'endpoints': 'example.com:5432',
+            'username': 'foo',
+            'password': 'bar',
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -389,11 +397,13 @@ def test_relation_data():
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services["fastapi-service"].environment == {
-        "DEMO_SERVER_DB_HOST": "example.com",
-        "DEMO_SERVER_DB_PORT": "5432",
-        "DEMO_SERVER_DB_USER": "foo",
-        "DEMO_SERVER_DB_PASSWORD": "bar",
+    assert state_out.get_container(container.name).layers['fastapi_demo'].services[
+        'fastapi-service'
+    ].environment == {
+        'DEMO_SERVER_DB_HOST': 'example.com',
+        'DEMO_SERVER_DB_PORT': '5432',
+        'DEMO_SERVER_DB_USER': 'foo',
+        'DEMO_SERVER_DB_PASSWORD': 'bar',
     }
 ```
 
@@ -402,7 +412,7 @@ In this chapter, we also defined a new method `_on_collect_status` that checks v
 ```python
 def test_no_database_blocked():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -410,33 +420,41 @@ def test_no_database_blocked():
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
-    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
+    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
 ```
 
-Run `tox -e unit` to make sure all test cases pass.
+Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`. Replace the `assert state_out.unit_status` line by:
+
+```python
+    # Check the unit is blocked:
+    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
+```
+
+Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
 Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
 
 ```python
+@pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+    charm = await ops_test.build_charm('.')
     resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
+        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
-    # Deploy the charm and wait for blocked/idle status
-    # The app will not be in active status as this requires a database relation
+    # Deploy the charm and wait for blocked/idle status.
+    # The app will not be in active status as this requires a database relation.
     await asyncio.gather(
         ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
         ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="blocked", raise_on_blocked=False, timeout=300
+            apps=[APP_NAME], status='blocked', raise_on_blocked=False, timeout=300
         ),
     )
 ```
@@ -453,15 +471,14 @@ async def test_database_integration(ops_test: OpsTest):
     Assert that the charm is active if the integration is established.
     """
     await ops_test.model.deploy(
-        application_name="postgresql-k8s",
-        entity_url="postgresql-k8s",
-        channel="14/stable",
+        application_name='postgresql-k8s',
+        entity_url='postgresql-k8s',
+        channel='14/stable',
     )
-    await ops_test.model.integrate(f"{APP_NAME}", "postgresql-k8s")
+    await ops_test.model.integrate(f'{APP_NAME}', 'postgresql-k8s')
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300
+        apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
     )
-
 ```
 
 ```{important}
