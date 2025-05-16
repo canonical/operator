@@ -438,7 +438,8 @@ class Harness(Generic[CharmType]):
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
-        self._charm = TestCharm(self._framework)  # type: ignore
+        with self.framework._event_context('__init__'):
+            self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
         """Fire the same hooks that Juju would fire at startup.

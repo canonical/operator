@@ -307,7 +307,8 @@ class _Manager:
         self.dispatcher.run_any_legacy_hook()
 
         self.framework = self._make_framework(self.dispatcher)
-        self.charm = self._charm_class(self.framework)
+        with self.framework._event_context('__init__'):
+            self.charm = self._charm_class(self.framework)
 
     def _load_charm_meta(self):
         return _charm.CharmMeta.from_charm_root(self._charm_root)
