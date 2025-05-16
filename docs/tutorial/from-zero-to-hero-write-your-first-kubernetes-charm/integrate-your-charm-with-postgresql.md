@@ -430,8 +430,6 @@ Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a dat
     assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
 ```
 
-Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`.
-
 Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
