@@ -1397,22 +1397,22 @@ class Harness(Generic[CharmType]):
         new_relation_instance = self.model.relations._get_unique(relation.name, relation_id)
         assert new_relation_instance is not None  # type guard; this passed before...
         databag = new_relation_instance.data[entity]
-        # ensure that WE as harness can temporarily write the databag
-        with self._event_context(''):
-            values_have_changed = False
-            for k, v in key_values.items():
-                if v == '':
-                    if databag.pop(k, None) != v:
-                        values_have_changed = True
-                else:
-                    if k not in databag or databag[k] != v:
-                        databag[k] = v  # this triggers relation-set
-                        values_have_changed = True
 
+        original = {k: v for k, v in databag._data.items()}
+        # ensure that WE as harness can temporarily write the databag
+        original_validate_read = databag._validate_read
+        original_validate_write_access = databag._validate_write_access
+        databag._validate_write_access = lambda: None
+        databag._validate_read = lambda: None
+        try:
+            databag.update(key_values)
+        finally:
+            databag._validate_read = original_validate_read
+            databag._validate_write_access = original_validate_write_access
+        values_have_changed = {k: v for k, v in databag._data.items()} != original
         if not values_have_changed:
             # Do not issue a relation changed event if the data bags have not changed
             return
-
         if app_or_unit == self._model.unit.name:
             # No events for our own unit
             return
@@ -2484,17 +2484,6 @@ class _TestingModelBackend:
 
         if relation_id not in self._relation_data_raw:
             raise RelationNotFoundError(relation_id)
-
-        relation = self._relation_data_raw[relation_id]
-        bucket_key = self.app_name if is_app else self.unit_name
-        if bucket_key not in relation:
-            relation[bucket_key] = {}
-        bucket = relation[bucket_key]
-        for key, value in data.items():
-            if value == '':
-                bucket.pop(key, None)
-            else:
-                bucket[key] = value
 
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
         # For Harness, ignore relation_id and assume relation is never cross-model.
