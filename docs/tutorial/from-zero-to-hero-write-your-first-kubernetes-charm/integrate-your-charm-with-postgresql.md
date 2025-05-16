@@ -439,23 +439,24 @@ Now run `tox -e unit` to make sure all test cases pass.
 Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
 
 ```python
+@pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+    charm = await ops_test.build_charm('.')
     resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
+        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
-    # Deploy the charm and wait for blocked/idle status
-    # The app will not be in active status as this requires a database relation
+    # Deploy the charm and wait for blocked/idle status.
+    # The app will not be in active status as this requires a database relation.
     await asyncio.gather(
         ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
         ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="blocked", raise_on_blocked=False, timeout=300
+            apps=[APP_NAME], status='blocked', raise_on_blocked=False, timeout=300
         ),
     )
 ```
@@ -472,15 +473,14 @@ async def test_database_integration(ops_test: OpsTest):
     Assert that the charm is active if the integration is established.
     """
     await ops_test.model.deploy(
-        application_name="postgresql-k8s",
-        entity_url="postgresql-k8s",
-        channel="14/stable",
+        application_name='postgresql-k8s',
+        entity_url='postgresql-k8s',
+        channel='14/stable',
     )
-    await ops_test.model.integrate(f"{APP_NAME}", "postgresql-k8s")
+    await ops_test.model.integrate(f'{APP_NAME}', 'postgresql-k8s')
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300
+        apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
     )
-
 ```
 
 ```{important}

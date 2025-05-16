@@ -38,9 +38,28 @@ async def test_build_and_deploy(ops_test: OpsTest):
         'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
+    # Deploy the charm and wait for blocked/idle status.
+    # The app will not be in active status as this requires a database relation.
     await asyncio.gather(
         ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
         ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
+            apps=[APP_NAME], status='blocked', raise_on_blocked=False, timeout=300
         ),
+    )
+
+
+@pytest.mark.abort_on_fail
+async def test_database_integration(ops_test: OpsTest):
+    """Verify that the charm integrates with the database.
+
+    Assert that the charm is active if the integration is established.
+    """
+    await ops_test.model.deploy(
+        application_name='postgresql-k8s',
+        entity_url='postgresql-k8s',
+        channel='14/stable',
+    )
+    await ops_test.model.integrate(f'{APP_NAME}', 'postgresql-k8s')
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
     )
