@@ -42,7 +42,7 @@ def test_pebble_layer():
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
-    # Check the unit status is active
+    # Check the unit is active:
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
     assert (
