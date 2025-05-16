@@ -93,9 +93,6 @@ extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 # Ruff formatter configuration
 [tool.ruff.format]
 quote-style = "single"
-exclude = [
-    "examples/*/lib/*",
-]
 
 [tool.ruff.lint]
 select = [
@@ -178,10 +175,7 @@ ignore = [
     # `subprocess` call: check for execution of untrusted input
     "S603",
 ]
-exclude = [
-    "tracing/ops_tracing/vendor/*",
-    "examples/*/lib/*",
-]
+exclude = ["tracing/ops_tracing/vendor/*"]
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = [
