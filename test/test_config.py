@@ -338,17 +338,22 @@ def test_config_custom_naming_pattern(request: pytest.FixtureRequest):
         foo_bar: int = 42
         other: str = 'baz'
 
-        @staticmethod
-        def _attr_to_juju_name(name: str):
-            if name == 'foo_bar':
-                return 'fooBar'
-            return name.replace('_', '-')
+        def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+            super().__init__()
+            if not isinstance(fooBar, int):
+                raise ValueError('fooBar must be an integer')
+            if not isinstance(other, str):
+                raise ValueError('other must be a string')
+            object.__setattr__(self, 'foo_bar', fooBar)
+            object.__setattr__(self, 'other', other)
 
-        @staticmethod
-        def _juju_name_to_attr(name: str):
-            if name == 'fooBar':
-                return 'foo_bar'
-            return name.replace('-', '_')
+        @classmethod
+        def to_juju_schema(cls):
+            schema = super().to_juju_schema()
+            # We need to override the options to use the custom names.
+            options = schema['options']
+            options['fooBar'] = options.pop('foo-bar')
+            return schema
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -363,39 +368,6 @@ def test_config_custom_naming_pattern(request: pytest.FixtureRequest):
     typed_config = harness.charm.typed_config
     assert typed_config.foo_bar == 42
     assert typed_config.other == 'baz'
-
-
-@pytest.mark.parametrize(
-    'errors,exc',
-    (('raise', ValueError), ('blocked', _model._InvalidSchemaError), (None, ValueError)),
-)
-def test_config_bad_attr_naming_pattern(
-    errors: Literal['blocked', 'raise'] | None,
-    exc: type[Exception],
-    request: pytest.FixtureRequest,
-):
-    @dataclasses.dataclass(frozen=True)
-    class BadConfig(ops.ConfigBase):
-        foo_bar: int = 42
-
-        @staticmethod
-        def _juju_name_to_attr(attr: str):
-            return attr.replace('_', '-')
-
-    class BadCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            if errors:
-                self.typed_config = self.load_config(BadConfig, errors=errors)
-            else:
-                self.typed_config = self.load_config(BadConfig)
-
-    config = BadConfig.to_juju_schema()
-    assert 'foo-bar' in config['options']
-    harness = testing.Harness(BadCharm, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    with pytest.raises(exc):
-        harness.begin()
 
 
 @pytest.mark.parametrize('config_class', _test_config_classes)

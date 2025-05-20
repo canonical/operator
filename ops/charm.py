@@ -1464,8 +1464,7 @@ class CharmBase(Object):
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
         fields = set(cls._juju_names())  # type: ignore
         for key, value in self.config.items():
-            attr = cls._juju_name_to_attr(key)  # type: ignore
-            assert isinstance(attr, str)
+            attr = key.replace('-', '_')
             if not attr.isidentifier():
                 if errors == 'raise':
                     raise ValueError(f'Invalid attribute name {attr}')

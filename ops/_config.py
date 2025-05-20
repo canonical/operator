@@ -128,24 +128,6 @@ class ConfigBase:
         # override `to_juju_schema` to adjust this if required.
         return 'string'
 
-    @staticmethod
-    def _attr_to_juju_name(attr: str):
-        """Convert from the class attribute name to the name used in the schema.
-
-        Python names are snake_case, but Juju config option names should be
-        kebab-case.
-        """
-        return attr.replace('_', '-')
-
-    @staticmethod
-    def _juju_name_to_attr(attr: str):
-        """Convert from the schema name to the class attribute name.
-
-        Python names are snake_case, but Juju config option names should be
-        kebab-case.
-        """
-        return attr.replace('-', '_')
-
     @classmethod
     def _juju_names(cls) -> Generator[str]:
         """Iterates over all the option names to include in the config YAML."""
@@ -187,7 +169,7 @@ class ConfigBase:
             option['type'] = hint
             if field.description:  # type: ignore
                 option['description'] = field.description  # type: ignore
-            options[cls._attr_to_juju_name(name)] = option  # type: ignore
+            options[name.replace('_', '-')] = option  # type: ignore
         return {'options': options}
 
     @classmethod
@@ -252,5 +234,5 @@ class ConfigBase:
             doc = attr_docstrings.get(attr)
             if doc:
                 option['description'] = doc
-            options[cls._attr_to_juju_name(attr)] = option
+            options[attr.replace('_', '-')] = option
         return {'options': options}
