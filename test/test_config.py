@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from typing import Any, Literal, Optional, Protocol, Union, cast
+from typing import Literal, Optional, Protocol, Union, cast
 
 import pytest
 
@@ -442,10 +442,11 @@ def test_config_custom_type(request: pytest.FixtureRequest):
             self.y = datetime.date(int(year), int(month), int(day))
 
         @classmethod
-        def _attr_to_juju_type(cls, attr: str, default: Any = None) -> str:
-            if attr == 'y':
-                return 'string'
-            return super()._attr_to_juju_type(attr, default)
+        def to_juju_schema(cls):
+            schema = super().to_juju_schema()
+            # Override the custom type.
+            schema['options']['y']['type'] = 'string'
+            return schema
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):

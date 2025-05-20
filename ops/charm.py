@@ -37,7 +37,7 @@ from typing import (
     cast,
 )
 
-from . import model
+from . import _config, model
 from ._private import yaml
 from .framework import (
     EventBase,
@@ -1462,7 +1462,7 @@ class CharmBase(Object):
                 ``raise``.
         """
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
-        fields = set(cls._juju_names())  # type: ignore
+        fields = set(_config._juju_names(cls))
         for key, value in self.config.items():
             attr = key.replace('-', '_')
             if not attr.isidentifier():
