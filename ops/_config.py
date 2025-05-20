@@ -18,12 +18,33 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Any, ClassVar, Final, Generator, Mapping, get_args, get_origin, get_type_hints
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Final,
+    Generator,
+    Mapping,
+    TypedDict,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from ._private import attrdocs
 from .model import Secret
 
 logger = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:
+    from typing_extensions import NotRequired
+
+    class OptionDict(TypedDict):
+        type: str
+        """The Juju option type."""
+        description: NotRequired[str]
+        default: NotRequired[bool | int | float | str]
 
 
 _JUJU_TYPES: Final[Mapping[str, str]] = {
@@ -180,7 +201,7 @@ class ConfigBase:
     """
 
     @classmethod
-    def to_juju_schema(cls) -> dict[str, Any]:
+    def to_juju_schema(cls) -> dict[str, dict[str, OptionDict]]:
         """Translate the class to YAML suitable for config.yaml.
 
         Using :attr:`ConfigBase.to_juju_schema` will generate a YAML schema
@@ -231,13 +252,12 @@ class ConfigBase:
 
         # Dataclasses, regular classes, etc.
         attr_docstrings = attrdocs.get_attr_docstrings(cls)
-        options: dict[str, dict[str, bool | int | float | str]] = {}
+        options: dict[str, OptionDict] = {}
         for attr in _juju_names(cls):
-            option = {}
             default = getattr(cls, attr, None)
+            option: OptionDict = {'type': _attr_to_juju_type(cls, attr, default)}
             if default is not None and type(default).__name__ in _JUJU_TYPES:
                 option['default'] = default
-            option['type'] = _attr_to_juju_type(cls, attr, default)
             doc = attr_docstrings.get(attr)
             if doc:
                 option['description'] = doc
