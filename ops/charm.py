@@ -1477,14 +1477,12 @@ class CharmBase(Object):
             # that using model.get_secret so that it's entirely lazy, in the
             # same way that SecretEvent.secret is.
             if option_type and option_type.type == 'secret' and isinstance(value, str):
-                secret = model.Secret(
+                value = model.Secret(
                     backend=self.model._backend,
                     id=value,
                     _secret_set_cache=self.model._cache._secret_set_cache,
                 )
-                config[attr] = secret
-            else:
-                config[attr] = value
+            config[attr] = value
         try:
             return cls(*args, **config)
         except ValueError as e:

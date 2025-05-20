@@ -47,7 +47,7 @@ class ConfigBase:
 
     .. note::
 
-        That is a dataclass, but the class can be any that inherits from
+        This example is a dataclass, but the class can be any that inherits from
         ``ops.ConfigBase``, and that can be initialised with the raw Juju config
         passed as keyword arguments. Any errors should be indicated by raising
         ``ValueError`` (or a ``ValueError`` subclass) in initialisation.
