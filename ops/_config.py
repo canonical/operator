@@ -132,18 +132,18 @@ class ConfigBase:
     def _juju_names(cls) -> Generator[str]:
         """Iterates over all the option names to include in the config YAML."""
         try:
-            yield from (field.name for field in dataclasses.fields(cls))  # type: ignore
+            yield from (field.name for field in sorted(dataclasses.fields(cls)))  # type: ignore
         except TypeError:
             pass
         else:
             return
         if hasattr(cls, 'model_fields'):
-            yield from iter(cls.model_fields)  # type: ignore
+            yield from sorted(cls.model_fields)  # type: ignore
             return
         # Fall back to using dir() and __annotations__.
         attrs = dir(cls)
         attrs.extend((a for a, t in cls.__annotations__.items() if get_origin(t) is not ClassVar))
-        for attr in set(attrs):
+        for attr in sorted(set(attrs)):
             if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
                 continue
             yield attr
