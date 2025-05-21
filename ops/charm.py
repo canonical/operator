@@ -1430,18 +1430,18 @@ class CharmBase(Object):
     ) -> _ConfigType:
         """Load the config into an instance of a config class.
 
-        The object will be instantiated with keyword arguments of the raw Juju
-        config for all the options that are found in the class, but with:
+        The raw Juju config is passed to the config class's ``__init__``, as
+        keyword arguments, with the following changes:
 
-        * ``secret`` type options having a :class:`model.Secret` value rather
+        * ``secret`` type options have a :class:`model.Secret` value rather
           than the secret ID. Note that the secret object is not validated by
           Juju at this time, so may raise :class:`SecretNotFoundError` when it
           is later used if the secret does not exist or the unit does not have
           permission to access it.
         * dashes in names converted to underscores.
 
-        Any additional positional or keyword arguments will be passed through to
-        the config class.
+        Any additional positional or keyword arguments to this method will be
+        passed through to the config class ``__init__``.
 
         Args:
             cls: A class that inherits from :class:`ops.ConfigBase`.
