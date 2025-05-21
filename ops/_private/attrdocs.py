@@ -27,9 +27,9 @@ attribute.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import inspect
 import logging
-from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -74,14 +74,13 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
     # For Pydantic dataclasses, we expect to have the docstrings in field
     # objects, but there's no "model_fields" attribute.
     elif hasattr(cls, '__dataclass_fields__'):
-        fields = cast('dict[str, Any]', cls.__dataclass_fields__)  # type: ignore
-        for attr, field in fields.items():
+        for field in dataclasses.fields(cls):  # type: ignore
             if (
                 hasattr(field, 'default')
                 and hasattr(field.default, 'description')
-                and field.default.description
+                and field.default.description  # type: ignore
             ):
-                docs[attr] = field.default.description
+                docs[field.name] = field.default.description  # type: ignore
 
     try:
         source_code = inspect.getsource(cls)
