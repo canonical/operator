@@ -27,13 +27,14 @@ $ RUN_REAL_PEBBLE_TESTS=1 PEBBLE=~/pebble pytest test/test_real_pebble.py -v
 $ deactivate
 """
 
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import tempfile
 import threading
 import time
-import typing
 import urllib.error
 import urllib.request
 import uuid
@@ -123,15 +124,15 @@ class TestRealPebble:
         # After two retries the "bad" check should go down
         for _ in range(5):
             checks = client.get_checks()
-            bad_check = [c for c in checks if c.name == 'bad'][0]
+            bad_check = next(c for c in checks if c.name == 'bad')
             if bad_check.status == pebble.CheckStatus.DOWN:
                 break
             time.sleep(0.06)
         else:
             assert False, 'timed out waiting for "bad" check to go down'
-        assert bad_check.failures == 2
+        assert bad_check.failures >= 2
         assert bad_check.threshold == 2
-        good_check = [c for c in checks if c.name == 'good'][0]
+        good_check = next(c for c in checks if c.name == 'good')
         assert good_check.status == pebble.CheckStatus.UP
 
         # And /v1/health should return "unhealthy" (with status HTTP 502)
@@ -250,7 +251,7 @@ class TestRealPebble:
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[str] = list(process.stdout)
+        reads: list[str] = list(process.stdout)
 
         process.wait()
 
@@ -272,7 +273,7 @@ class TestRealPebble:
 
         threading.Thread(target=stdin_thread).start()
 
-        reads: typing.List[bytes] = list(process.stdout)
+        reads: list[bytes] = list(process.stdout)
 
         process.wait()
 
@@ -308,6 +309,42 @@ class TestRealPebble:
         assert plan.log_targets['pretend-loki'].services == ['all']
         assert plan.log_targets['pretend-loki'].labels == {'foo': 'bar'}
 
+    def test_identities(self, client: pebble.Client):
+        identities = client.get_identities()
+        assert len(identities) == 0
+
+        identities = {
+            'web': pebble.Identity.from_dict({
+                'access': 'metrics',
+                'basic': {
+                    'password': '$6$et3kBQywmQQ./htQ$MuUHB8DyxOzZT//NXas0aT.P0j0DJA8fCWvpOJ9kn9O0HIlAvEcAJVGQ6OVr23ndtK9kiNgCnMs2NJtDe/nhC1'  # noqa: E501
+                },
+            }),
+            'alice': pebble.Identity.from_dict({
+                'access': 'admin',
+                'local': {'user-id': 42},
+            }),
+        }
+        client.replace_identities(identities)
+        identities = client.get_identities()
+        assert len(identities) == 2
+        assert identities['web'].access == pebble.IdentityAccess.METRICS
+        assert identities['web'].basic is not None
+        assert identities['web'].basic.password == '*****'
+        assert identities['alice'].access == pebble.IdentityAccess.ADMIN
+        assert identities['alice'].local is not None
+        assert identities['alice'].local.user_id == 42
+
+        identities['alice'].local.user_id = 1000
+        client.replace_identities(identities)
+        identities = client.get_identities()
+        assert identities['alice'].local is not None
+        assert identities['alice'].local.user_id == 1000
+
+        client.remove_identities({'web', 'alice'})
+        identities = client.get_identities()
+        assert len(identities) == 0
+
 
 @pytest.mark.skipif(
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
@@ -321,12 +358,6 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         pebble_dir = tempfile.mkdtemp(dir=pebble_path)
         yield pebble_dir
         shutil.rmtree(pebble_dir)
-
-    # Remove this entirely once the associated bug is fixed; it overrides the original test in the
-    # test mixin class.
-    @pytest.mark.skip(reason='pending resolution of https://github.com/canonical/pebble/issues/80')
-    def test_make_dir_with_permission_mask(self):
-        pass
 
 
 @pytest.mark.skipif(

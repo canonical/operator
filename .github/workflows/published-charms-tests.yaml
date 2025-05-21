@@ -1,0 +1,164 @@
+# To update the list of charms included here, run:
+# python .github/update-published-charms-tests-workflow.py
+
+name: Broad Charm Compatibility Tests
+
+on:
+  schedule:
+    - cron: '0 1 25 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  charm-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - charm-repo: canonical/airbyte-k8s-operator
+          - charm-repo: canonical/airbyte-ui-k8s-operator
+          - charm-repo: canonical/charm-ubuntu
+          - charm-repo: canonical/content-cache-k8s-operator
+          - charm-repo: canonical/dex-auth-operator
+          - charm-repo: canonical/digest-squid-auth-helper
+          - charm-repo: canonical/discourse-k8s-operator
+          - charm-repo: canonical/grafana-agent-k8s-operator
+          - charm-repo: canonical/hardware-observer-operator
+          - charm-repo: canonical/hydra-operator
+          - charm-repo: canonical/identity-platform-login-ui-operator
+          - charm-repo: canonical/indico-operator
+          - charm-repo: canonical/jenkins-agent-k8s-operator
+          - charm-repo: canonical/jenkins-agent-operator
+          - charm-repo: canonical/kafka-operator
+          - charm-repo: canonical/kratos-operator
+          - charm-repo: canonical/kubeflow-profiles-operator
+          - charm-repo: canonical/livepatch-k8s-operator
+          - charm-repo: canonical/loki-k8s-operator
+          - charm-repo: canonical/manual-tls-certificates-operator
+          - charm-repo: canonical/mongodb-k8s-operator
+          - charm-repo: canonical/mongodb-operator
+          - charm-repo: canonical/mysql-router-k8s-operator
+          - charm-repo: canonical/namecheap-lego-k8s-operator
+          - charm-repo: canonical/nginx-ingress-integrator-operator
+          - charm-repo: canonical/oathkeeper-operator
+          - charm-repo: canonical/oauth2-proxy-k8s-operator
+          - charm-repo: canonical/openfga-operator
+          - charm-repo: canonical/openstack-exporter-operator
+          - charm-repo: canonical/pgbouncer-k8s-operator
+          - charm-repo: canonical/ranger-k8s-operator
+          - charm-repo: canonical/route53-lego-k8s-operator
+          - charm-repo: canonical/s3-integrator
+          - charm-repo: canonical/saml-integrator-operator
+          - charm-repo: canonical/seldon-core-operator
+          - charm-repo: canonical/self-signed-certificates-operator
+          - charm-repo: canonical/smtp-integrator-operator
+          - charm-repo: canonical/superset-k8s-operator
+          - charm-repo: canonical/temporal-admin-k8s-operator
+          - charm-repo: canonical/temporal-k8s-operator
+          - charm-repo: canonical/temporal-ui-k8s-operator
+          - charm-repo: canonical/temporal-worker-k8s-operator
+          - charm-repo: canonical/traefik-k8s-operator
+          - charm-repo: canonical/trino-k8s-operator
+          - charm-repo: canonical/wordpress-k8s-operator
+          - charm-repo: canonical/zookeeper-operator
+    steps:
+      - name: Checkout the ${{ matrix.charm-repo }} repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          repository: ${{ matrix.charm-repo }}
+          persist-credentials: false
+
+      - name: Install patch dependencies
+        run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
+
+      - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        run: |
+          if [ -e "test-requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> test-requirements.txt
+            sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" test-requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> test-requirements.txt
+          fi
+          if [ -e "requirements-charmcraft.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements-charmcraft.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements-charmcraft.txt
+            sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements-charmcraft.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements-charmcraft.txt
+          fi
+          if [ -e "requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+          elif [ -e "poetry.lock" ]; then
+            poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --lock
+            poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --lock
+          elif [ -e "uv.lock" ]; then
+            uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
+            uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing
+            uv lock
+          else
+            echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        id: deps
+        run: pip install tox~=4.2
+
+        # The following test steps will only run if the last setup step (deps) succeeded.
+
+      - name: Run the charm's unit tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
+        run: tox -vve unit
+
+      - name: Check for tox static environment
+        id: has-static
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: |
+          if tox list --no-desc | grep '^static$'; then
+            echo 'static=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'static=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the charm's static tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static == 'true' }}
+        run: tox -vve static
+
+
+  charmcraft-profile-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: machine
+          - profile: kubernetes
+          - profile: simple
+    steps:
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
+
+      - name: Charmcraft init
+        run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
+
+      - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        run: |
+          if [ -e "requirements.txt" ]; then
+            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
+            sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+          fi
+
+      - name: Install dependencies
+        run: pip install tox~=4.2
+
+      - name: Run the charm's unit tests
+        run: tox -vve unit
+
+      - name: Run the charm's static tests
+        run: tox -vve static

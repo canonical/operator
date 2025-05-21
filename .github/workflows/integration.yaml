@@ -1,0 +1,35 @@
+name: ops Integration Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron:  '42 7 25 * *'
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: ['k8s', 'microk8s']
+        test: ['test_direct_connection', 'test_with_tls']
+
+    steps:
+      - run: |
+           # Work around https://github.com/jnsgruk/concierge/issues/30
+           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+           sudo rm -rf /run/containerd
+      - run: sudo snap install --classic concierge
+      - run: >
+          sudo concierge prepare
+          --juju-channel=3/stable
+          --charmcraft-channel=3.x/stable
+          -p "${{ matrix.preset }}"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca  # v6.0.1
+      - run: uvx tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import datetime
 import io
 import ipaddress
@@ -24,7 +26,8 @@ import typing
 import unittest
 from collections import OrderedDict
 from textwrap import dedent
-from unittest.mock import ANY, MagicMock, patch
+from typing import Mapping
+from unittest import mock
 
 import pytest
 
@@ -84,7 +87,7 @@ class TestModel:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         name: str = 'db1',
-        relation_id: typing.Optional[int] = None,
+        relation_id: int | None = None,
     ) -> ops.Relation:
         """Wrapper around harness.model.get_relation that enforces that None is not returned."""
         rel_db1 = harness.model.get_relation(name, relation_id)
@@ -255,8 +258,8 @@ class TestModel:
     )
     def test_update_app_relation_data(
         self,
-        args: typing.Tuple[typing.Any, ...],
-        kwargs: typing.Dict[str, str],
+        args: tuple[typing.Any, ...],
+        kwargs: dict[str, str],
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         harness.set_leader(True)
@@ -383,7 +386,14 @@ class TestModel:
             harness,
             [
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        'entity': harness.model.unit,
+                        'data': {'host': 'bar'},
+                    },
+                ),
             ],
         )
 
@@ -411,7 +421,10 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', 0),
                 ('relation_get', 0, 'myapp', True),
-                ('update_relation_data', 0, harness.model.app, 'password', 'foo'),
+                (
+                    'update_relation_data',
+                    {'relation_id': 0, 'entity': harness.model.app, 'data': {'password': 'foo'}},
+                ),
             ],
         )
 
@@ -487,7 +500,14 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
+                (
+                    'update_relation_data',
+                    {
+                        'relation_id': relation_id,
+                        'entity': harness.model.unit,
+                        'data': {'host': ''},
+                    },
+                ),
             ],
         )
 
@@ -513,7 +533,6 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'port', ''),
             ],
         )
 
@@ -532,11 +551,10 @@ class TestModel:
 
         def broken_update_relation_data(
             relation_id: int,
-            entity: typing.Union[ops.Unit, ops.Application],
-            key: str,
-            value: str,
+            entity: ops.Unit | ops.Application,
+            data: Mapping[str, str],
         ):
-            backend._calls.append(('update_relation_data', relation_id, entity, key, value))
+            backend._calls.append(('update_relation_data', relation_id, entity, data))
             raise ops.ModelError()
 
         backend.update_relation_data = broken_update_relation_data
@@ -559,8 +577,8 @@ class TestModel:
                 ('relation_ids', 'db1'),
                 ('relation_list', relation_id),
                 ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', 'bar'),
-                ('update_relation_data', relation_id, harness.model.unit, 'host', ''),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': 'bar'}),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': ''}),
             ],
         )
 
@@ -820,11 +838,19 @@ class TestModel:
         with pytest.raises(TypeError):
             ops.StatusBase('test')
 
-        class NoNameStatus(ops.StatusBase):
-            pass
+        with pytest.raises(TypeError):
+            # TypeError due to missing `name` attribute
+            class NoNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
+                pass
 
-        with pytest.raises(AttributeError):
-            ops.StatusBase.register_status(NoNameStatus)  # type: ignore
+        with pytest.raises(TypeError):
+            # TypeError due to non str type `name` attribute
+            class NonStringNameStatus(ops.StatusBase):  # pyright: ignore[reportUnusedClass]
+                name = None  # pyright: ignore[reportAssignmentType]
+
+    def test_base_status_register_is_deprecated(self):
+        with pytest.deprecated_call():
+            ops.StatusBase.register(ops.ActiveStatus)
 
     def test_status_repr(self):
         test_cases = {
@@ -883,7 +909,7 @@ class TestModel:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         target_status: ops.StatusBase,
-        backend_call: typing.Tuple[str, str, str, typing.Dict[str, bool]],
+        backend_call: tuple[str, str, str, dict[str, bool]],
     ):
         harness._get_backend_calls(reset=True)
         harness.model.unit.status = target_status
@@ -917,7 +943,7 @@ class TestModel:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         target_status: ops.StatusBase,
-        backend_call: typing.Tuple[str, str, str, typing.Dict[str, bool]],
+        backend_call: tuple[str, str, str, dict[str, bool]],
     ):
         harness.set_leader(True)
 
@@ -1100,7 +1126,7 @@ class TestModel:
     def assertBackendCalls(  # noqa: N802
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        expected: typing.List[typing.Tuple[typing.Any, ...]],
+        expected: list[tuple[typing.Any, ...]],
         *,
         reset: bool = True,
     ):
@@ -1114,9 +1140,9 @@ class TestModel:
         assert str(excinfo.value) == 'ERROR cannot get status\n'
         assert excinfo.value.args[0] == 'ERROR cannot get status\n'
 
-    @patch('grp.getgrgid')
-    @patch('pwd.getpwuid')
-    def test_push_path_unnamed(self, getpwuid: MagicMock, getgrgid: MagicMock):
+    @mock.patch('grp.getgrgid')
+    @mock.patch('pwd.getpwuid')
+    def test_push_path_unnamed(self, getpwuid: mock.MagicMock, getgrgid: mock.MagicMock):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
         harness = ops.testing.Harness(
@@ -1138,6 +1164,43 @@ class TestModel:
             container.push_path(push_path, '/')
         assert container.exists('/src.txt'), 'push_path failed: file "src.txt" missing'
 
+    def test_juju_version_from_model(self):
+        version = '3.6.2'
+        context = _JujuContext.from_dict({'JUJU_VERSION': version})
+        backend = _ModelBackend('myapp/0', juju_context=context)
+        model = ops.Model(ops.CharmMeta(), backend)
+        assert model.juju_version == version
+        assert isinstance(model.juju_version, ops.JujuVersion)
+        # Make sure it's not being loaded from the environment.
+        assert JujuVersion.from_environ() == '0.0.0'
+
+    def test_relation_remote_model(self, fake_script: FakeScript):
+        fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
+        fake_script.write('relation-ids', """echo '["db0:1"]'""")
+        fake_script.write('relation-model-get', """echo '{"uuid": "UUID"}'""")
+
+        meta = ops.CharmMeta.from_yaml("""
+            name: myapp
+            requires:
+                db:
+                    interface: pgsql
+        """)
+        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        rel = model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
+        # Multiple accesses to remote_model are cached (shouldn't call hook tool again).
+        remote_model = rel.remote_model
+        assert remote_model.uuid == 'UUID'
+
+        assert fake_script.calls() == [
+            ['relation-ids', 'db', '--format=json'],
+            ['relation-list', '-r', '1', '--format=json'],
+            ['relation-model-get', '-r', '1', '--format=json'],
+        ]
+
 
 class PushPullCase:
     """Test case for table-driven tests."""
@@ -1146,13 +1209,13 @@ class PushPullCase:
         self,
         *,
         name: str,
-        path: typing.Union[str, typing.List[str]],
-        files: typing.List[str],
-        want: typing.Optional[typing.Set[str]] = None,
-        dst: typing.Optional[str] = None,
-        errors: typing.Optional[typing.Set[str]] = None,
-        dirs: typing.Optional[typing.Set[str]] = None,
-        want_dirs: typing.Optional[typing.Set[str]] = None,
+        path: str | list[str],
+        files: list[str],
+        want: set[str] | None = None,
+        dst: str | None = None,
+        errors: set[str] | None = None,
+        dirs: set[str] | None = None,
+        want_dirs: set[str] | None = None,
     ):
         self.pattern = None
         self.dst = dst
@@ -1199,7 +1262,7 @@ class ConstFileInfoArgs(typing.TypedDict):
 
 @pytest.mark.parametrize('case', recursive_list_cases)
 def test_recursive_list(case: PushPullCase):
-    def list_func_gen(file_list: typing.List[str]):
+    def list_func_gen(file_list: list[str]):
         args: ConstFileInfoArgs = {
             'last_modified': datetime.datetime.now(),
             'permissions': 0o777,
@@ -1209,8 +1272,8 @@ def test_recursive_list(case: PushPullCase):
             'group_id': 1024,
             'group': 'bar',
         }
-        file_infos: typing.List[pebble.FileInfo] = []
-        dirs: typing.Set[str] = set()
+        file_infos: list[pebble.FileInfo] = []
+        dirs: set[str] = set()
         for f in file_list:
             file_infos.append(
                 pebble.FileInfo(
@@ -1233,7 +1296,7 @@ def test_recursive_list(case: PushPullCase):
 
         def inner(path: pathlib.Path):
             path_str = str(path)
-            matches: typing.List[pebble.FileInfo] = []
+            matches: list[pebble.FileInfo] = []
             for info in file_infos:
                 # exclude file infos for separate trees and also
                 # for the directory we are listing itself - we only want its contents.
@@ -1251,7 +1314,7 @@ def test_recursive_list(case: PushPullCase):
         return inner
 
     # test raw business logic for recursion and dest path construction
-    files: typing.Set[typing.Union[str, pathlib.Path]] = set()
+    files: set[str | pathlib.Path] = set()
     assert isinstance(case.path, str)
     case.path = os.path.normpath(case.path)
     case.files = [os.path.normpath(f) for f in case.files]
@@ -1361,8 +1424,8 @@ def test_recursive_push_and_pull(case: PushPullCase):
     for file in case.files:
         fpath = os.path.join(push_src.name, file[1:])
         os.makedirs(os.path.dirname(fpath), exist_ok=True)
-        with open(fpath, 'w') as f:
-            f.write('hello')
+        with open(fpath, 'wb') as f:
+            f.write(b'push \xc3\x28')  # invalid UTF-8 to ensure binary works
     if case.dirs:
         for directory in case.dirs:
             fpath = os.path.join(push_src.name, directory[1:])
@@ -1380,7 +1443,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
         # otherwise remove leading slash so we can do the path join properly.
         push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
 
-    errors: typing.Set[str] = set()
+    errors: set[str] = set()
     assert case.dst is not None
     try:
         c.push_path(push_path, case.dst)
@@ -1389,11 +1452,13 @@ def test_recursive_push_and_pull(case: PushPullCase):
             raise
         errors = {src[len(push_src.name) :] for src, _ in err.errors}
 
-    assert (
-        case.errors == errors
-    ), f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    assert case.errors == errors, (
+        f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    )
     for fpath in case.want:
         assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
+        content = c.pull(fpath, encoding=None).read()
+        assert content == b'push \xc3\x28'
     for fdir in case.want_dirs:
         assert c.isdir(fdir), f'push_path failed: dir {fdir} missing at destination'
 
@@ -1406,7 +1471,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
             c.make_dir(directory, make_parents=True)
 
     # test pull
-    errors: typing.Set[str] = set()
+    errors: set[str] = set()
     try:
         c.pull_path(case.path, os.path.join(pull_dst.name, case.dst[1:]))
     except ops.MultiPushPullError as err:
@@ -1414,9 +1479,9 @@ def test_recursive_push_and_pull(case: PushPullCase):
             raise
         errors = {src for src, _ in err.errors}
 
-    assert (
-        case.errors == errors
-    ), f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    assert case.errors == errors, (
+        f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    )
     for fpath in case.want:
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
     for fdir in case.want_dirs:
@@ -1865,6 +1930,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
+                'change-id': '1',
             }),
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
@@ -1872,6 +1938,7 @@ containers:
                 'status': 'down',
                 'failures': 2,
                 'threshold': 2,
+                'change-id': '2',
             }),
         ]
 
@@ -1911,6 +1978,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
+                'change-id': '1',
             })
         ])
         c = container.get_check('c1')
@@ -1934,6 +2002,7 @@ containers:
                 'status': 'up',
                 'failures': 0,
                 'threshold': 3,
+                'change-id': '1',
             }),
             pebble.CheckInfo.from_dict({
                 'name': 'c2',
@@ -1941,6 +2010,7 @@ containers:
                 'status': 'down',
                 'failures': 2,
                 'threshold': 2,
+                'change-id': '2',
             }),
         ])
         with pytest.raises(RuntimeError):
@@ -2047,7 +2117,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'connection error!', caplog.text)
+        assert 'connection error!' in caplog.text
 
     def test_can_connect_file_not_found_error(
         self,
@@ -2061,7 +2131,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'file not found!', caplog.text)
+        assert 'file not found!' in caplog.text
 
     def test_can_connect_api_error(
         self,
@@ -2075,7 +2145,7 @@ containers:
         with caplog.at_level(level='WARNING', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'api error!', caplog.text)
+        assert 'api error!' in caplog.text
 
     def test_exec(self, container: ops.Container, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(container, '_juju_version', JujuVersion('3.1.6'))
@@ -2221,8 +2291,8 @@ class MockPebbleBackend(_ModelBackend):
 class MockPebbleClient:
     def __init__(self, socket_path: str):
         self.socket_path = socket_path
-        self.requests: typing.List[typing.Tuple[typing.Any, ...]] = []
-        self.responses: typing.List[typing.Any] = []
+        self.requests: list[tuple[typing.Any, ...]] = []
+        self.responses: list[typing.Any] = []
 
     def autostart_services(self):
         self.requests.append(('autostart',))
@@ -2246,7 +2316,7 @@ class MockPebbleClient:
     def add_layer(
         self,
         label: str,
-        layer: typing.Union[str, ops.pebble.LayerDict, ops.pebble.Layer],
+        layer: str | ops.pebble.LayerDict | ops.pebble.Layer,
         *,
         combine: bool = False,
     ):
@@ -2260,11 +2330,11 @@ class MockPebbleClient:
         self.requests.append(('get_plan',))
         return self.responses.pop(0)
 
-    def get_services(self, names: typing.Optional[str] = None):
+    def get_services(self, names: str | None = None):
         self.requests.append(('get_services', names))
         return self.responses.pop(0)
 
-    def get_checks(self, level: typing.Optional[str] = None, names: typing.Optional[str] = None):
+    def get_checks(self, level: str | None = None, names: str | None = None):
         self.requests.append(('get_checks', level, names))
         return self.responses.pop(0)
 
@@ -2275,15 +2345,15 @@ class MockPebbleClient:
     def push(
         self,
         path: str,
-        source: 'ops.pebble._IOSource',
+        source: ops.pebble._IOSource,
         *,
         encoding: str = 'utf-8',
         make_dirs: bool = False,
-        permissions: typing.Optional[int] = None,
-        user_id: typing.Optional[int] = None,
-        user: typing.Optional[str] = None,
-        group_id: typing.Optional[int] = None,
-        group: typing.Optional[str] = None,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
     ):
         self.requests.append((
             'push',
@@ -2298,7 +2368,7 @@ class MockPebbleClient:
             group,
         ))
 
-    def list_files(self, path: str, *, pattern: typing.Optional[str] = None, itself: bool = False):
+    def list_files(self, path: str, *, pattern: str | None = None, itself: bool = False):
         self.requests.append(('list_files', path, pattern, itself))
         return self.responses.pop(0)
 
@@ -2307,11 +2377,11 @@ class MockPebbleClient:
         path: str,
         *,
         make_parents: bool = False,
-        permissions: typing.Optional[int] = None,
-        user_id: typing.Optional[int] = None,
-        user: typing.Optional[str] = None,
-        group_id: typing.Optional[int] = None,
-        group: typing.Optional[str] = None,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
     ):
         self.requests.append((
             'make_dir',
@@ -2327,11 +2397,11 @@ class MockPebbleClient:
     def remove_path(self, path: str, *, recursive: bool = False):
         self.requests.append(('remove_path', path, recursive))
 
-    def exec(self, command: typing.List[str], **kwargs: typing.Any):
+    def exec(self, command: list[str], **kwargs: typing.Any):
         self.requests.append(('exec', command, kwargs))
         return self.responses.pop(0)
 
-    def send_signal(self, signal: typing.Union[str, int], service_names: str):
+    def send_signal(self, signal: str | int, service_names: str):
         self.requests.append(('send_signal', signal, service_names))
 
     def get_notice(self, id: str) -> pebble.Notice:
@@ -2418,15 +2488,13 @@ class TestModelBindings:
 }"""
         return model
 
-    def ensure_relation(
-        self, model: ops.Model, name: str = 'db1', relation_id: typing.Optional[int] = None
-    ):
+    def ensure_relation(self, model: ops.Model, name: str = 'db1', relation_id: int | None = None):
         """Wrapper around model.get_relation that enforces that None is not returned."""
         rel_db1 = model.get_relation(name, relation_id)
         assert rel_db1 is not None, rel_db1  # Type checkers don't understand `assertIsNotNone`
         return rel_db1
 
-    def ensure_binding(self, model: ops.Model, binding_key: typing.Union[str, ops.Relation]):
+    def ensure_binding(self, model: ops.Model, binding_key: str | ops.Relation):
         """Wrapper around self.model.get_binding that enforces that None is not returned."""
         binding = model.get_binding(binding_key)
         assert binding is not None
@@ -2669,7 +2737,7 @@ class TestModelBackend:
     def test_relation_get_set_is_app_arg(self):
         # No is_app provided.
         with pytest.raises(TypeError):
-            self.backend.relation_set(1, 'fookey', 'barval')  # type: ignore
+            self.backend.relation_set(1, {'fookey': 'barval'})  # type: ignore
 
         with pytest.raises(TypeError):
             self.backend.relation_get(1, 'fooentity')  # type: ignore
@@ -2677,7 +2745,7 @@ class TestModelBackend:
         # Invalid types for is_app.
         for is_app_v in [None, 1, 2.0, 'a', b'beef']:
             with pytest.raises(TypeError):
-                self.backend.relation_set(1, 'fookey', 'barval', is_app=is_app_v)  # type: ignore
+                self.backend.relation_set(1, {'fookey': 'barval'}, is_app=is_app_v)  # type: ignore
 
             with pytest.raises(TypeError):
                 self.backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
@@ -2724,19 +2792,19 @@ class TestModelBackend:
             ),
             (
                 lambda: fake_script.write('relation-set', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
+                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=False),
                 ops.ModelError,
                 [['relation-set', '-r', '3', '--file', '-']],
             ),
             (
                 lambda: fake_script.write('relation-set', f'echo {err_msg} >&2 ; exit 2'),
-                lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=False),
+                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=False),
                 ops.RelationNotFoundError,
                 [['relation-set', '-r', '3', '--file', '-']],
             ),
             (
                 lambda: None,
-                lambda: self.backend.relation_set(3, 'foo', 'bar', is_app=True),
+                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=True),
                 ops.RelationNotFoundError,
                 [['relation-set', '-r', '3', '--app', '--file', '-']],
             ),
@@ -2788,7 +2856,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
 
@@ -2800,7 +2868,7 @@ class TestModelBackend:
         version: str,
     ):
         # on 2.7.0+, things proceed as expected
-        t = tempfile.NamedTemporaryFile()
+        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
         try:
             fake_script.write(
                 'relation-set',
@@ -2811,7 +2879,7 @@ class TestModelBackend:
             monkeypatch.setattr(
                 self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
             )
-            self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+            self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
             t.seek(0)
@@ -2825,8 +2893,8 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
-            self.backend.relation_set(1, 'foo', 'bar', is_app=True)
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
+            self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
 
     def test_status_get(self, fake_script: FakeScript):
@@ -2878,34 +2946,28 @@ class TestModelBackend:
                 case()
 
     def test_local_set_invalid_status(self, fake_script: FakeScript):
-        # juju returns exit code 1 if you ask to set status to 'unknown' or 'error'
+        # ops will directly raise InvalidStatusError if you try to set status to unknown or error
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
         model = ops.Model(meta, self.backend)
-        fake_script.write('status-set', 'exit 1')
         fake_script.write('is-leader', 'echo true')
 
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.unit.status = ops.UnknownStatus()
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.unit.status = ops.ErrorStatus()
 
-        assert fake_script.calls(True) == [
-            ['status-set', '--application=False', 'unknown', ''],
-            ['status-set', '--application=False', 'error', ''],
-        ]
+        assert fake_script.calls(True) == []
 
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.app.status = ops.UnknownStatus()
-        with pytest.raises(ops.ModelError):
+        with pytest.raises(ops.InvalidStatusError):
             model.app.status = ops.ErrorStatus()
 
         # A leadership check is needed for application status.
         assert fake_script.calls(True) == [
             ['is-leader', '--format=json'],
-            ['status-set', '--application=True', 'unknown', ''],
-            ['status-set', '--application=True', 'error', ''],
         ]
 
     @pytest.mark.parametrize('name', ['active', 'waiting', 'blocked', 'maintenance', 'error'])
@@ -2949,9 +3011,20 @@ class TestModelBackend:
         assert model.app.status.message == 'bar'
 
     def test_status_set_is_app_not_bool_raises(self):
-        for is_app_v in [None, 1, 2.0, 'a', b'beef', object]:
+        for is_app_v in [None, 1, 2.0, 'a', b'beef', object()]:
             with pytest.raises(TypeError):
-                self.backend.status_set(ops.ActiveStatus, is_app=is_app_v)  # type: ignore
+                self.backend.status_set(
+                    'active',
+                    is_app=is_app_v,  # type: ignore[assignment]
+                )
+
+    def test_status_set_message_not_str_raises(self):
+        for message in [None, 1, 2.0, True, b'beef', object()]:
+            with pytest.raises(TypeError):
+                self.backend.status_set(
+                    'active',
+                    message=message,  # type: ignore[assignment]
+                )
 
     def test_storage_tool_errors(self, fake_script: FakeScript):
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')
@@ -3155,7 +3228,7 @@ class TestModelBackend:
 
     def test_valid_metrics(self, fake_script: FakeScript):
         fake_script.write('add-metric', 'exit 0')
-        test_cases: typing.List[_ValidMetricsTestCase] = [
+        test_cases: list[_ValidMetricsTestCase] = [
             (
                 OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
                 OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
@@ -3182,7 +3255,7 @@ class TestModelBackend:
             assert fake_script.calls(clear=True) == expected_calls
 
     def test_invalid_metric_names(self, fake_script: FakeScript):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
@@ -3201,7 +3274,7 @@ class TestModelBackend:
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
@@ -3213,7 +3286,7 @@ class TestModelBackend:
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_labels(self):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'': 'baz'}),
             ({'foo': 4.2}, {',bar': 'baz'}),
             ({'foo': 4.2}, {'b=a=r': 'baz'}),
@@ -3224,7 +3297,7 @@ class TestModelBackend:
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_label_values(self):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
             ({'foo': 4.2}, {'bar': 'b=az'}),
@@ -3237,7 +3310,7 @@ class TestModelBackend:
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:5')
         monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
         assert self.backend.relation_remote_app_name(5) == 'remoteapp1'
-        os.environ['JUJU_RELATION_ID'] = '5'
+        monkeypatch.setenv('JUJU_RELATION_ID', '5')
         assert self.backend.relation_remote_app_name(5) == 'remoteapp1'
 
     def test_relation_remote_app_name_script_success(
@@ -3261,7 +3334,7 @@ echo '"remoteapp2"'
 
         # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
         monkeypatch.delenv('JUJU_RELATION_ID')
-        os.environ['JUJU_REMOTE_APP'] = 'remoteapp1'
+        monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
         assert self.backend.relation_remote_app_name(5) == 'remoteapp2'
 
         # Both set, but JUJU_RELATION_ID a different relation
@@ -3334,7 +3407,7 @@ echo '{
 
 class TestLazyMapping:
     def test_invalidate(self):
-        loaded: typing.List[int] = []
+        loaded: list[int] = []
 
         class MyLazyMap(ops.LazyMapping):
             def _load(self):
@@ -3364,7 +3437,9 @@ class TestSecrets:
         assert secret.id == 'secret:123'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'application', ANY]]
+        assert fake_script.calls(clear=True) == [
+            ['secret-add', '--owner', 'application', mock.ANY]
+        ]
         assert fake_script.secrets() == {'foo': 'x'}
 
     def test_app_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
@@ -3395,8 +3470,8 @@ class TestSecrets:
                 'hourly',
                 '--owner',
                 'application',
-                ANY,
-                ANY,
+                mock.ANY,
+                mock.ANY,
             ]
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
@@ -3409,7 +3484,7 @@ class TestSecrets:
         assert secret.id == 'secret:345'
         assert secret.label is None
 
-        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'unit', ANY]]
+        assert fake_script.calls(clear=True) == [['secret-add', '--owner', 'unit', mock.ANY]]
         assert fake_script.secrets() == {'foo': 'x'}
 
     def test_unit_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
@@ -3440,8 +3515,8 @@ class TestSecrets:
                 'yearly',
                 '--owner',
                 'unit',
-                ANY,
-                ANY,
+                mock.ANY,
+                mock.ANY,
             ]
         ]
         assert fake_script.secrets() == {'foo': 'w', 'bar': 'z'}
@@ -3482,11 +3557,13 @@ class TestSecrets:
         fake_script.write('secret-get', """echo '{"foo": "g"}'""")
 
         secret = model.get_secret(id='123')
-        assert secret.id == 'secret:123'
+        assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.label is None
         assert secret.get_content() == {'foo': 'g'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', 'secret:123', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json']
+        ]
 
     def test_get_secret_label(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-get', """echo '{"foo": "g"}'""")
@@ -3502,12 +3579,18 @@ class TestSecrets:
         fake_script.write('secret-get', """echo '{"foo": "h"}'""")
 
         secret = model.get_secret(id='123', label='l')
-        assert secret.id == 'secret:123'
+        assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.label == 'l'
         assert secret.get_content() == {'foo': 'h'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:123', '--label', 'l', '--format=json']
+            [
+                'secret-get',
+                f'secret://{model._backend.model_uuid}/123',
+                '--label',
+                'l',
+                '--format=json',
+            ]
         ]
 
     def test_get_secret_no_args(self, model: ops.Model):
@@ -3537,7 +3620,7 @@ class TestSecrets:
         assert secret.unique_identifier is None
 
         secret = model.get_secret(id='123')
-        assert secret.id == 'secret:123'
+        assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.unique_identifier == '123'
 
         secret = model.get_secret(id='secret:124')
@@ -3550,7 +3633,7 @@ class TestSecrets:
 
         assert fake_script.calls(clear=True) == [
             ['secret-get', '--label', 'lbl', '--format=json'],
-            ['secret-get', 'secret:123', '--format=json'],
+            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json'],
             ['secret-get', 'secret:124', '--format=json'],
             ['secret-get', 'secret://modeluuid/125', '--format=json'],
         ]
@@ -3566,8 +3649,9 @@ class TestSecretInfo:
             rotation=ops.SecretRotate.MONTHLY,
             rotates=datetime.datetime(2023, 1, 9, 14, 10, 0),
             description='desc',
+            model_uuid='abcd',
         )
-        assert info.id == 'secret:3'
+        assert info.id == 'secret://abcd/3'
         assert info.label == 'lbl'
         assert info.revision == 7
         assert info.expires == datetime.datetime(2022, 12, 9, 14, 10, 0)
@@ -3590,6 +3674,7 @@ class TestSecretInfo:
                 'rotates': '2023-01-09T14:10:00Z',
                 'description': 'desc',
             },
+            model_uuid='abcd',
         )
         assert info.id == 'secret:4'
         assert info.label == 'fromdict'
@@ -3600,14 +3685,15 @@ class TestSecretInfo:
         assert info.description == 'desc'
 
         info = ops.SecretInfo.from_dict(
-            'secret:4',
+            '4',
             {
                 'label': 'fromdict',
                 'revision': 8,
                 'rotation': 'badvalue',
             },
+            model_uuid='abcd',
         )
-        assert info.id == 'secret:4'
+        assert info.id == 'secret://abcd/4'
         assert info.label == 'fromdict'
         assert info.revision == 8
         assert info.expires is None
@@ -3615,32 +3701,38 @@ class TestSecretInfo:
         assert info.rotates is None
         assert info.description is None
 
-        info = ops.SecretInfo.from_dict('5', {'revision': 9})
+        with pytest.warns(DeprecationWarning, match='`model_uuid` should always be provided'):
+            info = ops.SecretInfo.from_dict('5', {'revision': 9})
         assert info.id == 'secret:5'
+        assert info.revision == 9
+
+        with pytest.warns(DeprecationWarning, match='`model_uuid` should always be provided'):
+            info = ops.SecretInfo.from_dict('secret://abcd/6', {'revision': 9})
+        assert info.id == 'secret://abcd/6'
         assert info.revision == 9
 
 
 class TestSecretClass:
     @pytest.fixture
     def model(self):
-        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0', model_uuid='abcd'))
 
     def make_secret(
         self,
         model: ops.Model,
-        id: typing.Optional[str] = None,
-        label: typing.Optional[str] = None,
-        content: typing.Optional[typing.Dict[str, str]] = None,
+        id: str | None = None,
+        label: str | None = None,
+        content: dict[str, str] | None = None,
     ) -> ops.Secret:
         return ops.Secret(model._backend, id=id, label=label, content=content)
 
     def test_id_and_label(self, model: ops.Model):
         secret = self.make_secret(model, id=' abc ', label='lbl')
-        assert secret.id == 'secret:abc'
+        assert secret.id == f'secret://{model._backend.model_uuid}/abc'
         assert secret.label == 'lbl'
 
         secret = self.make_secret(model, id='x')
-        assert secret.id == 'secret:x'
+        assert secret.id == f'secret://{model._backend.model_uuid}/x'
         assert secret.label is None
 
         secret = self.make_secret(model, label='y')
@@ -3664,7 +3756,7 @@ class TestSecretClass:
         assert content == {'foo': 'refreshed'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:y', '--refresh', '--format=json']
+            ['secret-get', f'secret://{model._backend.model_uuid}/y', '--refresh', '--format=json']
         ]
 
     def test_get_content_uncached(self, model: ops.Model, fake_script: FakeScript):
@@ -3674,7 +3766,9 @@ class TestSecretClass:
         content = secret.get_content()
         assert content == {'foo': 'notcached'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', 'secret:z', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+        ]
 
     def test_get_content_copies_dict(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
@@ -3685,7 +3779,9 @@ class TestSecretClass:
         content['new'] = 'value'
         assert secret.get_content() == {'foo': 'bar'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', 'secret:z', '--format=json']]
+        assert fake_script.calls(clear=True) == [
+            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+        ]
 
     def test_peek_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "peeked"}'""")
@@ -3695,7 +3791,14 @@ class TestSecretClass:
         assert content == {'foo': 'peeked'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', 'secret:a', '--label', 'b', '--peek', '--format=json']
+            [
+                'secret-get',
+                f'secret://{model._backend.model_uuid}/a',
+                '--label',
+                'b',
+                '--peek',
+                '--format=json',
+            ]
         ]
 
     def test_get_info(self, model: ops.Model, fake_script: FakeScript):
@@ -3704,28 +3807,28 @@ class TestSecretClass:
         # Secret with ID only
         secret = self.make_secret(model, id='x')
         info = secret.get_info()
-        assert info.id == 'secret:x'
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
         assert info.label == 'y'
         assert info.revision == 7
 
         # Secret with label only
         secret = self.make_secret(model, label='y')
         info = secret.get_info()
-        assert info.id == 'secret:x'
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
         assert info.label == 'y'
         assert info.revision == 7
 
         # Secret with ID and label
         secret = self.make_secret(model, id='x', label='y')
         info = secret.get_info()
-        assert info.id == 'secret:x'
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
         assert info.label == 'y'
         assert info.revision == 7
 
         assert fake_script.calls(clear=True) == [
-            ['secret-info-get', 'secret:x', '--format=json'],
+            ['secret-info-get', f'secret://{model._backend.model_uuid}/x', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-info-get', 'secret:x', '--format=json'],
+            ['secret-info-get', f'secret://{model._backend.model_uuid}/x', '--format=json'],
         ]
 
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
@@ -3739,15 +3842,15 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.set_content({'bar': 'foo'})
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         with pytest.raises(ValueError):
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
         assert fake_script.calls(clear=True) == [
-            ['secret-set', 'secret:x', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/x', mock.ANY],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', 'secret:z', ANY],
+            ['secret-set', f'secret://{model._backend.model_uuid}/z', mock.ANY],
         ]
         assert fake_script.secrets() == {'foo': 'bar', 'bar': 'foo'}
 
@@ -3768,12 +3871,12 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.set_info(label='lbl')
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
             [
                 'secret-set',
-                'secret:x',
+                f'secret://{model._backend.model_uuid}/x',
                 '--label',
                 'lab',
                 '--description',
@@ -3784,11 +3887,72 @@ class TestSecretClass:
                 'monthly',
             ],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', 'secret:z', '--label', 'lbl'],
+            ['secret-set', f'secret://{model._backend.model_uuid}/z', '--label', 'lbl'],
         ]
 
         with pytest.raises(TypeError):
             secret.set_info()  # no args provided
+
+    def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
+
+        secret = self.make_secret(model, id='q')
+        secret.set_content({'foo': 'bar'})
+        description = 'desc'
+        secret.set_info(description=description)
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
+        assert calls[1] == [
+            'secret-get',
+            f'secret://{model._backend.model_uuid}/q',
+            '--peek',
+            '--format=json',
+        ]
+        assert calls[2][:-1] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[2][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
+
+    def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+
+        secret = self.make_secret(model, id='q')
+        description = 'desc'
+        secret.set_info(description=description)
+        secret.set_content({'foo': 'bar'})
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[1][:-1] == [
+            'secret-set',
+            f'secret://{model._backend.model_uuid}/q',
+            '--description',
+            description,
+        ]
+        assert calls[1][-1].startswith('foo#file=') and calls[1][-1].endswith('/foo')
+
+    def test_set_content_aggregates(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+
+        secret = self.make_secret(model, id='q')
+        secret.set_content({'foo': 'bar'})
+        secret.set_content({'baz': 'qux', 'foo': 'newbar'})
+
+        calls = fake_script.calls(clear=True)
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert fake_script.secrets() == {'foo': 'newbar', 'baz': 'qux'}
 
     def test_grant(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('relation-list', """echo '[]'""")
@@ -3811,16 +3975,23 @@ class TestSecretClass:
         assert secret.id is None
         rel345 = ops.Relation('test', 345, True, unit, backend, cache)
         secret.grant(rel345)
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '123', '--format=json'],
             ['relation-list', '-r', '234', '--format=json'],
-            ['secret-grant', 'secret:x', '--relation', '123'],
-            ['secret-grant', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['secret-grant', f'secret://{model._backend.model_uuid}/x', '--relation', '123'],
+            [
+                'secret-grant',
+                f'secret://{model._backend.model_uuid}/x',
+                '--relation',
+                '234',
+                '--unit',
+                'app/0',
+            ],
             ['relation-list', '-r', '345', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-grant', 'secret:z', '--relation', '345'],
+            ['secret-grant', f'secret://{model._backend.model_uuid}/z', '--relation', '345'],
         ]
 
     def test_revoke(self, model: ops.Model, fake_script: FakeScript):
@@ -3841,16 +4012,23 @@ class TestSecretClass:
         assert secret.id is None
         rel345 = ops.Relation('test', 345, True, unit, model._backend, model._cache)
         secret.revoke(rel345)
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '123', '--format=json'],
             ['relation-list', '-r', '234', '--format=json'],
-            ['secret-revoke', 'secret:x', '--relation', '123'],
-            ['secret-revoke', 'secret:x', '--relation', '234', '--unit', 'app/0'],
+            ['secret-revoke', f'secret://{model._backend.model_uuid}/x', '--relation', '123'],
+            [
+                'secret-revoke',
+                f'secret://{model._backend.model_uuid}/x',
+                '--relation',
+                '234',
+                '--unit',
+                'app/0',
+            ],
             ['relation-list', '-r', '345', '--format=json'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-revoke', 'secret:z', '--relation', '345'],
+            ['secret-revoke', f'secret://{model._backend.model_uuid}/z', '--relation', '345'],
         ]
 
     def test_remove_revision(self, model: ops.Model, fake_script: FakeScript):
@@ -3864,12 +4042,12 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.remove_revision(234)
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['secret-remove', 'secret:x', '--revision', '123'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/x', '--revision', '123'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-remove', 'secret:z', '--revision', '234'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/z', '--revision', '234'],
         ]
 
     def test_remove_all_revisions(self, model: ops.Model, fake_script: FakeScript):
@@ -3883,12 +4061,12 @@ class TestSecretClass:
         secret = self.make_secret(model, label='y')
         assert secret.id is None
         secret.remove_all_revisions()
-        assert secret.id == 'secret:z'
+        assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['secret-remove', 'secret:x'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/x'],
             ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-remove', 'secret:z'],
+            ['secret-remove', f'secret://{model._backend.model_uuid}/z'],
         ]
 
 
@@ -4091,7 +4269,7 @@ class TestLazyNotice:
                     last_data={'key': 'val'},
                 )
 
-        workload = typing.cast(ops.Container, FakeWorkload())
+        workload = typing.cast('ops.Container', FakeWorkload())
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         assert n.id == '123'
         assert n.type == ops.pebble.NoticeType.CUSTOM
@@ -4109,7 +4287,7 @@ class TestLazyNotice:
             assert n.not_exist
 
     def test_repr(self):
-        workload = typing.cast(ops.Container, None)
+        workload = typing.cast('ops.Container', None)
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         assert repr(n) == "LazyNotice(id='123', type=NoticeType.CUSTOM, key='example.com/a')"
 

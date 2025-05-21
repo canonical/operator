@@ -1,0 +1,40 @@
+name: benchmark
+type: charm
+title: ops-benchmark
+summary: A simple charm used for benchmark tests
+description: Read the summary.
+bases:
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+    run-on:
+    - name: ubuntu
+      channel: "22.04"
+config:
+  options:
+    log-level:
+      description: Configures the log level.
+      default: "info"
+      type: string
+actions:
+  act:
+    description: Do something to the workload.
+containers:
+  foo:
+resources:
+  baz:
+    type: oci-image
+storage:
+  bar:
+    type: filesystem
+requires:
+  rel:
+    interface: qux
+peers:
+  peer:
+    interface: chat
+extra-bindings:
+  MySpace: null
+parts:
+  charm:
+    charm-entrypoint: src/bcharm.py

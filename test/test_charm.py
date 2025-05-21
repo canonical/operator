@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import annotations
+
 import functools
 import pathlib
 import tempfile
@@ -22,7 +25,7 @@ import yaml
 
 import ops
 import ops.charm
-from ops.model import ModelError
+from ops.model import ModelError, StatusName
 
 from .test_helpers import FakeScript, create_framework
 
@@ -45,7 +48,7 @@ def test_basic(request: pytest.FixtureRequest):
 
     framework = create_framework(request)
 
-    events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
+    events: list[str] = list(MyCharm.on.events())  # type: ignore
     assert 'install' in events
     assert 'custom' in events
 
@@ -65,13 +68,13 @@ def test_observe_decorated_method(request: pytest.FixtureRequest):
     # is more careful and it still works, this test is here to ensure that
     # it keeps working in future releases, as this is presently the only
     # way we know of to cleanly decorate charm event observers.
-    events: typing.List[ops.EventBase] = []
+    events: list[ops.EventBase] = []
 
     def dec(fn: typing.Any) -> typing.Callable[..., None]:
         # simple decorator that appends to the nonlocal
         # `events` list all events it receives
         @functools.wraps(fn)
-        def wrapper(charm: 'MyCharm', evt: ops.EventBase):
+        def wrapper(charm: MyCharm, evt: ops.EventBase):
             events.append(evt)
             fn(charm, evt)
 
@@ -122,9 +125,10 @@ def test_observer_not_referenced_warning(
     assert 'Reference to ops.Object' in caplog.text
 
 
-def test_empty_action():
-    meta = ops.CharmMeta.from_yaml('name: my-charm', '')
+def test_empty_action_and_config():
+    meta = ops.CharmMeta.from_yaml('name: my-charm', '', '')
     assert meta.actions == {}
+    assert meta.config == {}
 
 
 def test_helper_properties(request: pytest.FixtureRequest):
@@ -144,7 +148,7 @@ def test_relation_events(request: pytest.FixtureRequest):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             for rel in ('req1', 'req-2', 'pro1', 'pro-2', 'peer1', 'peer-2'):
                 # Hook up relation events to generic handler.
                 self.framework.observe(self.on[rel].relation_joined, self.on_any_relation)
@@ -212,7 +216,7 @@ def test_storage_events(request: pytest.FixtureRequest, fake_script: FakeScript)
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             self.framework.observe(self.on['stor1'].storage_attached, self._on_stor1_attach)
             self.framework.observe(self.on['stor2'].storage_detaching, self._on_stor2_detach)
             self.framework.observe(self.on['stor3'].storage_attached, self._on_stor3_attach)
@@ -338,17 +342,18 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
 
     def mock_check_info(
         self: ops.pebble.Client,
-        level: typing.Optional[ops.pebble.CheckLevel] = None,
-        names: typing.Optional[typing.Iterable[str]] = None,
+        level: ops.pebble.CheckLevel | None = None,
+        names: typing.Iterable[str] | None = None,
     ):
         assert names is not None
         names = list(names)
         return [
             ops.pebble.CheckInfo.from_dict({
                 'name': names[0],
-                'status': ops.pebble.CheckStatus.DOWN,
+                'status': 'down',
                 'failures': 3,
                 'threshold': 3,
+                'change-id': '1',
             })
         ]
 
@@ -357,7 +362,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             for workload in ('container-a', 'containerb'):
                 # Hook up relation events to generic handler.
                 self.framework.observe(self.on[workload].pebble_ready, self.on_any_pebble_ready)
@@ -379,7 +384,7 @@ def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
             self.seen.append(type(event).__name__)
 
         def on_any_pebble_check_event(
-            self, event: typing.Union[ops.PebbleCheckFailedEvent, ops.PebbleCheckRecoveredEvent]
+            self, event: ops.PebbleCheckFailedEvent | ops.PebbleCheckRecoveredEvent
         ):
             self.seen.append(type(event).__name__)
             info = event.info
@@ -496,6 +501,85 @@ def test_meta_from_charm_root():
         assert meta.requires['foo'].interface_name == 'bar'
 
 
+def test_config_from_charm_root():
+    with tempfile.TemporaryDirectory() as d:
+        td = pathlib.Path(d)
+        (td / 'config.yaml').write_text(
+            yaml.safe_dump({
+                'options': {
+                    'foo': {'type': 'string', 'default': 'bar'},
+                    'baz': {'type': 'int', 'default': 42},
+                    'qux': {'type': 'bool', 'default': True},
+                    'quux': {'type': 'float', 'default': 3.14},
+                    'sssh': {'type': 'secret', 'description': 'a user secret'},
+                }
+            })
+        )
+        (td / 'metadata.yaml').write_text(yaml.safe_dump({'name': 'bob'}))
+        meta = ops.CharmMeta.from_charm_root(td)
+        assert meta.name == 'bob'
+        assert meta.config['foo'].type == 'string'
+        assert meta.config['foo'].default == 'bar'
+        assert meta.config['baz'].type == 'int'
+        assert meta.config['baz'].default == 42
+        assert meta.config['qux'].type == 'bool'
+        assert meta.config['qux'].default  # == True
+        assert meta.config['quux'].type == 'float'
+        assert meta.config['quux'].default == 3.14
+        assert meta.config['sssh'].type == 'secret'
+        assert meta.config['sssh'].description == 'a user secret'
+
+
+def test_config_from_yaml():
+    options = yaml.safe_dump({
+        'options': {
+            'foo': {'type': 'string', 'default': 'bar'},
+            'baz': {'type': 'int', 'default': 42},
+            'qux': {'type': 'bool', 'default': True},
+            'quux': {'type': 'float', 'default': 3.14},
+            'sssh': {'type': 'secret', 'description': 'a user secret'},
+        }
+    })
+    metadata = yaml.safe_dump({'name': 'bob'})
+    meta = ops.CharmMeta.from_yaml(metadata, config=options)
+    assert meta.name == 'bob'
+    assert meta.config['foo'].type == 'string'
+    assert meta.config['foo'].default == 'bar'
+    assert meta.config['baz'].type == 'int'
+    assert meta.config['baz'].default == 42
+    assert meta.config['qux'].type == 'bool'
+    assert meta.config['qux'].default  # == True
+    assert meta.config['quux'].type == 'float'
+    assert meta.config['quux'].default == 3.14
+    assert meta.config['sssh'].type == 'secret'
+    assert meta.config['sssh'].description == 'a user secret'
+
+
+def test_config_from_raw():
+    options = {
+        'options': {
+            'foo': {'type': 'string', 'default': 'bar'},
+            'baz': {'type': 'int', 'default': 42},
+            'qux': {'type': 'bool', 'default': True},
+            'quux': {'type': 'float', 'default': 3.14},
+            'sssh': {'type': 'secret', 'description': 'a user secret'},
+        },
+    }
+    metadata = {'name': 'bob'}
+    meta = ops.CharmMeta(raw=metadata, config_raw=options)
+    assert meta.name == 'bob'
+    assert meta.config['foo'].type == 'string'
+    assert meta.config['foo'].default == 'bar'
+    assert meta.config['baz'].type == 'int'
+    assert meta.config['baz'].default == 42
+    assert meta.config['qux'].type == 'bool'
+    assert meta.config['qux'].default  # == True
+    assert meta.config['quux'].type == 'float'
+    assert meta.config['quux'].default == 3.14
+    assert meta.config['sssh'].type == 'secret'
+    assert meta.config['sssh'].description == 'a user secret'
+
+
 def test_actions_from_charm_root():
     with tempfile.TemporaryDirectory() as d:
         td = pathlib.Path(d)
@@ -566,7 +650,7 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     framework = create_framework(request, meta=meta)
     charm = MyCharm(framework)
 
-    events: typing.List[str] = list(MyCharm.on.events())  # type: ignore
+    events: list[str] = list(MyCharm.on.events())  # type: ignore
     assert 'foo_bar_action' in events
     assert 'start_action' in events
 
@@ -592,12 +676,12 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     ],
 )
 def test_invalid_action_results(
-    request: pytest.FixtureRequest, fake_script: FakeScript, bad_res: typing.Dict[str, typing.Any]
+    request: pytest.FixtureRequest, fake_script: FakeScript, bad_res: dict[str, typing.Any]
 ):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.res: typing.Dict[str, typing.Any] = {}
+            self.res: dict[str, typing.Any] = {}
             framework.observe(self.on.foo_bar_action, self._on_foo_bar_action)
 
         def _on_foo_bar_action(self, event: ops.ActionEvent):
@@ -628,7 +712,7 @@ def test_inappropriate_event_defer_fails(
     monkeypatch: pytest.MonkeyPatch,
     fake_script: FakeScript,
     event: str,
-    kwargs: typing.Dict[str, typing.Any],
+    kwargs: dict[str, typing.Any],
 ):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -753,7 +837,7 @@ def test_secret_events(request: pytest.FixtureRequest):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.seen: typing.List[str] = []
+            self.seen: list[str] = []
             self.framework.observe(self.on.secret_changed, self.on_secret_changed)
             self.framework.observe(self.on.secret_rotate, self.on_secret_rotate)
             self.framework.observe(self.on.secret_remove, self.on_secret_remove)
@@ -795,6 +879,57 @@ def test_secret_events(request: pytest.FixtureRequest):
         'SecretRemoveEvent',
         'SecretExpiredEvent',
     ]
+
+
+@pytest.mark.parametrize('event', ['secret_remove', 'secret_expired'])
+def test_secret_event_remove_revision(
+    request: pytest.FixtureRequest, fake_script: FakeScript, event: str
+):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(getattr(self.on, event), self.on_secret_event)
+
+        def on_secret_event(self, event: ops.SecretRemoveEvent | ops.SecretExpiredEvent):
+            event.remove_revision()
+
+    framework = create_framework(request)
+    charm = MyCharm(framework)
+    fake_script.write('secret-remove', 'exit 0')
+    secret_id = 'secret:remove'
+    revision = 28
+
+    getattr(charm.on, event).emit(secret_id, 'secret-label', revision)
+
+    assert fake_script.calls(True) == [
+        ['secret-remove', secret_id, '--revision', str(revision)],
+    ]
+
+
+def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_script: FakeScript):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.secrets: list[ops.Secret] = []
+            self.framework.observe(self.on.secret_changed, self.on_secret_changed)
+
+        def on_secret_changed(self, event: ops.SecretChangedEvent):
+            event.secret.set_info(description='desc')
+            event.secret.set_content({'key': 'value'})
+            self.secrets.append(event.secret)
+
+    fake_script.write('secret-get', """echo '{"key": "value"}'""")
+    fake_script.write('secret-set', 'exit 0')
+
+    framework = create_framework(request)
+    charm = MyCharm(framework)
+
+    charm.on.secret_changed.emit('secret:changed', None)
+    charm.on.secret_changed.emit('secret:changed', None)
+    cache = charm.secrets[0]._secret_set_cache
+    assert cache is charm.secrets[1]._secret_set_cache
+    assert charm.secrets[0]._secret_set_cache['secret:changed']['description'] == 'desc'
+    assert 'content' in cache['secret:changed']
 
 
 def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
@@ -956,22 +1091,19 @@ def test_add_status_type_error(request: pytest.FixtureRequest, fake_script: Fake
 @pytest.mark.parametrize(
     'statuses,expected',
     [
-        (['blocked', 'error'], 'error'),
         (['waiting', 'blocked'], 'blocked'),
         (['waiting', 'maintenance'], 'maintenance'),
         (['active', 'waiting'], 'waiting'),
-        (['active', 'unknown'], 'active'),
-        (['unknown'], 'unknown'),
     ],
 )
-def test_collect_status_priority(
+def test_collect_status_priority_valid(
     request: pytest.FixtureRequest,
     fake_script: FakeScript,
-    statuses: typing.List[str],
+    statuses: list[StatusName],
     expected: str,
 ):
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework, statuses: typing.List[str]):
+        def __init__(self, framework: ops.Framework, statuses: list[StatusName]):
             super().__init__(framework)
             self.framework.observe(self.on.collect_app_status, self._on_collect_status)
             self.statuses = statuses
@@ -989,6 +1121,37 @@ def test_collect_status_priority(
 
     status_set_calls = [call for call in fake_script.calls(True) if call[0] == 'status-set']
     assert status_set_calls == [['status-set', '--application=True', expected, '']]
+
+
+@pytest.mark.parametrize(
+    'statuses',
+    [
+        ['blocked', 'error'],
+        ['unknown'],
+        ['active', 'unknown'],
+    ],
+)
+def test_collect_status_priority_invalid(
+    request: pytest.FixtureRequest,
+    fake_script: FakeScript,
+    statuses: list[StatusName],
+):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework, statuses: list[StatusName]):
+            super().__init__(framework)
+            self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+            self.statuses = statuses
+
+        def _on_collect_status(self, event: ops.CollectStatusEvent):
+            for status in self.statuses:
+                event.add_status(ops.StatusBase.from_name(status, ''))
+
+    fake_script.write('is-leader', 'echo true')
+
+    framework = create_framework(request)
+    charm = MyCharm(framework, statuses=statuses)
+    with pytest.raises(ops.InvalidStatusError):
+        ops.charm._evaluate_status(charm)
 
 
 def test_meta_links():
@@ -1074,3 +1237,19 @@ assumes:
             ops.JujuAssumesCondition.ANY,
         ),
     ]
+
+
+@pytest.mark.parametrize('user', ['root', 'sudoer', 'non-root'])
+def test_meta_charm_user(user: str):
+    meta = ops.CharmMeta.from_yaml(f"""
+name: my-charm
+charm-user: {user}
+""")
+    assert meta.charm_user == user
+
+
+def test_meta_charm_user_default():
+    meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+""")
+    assert meta.charm_user == 'root'

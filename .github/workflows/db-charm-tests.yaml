@@ -7,6 +7,8 @@ on:
   pull_request:
   workflow_call:
 
+permissions: {}
+
 jobs:
   db-charm-tests:
     runs-on: ubuntu-latest
@@ -15,27 +17,29 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: e59139a097bd407b5e785daf8193b777cc691af9  # 2024-08-26T10:45:00Z
+            commit: 77d821003b49a1598f898db4214bf4d3754cf597  # 2025-04-24T01:13:34Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: beed68055e33191721896a3b8e28274a99e7de7b  # 2024-08-26T16:47:32Z
+            commit: bb2459a94664f64460bd3e5e8a0279b6d3d74b0d  # rev577 rev576 2025-04-22T18:50:43Z
           - charm-repo: canonical/mysql-operator
-            commit: 25a8a79680f3fbf3c36e9e1d8c20a852f54129c1  # 2024-08-26T13:48:51Z
+            commit: 0fbb95a2de9c607825beafa2fe2f0060484a449c  # 2025-04-09T16:18:58Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: 52df6266067d7233b7a067f7a967170b4096dba8  # rev183 rev182 2024-08-26T13:44:33Z
+            commit: d183cd41ca2abb01784d94d5a83659eff80d6b93  # 2025-04-17T19:41:27Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           repository: ${{ matrix.charm-repo }}
+          persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Checkout the operator repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: myops
+          persist-credentials: false
 
       - name: Install patch dependencies
-        run: pip install poetry~=1.6
+        run: pip install poetry~=2.0
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
@@ -44,7 +48,7 @@ jobs:
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
           else
             sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock --no-update
+            poetry lock
           fi
 
       - name: Install dependencies

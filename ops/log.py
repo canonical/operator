@@ -14,16 +14,19 @@
 
 """Interface to emit messages to the Juju logging system."""
 
+from __future__ import annotations
+
 import logging
 import sys
 import types
 import typing
+import warnings
 
-from ops.model import _ModelBackend
+from .model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
-    """A handler for sending logs to Juju via juju-log."""
+    """A handler for sending logs and warnings to Juju via juju-log."""
 
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
@@ -41,12 +44,15 @@ class JujuLogHandler(logging.Handler):
 def setup_root_logging(
     model_backend: _ModelBackend, debug: bool = False, exc_stderr: bool = False
 ):
-    """Setup python logging to forward messages to juju-log.
+    """Setup Python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
     Charmers can also set their own default log level with::
 
       logging.getLogger().setLevel(logging.INFO)
+
+    Warnings issued by the warnings module are redirected to the logging system
+    and forwarded to juju-log, too.
 
     Args:
         model_backend: a ModelBackend to use for juju-log
@@ -56,15 +62,27 @@ def setup_root_logging(
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
+
+    def custom_showwarning(
+        message: Warning | str,
+        category: type[Warning],
+        filename: str,
+        lineno: int,
+        file: typing.TextIO | None = None,
+        line: str | None = None,
+    ):
+        """Direct the warning to Juju's debug-log, and don't include the code."""
+        logger.warning('%s:%s: %s: %s', filename, lineno, category.__name__, message)
+
+    warnings.showwarning = custom_showwarning
+
     if debug:
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    def except_hook(
-        etype: typing.Type[BaseException], value: BaseException, tb: types.TracebackType
-    ):
+    def except_hook(etype: type[BaseException], value: BaseException, tb: types.TracebackType):
         logger.error('Uncaught exception while in charm code:', exc_info=(etype, value, tb))
         if exc_stderr:
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)

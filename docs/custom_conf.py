@@ -13,38 +13,23 @@
 # limitations under the License.
 
 import datetime
+import os
 import pathlib
 import sys
 
 from docutils import nodes
 
+import inspect
+import sphinx.ext.autodoc
 from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
-import furo
-import furo.navigation
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
-# Furo patch to get local TOC to show in sidebar (as sphinx-rtd-theme did)
-# See https://github.com/pradyunsg/furo/blob/490527b2aef00b1198770c3389a1979911ee1fcb/src/furo/__init__.py#L115-L128
-
-_old_compute_navigation_tree = furo._compute_navigation_tree
-
-
-def _compute_navigation_tree(context):
-    tree_html = _old_compute_navigation_tree(context)
-    if not tree_html and context.get('toc'):
-        tree_html = furo.navigation.get_navigation_tree(context['toc'])
-    return tree_html
-
-
-furo._compute_navigation_tree = _compute_navigation_tree
-
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
-import re  # noqa: E402
-import sphinx.ext.autodoc  # noqa: E402
+import re
 
 sphinx.ext.autodoc.py_ext_sig_re = re.compile(
     r"""^ ([\w.]+::)?            # explicit module name
@@ -107,7 +92,7 @@ copyright = '%s, %s' % (datetime.date.today().year, author)  # noqa: A001
 # don't know yet)
 # NOTE: If no ogp_* variable is defined (e.g. if you remove this section) the
 # sphinxext.opengraph extension will be disabled.
-ogp_site_url = 'https://canonical-starter-pack.readthedocs-hosted.com/'
+ogp_site_url = 'https://ops.readthedocs.io/en/latest/'
 # The documentation website name (usually the same as the product name)
 ogp_site_name = project
 # The URL of an image or logo that is used in the preview
@@ -124,11 +109,12 @@ html_context = {
     # For example: "ubuntu.com/lxd" or "microcloud.is"
     # If there is no product website, edit the header template to remove the
     # link (see the readme for instructions).
-    'product_page': 'juju.is/docs/sdk',
+    'product_page': 'juju.is',
     # Add your product tag (the orange part of your logo, will be used in the
     # header) to ".sphinx/_static" and change the path here (start with "_static")
     # (default is the circle of friends)
-    'product_tag': '_static/tag.png',
+    # Assumes the current directory is .sphinx.
+    'product_tag': '_static/logos/juju-logo-no-text.png',
     # Change to the discourse instance you want to be able to link to
     # using the :discourse: metadata at the top of a file
     # (use an empty value if you don't want to link)
@@ -153,6 +139,17 @@ html_context = {
     # Valid options: none, prev, next, both
     'sequential_nav': 'none',
 }
+# Addons-by-default, see: https://about.readthedocs.com/blog/2024/07/addons-by-default/
+if os.environ.get('READTHEDOCS', '') == 'True':
+    html_context['READTHEDOCS'] = True
+    # The following are needed, see: https://github.com/pradyunsg/furo/blob/main/docs/conf.py#L135.
+    html_context['current_version'] = 'latest'
+    html_context['conf_py_path'] = '/docs/'
+    html_context['display_github'] = True
+    html_context['github_user'] = 'canonical'
+    html_context['github_repo'] = 'operator'
+    html_context['github_version'] = 'main'
+    html_context['slug'] = 'operator'
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
@@ -295,11 +292,19 @@ autodoc_default_options = {
     'show-inheritance': None,
 }
 
+# This value stacks args vertically if a signature is too long.
+maximum_signature_line_length = 80
+
 # -- Options for sphinx.ext.intersphinx --------------------------------------
 
 # This config value contains the locations and names of other projects
 # that should be linked to in this documentation.
-intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
+    'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
+    'pebble': ('https://documentation.ubuntu.com/pebble', None),
+}
 
 # -- General configuration ---------------------------------------------------
 
@@ -315,9 +320,13 @@ nitpick_ignore = [
     # Please keep this list sorted alphabetically.
     ('py:class', '_ChangeDict'),
     ('py:class', '_CheckInfoDict'),
+    ('py:class', '_EntityStatus'),
+    ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
+    ('py:class', '_JujuContext'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
+    ('py:class', '_RawPortProtocolLiteral'),
     ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
@@ -326,6 +335,13 @@ nitpick_ignore = [
     ('py:class', '_TextOrBinaryIO'),
     ('py:class', '_WarningDict'),
     ('py:class', '_Writeable'),
+    ('py:class', 'AnyJson'),
+    ('py:class', 'BasicIdentityDict'),
+    ('py:class', 'CharmType'),
+    ('py:class', 'LocalIdentityDict'),
+    ('py:class', 'IdentityDict'),
+    ('py:obj', 'ops._private.harness.CharmType'),
+    ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
     ('py:class', 'ops.model._AddressDict'),
     ('py:class', 'ops.model._GenericLazyMapping'),
@@ -343,7 +359,34 @@ nitpick_ignore = [
     ('py:class', 'ops.testing._ConfigOption'),
     ('py:class', 'ops.testing.CharmType'),
     ('py:obj', 'ops.testing.CharmType'),
+    ('py:obj', 'scenario.state.CharmType'),
+    ('py:class', 'scenario.state.CharmType'),
+    ('py:class', 'scenario.state._EntityStatus'),
+    ('py:class', 'scenario.state._Event'),
+    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
+
+
+# Monkeypatch Sphinx to look for __init__ rather than __new__ for the subclasses
+# of _MaxPositionalArgs.
+_real_get_signature = sphinx.ext.autodoc.ClassDocumenter._get_signature
+
+
+def _custom_get_signature(self):
+    if any(p.__name__ == '_MaxPositionalArgs' for p in self.object.__mro__):
+        signature = inspect.signature(self.object)
+        parameters = []
+        for position, param in enumerate(signature.parameters.values()):
+            if position >= self.object._max_positional_args:
+                parameters.append(param.replace(kind=inspect.Parameter.KEYWORD_ONLY))
+            else:
+                parameters.append(param)
+        signature = signature.replace(parameters=parameters)
+        return None, None, signature
+    return _real_get_signature(self)
+
+
+sphinx.ext.autodoc.ClassDocumenter._get_signature = _custom_get_signature
 
 
 # This is very strongly based on
@@ -379,7 +422,7 @@ class JujuVersion(SphinxDirective):
             messages = []
         if self.content:
             node += self.parse_content_to_nodes()
-        classes = ['versionmodified', self.change, 'jujuversion']
+        classes = ['versionmodified', self.change]
         if len(node) > 0 and isinstance(node[0], nodes.paragraph):
             # The contents start with a paragraph.
             if node[0].rawsource:
@@ -418,11 +461,17 @@ class JujuAdded(JujuVersion):
     text = 'Added'
 
 
+class JujuChanged(JujuVersion):
+    change = 'changed'
+    text = 'Changed'
+
+
 class JujuRemoved(JujuVersion):
     change = 'removed'
     text = 'Scheduled for removal'
 
 
 def setup(app):
-    app.add_directive('jujuversion', JujuAdded)
+    app.add_directive('jujuadded', JujuAdded)
+    app.add_directive('jujuchanged', JujuChanged)
     app.add_directive('jujuremoved', JujuRemoved)

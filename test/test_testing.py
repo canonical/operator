@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import collections
 import datetime
 import grp
@@ -39,10 +41,11 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
+from ops._private.harness import _TestingPebbleClient
 from ops.jujuversion import JujuVersion
 from ops.model import _ModelBackend
 from ops.pebble import FileType
-from ops.testing import ExecResult, _TestingPebbleClient
+from ops.testing import ExecResult
 
 is_linux = platform.system() == 'Linux'
 
@@ -52,7 +55,7 @@ class StorageTester(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.observed_events: typing.List[ops.EventBase] = []
+        self.observed_events: list[ops.EventBase] = []
         self.framework.observe(self.on.test_storage_attached, self._on_test_storage_attached)
         self.framework.observe(self.on.test_storage_detaching, self._on_test_storage_detaching)
 
@@ -66,7 +69,7 @@ class StorageTester(ops.CharmBase):
 class StorageWithHyphensHelper(ops.Object):
     def __init__(self, parent: ops.Object, key: str):
         super().__init__(parent, key)
-        self.changes: typing.List[ops.EventBase] = []
+        self.changes: list[ops.EventBase] = []
         parent.framework.observe(
             parent.on.test_with_hyphens_storage_attached, self.on_storage_changed
         )
@@ -142,6 +145,25 @@ class TestHarness:
         assert backend.relation_list(rel_id) == ['postgresql/0']
         assert harness.get_relation_data(rel_id, 'postgresql') == {}
         assert harness.get_relation_data(rel_id, 'postgresql/0') == {'a': '1', 'b': '2'}
+
+    def test_relation_remote_model(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test-app
+            requires:
+                db:
+                    interface: pgsql
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'remoteapp1', unit_data={'foo': 'bar'})
+        rel = harness.model.get_relation('db')
+        assert rel is not None
+        remote_model = rel.remote_model
+        assert isinstance(remote_model, ops.RemoteModel)
+        assert remote_model
+        assert remote_model.uuid == harness.model.uuid
 
     def test_can_connect_default(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -257,7 +279,7 @@ class TestHarness:
 
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.observed_events: typing.List[ops.EventBase] = []
+                self.observed_events: list[ops.EventBase] = []
                 self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
 
             def _on_db_relation_changed(self, event: ops.EventBase):
@@ -311,7 +333,7 @@ class TestHarness:
 
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.observed_events: typing.List[ops.EventBase] = []
+                self.observed_events: list[ops.EventBase] = []
                 self.framework.observe(
                     self.on.cluster_relation_changed, self._on_cluster_relation_changed
                 )
@@ -360,7 +382,7 @@ class TestHarness:
         harness.set_leader(False)
         harness.update_relation_data(rel_id, 'test-app', {'k': 'v3'})
         assert backend.relation_get(rel_id, 'test-app', is_app=True) == {'k': 'v3'}
-        assert len(harness.charm.observed_events), 1
+        assert len(harness.charm.observed_events) == 1
         assert isinstance(harness.charm.observed_events[0], ops.RelationEvent)
 
     def test_remove_relation(self, request: pytest.FixtureRequest):
@@ -613,7 +635,7 @@ class TestHarness:
         assert self._find_relation_in_model_by_id(harness, rel_id) is None
 
     def test_remove_relation_marks_relation_as_inactive(self, request: pytest.FixtureRequest):
-        relations: typing.List[str] = []
+        relations: list[str] = []
         is_broken = False
 
         class MyCharm(ops.CharmBase):
@@ -643,7 +665,7 @@ class TestHarness:
         assert not relations, 'Model.relations contained broken relation'
 
     def _find_relation_in_model_by_id(
-        self, harness: ops.testing.Harness['RelationEventCharm'], rel_id: int
+        self, harness: ops.testing.Harness[RelationEventCharm], rel_id: int
     ):
         for relations in harness.charm.model.relations.values():
             for relation in relations:
@@ -1706,9 +1728,9 @@ class TestHarness:
 
         harness.add_storage('test')
         harness.begin()
-        assert (
-            len(harness.model.storages['test']) == 0
-        ), 'storage should start in detached state and be excluded from storage listing'
+        assert len(harness.model.storages['test']) == 0, (
+            'storage should start in detached state and be excluded from storage listing'
+        )
 
     def test_add_storage_without_metadata_key_fails(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -2263,7 +2285,10 @@ class TestHarness:
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
             ('relation_get', 0, 'test-charm/0', False),
-            ('update_relation_data', 0, test_charm_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': test_charm_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
 
         # add_relation_unit resets the relation_list, but doesn't trigger backend calls
@@ -2277,14 +2302,20 @@ class TestHarness:
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
             ('relation_list', rel_id),
             ('relation_get', 0, 'postgresql/0', False),
-            ('update_relation_data', 0, pgql_unit, 'foo', 'bar'),
+            (
+                'update_relation_data',
+                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+            ),
         ]
         # And the calls are gone
         assert harness._get_backend_calls() == []
@@ -2987,7 +3018,7 @@ class TestHarness:
             ]
         assert changes[:2] == expected_relation_created
         changes = changes[2:]
-        expected_middle: typing.List[typing.Dict[str, typing.Any]] = [
+        expected_middle: list[dict[str, typing.Any]] = [
             {'name': 'leader-elected'},
             {'name': 'config-changed', 'data': {}},
             {'name': 'start'},
@@ -3231,6 +3262,9 @@ class TestHarness:
 
     def test_evaluate_status(self):
         class TestCharm(ops.CharmBase):
+            app_status_to_add: ops.StatusBase
+            unit_status_to_add: ops.StatusBase
+
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
                 self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
@@ -3455,7 +3489,7 @@ class TestNetwork:
 class DBRelationChangedHelper(ops.Object):
     def __init__(self, parent: ops.Object, key: str):
         super().__init__(parent, key)
-        self.changes: typing.List[typing.Tuple[int, str]] = []
+        self.changes: list[tuple[int, str]] = []
         parent.framework.observe(parent.on.db_relation_changed, self.on_relation_changed)
 
     def on_relation_changed(self, event: ops.RelationEvent):
@@ -3472,7 +3506,7 @@ class RelationChangedViewer(ops.Object):
 
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
-        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
+        self.changes: list[dict[str, typing.Any]] = []
         charm.framework.observe(charm.on[relation_name].relation_changed, self.on_relation_changed)
 
     def on_relation_changed(self, event: ops.RelationEvent):
@@ -3490,7 +3524,7 @@ class RecordingCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
+        self.changes: list[dict[str, typing.Any]] = []
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.leader_settings_changed, self._on_leader_settings_changed)
@@ -3589,7 +3623,7 @@ class RelationEventCharm(RecordingCharm):
             assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
-        recording: typing.Dict[str, typing.Any] = {
+        recording: dict[str, typing.Any] = {
             'name': event_name,
             'relation': event.relation.name,
             'data': data,
@@ -3657,7 +3691,7 @@ class ContainerEventCharm(RecordingCharm):
 
 def get_public_methods(obj: object):
     """Get the public attributes of obj to compare to another object."""
-    public: typing.Set[str] = set()
+    public: set[str] = set()
     members = inspect.getmembers(obj)
     for name, member in members:
         if name.startswith('_'):
@@ -3777,9 +3811,9 @@ class TestTestingModelBackend:
         assert backend._resource_dir is None
         path = backend.resource_get('image')
         assert backend._resource_dir is not None
-        assert str(path).startswith(
-            str(backend._resource_dir.name)
-        ), f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        assert str(path).startswith(str(backend._resource_dir.name)), (
+            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        )
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -4684,7 +4718,10 @@ class TestTestingPebbleClient:
                 command: '/bin/echo bar'
             """,
         )
-        client.start_services(['bar'])
+        change_id = client.start_services(['bar'])
+        change = client.get_change(change_id)
+        assert change.kind == pebble.ChangeKind.START.value
+        assert 'start' in change.summary.lower()
         infos = client.get_services()
         assert len(infos) == 2
         bar_info = infos[0]
@@ -4697,7 +4734,10 @@ class TestTestingPebbleClient:
         assert foo_info.name == 'foo'
         assert foo_info.startup == pebble.ServiceStartup.ENABLED
         assert foo_info.current == pebble.ServiceStatus.INACTIVE
-        client.stop_services(['bar'])
+        change_id = client.stop_services(['bar'])
+        change = client.get_change(change_id)
+        assert change.kind == pebble.ChangeKind.STOP.value
+        assert 'stop' in change.summary.lower()
         infos = client.get_services()
         bar_info = infos[0]
         assert bar_info.name == 'bar'
@@ -4768,8 +4808,7 @@ class TestTestingPebbleClient:
         assert infos == []
 
     def test_invalid_start_service(self, client: _TestingPebbleClient):
-        # TODO: jam 2021-04-20 This should become a better error
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.start_services(['unknown'])
 
     def test_start_service_str(self, client: _TestingPebbleClient):
@@ -4778,11 +4817,19 @@ class TestTestingPebbleClient:
         with pytest.raises(TypeError):
             client.start_services('unknown')
 
+    def test_start_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.start_services([])
+
     def test_stop_service_str(self, client: _TestingPebbleClient):
         # Start service takes a list of names, but it is really easy to accidentally pass just a
         # name
         with pytest.raises(TypeError):
             client.stop_services('unknown')
+
+    def test_stop_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.stop_services([])
 
     def test_mixed_start_service(self, client: _TestingPebbleClient):
         client.add_layer(
@@ -4796,8 +4843,7 @@ class TestTestingPebbleClient:
                 command: '/bin/echo foo'
             """,
         )
-        # TODO: jam 2021-04-20 better error type
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.start_services(['foo', 'unknown'])
         # foo should not be started
         infos = client.get_services()
@@ -4820,8 +4866,7 @@ class TestTestingPebbleClient:
             """,
         )
         client.autostart_services()
-        # TODO: jam 2021-04-20 better error type
-        with pytest.raises(RuntimeError):
+        with pytest.raises(pebble.APIError):
             client.stop_services(['foo', 'unknown'])
         # foo should still be running
         infos = client.get_services()
@@ -4896,6 +4941,20 @@ class TestTestingPebbleClient:
         assert foo_info.name == 'foo'
         assert foo_info.startup == pebble.ServiceStartup.ENABLED
         assert foo_info.current == pebble.ServiceStatus.INACTIVE
+
+    def test_invalid_restart_service(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.restart_services(['unknown'])
+
+    def test_restart_service_str(self, client: _TestingPebbleClient):
+        # Restart service takes a list of names, but it is really easy to
+        # accidentally pass just a name.
+        with pytest.raises(TypeError):
+            client.restart_services('unknown')
+
+    def test_restart_service_no_services(self, client: _TestingPebbleClient):
+        with pytest.raises(pebble.APIError):
+            client.restart_services([])
 
     @unittest.skipUnless(is_linux, 'Pebble runs on Linux')
     def test_send_signal(self, client: _TestingPebbleClient):
@@ -4983,9 +5042,9 @@ class PebbleStorageAPIsTestMixin:
         self,
         pebble_dir: str,
         client: PebbleClientType,
-        original_data: typing.Union[str, bytes],
-        encoding: typing.Optional[str],
-        stream_class: typing.Union[typing.Type[io.BytesIO], typing.Type[io.StringIO]],
+        original_data: str | bytes,
+        encoding: str | None,
+        stream_class: type[io.BytesIO] | type[io.StringIO],
     ):
         # We separate out the calls to make it clearer to type checkers what's happening.
         if encoding is None:
@@ -4998,12 +5057,12 @@ class PebbleStorageAPIsTestMixin:
 
         # We also support file-like objects as input, so let's test that case as well.
         if encoding is None:
-            stream_class = typing.cast(typing.Type[io.BytesIO], stream_class)
-            small_file = stream_class(typing.cast(bytes, original_data))
+            stream_class = typing.cast('typing.Type[io.BytesIO]', stream_class)
+            small_file = stream_class(typing.cast('bytes', original_data))
             client.push(f'{pebble_dir}/test', small_file)
         else:
-            stream_class = typing.cast(typing.Type[io.StringIO], stream_class)
-            small_file = stream_class(typing.cast(str, original_data))
+            stream_class = typing.cast('typing.Type[io.StringIO]', stream_class)
+            small_file = stream_class(typing.cast('str', original_data))
             client.push(f'{pebble_dir}/test', small_file, encoding=encoding)
         with client.pull(f'{pebble_dir}/test', encoding=encoding) as infile:
             received_data = infile.read()
@@ -5109,7 +5168,7 @@ class PebbleStorageAPIsTestMixin:
         }
 
         # Let's pull the first file again and check its details
-        file = [f for f in files if f.path == f'{pebble_dir}/file1'][0]
+        file = next(f for f in files if f.path == f'{pebble_dir}/file1')
         assert file.name == 'file1'
         assert file.type == pebble.FileType.FILE
         assert file.size == 4
@@ -5163,7 +5222,7 @@ class PebbleStorageAPIsTestMixin:
             client.list_files('/not/existing/file/')
         assert excinfo.value.code == 404
         assert excinfo.value.status == 'Not Found'
-        assert excinfo.value.message == 'stat /not/existing/file/: no ' 'such file or directory'
+        assert excinfo.value.message == 'stat /not/existing/file/: no such file or directory'
 
     def test_list_directory_object_itself(
         self,
@@ -5271,8 +5330,8 @@ class PebbleStorageAPIsTestMixin:
         client.make_dir(f'{pebble_dir}/dir2', permissions=0o777)
 
         files = client.list_files(f'{pebble_dir}/', pattern='dir*')
-        assert [f for f in files if f.path == f'{pebble_dir}/dir1'][0].permissions == 0o700
-        assert [f for f in files if f.path == f'{pebble_dir}/dir2'][0].permissions == 0o777
+        assert next(f for f in files if f.path == f'{pebble_dir}/dir1').permissions == 0o700
+        assert next(f for f in files if f.path == f'{pebble_dir}/dir2').permissions == 0o777
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -5326,10 +5385,10 @@ class PebbleStorageAPIsTestMixin:
 
 
 class _MakedirArgs(typing.TypedDict):
-    user_id: typing.Optional[int]
-    user: typing.Optional[str]
-    group_id: typing.Optional[int]
-    group: typing.Optional[str]
+    user_id: int | None
+    user: str | None
+    group_id: int | None
+    group: str | None
 
 
 class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
@@ -5428,8 +5487,8 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         assert not c1.exists(c1_fpath)
 
     def _select_testing_user_group(self):
-        user = [u for u in pwd.getpwall() if u.pw_uid != os.getuid()][0]
-        group = [g for g in grp.getgrall() if g.gr_gid != os.getgid()][0]
+        user = next(u for u in pwd.getpwall() if u.pw_uid != os.getuid())
+        group = next(g for g in grp.getgrall() if g.gr_gid != os.getgid())
         return user, group
 
     def test_push_with_ownership(
@@ -5439,7 +5498,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
     ):
         data = 'data'
         user, group = self._select_testing_user_group()
-        cases: typing.List[_MakedirArgs] = [
+        cases: list[_MakedirArgs] = [
             {'user_id': user.pw_uid, 'user': None, 'group_id': group.gr_gid, 'group': None},
             {'user_id': None, 'user': user.pw_name, 'group_id': None, 'group': group.gr_name},
             {'user_id': None, 'user': user.pw_name, 'group_id': group.gr_gid, 'group': None},
@@ -5462,7 +5521,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         client: PebbleClientType,
     ):
         user, group = self._select_testing_user_group()
-        cases: typing.List[_MakedirArgs] = [
+        cases: list[_MakedirArgs] = [
             {'user_id': user.pw_uid, 'user': None, 'group_id': group.gr_gid, 'group': None},
             {'user_id': None, 'user': user.pw_name, 'group_id': None, 'group': group.gr_name},
             {'user_id': None, 'user': user.pw_name, 'group_id': group.gr_gid, 'group': None},
@@ -5614,13 +5673,13 @@ class TestFilesystem:
     def _make_storage_attach_harness(
         self,
         request: pytest.FixtureRequest,
-        meta: typing.Optional[str] = None,
+        meta: str | None = None,
     ):
         class MyCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.attached: typing.List[str] = []
-                self.locations: typing.List[pathlib.Path] = []
+                self.attached: list[str] = []
+                self.locations: list[pathlib.Path] = []
                 framework.observe(self.on['test-storage'].storage_attached, self._on_attach)
 
             def _on_attach(self, event: ops.StorageAttachedEvent):
@@ -6161,11 +6220,39 @@ class TestSecrets:
         with pytest.raises(RuntimeError):
             secret.remove_all_revisions()
 
+    def test_secret_id_variants(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase, meta='name: webapp\nrequires:\n db:\n  interface: database'
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.add_relation('db', 'database')
+        harness.begin()
+
+        # Local (app and unit) secrets, secrets that belong to other apps,
+        # and user secrets should have uniform ID behaviour.
+        app_secret = harness.model.app.add_secret({'password': '1234'})
+        unit_secret = harness.model.unit.add_secret({'password': '5678'})
+        remote_secret_id = harness.add_model_secret('database', {'password': 'abcd'})
+        harness.grant_secret(remote_secret_id, 'webapp')
+        remote_secret = harness.model.get_secret(id=remote_secret_id)
+        user_secret_id = harness.add_user_secret({'password': 'efgh'})
+        harness.grant_secret(user_secret_id, 'webapp')
+        user_secret = harness.model.get_secret(id=user_secret_id)
+
+        # Ensure that all three variants of the secret ID can be used to
+        # retrieve the secret from Harness.
+        for secret in (app_secret, unit_secret, remote_secret, user_secret):
+            id_only = secret.unique_identifier
+            id_with_prefix = f'secret:{id_only}'
+            id_with_model = f'secret://{harness.model.uuid}/{id_only}'
+            for uri in (id_only, id_with_prefix, id_with_model):
+                assert harness.model.get_secret(id=uri).get_content() == secret.get_content()
+
 
 class EventRecorder(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.events: typing.List[ops.EventBase] = []
+        self.events: list[ops.EventBase] = []
 
     def record_event(self, event: ops.EventBase):
         self.events.append(event)
@@ -6338,7 +6425,7 @@ class TestHandleExec:
         harness: ops.testing.Harness[ops.CharmBase],
         container: ops.Container,
     ):
-        args_history: typing.List[ops.testing.ExecArgs] = []
+        args_history: list[ops.testing.ExecArgs] = []
         return_value = None
 
         def handler(args: ops.testing.ExecArgs):
@@ -6412,7 +6499,7 @@ class TestHandleExec:
         harness: ops.testing.Harness[ops.CharmBase],
         container: ops.Container,
     ):
-        args_history: typing.List[ops.testing.ExecArgs] = []
+        args_history: list[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
@@ -6491,7 +6578,7 @@ class TestHandleExec:
             'services': {'test': service},
         }
         container.add_layer(label='test', layer=ops.pebble.Layer(layer))
-        args_history: typing.List[ops.testing.ExecArgs] = []
+        args_history: list[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
@@ -6528,11 +6615,11 @@ class TestHandleExec:
 class TestActions:
     @pytest.fixture
     def action_results(self):
-        action_results: typing.Dict[str, typing.Any] = {}
+        action_results: dict[str, typing.Any] = {}
         return action_results
 
     @pytest.fixture
-    def harness(self, action_results: typing.Dict[str, typing.Any]):
+    def harness(self, action_results: dict[str, typing.Any]):
         class ActionCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -6633,7 +6720,7 @@ class TestActions:
 
     def test_fail_action(
         self,
-        action_results: typing.Dict[str, typing.Any],
+        action_results: dict[str, typing.Any],
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         action_results['partial'] = 'foo'
@@ -6680,7 +6767,7 @@ class TestActions:
     )
     def test_bad_results(
         self,
-        action_results: typing.Dict[str, typing.Any],
+        action_results: dict[str, typing.Any],
         harness: ops.testing.Harness[ops.CharmBase],
         prohibited_key: str,
     ):
@@ -6860,7 +6947,7 @@ class TestNotify:
                 'spawn-time': '2021-02-10T04:36:22.118970777Z',
             })
 
-        monkeypatch.setattr(ops.testing._TestingPebbleClient, 'get_change', get_change)
+        monkeypatch.setattr(_TestingPebbleClient, 'get_change', get_change)
         harness.pebble_notify(
             'foo',
             '123',
@@ -6993,3 +7080,252 @@ class TestCloudSpec:
         harness.begin()
         with pytest.raises(ops.ModelError):
             harness.model.get_cloud_spec()
+
+
+class TestChecks:
+    @staticmethod
+    def _container_with_layer(request: pytest.FixtureRequest):
+        layer = pebble.Layer({
+            'checks': {
+                'chk1': {
+                    'override': 'replace',
+                    'exec': {'command': 'foo'},
+                },
+                'chk2': {
+                    'override': 'replace',
+                    'startup': 'enabled',
+                    'exec': {'command': 'foo'},
+                },
+                'chk3': {
+                    'override': 'replace',
+                    'startup': 'disabled',
+                    'exec': {'command': 'foo'},
+                },
+            },
+        })
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta='name: mycharm\ncontainers:\n  mycontainer:',
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer('mylayer', layer)
+        return container
+
+    def test_add_layer_with_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        chk1 = container.get_checks('chk1')['chk1']
+        assert chk1.startup == pebble.CheckStartup.UNSET
+        assert chk1.failures == 0
+        assert chk1.status == pebble.CheckStatus.UP
+        chk2 = container.get_checks('chk2')['chk2']
+        assert chk2.startup == pebble.CheckStartup.ENABLED
+        assert chk2.failures == 0
+        assert chk2.status == pebble.CheckStatus.UP
+        chk3 = container.get_checks('chk3')['chk3']
+        assert chk3.startup == pebble.CheckStartup.DISABLED
+        assert chk3.failures == 0
+        assert chk3.status == pebble.CheckStatus.INACTIVE
+
+    def test_start_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        changed = container.start_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk3']
+
+    def test_stop_checks(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk1', 'chk2']
+
+    def test_stop_then_start(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk1', 'chk2']
+        changed = container.start_checks('chk1', 'chk2', 'chk3')
+        assert changed == ['chk1', 'chk2', 'chk3']
+        for info in container.get_checks('chk1').values():
+            assert info.status == pebble.CheckStatus.UP
+            assert info.change_id, 'Change ID should not be None or the empty string'
+
+    @pytest.mark.parametrize(
+        'combine,new_layer_name',
+        [
+            (False, 'new-layer'),
+            (True, 'base'),
+            # This doesn't have anything to combine with, but for completeness:
+            (True, 'new-layer'),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'new_layer_dict',
+        [
+            {
+                'checks': {
+                    'server-ready': {
+                        'override': 'merge',
+                        'level': 'ready',
+                        'http': {'url': 'http://localhost:5050/version'},
+                    }
+                }
+            },
+            {
+                'checks': {
+                    'server-ready': {
+                        'override': 'merge',
+                        'level': 'alive',
+                        'threshold': 30,
+                        'startup': 'disabled',
+                        'http': {'url': 'http://localhost:5050/version'},
+                    }
+                }
+            },
+        ],
+    )
+    def test_add_layer_merge_check(
+        self,
+        request: pytest.FixtureRequest,
+        new_layer_name: str,
+        combine: bool,
+        new_layer_dict: ops.pebble.LayerDict,
+    ):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                framework.observe(self.on['my-container'].pebble_ready, self._on_pebble_ready)
+
+            def _on_pebble_ready(self, _: ops.PebbleReadyEvent):
+                container = self.unit.get_container('my-container')
+                container.add_layer(
+                    new_layer_name, ops.pebble.Layer(new_layer_dict), combine=combine
+                )
+
+        layer_in = pebble.Layer({
+            'checks': {
+                'server-ready': {
+                    'override': 'replace',
+                    'level': 'ready',
+                    'startup': 'enabled',
+                    'threshold': 10,
+                    'http': {'url': 'http://localhost:5000/version'},
+                }
+            }
+        })
+        harness = ops.testing.Harness(MyCharm, meta='name: mycharm\ncontainers:\n  my-container:')
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('my-container', True)
+        harness.begin()
+        container_in = harness.charm.unit.get_container('my-container')
+        container_in.add_layer('base', layer_in)
+
+        harness.container_pebble_ready('my-container')
+
+        assert 'checks' in new_layer_dict and 'server-ready' in new_layer_dict['checks']
+        new_layer_check = new_layer_dict['checks']['server-ready']
+        container_out = harness.charm.unit.get_container('my-container')
+        check_out = container_out.get_checks('server-ready')['server-ready']
+        assert check_out.level == pebble.CheckLevel(new_layer_check.get('level', 'ready'))
+        assert check_out.startup == pebble.CheckStartup(new_layer_check.get('startup', 'enabled'))
+        assert check_out.threshold == new_layer_check.get('threshold', 10)
+
+
+@pytest.mark.parametrize('layer1_name,layer2_name', [('a-base', 'b-base'), ('b-base', 'a-base')])
+def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, layer2_name: str):
+    layer1 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'replace',
+                'command': '/bin/sleep 10',
+                'summary': 'sum',
+                'description': 'desc',
+                'startup': 'enabled',
+            },
+        },
+        'checks': {
+            'server-ready': {
+                'override': 'replace',
+                'level': 'ready',
+                'startup': 'enabled',
+                'threshold': 10,
+                'period': '1s',
+                'timeout': '28s',
+                'http': {'url': 'http://localhost:5000/version'},
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://loki.example.com',
+                'services': ['server'],
+                'labels': {'foo': 'bar'},
+            }
+        },
+    })
+    layer2 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'merge',
+                'command': '/bin/sleep 20',
+            }
+        },
+        'checks': {
+            'server-ready': {
+                'override': 'merge',
+                'level': 'alive',
+                'http': {'url': 'http://localhost:5050/version'},
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'merge',
+                'location': 'https://loki2.example.com',
+            },
+        },
+    })
+    harness = ops.testing.Harness(
+        ops.CharmBase, meta='name: mycharm\ncontainers:\n  my-container:'
+    )
+    request.addfinalizer(harness.cleanup)
+    harness.set_can_connect('my-container', True)
+    harness.begin()
+    container_in = harness.charm.unit.get_container('my-container')
+    container_in.add_layer(layer1_name, layer1)
+    container_in.add_layer(layer2_name, layer2)
+    container_out = harness.charm.unit.get_container('my-container')
+    plan = container_out.get_plan()
+
+    service = plan.services['server']
+    assert service.summary == 'sum'
+    assert service.description == 'desc'
+    # Service.startup is always a string, even though we have the enum.
+    assert service.startup == pebble.ServiceStartup.ENABLED.value
+    assert service.override == 'merge'
+    assert service.command == '/bin/sleep 20'
+
+    check = plan.checks['server-ready']
+    assert check.startup == pebble.CheckStartup.ENABLED
+    assert check.threshold == 10
+    assert check.period == '1s'
+    assert check.timeout == '28s'
+    assert check.override == 'merge'
+    assert check.level == pebble.CheckLevel.ALIVE
+    assert check.http is not None
+    assert check.http.get('url') == 'http://localhost:5050/version'
+
+    log_target = plan.log_targets['loki']
+    assert log_target.type == 'loki'
+    assert log_target.services == ['server']
+    assert log_target.labels == {'foo': 'bar'}
+    assert log_target.override == 'merge'
+    assert log_target.location == 'https://loki2.example.com'
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_scenario_available():
+    ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
+    state = ctx.run(ctx.on.start(), ops.testing.State())
+    assert isinstance(state.unit_status, ops.testing.UnknownStatus)

@@ -1,0 +1,45 @@
+[build-system]
+requires = [
+    "setuptools >= 35.0.2",
+    "setuptools_scm >= 2.0.0, <3"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ops-scenario"
+
+version = "7.22.0.dev0"
+
+authors = [
+    { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
+]
+maintainers = [
+    { name = "The Charm Tech team at Canonical Ltd." }
+]
+description = "Python library providing a state-transition testing API for Operator Framework charms."
+license.text = "Apache-2.0"
+keywords = ["juju", "test"]
+
+dependencies = [
+    "ops==2.22.0.dev0",
+    "PyYAML>=6.0.1",
+]
+readme = "README.md"
+requires-python = ">=3.8"
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
+    'Framework :: Pytest',
+    'Intended Audience :: Developers',
+    'Topic :: Software Development :: Quality Assurance',
+    'Topic :: Software Development :: Testing',
+    'Topic :: Utilities',
+]
+
+[project.urls]
+"Homepage" = "https://github.com/canonical/operator"
+"Bug Tracker" = "https://github.com/canonical/operator/issues"
+
+[bdist_wheel]
+universal = 1

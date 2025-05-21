@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import datetime
 import functools
 import gc
@@ -49,8 +51,8 @@ def create_model():
 def create_framework(
     request: pytest.FixtureRequest,
     *,
-    model: typing.Optional[ops.Model] = None,
-    tmpdir: typing.Optional[pathlib.Path] = None,
+    model: ops.Model | None = None,
+    tmpdir: pathlib.Path | None = None,
 ):
     """Create a Framework object.
 
@@ -83,6 +85,18 @@ def create_framework(
 @pytest.fixture
 def fake_script(request: pytest.FixtureRequest) -> FakeScript:
     return FakeScript(request)
+
+
+class SimpleEventWithData(ops.EventBase):
+    def __init__(self, handle: ops.Handle, data: str):
+        super().__init__(handle)
+        self.data: str = data
+
+    def restore(self, snapshot: dict[str, typing.Any]):
+        self.data = typing.cast('str', snapshot['data'])
+
+    def snapshot(self) -> dict[str, typing.Any]:
+        return {'data': self.data}
 
 
 class TestFramework:
@@ -149,10 +163,10 @@ class TestFramework:
                 self.handle = handle
                 self.my_n = n
 
-            def snapshot(self) -> typing.Dict[str, int]:
+            def snapshot(self) -> dict[str, int]:
                 return {'My N!': self.my_n}
 
-            def restore(self, snapshot: typing.Dict[str, int]):
+            def restore(self, snapshot: dict[str, int]):
                 self.my_n = snapshot['My N!'] + 1
 
         handle = ops.Handle(None, 'a_foo', 'some_key')
@@ -167,14 +181,14 @@ class TestFramework:
         framework2 = create_framework(request, tmpdir=tmp_path)
         framework2.register_type(Foo, None, handle.kind)
         event2 = framework2.load_snapshot(handle)
-        event2 = typing.cast(Foo, event2)
+        event2 = typing.cast('Foo', event2)
         assert event2.my_n == 2
 
         framework2.save_snapshot(event2)  # type: ignore
         del event2
         gc.collect()
         event3 = framework2.load_snapshot(handle)
-        event3 = typing.cast(Foo, event3)
+        event3 = typing.cast('Foo', event3)
         assert event3.my_n == 3
 
         framework2.drop_snapshot(event.handle)
@@ -200,8 +214,8 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
-                self.reprs: typing.List[str] = []
+                self.seen: list[str] = []
+                self.reprs: list[str] = []
 
             def on_any(self, event: ops.EventBase):
                 self.seen.append(f'on_any:{event.handle.kind}')
@@ -217,7 +231,7 @@ class TestFramework:
         framework.observe(pub.foo, obs.on_any)
         framework.observe(pub.bar, obs.on_any)
 
-        with pytest.raises(TypeError, match='^Framework.observe requires a method'):
+        with pytest.raises(TypeError, match=r'^Framework\.observe requires a method'):
             framework.observe(pub.baz, obs)  # type: ignore
 
         pub.foo.emit()
@@ -244,8 +258,8 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
-                self.reprs: typing.List[str] = []
+                self.seen: list[str] = []
+                self.reprs: list[str] = []
 
             def on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{event.handle.kind}')
@@ -304,13 +318,13 @@ class TestFramework:
             def _on_baz(
                 self,
                 event: ops.EventBase,
-                extra: typing.Optional[typing.Any] = None,
+                extra: typing.Any | None = None,
                 *,
                 k: typing.Any,
             ):
                 assert False, 'should not be reached'
 
-            def _on_qux(self, event: ops.EventBase, extra: typing.Optional[typing.Any] = None):
+            def _on_qux(self, event: ops.EventBase, extra: typing.Any | None = None):
                 assert False, 'should not be reached'
 
         framework = create_framework(request)
@@ -331,9 +345,9 @@ class TestFramework:
         class PreCommitObserver(ops.Object):
             _stored = ops.StoredState()
 
-            def __init__(self, parent: ops.Object, key: typing.Optional[str]):
+            def __init__(self, parent: ops.Object, key: str | None):
                 super().__init__(parent, key)
-                self.seen: typing.List[typing.Any] = []
+                self.seen: list[typing.Any] = []
                 self._stored.myinitdata = 40
 
             def on_pre_commit(self, event: ops.PreCommitEvent):
@@ -372,21 +386,18 @@ class TestFramework:
     def test_defer_and_reemit(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
-        class MyEvent(ops.EventBase):
-            pass
-
         class MyNotifier1(ops.Object):
-            a = ops.EventSource(MyEvent)
-            b = ops.EventSource(MyEvent)
+            a = ops.EventSource(SimpleEventWithData)
+            b = ops.EventSource(SimpleEventWithData)
 
         class MyNotifier2(ops.Object):
-            c = ops.EventSource(MyEvent)
+            c = ops.EventSource(SimpleEventWithData)
 
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
-                self.done: typing.Dict[str, bool] = {}
+                self.seen: list[str] = []
+                self.done: dict[str, bool] = {}
 
             def on_any(self, event: ops.EventBase):
                 self.seen.append(event.handle.kind)
@@ -404,18 +415,18 @@ class TestFramework:
         framework.observe(pub1.b, obs2.on_any)
         framework.observe(pub2.c, obs2.on_any)
 
-        pub1.a.emit()
-        pub1.b.emit()
-        pub2.c.emit()
+        pub1.a.emit('a')
+        pub1.b.emit('b')
+        pub2.c.emit('c')
 
-        # Events remain stored because they were deferred.
+        # Events remain stored because they were deferred (and distinct).
         ev_a_handle = ops.Handle(pub1, 'a', '1')
         framework.load_snapshot(ev_a_handle)
         ev_b_handle = ops.Handle(pub1, 'b', '2')
         framework.load_snapshot(ev_b_handle)
         ev_c_handle = ops.Handle(pub2, 'c', '3')
         framework.load_snapshot(ev_c_handle)
-        # make sure the objects are gone before we reemit them
+        # Make sure the objects are gone before we reemit them.
         gc.collect()
 
         framework.reemit()
@@ -439,6 +450,169 @@ class TestFramework:
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
         pytest.raises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
 
+    def test_repeated_defer(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
+
+        class MyEvent(ops.EventBase):
+            data: str | None = None
+
+        class ReleaseEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            n = ops.EventSource(MyEvent)
+            d = ops.EventSource(SimpleEventWithData)
+            r = ops.EventSource(ReleaseEvent)
+
+        class MyObserver(ops.Object):
+            def __init__(self, parent: ops.Object, key: str):
+                super().__init__(parent, key)
+                self.defer_all = True
+
+            def stop_deferring(self, _: MyEvent):
+                self.defer_all = False
+
+            def on_any(self, event: MyEvent):
+                if self.defer_all:
+                    event.defer()
+
+        pub = MyNotifier(framework, 'n')
+        obs1 = MyObserver(framework, '1')
+        obs2 = MyObserver(framework, '2')
+
+        framework.observe(pub.n, obs1.on_any)
+        framework.observe(pub.n, obs2.on_any)
+        framework.observe(pub.d, obs1.on_any)
+        framework.observe(pub.d, obs2.on_any)
+        framework.observe(pub.r, obs1.stop_deferring)
+
+        # Emit an event, which will be deferred.
+        pub.d.emit('foo')
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 2  # One per observer.
+        assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
+
+        # Emit the same event, and we'll still just have the single notice.
+        pub.d.emit('foo')
+        assert len(tuple(framework._storage.notices())) == 2
+
+        # Emit the same event kind but with a different snapshot, and we'll get a new notice.
+        pub.d.emit('bar')
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 4
+        assert framework._storage.load_snapshot(notices[2][0]) == {'data': 'bar'}
+
+        # Emit a totally different event, and we'll get a new notice.
+        pub.n.emit()
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 6
+        assert framework._storage.load_snapshot(notices[2][0]) == {'data': 'bar'}
+        assert framework._storage.load_snapshot(notices[4][0]) == {}
+
+        # Even though these events are far back in the queue, since they're
+        # duplicates, they will get skipped.
+        pub.d.emit('foo')
+        pub.d.emit('bar')
+        pub.n.emit()
+        assert len(tuple(framework._storage.notices())) == 6
+
+        def notices_for_observer(n: int):
+            return [
+                notice for notice in framework._storage.notices() if notice[1].endswith(f'[{n}]')
+            ]
+
+        # Stop deferring on the first observer, and all those events will be
+        # completed and the notices removed, while the second observer will
+        # still have them queued.
+        pub.r.emit()
+        assert len(tuple(framework._storage.notices())) == 6
+        pub.n.emit()
+        framework.reemit()
+        assert len(notices_for_observer(1)) == 0
+        assert len(notices_for_observer(2)) == 3
+
+        # Without the defer active, the first observer always ends up with an
+        # empty queue, while the second observer's queue continues to skip
+        # duplicates and add new events.
+        pub.d.emit('foo')
+        pub.d.emit('foo')
+        pub.d.emit('bar')
+        pub.n.emit()
+        pub.d.emit('foo')
+        pub.d.emit('bar')
+        pub.n.emit()
+        pub.d.emit('baz')
+        framework.reemit()
+        assert len(notices_for_observer(1)) == 0
+        assert len(notices_for_observer(2)) == 4
+
+    def test_two_observers_one_deferring(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
+
+        class MyNotifier(ops.Object):
+            my_event = ops.EventSource(SimpleEventWithData)
+
+        class RecordingObserver(ops.Object):
+            def __init__(self, parent: ops.Object, key: str):
+                super().__init__(parent, key)
+                self.events: list[str] = []
+
+            def on_event(self, _: SimpleEventWithData):
+                self.events.append(self.__class__.__name__)
+
+        class DeferringObserver(RecordingObserver):
+            defer = True
+
+            def on_event(self, event: SimpleEventWithData):
+                super().on_event(event)
+                if self.defer:
+                    event.defer()
+
+        pub = MyNotifier(framework, 'my_event')
+        obs1 = DeferringObserver(framework, '1')
+        obs2 = RecordingObserver(framework, '2')
+
+        framework.observe(pub.my_event, obs1.on_event)
+        framework.observe(pub.my_event, obs2.on_event)
+
+        # We always reemit() to handle the deferred events and then do the
+        # actual emit(). Create a helper function to do this.
+        def emit():
+            framework.reemit()
+            pub.my_event.emit('foo')
+
+        # Emit an event, which will be deferred by one observer, and not by the
+        # other. We should have a single notice with a corresponding snapshot,
+        # which is the deferred event, and each observer will have seen the
+        # event once.
+        emit()
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 1
+        assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
+        assert len(obs1.events) == len(obs2.events) == 1
+
+        # If we emit the event another time, we'll still have one notice and
+        # snapshot, and each observer will have seen the event twice.
+        emit()
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 1
+        assert framework._storage.load_snapshot(notices[0][0]) == {'data': 'foo'}
+        assert len(obs1.events) == len(obs2.events) == 2
+
+        # If we emit the event with neither observer deferring, we'll have no
+        # remaining notice or snapshot. The observer that didn't defer will have
+        # seen the event a straightforward 3 times. The observer that did defer
+        # will have seen it once more - in this final case, it runs the deferred
+        # event, which clears the queue, and then it runs the actual event
+        # (not skipping because the queue is empty at that point).
+        obs1.defer = False
+        emit()
+        assert len(obs1.events) == 4
+        assert len(obs2.events) == 3
+        notices = tuple(framework._storage.notices())
+        assert len(notices) == 0
+        assert len(tuple(framework._storage.list_snapshots())) == 0
+
     def test_custom_event_data(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
@@ -450,7 +624,7 @@ class TestFramework:
             def snapshot(self):
                 return {'My N!': self.my_n}
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+            def restore(self, snapshot: dict[str, typing.Any]):
                 super().restore(snapshot)
                 self.my_n = snapshot['My N!'] + 1
 
@@ -460,7 +634,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: MyEvent):
                 self.seen.append(f'on_foo:{event.handle.kind}={event.my_n}')
@@ -488,7 +662,7 @@ class TestFramework:
     def test_weak_observer(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
-        observed_events: typing.List[str] = []
+        observed_events: list[str] = []
 
         class MyEvent(ops.EventBase):
             pass
@@ -520,10 +694,10 @@ class TestFramework:
         framework = create_framework(request)
 
         class MyObject(ops.Object):
-            def snapshot(self) -> typing.Dict[str, typing.Any]:
+            def snapshot(self) -> dict[str, typing.Any]:
                 raise NotImplementedError()
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]) -> None:
+            def restore(self, snapshot: dict[str, typing.Any]) -> None:
                 raise NotImplementedError()
 
         o1 = MyObject(framework, 'path')
@@ -560,7 +734,7 @@ class TestFramework:
             def snapshot(self):
                 return {'value': self.value}
 
-            def restore(self, snapshot: typing.Dict[str, typing.Any]):
+            def restore(self, snapshot: dict[str, typing.Any]):
                 self.value = snapshot['value']
 
         framework.register_type(MyObject, None, MyObject.handle_kind)
@@ -571,14 +745,14 @@ class TestFramework:
         del o1
         gc.collect()
         o2 = framework.load_snapshot(o_handle)
-        o2 = typing.cast(MyObject, o2)
+        o2 = typing.cast('MyObject', o2)
         # Trying to load_snapshot a second object at the same path should fail with RuntimeError
         with pytest.raises(RuntimeError):
             framework.load_snapshot(o_handle)
         # Unless we _forget the object first
         framework._forget(o2)
         o3 = framework.load_snapshot(o_handle)
-        o3 = typing.cast(MyObject, o3)
+        o3 = typing.cast('MyObject', o3)
         assert o2.value == o3.value
         # A loaded object also prevents direct creation of an object
         with pytest.raises(RuntimeError):
@@ -592,7 +766,7 @@ class TestFramework:
         framework_copy2 = create_framework(request, tmpdir=tmp_path)
         framework_copy2.register_type(MyObject, None, MyObject.handle_kind)
         o_copy2 = framework_copy2.load_snapshot(o_handle)
-        o_copy2 = typing.cast(MyObject, o_copy2)
+        o_copy2 = typing.cast('MyObject', o_copy2)
         assert o_copy2.value == 'path'
 
     def test_events_base(self, request: pytest.FixtureRequest):
@@ -611,7 +785,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{event.handle.kind}')
@@ -684,7 +858,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[typing.Any] = []
+                self.seen: list[typing.Any] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(event.handle)
@@ -730,7 +904,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{type(event).__name__}:{event.handle.kind}')
@@ -770,7 +944,7 @@ class TestFramework:
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[str] = []
+                self.seen: list[str] = []
 
             def _on_foo(self, event: ops.EventBase):
                 self.seen.append(f'on_foo:{type(event).__name__}:{event.handle.kind}')
@@ -842,7 +1016,7 @@ class TestFramework:
 
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
-                self.seen: typing.List[typing.Any] = []
+                self.seen: list[typing.Any] = []
 
             def _on_foo(self, event: MyEvent):
                 self.seen.append((event.handle.key, event.value))
@@ -1148,7 +1322,7 @@ class TestStoredState:
         self,
         request: pytest.FixtureRequest,
         tmp_path: pathlib.Path,
-        cls: typing.Type[ops.Object],
+        cls: type[ops.Object],
     ):
         @typing.runtime_checkable
         class _StoredProtocol(typing.Protocol):
@@ -1313,7 +1487,7 @@ class TestStoredState:
             with pytest.raises(TypeError):
                 a.add(b)
 
-        test_operations: typing.List[MutableTypesTestCase] = [
+        test_operations: list[MutableTypesTestCase] = [
             (
                 lambda: {},
                 None,
@@ -1458,14 +1632,14 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast(typing.Set[str], set()),
+                lambda: typing.cast('typing.Set[str]', set()),
                 None,
                 set(),
                 lambda a, b: None,
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast(typing.Set[str], set()),
+                lambda: typing.cast('typing.Set[str]', set()),
                 'a',
                 {'a'},
                 lambda a, b: a.add(b),
@@ -1479,7 +1653,7 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast(typing.Set[str], set()),
+                lambda: typing.cast('typing.Set[str]', set()),
                 {'a'},
                 set(),
                 # Nested sets are not allowed as sets themselves are not hashable.
@@ -1494,8 +1668,8 @@ class TestStoredState:
         class WrappedFramework(ops.Framework):
             def __init__(
                 self,
-                store: typing.Union[SQLiteStorage, JujuStorage],
-                charm_dir: typing.Union[str, Path],
+                store: SQLiteStorage | JujuStorage,
+                charm_dir: str | Path,
                 meta: ops.CharmMeta,
                 model: ops.Model,
                 event_name: str,
@@ -1508,9 +1682,9 @@ class TestStoredState:
                     event_name,
                     juju_debug_at=set(),
                 )
-                self.snapshots: typing.List[typing.Any] = []
+                self.snapshots: list[typing.Any] = []
 
-            def save_snapshot(self, value: typing.Union[ops.StoredStateData, ops.EventBase]):
+            def save_snapshot(self, value: ops.StoredStateData | ops.EventBase):
                 if value.handle.path == 'SomeObject[1]/StoredStateData[_stored]':
                     self.snapshots.append((type(value), value.snapshot()))
                 return super().save_snapshot(value)
@@ -1558,7 +1732,7 @@ class TestStoredState:
             framework_copy.close()
 
     def test_comparison_operations(self, request: pytest.FixtureRequest):
-        test_operations: typing.List[ComparisonOperationsTestCase] = [
+        test_operations: list[ComparisonOperationsTestCase] = [
             (
                 {'1'},
                 {'1', '2'},
@@ -1599,7 +1773,7 @@ class TestStoredState:
             assert op(b, obj._stored.a) == op_ba
 
     def test_set_operations(self, request: pytest.FixtureRequest):
-        test_operations: typing.List[SetOperationsTestCase] = [
+        test_operations: list[SetOperationsTestCase] = [
             ({'1'}, lambda a, b: a | b, {'1', 'a', 'b'}, {'1', 'a', 'b'}),
             ({'a', 'c'}, lambda a, b: a - b, {'b'}, {'c'}),
             ({'a', 'c'}, lambda a, b: a & b, {'a'}, {'a'}),
@@ -1810,7 +1984,8 @@ class TestBreakpoint:
             '-',
             '...foo',
             'foo.bar',
-            'bar--' 'FOO',
+            'bar--',
+            'FOO',
             'FooBar',
             'foo bar',
             'foo_bar',
@@ -1857,7 +2032,7 @@ class TestBreakpoint:
         self,
         request: pytest.FixtureRequest,
         envvar_value: str,
-        breakpoint_name: typing.Optional[str],
+        breakpoint_name: str | None,
         call_count: int,
     ):
         """Helper to check the diverse combinations of situations."""
@@ -1957,7 +2132,7 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast(io.StringIO, fake_stderr)
+            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
 
@@ -2106,7 +2281,7 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast(io.StringIO, fake_stderr)
+            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
                 assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE

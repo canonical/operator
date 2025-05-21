@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Support legacy ops.main.main() import."""
 
-import warnings
-from typing import Optional, Type
-
-import ops.charm
+from __future__ import annotations
 
 from . import _main
+from . import charm as _charm
 
 # Re-export specific set of symbols that Scenario 6 imports from ops.main
 from ._main import (  # noqa: F401
@@ -29,7 +28,7 @@ from ._main import (  # noqa: F401
 )
 
 
-def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[bool] = None):
+def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None = None):
     """Legacy entrypoint to set up the charm and dispatch the observed event.
 
     .. deprecated:: 2.16.0
@@ -37,9 +36,4 @@ def main(charm_class: Type[ops.charm.CharmBase], use_juju_for_storage: Optional[
 
     See `ops.main() <#ops-main-entry-point>`_ for details.
     """
-    warnings.warn(
-        'Calling `ops.main.main()` is deprecated, call `ops.main()` instead',
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)

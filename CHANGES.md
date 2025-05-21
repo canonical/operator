@@ -1,38 +1,281 @@
+# 2.21.1 - 1 May 2025
+
+## Reverted
+
+* Reverting "run deferred events with fresh charm instances" (#1711)
+
+## Documentation
+
+* Add best practices about status (#1689)
+
+# 2.21.0 - 30 Apr 2025
+
+## Features
+
+* Ops[tracing] (with a first-party charm lib) (#1612)
+* Pebble identities (#1672)
+* Run deferred events with fresh charm instances (#1631)
+
+## Fixes
+
+* Allow TLS 1.2 in ops-tracing (#1705)
+* Try to fix flaky pebble exec test (#1664)
+
+## Documentation
+
+* Add best practice note around using tooling provided by the charmcraft profile (#1700)
+* Clarify guidance about designing python modules (#1670)
+* Fix a bug in the k8s tutorial doc about unit test (#1688)
+* Fix broken link in readme (#1679)
+* Fix links to juju docs (#1681)
+* Fix tox command in hacking.md (#1661)
+* Improve landing page of kubernetes charm tutorial (#1660)
+
+## CI
+
+* Add zizmor to static check github workflows (#1656)
+* Change prerelease setting used to add latest ops and scenario (#1682)
+* Don't pin release jobs to github environments (#1683)
+* Don't run tests within the publish job (#1684)
+* Fix smoke test (#1698)
+* Post-release versioning, release process update + workflow fix (#1658)
+* Rename "tox -e fmt" to "tox -e format" (#1668)
+
+## Tests
+
+* Fix overly specific test that fails sometimes with tracing (#1695)
+
+# 2.20.0 - 31 Mar 2025
+
+## Features
+
+* Add a `remove_revision()` method to `SecretRemoveEvent` and `SecretExpiredEvent` (#1624)
+* Add `Relation.remote_model` property (#1610)
+* Efficient implementation of `RelationDataContent.update` (#1586)
+* Expose the config metadata in `CharmMeta` (#1648)
+* Add the ability to emit custom events in unit tests (#1589)
+* Check that the check-infos in `testing.Container` match the plan (#1630)
+* `ops.testing.State` components are less mutable (#1617)
+
+## Fixes
+
+* Assorted fixes for Pebble layer merging in Harness and Scenario (#1627)
+
+## Documentation
+
+* Add a docs link to the Harness deprecation warning (#1513)
+* Add best practices and a "manage charms" how-to (#1615)
+* Add section about services with long startup time (#1604)
+* Clarify how to use mounts in `ops.testing.Container` (#1637)
+* Fix code snippet indentation (#1649)
+* Fix Scenario example (#1616)
+* Move hooks-based charm migration guide (#1636)
+* Putting test into each chapter of the tutorial (#1647)
+* Refactor how-to unit test according to comments (#1642)
+* Refactor test docs to 1 explanation and 2 how-tos (#1628)
+* Remove the charm-tech@lists.launchpad.net email address (#1632)
+* Remove tutorial chapters that are covered by the how-to guide (#1511)
+* Stack args vertically for long signature lines (#1641)
+* Testing explanation (#1635)
+* Unify charm test docs how to (#1639)
+
+## CI
+
+* Exclude vault-k8s-operator until the system can handle monorepos (#1650)
+* Use the latest version of ops-scenario in the compatibility tests (#1608)
+
+# 2.19.0 - 27 Feb 2025
+
+## Features
+
+* Expose the Juju version via Model objects (#1563)
+* Support starting and stopping Pebble checks, and the checks enabled field (#1560)
+
+## Documentation
+
+* Update logo and readme by @tmihoc (#1571)
+* Fill out remaining external link placeholders (#1564)
+* Use noun relation and verb integrate (#1574)
+* Update ref to charmcraft.yaml reference by @medubelko (#1580)
+* Add a how-to for setting open ports (#1579)
+* Fix links that pointed to earlier Juju docs (#1575)
+* Update links to Charmcraft docs (#1582)
+* Small updates to machine charm tutorial (#1583)
+
+## CI
+
+* Update list of charms and handle increasing uv usage (#1588)
+* Handle presence/absence of "static" and "static-charm" envs (#1590)
+
+# 2.18.1 - 5 Feb 2025
+
+## Fixes
+
+* Ensure that the event snapshot is available when one observer defers and another does not (#1562)
+* Maintain transaction integrity on first run (#1558)
+
+## Documentation
+
+* Set up intersphinx and add links (#1546)
+
+# 2.18.0 - 30 Jan 2025
+
+## Features
+
+* Don't store duplicate events in the notice queue (#1372)
+
+## Fixes
+* Remove ops.main.main deprecation warning, and avoid warnings in action output (#1496)
+
+## Documentation
+* Use the right ops-scenario for building the docs (#1470)
+* Go full Diátaxis, ingesting the relevant juju.is/docs/sdk documentation by @tmihoc (#1481)
+* Update boilerplate links (#1515)
+* Fix broken links and use cross references instead of absolute links (#1519)
+* Use explicit framework param instead of *args (#1523)
+* Add doc style tips to HACKING.md (#1528)
+* Fix link to Juju docs in Kubernetes charm tutorial (#1529)
+* Remove the publish badge from the README (#1505)
+* Add how-to for storing state (#1534)
+* Improve info about contributing to docs (#1533)
+* Fix formatting errors in HACKING.md (#1539)
+
+## Continuous Integration
+* Add support for injecting the latest ops when uv is used (#1477)
+* Don't cancel other unit tests when one fails (#1471)
+* Use Concierge to set up the smoke test environments (#1541)
+* Bump poetry to 2.0 to match downstream (#1542)
+* Enable the prometheus-k8s revision updates again (#1544)
+* Include Juju 2.9 in the smoke tests (#1545)
+
+## Testing
+* Handle warnings generated by our own tests (#1469)
+* Allow check to fail an additional time when running the test (#1531)
+
+# 2.17.1 - 28 Nov 2024
+
+## Fixes
+
+* Make `push_path` open in binary mode so it works on non-text files (#1458)
+
+## Documentation
+
+* Use `MaintenanceStatus` for local issues (#1397)
+* Explicitly document that `collect-status` is is run on every hook (#1399)
+* Use our docs URL for the `ogp:url` properties Sphinx generates (#1411)
+* Set the `READTHEDOCS` context variable (#1410)
+* Fix Read the Docs ad placement (#1414)
+* Clarify where `StoredState` is stored, and the upgrade behaviour (#1416)
+* Fix copy 'n' paste error in `stop_services` docstring (#1457)
+
+## Continuous Integration
+
+* Configure the labels for dependabot PRs (#1407)
+* Disable the automatic ops[testing] releasing (#1415)
+* Use the actual poetry command, rather than manually tweaking the file (#1443)
+* Fix broken GitHub variable expansion (#1446)
+* Coverage report generation should also include testing/src/scenario (#1453)
+* Fix PR title CI job concurrency (#1451)
+* Adjust the release process to handle publishing ops and ops[testing] (#1432)
+* A better way than commenting out external repos (#1463)
+* Use more descriptive names for the publish workflows (#1464)
+* Move the XML coverage report to .report (#1465)
+
+## Refactoring
+
+* Import the ops[testing] repository (#1406)
+* Update linting with the latest ruff (#1441)
+
+# 2.17.0 - 26 Sep 2024
+
+## Features
+
+* Optionally install Scenario with `ops[testing]` and expose the names in ops.testing (#1381)
+* Change ops.main() so that you don't need to `type: ignore` it (#1345)
+* Expand the secret ID out to the full URI when only given the ID (#1358)
+* Add a JujuVersion property for Pebble log forwarding to Loki (#1370)
+* Preemptively raise `InvalidStatusError` instead of waiting for Juju:
+    * Make it an error to call `CollectStatusEvent.add_status` with error or unknown (#1386)
+    * Document and validate settable status values in `_ModelBackend.set_status` (#1354)
+
+## Fixes
+
+* Fix type of `StatusBase` subclasses by calling `StatusBase.register` in `__init_subclass__` (#1383)
+* `Secret.set_info` and `Secret.set_content` can be called in the same hook (#1373)
+
+## Documentation
+
+* Add top-level intro and module-level intros (#1320)
+* Update the links to the Pebble docs (#1362)
+* Note about repeatedly setting secret value in Juju 3.6 (#1366)
+* `config-changed` is triggered by Juju trust (#1357)
+* Typo on `CharmBase` inheritance example by @theofpa (#1349)
+* Docs: move Pebble to a separate page (#1392)
+
+## Continuous Integration
+
+* Periodically run the unit tests of all GitHub-hosted published charms (#1365)
+* Update the TIOBE reporting for the changes in coverage calculation (#1367)
+* Spell-check the code as part of linting (#1388)
+* Run the smoke tests on a schedule (#1387)
+
+## Testing
+
+* Fix tests that leaked environment variables (#1385)
+
+## Refactoring
+
+* Move the content of `ops.testing` to `ops._private.harness` (#1369)
+* Keep the `unittest.mock` names in the 'mock' namespace (#1379)
+* Deprecate `StatusBase.register` decorator (#1384)
+
+## Chores
+
+* Note Juju version on legacy workaround (#1355)
+* Re-enable test now that Pebble directory permissions are fixed (#1363)
+* Generate warnings for events that will be removed in Juju 4.0 (#1374)
+
+# 2.16.1 - 5 Sep 2024
+
+## Fix
+
+* Don't alter os.environ when creating a Harness (#1359)
+
 # 2.16.0 - 29 Aug 2024
 
 ## Features
 
-* Add the description field to SecretInfo in https://github.com/canonical/operator/pull/1338
+* Add the description field to SecretInfo in (#1338)
 
 ## Refactor
 
-* Parse JUJU_* environment variables in one place in https://github.com/canonical/operator/pull/1313
+* Parse JUJU_* environment variables in one place in (#1313)
 
 ## Fixes
 
-* Fix reading Juju secret expiry dates in https://github.com/canonical/operator/pull/1317
-* Correct the signature of .events() in https://github.com/canonical/operator/pull/1342
+* Fix reading Juju secret expiry dates in (#1317)
+* Correct the signature of .events() in (#1342)
 
 ## Documentation
 
-* Security policy change to only support each active major release in https://github.com/canonical/operator/pull/1297
-* Add Juju version markers in https://github.com/canonical/operator/pull/1311
-* Use Sphinx 8 in https://github.com/canonical/operator/pull/1303
-* Live reload documentation with sphinx-autobuild in https://github.com/canonical/operator/pull/1323
+* Security policy change to only support each active major release in (#1297)
+* Add Juju version markers in (#1311)
+* Use Sphinx 8 in (#1303)
+* Live reload documentation with sphinx-autobuild in (#1323)
 
 ## Tests
 
-* Update the smoke test series/bases in https://github.com/canonical/operator/pull/1318
-* Run pytest in parallel with pytest xdist in https://github.com/canonical/operator/pull/1319
-* Bump Pyright to 1.1.377 in https://github.com/canonical/operator/pull/1332
-* Run tests on Python 3.12 and the install test on Python 3.13 in https://github.com/canonical/operator/pull/1315
+* Update the smoke test series/bases in (#1318)
+* Run pytest in parallel with pytest xdist in (#1319)
+* Bump Pyright to 1.1.377 in (#1332)
+* Run tests on Python 3.12 and the install test on Python 3.13 in (#1315)
 
 ## CI
 
-* Add a workflow that runs the TIOBE quality checks in https://github.com/canonical/operator/pull/1301
-* Allow executing the TIOBE workflow manually in https://github.com/canonical/operator/pull/1321
-* Make Pyright report unnecessary type ignore comments in https://github.com/canonical/operator/pull/1333
-* Enable linting of docs/custom_conf.py in https://github.com/canonical/operator/pull/1330
+* Add a workflow that runs the TIOBE quality checks in (#1301)
+* Allow executing the TIOBE workflow manually in (#1321)
+* Make Pyright report unnecessary type ignore comments in (#1333)
+* Enable linting of docs/custom_conf.py in (#1330)
 
 # 2.15.0 - 22 Jul 2024
 
@@ -159,7 +402,7 @@
 
 ## Features
 
-* `StopEvent`, `RemoveEvent`, and all `LifeCycleEvent`s are no longer deferrable, and will raise a `RuntimeError` if `defer()` is called on the event object (#1122)
+* `StopEvent`, `RemoveEvent`, and all `LifecycleEvent`s are no longer deferrable, and will raise a `RuntimeError` if `defer()` is called on the event object (#1122)
 * Add `ActionEvent.id`, exposing the JUJU_ACTION_UUID environment variable (#1124)
 * Add support for creating `pebble.Plan` objects by passing in a `pebble.PlanDict`, the
   ability to compare two `Plan` objects with `==`, and the ability to create an empty Plan with `Plan()` (#1134)

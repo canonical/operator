@@ -17,4 +17,6 @@
 This module is NOT to be used when developing charms using ops.
 """
 
-version: str = '2.17.0.dev0'
+from __future__ import annotations
+
+version: str = '2.22.0.dev0'
