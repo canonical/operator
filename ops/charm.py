@@ -1446,7 +1446,7 @@ class CharmBase(Object):
         Args:
             cls: A class that inherits from :class:`ops.ConfigBase`.
             errors: what to do if the config is invalid. If ``blocked``, the
-                charm will exit successfully (note that this informs Juju that
+                charm will exit successfully (this informs Juju that
                 the event was handled and it will not be retried) after setting
                 an appropriate blocked status. If ``raise``, ``load_config``
                 will not catch any exceptions, leaving the charm to handle
