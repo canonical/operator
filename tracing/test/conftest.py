@@ -71,14 +71,16 @@ def ca_relation():
 def juju_context(tmp_path: pathlib.Path):
     return _JujuContext.from_dict({
         'JUJU_VERSION': '3.6.0',
-        'JUJU_UNIT_NAME': 'app/0',
+        'JUJU_MODEL_NAME': 'test-model',
+        'JUJU_MODEL_UUID': '4242',
+        'JUJU_UNIT_NAME': 'testapp/42',
         'JUJU_CHARM_DIR': str(tmp_path),
     })
 
 
 @pytest.fixture
 def setup_tracing(juju_context: _JujuContext):
-    ops_tracing._setup(juju_context, 'charm')
+    ops_tracing._setup(juju_context, 'DummyCharm')
     yield
     ops_tracing._shutdown()
     # Note that OpenTelemetry disallows setting the tracer provider twice,
