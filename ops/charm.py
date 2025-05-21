@@ -1446,7 +1446,7 @@ class CharmBase(Object):
         passed through to the config class ``__init__``.
 
         Args:
-            cls: A class that inherits from :class:`ops.ConfigBase`.
+            cls: A class that will accept the Juju options as keyword arguments.
             errors: what to do if the config is invalid. If ``blocked``, the
                 charm will exit successfully (this informs Juju that
                 the event was handled and it will not be retried) after setting
@@ -2015,8 +2015,8 @@ class JujuAssumesCondition(enum.Enum):
 class JujuAssumes:
     """Juju model features that are required by the charm.
 
-    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
-    list of available features.
+    See the `Charmcraft docs <https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#assumes>`_
+    for a list of available features.
     """
 
     features: list[str | JujuAssumes]
