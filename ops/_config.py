@@ -63,7 +63,38 @@ _JUJU_TYPES: Final[Mapping[str, str]] = {
 }
 
 
-def _attr_to_juju_type(cls: type[object], name: str, default: Any = None) -> str:
+def get_default_value(cls: type[object], name: str) -> Any:
+    """Get the default value for a class attribute."""
+    # Dataclasses:
+    if hasattr(cls, '__dataclass_fields__'):
+        field = {f.name: f for f in dataclasses.fields(cls)}[name]  # type: ignore
+        # This might be a Pydantic dataclass using a Pydantic.Field object.
+        field_default = (  # type: ignore
+            field.default.default  # type: ignore
+            if hasattr(field.default, 'default')
+            else field.default
+        )
+        if field_default is not dataclasses.MISSING:
+            return field_default  # type: ignore
+        if field.default_factory is not dataclasses.MISSING:
+            return field.default_factory()
+        return None
+
+    # Pydantic models:
+    if hasattr(cls, 'model_fields'):
+        field = cls.model_fields[name]  # type: ignore
+        # This is a hack to avoid importing pydantic.
+        if 'PydanticUndefinedType' not in str(type(field.default)):  # type: ignore
+            return field.default  # type: ignore
+        if field.default_factory is not None:  # type: ignore
+            return field.default_factory()  # type: ignore
+        return None
+
+    # Everything else:
+    return getattr(cls, name, None)
+
+
+def attr_to_juju_type(cls: type[object], name: str, default: Any = None) -> str:
     """Provide the appropriate type for the config YAML for the given class attribute.
 
     If possible, use the type hint from the class attribute, ignoring
@@ -118,7 +149,7 @@ def _attr_to_juju_type(cls: type[object], name: str, default: Any = None) -> str
     return 'string'
 
 
-def _juju_schema_from_model_fields(cls: type[object]) -> dict[str, Any]:
+def juju_schema_from_model_fields(cls: type[object]) -> dict[str, Any]:
     options = {}
     for name, field in cls.model_fields.items():  # type: ignore
         option = {}
@@ -142,7 +173,7 @@ def _juju_schema_from_model_fields(cls: type[object]) -> dict[str, Any]:
     return {'options': options}
 
 
-def _juju_names(cls: type[object]) -> Generator[str]:
+def juju_names(cls: type[object]) -> Generator[str]:
     """Iterates over all the option names to include in the config YAML."""
     try:
         yield from (field.name for field in sorted(dataclasses.fields(cls)))  # type: ignore
@@ -248,14 +279,14 @@ class ConfigBase:
         # Special-case pydantic BaseModel or anything else with a compatible
         # `model_fields`` attribute.
         if hasattr(cls, 'model_fields'):
-            return _juju_schema_from_model_fields(cls)
+            return juju_schema_from_model_fields(cls)
 
         # Dataclasses, regular classes, etc.
         attr_docstrings = attrdocs.get_attr_docstrings(cls)
         options: dict[str, OptionDict] = {}
-        for attr in _juju_names(cls):
-            default = getattr(cls, attr, None)
-            option: OptionDict = {'type': _attr_to_juju_type(cls, attr, default)}
+        for attr in juju_names(cls):
+            default = get_default_value(cls, attr)
+            option: OptionDict = {'type': attr_to_juju_type(cls, attr, default)}
             if default is not None and type(default).__name__ in _JUJU_TYPES:
                 option['default'] = default
             doc = attr_docstrings.get(attr)

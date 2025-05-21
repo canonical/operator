@@ -1462,7 +1462,7 @@ class CharmBase(Object):
                 ``raise``.
         """
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
-        fields = set(_config._juju_names(cls))
+        fields = set(_config.juju_names(cls))
         for key, value in self.config.items():
             attr = key.replace('-', '_')
             if not attr.isidentifier():
