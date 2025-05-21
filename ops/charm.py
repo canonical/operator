@@ -1475,7 +1475,8 @@ class CharmBase(Object):
             # Convert secret IDs to secret objects. We create the object rather
             # that using model.get_secret so that it's entirely lazy, in the
             # same way that SecretEvent.secret is.
-            if option_type and option_type.type == 'secret' and isinstance(value, str):
+            if option_type and option_type.type == 'secret':
+                assert isinstance(value, str)  # Juju will have made sure of this.
                 value = model.Secret(
                     backend=self.model._backend,
                     id=value,
