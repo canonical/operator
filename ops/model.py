@@ -1721,7 +1721,7 @@ class Relation:
     ``relation-broken`` event associated with this relation.
     """
 
-    _remote_unit: Optional[Unit]
+    _remote_unit: Unit | None
 
     def __init__(
         self,
@@ -1732,7 +1732,7 @@ class Relation:
         backend: _ModelBackend,
         cache: _ModelCache,
         active: bool = True,
-        _remote_unit: Optional[Unit] = None,
+        _remote_unit: Unit | None = None,
     ):
         self.name = relation_name
         self.id = relation_id

@@ -373,7 +373,7 @@ class _Manager:
         # Similarly, if we are in a RelationBroken or RelationDeparted event, we
         # need to provide access to the remote relation data, even though the
         # relation will not be returned from the `relation-list` hook tool.
-        model = ops.model.Model(
+        model = _model.Model(
             self._charm_meta,
             self._model_backend,
             broken_relation_id=broken_relation_id,
