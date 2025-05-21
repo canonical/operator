@@ -425,7 +425,6 @@ class _TestMain(abc.ABC):
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['InstallEvent']
 
-        fake_script.write('config-get', "echo '{}'")
         state = self._simulate_event(
             fake_script, EventSpec(ops.ConfigChangedEvent, 'config-changed')
         )
@@ -442,7 +441,6 @@ class _TestMain(abc.ABC):
     @pytest.mark.usefixtures('setup_charm')
     def test_no_reemission_on_collect_metrics(self, fake_script: FakeScript):
         fake_script.write('add-metric', 'exit 0')
-        fake_script.write('config-get', "echo '{}'")
 
         # First run "install" to make sure all hooks are set up.
         state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
@@ -1109,49 +1107,6 @@ class _TestMain(abc.ABC):
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected
-
-    @pytest.mark.usefixtures('setup_charm')
-    def test_invalid_schema_clean_exit(self, fake_script: FakeScript):
-        # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
-        assert isinstance(state, ops.BoundStoredState)
-        assert list(state.observed_event_types) == ['InstallEvent']
-
-        fake_script.write('config-get', 'echo \'{"invalid": "invalid"}\'')
-        state = self._simulate_event(
-            fake_script,
-            EventSpec(
-                ops.ConfigChangedEvent,
-                'config-changed',
-            ),
-        )
-        assert isinstance(state, ops.BoundStoredState)
-        expected = [['is-leader', '--format=json'], ['config-get', '--format=json']]
-        assert [call for call in fake_script.calls() if call[0] != 'juju-log'] == expected
-
-    @pytest.mark.usefixtures('setup_charm')
-    def test_invalid_schema_set_status(self, fake_script: FakeScript):
-        # First run "install" to make sure all hooks are set up.
-        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
-        assert isinstance(state, ops.BoundStoredState)
-        assert list(state.observed_event_types) == ['InstallEvent']
-
-        fake_script.write('config-get', 'echo \'{"invalid": "status message"}\'')
-        fake_script.write('status-set', 'exit 0')
-        state = self._simulate_event(
-            fake_script,
-            EventSpec(
-                ops.ConfigChangedEvent,
-                'config-changed',
-            ),
-        )
-        assert isinstance(state, ops.BoundStoredState)
-        expected = [
-            ['is-leader', '--format=json'],
-            ['config-get', '--format=json'],
-            ['status-set', '--application=False', 'blocked', 'Error in config: status message'],
-        ]
-        assert [call for call in fake_script.calls() if call[0] != 'juju-log'] == expected
 
 
 class TestMainWithDispatchAsSymlink(_TestMain):

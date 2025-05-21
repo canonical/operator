@@ -12,7 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-options:
-  invalid:
-    type: string
-    description: Fail if set, using the value as the status message.
+options: {}

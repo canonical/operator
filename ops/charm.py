@@ -1461,6 +1461,8 @@ class CharmBase(Object):
             ValueError: if the configuration is invalid and ``errors`` is set to
                 ``raise``.
         """
+        from ._main import _Abort
+
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
         fields = set(_config.juju_names(cls))
         for key, value in self.config.items():
@@ -1468,7 +1470,8 @@ class CharmBase(Object):
             if not attr.isidentifier():
                 if errors == 'raise':
                     raise ValueError(f'Invalid attribute name {attr}')
-                raise model._InvalidSchemaError(status=f'Invalid attribute name {attr}')
+                self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
+                raise _Abort(0)
             if attr not in fields:
                 continue
             option_type = self.meta.config.get(key)
@@ -1488,7 +1491,12 @@ class CharmBase(Object):
         except ValueError as e:
             if errors == 'raise':
                 raise
-            raise model._InvalidSchemaError(status=f'Error in config: {e}') from e
+            # We exit with a zero code because we don't want Juju to retry
+            # (the config needs to be fixed by the Juju user), and we don't
+            # want the status we just set to be overridden by an error
+            # status.
+            self.unit.status = model.BlockedStatus(f'Invalid config: {e}')
+            raise _Abort(0) from e
 
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]

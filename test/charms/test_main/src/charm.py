@@ -22,7 +22,6 @@ import typing
 import warnings
 
 import ops
-import ops.model
 
 sys.path.append('lib')
 
@@ -142,17 +141,6 @@ class Charm(ops.CharmBase):
         self._stored.observed_event_types.append(type(event).__name__)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        if 'invalid' in self.config:
-            if self.config['invalid'] == 'invalid':
-                raise ops.model._InvalidSchemaError()
-
-            status = str(self.config['invalid'])
-
-            class Config(ops.ConfigBase):
-                def __init__(self, **_):
-                    raise ValueError(status)
-
-            self.load_config(Config, errors='blocked')
         self._stored.on_config_changed.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         event.defer()

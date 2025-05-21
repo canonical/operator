@@ -3269,14 +3269,6 @@ class SecretNotFoundError(ModelError):
     """Raised when the specified secret does not exist."""
 
 
-class _InvalidSchemaError(Exception):  # pyright: ignore[reportUnusedClass]
-    """Raised when a config option or action parameter schema does not match the data."""
-
-    def __init__(self, message: str = '', status: str | None = None):
-        super().__init__(message)
-        self.status = status
-
-
 _ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
 
 

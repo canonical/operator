@@ -458,17 +458,6 @@ class _Manager:
             self._emit()
             self._commit()
             self._close()
-        except _model._InvalidSchemaError as e:
-            # Optionally set a status message on the unit.
-            if e.status:
-                self._model_backend.status_set('blocked', e.status)
-            # We exit with a zero exit code. If this has been raised when
-            # loading config, we don't want to go into error status, which would
-            # overwrite any status we set above and would automatically retry,
-            # even though the Juju user must manually fix the config. If this
-            # has been raised when loading action parameters, we don't want the
-            # action to *crash*, we want it to gracefully fail.
-            raise _Abort(0) from e
         finally:
             self.framework.close()
 

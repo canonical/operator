@@ -28,8 +28,8 @@ except ImportError:
     pydantic = None
 
 import ops
+import ops._main
 import ops._private.yaml
-import ops.model as _model
 from ops import testing
 
 logger = logging.getLogger(__name__)
@@ -291,7 +291,7 @@ def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pyte
 
 @pytest.mark.parametrize(
     'errors,exc',
-    (('raise', ValueError), ('blocked', _model._InvalidSchemaError), (None, ValueError)),
+    (('raise', ValueError), ('blocked', ops._main._Abort), (None, ValueError)),
 )
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_config_with_error_blocked(
@@ -310,6 +310,10 @@ def test_config_with_error_blocked(
     })
     with pytest.raises(exc):
         harness.begin()
+    if errors == 'blocked':
+        status_dict = harness._backend.status_get()
+        assert status_dict['status'] == 'blocked'
+        assert 'my_int must be zero or positive' in status_dict['message']
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
