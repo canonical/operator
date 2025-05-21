@@ -26,6 +26,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    Generator,
     List,
     Literal,
     Mapping,
@@ -33,7 +34,9 @@ from typing import (
     Optional,
     TextIO,
     TypedDict,
+    TypeVar,
     cast,
+    get_origin,
 )
 
 from . import model
@@ -1322,6 +1325,9 @@ class CharmEvents(ObjectEvents):
     """
 
 
+_ConfigType = TypeVar('_ConfigType')
+
+
 class CharmBase(Object):
     """Base class that represents the charm overall.
 
@@ -1417,6 +1423,103 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
+    def load_config(
+        self,
+        cls: type[_ConfigType],
+        *args: Any,
+        errors: Literal['raise', 'blocked'] = 'raise',
+        **kwargs: Any,
+    ) -> _ConfigType:
+        """Load the config into an instance of a config class.
+
+        The raw Juju config is passed to the config class's ``__init__``, as
+        keyword arguments, with the following changes:
+
+        * ``secret`` type options have a :class:`model.Secret` value rather
+          than the secret ID. Note that the secret object is not validated by
+          Juju at this time, so may raise :class:`SecretNotFoundError` when it
+          is later used if the secret does not exist or the unit does not have
+          permission to access it.
+        * dashes in names converted to underscores.
+
+        Any additional positional or keyword arguments to this method will be
+        passed through to the config class ``__init__``.
+
+        Args:
+            cls: A class that inherits from :class:`ops.ConfigBase`.
+            errors: what to do if the config is invalid. If ``blocked``, the
+                charm will exit successfully (this informs Juju that
+                the event was handled and it will not be retried) after setting
+                an appropriate blocked status. If ``raise``, ``load_config``
+                will not catch any exceptions, leaving the charm to handle
+                errors.
+            args: positional arguments to pass through to the config class.
+            kwargs: keyword arguments to pass through to the config class.
+
+        Returns:
+            An instance of the config class with the current config values.
+
+        Raises:
+            ValueError: if the configuration is invalid and ``errors`` is set to
+                ``raise``.
+        """
+        from ._main import _Abort
+
+        config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
+        fields = set(_juju_option_names(cls))
+        for key, value in self.config.items():
+            attr = key.replace('-', '_')
+            if not attr.isidentifier():
+                if errors == 'raise':
+                    raise ValueError(f'Invalid attribute name {attr}')
+                self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
+                raise _Abort(0)
+            if attr not in fields:
+                continue
+            option_type = self.meta.config.get(key)
+            # Convert secret IDs to secret objects. We create the object rather
+            # that using model.get_secret so that it's entirely lazy, in the
+            # same way that SecretEvent.secret is.
+            if option_type and option_type.type == 'secret':
+                assert isinstance(value, str)  # Juju will have made sure of this.
+                value = model.Secret(
+                    backend=self.model._backend,
+                    id=value,
+                    _secret_set_cache=self.model._cache._secret_set_cache,
+                )
+            config[attr] = value
+        try:
+            return cls(*args, **config)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            # We exit with a zero code because we don't want Juju to retry
+            # (the config needs to be fixed by the Juju user), and we don't
+            # want the status we just set to be overridden by an error
+            # status.
+            self.unit.status = model.BlockedStatus(f'Invalid config: {e}')
+            raise _Abort(0) from e
+
+
+def _juju_option_names(cls: type[object]) -> Generator[str]:
+    """Iterates over all the option names to include in the config YAML."""
+    try:
+        yield from (field.name for field in sorted(dataclasses.fields(cls)))  # type: ignore
+    except TypeError:
+        pass
+    else:
+        return
+    if hasattr(cls, 'model_fields'):
+        yield from sorted(cls.model_fields)  # type: ignore
+        return
+    # Fall back to using dir() and __annotations__.
+    attrs = dir(cls)
+    attrs.extend((a for a, t in cls.__annotations__.items() if get_origin(t) is not ClassVar))
+    for attr in sorted(set(attrs)):
+        if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
+            continue
+        yield attr
+
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
@@ -1438,13 +1541,15 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from ``metadata.yaml`` and ``actions.yaml``. Generally
-    charms will define this information, rather than reading it at runtime. This
-    class is mostly for the framework to understand what the charm has defined.
+    This is read from ``metadata.yaml``, ``config.yaml``, and ``actions.yaml``.
+    Generally charms will define this information, rather than reading it at
+    runtime. This class is mostly for the framework to understand what the charm
+    has defined.
 
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
+        config_raw: a mapping containing the contents of config.yaml
     """
 
     name: str
@@ -1636,7 +1741,6 @@ class CharmMeta:
             meta = yaml.safe_load(f.read())
 
         actions = None
-
         actions_path = charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
@@ -1911,8 +2015,8 @@ class JujuAssumesCondition(enum.Enum):
 class JujuAssumes:
     """Juju model features that are required by the charm.
 
-    See the `Charmcraft docs <https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#assumes>`_
-    for a list of available features.
+    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
+    list of available features.
     """
 
     features: list[str | JujuAssumes]
