@@ -462,10 +462,12 @@ class _Manager:
             # Optionally set a status message on the unit.
             if e.status:
                 self._model_backend.status_set('blocked', e.status)
-            # We exit with a zero exit code because we don't want Juju to go into
-            # error status (for config we have set a status ourselves) and we
-            # don't want to automatically retry (the Juju user must correct the
-            # data to match the schema).
+            # We exit with a zero exit code. If this has been raised when
+            # loading config, we don't want to go into error status, which would
+            # overwrite any status we set above and would automatically retry,
+            # even though the Juju user must manually fix the config. If this
+            # has been raised when loading action parameters, we don't want the
+            # action to *crash*, we want it to gracefully fail.
             raise _Abort(0) from e
         finally:
             self.framework.close()
