@@ -65,8 +65,15 @@ class AttributeDocstringExtractor(ast.NodeVisitor):
 
 def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
     docs: dict[str, str] = {}
-    # pydantic stores descriptions in the field object.
-    if hasattr(cls, '__dataclass_fields__'):
+    # For Pydantic models, we expect to have the docstrings in field objects.
+    if hasattr(cls, 'model_fields'):
+        for attr, field in cls.model_fields.items():  # type: ignore
+            if hasattr(field, 'description') and field.description:  # type: ignore
+                docs[attr] = field.description  # type: ignore
+
+    # For Pydantic dataclasses, we expect to have the docstrings in field
+    # objects, but there's no "model_fields" attribute.
+    elif hasattr(cls, '__dataclass_fields__'):
         fields = cast('dict[str, Any]', cls.__dataclass_fields__)  # type: ignore
         for attr, field in fields.items():
             if (
