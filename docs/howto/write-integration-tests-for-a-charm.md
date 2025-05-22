@@ -188,7 +188,7 @@ async def test_my_integration(ops_test: OpsTest):
 
 ### Test a configuration
 
-> See first: {ref}`manage-configurations`
+> See first: {ref}`manage-configuration`
 
 You can set a configuration option in your application and check its results. 
 
