@@ -58,8 +58,8 @@ from typing import (
     get_args,
 )
 
-from . import _relationdata, pebble
 from . import charm as _charm
+from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
@@ -1794,7 +1794,7 @@ class Relation:
         the data class.
 
         Args:
-            cls: A class that inherits from :class:`ops.RelationDataBase`.
+            cls: A class that can be instantiated with Juju relation data.
             app_or_unit: The data to load. This can be either a :class:`Unit`
                 or :class:`Application` instance.
             decoder: An optional callable that will be used to decode each field
@@ -1815,14 +1815,14 @@ class Relation:
 
     def save(
         self,
-        obj: _relationdata.RelationDataBase,
+        obj: object,
         app_or_unit: Unit | Application,
         encoder: Callable[[Any], Any] | None = None,
     ):
         """Save the data for the provided class to Juju relation data.
 
         Args:
-            obj: A object of a class that inherits from :class:`ops.RelationDataBase`.
+            obj: an object with attributes to save to the relation data.
             app_or_unit: The data to load. This can be either a :class:`Unit`
                 or :class:`Application` instance.
             encoder: An optional callable that will be used to encode each field
