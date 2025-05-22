@@ -105,12 +105,12 @@ class BaseTestCharm(ops.CharmBase):
     def _on_install(self, _: ops.InstallEvent):
         rel = self.model.get_relation('db')
         assert rel is not None
-        self.data1 = rel.load_data(
+        self.data1 = rel.load(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
         rel = self.model.get_relation('db')
         assert rel is not None
-        self.data2 = rel.load_data(
+        self.data2 = rel.load(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
 
@@ -118,9 +118,7 @@ class BaseTestCharm(ops.CharmBase):
         rel = self.model.get_relation('db')
         assert rel is not None
         classic = rel.data[self.app]
-        modern = rel.load_data(
-            self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
-        )
+        modern = rel.load(self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder)
         modern = cast('DatabagProtocol', modern)
         classic['foo'] = json.dumps('one')
         assert modern.foo == json.dumps('one')
@@ -134,14 +132,12 @@ class BaseTestCharm(ops.CharmBase):
     def _on_update_status(self, event: ops.UpdateStatusEvent):
         rel = self.model.get_relation('db')
         assert rel is not None
-        data = rel.load_data(
-            self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
-        )
+        data = rel.load(self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder)
         data = cast('DatabagProtocol', data)
         data.bar = -42
 
     def _on_relation_changed(self, event: ops.RelationChangedEvent):
-        data = event.relation.load_data(
+        data = event.relation.load(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
         data = cast('DatabagProtocol', data)
@@ -154,7 +150,7 @@ class BaseTestCharm(ops.CharmBase):
         self.data = data
 
     def _on_relation_joined(self, event: ops.RelationJoinedEvent):
-        data = event.relation.load_data(
+        data = event.relation.load(
             self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
         )
         data = cast('DatabagProtocol', data)
@@ -411,10 +407,10 @@ def test_databag_single_object_different_databag(
         def _on_install(self, _: ops.InstallEvent):
             rel = self.model.get_relation('db')
             assert rel is not None
-            self.data1 = rel.load_data(self.databag_class, self.app)  # type: ignore
+            self.data1 = rel.load(self.databag_class, self.app)  # type: ignore
             rel = self.model.get_relation('db')
             assert rel is not None
-            self.data2 = rel.load_data(OtherDatabag, self.app)
+            self.data2 = rel.load(OtherDatabag, self.app)
 
     harness = testing.Harness(
         BadCharmClass, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
@@ -435,7 +431,7 @@ def test_databag_single_object_different_databag(
 def test_databag_no_encode(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     class NoEncodeCharm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            data = event.relation.load_data(  # type: ignore
+            data = event.relation.load(  # type: ignore
                 self.databag_class,  # type: ignore
                 self.app,
                 encoder=lambda x: x,
@@ -488,7 +484,7 @@ def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest
             return self.custom_decode
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            data = event.relation.load_data(  # type: ignore
+            data = event.relation.load(  # type: ignore
                 self.databag_class,  # type: ignore
                 self.app,
                 encoder=self.encoder,
