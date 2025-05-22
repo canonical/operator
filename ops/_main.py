@@ -370,13 +370,13 @@ class _Manager:
         else:
             broken_relation_id = None
 
-        # Similarly, if we are in a RelationBroken or RelationDeparted event, we
-        # need to provide access to the remote relation data, even though the
-        # relation will not be returned from the `relation-list` hook tool.
         model = _model.Model(
             self._charm_meta,
             self._model_backend,
             broken_relation_id=broken_relation_id,
+            # Similarly, if we are in a RelationDeparted event, we need to provide
+            # access to the remote relation data, even though the relation will not
+            # be returned from the `relation-list` hook tool.
             remote_unit_name=self._juju_context.remote_unit_name,
         )
         store = self._make_storage(dispatcher)
