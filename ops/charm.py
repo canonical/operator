@@ -1438,19 +1438,21 @@ class CharmBase(Object):
         * ``secret`` type options have a :class:`model.Secret` value rather
           than the secret ID. Note that the secret object is not validated by
           Juju at this time, so may raise :class:`SecretNotFoundError` when it
-          is later used if the secret does not exist or the unit does not have
-          permission to access it.
-        * dashes in names converted to underscores.
+          is used later (if the secret does not exist or the unit does not have
+          permission to access it).
+        * dashes in names are converted to underscores.
 
         Any additional positional or keyword arguments to this method will be
         passed through to the config class ``__init__``.
 
         Args:
-            cls: A class that will accept the Juju options as keyword arguments.
-            errors: what to do if the config is invalid. If ``blocked``, the
-                charm will exit successfully (this informs Juju that
-                the event was handled and it will not be retried) after setting
-                an appropriate blocked status. If ``raise``, ``load_config``
+            cls: A class that will accept the Juju options as keyword arguments,
+                and raise ``ValueError`` if validation fails.
+            errors: what to do if the config is invalid. If ``blocked``, this
+                will set the unit status to blocked with an appropriate message
+                and then exit successfully (this informs Juju that
+                the event was handled and it will not be retried).
+                If ``raise``, ``load_config``
                 will not catch any exceptions, leaving the charm to handle
                 errors.
             args: positional arguments to pass through to the config class.
