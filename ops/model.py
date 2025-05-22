@@ -1754,8 +1754,8 @@ class Relation:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
 
-        # In relation-departing and relation-broken, `relation-list` doesn't
-        # include the remote unit, but the data should still be available.
+        # In relation-departed `relation-list` doesn't include the remote unit,
+        # but the data should still be available.
         if _remote_unit is not None:
             self.units.add(_remote_unit)
 
