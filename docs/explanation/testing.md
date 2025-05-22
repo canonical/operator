@@ -98,7 +98,7 @@ Integration tests typically take significantly longer to run than unit tests.
 * Packing and deploying the charm
 * Charm actions
 * Charm relations
-* Charm configurations
+* Charm configuration
 * That the workload is up and running, and responsive
 * Upgrade sequence
   * Regression test: upgrade stable/candidate/beta/edge from charmhub with the locally-built charm.
