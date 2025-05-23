@@ -1505,19 +1505,26 @@ class CharmBase(Object):
 
 def _juju_option_names(cls: type[object]) -> Generator[str]:
     """Iterates over all the option names to include in the config YAML."""
+    # Dataclasses:
     try:
         yield from (field.name for field in sorted(dataclasses.fields(cls)))  # type: ignore
     except TypeError:
         pass
     else:
         return
+    # Pydantic models:
     if hasattr(cls, 'model_fields'):
         yield from sorted(cls.model_fields)  # type: ignore
         return
     # Fall back to using dir() and __annotations__.
     attrs = dir(cls)
+    # We filter out any ClassVar annotations, since they wouldn't have different
+    # values for different instances of the class. We also filter out any
+    # attributes with leading underscores, and any attributes that are methods.
     attrs.extend((a for a, t in cls.__annotations__.items() if get_origin(t) is not ClassVar))
     for attr in sorted(set(attrs)):
+        # If the attribute comes from __annotations__, and doesn't have a
+        # default value, then it's not accessible with hasattr
         if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
             continue
         yield attr
