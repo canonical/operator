@@ -183,25 +183,18 @@ Pull requests should have a short title that follows the
 * revert
 * test
 
-At present, we only add a scope in these cases:
-
-* If the PR is limited to optional features, use one of these scopes to clarify context:
-  * `(harness)` for changes in `ops/_private/harness.py`
-  * `(testing)` for changes in `testing/`
-  * `(tracing)` for changes in `tracing/`
-
-Use of these scopes makes it clear when a change is limited to test tooling or optional features, rather than core runtime behavior.
-
-For example:
+Some examples:
 
 * feat: add the ability to observe change-updated events
 * fix!: correct the type hinting for config data
-* docs(harness): clarify the types of exceptions that Harness.add_user_secret may raise
-* ci(testing): adjust the workflow that publishes ops-scenario
+* docs: clarify how to use mounts in ops.testing.Container
+* ci: adjust the workflow that publishes ops-scenario
 
 Note that the commit messages to the PR's branch do not need to follow the
 conventional commit format, as these will be squashed into a single commit to `main`
 using the PR title as the commit message.
+
+We consider Ops too small a project to use scopes, so we don't use them.
 
 ## Copyright
 
