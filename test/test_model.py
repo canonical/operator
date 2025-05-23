@@ -4410,5 +4410,19 @@ class TestGetCloudSpec:
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
 
 
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_departing_unit_in_relations():
+    ctx = ops.testing.Context(
+        ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
+    )
+    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
+    state_in = ops.testing.State(relations={rel})
+    with ctx(ctx.on.relation_departed(rel, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
+
+
 if __name__ == '__main__':
     unittest.main()
