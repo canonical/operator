@@ -1471,11 +1471,6 @@ class CharmBase(Object):
         fields = set(_juju_option_names(cls))
         for key, value in self.config.items():
             attr = key.replace('-', '_')
-            if not attr.isidentifier():
-                if errors == 'raise':
-                    raise ValueError(f'Invalid attribute name {attr}')
-                self.unit.status = model.BlockedStatus(f'Invalid attribute name {attr}')
-                raise _Abort(0)
             if attr not in fields:
                 continue
             option_type = self.meta.config.get(key)
