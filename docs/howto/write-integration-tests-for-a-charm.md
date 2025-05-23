@@ -211,7 +211,7 @@ async def test_config_changed(ops_test: OpsTest):
 
 You can execute an action on a unit and get its results. 
 
-```text
+```
 async def test_run_action(ops_test: OpsTest):
     action_register_user = await ops_test.model.applications["myapp"].units[0].run_action("register-user", username="ubuntu")
     await action_register_user.wait()
@@ -228,7 +228,7 @@ To interact with the workload, you need to have access to it. This is dependent 
 
 You can get information from your application or unit addresses using `await ops_test.model.get_status`. That way, if your application exposes a public address you can reference it. You can also try to connect to a unit address or public address.
 
-```text
+```
 async def test_workload_connectivity(ops_test: OpsTest):
     status = await ops_test.model.get_status()
     address = status.applications['my_app'].public_address
@@ -252,7 +252,7 @@ How you can connect to a private or public address is dependent on your configur
 
 You can run a command within the Juju context with:
 
-```text
+```
     ...
     command = ["microk8s", "version"]
     returncode, stdout, stderr = await ops_test.run(*command, check=True)
