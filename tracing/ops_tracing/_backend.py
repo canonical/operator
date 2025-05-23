@@ -49,6 +49,11 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
             'service.name': app_name,
             'service.instance.id': unit_number,
             'service.charm': charm_class_name,
+            'charm_type': charm_class_name,
+            'juju_model': juju_context.model_name,
+            'juju_model_uuid': juju_context.model_uuid,
+            'juju_application': app_name,
+            'juju_unit': juju_context.unit_name,
         }
     )
     set_tracer_provider(_create_provider(resource, juju_context.charm_dir))
