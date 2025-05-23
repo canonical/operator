@@ -71,7 +71,7 @@ async def test_operation(ops_test: OpsTest):
     
     # Add another charm and integrate them:
     await ops_test.model.deploy('other-app')
-    await ops_test.model.relate('tester:endpoint1', 'other-charm:endpoint2')
+    await ops_test.model.relate('tester:endpoint1', 'other-app:endpoint2')
     
     # Scale it up:
     await app.add_unit(2)
