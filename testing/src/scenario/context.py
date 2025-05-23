@@ -457,8 +457,8 @@ class Context(Generic[CharmType]):
             # Assert: verify the output state is what you think it should be
             assert state_out.unit_status == ActiveStatus('foobar')
             # Assert: verify the Context contains what you think it should
-            assert len(c.emitted_events) == 4
-            assert isinstance(c.emitted_events[3], MyCustomEvent)
+            assert len(ctx.emitted_events) == 4
+            assert isinstance(ctx.emitted_events[3], MyCustomEvent)
 
     If you need access to the charm object that will handle the event, use the
     class in a ``with`` statement, like::
