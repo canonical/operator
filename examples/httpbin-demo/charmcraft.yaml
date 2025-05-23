@@ -1,0 +1,76 @@
+# This file configures Charmcraft.
+# See https://juju.is/docs/sdk/charmcraft-config for guidance.
+
+# (Required)
+# The charm package name, no spaces
+# See https://juju.is/docs/sdk/naming#heading--naming-charms for guidance.
+name: httpbin-demo
+
+# (Required)
+# The charm type, either 'charm' or 'bundle'.
+type: charm
+
+# (Recommended)
+title: Charm Template
+
+# (Required)
+summary: A very short one-line summary of the charm.
+
+# (Required)
+description: |
+  A single sentence that says what the charm is, concisely and memorably.
+
+  A paragraph of one to three short sentences, that describe what the charm does.
+
+  A third paragraph that explains what need the charm meets.
+
+  Finally, a paragraph that describes whom the charm is useful for.
+
+# (Required for 'charm' type)
+# A list of environments (OS version and architecture) where charms must be
+# built on and run on.
+bases:
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+    run-on:
+    - name: ubuntu
+      channel: "22.04"
+
+# (Optional) Configuration options for the charm
+# This config section defines charm config options, and populates the Configure
+# tab on Charmhub.
+# More information on this section at https://juju.is/docs/sdk/charmcraft-yaml#heading--config
+# General configuration documentation: https://juju.is/docs/sdk/config
+config:
+  options:
+    # An example config option to customise the log level of the workload
+    log-level:
+      description: |
+        Configures the log level of gunicorn.
+
+        Acceptable values are: "info", "debug", "warning", "error" and "critical"
+      default: "info"
+      type: string
+
+# The containers and resources metadata apply to Kubernetes charms only.
+# See https://juju.is/docs/sdk/metadata-reference for a checklist and guidance.
+# Remove them if not required.
+
+# Your workload’s containers.
+containers:
+  httpbin:
+    resource: httpbin-image
+
+# This field populates the Resources tab on Charmhub.
+resources:
+  # An OCI image resource for each container listed above.
+  # You may remove this if your charm will run without a workload sidecar container.
+  httpbin-image:
+    type: oci-image
+    description: OCI image for httpbin
+    # The upstream-source field is ignored by Juju. It is included here as a
+    # reference so the integration testing suite knows which image to deploy
+    # during testing. This field is also used by the 'canonical/charming-actions'
+    # Github action for automated releasing.
+    upstream-source: kennethreitz/httpbin

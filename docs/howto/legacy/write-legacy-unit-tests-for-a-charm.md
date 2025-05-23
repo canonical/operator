@@ -5,7 +5,7 @@
 
 ## Testing basics
 
-Here’s a minimal example, taken from the `charmcraft init` template with some additional comments:
+Here’s a minimal example:
 
 ```python
 # Import Ops library's legacy testing harness
