@@ -51,7 +51,9 @@ self.framework.observe(self.on.config_changed, self._on_config_changed)
 
 Also in the `__init__` function, load the config into the config class that you
 defined. Pass `errors='blocked'` to have the charm exit after setting a blocked
-status if the configuration doesn't validate against the class you defined.
+status if the configuration doesn't validate against the class you defined. The
+default is `errors='raise'`, which means that the charm is responsible for
+catching any `ValueError` raised.
 
 ```python
 self.typed_config = self.load_config(WikiConfig, errors='blocked')
