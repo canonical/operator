@@ -187,7 +187,7 @@ Some examples:
 
 * feat: add the ability to observe change-updated events
 * fix!: correct the type hinting for config data
-* docs: clarify the types of exceptions that Harness.add_user_secret may raise
+* docs: clarify how to use mounts in ops.testing.Container
 * ci: adjust the workflow that publishes ops-scenario
 
 Note that the commit messages to the PR's branch do not need to follow the
