@@ -1502,12 +1502,11 @@ def _juju_option_names(cls: type[object]) -> Generator[str]:
     """Iterates over all the option names to include in the config YAML."""
     # Dataclasses:
     try:
-        fields = dataclasses.fields(cls)
+        fields = [field.name for field in dataclasses.fields(cls)]  # type: ignore
     except TypeError:
         pass
     else:
-        for field in sorted(fields):
-            yield field.name
+        yield from sorted(fields)
         return
     # Pydantic models:
     if hasattr(cls, 'model_fields'):
