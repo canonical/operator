@@ -22,7 +22,7 @@ jobs:
       - name: Build
         run: python -m build
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd  # v2.3.0
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'dist/*'
       - name: Publish to test.pypi.org
