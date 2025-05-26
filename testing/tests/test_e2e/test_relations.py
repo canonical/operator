@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ops
 import pytest
 from ops.charm import (
     CharmBase,
@@ -12,6 +13,7 @@ from ops.charm import (
 )
 from ops.framework import EventBase, Framework
 
+import scenario
 from scenario import Context
 from scenario.errors import UncaughtCharmError
 from scenario.state import (
@@ -86,6 +88,76 @@ def test_get_relation(mycharm):
         config={'options': {'foo': {'type': 'string'}}},
         pre_event=pre_event,
     )
+
+
+@pytest.mark.parametrize('test_context', ['init', 'event'])
+@pytest.mark.parametrize(
+    'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
+)
+def test_relation_validates_access(request: pytest.FixtureRequest, is_leader: bool, test_context: str):
+    """Test that relation databag read/write access in __init__ is the same as in observers."""
+    REL_NAME = 'relation'
+    ACTION_NAME = 'action'
+    KEY = 'key'
+    LOCAL_VAL = 'local value'
+    REMOTE_VAL = 'remote value'
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on[ACTION_NAME].action, self._on_action)
+            self.test_validation('init')
+
+        def _on_action(self, action: ops.ActionEvent):
+            self.test_validation('event')
+
+        def test_validation(self, context: str):
+            if context != test_context:
+                return
+            nonlocal validated
+            validated += 1
+            rel = self.model.get_relation(REL_NAME)
+            assert rel is not None
+
+            # remote application databag
+            # any unit can read the remote application databag
+            remote_app_data = rel.data[rel.app]
+            assert remote_app_data[KEY] == REMOTE_VAL
+            assert len(remote_app_data.items()) == 1
+            # no unit can write to the remote application databag
+            with pytest.raises(ops.RelationDataAccessError):
+                remote_app_data[KEY] = 'something'
+
+            # local application databag
+            local_app_data = rel.data[self.app]
+            # only the leader can read or write the local application databag
+            if self.unit.is_leader():
+                assert local_app_data[KEY] == LOCAL_VAL  # test read
+                local_app_data[KEY] = 'new value'  # test write
+            else:
+                with pytest.raises(ops.RelationDataAccessError):
+                    local_app_data[KEY]
+            # these probably fail at real runtime with a ModelError
+            # but pass here because the validation methods are only hooked up to get/set
+            assert len(local_app_data.items()) == 1
+            assert KEY in local_app_data
+
+    ctx = Context(
+        Charm,
+        meta={
+            'name': 'charm',
+            'requires': {REL_NAME: {'interface': 'interface-name'}},
+        },
+        actions={ACTION_NAME: {}},
+    )
+    rel_in = scenario.Relation(
+        endpoint=REL_NAME,
+        local_app_data={KEY: LOCAL_VAL},
+        remote_app_data={KEY: REMOTE_VAL},
+    )
+    validated = 0
+    ctx.run(ctx.on.action(ACTION_NAME), State(relations={rel_in}, leader=is_leader))
+    assert validated
 
 
 def test_relation_set_single_add_del_change():
