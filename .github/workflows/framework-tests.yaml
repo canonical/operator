@@ -99,7 +99,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up Go
-        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b  # v5.4.0
+        uses: actions/setup-go@v5
         with:
           go-version: "1.22"
           # To suppress the "Restore cache failed" error, since there is no go.sum file here.
