@@ -222,6 +222,10 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 "testing/tests/*" = [
     # All documentation linting.
     "D",
+
+    # UPPERCASE variables outside global scope
+    "N806",
+
     # TODO: the below ignores should be fixed
     "CPY",  # flake8-copyright
     "I001",  # isort

@@ -7335,7 +7335,9 @@ def test_scenario_available():
 @pytest.mark.parametrize(
     'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
 )
-def test_relation_validates_access(request: pytest.FixtureRequest, is_leader: bool, test_context: str):
+def test_relation_validates_access(
+    request: pytest.FixtureRequest, is_leader: bool, test_context: str
+):
     """Test that relation databag read/write access in __init__ is the same as in observers."""
     APP_NAME = 'charm'
     REL_NAME = 'relation'
