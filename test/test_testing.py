@@ -7331,8 +7331,11 @@ def test_scenario_available():
     assert isinstance(state.unit_status, ops.testing.UnknownStatus)
 
 
-@pytest.mark.parametrize('leader', [True, False])
-def test_relation_validates_access_in_init(request: pytest.FixtureRequest, leader: bool):
+@pytest.mark.parametrize('test_context', ['init', 'event'])
+@pytest.mark.parametrize(
+    'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
+)
+def test_relation_validates_access(request: pytest.FixtureRequest, is_leader: bool, test_context: str):
     """Test that relation databag read/write access in __init__ is the same as in observers."""
     APP_NAME = 'charm'
     REL_NAME = 'relation'
@@ -7345,12 +7348,16 @@ def test_relation_validates_access_in_init(request: pytest.FixtureRequest, leade
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on[ACTION_NAME].action, self._on_action)
-            self.test_validation()
+            self.validated = 0
+            self.test_validation('init')
 
         def _on_action(self, action: ops.ActionEvent):
-            self.test_validation()
+            self.test_validation('event')
 
-        def test_validation(self):
+        def test_validation(self, context: str):
+            if context != test_context:
+                return
+            self.validated += 1
             rel = self.model.get_relation(REL_NAME)
             assert rel is not None
 
@@ -7369,7 +7376,6 @@ def test_relation_validates_access_in_init(request: pytest.FixtureRequest, leade
             if self.unit.is_leader():
                 assert local_app_data[KEY] == LOCAL_VAL  # test read
                 local_app_data[KEY] = 'new value'  # test write
-                local_app_data[KEY] = LOCAL_VAL  # restore original value
             else:
                 with pytest.raises(ops.RelationDataAccessError):
                     local_app_data[KEY]
@@ -7395,6 +7401,7 @@ requires:
     rid = harness.add_relation(REL_NAME, remote_app='remote', app_data={KEY: REMOTE_VAL})
     # setup local application databag
     harness.update_relation_data(rid, APP_NAME, {KEY: LOCAL_VAL})
-    harness.set_leader(leader)
+    harness.set_leader(is_leader)
     harness.begin()  # run Charm.__init__
     harness.run_action(ACTION_NAME)  # run Charm._on_action
+    assert harness.charm.validated
