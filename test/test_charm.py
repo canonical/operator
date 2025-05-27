@@ -1432,7 +1432,7 @@ options:
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
+def test_config_init(charm_class: type[BaseTestCharm], request: pytest.FixtureRequest):
     harness = testing.Harness(charm_class, config=_config)
     request.addfinalizer(harness.cleanup)
     harness.begin()
