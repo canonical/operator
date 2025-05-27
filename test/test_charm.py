@@ -1263,9 +1263,6 @@ name: my-charm
     assert meta.charm_user == 'root'
 
 
-JUJU_TYPES = typing.Union[bool, int, float, str]
-
-
 class _ConfigProtocol(typing.Protocol):
     @property
     def my_bool(self) -> bool | None: ...
@@ -1289,10 +1286,10 @@ class MyConfig:
     def __init__(
         self,
         *,
-        my_bool: JUJU_TYPES | None = None,
-        my_int: JUJU_TYPES = 42,
-        my_float: JUJU_TYPES = 3.14,
-        my_str: JUJU_TYPES = 'foo',
+        my_bool: bool | int | float | str | None = None,
+        my_int: bool | int | float | str = 42,
+        my_float: bool | int | float | str = 3.14,
+        my_str: bool | int | float | str = 'foo',
         my_secret: ops.Secret | None = None,
     ):
         super().__init__()
