@@ -1436,8 +1436,7 @@ def test_config_init(charm_class: type[BaseTestCharm], request: pytest.FixtureRe
     harness = testing.Harness(charm_class, config=_config)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = typing.cast('_ConfigProtocol', typed_config)
+    typed_config = harness.charm.typed_config
     assert typed_config.my_bool is None
     assert typed_config.my_float == 3.14
     assert isinstance(typed_config.my_float, float)
