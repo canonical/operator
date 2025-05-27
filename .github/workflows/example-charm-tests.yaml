@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  test-tutorial-k8s:
+  charm-unit-tests:
     runs-on: ubuntu-latest
 
     strategy:
@@ -19,6 +19,8 @@ jobs:
         python-version: ["3.10", "3.12"]
         dir:
           - examples/k8s-1-minimal
+          - examples/k8s-2-configurable
+          - examples/k8s-3-postgresql
 
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +32,10 @@ jobs:
           python-version: '${{ matrix.python-version }}'
       - name: Install tox
         run: pip install tox~=4.2
-      - name: Run unit tests
+      - name: Install Charmcraft
+        run: sudo snap install charmcraft --classic
+      - name: Fetch lib and run unit tests
         run: |
           cd ${{ matrix.dir }}
+          charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
           tox -e unit
