@@ -376,7 +376,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 
 Congratulations, your charm users can now deploy the application from a specific channel!
 
-> See more: {ref}`manage-configurations`
+> See more: {ref}`manage-configuration`
 
 
 ## Enable `juju status` with `App Version`

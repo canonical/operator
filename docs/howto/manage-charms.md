@@ -95,7 +95,7 @@ do it well.
 > * Add functionality
 >   - [Charmcraft | Add runtime details to a charm](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-runtime-details-to-a-charm)
 >   - {ref}`manage-actions`
->   - {ref}`manage-configurations`
+>   - {ref}`manage-configuration`
 >   - {ref}`manage-opened-ports`
 > * {external+charmcraft:ref}`Charmcraft | Manage charms > Pack a charm <pack-a-charm>`
 > * {external+juju:ref}`Juju | Manage charms > Deploy a charm <deploy-a-charm>` (you'll need to follow the "Deploy a local charm" example)
