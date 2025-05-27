@@ -72,7 +72,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent):
     self.set_wiki_name(name)
 ```
 
-> See more: [](ops.CharmBase.load_config)
+> See more: [](ops.CharmBase.load_config), [](ops.CharmBase.config)
 
 ```{caution}
 
