@@ -36,7 +36,7 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
-    get_origin,
+    get_type_hints,
 )
 
 from . import model
@@ -1512,14 +1512,17 @@ def _juju_option_names(cls: type[object]) -> Generator[str]:
     if hasattr(cls, 'model_fields'):
         yield from sorted(cls.model_fields)  # type: ignore
         return
-    # Fall back to using dir() and __annotations__.
+    # Fall back to using dir() and type annotations, ignoring any that are
+    # intended to be private, and any methods.
     attrs = dir(cls)
-    # We filter out any ClassVar annotations, since they wouldn't have different
-    # values for different instances of the class. We also filter out any
-    # attributes with leading underscores, and any attributes that are methods.
-    attrs.extend((a for a, t in cls.__annotations__.items() if get_origin(t) is not ClassVar))
+    try:
+        attrs.extend(get_type_hints(cls))
+    except TypeError:
+        # `get_type_hints` fails in Python 3.8 in some situations.
+        # We leave solving this to the charmer.
+        pass
     for attr in sorted(set(attrs)):
-        # If the attribute comes from __annotations__, and doesn't have a
+        # If the attribute comes from type annotations, and doesn't have a
         # default value, then it's not accessible with hasattr
         if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
             continue
