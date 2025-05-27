@@ -1363,7 +1363,7 @@ class MyDataclassCharm(BaseTestCharm):
         return MyDataclassConfig
 
 
-_test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
+_test_classes: list[type[BaseTestCharm]] = [MyCharm, MyDataclassCharm]
 
 if pydantic:
 
