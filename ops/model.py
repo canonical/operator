@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import contextvars
+import copy
 import dataclasses
 import datetime
 import enum
@@ -52,12 +53,13 @@ from typing import (
     MutableMapping,
     TextIO,
     TypedDict,
+    TypeVar,
     Union,
     get_args,
 )
 
+from . import _relationdata, pebble
 from . import charm as _charm
-from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
@@ -115,6 +117,13 @@ _NetworkDict = TypedDict(
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+
+
+_InterfaceType = TypeVar('_InterfaceType')
+
+
+class InvalidSchemaError(Exception):
+    """Raised when a config, action parameter, or databag schema does not match the data."""
 
 
 class Model:
@@ -918,7 +927,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
-        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
+        self._data: _RelationMapping_Raw = dict.fromkeys(relations_meta)
 
     def __contains__(self, key: str):
         return key in self._data
@@ -1721,6 +1730,7 @@ class Relation:
         self.units: set[Unit] = set()
         self.active = active
         self._backend = backend
+        self._cache = cache
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1745,7 +1755,7 @@ class Relation:
 
         # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast('Application', app)
-        self.data = RelationData(self, our_unit, backend)
+        self.data = RelationData(self, our_unit, backend, cache)
 
         self._remote_model: RemoteModel | None = None
 
@@ -1767,6 +1777,84 @@ class Relation:
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
 
+    def load(
+        self,
+        cls: type[_InterfaceType],
+        app_or_unit: Unit | Application,
+        *args: Any,
+        decoder: Callable[[Any], Any] | None = None,
+        **kwargs: Any,
+    ) -> _InterfaceType:
+        """Load the data for this relation into an instance of a data class.
+
+        The object will be instantiated with the Juju relation data, passed as
+        keyword arguments.
+
+        Any additional positional or keyword arguments will be passed through to
+        the data class.
+
+        Args:
+            cls: A class that inherits from :class:`ops.RelationDataBase`.
+            app_or_unit: The data to load. This can be either a :class:`Unit`
+                or :class:`Application` instance.
+            decoder: An optional callable that will be used to decode each field
+                before loading into the class. If not provided, json.loads will
+                be used.
+            args: positional arguments to pass through to the data class.
+            kwargs: keyword arguments to pass through to the data class.
+
+        Returns:
+            An instance of the data class with the current relation data values.
+        """
+        data = copy.deepcopy(kwargs)
+        if decoder is None:
+            decoder = json.loads
+        content = {k: decoder(v) for k, v in self.data[app_or_unit].items()}
+        data.update(**content)
+        return cls(*args, **data)
+
+    def save(
+        self,
+        obj: _relationdata.RelationDataBase,
+        app_or_unit: Unit | Application,
+        encoder: Callable[[Any], Any] | None = None,
+    ):
+        """Save the data for the provided class to Juju relation data.
+
+        Args:
+            obj: A object of a class that inherits from :class:`ops.RelationDataBase`.
+            app_or_unit: The data to load. This can be either a :class:`Unit`
+                or :class:`Application` instance.
+            encoder: An optional callable that will be used to encode each field
+                before passing to Juju. If not provided, json.dumps will be
+                used.
+        """
+        if encoder is None:
+            encoder = json.dumps
+        if hasattr(obj, '__dataclass_fields__'):
+            # A standard library dataclass or Pydantic dataclass.
+            fields = (field.name for field in dataclasses.fields(obj))  # type: ignore
+            values = dataclasses.asdict(obj)  # type: ignore
+        elif hasattr(obj, 'model_fields'):
+            # A Pydantic model.
+            fields = obj.model_fields  # type: ignore
+            values = obj.model_dump()  # type: ignore
+        else:
+            # We're not sure, so do a best guess.
+            fields = [attr for attr in dir(obj) if not attr.startswith('_') and not callable(attr)]
+            fields.extend(obj.__annotations__)
+            values = {field: getattr(obj, field) for field in fields}
+        data: dict[str, str] = {}
+        for field in fields:  # type: ignore
+            assert isinstance(field, str)
+            value = encoder(values[field])
+            if not isinstance(field, str):
+                raise ValueError(
+                    f'The value for "{field}" must be a string, not {type(field).__name__}'
+                )
+            data[field] = value
+        self._backend.update_relation_data(self.id, app_or_unit, data)
+
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
@@ -1783,19 +1871,28 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     :attr:`Relation.data`
     """
 
-    def __init__(self, relation: Relation, our_unit: Unit, backend: _ModelBackend):
+    def __init__(
+        self,
+        relation: Relation,
+        our_unit: Unit,
+        backend: _ModelBackend,
+        cache: _ModelCache | None = None,
+    ):
         self.relation = weakref.proxy(relation)
         self._data: dict[Unit | Application, RelationDataContent] = {
-            our_unit: RelationDataContent(self.relation, our_unit, backend),
-            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
+            our_unit: RelationDataContent(self.relation, our_unit, backend, cache),
+            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend, cache),
         }
         self._data.update({
-            unit: RelationDataContent(self.relation, unit, backend) for unit in self.relation.units
+            unit: RelationDataContent(self.relation, unit, backend, cache)
+            for unit in self.relation.units
         })
         # The relation might be dead so avoid a None key here.
         if self.relation.app is not None:
             self._data.update({
-                self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
+                self.relation.app: RelationDataContent(
+                    self.relation, self.relation.app, backend, cache
+                ),
             })
 
     def __contains__(self, key: Unit | Application):
@@ -1819,10 +1916,17 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(self, relation: Relation, entity: Unit | Application, backend: _ModelBackend):
+    def __init__(
+        self,
+        relation: Relation,
+        entity: Unit | Application,
+        backend: _ModelBackend,
+        cache: _ModelCache | None = None,
+    ):
         self.relation = relation
         self._entity = entity
         self._backend = backend
+        self._cache = cache
         self._is_app: bool = isinstance(entity, Application)
 
     @property
@@ -2182,7 +2286,7 @@ class Resources:
 
     def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._paths: dict[str, Path | None] = {name: None for name in names}
+        self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
@@ -2233,9 +2337,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._storage_map: _StorageDictType = {
-            storage_name: None for storage_name in storage_names
-        }
+        self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
     def __contains__(self, key: str):
         return key in self._storage_map
