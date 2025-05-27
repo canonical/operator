@@ -1293,23 +1293,21 @@ class MyConfig:
         my_secret: ops.Secret | None = None,
     ):
         super().__init__()
-        if my_bool is not None and not isinstance(my_bool, bool):
-            raise ValueError('my_bool must be a Boolean')
+        # Juju takes care of making sure the types are correct, so this
+        # is only to help the Python type checking understand that.
+        if my_bool is not None:
+            assert isinstance(my_bool, bool)
         self.my_bool = my_bool
-        if not isinstance(my_float, float):
-            raise ValueError('my_float must be a float')
+        assert isinstance(my_float, float)
         self.my_float = my_float
-        if not isinstance(my_int, int):
-            raise ValueError('my_int must be an integer')
+        assert isinstance(my_int, int)
         if my_int < 0:
             raise ValueError('my_int must be zero or positive')
         self.my_int = my_int
-        if not isinstance(my_str, str):
-            raise ValueError('my_str must be a string')
+        assert isinstance(my_str, str)
         self.my_str = my_str
         if my_secret is not None:
-            if not isinstance(my_secret, ops.Secret):
-                raise ValueError('my_secret must be a secret')
+            assert isinstance(my_secret, ops.Secret)
             self.my_secret = my_secret
 
 
