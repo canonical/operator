@@ -25,7 +25,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
+    Generator,
     List,
     Literal,
     Mapping,
@@ -33,6 +33,7 @@ from typing import (
     Optional,
     TextIO,
     TypedDict,
+    TypeVar,
     cast,
 )
 
@@ -110,6 +111,9 @@ class HookEvent(EventBase):
     - Storage events
     - Metric events
     """
+
+
+_ActionType = TypeVar('_ActionType')
 
 
 class ActionEvent(EventBase):
@@ -226,6 +230,59 @@ class ActionEvent(EventBase):
             message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
+
+    def load_params(
+        self,
+        cls: type[_ActionType],
+        *args: Any,
+        errors: Literal['raise', 'fail'] = 'raise',
+        **kwargs: Any,
+    ) -> _ActionType:
+        """Load the action parameters into an instance of an action class.
+
+        The raw Juju action parameters are passed to the action class's
+        ``__init__`` method as keyword arguments, with the following changes:
+        * dashes in names are converted to underscores.
+
+        Any additional positional or keyword arguments will be passed through to
+        the action class ``__init__``.
+
+        Args:
+            cls: A class that will accept the Juju parameters as keyword
+                arguments, and raise ``ValueError`` if validation fails.
+            errors: what to do if the parameters are invalid. If ``fail``, this
+                will set the action to failed with an appropriate message and
+                then immediately exit. If ``raise``, ``load_params`` will not
+                catch any exceptions, leaving the charm to handle errors.
+            args: positional arguments to pass through to the action class.
+            kwargs: keyword arguments to pass through to the action class.
+
+        Returns:
+            An instance of the action class with the provided parameter values.
+
+        Raises:
+            ValueError: if ``errors`` is set to ``raise`` and instantiating the
+                action class raises a ValueError.
+        """
+        try:
+            fields = set(_juju_fields(cls))
+        except ValueError:
+            fields = None
+        params: dict[str, Any] = kwargs.copy()
+        for key, value in self.params.items():
+            attr = key.replace('-', '_')
+            if fields is not None and attr not in fields:
+                continue
+            params[attr] = value
+        try:
+            return cls(*args, **params)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            self.fail(f'Error in action parameters: {e}')
+            from ._main import _Abort
+
+            raise _Abort(0) from e
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
@@ -1435,6 +1492,28 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
 
 
+def _juju_fields(cls: type[object]) -> Generator[str]:
+    """Iterates over all the field names to include when loading into a class.
+
+    Raises:
+        ValueError: if unable to determine which fields to include
+    """
+    # Dataclasses:
+    try:
+        fields = [field.name for field in dataclasses.fields(cls)]  # type: ignore
+    except TypeError:
+        pass
+    else:
+        yield from sorted(fields)
+        return
+    # Pydantic models:
+    if hasattr(cls, 'model_fields'):
+        yield from sorted(cls.model_fields)  # type: ignore
+        return
+    # It's not clear, so give up.
+    raise ValueError('Unable to find field list')
+
+
 class CharmMeta:
     """Object containing the metadata for the charm.
 
@@ -1697,12 +1776,12 @@ class CharmMeta:
         meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = cast('Optional[Dict[str, Any]]', yaml.safe_load(actions))
+            raw_actions = cast('dict[str, Any] | None', yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         raw_config = {}
         if config is not None:
-            raw_config = cast('Optional[Dict[str, Any]]', yaml.safe_load(config))
+            raw_config = cast('dict[str, Any] | None', yaml.safe_load(config))
             if raw_config is None:
                 raw_config = {}
         return cls(meta, raw_actions, raw_config)

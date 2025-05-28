@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import pathlib
 import tempfile
@@ -23,8 +24,16 @@ from pathlib import Path
 import pytest
 import yaml
 
+try:
+    import pydantic
+    import pydantic.dataclasses
+except ImportError:
+    pydantic = None
+
 import ops
 import ops.charm
+from ops import testing
+from ops._main import _Abort
 from ops.model import ModelError, StatusName
 
 from .test_helpers import FakeScript, create_framework
@@ -1253,3 +1262,373 @@ def test_meta_charm_user_default():
 name: my-charm
 """)
     assert meta.charm_user == 'root'
+
+
+class MyAction:
+    my_str: str
+    my_bool: bool = False
+    my_int: int = 42
+    my_float: float = 3.14
+    my_list: list[str] = []  # noqa: RUF012
+
+    def __init__(
+        self,
+        *,
+        my_str: typing.Any,
+        my_bool: typing.Any = False,
+        my_int: typing.Any = 42,
+        my_float: typing.Any = 3.14,
+        my_list: typing.Any = None,
+    ):
+        super().__init__()
+        assert isinstance(my_bool, bool)
+        self.my_bool = my_bool
+        assert isinstance(my_float, float)
+        self.my_float = my_float
+        assert isinstance(my_float, float)
+        assert isinstance(my_int, int)
+        if my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+        self.my_int = my_int
+        assert isinstance(my_str, str)
+        self.my_str = my_str
+        if my_list is None:
+            self.my_list = []
+        else:
+            assert isinstance(my_list, list)
+            self.my_list = my_list
+
+
+class MyCharm(ops.CharmBase):
+    errors: typing.Literal['fail', 'raise'] = 'fail'
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['my-action'].action, self._on_action)
+
+    def _on_action(self, event: ops.ActionEvent):
+        params = event.load_params(MyAction, errors=self.errors)
+        # These should not have any type errors.
+        new_float = params.my_float + 2006.8
+        new_int = params.my_int + 1979
+        new_str = params.my_str + 'bar'
+        new_list = params.my_list[:]
+        event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+        event.set_results({'params': params})
+
+
+# Note that we would really like to have kw_only=True here as well, but that's
+# not available in Python 3.8.
+@dataclasses.dataclass(frozen=True)
+class MyDataclassAction:
+    my_str: str
+    my_bool: bool = False
+    my_int: int = 42
+    my_float: float = 3.14
+    my_list: list[str] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        if self.my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+
+
+class MyDataclassCharm(ops.CharmBase):
+    errors: typing.Literal['fail', 'raise'] = 'fail'
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['my-action'].action, self._on_action)
+
+    def _on_action(self, event: ops.ActionEvent):
+        params = event.load_params(MyDataclassAction, errors=self.errors)
+        # These should not have any type errors.
+        new_float = params.my_float + 2006.8
+        new_int = params.my_int + 1979
+        new_str = params.my_str + 'bar'
+        new_list = params.my_list[:]
+        event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+        event.set_results({'params': params})
+
+
+_test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class MyPydanticDataclassAction:
+        my_str: str = pydantic.Field()
+        my_bool: bool = pydantic.Field(False)
+        my_int: int = pydantic.Field(42)
+        my_float: float = pydantic.Field(3.14)
+        my_list: list[str] = pydantic.Field(default_factory=list)
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+    class MyPydanticDataclassCharm(ops.CharmBase):
+        errors: typing.Literal['fail', 'raise'] = 'fail'
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['my-action'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(MyDataclassAction, errors=self.errors)
+            # These should not have any type errors.
+            new_float = params.my_float + 2006.8
+            new_int = params.my_int + 1979
+            new_str = params.my_str + 'bar'
+            new_list = params.my_list[:]
+            event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+            event.set_results({'params': params})
+
+    class MyPydanticBaseModelAction(pydantic.BaseModel):
+        my_str: str = pydantic.Field(alias='my-str')  # type: ignore
+        my_bool: bool = pydantic.Field(
+            False,
+            alias='my-bool',  # type: ignore
+        )
+        my_int: int = pydantic.Field(42, alias='my-int')  # type: ignore
+        my_float: float = pydantic.Field(
+            3.14,
+            alias='my-float',  # type: ignore
+        )
+        my_list: list[str] = pydantic.Field(
+            alias='my-list',  # type: ignore
+            default_factory=list,
+        )
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+        class Config:
+            frozen = True
+
+    class MyPydanticBaseModelCharm(ops.CharmBase):
+        errors: typing.Literal['fail', 'raise'] = 'fail'
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['my-action'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(MyDataclassAction, errors=self.errors)
+            # These should not have any type errors.
+            new_float = params.my_float + 2006.8
+            new_int = params.my_int + 1979
+            new_str = params.my_str + 'bar'
+            new_list = params.my_list[:]
+            event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+            event.set_results({'params': params})
+
+    _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_action_init(
+    charm_class: type[ops.CharmBase],
+    request: pytest.FixtureRequest,
+):
+    schema = """
+my-action:
+    params:
+        my-str:
+            type: string
+        my-bool:
+            type: boolean
+            default: false
+        my-int:
+            type: integer
+            default: 42
+        my-float:
+            type: float
+            default: 3.14
+        my-list:
+            type: list
+"""
+    harness = testing.Harness(charm_class, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_out = harness.run_action('my-action', {'my-str': 'foo'}).results['params']
+    assert params_out.my_bool is False
+    assert params_out.my_float == 3.14
+    assert isinstance(params_out.my_float, float)
+    assert params_out.my_int == 42
+    assert isinstance(params_out.my_int, int)
+    assert params_out.my_str == 'foo'
+    assert isinstance(params_out.my_str, str)
+    assert params_out.my_list == []
+    assert isinstance(params_out.my_list, list)
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_action_init_non_default(
+    charm_class: type[ops.CharmBase],
+    request: pytest.FixtureRequest,
+):
+    schema = """
+my-action:
+    params:
+        my-str:
+            type: string
+        my-bool:
+            type: boolean
+            default: false
+        my-int:
+            type: integer
+            default: 42
+        my-float:
+            type: float
+            default: 3.14
+        my-list:
+            type: list
+"""
+    harness = testing.Harness(charm_class, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_in = {
+        'my-bool': True,
+        'my-float': 2.71,
+        'my-int': 24,
+        'my-str': 'bar',
+        'my-list': ['a', 'b', 'c'],
+    }
+    params_out = harness.run_action('my-action', params_in).results['params']
+    assert params_out.my_bool is True
+    assert params_out.my_float == 2.71
+    assert params_out.my_int == 24
+    assert params_out.my_str == 'bar'
+    assert params_out.my_list == ['a', 'b', 'c']
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_action_with_error_fail(
+    charm_class: type[ops.CharmBase],
+    request: pytest.FixtureRequest,
+):
+    schema = """
+my-action:
+    params:
+        my-str:
+            type: string
+            default: foo
+        my-int:
+            type: integer
+            default: 42
+"""
+    harness = testing.Harness(charm_class, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    # Harness raises an exception when fail() is called, so within Harness, we
+    # don't actually get the _Abort raised.
+    with pytest.raises(_Abort):
+        harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
+    message = harness._backend._running_action.failure_message
+    assert 'my_int must be zero or positive' in message
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_action_with_error_raise(
+    charm_class: type[ops.CharmBase],
+    request: pytest.FixtureRequest,
+):
+    schema = """
+my-action:
+    params:
+        my-str:
+            type: string
+            default: foo
+        my-int:
+            type: integer
+            default: 42
+"""
+
+    class FailCharm(charm_class):
+        errors = 'raise'
+
+    harness = testing.Harness(FailCharm, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    with pytest.raises(ValueError):
+        harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
+
+
+def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
+    @dataclasses.dataclass(frozen=True)
+    class Act1:
+        foo_bar: int = 42
+        other: str = 'baz'
+
+        def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+            super().__init__()
+            object.__setattr__(self, 'foo_bar', fooBar)
+            object.__setattr__(self, 'other', other)
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['act1'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(Act1)
+            event.set_results({'params': params})
+
+    schema = """
+act1:
+    params:
+        fooBar:
+            type: int
+            default: 42
+        other:
+            type: string
+            default: baz
+"""
+    harness = testing.Harness(Charm, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_out = harness.run_action('act1', {}).results['params']
+    assert params_out.foo_bar == 42
+    assert params_out.other == 'baz'
+
+
+def test_action_extra_args(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Action:
+        a: int
+        b: float
+        c: str
+
+        @classmethod
+        def _param_names(cls):
+            yield 'b'
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['action'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(Action, 10, c='foo')
+            event.set_results({'params': params})
+
+    schema = """
+action:
+    params:
+        b:
+            type: float
+"""
+    harness = testing.Harness(Charm, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params = harness.run_action('action', {'b': 3.14}).results['params']
+    assert params.a == 10
+    assert params.b == 3.14
+    assert params.c == 'foo'
