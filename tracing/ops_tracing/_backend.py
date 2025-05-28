@@ -21,6 +21,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import get_tracer_provider, set_tracer_provider
+from ops._private import yaml
 
 if TYPE_CHECKING:
     from ops.jujucontext import _JujuContext
@@ -40,8 +41,12 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
         charm_class_name: the name of the charm class, for annotation
     """
     app_name, unit_number = juju_context.unit_name.split('/', 1)
-    # Note that the Resource is immutable, and we want to start tracing early.
-    # This means that the Charmhub charm name (self.meta.name) is not available yet.
+    try:
+        meta = yaml.safe_load((juju_context.charm_dir / 'metadata.yaml').read_text())
+        charmhub_charm_name = meta['name']
+    except FileNotFoundError:
+        charmhub_charm_name = '[unknown]'
+
     resource = Resource.create(
         attributes={
             'service.namespace': juju_context.model_uuid,
@@ -49,6 +54,7 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
             'service.name': app_name,
             'service.instance.id': unit_number,
             'service.charm': charm_class_name,
+            'charm': charmhub_charm_name,
             'charm_type': charm_class_name,
             'juju_model': juju_context.model_name,
             'juju_model_uuid': juju_context.model_uuid,
