@@ -1851,8 +1851,7 @@ class _EventPath(str):
         )
         # TODO: when we drop Python 3.8, we can change the whole if-else below to
         # instance.prefix = string.removesuffix(suffix)
-        if suffix:
-            assert string.endswith(suffix)  # due to _get_suffix_and_type logic
+        if suffix and string.endswith(suffix):
             instance.prefix = string[: -len(suffix)]
         else:
             instance.prefix = string
