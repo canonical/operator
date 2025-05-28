@@ -7339,17 +7339,11 @@ def test_relation_validates_access(
     request: pytest.FixtureRequest, is_leader: bool, test_context: str
 ):
     """Test that relation databag read/write access in __init__ is the same as in observers."""
-    APP_NAME = 'charm'
-    REL_NAME = 'relation'
-    ACTION_NAME = 'action'
-    KEY = 'key'
-    LOCAL_VAL = 'local value'
-    REMOTE_VAL = 'remote value'
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            framework.observe(self.on[ACTION_NAME].action, self._on_action)
+            framework.observe(self.on['my-action'].action, self._on_action)
             self.validated = 0
             self.test_validation('init')
 
@@ -7360,50 +7354,50 @@ def test_relation_validates_access(
             if context != test_context:
                 return
             self.validated += 1
-            rel = self.model.get_relation(REL_NAME)
+            rel = self.model.get_relation('my-relation')
             assert rel is not None
 
             # remote application databag
             # any unit can read the remote application databag
             remote_app_data = rel.data[rel.app]
-            assert remote_app_data[KEY] == REMOTE_VAL
+            assert remote_app_data['k'] == 'remote val'
             assert len(remote_app_data.items()) == 1
             # no unit can write to the remote application databag
             with pytest.raises(ops.RelationDataAccessError):
-                remote_app_data[KEY] = 'something'
+                remote_app_data['k'] = 'something'
 
             # local application databag
             local_app_data = rel.data[self.app]
             # only the leader can read or write the local application databag
             if self.unit.is_leader():
-                assert local_app_data[KEY] == LOCAL_VAL  # test read
-                local_app_data[KEY] = 'new value'  # test write
+                assert local_app_data['k'] == 'local val'  # test read
+                local_app_data['k'] = 'new val'  # test write
             else:
                 with pytest.raises(ops.RelationDataAccessError):
-                    local_app_data[KEY]
+                    local_app_data['k']
             # these probably fail at real runtime with a ModelError
             # but pass here because the validation methods are only hooked up to get/set
             assert len(local_app_data.items()) == 1
-            assert KEY in local_app_data
+            assert 'k' in local_app_data
 
     harness = ops.testing.Harness(
         Charm,
-        meta=f"""
-name: {APP_NAME}
+        meta="""
+name: my-charm
 requires:
-  {REL_NAME}:
-    interface: interface-name
+  my-relation:
+    interface: my-interface
 """,
-        actions=f"""
-{ACTION_NAME}:
+        actions="""
+my-action:
 """,
     )
     request.addfinalizer(harness.cleanup)
     # create relation and setup remote application databag
-    rid = harness.add_relation(REL_NAME, remote_app='remote', app_data={KEY: REMOTE_VAL})
+    rid = harness.add_relation('my-relation', remote_app='remote', app_data={'k': 'remote val'})
     # setup local application databag
-    harness.update_relation_data(rid, APP_NAME, {KEY: LOCAL_VAL})
+    harness.update_relation_data(rid, 'my-charm', {'k': 'local val'})
     harness.set_leader(is_leader)
     harness.begin()  # run Charm.__init__
-    harness.run_action(ACTION_NAME)  # run Charm._on_action
+    harness.run_action('my-action')  # run Charm._on_action
     assert harness.charm.validated
