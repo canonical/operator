@@ -179,7 +179,7 @@ async def test_my_integration(ops_test: OpsTest):
         await ops_test.model.integrate("application_1:relation_name_1", "application_2:relation_name_2")
         await ops_test.model.wait_for_idle(status="active", timeout=60)
         # check any assertion here
-    ....
+    ...
 ```
 
 > Example implementations: [slurmd-operator](https://github.com/canonical/slurmd-operator/blob/ffb24b05bec1b10cc512c060a4739358bfea0df0/tests/integration/test_charm.py#L89)
@@ -199,7 +199,7 @@ async def test_config_changed(ops_test: OpsTest):
         # In this case, when setting server_name to "invalid_name" 
         # we could for example expect a blocked status.
         await ops_test.model.wait_for_idle(status="blocked",  timeout=60)
-    ....
+    ...
 ```
 > See also: https://discourse.charmhub.io/t/how-to-add-a-configuration-option-to-a-charm/4458
 >
@@ -263,10 +263,10 @@ You can similarly invoke the Juju CLI. This can be useful for cases where `pytho
 so you don't need to include the `-m` parameter.
 
 ```python
-    ....
+    ...
     command = ["secrets"]
     returncode, stdout, stderr = await ops_test.juju(*command, check=True)
-    ....
+    ...
 ```
 
 > Example implementations: [prometheus-k8s-operator](https://github.com/canonical/prometheus-k8s-operator/blob/d29f323343a1e4906a8c71104fcd1de817b2c2e6/tests/integration/conftest.py#L86), [hardware-observer-operator](https://github.com/canonical/hardware-observer-operator/blob/08c50798ca1c133a5d8ba5c889e0bcb09771300b/tests/functional/conftest.py#L14)
@@ -364,7 +364,7 @@ firing rate with `fast_forward`. Inside the new async context you can put any co
 
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(status="active",  timeout=120)
-    ....
+    ...
 ```
 
 > Example implementations [`postgresql-k8s-operator`](https://github.com/canonical/postgresql-k8s-operator/blob/69b2c138fa6b974883aa6d3d15a3315189d321d8/tests/integration/ha_tests/test_upgrade.py#L58), [`synapse-operator`](https://github.com/canonical/synapse-operator/blob/05c00bb7666197d04f1c025c36d8339b10b64a1a/tests/integration/test_charm.py#L249)
