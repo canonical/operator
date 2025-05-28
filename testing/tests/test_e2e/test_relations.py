@@ -100,7 +100,7 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            framework.observe(self.on['my-action'].action, self._on_action)
+            framework.observe(self.on['my-act'].action, self._on_action)
             self.test_validation('init')
 
         def _on_action(self, action: ops.ActionEvent):
@@ -111,7 +111,7 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
                 return
             nonlocal validated
             validated += 1
-            rel = self.model.get_relation('my-relation')
+            rel = self.model.get_relation('my-rel')
             assert rel is not None
 
             # remote application databag
@@ -141,17 +141,17 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
         Charm,
         meta={
             'name': 'charm',
-            'requires': {'my-relation': {'interface': 'interface-name'}},
+            'requires': {'my-rel': {'interface': 'my-face'}},
         },
-        actions={'my-action': {}},
+        actions={'my-act': {}},
     )
     rel_in = scenario.Relation(
-        endpoint='my-relation',
+        endpoint='my-rel',
         local_app_data={'k': 'local val'},
         remote_app_data={'k': 'remote val'},
     )
     validated = 0
-    ctx.run(ctx.on.action('my-action'), State(relations={rel_in}, leader=is_leader))
+    ctx.run(ctx.on.action('my-act'), State(relations={rel_in}, leader=is_leader))
     assert validated
 
 

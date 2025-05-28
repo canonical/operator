@@ -7343,7 +7343,7 @@ def test_relation_validates_access(
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            framework.observe(self.on['my-action'].action, self._on_action)
+            framework.observe(self.on['my-act'].action, self._on_action)
             self.validated = 0
             self.test_validation('init')
 
@@ -7354,7 +7354,7 @@ def test_relation_validates_access(
             if context != test_context:
                 return
             self.validated += 1
-            rel = self.model.get_relation('my-relation')
+            rel = self.model.get_relation('my-rel')
             assert rel is not None
 
             # remote application databag
@@ -7385,19 +7385,19 @@ def test_relation_validates_access(
         meta="""
 name: my-charm
 requires:
-  my-relation:
-    interface: my-interface
+  my-rel:
+    interface: my-face
 """,
         actions="""
-my-action:
+my-act:
 """,
     )
     request.addfinalizer(harness.cleanup)
     # create relation and setup remote application databag
-    rid = harness.add_relation('my-relation', remote_app='remote', app_data={'k': 'remote val'})
+    rid = harness.add_relation('my-rel', remote_app='remote', app_data={'k': 'remote val'})
     # setup local application databag
     harness.update_relation_data(rid, 'my-charm', {'k': 'local val'})
     harness.set_leader(is_leader)
     harness.begin()  # run Charm.__init__
-    harness.run_action('my-action')  # run Charm._on_action
+    harness.run_action('my-act')  # run Charm._on_action
     assert harness.charm.validated
