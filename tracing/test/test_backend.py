@@ -71,7 +71,6 @@ def test_juju_topology_labels(setup_tracing: None):
         'service.namespace.name': 'test-model',
         'service.name': 'testapp',
         'service.instance.id': '42',
-        'service.charm': 'DummyCharm',
         'charm': 'testcharm',
         'charm_type': 'DummyCharm',
         'juju_model': 'test-model',

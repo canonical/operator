@@ -53,7 +53,6 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
             'service.namespace.name': juju_context.model_name,
             'service.name': app_name,
             'service.instance.id': unit_number,
-            'service.charm': charm_class_name,
             'charm': charmhub_charm_name,
             'charm_type': charm_class_name,
             'juju_model': juju_context.model_name,
