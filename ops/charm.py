@@ -36,7 +36,6 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
-    get_type_hints,
 )
 
 from . import model
@@ -1468,10 +1467,13 @@ class CharmBase(Object):
         from ._main import _Abort
 
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
-        fields = set(_juju_option_names(cls))
+        try:
+            fields = set(_juju_option_names(cls))
+        except ValueError:
+            fields = None
         for key, value in self.config.items():
             attr = key.replace('-', '_')
-            if attr not in fields:
+            if fields is not None and attr not in fields:
                 continue
             option_type = self.meta.config.get(key)
             # Convert secret IDs to secret objects. We create the object rather
@@ -1499,7 +1501,11 @@ class CharmBase(Object):
 
 
 def _juju_option_names(cls: type[object]) -> Generator[str]:
-    """Iterates over all the option names to include in the config YAML."""
+    """Iterates over all the option names to include in the config YAML.
+
+    Raises:
+        ValueError: if unable to determine which fields to include
+    """
     # Dataclasses:
     try:
         fields = [field.name for field in dataclasses.fields(cls)]  # type: ignore
@@ -1512,21 +1518,8 @@ def _juju_option_names(cls: type[object]) -> Generator[str]:
     if hasattr(cls, 'model_fields'):
         yield from sorted(cls.model_fields)  # type: ignore
         return
-    # Fall back to using dir() and type annotations, ignoring any that are
-    # intended to be private, and any methods.
-    attrs = dir(cls)
-    try:
-        attrs.extend(get_type_hints(cls))
-    except TypeError:
-        # `get_type_hints` fails in Python 3.8 in some situations.
-        # We leave solving this to the charmer.
-        pass
-    for attr in sorted(set(attrs)):
-        # If the attribute comes from type annotations, and doesn't have a
-        # default value, then it's not accessible with hasattr
-        if attr.startswith('_') or (hasattr(cls, attr) and callable(getattr(cls, attr))):
-            continue
-        yield attr
+    # It's not clear, so give up.
+    raise ValueError('Unable to find field list')
 
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
