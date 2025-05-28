@@ -14,9 +14,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
+from opentelemetry.trace import get_tracer_provider
 
 import ops_tracing
 from ops_tracing import _backend
@@ -58,3 +59,22 @@ def test_set_destination_invalid_url(setup_tracing: None, url: str):
     assert exporter
     with pytest.raises(ValueError):
         ops_tracing.set_destination(url, None)
+
+
+def test_juju_topology_labels(setup_tracing: None):
+    get_tracer_provider()
+    assert {**get_tracer_provider()._resource._attributes} == {  # type: ignore
+        'telemetry.sdk.language': 'python',
+        'telemetry.sdk.name': 'opentelemetry',
+        'telemetry.sdk.version': ANY,
+        'service.namespace': '4242',
+        'service.namespace.name': 'test-model',
+        'service.name': 'testapp',
+        'service.instance.id': '42',
+        'charm': 'testcharm',
+        'charm_type': 'DummyCharm',
+        'juju_model': 'test-model',
+        'juju_model_uuid': '4242',
+        'juju_application': 'testapp',
+        'juju_unit': 'testapp/42',
+    }
