@@ -9,15 +9,15 @@ Open Telemetry resource attributes
 ----------------------------------
 
 The following `well-known <https://opentelemetry.io/docs/specs/semconv/resource/#service>`_
-and additional resource attributes are set:
+resource attributes are set:
 
 - ``service.namespace`` the UUID of the Juju model.
 - ``service.namespace.name`` the name of the Juju model.
 - ``service.name`` the application name, like ``user_db``.
 - ``service.instance.id`` the unit number, like ``0``.
 
-The `Juju topology attributes <https://discourse.charmhub.io/t/juju-topology-labels/8874>`_
-are also set:
+The following `Juju topology <https://discourse.charmhub.io/t/juju-topology-labels/8874>`_
+resources attributes are also set:
 
 - ``charm`` the charm name, like ``database-operator-k8s``.
 - ``charm_type`` the charm class name, like ``DbCharm``.
