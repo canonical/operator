@@ -169,7 +169,7 @@ class Tracing(ops.Object):
                 return Destination(None, None)
 
             if not base_url.startswith(('http://', 'https://')):
-                logger.warning(f'The {base_url=} must be an HTTP or an HTTPS URL')
+                logger.warning('The base_url=%s must be an HTTP or an HTTPS URL', base_url)
                 return Destination(None, None)
 
             url = f'{base_url.rstrip("/")}/v1/traces'

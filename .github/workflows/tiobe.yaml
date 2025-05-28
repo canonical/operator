@@ -19,10 +19,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
       - name: Install dependencies
-        run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23
+        run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23 opentelemetry-api~=1.0 importlib-metadata
       - name: Generate coverage report
         run: |
-          tox -e coverage
+          tox -e coverage,coverage-tracing,coverage-report
 
       - name: TICS GitHub Action
         uses: tiobe/tics-github-action@009979693978bfefad2ad15c1020066694968dc7  # v3.4.0
