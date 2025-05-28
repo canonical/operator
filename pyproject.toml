@@ -188,7 +188,7 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "S106",
 
     # "Useless" expression.
-    "B018",
+    "B018"
 ]
 "testing/*" = [
     # TODO: the below ignores should be fixed
