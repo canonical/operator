@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 import functools
 import pathlib
 import tempfile
@@ -1632,3 +1633,119 @@ action:
     assert params.a == 10
     assert params.b == 3.14
     assert params.c == 'foo'
+
+
+@pytest.mark.skipif(
+    pydantic is None,
+    reason='pydantic is not available, so we cannot test pydantic-based classes.',
+)
+def test_action_nested_with_enum(request: pytest.FixtureRequest):
+    schema = """
+snapshot:
+    description: Take a snapshot of the database.
+    params:
+        filename:
+            type: string
+            description: The name of the snapshot file.
+        compression:
+            type: object
+            description: The type of compression to use.
+            properties:
+                kind:
+                    type: string
+                    enum:
+                    - gzip
+                    - bzip2
+                    - xz
+                    default: gzip
+                quality:
+                    description: Compression quality
+                    type: integer
+                    default: 5
+                    minimum: 0
+                    maximum: 9
+    required:
+    - filename
+    additionalProperties: false
+"""
+
+    class CompressionKind(enum.Enum):
+        GZIP = 'gzip'
+        BZIP = 'bzip2'
+        XZ = 'xz'
+
+    assert pydantic is not None
+
+    class Compression(pydantic.BaseModel):
+        kind: CompressionKind = pydantic.Field(CompressionKind.BZIP)
+
+        quality: int = pydantic.Field(5, description='Compression quality.', ge=0, le=9)
+
+    class SnapshotAction(pydantic.BaseModel):
+        """Take a snapshot of the database."""
+
+        filename: str = pydantic.Field(description='The name of the snapshot file.')
+
+        compression: Compression = pydantic.Field(  # type: ignore
+            default_factory=Compression,  # type: ignore
+            description='The type of compression to use.',
+        )
+
+    class DBCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['snapshot'].action, self._on_snapshot_action)
+
+        def _on_snapshot_action(self, event: ops.ActionEvent):
+            params = event.load_params(SnapshotAction, errors='raise')
+            event.log(f'Generating snapshot into {params.filename}')
+            success = self.do_snapshot(
+                filename=params.filename,
+                kind=params.compression.kind,
+                quality=params.compression.quality,
+            )
+            if not success:
+                event.fail('Failed to generate snapshot.')
+                return
+            msg = f'Stored snapshot in {params.filename}.'
+            event.set_results({'result': msg})
+
+        def do_snapshot(self, filename: str, kind: CompressionKind, quality: int) -> bool:
+            self.snapped = [filename, kind, quality]
+            return True
+
+    harness = testing.Harness(DBCharm, actions=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    # Snapshot with the defaults.
+    out = harness.run_action('snapshot', {'filename': 'snap.bz2'})
+    assert out.results['result'] == 'Stored snapshot in snap.bz2.'
+    assert harness.charm.snapped == ['snap.bz2', CompressionKind.BZIP, 5]
+    # Snapshot with custom values.
+    out = harness.run_action(
+        'snapshot',
+        {
+            'filename': 'snap.gz',
+            'compression': {'kind': 'gzip', 'quality': 7},
+        },
+    )
+    assert out.results['result'] == 'Stored snapshot in snap.gz.'
+    assert harness.charm.snapped == ['snap.gz', CompressionKind.GZIP, 7]
+    # Snapshot with an invalid compression kind.
+    with pytest.raises(ValueError):
+        harness.run_action(
+            'snapshot',
+            {
+                'filename': 'snap.zip',
+                'compression': {'kind': 'zip'},
+            },
+        )
+    # Snapshot with an invalid compression quality.
+    with pytest.raises(ValueError):
+        harness.run_action(
+            'snapshot',
+            {
+                'filename': 'snap.xz',
+                'compression': {'kind': 'xz', 'quality': 10},
+            },
+        )

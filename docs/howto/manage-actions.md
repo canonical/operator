@@ -44,7 +44,7 @@ actions:
 In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the action event associated with your action and pair that with an event handler. For example:
 
 ```
-self.framework.observe(self.on.grant_admin_role_action, self._on_grant_admin_role_action)
+framework.observe(self.on['snapshot'].action, self._on_snapshot_action)
 ```
 
 Also in the `src/charm.py file`, create a class for each action that defines the schema of the action parameters. For example:
@@ -58,13 +58,7 @@ class CompressionKind(enum.Enum):
 class Compression(pydantic.BaseModel):
     kind: CompressionKind = pydantic.Field(CompressionKind.BZIP)
 
-    quality: int = pydantic.Field(5, description="Compression quality.")
-
-    @pydantic.validator("quality")
-    def validate_quality(cls, value):
-        if 0 <= quality <= 9:
-            return value
-        raise ValueError("Quality must be an integer between 0 and 9 inclusive.")
+    quality: int = pydantic.Field(5, description='Compression quality.', ge=0, le=9)
 
 class SnapshotAction(pydantic.BaseModel):
     """Take a snapshot of the database."""
@@ -72,7 +66,7 @@ class SnapshotAction(pydantic.BaseModel):
     filename: str = pydantic.Field(description="The name of the snapshot file.")
 
     compression: Compression = pydantic.Field(
-        Compression.GZIP,
+        default_factory=Compression,
         description="The type of compression to use.",
     )
 ```
@@ -80,7 +74,7 @@ class SnapshotAction(pydantic.BaseModel):
 Now, in the body of the charm definition, define the action event handler. For example:
 
 ```python
-def _on_snapshot_action(self, event):
+def _on_snapshot_action(self, event: ops.ActionEvent):
     """Handle the snapshot action."""
     # Fetch the parameters. If the user passes something invalid, this will
     # fail the action with an appropriate message.
@@ -97,7 +91,7 @@ def _on_snapshot_action(self, event):
     )
     if not success:
         # Report to the user that the action has failed.
-        event.fail(f"Failed to generate snapshot.")  # Ideally, include more details than this!
+        event.fail("Failed to generate snapshot.")  # Ideally, include more details than this!
         # Note that `fail()` doesn't interrupt code, so is typically followed by a `return`.
         return
     # Set the results of the action.
