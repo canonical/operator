@@ -1300,15 +1300,19 @@ class MyAction:
             self.my_list = my_list
 
 
-class MyCharm(ops.CharmBase):
+class BaseTestCharm(ops.CharmBase):
     errors: typing.Literal['fail', 'raise'] = 'fail'
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on['my-action'].action, self._on_action)
 
+    @property
+    def action_class(self) -> type[MyAction]:
+        raise NotImplementedError
+
     def _on_action(self, event: ops.ActionEvent):
-        params = event.load_params(MyAction, errors=self.errors)
+        params = event.load_params(self.action_class, errors=self.errors)
         # These should not have any type errors.
         new_float = params.my_float + 2006.8
         new_int = params.my_int + 1979
@@ -1316,6 +1320,12 @@ class MyCharm(ops.CharmBase):
         new_list = params.my_list[:]
         event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
         event.set_results({'params': params})
+
+
+class MyCharm(BaseTestCharm):
+    @property
+    def action_class(self) -> type[MyAction]:
+        return MyAction
 
 
 # Note that we would really like to have kw_only=True here as well, but that's
@@ -1333,22 +1343,10 @@ class MyDataclassAction:
             raise ValueError('my_int must be zero or positive')
 
 
-class MyDataclassCharm(ops.CharmBase):
-    errors: typing.Literal['fail', 'raise'] = 'fail'
-
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        framework.observe(self.on['my-action'].action, self._on_action)
-
-    def _on_action(self, event: ops.ActionEvent):
-        params = event.load_params(MyDataclassAction, errors=self.errors)
-        # These should not have any type errors.
-        new_float = params.my_float + 2006.8
-        new_int = params.my_int + 1979
-        new_str = params.my_str + 'bar'
-        new_list = params.my_list[:]
-        event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
-        event.set_results({'params': params})
+class MyDataclassCharm(BaseTestCharm):
+    @property
+    def action_class(self) -> type[MyDataclassAction]:
+        return MyDataclassAction
 
 
 _test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
@@ -1370,72 +1368,31 @@ if pydantic:
                 raise ValueError('my_int must be zero or positive')
             return my_int
 
-    class MyPydanticDataclassCharm(ops.CharmBase):
-        errors: typing.Literal['fail', 'raise'] = 'fail'
-
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['my-action'].action, self._on_action)
-
-        def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(MyDataclassAction, errors=self.errors)
-            # These should not have any type errors.
-            new_float = params.my_float + 2006.8
-            new_int = params.my_int + 1979
-            new_str = params.my_str + 'bar'
-            new_list = params.my_list[:]
-            event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
-            event.set_results({'params': params})
+    class MyPydanticDataclassCharm(BaseTestCharm):
+        @property
+        def action_class(self) -> type[MyPydanticDataclassAction]:
+            return MyPydanticDataclassAction
 
     class MyPydanticBaseModelAction(pydantic.BaseModel):
-        my_str: str = pydantic.Field(alias='my-str')  # type: ignore
-        my_bool: bool = pydantic.Field(
-            False,
-            alias='my-bool',  # type: ignore
-        )
-        my_int: int = pydantic.Field(42, alias='my-int')  # type: ignore
-        my_float: float = pydantic.Field(
-            3.14,
-            alias='my-float',  # type: ignore
-        )
-        my_list: list[str] = pydantic.Field(
-            alias='my-list',  # type: ignore
-            default_factory=list,
-        )
+        my_str: str = pydantic.Field()
+        my_bool: bool = pydantic.Field(False)
+        my_int: int = pydantic.Field(42, ge=0)
+        my_float: float = pydantic.Field(3.14)
+        my_list: list[str] = pydantic.Field(default_factory=list)
 
-        @pydantic.field_validator('my_int')
-        @classmethod
-        def validate_my_int(cls, my_int: int) -> int:
-            if my_int < 0:
-                raise ValueError('my_int must be zero or positive')
-            return my_int
+        model_config = pydantic.ConfigDict(frozen=True)
 
-        class Config:
-            frozen = True
-
-    class MyPydanticBaseModelCharm(ops.CharmBase):
-        errors: typing.Literal['fail', 'raise'] = 'fail'
-
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['my-action'].action, self._on_action)
-
-        def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(MyDataclassAction, errors=self.errors)
-            # These should not have any type errors.
-            new_float = params.my_float + 2006.8
-            new_int = params.my_int + 1979
-            new_str = params.my_str + 'bar'
-            new_list = params.my_list[:]
-            event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
-            event.set_results({'params': params})
+    class MyPydanticBaseModelCharm(BaseTestCharm):
+        @property
+        def action_class(self) -> type[MyPydanticBaseModelAction]:
+            return MyPydanticBaseModelAction
 
     _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_action_init(
-    charm_class: type[ops.CharmBase],
+    charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
     schema = """
@@ -1472,7 +1429,7 @@ my-action:
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_action_init_non_default(
-    charm_class: type[ops.CharmBase],
+    charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
     schema = """
@@ -1512,7 +1469,7 @@ my-action:
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_action_with_error_fail(
-    charm_class: type[ops.CharmBase],
+    charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
     schema = """
@@ -1532,13 +1489,14 @@ my-action:
     # don't actually get the _Abort raised.
     with pytest.raises(_Abort):
         harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
-    message = harness._backend._running_action.failure_message
-    assert 'my_int must be zero or positive' in message
+    # There should be a failure message, but we're not concerned with the exact
+    # wording, which will differ between action classes.
+    assert harness._backend._running_action.failure_message
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_action_with_error_raise(
-    charm_class: type[ops.CharmBase],
+    charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
     schema = """
