@@ -1634,14 +1634,12 @@ snapshot:
 
     class Compression(pydantic.BaseModel):
         kind: CompressionKind = pydantic.Field(CompressionKind.BZIP)
-
         quality: int = pydantic.Field(5, description='Compression quality.', ge=0, le=9)
 
     class SnapshotAction(pydantic.BaseModel):
         """Take a snapshot of the database."""
 
         filename: str = pydantic.Field(description='The name of the snapshot file.')
-
         compression: Compression = pydantic.Field(  # type: ignore
             default_factory=Compression,  # type: ignore
             description='The type of compression to use.',
