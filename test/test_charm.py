@@ -1562,10 +1562,6 @@ def test_action_extra_args(request: pytest.FixtureRequest):
         b: float
         c: str
 
-        @classmethod
-        def _param_names(cls):
-            yield 'b'
-
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
