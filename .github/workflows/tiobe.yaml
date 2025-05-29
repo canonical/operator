@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
       - name: Install dependencies
-        run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23 opentelemetry-api~=1.0 importlib-metadata opentelemetry-sdk~=1.30 pydantic
+        run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23 opentelemetry-api~=1.0 importlib-metadata opentelemetry-sdk~=1.30 pydantic ops-scenario ops-tracing
       - name: Generate coverage report
         run: |
           tox -e coverage,coverage-tracing,coverage-report
