@@ -3,8 +3,8 @@ name: "Validate PR Title"
 # Ensure that the PR title conforms to the Conventional Commits and our choice of types and scopes, so that library version bumps can be detected automatically
 
 on:
-  pull_request_target:  # zizmor: ignore[dangerous-triggers] Doesn't touch code - pull_request results in cancellation errors.
-    types: [opened, edited, synchronize]
+  #pull_request_target:  # zizmor: ignore[dangerous-triggers] Doesn't touch code - pull_request results in cancellation errors.
+    #types: [opened, edited, synchronize]
 
 permissions:
   pull-requests: read

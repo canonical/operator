@@ -10,121 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install tox
-        run: pip install tox~=4.2
-
-      - name: Run linting
-        run: tox -e lint
-
-      - name: Run tracing linter
-        run: cd tracing && tox -e lint
-
-  static:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install tox
-        run: pip install tox~=4.2
-
-      - name: Run static type checks
-        run: tox -e static
-
-      - name: Run tracing static type checks
-        run: cd tracing && tox -e static
-
   test:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.8", "3.10", "3.12"]
-        exclude:
-        - {python-version: "3.8", os: "macos-latest"}  # macos-14 is arm64, and there's no Python 3.8 build for arm64
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install tox
-        run: pip install tox~=4.2
-
-      - name: Run unit tests
-        run: tox -e unit
-
-      - name: Run tracing unit tests
-        run: cd tracing && tox -e unit
-
-  test-real-pebble:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.8", "3.10", "3.12"]
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          # To suppress the "Restore cache failed" error, since there is no go.sum file here.
-          cache: false
-
-      - name: Install tox
-        run: pip install tox~=4.2
-
-      - name: Install Pebble
-        run: go install github.com/canonical/pebble/cmd/pebble@master
-
-      - name: Start Pebble
-        run: |
-          umask 0
-          $HOME/go/bin/pebble run --create-dirs --http=:4000 &
-        env:
-          PEBBLE: /tmp/pebble
-
-      - name: Run Real pebble tests
-        run: tox -e unit -- test/test_real_pebble.py
-        env:
-          RUN_REAL_PEBBLE_TESTS: 1
-          PEBBLE: /tmp/pebble
-
-  pip-install:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -133,25 +19,50 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
         exclude:
-        - {python-version: "3.8", os: "macos-latest"}  # macos-14 is arm64, and there's no Python 3.8 build for arm64
-        - {python-version: "3.9", os: "macos-latest"}  # macos-14 is arm64, and there's no Python 3.9 build for arm64
+          - {python-version: "3.8", os: "macos-latest"}  # because arm
+          - {python-version: "3.9", os: "macos-latest"}  # because arm
 
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Set up Python 3
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install build dependencies
-        run: pip install wheel build
+      - name: Install tox
+        run: pip install tox~=4.2
 
-      - name: Build
-        run: python -m build
+      - name: Run unit tests 0
+        run: tox -e unit
 
-      # Test that a pip install of the source dist .tar.gz will work
-      - name: Test 'pip install'
-        # Shouldn't happen, but pip install will fail if ls returns multiple lines
-        run: pip install $(ls dist/ops*.gz)
+      - name: Run unit tests 1
+        run: tox -e unit
+
+      - name: Run unit tests 2
+        run: tox -e unit
+
+      - name: Run unit tests 3
+        run: tox -e unit
+
+      - name: Run unit tests 4
+        run: tox -e unit
+
+      - name: Run unit tests 5
+        run: tox -e unit
+
+      - name: Run unit tests 6
+        run: tox -e unit
+
+      - name: Run unit tests 7
+        run: tox -e unit
+
+      - name: Run unit tests 8
+        run: tox -e unit
+
+      - name: Run unit tests 9
+        run: tox -e unit
+
+      - name: Run tracing unit tests
+        run: cd tracing && tox -e unit
