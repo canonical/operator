@@ -1395,7 +1395,7 @@ def test_action_init(
     charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
-    schema = """
+    action_yaml = """
 my-action:
     params:
         my-str:
@@ -1412,7 +1412,7 @@ my-action:
         my-list:
             type: list
 """
-    harness = testing.Harness(charm_class, actions=schema)
+    harness = testing.Harness(charm_class, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     params_out = harness.run_action('my-action', {'my-str': 'foo'}).results['params']
@@ -1432,7 +1432,7 @@ def test_action_init_non_default(
     charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
-    schema = """
+    action_yaml = """
 my-action:
     params:
         my-str:
@@ -1449,7 +1449,7 @@ my-action:
         my-list:
             type: list
 """
-    harness = testing.Harness(charm_class, actions=schema)
+    harness = testing.Harness(charm_class, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     params_in = {
@@ -1472,7 +1472,7 @@ def test_action_with_error_fail(
     charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
-    schema = """
+    action_yaml = """
 my-action:
     params:
         my-str:
@@ -1482,7 +1482,7 @@ my-action:
             type: integer
             default: 42
 """
-    harness = testing.Harness(charm_class, actions=schema)
+    harness = testing.Harness(charm_class, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     with pytest.raises(_Abort):
@@ -1497,7 +1497,10 @@ def test_action_with_error_raise(
     charm_class: type[BaseTestCharm],
     request: pytest.FixtureRequest,
 ):
-    schema = """
+    class RaiseCharm(charm_class):
+        errors = 'raise'
+
+    action_yaml = """
 my-action:
     params:
         my-str:
@@ -1508,10 +1511,7 @@ my-action:
             default: 42
 """
 
-    class FailCharm(charm_class):
-        errors = 'raise'
-
-    harness = testing.Harness(FailCharm, actions=schema)
+    harness = testing.Harness(RaiseCharm, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     with pytest.raises(ValueError):
@@ -1537,7 +1537,7 @@ def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
             params = event.load_params(Act1)
             event.set_results({'params': params})
 
-    schema = """
+    action_yaml = """
 act1:
     params:
         fooBar:
@@ -1547,7 +1547,7 @@ act1:
             type: string
             default: baz
 """
-    harness = testing.Harness(Charm, actions=schema)
+    harness = testing.Harness(Charm, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     params_out = harness.run_action('act1', {}).results['params']
@@ -1571,13 +1571,13 @@ def test_action_extra_args(request: pytest.FixtureRequest):
             params = event.load_params(Action, 10, c='foo')
             event.set_results({'params': params})
 
-    schema = """
+    action_yaml = """
 action:
     params:
         b:
             type: float
 """
-    harness = testing.Harness(Charm, actions=schema)
+    harness = testing.Harness(Charm, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     params = harness.run_action('action', {'b': 3.14}).results['params']
@@ -1592,35 +1592,6 @@ action:
 )
 def test_action_nested_with_enum(request: pytest.FixtureRequest):
     assert pydantic is not None
-
-    schema = """
-snapshot:
-    description: Take a snapshot of the database.
-    params:
-        filename:
-            type: string
-            description: The name of the snapshot file.
-        compression:
-            type: object
-            description: The type of compression to use.
-            properties:
-                kind:
-                    type: string
-                    enum:
-                    - gzip
-                    - bzip2
-                    - xz
-                    default: gzip
-                quality:
-                    description: Compression quality
-                    type: integer
-                    default: 5
-                    minimum: 0
-                    maximum: 9
-    required:
-    - filename
-    additionalProperties: false
-"""
 
     class CompressionKind(enum.Enum):
         GZIP = 'gzip'
@@ -1663,7 +1634,36 @@ snapshot:
             self.snapped = [filename, kind, quality]
             return True
 
-    harness = testing.Harness(DBCharm, actions=schema)
+    action_yaml = """
+snapshot:
+    description: Take a snapshot of the database.
+    params:
+        filename:
+            type: string
+            description: The name of the snapshot file.
+        compression:
+            type: object
+            description: The type of compression to use.
+            properties:
+                kind:
+                    type: string
+                    enum:
+                    - gzip
+                    - bzip2
+                    - xz
+                    default: gzip
+                quality:
+                    description: Compression quality
+                    type: integer
+                    default: 5
+                    minimum: 0
+                    maximum: 9
+    required:
+    - filename
+    additionalProperties: false
+"""
+
+    harness = testing.Harness(DBCharm, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
     # Snapshot with the defaults.
