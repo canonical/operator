@@ -1519,14 +1519,13 @@ my-action:
 
 
 def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
-    @dataclasses.dataclass(frozen=True)
-    class Act1:
+    class Act1:  # noqa: B903
         foo_bar: int = 42
         other: str = 'baz'
 
         def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
-            object.__setattr__(self, 'foo_bar', fooBar)
-            object.__setattr__(self, 'other', other)
+            self.foo_bar = fooBar
+            self.other = other
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
