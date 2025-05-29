@@ -1591,6 +1591,8 @@ action:
     reason='pydantic is not available, so we cannot test pydantic-based classes.',
 )
 def test_action_nested_with_enum(request: pytest.FixtureRequest):
+    assert pydantic is not None
+
     schema = """
 snapshot:
     description: Take a snapshot of the database.
@@ -1624,8 +1626,6 @@ snapshot:
         GZIP = 'gzip'
         BZIP = 'bzip2'
         XZ = 'xz'
-
-    assert pydantic is not None
 
     class Compression(pydantic.BaseModel):
         kind: CompressionKind = pydantic.Field(CompressionKind.BZIP)
