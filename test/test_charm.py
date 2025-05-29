@@ -1540,15 +1540,40 @@ options:
     assert typed_config.c == 'foo'
 
 
-def test_config_partial_init(request: pytest.FixtureRequest):
-    @dataclasses.dataclass(frozen=True)
-    class Config:
+class SmallConfig:
+    x: int
+
+    # Note that for plain classes we do not try to determine the fields
+    # and instead get all arguments.
+    def __init__(self, x: int, **_):
+        self.x = x
+
+
+@dataclasses.dataclass(frozen=True)
+class SmallDataclassConfig:
+    x: int
+
+
+_small_configs: list[type[object]] = [SmallConfig, SmallDataclassConfig]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class SmallPydanticDataclassConfig:
         x: int
 
+    class SmallPydanticBaseModelConfig(pydantic.BaseModel):
+        x: int = pydantic.Field()
+
+    _small_configs.extend((SmallPydanticDataclassConfig, SmallPydanticBaseModelConfig))
+
+
+@pytest.mark.parametrize('config_class', _small_configs)
+def test_config_partial_init(config_class: type[object], request: pytest.FixtureRequest):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.typed_config = self.load_config(Config)
+            self.typed_config = self.load_config(config_class)
 
     # Harness needs to know about *all* the options, even though the charm does not.
     schema = """
@@ -1565,6 +1590,6 @@ options:
     harness.update_config({'x': 42, 'y': 'foo'})
     harness.begin()
     typed_config = harness.charm.typed_config
-    assert isinstance(typed_config, Config)
-    assert typed_config.x == 42
+    assert isinstance(typed_config, config_class)
+    assert typed_config.x == 42  # type: ignore
     assert not hasattr(typed_config, 'y')
