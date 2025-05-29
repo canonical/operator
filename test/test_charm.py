@@ -1485,8 +1485,6 @@ my-action:
     harness = testing.Harness(charm_class, actions=schema)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    # Harness raises an exception when fail() is called, so within Harness, we
-    # don't actually get the _Abort raised.
     with pytest.raises(_Abort):
         harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
     # There should be a failure message, but we're not concerned with the exact
