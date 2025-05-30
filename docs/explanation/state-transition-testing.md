@@ -2,7 +2,7 @@
 
 Scenario is a state-transition testing SDK for Ops charms.
 
-```note
+```{note}
 The state-transition testing framework was originally developed under the name
 "Scenario", and the package is found on PyPI as `ops-scenario`. The framework
 solved so many issues with the older "Harness" framework that it was adopted as
@@ -105,7 +105,7 @@ def test_basic_scenario():
     assert state_out.unit_status == testing.UnknownStatus()
 ```
 
-```tip
+```{tip}
 You should always compare the app and unit status using `==`, not `is`. You can
 compare them to either the `ops.testing` objects, or the `ops` ones.
 ```
