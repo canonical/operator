@@ -14,8 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:  # zizmor: ignore[artipacked]
+        with:
           token: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
+          persist-credentials: true
 
       - uses: ./.github/actions/update-charm-pins
         with:
