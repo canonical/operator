@@ -7,12 +7,16 @@ on:
   pull_request:
   workflow_call:
 
+permissions: {}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
@@ -23,11 +27,16 @@ jobs:
       - name: Run linting
         run: tox -e lint
 
+      - name: Run tracing linter
+        run: cd tracing && tox -e lint
+
   static:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
@@ -38,6 +47,9 @@ jobs:
 
       - name: Run static type checks
         run: tox -e static
+
+      - name: Run tracing static type checks
+        run: cd tracing && tox -e static
 
   test:
     runs-on: ${{ matrix.os }}
@@ -52,6 +64,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -62,6 +76,9 @@ jobs:
 
       - name: Run unit tests
         run: tox -e unit
+
+      - name: Run tracing unit tests
+        run: cd tracing && tox -e unit
 
   test-real-pebble:
     runs-on: ${{ matrix.os }}
@@ -74,6 +91,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -119,6 +138,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:

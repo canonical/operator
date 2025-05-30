@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
@@ -16,7 +18,7 @@ class MyCharmEvents(CharmEvents):
 
 
 class MyCharm(CharmBase):
-    META = {"name": "mycharm"}
+    META = {'name': 'mycharm'}
     on = MyCharmEvents()
 
     def __init__(self, *args, **kwargs):
@@ -33,7 +35,7 @@ class MyCharm(CharmBase):
 
 def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
     with capture_events(include_framework=True) as emitted:
-        trigger(State(), "start", MyCharm, meta=MyCharm.META)
+        trigger(State(), 'start', MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 5
     assert isinstance(emitted[0], StartEvent)
@@ -45,7 +47,7 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
 
 def test_capture_juju_evt():
     with capture_events() as emitted:
-        trigger(State(), "start", MyCharm, meta=MyCharm.META)
+        trigger(State(), 'start', MyCharm, meta=MyCharm.META)
 
     assert len(emitted) == 2
     assert isinstance(emitted[0], StartEvent)
@@ -56,8 +58,8 @@ def test_capture_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
     with capture_events() as emitted:
         trigger(
-            State(deferred=[_Event("foo").deferred(handler=MyCharm._on_foo)]),
-            "start",
+            State(deferred=[_Event('foo').deferred(handler=MyCharm._on_foo)]),
+            'start',
             MyCharm,
             meta=MyCharm.META,
         )
@@ -72,8 +74,8 @@ def test_capture_no_deferred_evt():
     # todo: this test should pass with ops < 2.1 as well
     with capture_events(include_deferred=False) as emitted:
         trigger(
-            State(deferred=[_Event("foo").deferred(handler=MyCharm._on_foo)]),
-            "start",
+            State(deferred=[_Event('foo').deferred(handler=MyCharm._on_foo)]),
+            'start',
             MyCharm,
             meta=MyCharm.META,
         )

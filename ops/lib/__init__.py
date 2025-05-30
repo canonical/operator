@@ -16,9 +16,11 @@
 
 .. deprecated:: 2.1.0
     The ops.lib functionality is deprecated, and is superseded by
-    charm libraries (https://juju.is/docs/sdk/library) and regular Python imports.
+    charm libraries and regular Python imports.
     We now prefer to do version selection at build (charmcraft pack) time.
 """
+
+from __future__ import annotations
 
 import logging
 import os
@@ -31,7 +33,6 @@ from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec
 from pkgutil import get_importer
 from types import ModuleType
-from typing import List
 
 __all__ = ('autoimport', 'use')
 
@@ -61,8 +62,7 @@ def use(name: str, api: int, author: str) -> ModuleType:
         ValueError: if the name, api, or author are invalid.
 
     .. deprecated:: 2.1.0
-        This function is deprecated. Prefer charm libraries instead
-        (https://juju.is/docs/sdk/library).
+        This function is deprecated. Prefer charm libraries instead.
     """
     warnings.warn(
         'ops.lib is deprecated, prefer charm libraries instead', category=DeprecationWarning
@@ -105,8 +105,7 @@ def autoimport():
     Otherwise libraries are found on first call of `use`.
 
     .. deprecated:: 2.1.0
-        This function is deprecated. Prefer charm libraries instead
-        (https://juju.is/docs/sdk/library).
+        This function is deprecated. Prefer charm libraries instead.
     """
     warnings.warn(
         'ops.lib is deprecated, prefer charm libraries instead', category=DeprecationWarning
@@ -174,7 +173,7 @@ _MAX_LIB_LINES = 99
 _NEEDED_KEYS = {'NAME': str, 'AUTHOR': str, 'API': int, 'PATCH': int}
 
 
-def _join_and(keys: List[str]) -> str:
+def _join_and(keys: list[str]) -> str:
     if len(keys) == 0:
         return ''
     if len(keys) == 1:
@@ -198,7 +197,7 @@ class _Missing:
         return f'got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}'
 
 
-def _parse_lib(spec: ModuleSpec) -> typing.Optional['_Lib']:
+def _parse_lib(spec: ModuleSpec) -> _Lib | None:
     if spec.origin is None:
         # "can't happen"
         logger.warning('No origin for %r (no idea why; please report)', spec.name)

@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
+import dataclasses
 import datetime
 import email.message
 import email.parser
@@ -22,7 +25,6 @@ import socket
 import tempfile
 import typing
 import unittest
-import unittest.mock
 import unittest.util
 
 import pytest
@@ -1378,18 +1380,18 @@ class MockClient(pebble.Client):
     """Mock Pebble client that simply records requests and returns stored responses."""
 
     def __init__(self):
-        self.requests: typing.List[typing.Any] = []
-        self.responses: typing.List[typing.Any] = []
+        self.requests: list[typing.Any] = []
+        self.responses: list[typing.Any] = []
         self.timeout = 5
-        self.websockets: typing.Dict[typing.Any, MockWebsocket] = {}
+        self.websockets: dict[typing.Any, MockWebsocket] = {}
 
     def _request(
         self,
         method: str,
         path: str,
-        query: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        body: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Dict[str, typing.Any]:
+        query: dict[str, typing.Any] | None = None,
+        body: dict[str, typing.Any] | None = None,
+    ) -> dict[str, typing.Any]:
         self.requests.append((method, path, query, body))
         resp = self.responses.pop(0)
         if isinstance(resp, Exception):
@@ -1402,9 +1404,9 @@ class MockClient(pebble.Client):
         self,
         method: str,
         path: str,
-        query: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        headers: typing.Optional[typing.Dict[str, str]] = None,
-        data: typing.Optional[typing.Union[bytes, _bytes_generator]] = None,
+        query: dict[str, typing.Any] | None = None,
+        headers: dict[str, str] | None = None,
+        data: bytes | _bytes_generator | None = None,
     ):
         self.requests.append((method, path, query, headers, data))
         headers, body = self.responses.pop(0)
@@ -1416,7 +1418,7 @@ class MockClient(pebble.Client):
 
 
 class MockHTTPResponse:
-    def __init__(self, headers: typing.Dict[str, str], body: bytes):
+    def __init__(self, headers: dict[str, str], body: bytes):
         message = email.message.Message()
         for key, value in (headers or {}).items():
             message[key] = value
@@ -1441,7 +1443,7 @@ class MockTime:
         self._time += delay
 
 
-def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
+def build_mock_change_dict(change_id: str = '70') -> pebble._ChangeDict:
     return {
         'id': change_id,
         'kind': 'autostart',
@@ -1471,26 +1473,16 @@ def build_mock_change_dict(change_id: str = '70') -> 'pebble._ChangeDict':
     }
 
 
+@dataclasses.dataclass(frozen=True)
 class MultipartParserTestCase:
-    def __init__(
-        self,
-        name: str,
-        data: bytes,
-        want_headers: typing.List[bytes],
-        want_bodies: typing.List[bytes],
-        want_bodies_done: typing.List[bool],
-        max_boundary: int = 14,
-        max_lookahead: int = 8 * 1024,
-        error: str = '',
-    ):
-        self.name = name
-        self.data = data
-        self.want_headers = want_headers
-        self.want_bodies = want_bodies
-        self.want_bodies_done = want_bodies_done
-        self.max_boundary = max_boundary
-        self.max_lookahead = max_lookahead
-        self.error = error
+    name: str
+    data: bytes
+    want_headers: list[bytes]
+    want_bodies: list[bytes]
+    want_bodies_done: list[bool]
+    max_boundary: int = 14
+    max_lookahead: int = 8 * 1024
+    error: str = ''
 
 
 class TestMultipartParser:
@@ -1584,9 +1576,9 @@ class TestMultipartParser:
         chunk_sizes = [1, 2, 3, 4, 5, 7, 13, 17, 19, 23, 29, 31, 37, 42, 50, 100, 1000]
         marker = b'qwerty'
         for chunk_size in chunk_sizes:
-            headers: typing.List[bytes] = []
-            bodies: typing.List[bytes] = []
-            bodies_done: typing.List[bool] = []
+            headers: list[bytes] = []
+            bodies: list[bytes] = []
+            bodies_done: list[bool] = []
 
             # All of the "noqa: B023" here are due to a ruff bug:
             # https://github.com/astral-sh/ruff/issues/7847
@@ -1665,7 +1657,7 @@ class TestClient:
         ]
 
     def test_get_warnings(self, client: MockClient):
-        empty: typing.Dict[str, typing.Any] = {
+        empty: dict[str, typing.Any] = {
             'result': [],
             'status': 'OK',
             'status-code': 200,
@@ -1722,7 +1714,7 @@ class TestClient:
         assert change.spawn_time == datetime_nzdt(2021, 1, 28, 14, 37, 2, 247202)
 
     def test_get_changes(self, client: MockClient):
-        empty: typing.Dict[str, typing.Any] = {
+        empty: dict[str, typing.Any] = {
             'result': [],
             'status': 'OK',
             'status-code': 200,
@@ -1803,7 +1795,7 @@ class TestClient:
         client: MockClient,
         action: str,
         api_func: typing.Callable[[], str],
-        services: typing.List[str],
+        services: list[str],
     ):
         client.responses.append({
             'change': '70',
@@ -1832,7 +1824,7 @@ class TestClient:
         client: MockClient,
         action: str,
         api_func: typing.Callable[..., str],
-        services: typing.List[str],
+        services: list[str],
     ):
         client.responses.append({
             'change': '70',
@@ -1951,7 +1943,7 @@ class TestClient:
             ('GET', '/v1/changes/70/wait', {'timeout': '4.000s'}, None),
         ]
 
-    def test_wait_change_success(self, client: MockClient, timeout: typing.Optional[float] = 30.0):
+    def test_wait_change_success(self, client: MockClient, timeout: float | None = 30.0):
         change = build_mock_change_dict()
         client.responses.append({
             'result': change,
@@ -2001,7 +1993,7 @@ class TestClient:
         self,
         client: MockClient,
         time: MockTime,
-        timeout: typing.Optional[float] = 30.0,
+        timeout: float | None = 30.0,
     ):
         # Trigger polled mode
         client.responses.append(pebble.APIError({}, 404, 'Not Found', 'not found'))
@@ -2433,7 +2425,7 @@ bad path\r
     def test_push_text(self, client: MockClient):
         self._test_push_str(client, io.StringIO('content 😀\nfoo\r\nbar'))
 
-    def _test_push_str(self, client: MockClient, source: typing.Union[str, typing.IO[str]]):
+    def _test_push_str(self, client: MockClient, source: str | typing.IO[str]):
         client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -2471,7 +2463,7 @@ bad path\r
     def test_push_binary(self, client: MockClient):
         self._test_push_bytes(client, io.BytesIO(b'content \xf0\x9f\x98\x80\nfoo\r\nbar'))
 
-    def _test_push_bytes(self, client: MockClient, source: typing.Union[bytes, typing.IO[bytes]]):
+    def _test_push_bytes(self, client: MockClient, source: bytes | typing.IO[bytes]):
         client.responses.append((
             {'Content-Type': 'application/json'},
             b"""
@@ -2649,7 +2641,7 @@ bad path\r
         for part in message.walk():
             name = part.get_param('name', header='Content-Disposition')
             if name == 'request':
-                req = json.loads(typing.cast(str, part.get_payload()))
+                req = json.loads(typing.cast('str', part.get_payload()))
             elif name == 'files':
                 # decode=True, ironically, avoids decoding bytes to str
                 content = part.get_payload(decode=True)
@@ -3194,6 +3186,83 @@ bad path\r
             ('GET', '/v1/notices', query, None),
         ]
 
+    def test_get_identities(self, client: MockClient):
+        client.responses.append({
+            'result': {
+                'alice': {'access': 'admin', 'local': {'user-id': 42}},
+                'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+            },
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        identities = client.get_identities()
+        assert identities == {
+            'alice': pebble.Identity(
+                access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+            ),
+            'web': pebble.Identity(
+                access=pebble.IdentityAccess.METRICS,
+                basic=pebble.BasicIdentity(password='hashed password'),
+            ),
+        }
+        assert identities['alice'].access == 'admin'
+        assert identities['web'].access == 'metrics'
+
+    def test_replace_identities(self, client: MockClient):
+        client.responses.append({
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        identities: dict[str, pebble.IdentityDict | pebble.Identity | None] = {
+            'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+            'alice': pebble.Identity(
+                access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+            ),
+            'bob': None,
+        }
+        client.replace_identities(identities)
+        assert client.requests == [
+            (
+                'POST',
+                '/v1/identities',
+                None,
+                {
+                    'action': 'replace',
+                    'identities': {
+                        'web': {'access': 'metrics', 'basic': {'password': 'hashed password'}},
+                        'alice': {'access': 'admin', 'local': {'user-id': 42}},
+                        'bob': None,
+                    },
+                },
+            ),
+        ]
+
+    def test_remove_identities(self, client: MockClient):
+        client.responses.append({
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        client.remove_identities({'web', 'alice', 'bob'})
+        assert client.requests == [
+            (
+                'POST',
+                '/v1/identities',
+                None,
+                {
+                    'action': 'remove',
+                    'identities': {
+                        'web': None,
+                        'alice': None,
+                        'bob': None,
+                    },
+                },
+            ),
+        ]
+
 
 class TestSocketClient:
     def test_socket_not_found(self):
@@ -3260,8 +3329,8 @@ class TestExecError:
 
 class MockWebsocket:
     def __init__(self):
-        self.sends: typing.List[typing.Tuple[str, typing.Union[str, bytes]]] = []
-        self.receives: typing.List[typing.Union[str, bytes]] = []
+        self.sends: list[tuple[str, str | bytes]] = []
+        self.receives: list[str | bytes] = []
 
     def send_binary(self, b: bytes):
         self.sends.append(('BIN', b))
@@ -3282,7 +3351,7 @@ class TestExec:
         client: MockClient,
         change_id: str,
         exit_code: int,
-        change_err: typing.Optional[str] = None,
+        change_err: str | None = None,
     ):
         task_id = f'T{change_id}'  # create a task_id based on change_id
         client.responses.append({
@@ -3312,15 +3381,15 @@ class TestExec:
 
     def build_exec_data(
         self,
-        command: typing.List[str],
-        service_context: typing.Optional[str] = None,
-        environment: typing.Optional[typing.Dict[str, str]] = None,
-        working_dir: typing.Optional[str] = None,
-        timeout: typing.Optional[float] = None,
-        user_id: typing.Optional[int] = None,
-        user: typing.Optional[str] = None,
-        group_id: typing.Optional[int] = None,
-        group: typing.Optional[str] = None,
+        command: list[str],
+        service_context: str | None = None,
+        environment: dict[str, str] | None = None,
+        working_dir: str | None = None,
+        timeout: float | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
         combine_stderr: bool = False,
     ):
         return {
@@ -3355,8 +3424,13 @@ class TestExec:
         with pytest.warns(ResourceWarning) as record:
             process = client.exec(['true'])
             del process
+
+        # GC may trigger unrelated warnings (for example, from TemporaryDirectory).
+        # Filter the warnings to only those from ExecProcess.
+        warnings = [r for r in record if 'ExecProcess' in str(r.message)]
+        assert len(warnings) == 1
         assert (
-            str(record[0].message)
+            str(warnings[0].message)
             == 'ExecProcess instance garbage collected without call to wait() or wait_output()'
         )
 
@@ -3902,3 +3976,75 @@ class TestExec:
         test_websocket_recv_raises = pytest.mark.filterwarnings(
             'ignore::pytest.PytestUnhandledThreadExceptionWarning'
         )(test_websocket_recv_raises)
+
+
+class TestIdentity:
+    def test_local_identity_from_dict(self):
+        identity = pebble.Identity.from_dict({'access': 'admin', 'local': {'user-id': 42}})
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+
+    def test_local_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.ADMIN,
+            'local': {'user-id': 42},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+
+    def test_local_identity_to_dict(self):
+        identity = pebble.Identity(
+            access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
+        )
+        assert identity.to_dict() == {'access': 'admin', 'local': {'user-id': 42}}
+
+    def test_basic_identity_from_dict(self):
+        identity = pebble.Identity.from_dict({
+            'access': 'metrics',
+            'basic': {'password': 'hashed password'},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+
+    def test_basic_identity_from_dict_with_access_enum(self):
+        identity = pebble.Identity.from_dict({
+            'access': pebble.IdentityAccess.METRICS,
+            'basic': {'password': 'hashed password'},
+        })
+        assert identity == pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+
+    def test_basic_identity_to_dict(self):
+        identity = pebble.Identity(
+            access=pebble.IdentityAccess.METRICS,
+            basic=pebble.BasicIdentity(password='hashed password'),
+        )
+        assert identity.to_dict() == {
+            'access': 'metrics',
+            'basic': {'password': 'hashed password'},
+        }
+
+    def test_no_access(self):
+        with pytest.raises(KeyError):
+            raw: pebble.IdentityDict = {  # pyright: ignore[reportAssignmentType]
+                'local': {'user-id': 42}
+            }
+            pebble.Identity.from_dict(raw)
+
+    def test_invalid_access(self):
+        raw: pebble.IdentityDict = {
+            'access': 'foo',  # pyright: ignore[reportAssignmentType]
+            'local': {'user-id': 42},
+        }
+        identity = pebble.Identity.from_dict(raw)
+        assert identity.access == 'foo'
+
+    def test_no_identity(self):
+        with pytest.raises(ValueError):
+            pebble.Identity(access=pebble.IdentityAccess.ADMIN)

@@ -14,6 +14,8 @@
 
 """Benchmark tests for ops-scenario."""
 
+from __future__ import annotations
+
 import dataclasses
 import pathlib
 import sys
@@ -26,9 +28,7 @@ from ops import testing
 
 @pytest.fixture
 def benchmark_charm():
-    charm_path = str(
-        pathlib.Path(__file__).parent / "charms" / "benchmark_charm" / "src"
-    )
+    charm_path = str(pathlib.Path(__file__).parent / 'charms' / 'benchmark_charm' / 'src')
     sys.path.append(charm_path)
     from benchmark_charm import BenchmarkCharm
 
@@ -39,7 +39,7 @@ def benchmark_charm():
 # Note: the 'benchmark' argument here is a fixture that pytest-benchmark
 # automatically makes available to all tests.
 def test_context_explicit_meta(benchmark):
-    ctx = benchmark(testing.Context, ops.CharmBase, meta={"name": "foo"})
+    ctx = benchmark(testing.Context, ops.CharmBase, meta={'name': 'foo'})
     assert isinstance(ctx, testing.Context)
 
 
@@ -64,11 +64,11 @@ def test_context_explicit_meta_config_actions(benchmark):
     ctx = benchmark(
         testing.Context,
         ops.CharmBase,
-        meta={"name": "foo"},
-        actions={"act": {"description": "foo"}},
-        config={"options": {"conf": {"type": "int", "description": "bar"}}},
+        meta={'name': 'foo'},
+        actions={'act': {'description': 'foo'}},
+        config={'options': {'conf': {'type': 'int', 'description': 'bar'}}},
     )
-    ctx.run(ctx.on.action("act"), testing.State(config={"conf": 10}))
+    ctx.run(ctx.on.action('act'), testing.State(config={'conf': 10}))
     assert len({e.handle.kind for e in ctx.emitted_events}) == 1
 
 
@@ -99,9 +99,9 @@ def test_many_tests_explicit_meta(benchmark):
 
     def mock_pytest():
         """Simulate running multiple tests against the same charm."""
-        ctx = testing.Context(ops.CharmBase, meta={"name": "foo"})
+        ctx = testing.Context(ops.CharmBase, meta={'name': 'foo'})
         state = testing.State()
-        for event in ("install", "start", "stop", "remove"):
+        for event in ('install', 'start', 'stop', 'remove'):
             state = ctx.run(getattr(ctx.on, event)(), state)
 
     benchmark(mock_pytest)
@@ -112,7 +112,7 @@ def test_many_tests_autoload_meta(benchmark, benchmark_charm):
         """Simulate running multiple tests against the same charm."""
         ctx = testing.Context(benchmark_charm)
         state = testing.State()
-        for event in ("install", "start", "stop", "remove"):
+        for event in ('install', 'start', 'stop', 'remove'):
             state = ctx.run(getattr(ctx.on, event)(), state)
 
     benchmark(mock_pytest)
@@ -126,17 +126,17 @@ def test_lots_of_logs(benchmark, benchmark_charm):
 
 def test_full_state(benchmark, benchmark_charm):
     def fill_state():
-        rel = testing.Relation("rel")
-        peer = testing.PeerRelation("peer")
-        network = testing.Network("MySpace")
-        container = testing.Container("foo")
-        storage = testing.Storage("bar")
+        rel = testing.Relation('rel')
+        peer = testing.PeerRelation('peer')
+        network = testing.Network('MySpace')
+        container = testing.Container('foo')
+        storage = testing.Storage('bar')
         tcp = testing.TCPPort(22)
         icmp = testing.ICMPPort()
         udp = testing.UDPPort(8000)
-        secret = testing.Secret({"password": "admin"})
-        resource = testing.Resource(name="baz", path=".")
-        stored_state = testing.StoredState(owner_path="BenchMarkCharm")
+        secret = testing.Secret({'password': 'admin'})
+        resource = testing.Resource(name='baz', path='.')
+        stored_state = testing.StoredState(owner_path='BenchMarkCharm')
         state = testing.State(
             relations={rel, peer},
             networks={network},
@@ -161,11 +161,11 @@ def test_full_state(benchmark, benchmark_charm):
     state_in_dict = dataclasses.asdict(state_in)
     state_out_dict = dataclasses.asdict(state_out)
     # An owner_path of None means that it's owned by the framework.
-    assert state_in_dict["stored_states"] == {
-        ss for ss in state_out_dict["stored_states"] if ss.owner_path is not None
+    assert state_in_dict['stored_states'] == {
+        ss for ss in state_out_dict['stored_states'] if ss.owner_path is not None
     }
-    del state_in_dict["stored_states"]
-    del state_out_dict["stored_states"]
+    del state_in_dict['stored_states']
+    del state_out_dict['stored_states']
     assert state_in_dict == state_out_dict
 
 

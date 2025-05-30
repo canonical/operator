@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import collections
 import datetime
 import grp
@@ -53,7 +55,7 @@ class StorageTester(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.observed_events: typing.List[ops.EventBase] = []
+        self.observed_events: list[ops.EventBase] = []
         self.framework.observe(self.on.test_storage_attached, self._on_test_storage_attached)
         self.framework.observe(self.on.test_storage_detaching, self._on_test_storage_detaching)
 
@@ -67,7 +69,7 @@ class StorageTester(ops.CharmBase):
 class StorageWithHyphensHelper(ops.Object):
     def __init__(self, parent: ops.Object, key: str):
         super().__init__(parent, key)
-        self.changes: typing.List[ops.EventBase] = []
+        self.changes: list[ops.EventBase] = []
         parent.framework.observe(
             parent.on.test_with_hyphens_storage_attached, self.on_storage_changed
         )
@@ -277,7 +279,7 @@ class TestHarness:
 
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.observed_events: typing.List[ops.EventBase] = []
+                self.observed_events: list[ops.EventBase] = []
                 self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
 
             def _on_db_relation_changed(self, event: ops.EventBase):
@@ -331,7 +333,7 @@ class TestHarness:
 
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.observed_events: typing.List[ops.EventBase] = []
+                self.observed_events: list[ops.EventBase] = []
                 self.framework.observe(
                     self.on.cluster_relation_changed, self._on_cluster_relation_changed
                 )
@@ -633,7 +635,7 @@ class TestHarness:
         assert self._find_relation_in_model_by_id(harness, rel_id) is None
 
     def test_remove_relation_marks_relation_as_inactive(self, request: pytest.FixtureRequest):
-        relations: typing.List[str] = []
+        relations: list[str] = []
         is_broken = False
 
         class MyCharm(ops.CharmBase):
@@ -663,7 +665,7 @@ class TestHarness:
         assert not relations, 'Model.relations contained broken relation'
 
     def _find_relation_in_model_by_id(
-        self, harness: ops.testing.Harness['RelationEventCharm'], rel_id: int
+        self, harness: ops.testing.Harness[RelationEventCharm], rel_id: int
     ):
         for relations in harness.charm.model.relations.values():
             for relation in relations:
@@ -1726,9 +1728,9 @@ class TestHarness:
 
         harness.add_storage('test')
         harness.begin()
-        assert (
-            len(harness.model.storages['test']) == 0
-        ), 'storage should start in detached state and be excluded from storage listing'
+        assert len(harness.model.storages['test']) == 0, (
+            'storage should start in detached state and be excluded from storage listing'
+        )
 
     def test_add_storage_without_metadata_key_fails(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -3016,7 +3018,7 @@ class TestHarness:
             ]
         assert changes[:2] == expected_relation_created
         changes = changes[2:]
-        expected_middle: typing.List[typing.Dict[str, typing.Any]] = [
+        expected_middle: list[dict[str, typing.Any]] = [
             {'name': 'leader-elected'},
             {'name': 'config-changed', 'data': {}},
             {'name': 'start'},
@@ -3487,7 +3489,7 @@ class TestNetwork:
 class DBRelationChangedHelper(ops.Object):
     def __init__(self, parent: ops.Object, key: str):
         super().__init__(parent, key)
-        self.changes: typing.List[typing.Tuple[int, str]] = []
+        self.changes: list[tuple[int, str]] = []
         parent.framework.observe(parent.on.db_relation_changed, self.on_relation_changed)
 
     def on_relation_changed(self, event: ops.RelationEvent):
@@ -3504,7 +3506,7 @@ class RelationChangedViewer(ops.Object):
 
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
-        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
+        self.changes: list[dict[str, typing.Any]] = []
         charm.framework.observe(charm.on[relation_name].relation_changed, self.on_relation_changed)
 
     def on_relation_changed(self, event: ops.RelationEvent):
@@ -3522,7 +3524,7 @@ class RecordingCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.changes: typing.List[typing.Dict[str, typing.Any]] = []
+        self.changes: list[dict[str, typing.Any]] = []
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.leader_settings_changed, self._on_leader_settings_changed)
@@ -3621,7 +3623,7 @@ class RelationEventCharm(RecordingCharm):
             assert event.departing_unit is not None
             data['departing_unit'] = event.departing_unit.name
 
-        recording: typing.Dict[str, typing.Any] = {
+        recording: dict[str, typing.Any] = {
             'name': event_name,
             'relation': event.relation.name,
             'data': data,
@@ -3689,7 +3691,7 @@ class ContainerEventCharm(RecordingCharm):
 
 def get_public_methods(obj: object):
     """Get the public attributes of obj to compare to another object."""
-    public: typing.Set[str] = set()
+    public: set[str] = set()
     members = inspect.getmembers(obj)
     for name, member in members:
         if name.startswith('_'):
@@ -3809,9 +3811,9 @@ class TestTestingModelBackend:
         assert backend._resource_dir is None
         path = backend.resource_get('image')
         assert backend._resource_dir is not None
-        assert str(path).startswith(
-            str(backend._resource_dir.name)
-        ), f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        assert str(path).startswith(str(backend._resource_dir.name)), (
+            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        )
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -5040,9 +5042,9 @@ class PebbleStorageAPIsTestMixin:
         self,
         pebble_dir: str,
         client: PebbleClientType,
-        original_data: typing.Union[str, bytes],
-        encoding: typing.Optional[str],
-        stream_class: typing.Union[typing.Type[io.BytesIO], typing.Type[io.StringIO]],
+        original_data: str | bytes,
+        encoding: str | None,
+        stream_class: type[io.BytesIO] | type[io.StringIO],
     ):
         # We separate out the calls to make it clearer to type checkers what's happening.
         if encoding is None:
@@ -5055,12 +5057,12 @@ class PebbleStorageAPIsTestMixin:
 
         # We also support file-like objects as input, so let's test that case as well.
         if encoding is None:
-            stream_class = typing.cast(typing.Type[io.BytesIO], stream_class)
-            small_file = stream_class(typing.cast(bytes, original_data))
+            stream_class = typing.cast('typing.Type[io.BytesIO]', stream_class)
+            small_file = stream_class(typing.cast('bytes', original_data))
             client.push(f'{pebble_dir}/test', small_file)
         else:
-            stream_class = typing.cast(typing.Type[io.StringIO], stream_class)
-            small_file = stream_class(typing.cast(str, original_data))
+            stream_class = typing.cast('typing.Type[io.StringIO]', stream_class)
+            small_file = stream_class(typing.cast('str', original_data))
             client.push(f'{pebble_dir}/test', small_file, encoding=encoding)
         with client.pull(f'{pebble_dir}/test', encoding=encoding) as infile:
             received_data = infile.read()
@@ -5383,10 +5385,10 @@ class PebbleStorageAPIsTestMixin:
 
 
 class _MakedirArgs(typing.TypedDict):
-    user_id: typing.Optional[int]
-    user: typing.Optional[str]
-    group_id: typing.Optional[int]
-    group: typing.Optional[str]
+    user_id: int | None
+    user: str | None
+    group_id: int | None
+    group: str | None
 
 
 class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
@@ -5496,7 +5498,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
     ):
         data = 'data'
         user, group = self._select_testing_user_group()
-        cases: typing.List[_MakedirArgs] = [
+        cases: list[_MakedirArgs] = [
             {'user_id': user.pw_uid, 'user': None, 'group_id': group.gr_gid, 'group': None},
             {'user_id': None, 'user': user.pw_name, 'group_id': None, 'group': group.gr_name},
             {'user_id': None, 'user': user.pw_name, 'group_id': group.gr_gid, 'group': None},
@@ -5519,7 +5521,7 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         client: PebbleClientType,
     ):
         user, group = self._select_testing_user_group()
-        cases: typing.List[_MakedirArgs] = [
+        cases: list[_MakedirArgs] = [
             {'user_id': user.pw_uid, 'user': None, 'group_id': group.gr_gid, 'group': None},
             {'user_id': None, 'user': user.pw_name, 'group_id': None, 'group': group.gr_name},
             {'user_id': None, 'user': user.pw_name, 'group_id': group.gr_gid, 'group': None},
@@ -5671,13 +5673,13 @@ class TestFilesystem:
     def _make_storage_attach_harness(
         self,
         request: pytest.FixtureRequest,
-        meta: typing.Optional[str] = None,
+        meta: str | None = None,
     ):
         class MyCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
-                self.attached: typing.List[str] = []
-                self.locations: typing.List[pathlib.Path] = []
+                self.attached: list[str] = []
+                self.locations: list[pathlib.Path] = []
                 framework.observe(self.on['test-storage'].storage_attached, self._on_attach)
 
             def _on_attach(self, event: ops.StorageAttachedEvent):
@@ -6250,7 +6252,7 @@ class TestSecrets:
 class EventRecorder(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.events: typing.List[ops.EventBase] = []
+        self.events: list[ops.EventBase] = []
 
     def record_event(self, event: ops.EventBase):
         self.events.append(event)
@@ -6423,7 +6425,7 @@ class TestHandleExec:
         harness: ops.testing.Harness[ops.CharmBase],
         container: ops.Container,
     ):
-        args_history: typing.List[ops.testing.ExecArgs] = []
+        args_history: list[ops.testing.ExecArgs] = []
         return_value = None
 
         def handler(args: ops.testing.ExecArgs):
@@ -6497,7 +6499,7 @@ class TestHandleExec:
         harness: ops.testing.Harness[ops.CharmBase],
         container: ops.Container,
     ):
-        args_history: typing.List[ops.testing.ExecArgs] = []
+        args_history: list[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
@@ -6576,7 +6578,7 @@ class TestHandleExec:
             'services': {'test': service},
         }
         container.add_layer(label='test', layer=ops.pebble.Layer(layer))
-        args_history: typing.List[ops.testing.ExecArgs] = []
+        args_history: list[ops.testing.ExecArgs] = []
 
         def handler(args: ops.testing.ExecArgs):
             args_history.append(args)
@@ -6613,11 +6615,11 @@ class TestHandleExec:
 class TestActions:
     @pytest.fixture
     def action_results(self):
-        action_results: typing.Dict[str, typing.Any] = {}
+        action_results: dict[str, typing.Any] = {}
         return action_results
 
     @pytest.fixture
-    def harness(self, action_results: typing.Dict[str, typing.Any]):
+    def harness(self, action_results: dict[str, typing.Any]):
         class ActionCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -6718,7 +6720,7 @@ class TestActions:
 
     def test_fail_action(
         self,
-        action_results: typing.Dict[str, typing.Any],
+        action_results: dict[str, typing.Any],
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         action_results['partial'] = 'foo'
@@ -6765,7 +6767,7 @@ class TestActions:
     )
     def test_bad_results(
         self,
-        action_results: typing.Dict[str, typing.Any],
+        action_results: dict[str, typing.Any],
         harness: ops.testing.Harness[ops.CharmBase],
         prohibited_key: str,
     ):
@@ -7327,3 +7329,75 @@ def test_scenario_available():
     ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
     state = ctx.run(ctx.on.start(), ops.testing.State())
     assert isinstance(state.unit_status, ops.testing.UnknownStatus)
+
+
+@pytest.mark.parametrize('test_context', ['init', 'event'])
+@pytest.mark.parametrize(
+    'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
+)
+def test_relation_validates_access(
+    request: pytest.FixtureRequest, is_leader: bool, test_context: str
+):
+    """Test that relation databag read/write access in __init__ is the same as in observers."""
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['my-act'].action, self._on_action)
+            self.validated = 0
+            self.test_validation('init')
+
+        def _on_action(self, action: ops.ActionEvent):
+            self.test_validation('event')
+
+        def test_validation(self, context: str):
+            if context != test_context:
+                return
+            self.validated += 1
+            rel = self.model.get_relation('my-rel')
+            assert rel is not None
+
+            # remote application databag
+            # any unit can read the remote application databag
+            remote_app_data = rel.data[rel.app]
+            assert remote_app_data['k'] == 'remote val'
+            assert len(remote_app_data.items()) == 1
+            # no unit can write to the remote application databag
+            with pytest.raises(ops.RelationDataAccessError):
+                remote_app_data['k'] = 'something'
+
+            # local application databag
+            local_app_data = rel.data[self.app]
+            # only the leader can read or write the local application databag
+            if self.unit.is_leader():
+                assert local_app_data['k'] == 'local val'  # test read
+                local_app_data['k'] = 'new val'  # test write
+            else:
+                with pytest.raises(ops.RelationDataAccessError):
+                    local_app_data['k']
+            # these probably fail at real runtime with a ModelError
+            # but pass here because the validation methods are only hooked up to get/set
+            assert len(local_app_data.items()) == 1
+            assert 'k' in local_app_data
+
+    harness = ops.testing.Harness(
+        Charm,
+        meta="""
+name: my-charm
+requires:
+  my-rel:
+    interface: my-face
+""",
+        actions="""
+my-act:
+""",
+    )
+    request.addfinalizer(harness.cleanup)
+    # create relation and setup remote application databag
+    rid = harness.add_relation('my-rel', remote_app='remote', app_data={'k': 'remote val'})
+    # setup local application databag
+    harness.update_relation_data(rid, 'my-charm', {'k': 'local val'})
+    harness.set_leader(is_leader)
+    harness.begin()  # run Charm.__init__
+    harness.run_action('my-act')  # run Charm._on_action
+    assert harness.charm.validated

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from ops import RelationNotFoundError
 from ops.charm import CharmBase
@@ -14,7 +16,7 @@ from scenario.state import (
 )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
         _call = None
@@ -38,12 +40,12 @@ def test_ip_get(mycharm):
     ctx = Context(
         mycharm,
         meta={
-            "name": "foo",
-            "requires": {
-                "metrics-endpoint": {"interface": "foo"},
-                "deadnodead": {"interface": "bar"},
+            'name': 'foo',
+            'requires': {
+                'metrics-endpoint': {'interface': 'foo'},
+                'deadnodead': {'interface': 'bar'},
             },
-            "extra-bindings": {"foo": {}},
+            'extra-bindings': {'foo': {}},
         },
     )
 
@@ -52,35 +54,32 @@ def test_ip_get(mycharm):
         State(
             relations=[
                 Relation(
-                    interface="foo",
-                    remote_app_name="remote",
-                    endpoint="metrics-endpoint",
+                    interface='foo',
+                    remote_app_name='remote',
+                    endpoint='metrics-endpoint',
                     id=1,
                 ),
             ],
-            networks={Network("foo", [BindAddress([Address("4.4.4.4")])])},
+            networks={Network('foo', [BindAddress([Address('4.4.4.4')])])},
         ),
     ) as mgr:
         # we have a network for the relation
-        rel = mgr.charm.model.get_relation("metrics-endpoint")
-        assert str(mgr.charm.model.get_binding(rel).network.bind_address) == "192.0.2.0"
+        rel = mgr.charm.model.get_relation('metrics-endpoint')
+        assert str(mgr.charm.model.get_binding(rel).network.bind_address) == '192.0.2.0'
 
         # we have a network for a binding without relations on it
-        assert (
-            str(mgr.charm.model.get_binding("deadnodead").network.bind_address)
-            == "192.0.2.0"
-        )
+        assert str(mgr.charm.model.get_binding('deadnodead').network.bind_address) == '192.0.2.0'
 
         # and an extra binding
-        assert str(mgr.charm.model.get_binding("foo").network.bind_address) == "4.4.4.4"
+        assert str(mgr.charm.model.get_binding('foo').network.bind_address) == '4.4.4.4'
 
 
 def test_no_sub_binding(mycharm):
     ctx = Context(
         mycharm,
         meta={
-            "name": "foo",
-            "requires": {"bar": {"interface": "foo", "scope": "container"}},
+            'name': 'foo',
+            'requires': {'bar': {'interface': 'foo', 'scope': 'container'}},
         },
     )
 
@@ -88,13 +87,13 @@ def test_no_sub_binding(mycharm):
         ctx.on.update_status(),
         State(
             relations=[
-                SubordinateRelation("bar"),
+                SubordinateRelation('bar'),
             ]
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
             # sub relations have no network
-            mgr.charm.model.get_binding("bar").network
+            mgr.charm.model.get_binding('bar').network
 
 
 def test_no_relation_error(mycharm):
@@ -103,9 +102,9 @@ def test_no_relation_error(mycharm):
     ctx = Context(
         mycharm,
         meta={
-            "name": "foo",
-            "requires": {"metrics-endpoint": {"interface": "foo"}},
-            "extra-bindings": {"bar": {}},
+            'name': 'foo',
+            'requires': {'metrics-endpoint': {'interface': 'foo'}},
+            'extra-bindings': {'bar': {}},
         },
     )
 
@@ -114,23 +113,23 @@ def test_no_relation_error(mycharm):
         State(
             relations=[
                 Relation(
-                    interface="foo",
-                    remote_app_name="remote",
-                    endpoint="metrics-endpoint",
+                    interface='foo',
+                    remote_app_name='remote',
+                    endpoint='metrics-endpoint',
                     id=1,
                 ),
             ],
-            networks={Network("bar")},
+            networks={Network('bar')},
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
-            mgr.charm.model.get_binding("foo").network
+            mgr.charm.model.get_binding('foo').network
 
 
 def test_juju_info_network_default(mycharm):
     ctx = Context(
         mycharm,
-        meta={"name": "foo"},
+        meta={'name': 'foo'},
     )
 
     with ctx(
@@ -138,19 +137,16 @@ def test_juju_info_network_default(mycharm):
         State(),
     ) as mgr:
         # we have a network for the relation
-        assert (
-            str(mgr.charm.model.get_binding("juju-info").network.bind_address)
-            == "192.0.2.0"
-        )
+        assert str(mgr.charm.model.get_binding('juju-info').network.bind_address) == '192.0.2.0'
 
 
 def test_explicit_juju_info_network_override(mycharm):
     ctx = Context(
         mycharm,
         meta={
-            "name": "foo",
+            'name': 'foo',
             # this charm for whatever reason explicitly defines a juju-info endpoint
-            "requires": {"juju-info": {"interface": "juju-info"}},
+            'requires': {'juju-info': {'interface': 'juju-info'}},
         },
     )
 
@@ -158,4 +154,4 @@ def test_explicit_juju_info_network_override(mycharm):
         ctx.on.update_status(),
         State(),
     ) as mgr:
-        assert mgr.charm.model.get_binding("juju-info").network.bind_address
+        assert mgr.charm.model.get_binding('juju-info').network.bind_address

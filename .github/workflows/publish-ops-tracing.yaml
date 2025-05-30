@@ -1,0 +1,33 @@
+name: Publish (ops-tracing)
+on:
+  push:
+    tags:
+      - '2.*'
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: publish-pypi
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca  # v6.0.1
+        with:
+          enable-cache: false
+      - run: |
+          cd tracing
+          uv build --sdist --wheel
+          rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
+      # This step is expected to fail until the trusted publisher configuration
+      # is updated in the PYPI settings.
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./tracing/dist/
+          skip-existing: true
+          verbose: true

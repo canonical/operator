@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Learn more about testing at: https://juju.is/docs/sdk/testing
+# Learn more about testing at
+# https://ops.readthedocs.io/en/latest/explanation/testing.html
+
+from __future__ import annotations
 
 import grp
 import logging
@@ -110,3 +113,9 @@ async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name
     await ops_test.model.wait_for_idle(timeout=600)
 
     assert app.status == 'active', f"Base ubuntu@{base} failed with '{app.status}' status"
+
+
+@pytest.fixture
+def setup_tracing():
+    """Stub out the top-level fixture."""
+    pass

@@ -14,9 +14,10 @@
 
 """Time conversion utilities."""
 
+from __future__ import annotations
+
 import datetime
 import re
-from typing import Union
 
 # Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
 _TIMESTAMP_RE = re.compile(r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
@@ -114,7 +115,7 @@ def parse_duration(s: str) -> datetime.timedelta:
     return -duration if negative else duration
 
 
-def _duration_number(s: str) -> Union[int, float]:
+def _duration_number(s: str) -> int | float:
     """Try converting s to int; if that fails, try float; otherwise raise ValueError.
 
     This is to preserve precision where possible.

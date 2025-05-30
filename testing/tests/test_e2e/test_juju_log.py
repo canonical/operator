@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 import pytest
@@ -6,13 +8,13 @@ from ops.charm import CharmBase, CollectStatusEvent
 from scenario import Context
 from scenario.state import JujuLogLine, State
 
-logger = logging.getLogger("testing logger")
+logger = logging.getLogger('testing logger')
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META = {"name": "mycharm"}
+        META = {'name': 'mycharm'}
 
         def __init__(self, framework):
             super().__init__(framework)
@@ -22,8 +24,8 @@ def mycharm():
         def _on_event(self, event):
             if isinstance(event, CollectStatusEvent):
                 return
-            print("foo!")
-            logger.warning("bar!")
+            print('foo!')
+            logger.warning('bar!')
 
     return MyCharm
 
@@ -31,8 +33,6 @@ def mycharm():
 def test_juju_log(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     ctx.run(ctx.on.start(), State())
-    assert ctx.juju_log[-2] == JujuLogLine(
-        level="DEBUG", message="Emitting Juju event start."
-    )
-    assert ctx.juju_log[-1] == JujuLogLine(level="WARNING", message="bar!")
+    assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in ctx.juju_log
+    assert JujuLogLine(level='WARNING', message='bar!') in ctx.juju_log
     # prints are not juju-logged.

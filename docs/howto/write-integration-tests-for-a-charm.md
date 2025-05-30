@@ -25,7 +25,7 @@ In order to run integrations tests you will need to have your environment set up
 
 Check that the next information is in your `tox.ini` file. If you initialised the charm with `charmcraft init` it should already be there.
 
-```
+```ini
 [testenv:integration]
 description = Run integration tests
 deps =
@@ -48,7 +48,7 @@ By convention, integration tests are kept in the charm’s source tree, in a dir
 
 If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, create this directory structure manually (the test file can be called whatever you wish) and, inside the `.py` file, import `pytest` and, from the `pytest_operator.plugin`, the  `OpsTest` class provided by the `ops_test` fixture:
 
-```
+```python
 import pytest
 from pytest_operator.plugin import OpsTest
 ```
@@ -71,7 +71,7 @@ async def test_operation(ops_test: OpsTest):
     
     # Add another charm and integrate them:
     await ops_test.model.deploy('other-app')
-    await ops_test.model.relate('tester:endpoint1', 'other-charm:endpoint2')
+    await ops_test.model.relate('tester:endpoint1', 'other-app:endpoint2')
     
     # Scale it up:
     await app.add_unit(2)
@@ -122,7 +122,7 @@ The decorator `@pytest.mark.abort_on_fail` abort all next tests if something goe
 
 As an alternative to `wait_for_idle`, you can explicitly block until the application status is `active` or `error` and then assert that it is `active`.
 
-```
+```python
     await ops_test.model.block_until(lambda: app.status in ("active", "error"), timeout=60,)
     assert app.status, "active"
 ```
@@ -151,7 +151,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 You can also reference a file resource on the filesystem. You can also use [`ops_test.build_resources`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1073) to build file resources from a build script.
 
 For `oci-images` you can reference an image registry.
-```
+```python
     ...
     resources = {"resource_name": "localhost:32000/image_name:latest"}
     app = await ops_test.model.deploy(charm, resources=resources)
@@ -171,7 +171,7 @@ For `oci-images` you can reference an image registry.
 To test a relation between two applications, integrate them through
 the model. Both applications have to be deployed beforehand.
 
-``` 
+```python
     ...
 async def test_my_integration(ops_test: OpsTest):
         # both application_1 and application_2 have to be deployed
@@ -179,7 +179,7 @@ async def test_my_integration(ops_test: OpsTest):
         await ops_test.model.integrate("application_1:relation_name_1", "application_2:relation_name_2")
         await ops_test.model.wait_for_idle(status="active", timeout=60)
         # check any assertion here
-    ....
+    ...
 ```
 
 > Example implementations: [slurmd-operator](https://github.com/canonical/slurmd-operator/blob/ffb24b05bec1b10cc512c060a4739358bfea0df0/tests/integration/test_charm.py#L89)
@@ -188,18 +188,18 @@ async def test_my_integration(ops_test: OpsTest):
 
 ### Test a configuration
 
-> See first: {ref}`manage-configurations`
+> See first: {ref}`manage-configuration`
 
 You can set a configuration option in your application and check its results. 
 
-``` 
+```python
 async def test_config_changed(ops_test: OpsTest):
     ...
         await ops_test.model.applications["synapse"].set_config({"server_name": "invalid_name"})
         # In this case, when setting server_name to "invalid_name" 
         # we could for example expect a blocked status.
         await ops_test.model.wait_for_idle(status="blocked",  timeout=60)
-    ....
+    ...
 ```
 > See also: https://discourse.charmhub.io/t/how-to-add-a-configuration-option-to-a-charm/4458
 >
@@ -211,7 +211,7 @@ async def test_config_changed(ops_test: OpsTest):
 
 You can execute an action on a unit and get its results. 
 
-```text
+```python
 async def test_run_action(ops_test: OpsTest):
     action_register_user = await ops_test.model.applications["myapp"].units[0].run_action("register-user", username="ubuntu")
     await action_register_user.wait()
@@ -228,7 +228,7 @@ To interact with the workload, you need to have access to it. This is dependent 
 
 You can get information from your application or unit addresses using `await ops_test.model.get_status`. That way, if your application exposes a public address you can reference it. You can also try to connect to a unit address or public address.
 
-```text
+```python
 async def test_workload_connectivity(ops_test: OpsTest):
     status = await ops_test.model.get_status()
     address = status.applications['my_app'].public_address
@@ -252,21 +252,21 @@ How you can connect to a private or public address is dependent on your configur
 
 You can run a command within the Juju context with:
 
-```text
+```python
     ...
     command = ["microk8s", "version"]
     returncode, stdout, stderr = await ops_test.run(*command, check=True)
-   ...
+    ...
 ```
 
 You can similarly invoke the Juju CLI. This can be useful for cases where `python-libjuju` sees things differently than the Juju CLI. By default the environment variable `JUJU_MODEL` is set,
 so you don't need to include the `-m` parameter.
 
-```
-    ....
+```python
+    ...
     command = ["secrets"]
     returncode, stdout, stderr = await ops_test.juju(*command, check=True)
-    ....
+    ...
 ```
 
 > Example implementations: [prometheus-k8s-operator](https://github.com/canonical/prometheus-k8s-operator/blob/d29f323343a1e4906a8c71104fcd1de817b2c2e6/tests/integration/conftest.py#L86), [hardware-observer-operator](https://github.com/canonical/hardware-observer-operator/blob/08c50798ca1c133a5d8ba5c889e0bcb09771300b/tests/functional/conftest.py#L14)
@@ -284,7 +284,7 @@ with Kubernetes charms easily.
 
 You can track a new model with:
 
-```
+```python
     new_model = await ops_test.track_model("model_alias",
                                            cloud_name="cloud_name",
                                            credential_name="credentials")
@@ -294,7 +294,7 @@ You can track a new model with:
 
 Using the new alias, you can switch context to the new created model, similar to `juju switch` command:
 
-```
+```python
     with ops_test.model_context("model_alias"):
         # Here ops_test.model relates to the model referred by <model_alias>
         # You can now use ops_test.model and it will apply to the model in the context
@@ -302,7 +302,7 @@ Using the new alias, you can switch context to the new created model, similar to
 
 `pytest-operator` will handle the new created model by default. If you want to, you can remove it from the controller at any point:
 
-```
+```python
     await ops_test.forget_model("model_alias")
 ```
 
@@ -328,7 +328,7 @@ It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle
 `pytest-operator` has utilities to template your charms and bundles using Jinja2.
 
 To render a kubernetes bundle with your current charm, create the file `./test/integration/bundle.yaml.j2` with this content:
-```
+```text
 bundle: kubernetes
 applications:
   my-app:
@@ -337,7 +337,7 @@ applications:
 ```
 
 You can now add the next integration test that will build an deploy the bundle with the current charm:
-```
+```python
 async def test_build_and_deploy_bundle(ops_test: OpsTest):
     charm = await ops_test.build_charm(".")
 
@@ -358,13 +358,13 @@ async def test_build_and_deploy_bundle(ops_test: OpsTest):
 If your charm code depends on the `update_status` event, you can speed up its
 firing rate with `fast_forward`. Inside the new async context you can put any code that will benefit  from the new refresh rate so your test may execute faster.
 
-``` 
+```python
     ...
     app = await ops_test.model.deploy(charm)
 
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(status="active",  timeout=120)
-    ....
+    ...
 ```
 
 > Example implementations [`postgresql-k8s-operator`](https://github.com/canonical/postgresql-k8s-operator/blob/69b2c138fa6b974883aa6d3d15a3315189d321d8/tests/integration/ha_tests/test_upgrade.py#L58), [`synapse-operator`](https://github.com/canonical/synapse-operator/blob/05c00bb7666197d04f1c025c36d8339b10b64a1a/tests/integration/test_charm.py#L249)
@@ -378,14 +378,14 @@ firing rate with `fast_forward`. Inside the new async context you can put any co
 
 By default you can run all your tests with:
 
-```
+```text
 tox -e integration
 ```
 
 These tests will use the context of the current controller in Juju, and by default will create a new model per module, that will be destroyed when the test is finished. The cloud, controller and model name can be specified with the parameters `--cloud`, `--controller` and `--model` parameters. 
 
 If you specify the model name and do not delete the model on test tear down with the parameter `--keep-models`, you can reuse a model from a previous test run, as in the next example:
-```
+```text
 # in the initial execution, the new model will be created
 tox -e integration -- --keep-models --model test-example-model
 # in the next execution it will reuse the model created previously:
@@ -395,7 +395,7 @@ tox -e integration -- --keep-models --model test-example-model --no-deploy
 The parameter `--no-deploy` will skip tests decorated with `@pytest.mark.skip_if_deployed`. That way you can iterate faster on integration tests, as applications can be deployed only once.
 
 There are different ways of specifying a subset of tests to run using `pytest`. With the `-k` option you can specify different expressions. For example, the next command will run all tests in the `test_charm.py` file except `test_one` function.
-```
+```text
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
 
@@ -414,7 +414,7 @@ By default, when tests are run, a crash dump file will be created in the current
 
 You can disable crash dump generation with `--crash-dump=never`. To always create a crash dump file (even when tests do not fail) to a specific location run:
 
-```
+```text
 tox -e integration -- --crash-dump=always --crash-dump-output=/tmp
 ```
 

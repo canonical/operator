@@ -16,7 +16,7 @@ charm, or ``<base charm name>-operators`` when the repository will hold
 multiple related charms. For the charm name, see
 {external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
 ```
-    
+
 In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
@@ -157,30 +157,193 @@ control, so that exact versions of charms can be reproduced.
 (design-your-python-modules)=
 ## Design your Python modules
 
-In your `src/charm.py` file, define the charm class and manage the charm's interface
-with Juju: set up the event observation and add the handlers. For each workload
-that the charm manages, add a `{workload}.py` file that contains methods for
-interacting with the workload.
+In your `src/charm.py` file, define a class for managing how the charm interacts with Juju.
 
-```{note}
-If there is an existing Python library for managing your workload, use that
-rather than creating a `<workload>.py` file yourself.
-```
+You'll have a single class that inherits from [](ops.CharmBase).
+Arrange the methods of this class in the following order:
 
-In your `src/charm.py` file, you will have a single class inheriting from
-[](ops.CharmBase). Arrange the content of that charm in the following order:
-
-1. An `__init__` that instantiates any needed library objects and then observes
-   all relevant events.
-2. Event handlers, in the order that they are observed in the `__init__` method.
-   Note that these handlers should all be private to the class.
-   For example, `def _on_install(...)` instead of `def on_install(...)`.
-3. Public methods.
-3. Other private methods.
+1. An `__init__` method that observes all relevant events and instantiates any objects that
+   the charm needs.
+   For example, in a Kubernetes charm:
+   ```python
+   def __init__(self, framework: ops.Framework):
+       super().__init__(framework)
+       framework.observe(self.on["workload_container"].pebble_ready, self._on_pebble_ready)
+       self.container = self.unit.get_container("workload-container")
+   ```
+2. Event handlers, in the order that they're observed in `__init__`.
+   Make the event handlers private.
+   For example, `def _on_pebble_ready(...)` instead of `def on_pebble_ready(...)`.
+3. Other helper methods, which may be private or public.
 
 ```{tip}
-Use private methods or module-level functions rather than nested functions.
+
+If an event handler needs to pass event data to a helper method, extract the relevant data
+from the event object and pass that data to the helper method. Don't pass the event object itself.
+This approach will make it easier to write unit tests for the charm.
 ```
+
+For each workload that the charm manages, create a file called `src/<workload>.py` that contains
+functions for interacting with the workload. If there's an existing Python library for managing a
+workload, use the existing library instead of creating your own file.
+
+### Example
+
+Suppose that you're writing a machine charm to manage a workload called Demo Server.
+Your charm code is in `src/charm.py`:
+
+```python
+#!/usr/bin/env python3
+# Copyright 2025 User
+# See LICENSE file for licensing details.
+
+"""A machine charm that manages the server."""
+
+import logging
+
+import ops
+
+import demo_server  # Provided by src/demo_server.py
+
+logger = logging.getLogger(__name__)
+
+
+class DemoServerCharm(ops.CharmBase):
+    """Manage the server."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_install(self, event: ops.InstallEvent):
+        """Install the server."""
+        demo_server.install()
+
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
+        self.unit.status = ops.MaintenanceStatus("starting server")
+        demo_server.start()
+        version = demo_server.get_version()
+        self.unit.set_workload_version(version)
+        self.unit.status = ops.ActiveStatus()
+
+    # Put helper methods here.
+    # If a method doesn't depend on Ops, put it in src/demo_server.py instead.
+
+
+if __name__ == "__main__":  # pragma: nocover
+    ops.main(DemoServerCharm)
+```
+
+Workload-specific logic is in `src/demo_server.py`:
+
+```python
+# Copyright 2025 User
+# See LICENSE file for licensing details.
+
+"""Functions for managing and interacting with the server."""
+
+import logging
+import subprocess
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+
+def install() -> None:
+    """Install the server from a snap."""
+    subprocess.run(["snap", "install", "demo-server"], capture_output=True, check=True)
+
+
+def start() -> None:
+    """Start the server."""
+    subprocess.run(["demo-server", "start"], capture_output=True, check=True)
+
+
+def get_version() -> str:
+    """Get the running version of the server."""
+    response = requests.get("http://localhost:5000/version", timeout=5)
+    return response.text
+```
+
+(handle-status)=
+## Handle status
+
+> See first: {external+juju:ref}`Juju | Status <status>`
+
+### Unit status
+
+Your charm should report the status of each unit to Juju.
+
+To report the unit status, observe the `collect_unit_status` event. This event is triggered by Ops at the end of each hook and provides a callback method for reporting the unit status. For example:
+
+```python
+class DemoServerCharm(ops.CharmBase):
+    """Manage the server."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on_collect_unit_status, self._on_collect_status)
+        # Observe other events...
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
+        if "port" not in self.config:
+            event.add_status(ops.BlockedStatus("no port specified"))
+            return
+        event.add_status(ops.ActiveStatus())
+```
+
+In your handler for `collect_unit_status`, you can call `add_status()` multiple times. Ops will send the highest priority status to Juju. This reduces the amount of logic you need to write to decide which status to report. For more information, see [`CollectStatusEvent`](ops.CollectStatusEvent).
+
+Your handler for `collect_unit_status` won't have access to data about the main Juju event (hook) being handled.
+
+To report the unit status while handling an event, set [`self.unit.status`](ops.Unit.status). When your charm code sets `self.unit.status`, Ops immediately sends the unit status to Juju. For example:
+
+```python
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
+        self.unit.status = ops.MaintenanceStatus("starting server")
+        demo_server.start()
+        # At the end of the handler, Ops triggers collect_unit_status.
+```
+
+### Application status
+
+If you expect to have more than one unit, you should also report the application status to Juju.
+
+To report the application status, observe the `collect_app_status` event. This event is triggered by Ops at the end of each hook, for the leader unit only. For example:
+
+```python
+class DemoServerCharm(ops.CharmBase):
+    """Manage the server."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on_collect_app_status, self._on_collect_app_status)
+        framework.observe(self.on_collect_unit_status, self._on_collect_unit_status)
+        # Observe other events...
+
+    def _on_collect_app_status(self, event: ops.CollectStatusEvent):
+        # This is triggered for the leader unit only.
+        num_degraded = ...  # Inspect peer unit databags to find degraded units.
+        if num_degraded:
+            event.add_status(ops.ActiveStatus(f"degraded units: {num_degraded}"))
+            return
+        event.add_status(ops.ActiveStatus())
+
+    def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
+        # This is triggered for each unit.
+        if self.is_degraded():  # Use a custom helper method to determine status.
+            event.add_status(ops.ActiveStatus("degraded"))
+            return
+        event.add_status(ops.ActiveStatus())
+```
+
+As with `collect_unit_status`, you can call `add_status()` multiple times and Ops will send the highest priority status to Juju.
+
+If you need to report the application status while handling an event, you can use [`self.app.status`](ops.Application.status). However, your charm code will first need to use [`self.unit.is_leader()`](ops.Unit.is_leader) to check that it's running as the leader unit.
 
 (handle-errors)=
 ## Handle errors

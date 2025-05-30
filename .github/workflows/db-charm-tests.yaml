@@ -7,6 +7,8 @@ on:
   pull_request:
   workflow_call:
 
+permissions: {}
+
 jobs:
   db-charm-tests:
     runs-on: ubuntu-latest
@@ -15,24 +17,26 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: 6cce771de5d4a33f751de0ce34af85f0c17fd3d3  # 2025-02-25T15:17:48Z
+            commit: 77d821003b49a1598f898db4214bf4d3754cf597  # 2025-04-24T01:13:34Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: e92a015465cd7556f41cdd1ff51bb02590309a0e  # 2025-02-26T21:59:57Z
+            commit: bb2459a94664f64460bd3e5e8a0279b6d3d74b0d  # rev577 rev576 2025-04-22T18:50:43Z
           - charm-repo: canonical/mysql-operator
-            commit: cd09784bba60dd77554da97b2a9bc4ef323cd586  # rev363 rev362 2025-02-26T20:13:40Z
+            commit: 0fbb95a2de9c607825beafa2fe2f0060484a449c  # 2025-04-09T16:18:58Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: b353fdb5b9e8ee59aefac4eb4fe3c53af4790bf6  # rev241 rev240 2025-02-25T12:29:30Z
+            commit: d183cd41ca2abb01784d94d5a83659eff80d6b93  # 2025-04-17T19:41:27Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
         with:
           repository: ${{ matrix.charm-repo }}
+          persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Checkout the operator repository
         uses: actions/checkout@v4
         with:
           path: myops
+          persist-credentials: false
 
       - name: Install patch dependencies
         run: pip install poetry~=2.0

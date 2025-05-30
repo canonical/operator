@@ -14,6 +14,8 @@
 
 """Structures to offer storage to the charm (through Juju or locally)."""
 
+from __future__ import annotations
+
 import logging
 import os
 import pickle
@@ -23,12 +25,13 @@ import stat
 import subprocess
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Generator, List, Tuple, cast
 
 import yaml
 
-logger = logging.getLogger()
+from ._private import tracer
 
+logger = logging.getLogger()
 
 # _Notice = Tuple[event_path, observer_path, method_name]
 _Notice = Tuple[str, str, str]
@@ -41,11 +44,13 @@ _TupleRepresenterType = Callable[[Any, Tuple[Any, ...]], yaml.Node]
 _NoticeGenerator = Generator['_Notice', None, None]
 
 
-def _run(args: List[str], **kw: Any):
-    cmd: Optional[str] = shutil.which(args[0])
+def _run(args: list[str], **kw: Any):
+    cmd: str | None = shutil.which(args[0])
     if cmd is None:
         raise FileNotFoundError(args[0])
-    return subprocess.run([cmd, *args[1:]], encoding='utf-8', **kw)
+    with tracer.start_as_current_span(args[0]) as span:
+        span.set_attribute('argv', args)
+        return subprocess.run([cmd, *args[1:]], encoding='utf-8', **kw)
 
 
 class SQLiteStorage:
@@ -53,7 +58,7 @@ class SQLiteStorage:
 
     DB_LOCK_TIMEOUT = timedelta(hours=1)
 
-    def __init__(self, filename: Union['Path', str]):
+    def __init__(self, filename: Path | str):
         # The isolation_level argument is set to None such that the implicit
         # transaction management behavior of the sqlite3 module is disabled.
 
@@ -181,7 +186,7 @@ class SQLiteStorage:
             (event_path, observer_path, method_name),
         )
 
-    def notices(self, event_path: Optional[str] = None) -> '_NoticeGenerator':
+    def notices(self, event_path: str | None = None) -> _NoticeGenerator:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -212,7 +217,7 @@ class SQLiteStorage:
             if not rows:
                 break
             for row in rows:
-                yield cast(_Notice, tuple(row))
+                yield cast('_Notice', tuple(row))
 
 
 class JujuStorage:
@@ -224,7 +229,7 @@ class JujuStorage:
 
     NOTICE_KEY = '#notices#'
 
-    def __init__(self, backend: Optional['_JujuStorageBackend'] = None):
+    def __init__(self, backend: _JujuStorageBackend | None = None):
         self._backend: _JujuStorageBackend = backend or _JujuStorageBackend()
 
     def close(self) -> None:
@@ -283,7 +288,7 @@ class JujuStorage:
         notice_list.remove((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path: Optional[str] = None):
+    def notices(self, event_path: str | None = None):
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -299,7 +304,7 @@ class JujuStorage:
                 continue
             yield tuple(row)
 
-    def _load_notice_list(self) -> '_Notices':
+    def _load_notice_list(self) -> _Notices:
         """Load a notice list from current key.
 
         Returns:
@@ -313,7 +318,7 @@ class JujuStorage:
             return []
         return notice_list
 
-    def _save_notice_list(self, notices: '_Notices') -> None:
+    def _save_notice_list(self, notices: _Notices) -> None:
         """Save a notice list under current key.
 
         Args:
@@ -354,7 +359,7 @@ class _SimpleDumper(_BaseDumper):  # type: ignore
     we want to only support dumping out types that are safe to load.
     """
 
-    represent_tuple: '_TupleRepresenterType' = yaml.Dumper.represent_tuple
+    represent_tuple: _TupleRepresenterType = yaml.Dumper.represent_tuple
 
 
 _SimpleDumper.add_representer(tuple, _SimpleDumper.represent_tuple)  # type: ignore

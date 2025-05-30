@@ -1,0 +1,123 @@
+[project]
+name = "ops-tracing"
+version = "2.23.0.dev0"
+description = "The tracing facility for the Ops library."
+requires-python = ">=3.8"
+readme = "README.md"
+authors = [
+    {name="The Charm Tech team at Canonical Ltd."},
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries",
+    "Framework :: OpenTelemetry",
+]
+dependencies = [
+    "opentelemetry-sdk~=1.30",
+    "ops==2.23.0.dev0",
+    "pydantic",
+]
+
+[project.urls]
+"Repository" = "https://github.com/canonical/operator"
+"Issues" = "https://github.com/canonical/operator/issues"
+"Documentation" = "https://ops.readthedocs.io"
+"Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
+
+
+[dependency-groups]
+dev = [
+    "pyright ~= 1.1",
+    "ruff ~= 0.9",
+]
+testing = [
+    "pytest ~= 8.3.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 99
+target-version = "py38"
+
+[tool.ruff.format]
+quote-style = "single"
+exclude = ["ops_tracing/vendor/*"]
+
+[tool.ruff.lint]
+exclude = ["ops_tracing/vendor/*"]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001",
+    # pep8-naming
+    "N",
+    # flake8-builtins
+    "A",
+    # flake8-copyright
+    "CPY",
+    # pyupgrade
+    "UP",
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # Ruff specific
+    "RUF",
+    # Perflint
+    "PERF",
+    # pyflakes-docstrings
+    "D",
+]
+ignore = [
+    # `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible.
+    "D203",
+    # `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible.
+    "D213",
+    # we don't add a blank line after Args: in a function docstring
+    "D413",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"test/*" = [
+    # no need for docstring
+    "D",
+    # asserts are OK in tests
+    "S101",
+    # type[xxx] require Python 3.9
+    "UP006",
+]
+
+[tool.pyright]
+exclude = [".tox", ".venv", "ops_tracing/vendor"]
+extraPaths = ["..", "../testing"]
+pythonVersion = "3.8" # check no python > 3.8 features are used
+pythonPlatform = "All"

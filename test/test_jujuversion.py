@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import os
 import unittest.mock  # in this file, importing just 'patch' would be confusing
 
@@ -115,6 +117,16 @@ def test_supports_exec_service_context():
 )
 def test_supports_pebble_log_forwarding(version: str, has_support: bool):
     assert ops.JujuVersion(version).supports_pebble_log_forwarding is has_support
+
+
+def test_has_pebble_identities():
+    assert ops.JujuVersion('3.6.4').supports_pebble_identities
+    assert not ops.JujuVersion('3.6.3').supports_pebble_identities
+
+
+def test_has_pebble_metrics():
+    assert ops.JujuVersion('3.6.4').supports_pebble_metrics
+    assert not ops.JujuVersion('3.6.3').supports_pebble_metrics
 
 
 @pytest.mark.parametrize(

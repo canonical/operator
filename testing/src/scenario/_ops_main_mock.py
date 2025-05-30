@@ -1,6 +1,8 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from __future__ import annotations
+
 import dataclasses
 import logging
 import marshal
@@ -10,12 +12,7 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    FrozenSet,
-    List,
     Sequence,
-    Set,
-    Tuple,
 )
 
 import ops
@@ -45,10 +42,10 @@ if TYPE_CHECKING:  # pragma: no cover
 
 EVENT_REGEX = re.compile(_event_regex)
 STORED_STATE_REGEX = re.compile(
-    r"((?P<owner_path>.*)\/)?(?P<_data_type_name>\D+)\[(?P<name>.*)\]",
+    r'((?P<owner_path>.*)\/)?(?P<_data_type_name>\D+)\[(?P<name>.*)\]',
 )
 
-logger = scenario_logger.getChild("ops_main_mock")
+logger = scenario_logger.getChild('ops_main_mock')
 
 # pyright: reportPrivateUsage=false
 
@@ -59,10 +56,10 @@ class UnitStateDB:
     def __init__(self, underlying_store: ops.storage.SQLiteStorage):
         self._db = underlying_store
 
-    def get_stored_states(self) -> FrozenSet["StoredState"]:
+    def get_stored_states(self) -> frozenset[StoredState]:
         """Load any StoredState data structures from the db."""
         db = self._db
-        stored_states: Set[StoredState] = set()
+        stored_states: set[StoredState] = set()
         for handle_path in db.list_snapshots():
             if not EVENT_REGEX.match(handle_path) and (
                 match := STORED_STATE_REGEX.match(handle_path)
@@ -74,10 +71,10 @@ class UnitStateDB:
 
         return frozenset(stored_states)
 
-    def get_deferred_events(self) -> List["DeferredEvent"]:
+    def get_deferred_events(self) -> list[DeferredEvent]:
         """Load any DeferredEvent data structures from the db."""
         db = self._db
-        deferred: List[DeferredEvent] = []
+        deferred: list[DeferredEvent] = []
         for handle_path in db.list_snapshots():
             if EVENT_REGEX.match(handle_path):
                 notices = db.notices(handle_path)
@@ -85,7 +82,7 @@ class UnitStateDB:
                     try:
                         snapshot_data = db.load_snapshot(handle)
                     except ops.storage.NoSnapshotError:
-                        snapshot_data: Dict[str, Any] = {}
+                        snapshot_data: dict[str, Any] = {}
 
                     event = DeferredEvent(
                         handle_path=handle,
@@ -97,7 +94,7 @@ class UnitStateDB:
 
         return deferred
 
-    def apply_state(self, state: "State"):
+    def apply_state(self, state: State):
         """Add DeferredEvent and StoredState from this State instance to the storage."""
         db = self._db
         for event in state.deferred:
@@ -106,7 +103,7 @@ class UnitStateDB:
                 marshal.dumps(event.snapshot_data)
             except ValueError as e:
                 raise ValueError(
-                    f"unable to save the data for {event}, it must contain only simple types.",
+                    f'unable to save the data for {event}, it must contain only simple types.',
                 ) from e
             db.save_snapshot(event.handle_path, event.snapshot_data)
 
@@ -119,10 +116,10 @@ class Ops(_Manager):
 
     def __init__(
         self,
-        state: "State",
-        event: "_Event",
-        context: "Context[CharmType]",
-        charm_spec: "_CharmSpec[CharmType]",
+        state: State,
+        event: _Event,
+        context: Context[CharmType],
+        charm_spec: _CharmSpec[CharmType],
         juju_context: ops.jujucontext._JujuContext,
     ):
         self.state = state
@@ -130,6 +127,14 @@ class Ops(_Manager):
         self.context = context
         self.charm_spec = charm_spec
         self.store = None
+
+        try:
+            import ops_tracing._mock  # break circular import
+
+            self._tracing_mock = ops_tracing._mock.patch_tracing()
+            self._tracing_mock.__enter__()
+        except ImportError:
+            self._tracing_mock = None
 
         model_backend = _MockModelBackend(
             state=state,
@@ -139,18 +144,16 @@ class Ops(_Manager):
             juju_context=juju_context,
         )
 
-        super().__init__(
-            self.charm_spec.charm_type, model_backend, juju_context=juju_context
-        )
+        super().__init__(self.charm_spec.charm_type, model_backend, juju_context=juju_context)
 
     def _load_charm_meta(self):
-        metadata = (self._charm_root / "metadata.yaml").read_text()
-        actions_meta = self._charm_root / "actions.yaml"
+        metadata = (self._charm_root / 'metadata.yaml').read_text()
+        actions_meta = self._charm_root / 'actions.yaml'
         if actions_meta.exists():
             actions_metadata = actions_meta.read_text()
         else:
             actions_metadata = None
-        config_meta = self._charm_root / "config.yaml"
+        config_meta = self._charm_root / 'config.yaml'
         if config_meta.exists():
             config_metadata = config_meta.read_text()
         else:
@@ -174,8 +177,8 @@ class Ops(_Manager):
 
     def _make_storage(self, _: _Dispatcher):
         # TODO: add use_juju_for_storage support
-        storage = ops.storage.SQLiteStorage(":memory:")
-        logger.info("Copying input state to storage.")
+        storage = ops.storage.SQLiteStorage(':memory:')
+        logger.info('Copying input state to storage.')
         self.store = UnitStateDB(storage)
         self.store.apply_state(self.state)
         return storage
@@ -198,24 +201,19 @@ class Ops(_Manager):
                         continue
                     return getattr(sub_attr, self.event.custom_event.event_kind)
 
-        owner = (
-            self._get_owner(self.charm, self.event.owner_path)
-            if self.event
-            else self.charm.on
-        )
+        owner = self._get_owner(self.charm, self.event.owner_path) if self.event else self.charm.on
 
         try:
             event_to_emit = getattr(owner, event_name)
         except AttributeError:
-            ops_logger.debug("Event %s not defined for %s.", event_name, self.charm)
+            ops_logger.debug('Event %s not defined for %s.', event_name, self.charm)
             raise NoObserverError(
-                f"Cannot fire {event_name!r} on {owner}: "
-                f"invalid event (not on charm.on).",
+                f'Cannot fire {event_name!r} on {owner}: invalid event (not on charm.on).',
             )
         return event_to_emit
 
     def _object_to_ops_object(self, obj: Any) -> Any:
-        if hasattr(obj, "_to_ops"):
+        if hasattr(obj, '_to_ops'):
             return obj._to_ops()
         if isinstance(obj, Secret):
             return self.charm.model.get_secret(id=obj.id, label=obj.label)
@@ -231,7 +229,7 @@ class Ops(_Manager):
 
     def _get_event_args(
         self, bound_event: ops.framework.BoundEvent
-    ) -> Tuple[List[Any], Dict[str, Any]]:
+    ) -> tuple[list[Any], dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
         # Juju events). We also handle converting from Scenario to ops types,
@@ -255,21 +253,23 @@ class Ops(_Manager):
                 obj = getattr(obj, step)
             except AttributeError:
                 raise BadOwnerPath(
-                    f"event_owner_path {path!r} invalid: {step!r} leads to nowhere.",
+                    f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
                 )
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
-                f"event_owner_path {path!r} invalid: does not lead to "
-                f"an ObjectEvents instance.",
+                f'event_owner_path {path!r} invalid: does not lead to an ObjectEvents instance.',
             )
         return obj
 
     def _close(self):
         """Now that we're done processing this event, read the charm state and expose it."""
-        logger.info("Copying storage to output state.")
+        logger.info('Copying storage to output state.')
         assert self.store is not None
         deferred = self.store.get_deferred_events()
         stored_state = self.store.get_stored_states()
-        self.state = dataclasses.replace(
-            self.state, deferred=deferred, stored_states=stored_state
-        )
+        self.state = dataclasses.replace(self.state, deferred=deferred, stored_states=stored_state)
+
+    def _destroy(self):
+        super()._destroy()
+        if self._tracing_mock:
+            self._tracing_mock.__exit__(None, None, None)

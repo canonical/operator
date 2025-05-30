@@ -2,25 +2,23 @@ name: Publish (ops-scenario)
 on:
   push:
     tags:
-      - 'scenario-7.*'
+      - '2.*'
+
+permissions: {}
 
 jobs:
-  framework-tests:
-    uses: ./.github/workflows/framework-tests.yaml
-  observability-charm-tests:
-    uses: ./.github/workflows/observability-charm-tests.yaml
-  hello-charm-tests:
-    uses: ./.github/workflows/hello-charm-tests.yaml
   build-n-publish:
     name: Build and Publish ops-scenario to PyPI
     runs-on: ubuntu-latest
+    environment: publish-pypi
     permissions:
       id-token: write
       attestations: write
       contents: read
-    needs: [framework-tests, observability-charm-tests, hello-charm-tests]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@v5
       - name: Install build dependencies
@@ -29,7 +27,7 @@ jobs:
         run: python -m build
         working-directory: ./testing
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2.2.2
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'testing/dist/*'
       - name: Publish

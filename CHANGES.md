@@ -1,25 +1,143 @@
+# 2.22.0 - 29 May 2025
+
+## Features
+
+* Add Juju topology labels (#1744)
+
+## Fixes
+
+* Turn on databag access validation in `__init__` (#1737)
+* Allow event suffixes to appear in event names in `ops.testing` (#1754)
+
+## Documentation
+
+* Document how to manage metrics (#1692)
+* Link to our docs from the top of our README (#1710)
+* Update code in K8s tutorial, with source in repo (part 1) (#1719)
+* Update links to juju.is/docs (#1725)
+* Fix link in breakpoint output, remove link from Harness error message (#1726)
+* Update Matrix channel name to Charm Tech (#1740)
+* Rename configurations to configuration (#1746)
+* Fix typos in code snippets by @MattiaSarti (#1750)
+
+## CI
+
+* Add `ops[tracing]` integration tests (#1686)
+* Pin workflows by hash (#1721)
+* Disable alertmanager compatibility tests until upstream fix (#1745)
+* Remove explicit scopes and update HACKING.md (#1748)
+* Pin trusted workflows by tag (#1752)
+* Re-enable `alertmanager-k8s-operator` in observability charm tests (#1753)
+* Fix reporting to TIOBE after `ops[tracing]` addition (#1755)
+
+# 2.21.1 - 1 May 2025
+
+## Reverted
+
+* Reverting "run deferred events with fresh charm instances" (#1711)
+
+## Documentation
+
+* Add best practices about status (#1689)
+
+# 2.21.0 - 30 Apr 2025
+
+## Features
+
+* Ops[tracing] (with a first-party charm lib) (#1612)
+* Pebble identities (#1672)
+* Run deferred events with fresh charm instances (#1631)
+
+## Fixes
+
+* Allow TLS 1.2 in ops-tracing (#1705)
+* Try to fix flaky pebble exec test (#1664)
+
+## Documentation
+
+* Add best practice note around using tooling provided by the charmcraft profile (#1700)
+* Clarify guidance about designing python modules (#1670)
+* Fix a bug in the k8s tutorial doc about unit test (#1688)
+* Fix broken link in readme (#1679)
+* Fix links to juju docs (#1681)
+* Fix tox command in hacking.md (#1661)
+* Improve landing page of kubernetes charm tutorial (#1660)
+
+## CI
+
+* Add zizmor to static check github workflows (#1656)
+* Change prerelease setting used to add latest ops and scenario (#1682)
+* Don't pin release jobs to github environments (#1683)
+* Don't run tests within the publish job (#1684)
+* Fix smoke test (#1698)
+* Post-release versioning, release process update + workflow fix (#1658)
+* Rename "tox -e fmt" to "tox -e format" (#1668)
+
+## Tests
+
+* Fix overly specific test that fails sometimes with tracing (#1695)
+
+# 2.20.0 - 31 Mar 2025
+
+## Features
+
+* Add a `remove_revision()` method to `SecretRemoveEvent` and `SecretExpiredEvent` (#1624)
+* Add `Relation.remote_model` property (#1610)
+* Efficient implementation of `RelationDataContent.update` (#1586)
+* Expose the config metadata in `CharmMeta` (#1648)
+* Add the ability to emit custom events in unit tests (#1589)
+* Check that the check-infos in `testing.Container` match the plan (#1630)
+* `ops.testing.State` components are less mutable (#1617)
+
+## Fixes
+
+* Assorted fixes for Pebble layer merging in Harness and Scenario (#1627)
+
+## Documentation
+
+* Add a docs link to the Harness deprecation warning (#1513)
+* Add best practices and a "manage charms" how-to (#1615)
+* Add section about services with long startup time (#1604)
+* Clarify how to use mounts in `ops.testing.Container` (#1637)
+* Fix code snippet indentation (#1649)
+* Fix Scenario example (#1616)
+* Move hooks-based charm migration guide (#1636)
+* Putting test into each chapter of the tutorial (#1647)
+* Refactor how-to unit test according to comments (#1642)
+* Refactor test docs to 1 explanation and 2 how-tos (#1628)
+* Remove the charm-tech@lists.launchpad.net email address (#1632)
+* Remove tutorial chapters that are covered by the how-to guide (#1511)
+* Stack args vertically for long signature lines (#1641)
+* Testing explanation (#1635)
+* Unify charm test docs how to (#1639)
+
+## CI
+
+* Exclude vault-k8s-operator until the system can handle monorepos (#1650)
+* Use the latest version of ops-scenario in the compatibility tests (#1608)
+
 # 2.19.0 - 27 Feb 2025
 
 ## Features
 
-* Expose the Juju version via Model objects in (#1563)
-* Support starting and stopping Pebble checks, and the checks enabled field in (#1560)
+* Expose the Juju version via Model objects (#1563)
+* Support starting and stopping Pebble checks, and the checks enabled field (#1560)
 
 ## Documentation
 
-* Update logo and readme by @tmihoc in (#1571)
-* Fill out remaining external link placeholders in (#1564)
-* Use noun relation and verb integrate in (#1574)
-* Update ref to charmcraft.yaml reference by @medubelko in (#1580)
-* Add a how-to for setting open ports in (#1579)
-* Fix links that pointed to earlier Juju docs in (#1575)
-* Update links to Charmcraft docs in (#1582)
-* Small updates to machine charm tutorial in (#1583)
+* Update logo and readme by @tmihoc (#1571)
+* Fill out remaining external link placeholders (#1564)
+* Use noun relation and verb integrate (#1574)
+* Update ref to charmcraft.yaml reference by @medubelko (#1580)
+* Add a how-to for setting open ports (#1579)
+* Fix links that pointed to earlier Juju docs (#1575)
+* Update links to Charmcraft docs (#1582)
+* Small updates to machine charm tutorial (#1583)
 
 ## CI
 
-* Update list of charms and handle increasing uv usage in (#1588)
-* Handle presence/absence of "static" and "static-charm" envs in (#1590)
+* Update list of charms and handle increasing uv usage (#1588)
+* Handle presence/absence of "static" and "static-charm" envs (#1590)
 
 # 2.18.1 - 5 Feb 2025
 

@@ -1,3 +1,9 @@
+# 7.22.0 - 29 May 2025
+
+## Fixes
+
+* Allow event suffixes to appear in event names in `ops.testing` (#1754)
+
 # 7.1.3 - 13 Feb 2025
 
 ## Fixes

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import sys
 
-pytest_plugins = "pytester"
-sys.path.append(".")
+pytest_plugins = 'pytester'
+sys.path.append('.')
 
 
 def test_plugin_ctx_run(pytester):
@@ -26,11 +28,11 @@ def test_plugin_ctx_run(pytester):
     )
 
     # run pytest with the following cmd args
-    result = pytester.runpytest("-v")
+    result = pytester.runpytest('-v')
 
     # fnmatch_lines does an assertion internally
     result.stdout.fnmatch_lines([
-        "*::test_sth PASSED*",
+        '*::test_sth PASSED*',
     ])
 
     # make sure that we get a '0' exit code for the testsuite

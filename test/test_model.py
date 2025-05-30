@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import datetime
 import io
 import ipaddress
@@ -85,7 +87,7 @@ class TestModel:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         name: str = 'db1',
-        relation_id: typing.Optional[int] = None,
+        relation_id: int | None = None,
     ) -> ops.Relation:
         """Wrapper around harness.model.get_relation that enforces that None is not returned."""
         rel_db1 = harness.model.get_relation(name, relation_id)
@@ -256,8 +258,8 @@ class TestModel:
     )
     def test_update_app_relation_data(
         self,
-        args: typing.Tuple[typing.Any, ...],
-        kwargs: typing.Dict[str, str],
+        args: tuple[typing.Any, ...],
+        kwargs: dict[str, str],
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         harness.set_leader(True)
@@ -549,7 +551,7 @@ class TestModel:
 
         def broken_update_relation_data(
             relation_id: int,
-            entity: typing.Union[ops.Unit, ops.Application],
+            entity: ops.Unit | ops.Application,
             data: Mapping[str, str],
         ):
             backend._calls.append(('update_relation_data', relation_id, entity, data))
@@ -907,7 +909,7 @@ class TestModel:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         target_status: ops.StatusBase,
-        backend_call: typing.Tuple[str, str, str, typing.Dict[str, bool]],
+        backend_call: tuple[str, str, str, dict[str, bool]],
     ):
         harness._get_backend_calls(reset=True)
         harness.model.unit.status = target_status
@@ -941,7 +943,7 @@ class TestModel:
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         target_status: ops.StatusBase,
-        backend_call: typing.Tuple[str, str, str, typing.Dict[str, bool]],
+        backend_call: tuple[str, str, str, dict[str, bool]],
     ):
         harness.set_leader(True)
 
@@ -1124,7 +1126,7 @@ class TestModel:
     def assertBackendCalls(  # noqa: N802
         self,
         harness: ops.testing.Harness[ops.CharmBase],
-        expected: typing.List[typing.Tuple[typing.Any, ...]],
+        expected: list[tuple[typing.Any, ...]],
         *,
         reset: bool = True,
     ):
@@ -1207,13 +1209,13 @@ class PushPullCase:
         self,
         *,
         name: str,
-        path: typing.Union[str, typing.List[str]],
-        files: typing.List[str],
-        want: typing.Optional[typing.Set[str]] = None,
-        dst: typing.Optional[str] = None,
-        errors: typing.Optional[typing.Set[str]] = None,
-        dirs: typing.Optional[typing.Set[str]] = None,
-        want_dirs: typing.Optional[typing.Set[str]] = None,
+        path: str | list[str],
+        files: list[str],
+        want: set[str] | None = None,
+        dst: str | None = None,
+        errors: set[str] | None = None,
+        dirs: set[str] | None = None,
+        want_dirs: set[str] | None = None,
     ):
         self.pattern = None
         self.dst = dst
@@ -1260,7 +1262,7 @@ class ConstFileInfoArgs(typing.TypedDict):
 
 @pytest.mark.parametrize('case', recursive_list_cases)
 def test_recursive_list(case: PushPullCase):
-    def list_func_gen(file_list: typing.List[str]):
+    def list_func_gen(file_list: list[str]):
         args: ConstFileInfoArgs = {
             'last_modified': datetime.datetime.now(),
             'permissions': 0o777,
@@ -1270,8 +1272,8 @@ def test_recursive_list(case: PushPullCase):
             'group_id': 1024,
             'group': 'bar',
         }
-        file_infos: typing.List[pebble.FileInfo] = []
-        dirs: typing.Set[str] = set()
+        file_infos: list[pebble.FileInfo] = []
+        dirs: set[str] = set()
         for f in file_list:
             file_infos.append(
                 pebble.FileInfo(
@@ -1294,7 +1296,7 @@ def test_recursive_list(case: PushPullCase):
 
         def inner(path: pathlib.Path):
             path_str = str(path)
-            matches: typing.List[pebble.FileInfo] = []
+            matches: list[pebble.FileInfo] = []
             for info in file_infos:
                 # exclude file infos for separate trees and also
                 # for the directory we are listing itself - we only want its contents.
@@ -1312,7 +1314,7 @@ def test_recursive_list(case: PushPullCase):
         return inner
 
     # test raw business logic for recursion and dest path construction
-    files: typing.Set[typing.Union[str, pathlib.Path]] = set()
+    files: set[str | pathlib.Path] = set()
     assert isinstance(case.path, str)
     case.path = os.path.normpath(case.path)
     case.files = [os.path.normpath(f) for f in case.files]
@@ -1441,7 +1443,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
         # otherwise remove leading slash so we can do the path join properly.
         push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
 
-    errors: typing.Set[str] = set()
+    errors: set[str] = set()
     assert case.dst is not None
     try:
         c.push_path(push_path, case.dst)
@@ -1450,9 +1452,9 @@ def test_recursive_push_and_pull(case: PushPullCase):
             raise
         errors = {src[len(push_src.name) :] for src, _ in err.errors}
 
-    assert (
-        case.errors == errors
-    ), f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    assert case.errors == errors, (
+        f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+    )
     for fpath in case.want:
         assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
         content = c.pull(fpath, encoding=None).read()
@@ -1469,7 +1471,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
             c.make_dir(directory, make_parents=True)
 
     # test pull
-    errors: typing.Set[str] = set()
+    errors: set[str] = set()
     try:
         c.pull_path(case.path, os.path.join(pull_dst.name, case.dst[1:]))
     except ops.MultiPushPullError as err:
@@ -1477,9 +1479,9 @@ def test_recursive_push_and_pull(case: PushPullCase):
             raise
         errors = {src for src, _ in err.errors}
 
-    assert (
-        case.errors == errors
-    ), f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    assert case.errors == errors, (
+        f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+    )
     for fpath in case.want:
         assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
     for fdir in case.want_dirs:
@@ -2115,7 +2117,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'connection error!', caplog.text)
+        assert 'connection error!' in caplog.text
 
     def test_can_connect_file_not_found_error(
         self,
@@ -2129,7 +2131,7 @@ containers:
         with caplog.at_level(level='DEBUG', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'file not found!', caplog.text)
+        assert 'file not found!' in caplog.text
 
     def test_can_connect_api_error(
         self,
@@ -2143,7 +2145,7 @@ containers:
         with caplog.at_level(level='WARNING', logger='ops'):
             assert not container.can_connect()
         assert len(caplog.records) == 1
-        assert re.search(r'api error!', caplog.text)
+        assert 'api error!' in caplog.text
 
     def test_exec(self, container: ops.Container, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(container, '_juju_version', JujuVersion('3.1.6'))
@@ -2289,8 +2291,8 @@ class MockPebbleBackend(_ModelBackend):
 class MockPebbleClient:
     def __init__(self, socket_path: str):
         self.socket_path = socket_path
-        self.requests: typing.List[typing.Tuple[typing.Any, ...]] = []
-        self.responses: typing.List[typing.Any] = []
+        self.requests: list[tuple[typing.Any, ...]] = []
+        self.responses: list[typing.Any] = []
 
     def autostart_services(self):
         self.requests.append(('autostart',))
@@ -2314,7 +2316,7 @@ class MockPebbleClient:
     def add_layer(
         self,
         label: str,
-        layer: typing.Union[str, ops.pebble.LayerDict, ops.pebble.Layer],
+        layer: str | ops.pebble.LayerDict | ops.pebble.Layer,
         *,
         combine: bool = False,
     ):
@@ -2328,11 +2330,11 @@ class MockPebbleClient:
         self.requests.append(('get_plan',))
         return self.responses.pop(0)
 
-    def get_services(self, names: typing.Optional[str] = None):
+    def get_services(self, names: str | None = None):
         self.requests.append(('get_services', names))
         return self.responses.pop(0)
 
-    def get_checks(self, level: typing.Optional[str] = None, names: typing.Optional[str] = None):
+    def get_checks(self, level: str | None = None, names: str | None = None):
         self.requests.append(('get_checks', level, names))
         return self.responses.pop(0)
 
@@ -2343,15 +2345,15 @@ class MockPebbleClient:
     def push(
         self,
         path: str,
-        source: 'ops.pebble._IOSource',
+        source: ops.pebble._IOSource,
         *,
         encoding: str = 'utf-8',
         make_dirs: bool = False,
-        permissions: typing.Optional[int] = None,
-        user_id: typing.Optional[int] = None,
-        user: typing.Optional[str] = None,
-        group_id: typing.Optional[int] = None,
-        group: typing.Optional[str] = None,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
     ):
         self.requests.append((
             'push',
@@ -2366,7 +2368,7 @@ class MockPebbleClient:
             group,
         ))
 
-    def list_files(self, path: str, *, pattern: typing.Optional[str] = None, itself: bool = False):
+    def list_files(self, path: str, *, pattern: str | None = None, itself: bool = False):
         self.requests.append(('list_files', path, pattern, itself))
         return self.responses.pop(0)
 
@@ -2375,11 +2377,11 @@ class MockPebbleClient:
         path: str,
         *,
         make_parents: bool = False,
-        permissions: typing.Optional[int] = None,
-        user_id: typing.Optional[int] = None,
-        user: typing.Optional[str] = None,
-        group_id: typing.Optional[int] = None,
-        group: typing.Optional[str] = None,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
     ):
         self.requests.append((
             'make_dir',
@@ -2395,11 +2397,11 @@ class MockPebbleClient:
     def remove_path(self, path: str, *, recursive: bool = False):
         self.requests.append(('remove_path', path, recursive))
 
-    def exec(self, command: typing.List[str], **kwargs: typing.Any):
+    def exec(self, command: list[str], **kwargs: typing.Any):
         self.requests.append(('exec', command, kwargs))
         return self.responses.pop(0)
 
-    def send_signal(self, signal: typing.Union[str, int], service_names: str):
+    def send_signal(self, signal: str | int, service_names: str):
         self.requests.append(('send_signal', signal, service_names))
 
     def get_notice(self, id: str) -> pebble.Notice:
@@ -2486,15 +2488,13 @@ class TestModelBindings:
 }"""
         return model
 
-    def ensure_relation(
-        self, model: ops.Model, name: str = 'db1', relation_id: typing.Optional[int] = None
-    ):
+    def ensure_relation(self, model: ops.Model, name: str = 'db1', relation_id: int | None = None):
         """Wrapper around model.get_relation that enforces that None is not returned."""
         rel_db1 = model.get_relation(name, relation_id)
         assert rel_db1 is not None, rel_db1  # Type checkers don't understand `assertIsNotNone`
         return rel_db1
 
-    def ensure_binding(self, model: ops.Model, binding_key: typing.Union[str, ops.Relation]):
+    def ensure_binding(self, model: ops.Model, binding_key: str | ops.Relation):
         """Wrapper around self.model.get_binding that enforces that None is not returned."""
         binding = model.get_binding(binding_key)
         assert binding is not None
@@ -2856,7 +2856,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
 
@@ -2893,7 +2893,7 @@ class TestModelBackend:
         monkeypatch.setattr(
             self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
         )
-        with pytest.raises(RuntimeError, match='not supported on Juju version 2.6.9'):
+        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
 
@@ -3228,7 +3228,7 @@ class TestModelBackend:
 
     def test_valid_metrics(self, fake_script: FakeScript):
         fake_script.write('add-metric', 'exit 0')
-        test_cases: typing.List[_ValidMetricsTestCase] = [
+        test_cases: list[_ValidMetricsTestCase] = [
             (
                 OrderedDict([('foo', 42), ('b-ar', 4.5), ('ba_-z', 4.5), ('a', 1)]),
                 OrderedDict([('de', 'ad'), ('be', 'ef_ -')]),
@@ -3255,7 +3255,7 @@ class TestModelBackend:
             assert fake_script.calls(clear=True) == expected_calls
 
     def test_invalid_metric_names(self, fake_script: FakeScript):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
             ({'1': -4.2}, {}),
@@ -3274,7 +3274,7 @@ class TestModelBackend:
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_values(self):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
             ({'a': float('nan')}, {}),
@@ -3286,7 +3286,7 @@ class TestModelBackend:
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_labels(self):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'': 'baz'}),
             ({'foo': 4.2}, {',bar': 'baz'}),
             ({'foo': 4.2}, {'b=a=r': 'baz'}),
@@ -3297,7 +3297,7 @@ class TestModelBackend:
                 self.backend.add_metrics(metrics, labels)
 
     def test_invalid_metric_label_values(self):
-        invalid_inputs: typing.List[_MetricAndLabelPair] = [
+        invalid_inputs: list[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
             ({'foo': 4.2}, {'bar': 'b=az'}),
@@ -3407,7 +3407,7 @@ echo '{
 
 class TestLazyMapping:
     def test_invalidate(self):
-        loaded: typing.List[int] = []
+        loaded: list[int] = []
 
         class MyLazyMap(ops.LazyMapping):
             def _load(self):
@@ -3720,9 +3720,9 @@ class TestSecretClass:
     def make_secret(
         self,
         model: ops.Model,
-        id: typing.Optional[str] = None,
-        label: typing.Optional[str] = None,
-        content: typing.Optional[typing.Dict[str, str]] = None,
+        id: str | None = None,
+        label: str | None = None,
+        content: dict[str, str] | None = None,
     ) -> ops.Secret:
         return ops.Secret(model._backend, id=id, label=label, content=content)
 
@@ -4269,7 +4269,7 @@ class TestLazyNotice:
                     last_data={'key': 'val'},
                 )
 
-        workload = typing.cast(ops.Container, FakeWorkload())
+        workload = typing.cast('ops.Container', FakeWorkload())
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         assert n.id == '123'
         assert n.type == ops.pebble.NoticeType.CUSTOM
@@ -4287,7 +4287,7 @@ class TestLazyNotice:
             assert n.not_exist
 
     def test_repr(self):
-        workload = typing.cast(ops.Container, None)
+        workload = typing.cast('ops.Container', None)
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
         assert repr(n) == "LazyNotice(id='123', type=NoticeType.CUSTOM, key='example.com/a')"
 

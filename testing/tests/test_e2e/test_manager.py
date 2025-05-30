@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from ops import ActiveStatus
 from ops.charm import CharmBase, CollectStatusEvent
@@ -6,11 +8,11 @@ from scenario import Context, State
 from scenario.context import AlreadyEmittedError, Manager
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META = {"name": "mycharm"}
-        ACTIONS = {"do-x": {}}
+        META = {'name': 'mycharm'}
+        ACTIONS = {'do-x': {}}
 
         def __init__(self, framework):
             super().__init__(framework)
@@ -58,12 +60,12 @@ def test_context_manager(mycharm):
     with ctx(ctx.on.start(), State()) as manager:
         state_out = manager.run()
         assert isinstance(state_out, State)
-    assert ctx.emitted_events[0].handle.kind == "start"
+    assert ctx.emitted_events[0].handle.kind == 'start'
 
 
 def test_context_action_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
-    with ctx(ctx.on.action("do-x"), State()) as manager:
+    with ctx(ctx.on.action('do-x'), State()) as manager:
         state_out = manager.run()
         assert isinstance(state_out, State)
-    assert ctx.emitted_events[0].handle.kind == "do_x_action"
+    assert ctx.emitted_events[0].handle.kind == 'do_x_action'
