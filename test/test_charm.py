@@ -1523,7 +1523,7 @@ def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
         foo_bar: int = 42
         other: str = 'baz'
 
-        def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+        def __init__(self, fooBar: int, other: str):  # noqa: N803
             self.foo_bar = fooBar
             self.other = other
 
