@@ -142,9 +142,8 @@ my relations? What is the remote unit I'm talking to? And so on ...
 
 ## Statuses
 
-One of the simplest types of black-box testing available to charmers is to execute the charm and verify that the charm
-sets the expected unit/application status. We have seen a simple example above including leadership. But what if the
-charm transitions through a sequence of statuses?
+One of the simplest types of black-box testing available to charmers is to execute the charm and
+verify that the charm sets the expected unit/application status. We have seen a simple example above including leadership. But what if the charm transitions through a sequence of statuses?
 
 ```python
 # charm code:
@@ -161,9 +160,8 @@ def _on_event(self, _event):
         self.unit.status = ops.BlockedStatus('something went wrong')
 ```
 
-More broadly, often we want to test 'side effects' of executing a charm, such as what events have been emitted, what
-statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its
-relationship with the `State`.
+More broadly, often we want to test 'side effects' of executing a charm, such as what events have
+been emitted, what statuses it went through, etc... Before we get there, we have to explain what the `Context` represents, and its relationship with the `State`.
 
 ## Context and State
 
@@ -173,62 +171,13 @@ Consider the following tests. Suppose we want to verify that while handling a gi
 - the charm `juju-log`ged these specific strings
 - the charm went through this sequence of app/unit statuses (e.g. `maintenance`, then `waiting`, then `active`)
 
-These types of test have a place in Scenario, but that is not State: the contents of the Juju log or the status history
-are side effects of executing a charm, but are not persisted in a charm-accessible "state" in any meaningful way.
-In other words: those data streams are, from the charm's perspective, write-only.
+These types of test have a place in Scenario, but that is not State: the contents of the Juju log or
+the status history are side effects of executing a charm, but are not persisted in a
+charm-accessible "state" in any meaningful way. In other words: those data streams are, from the
+charm's perspective, write-only.
 
-As such, they do not belong in `scenario.State` but in `scenario.Context`: the object representing the charm's execution
-context.
-
-# Deferred events
-
-The test framework allows you to accurately simulate the `ops` event queue. The
-event queue is responsible for keeping track of deferred events. On the input
-side, you can verify that if the charm triggers with this and that event in its
-queue (they would be there because they had been deferred in the previous run),
-then the output state is valid. You generate the deferred data structure using
-the event's `deferred()` method:
-
-```python
-class MyCharm(ops.CharmBase):
-    ...
-
-    def _on_update_status(self, event):
-        event.defer()
-
-    def _on_start(self, event):
-        event.defer()
-
-
-def test_start_on_deferred_update_status():
-    """Test charm execution if a 'start' is dispatched when in the previous run an update-status had been deferred."""
-    ctx = testing.Context(MyCharm)
-    state_in = testing.State(
-        deferred=[
-            ctx.on.update_status().deferred(handler=MyCharm._on_update_status)
-        ]
-    )
-    state_out = ctx.run(ctx.on.start(), state_in)
-    assert len(state_out.deferred) == 1
-    assert state_out.deferred[0].name == 'start'
-```
-
-On the output side, you can verify that an event that you expect to have been
-deferred during this trigger, has indeed been deferred.
-
-```python
-class MyCharm(ops.CharmBase):
-    ...
-
-    def _on_start(self, event):
-        event.defer()
-
-
-def test_defer(MyCharm):
-    out = testing.Context(MyCharm).run(ctx.on.start(), testing.State())
-    assert len(out.deferred) == 1
-    assert out.deferred[0].name == 'start'
-```
+As such, they do not belong in `State` but in `Context`: the object representing the charm's
+execution context.
 
 # Live charm introspection
 
@@ -238,55 +187,8 @@ that, in the context of this charm execution, with this state, a certain
 charm-internal method was called and returned a given piece of data, or would
 return this and that _if_ it had been called.
 
-The `Context` object can be used as a context manager for this use case. Given
-this charm:
-
-```python
-from charms.bar.lib_name.v1.charm_lib import CharmLib
-
-class MyCharm(ops.CharmBase):
-    _stored = ops.StoredState()
-    
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        self._stored.set_default(a="a")
-        self.my_charm_lib = CharmLib()
-        framework.observe(self.on.start, self._on_start)
-
-    def _on_start(self, event):
-        self._stored.a = "b"
-```
-
-This test uses the context manager to work with the charm object before and
-after the event is emitted:
-
-```python
-def test_live_charm_introspection():
-    ctx = testing.Context(MyCharm)
-    with ctx(ctx.on.start(), testing.State()) as manager:
-        # This is your charm instance, after ops has set it up:
-        charm: MyCharm = manager.charm
-        
-        # We can check attributes on nested Objects or the charm itself:
-        assert charm.my_charm_lib.foo == "foo"
-        # such as stored state:
-        assert charm._stored.a == "a"
-
-        # This will tell ops.main to proceed with normal execution and emit the
-        # "start" event on the charm:
-        state_out = manager.run()
-    
-        # After that is done, we are handed back control, and we can again do
-        # some introspection:
-        assert charm.my_charm_lib.foo == "bar"
-        # and check that the charm's internal state is as we expect:
-        assert charm._stored.a == "b"
-
-    # state_out is, as in regular tests, a State object you can assert on:
-    assert state_out.unit_status == ...
-```
-
-Note that you can't call `manager.run()` multiple times: the object is a context
+The `Context` object can be used as a context manager for this use case. Note
+that you can't call `manager.run()` multiple times: the object is a context
 that ensures that `ops.main` 'pauses' right before emitting the event to hand
 you some introspection hooks, but for the rest this is a regular test: you can't
 emit multiple events in a single charm execution.
@@ -294,7 +196,7 @@ emit multiple events in a single charm execution.
 # The virtual charm root
 
 Before executing the charm, the framework copies the charm's `/src`, any libs,
-the metadata, config, and actions `yaml`s to a temporary directory. The charm
+and the metadata, config, and actions YAML to a temporary directory. The charm
 will see that temporary directory as its 'root'. This allows us to keep things
 simple when dealing with metadata that can be either inferred from the charm
 type being passed to `Context` or be passed to it as an argument, thereby
@@ -331,13 +233,6 @@ ctx = testing.Context(
 state = ctx.run(ctx.on.start(), testing.State())
 ```
 
-Do this, and you will be able to set up said directory as you like before the
-charm is run, as well as verify its contents after the charm has run. Do keep in
-mind that any metadata files you create in it will be overwritten, and therefore
-ignored, if you pass any metadata keys to `Context`. Omit `meta` in the call
-above, and the framework will instead attempt to read metadata from the
-temporary directory.
-
 # Immutability
 
 All of the data structures in the state, (`State`, `Relation`, `Container`, and
@@ -359,6 +254,12 @@ relation = testing.Relation('foo', remote_app_data={"1": "2"})
 # make a copy of relation, but with remote_app_data set to {"3": "4"}
 relation2 = dataclasses.replace(relation, remote_app_data={"3": "4"})
 ```
+
+Note that this also means that it's important to assert on the objects in the
+*output* state. The input and output state will often have the same objects
+(such as containers or relations), but the content of those objects is likely to
+have changed during the event run. The `State` has 'get_' methods to simplify
+this, for example: `container_out = state_out.get_container(container_in.name)`.
 
 # Consistency checks
 

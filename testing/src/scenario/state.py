@@ -454,7 +454,26 @@ class BindAddress(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Network(_max_posargs(2)):
-    """A Juju network space."""
+    """A Juju network space.
+    
+    Simplifying the Juju "spaces" model, each relation endpoint of the charm is
+    associated with a ``Network``, even if charms have not been integrated over
+    that endpoint yet.
+
+    If your charm has a relation `"foo"`, then the charm will be able, at
+    runtime, to do ``self.model.get_binding("foo").network``. The network you'll
+    get by doing so is heavily defaulted and good for most use-cases because the
+    charm should typically not be concerned about what IP it gets. 
+
+    If you want to, you can override any of these networks with a custom one by
+    passing it to :attr:`State.networks`:
+
+    ```python
+    state = State(networks={
+        Network("foo", [BindAddress([Address('192.0.2.1')])]),
+    })
+    ```
+    """
 
     binding_name: str
     """The name of the network space."""
@@ -2079,7 +2098,32 @@ class _Event:  # type: ignore
         return self._path.type is not _EventType.CUSTOM
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
-        """Construct a DeferredEvent from this Event."""
+        """Construct a deferred event from this event.
+        
+        The framework simulates the ops notice queue. The queue is responsible
+        for keeping track of the deferred event handlers. On the input side, you
+        can verify that if the charm triggers with this and that notice in its
+        queue (they would be there because they had been deferred in the
+        previous run), then the output state is valid. For example:
+
+            class MyCharm(ops.CharmBase):
+                def _on_update_status(self, event: ops.UpdateStatusEvent):
+                    event.defer()
+
+                def _on_start(self, event: ops.StartEvent):
+                    event.defer()
+
+            def test_start_on_deferred_update_status():
+                ctx = Context(MyCharm)
+                state_in = State(
+                    deferred=[
+                        ctx.on.update_status().deferred(handler=MyCharm._on_update_status)
+                    ]
+                )
+                state_out = ctx.run(ctx.on.start(), state_in)
+                assert len(state_out.deferred) == 2
+                assert state_out.deferred[1].name == 'start'
+        """
         handler_repr = repr(handler)
         handler_re = re.compile(r'<function (.*) at .*>')
         match = handler_re.match(handler_repr)

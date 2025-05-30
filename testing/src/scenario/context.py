@@ -468,6 +468,11 @@ class Context(Generic[CharmType]):
             with ctx(ctx.on.start(), State()) as manager:
                 manager.charm._some_private_setup()
                 manager.run()
+                assert manager.charm._some_private_attribute == "bar"
+
+    Note that you can't call `run()` multiple times. The context 'pauses' ops
+    right before emitting the event, but otherwise this is a regular test; you
+    can't emit multiple events in a single charm execution.
     """
 
     juju_log: list[JujuLogLine]
@@ -563,6 +568,17 @@ class Context(Generic[CharmType]):
 
     This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
     """
+    charm_root: str | Path | None
+    """The charm root directory to use when executing the charm.
+
+    Before running the event, the charm's `/src`, any libs, and the metadata, config, and action
+    YAML is copied to the charm root. If `charm_root` is None, then a temporary directory is created
+    and used. To set up the charm root directory with other files, pass in the location of the
+    directory to use. If a `charm_root` is provided, the tests are also able to inspect the content
+    of the directory after the event has run, unlike the temporary directory, which is automatically
+    deleted after the run.
+    """
+
     on: CharmEvents
     """The events that this charm can respond to.
 
