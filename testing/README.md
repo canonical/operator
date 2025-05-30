@@ -92,9 +92,18 @@ package.
 
 `ops-scenario` supports the same platforms and Python versions as ops itself.
 
-## Where to find the documentation
+## Documentation
 
-[**Read the full documentation**](https://canonical-jubilant.readthedocs-hosted.com/)
+ * Work through our ['Write your first Kubernetes charm' tutorial](https://ops.readthedocs.io/en/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html#write-unit-tests-for-your-charm), following the instructions for adding
+   unit tests at the end of each chapter, to get started..
+ * When you need to write a test that involves specific ops functionality,
+   refer to our [how-to guides](https://ops.readthedocs.io/en/latest/howto/index.html)
+   which all conclude with examples of tests of the ops functionality.
+ * Use our extensive [reference documentation](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops-testing) when you need to know how each `testing` object works. These
+   docs are also available via the standard Python `help()` functionality and in
+   your IDE.
+
+[**Read the full documentation**](https://ops.readthedocs.io/)
 
 ## About the community, how to get support
 
