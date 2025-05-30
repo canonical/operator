@@ -538,23 +538,23 @@ class Context(Generic[CharmType]):
 
     For example::
 
-    def test_emitted():
-        ctx = Context(
-            MyCharm,
-            capture_deferred_events=True,
-            capture_framework_events=True,
-        )
-        deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
-        ctx.run(ctx.on.start(), State(deferred=[deferred]))
+        def test_emitted():
+            ctx = Context(
+                MyCharm,
+                capture_deferred_events=True,
+                capture_framework_events=True,
+            )
+            deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
+            ctx.run(ctx.on.start(), State(deferred=[deferred]))
 
-        assert len(ctx.emitted_events) == 5
-        assert [e.handle.kind for e in ctx.emitted_events] == [
-            "update_status",
-            "start",
-            "collect_unit_status",
-            "pre_commit",
-            "commit",
-        ]
+            assert len(ctx.emitted_events) == 5
+            assert [e.handle.kind for e in ctx.emitted_events] == [
+                "update_status",
+                "start",
+                "collect_unit_status",
+                "pre_commit",
+                "commit",
+            ]
     """
     requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
@@ -571,12 +571,12 @@ class Context(Generic[CharmType]):
     charm_root: str | Path | None
     """The charm root directory to use when executing the charm.
 
-    Before running the event, the charm's `/src`, any libs, and the metadata, config, and action
-    YAML is copied to the charm root. If `charm_root` is None, then a temporary directory is created
-    and used. To set up the charm root directory with other files, pass in the location of the
-    directory to use. If a `charm_root` is provided, the tests are also able to inspect the content
-    of the directory after the event has run, unlike the temporary directory, which is automatically
-    deleted after the run.
+    Before running the event, the charm's ``/src``, any libs, and the metadata, config, and action
+    YAML is copied to the charm root. If ``charm_root`` is None, then a temporary directory is
+    created and used. To set up the charm root directory with other files, pass in the location of
+    the directory to use. If a ``charm_root`` is provided, the tests are also able to inspect the
+    content of the directory after the event has run, unlike the temporary directory, which is
+    automatically deleted after the run.
     """
 
     on: CharmEvents

@@ -466,13 +466,11 @@ class Network(_max_posargs(2)):
     charm should typically not be concerned about what IP it gets.
 
     If you want to, you can override any of these networks with a custom one by
-    passing it to :attr:`State.networks`:
+    passing it to :attr:`State.networks`::
 
-    ```python
-    state = State(networks={
-        Network("foo", [BindAddress([Address('192.0.2.1')])]),
-    })
-    ```
+        state = State(networks={
+            Network("foo", [BindAddress([Address('192.0.2.1')])]),
+        })
     """
 
     binding_name: str
