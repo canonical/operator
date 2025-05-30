@@ -10,9 +10,9 @@ specific `State` exists in, and the events that can be executed on that `State`.
 from __future__ import annotations
 
 import functools
+import pathlib
 import tempfile
 from contextlib import contextmanager
-from pathlib import Path
 from typing import (
     Generic,
     TYPE_CHECKING,
@@ -568,7 +568,7 @@ class Context(Generic[CharmType]):
 
     This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
     """
-    charm_root: str | Path | None
+    charm_root: str | pathlib.Path | None
     """The charm root directory to use when executing the charm.
 
     Before running the event, the charm's ``/src``, any libs, and the metadata, config, and action
@@ -592,7 +592,7 @@ class Context(Generic[CharmType]):
         *,
         actions: dict[str, Any] | None = None,
         config: dict[str, Any] | None = None,
-        charm_root: str | Path | None = None,
+        charm_root: str | pathlib.Path | None = None,
         juju_version: str = _DEFAULT_JUJU_VERSION,
         capture_deferred_events: bool = False,
         capture_framework_events: bool = False,
@@ -691,11 +691,11 @@ class Context(Generic[CharmType]):
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
-        return Path(self._tmp.name) / 'containers' / container_name
+        return pathlib.Path(self._tmp.name) / 'containers' / container_name
 
-    def _get_storage_root(self, name: str, index: int) -> Path:
+    def _get_storage_root(self, name: str, index: int) -> pathlib.Path:
         """Get the path to a tempdir where this storage's simulated root will live."""
-        storage_root = Path(self._tmp.name) / 'storages' / f'{name}-{index}'
+        storage_root = pathlib.Path(self._tmp.name) / 'storages' / f'{name}-{index}'
         # in the case of _get_container_root, _MockPebbleClient will ensure the dir exists.
         storage_root.mkdir(parents=True, exist_ok=True)
         return storage_root
