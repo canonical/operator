@@ -241,8 +241,8 @@ class ActionEvent(EventBase):
         """Load the action parameters into an instance of an action class.
 
         The raw Juju action parameters are passed to the action class's
-        ``__init__`` method as keyword arguments, with the following changes:
-        * dashes in names are converted to underscores.
+        ``__init__`` method as keyword arguments, with dashes in names
+        converted to underscores.
 
         Any additional positional or keyword arguments will be passed through to
         the action class ``__init__``.
