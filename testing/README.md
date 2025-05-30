@@ -105,10 +105,22 @@ package.
 
 [**Read the full documentation**](https://ops.readthedocs.io/)
 
-## About the community, how to get support
+## Community
 
-Invite the user to participate in the community, with a link to the Code of Conduct and its central forums.
-Link to the official support resources (GitHub, Discourse, and so on). If appropriate, spur the reader to consult the community posts and documentation first.
+`ops-scenario` is a member of the Charming family. It's an open source project
+that warmly welcomes community contributions, suggestions, fixes and
+constructive feedback.
+
+* Read our [code of conduct](https://ubuntu.com/community/ethos/code-of-conduct):
+  As a community we adhere to the Ubuntu code of conduct.
+* [Get support](https://discourse.charmhub.io/): Discourse is the go-to forum
+  for all Ops-related discussions, including around testing.
+* Join our [online chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com):
+  Meet us in the #charmhub-charmdev channel on Matrix.
+* [Report bugs](https://github.com/canonical/operator/issues): We want to know
+  about the problems so we can fix them.
+* [Contribute docs](https://github.com/canonical/operator/blob/main/HACKING.md#contributing-documentation):
+  Get started on GitHub.
 
 ## Contributing and developing
 
