@@ -44,7 +44,7 @@ that:
 - the charm does not raise uncaught exceptions while handling the event
 - the output state (or the diff with the input state) is as expected.
 
-# Core concepts
+## Core concepts
 
 The tests are about running assertions on atomic state transitions treating the
 charm being tested like a black box. An initial state goes in, an event occurs
@@ -69,7 +69,7 @@ Comparing these tests with `Harness` tests:
   mocking data in a monolithic data structure (the `State`), which makes it more
   lightweight and portable.
 
-# Writing tests
+## Writing tests
 
 A test consists of three broad steps:
 
@@ -179,7 +179,7 @@ charm's perspective, write-only.
 As such, they do not belong in `State` but in `Context`: the object representing the charm's
 execution context.
 
-# Live charm introspection
+## Live charm introspection
 
 The testing framework is a black-box, state-transition testing framework. It
 makes it trivial to assert that a status went from A to B, but not to assert
@@ -193,7 +193,7 @@ that ensures that `ops.main` 'pauses' right before emitting the event to hand
 you some introspection hooks, but for the rest this is a regular test: you can't
 emit multiple events in a single charm execution.
 
-# The virtual charm root
+## The virtual charm root
 
 Before executing the charm, the framework copies the charm's `/src`, any libs,
 and the metadata, config, and actions YAML to a temporary directory. The charm
@@ -233,7 +233,7 @@ ctx = testing.Context(
 state = ctx.run(ctx.on.start(), testing.State())
 ```
 
-# Immutability
+## Immutability
 
 All of the data structures in the state, (`State`, `Relation`, `Container`, and
 so on) are implemented as frozen dataclasses.
@@ -261,7 +261,7 @@ Note that this also means that it's important to assert on the objects in the
 have changed during the event run. The `State` has 'get_' methods to simplify
 this, for example: `container_out = state_out.get_container(container_in.name)`.
 
-# Consistency checks
+## Consistency checks
 
 A scenario, that is, the combination of an event, a state, and a charm, is
 consistent if it's plausible in Juju. For example, Juju can't emit a
