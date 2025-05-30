@@ -455,7 +455,7 @@ class BindAddress(_max_posargs(1)):
 @dataclasses.dataclass(frozen=True)
 class Network(_max_posargs(2)):
     """A Juju network space.
-    
+
     Simplifying the Juju "spaces" model, each relation endpoint of the charm is
     associated with a ``Network``, even if charms have not been integrated over
     that endpoint yet.
@@ -463,7 +463,7 @@ class Network(_max_posargs(2)):
     If your charm has a relation `"foo"`, then the charm will be able, at
     runtime, to do ``self.model.get_binding("foo").network``. The network you'll
     get by doing so is heavily defaulted and good for most use-cases because the
-    charm should typically not be concerned about what IP it gets. 
+    charm should typically not be concerned about what IP it gets.
 
     If you want to, you can override any of these networks with a custom one by
     passing it to :attr:`State.networks`:
@@ -2099,7 +2099,7 @@ class _Event:  # type: ignore
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
         """Construct a deferred event from this event.
-        
+
         The framework simulates the ops notice queue. The queue is responsible
         for keeping track of the deferred event handlers. On the input side, you
         can verify that if the charm triggers with this and that notice in its
