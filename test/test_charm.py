@@ -1585,6 +1585,11 @@ action:
     assert params.c == 'foo'
 
 
+# Note that this test is based on the example in the actions how-to doc.
+# Ideally, the configuration and charm classes are kept the same as in that
+# doc, so that we are confident that the code we're recommending charmers
+# write will actually work. This means that the test is a bit more verbose
+# than otherwise, but not excessively so.
 @pytest.mark.skipif(
     pydantic is None,
     reason='pydantic is not available, so we cannot test pydantic-based classes.',
