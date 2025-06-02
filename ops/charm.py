@@ -1541,6 +1541,8 @@ class CharmMeta:
     ):
         raw_: dict[str, Any] = raw or {}
         actions_raw_: dict[str, Any] = actions_raw or {}
+        # config_raw might be {'options': None} - this is accepted by
+        # charmcraft, even though {'options: {}} would be more correct.
         options_raw: dict[str, Any] = (config_raw or {}).get('options') or {}
 
         # When running in production, this data is generally loaded from
