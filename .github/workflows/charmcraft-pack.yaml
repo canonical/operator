@@ -43,7 +43,7 @@ jobs:
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up LXD
-        uses: canonical/setup-lxd@54a5806e490d92e207b57183cf111ed54bbdeff4
+        uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
         with:
           channel: 5.0/stable
 
