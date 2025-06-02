@@ -1541,7 +1541,7 @@ class CharmMeta:
     ):
         raw_: dict[str, Any] = raw or {}
         actions_raw_: dict[str, Any] = actions_raw or {}
-        options_raw: dict[str, Any] = (config_raw or {}).get('options', {}) or {}
+        options_raw: dict[str, Any] = (config_raw or {}).get('options') or {}
 
         # When running in production, this data is generally loaded from
         # metadata.yaml. However, when running tests, this data is
