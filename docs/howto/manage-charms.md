@@ -73,8 +73,6 @@ and the charm workflow.
 The next thing to do is add functionality to your charm.
 As you do that, you'll frequently pack, test, and debug your charm.
 
-```{admonition} Best practice
-:class: hint
 One of the powers of charms is their reusability. As such, do not try to
 duplicate functionality already achieved by an existing charm – rather, make
 your charm take advantage of the [charm ecosystem](https://charmhub.io) by
@@ -84,7 +82,6 @@ identity, scaling, and so on.
 This also helps you stay compliant with another fundamental rule in charms,
 namely that, following the Unix philosophy, each charm should do one thing and
 do it well.
-```
 
 > See more:
 >

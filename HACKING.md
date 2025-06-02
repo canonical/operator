@@ -370,7 +370,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
 11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
-   using the same Python version as specified in the `.readthedocs.yaml` file.
+   using the same Python version as specified in the `docs/.readthedocs.yaml` file.
 12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
 13. Wait until the tests pass after the PR is merged. It takes around 10 minutes.

@@ -1,16 +1,9 @@
 (run-workloads-with-a-charm-machines)=
 # How to run workloads with a machine charm
 
-There are several ways your charm might start a workload, depending on the type of charm you're authoring. 
+There are several ways your charm might start a workload, depending on the type of charm you're authoring.
 
 For a machine charm, it is likely that packages will need to be fetched, installed and started to provide the desired charm functionality. This can be achieved by interacting with the system's package manager, ensuring that package and service status is maintained by reacting to events accordingly.
-
-```{admonition} Best practice
-:class: hint
-
-Limit the use of shell scripts and commands as much as possible in favour of
-writing Python for charm code.
-```
 
 It is important to consider which events to respond to in the context of your charm. A simple example might be:
 
@@ -75,8 +68,7 @@ class MachineCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 ```
 
-```{admonition} Best practice
-:class: hint
+```{tip}
 
 When running subprocesses, log the return (exit) code as well as `stderr` when
 errors occur.
