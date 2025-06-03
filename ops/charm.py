@@ -25,6 +25,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Generator,
     List,
     Literal,
     Mapping,
@@ -34,6 +35,7 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
+    get_type_hints,
 )
 
 from . import model
@@ -264,18 +266,15 @@ class ActionEvent(EventBase):
                 action class raises a ValueError.
         """
         try:
-            fields = _juju_fields(cls)
+            fields = set(_juju_fields(cls))
         except ValueError:
             fields = None
         params: dict[str, Any] = kwargs.copy()
         for key, value in sorted(self.params.items()):
             attr = key.replace('-', '_')
-            if fields is None:
-                params[attr] = value
-            else:
-                if attr not in fields:
-                    continue
-                params[fields[attr]] = value
+            if fields is not None and attr not in fields:
+                continue
+            params[attr] = value
         try:
             return cls(*args, **params)
         except ValueError as e:
@@ -1494,45 +1493,39 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
 
 
-def _juju_fields(cls: type[object]) -> dict[str, str]:
+def _juju_fields(cls: type[object]) -> Generator[str]:
     """Iterates over all the field names to include when loading into a class.
-
-    Any Juju names that are not in the returned dictionary should not be passed to
-    the class. Names that are in the dictionary are mapped to the argument name;
-    in most cases this is the same string, but for aliases will differ.
-
-    Returns:
-        A dictionary where the key is the Juju name and the value is the name of
-        the attribute in the Python class.
 
     Raises:
         ValueError: if unable to determine which fields to include
     """
     # Dataclasses:
-    juju_to_arg: dict[str, str] = {}
+    # If this a Pydantic dataclass, then it handles the __init__
+    # argument name. Using pydantic.dataclasses.is_pydantic_dataclass()
+    # would be best here, but we don't want to import pydantic in ops,
+    # so we look more explicitly.
+    is_pydantic = getattr(cls, '__is_pydantic_dataclass__', False)
     try:
         fields = dataclasses.fields(cls)  # type: ignore
     except TypeError:
         pass
     else:
         for field in fields:
-            alias = field.metadata.get('alias', field.name)
-            # If this a Pydantic dataclass, then it handles the alias.
-            # Using pydantic.dataclasses.is_pydantic_dataclass() would be
-            # best here, but we don't want to import pydantic in ops, so
-            # we look more explicitly.
-            if getattr(cls, '__is_pydantic_dataclass__', False):
-                juju_to_arg[alias] = alias
+            if is_pydantic:
+                yield field.metadata.get('alias', field.name)
             else:
-                juju_to_arg[alias] = field.name
-        return juju_to_arg
+                # Regular dataclasses have to customise the __init__.
+                yield field.name
+        # We also need to allow any InitVars, because those are allowed.
+        for name, field in get_type_hints(cls).items():
+            if 'InitVar' in str(field):  # typing.get_origin doesn't know dataclasses.InitVar
+                yield name
+        return
     # Pydantic models:
-    class_fields: dict[str, str] = {}
     if hasattr(cls, 'model_fields'):
         for name, field in cls.model_fields.items():  # type: ignore
-            # Pydantic takes care of the alias.
-            class_fields[field.alias or name] = field.alias or name  # type: ignore
-        return class_fields
+            yield field.alias or name  # type: ignore
+        return
     # It's not clear, so give up.
     raise ValueError('Unable to find class fields')
 
