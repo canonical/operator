@@ -17,7 +17,7 @@ The instructions all use the Juju `python-libjuju` client, either through the `p
 
 ## Prepare your environment
 
-In order to run integrations tests you will need to have your environment set up with `tox` installed.
+In order to run integrations tests you will need to have your environment set up with a Juju controller and have `tox` installed.
 
 > See more: {external+juju:ref}`Set up your deployment <set-up-your-deployment>`
 
