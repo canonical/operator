@@ -19,7 +19,7 @@ The instructions all use the Juju `python-libjuju` client, either through the `p
 
 In order to run integrations tests you will need to have your environment set up with `tox` installed.
 
-> See more: {external+juju:ref}`How to set up your development environment <manage-your-deployment-environment>`
+> See more: {external+juju:ref}`Set up your deployment <set-up-your-deployment>`
 
 ## Prepare the `tox.ini` configuration file
 
@@ -53,7 +53,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 ```
 
-The `ops_test` fixture is your entry point to the `pytest-operator` library, and the preferred way of interacting with Juju in integration tests. The fixture will create a model for each test file -- if you write two tests that should not share a model, make sure to place them in different files. The fixture is a module-scoped context which, on entry, adds to Juju a randomly-named new model and destroys it on exit. All tests in that module, and all interactions with the `ops_test` object, will take place against that model. Once you have used `ops_test` to get a model in which to run your integration tests, most of the remaining integration test code will interact with Juju via the `python-libjuju` package.  
+The `ops_test` fixture is your entry point to the `pytest-operator` library, and the preferred way of interacting with Juju in integration tests. The fixture will create a model for each test file -- if you write two tests that should not share a model, make sure to place them in different files. The fixture is a module-scoped context which, on entry, adds to Juju a randomly-named new model and destroys it on exit. All tests in that module, and all interactions with the `ops_test` object, will take place against that model. Once you have used `ops_test` to get a model in which to run your integration tests, most of the remaining integration test code will interact with Juju via the `python-libjuju` package.
 
 ```{note}
 
@@ -68,24 +68,24 @@ async def test_operation(ops_test: OpsTest):
     # Tweak the config:
     app: Application = ops_test.model.applications.get("tester")
     await app.set_config({"my-key": "my-value"})
-    
+
     # Add another charm and integrate them:
     await ops_test.model.deploy('other-app')
     await ops_test.model.relate('tester:endpoint1', 'other-app:endpoint2')
-    
+
     # Scale it up:
     await app.add_unit(2)
-    
+
     # Remove another app:
     await ops_test.model.remove_application('yet-another-app')
-    
+
     # Run an action on a unit:
     unit: Unit = app.units[1]
     action = await unit.run('my-action')
     assert action.results == <foo>
-    
+
     # What this means depends on the workload:
-    assert charm_operates_correctly()  
+    assert charm_operates_correctly()
 ```
 
 `python-libjuju` has, of course, an API for all inverse operations: remove an app, scale it down, remove a relation...
@@ -129,7 +129,7 @@ As an alternative to `wait_for_idle`, you can explicitly block until the applica
 
 > Example implementations: [charm-coredns](https://github.com/charmed-kubernetes/charm-coredns/blob/b1d83b6a31200924fefcd288336bc1f9323c6a72/tests/integration/test_integration.py#L21), [charm-calico](https://github.com/charmed-kubernetes/charm-calico/blob/e1dfdda92fefdba90b7b7e5247fbc861c34ad146/tests/integration/test_calico_integration.py#L18)
 
-> See more: 
+> See more:
 > - [`pytest-operator` | `ops_test.build_charm`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1020)
 > - [`python-libjuju` | `model.deploy `](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/model.py#L1658)
 
@@ -161,7 +161,7 @@ For `oci-images` you can reference an image registry.
 > Example implementations: [kubernetes-control-plane](https://github.com/charmed-kubernetes/charm-kubernetes-control-plane/blob/8769db394bf377a03ce94066307ecf831b88ad17/tests/integration/test_kubernetes_control_plane_integration.py#L41), [synapse-operator](https://github.com/canonical/synapse-operator/blob/eb44f4959a00040f08b98470f8b17cae4cc616da/tests/integration/conftest.py#L119), [prometheus-k8s](https://github.com/canonical/prometheus-k8s-operator/blob/d29f323343a1e4906a8c71104fcd1de817b2c2e6/tests/integration/test_remote_write_with_zinc.py#L27)
 
 >
-> See more: 
+> See more:
 > - [`pytest-operator` | `build_resources`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1073)
 > - [`pytest-operator` |  `download_resources`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1101)
 > - [`python-libjuju` | `model.deploy`](https://github.com/juju/python-libjuju/blob/2581b0ced1df6201c6b7fd8cc0b20dcfa9d97c51/juju/model.py#L1658)
@@ -190,13 +190,13 @@ async def test_my_integration(ops_test: OpsTest):
 
 > See first: {ref}`manage-configuration`
 
-You can set a configuration option in your application and check its results. 
+You can set a configuration option in your application and check its results.
 
 ```python
 async def test_config_changed(ops_test: OpsTest):
     ...
         await ops_test.model.applications["synapse"].set_config({"server_name": "invalid_name"})
-        # In this case, when setting server_name to "invalid_name" 
+        # In this case, when setting server_name to "invalid_name"
         # we could for example expect a blocked status.
         await ops_test.model.wait_for_idle(status="blocked",  timeout=60)
     ...
@@ -209,7 +209,7 @@ async def test_config_changed(ops_test: OpsTest):
 
 > See also: {external+juju:ref}`Action <action>`
 
-You can execute an action on a unit and get its results. 
+You can execute an action on a unit and get its results.
 
 ```python
 async def test_run_action(ops_test: OpsTest):
@@ -244,7 +244,7 @@ How you can connect to a private or public address is dependent on your configur
 
 > Example implementations: [mongodb-k8s-operator](https://github.com/canonical/mongodb-k8s-operator/blob/8b9ebbee3f225ca98175c25781f1936dc4a62a7d/tests/integration/metrics_tests/test_metrics.py#L33), [tempo-k8s-operator](https://github.com/canonical/tempo-k8s-operator/blob/78a1143d99af99a1a56fe9ff82b1a3563e4fd2f7/tests/integration/test_integration.py#L69), [synapse](https://github.com/canonical/synapse-operator/blob/eb44f4959a00040f08b98470f8b17cae4cc616da/tests/integration/conftest.py#L170)
 
-> See more: 
+> See more:
 > - {external+juju:ref}`Charm development best practices > Fetching network information <charm-development-best-practices>`
 > - {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
 
@@ -272,13 +272,13 @@ so you don't need to include the `-m` parameter.
 > Example implementations: [prometheus-k8s-operator](https://github.com/canonical/prometheus-k8s-operator/blob/d29f323343a1e4906a8c71104fcd1de817b2c2e6/tests/integration/conftest.py#L86), [hardware-observer-operator](https://github.com/canonical/hardware-observer-operator/blob/08c50798ca1c133a5d8ba5c889e0bcb09771300b/tests/functional/conftest.py#L14)
 
 
-> See more: 
+> See more:
 > - [`pytest-operator` | `run`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L576)
 > - [`pytest-operator` | `juju`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L624)
 
 ### Use several models
 
-You can use `pytest-operator` with several models, in the same cloud or in 
+You can use `pytest-operator` with several models, in the same cloud or in
 different clouds. This way you can, for example, integrate machine charms
 with Kubernetes charms easily.
 
@@ -308,7 +308,7 @@ Using the new alias, you can switch context to the new created model, similar to
 
 > Example implementations: [`charm-kubernetes-autoscaler`](https://github.com/charmed-kubernetes/charm-kubernetes-autoscaler/blob/8f4ddf5d66802ade73ed3aab2bb8d09fd9e4d63a/tests/integration/test_kubernetes_autoscaler.py#L31)
 
-> See more: 
+> See more:
 > - {external+juju:ref}`Juju offers <manage-offers>`
 > - {external+juju:ref}`How to manage clouds <manage-clouds>`
 > - [pytest-operator | track_model](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L720)
@@ -369,7 +369,7 @@ firing rate with `fast_forward`. Inside the new async context you can put any co
 
 > Example implementations [`postgresql-k8s-operator`](https://github.com/canonical/postgresql-k8s-operator/blob/69b2c138fa6b974883aa6d3d15a3315189d321d8/tests/integration/ha_tests/test_upgrade.py#L58), [`synapse-operator`](https://github.com/canonical/synapse-operator/blob/05c00bb7666197d04f1c025c36d8339b10b64a1a/tests/integration/test_charm.py#L249)
 
- 
+
 > See more:
 > - [`pytest-operator` | `fast_forward`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L1400)
 
@@ -382,7 +382,7 @@ By default you can run all your tests with:
 tox -e integration
 ```
 
-These tests will use the context of the current controller in Juju, and by default will create a new model per module, that will be destroyed when the test is finished. The cloud, controller and model name can be specified with the parameters `--cloud`, `--controller` and `--model` parameters. 
+These tests will use the context of the current controller in Juju, and by default will create a new model per module, that will be destroyed when the test is finished. The cloud, controller and model name can be specified with the parameters `--cloud`, `--controller` and `--model` parameters.
 
 If you specify the model name and do not delete the model on test tear down with the parameter `--keep-models`, you can reuse a model from a previous test run, as in the next example:
 ```text
@@ -399,7 +399,7 @@ There are different ways of specifying a subset of tests to run using `pytest`. 
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
 
-> See more: 
+> See more:
 > - [`pytest-operator` | `skip_if_deployed`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L139)
 > - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
 
@@ -418,6 +418,6 @@ You can disable crash dump generation with `--crash-dump=never`. To always creat
 tox -e integration -- --crash-dump=always --crash-dump-output=/tmp
 ```
 
-> See more: 
+> See more:
 > - [`juju-crashdump`](https://github.com/juju/juju-crashdump)
 > - [`pytest-operator` | `--crash-dump`](https://github.com/charmed-kubernetes/pytest-operator/blob/ab50fc20320d3ea3d8a37495f92a004531a4023f/pytest_operator/plugin.py#L97)
