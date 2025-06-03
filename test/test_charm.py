@@ -1526,12 +1526,8 @@ class _Alias:  # noqa: B903
 
 @dataclasses.dataclass(frozen=True)
 class _DataclassesAlias:
-    fooBar: dataclasses.InitVar[int]  # noqa: N815
-    foo_bar: int = dataclasses.field(init=False)
-    other: str
-
-    def __post_init__(self, fooBar: int):  # noqa: N803
-        object.__setattr__(self, 'foo_bar', fooBar)
+    foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+    other: str = 'baz'
 
 
 _alias_action_classes: list[type[object]] = [_Alias, _DataclassesAlias]
