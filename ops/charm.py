@@ -25,7 +25,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Generator,
     List,
     Literal,
     Mapping,
@@ -265,15 +264,18 @@ class ActionEvent(EventBase):
                 action class raises a ValueError.
         """
         try:
-            fields = set(_juju_fields(cls))
+            fields = _juju_fields(cls)
         except ValueError:
             fields = None
         params: dict[str, Any] = kwargs.copy()
-        for key, value in self.params.items():
+        for key, value in sorted(self.params.items()):
             attr = key.replace('-', '_')
-            if fields is not None and attr not in fields:
-                continue
-            params[attr] = value
+            if fields is None:
+                params[attr] = value
+            else:
+                if attr not in fields:
+                    continue
+                params[fields[attr]] = value
         try:
             return cls(*args, **params)
         except ValueError as e:
@@ -1492,26 +1494,43 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
 
 
-def _juju_fields(cls: type[object]) -> Generator[str]:
+def _juju_fields(cls: type[object]) -> dict[str, str]:
     """Iterates over all the field names to include when loading into a class.
+
+    Any Juju names that are not in the returned dictionary should not be passed to
+    the class. Names that are in the dictionary are mapped to the argument name;
+    in most cases this is the same string, but for aliases will differ.
 
     Raises:
         ValueError: if unable to determine which fields to include
     """
     # Dataclasses:
+    juju_to_arg: dict[str, str] = {}
     try:
-        fields = [field.name for field in dataclasses.fields(cls)]  # type: ignore
+        fields = dataclasses.fields(cls)  # type: ignore
     except TypeError:
         pass
     else:
-        yield from sorted(fields)
-        return
+        for field in fields:
+            alias = field.metadata.get('alias', field.name)
+            # If this a Pydantic dataclass, then it handles the alias.
+            # Using pydantic.dataclasses.is_pydantic_dataclass() would be
+            # best here, but we don't want to import pydantic in ops, so
+            # we look more explicitly.
+            if getattr(cls, '__is_pydantic_dataclass__', False):
+                juju_to_arg[alias] = alias
+            else:
+                juju_to_arg[alias] = field.name
+        return juju_to_arg
     # Pydantic models:
+    class_fields: dict[str, str] = {}
     if hasattr(cls, 'model_fields'):
-        yield from sorted(cls.model_fields)  # type: ignore
-        return
+        for name, field in cls.model_fields.items():
+            # Pydantic takes care of the alias.
+            class_fields[field.alias or name] = field.alias or name
+        return class_fields
     # It's not clear, so give up.
-    raise ValueError('Unable to find field list')
+    raise ValueError('Unable to find class fields')
 
 
 class CharmMeta:

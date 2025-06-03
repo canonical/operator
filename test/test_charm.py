@@ -1518,26 +1518,53 @@ my-action:
         harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
 
 
-def test_action_custom_naming_pattern(request: pytest.FixtureRequest):
-    class Act1:  # noqa: B903
-        foo_bar: int = 42
-        other: str = 'baz'
+class _Alias:  # noqa: B903
+    foo_bar: int = 42
+    other: str = 'baz'
 
-        def __init__(self, fooBar: int, other: str):  # noqa: N803
-            self.foo_bar = fooBar
-            self.other = other
+    def __init__(self, fooBar: int, other: str):  # noqa: N803
+        self.foo_bar = fooBar
+        self.other = other
 
+
+@dataclasses.dataclass(frozen=True)
+class _DataclassesAlias:
+    foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+    other: str = 'baz'
+
+
+_alternate_name_configs: list[type[object]] = [_Alias, _DataclassesAlias]
+
+if pydantic is not None:
+
+    @pydantic.dataclasses.dataclass(frozen=True, init=False)
+    class _PydanticDataclassesAlias:
+        foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+        other: str = pydantic.Field(default='baz')
+
+    class _PydanticBaseModelAlias(pydantic.BaseModel):
+        foo_bar: int = pydantic.Field(42, alias='fooBar')
+        other: str = pydantic.Field('baz')
+
+    _alternate_name_configs.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
+
+
+@pytest.mark.parametrize('fb_value', [{}, {'fooBar': 24}])
+@pytest.mark.parametrize('action_config', _alternate_name_configs)
+def test_action_custom_naming_pattern(
+    fb_value: dict[str, int], action_config: type[object], request: pytest.FixtureRequest
+):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            framework.observe(self.on['act1'].action, self._on_action)
+            framework.observe(self.on['act'].action, self._on_action)
 
         def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(Act1)
+            params = event.load_params(action_config)
             event.set_results({'params': params})
 
     action_yaml = """
-act1:
+act:
     params:
         fooBar:
             type: int
@@ -1549,8 +1576,8 @@ act1:
     harness = testing.Harness(Charm, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    params_out = harness.run_action('act1', {}).results['params']
-    assert params_out.foo_bar == 42
+    params_out = harness.run_action('act', fb_value).results['params']
+    assert params_out.foo_bar == fb_value.get('fooBar', 42)
     assert params_out.other == 'baz'
 
 
