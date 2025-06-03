@@ -1525,9 +1525,9 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
     # Pydantic models:
     class_fields: dict[str, str] = {}
     if hasattr(cls, 'model_fields'):
-        for name, field in cls.model_fields.items():
+        for name, field in cls.model_fields.items():  # type: ignore
             # Pydantic takes care of the alias.
-            class_fields[field.alias or name] = field.alias or name
+            class_fields[field.alias or name] = field.alias or name  # type: ignore
         return class_fields
     # It's not clear, so give up.
     raise ValueError('Unable to find class fields')
