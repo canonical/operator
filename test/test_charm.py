@@ -1519,9 +1519,6 @@ my-action:
 
 
 class _Alias:  # noqa: B903
-    foo_bar: int = 42
-    other: str = 'baz'
-
     def __init__(self, fooBar: int, other: str):  # noqa: N803
         self.foo_bar = fooBar
         self.other = other
