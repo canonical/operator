@@ -1501,6 +1501,10 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
     the class. Names that are in the dictionary are mapped to the argument name;
     in most cases this is the same string, but for aliases will differ.
 
+    Returns:
+        A dictionary where the key is the Juju name and the value is the name of
+        the attribute in the Python class.
+
     Raises:
         ValueError: if unable to determine which fields to include
     """
