@@ -1533,7 +1533,7 @@ class _DataclassesAlias:
     other: str = 'baz'
 
 
-_alternate_name_configs: list[type[object]] = [_Alias, _DataclassesAlias]
+_alias_action_classes: list[type[object]] = [_Alias, _DataclassesAlias]
 
 if pydantic is not None:
 
@@ -1546,13 +1546,13 @@ if pydantic is not None:
         foo_bar: int = pydantic.Field(42, alias='fooBar')
         other: str = pydantic.Field('baz')
 
-    _alternate_name_configs.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
+    _alias_action_classes.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
 
 
-@pytest.mark.parametrize('fb_value', [{}, {'fooBar': 24}])
-@pytest.mark.parametrize('action_config', _alternate_name_configs)
+@pytest.mark.parametrize('action_params', [{}, {'fooBar': 24}])
+@pytest.mark.parametrize('action_class', _alias_action_classes)
 def test_action_custom_naming_pattern(
-    fb_value: dict[str, int], action_config: type[object], request: pytest.FixtureRequest
+    action_params: dict[str, int], action_class: type[object], request: pytest.FixtureRequest
 ):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -1560,7 +1560,7 @@ def test_action_custom_naming_pattern(
             framework.observe(self.on['act'].action, self._on_action)
 
         def _on_action(self, event: ops.ActionEvent):
-            params = event.load_params(action_config)
+            params = event.load_params(action_class)
             event.set_results({'params': params})
 
     action_yaml = """
@@ -1576,8 +1576,8 @@ act:
     harness = testing.Harness(Charm, actions=action_yaml)
     request.addfinalizer(harness.cleanup)
     harness.begin()
-    params_out = harness.run_action('act', fb_value).results['params']
-    assert params_out.foo_bar == fb_value.get('fooBar', 42)
+    params_out = harness.run_action('act', action_params).results['params']
+    assert params_out.foo_bar == action_params.get('fooBar', 42)
     assert params_out.other == 'baz'
 
 
