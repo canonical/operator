@@ -22,7 +22,7 @@ jobs:
           rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
       # This step is expected to fail until the trusted publisher configuration
       # is updated in the test PYPI settings.
-      - uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc  # v1.12.4
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: ./tracing/dist/
           repository-url: https://test.pypi.org/legacy/
