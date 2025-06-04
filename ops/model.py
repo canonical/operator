@@ -1858,16 +1858,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # leaders have no read restrictions
             return
 
-        # type guard; we should not be accessing relation data
-        # if the remote app does not exist.
-        app = self.relation.app
-        if app is None:
-            raise RelationDataAccessError(
-                f'Remote application instance cannot be retrieved for {self.relation}.'
-            )
-
         # is this a peer relation?
-        if app.name == self._entity.name:
+        # The 'hasattr' check here is to protect against a Juju bug where
+        # JUJU_REMOTE_APP is sometimes not set. In that case, self.relation.app
+        # will be None (even though it is typed to always be an Application).
+        # https://bugs.launchpad.net/juju/+bug/1960934
+        if hasattr(self.relation.app, 'name') and self.relation.app.name == self._entity.name:
             # peer relation data is always publicly readable
             return
 
