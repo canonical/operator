@@ -1016,7 +1016,7 @@ class Container(_max_posargs(1)):
     notices: Sequence[Notice] = dataclasses.field(default_factory=list)
     """Any Pebble notices that already exist in the container."""
 
-    check_infos: frozenset[CheckInfo] = frozenset()
+    check_infos: Iterable[CheckInfo] = frozenset()
     """All Pebble health checks that have been added to the container."""
 
     def __hash__(self) -> int:
