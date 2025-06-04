@@ -2634,9 +2634,9 @@ class Container:
             user_id: User ID (UID) for file.
             user: Username for file. User's UID must match user_id if both are
                 specified.
-            group_id: Group ID (GID) for file.
+            group_id: Group ID (GID) for file. May only be specified along with user_id or user.
             group: Group name for file. Group's GID must match group_id if
-                both are specified.
+                both are specified. May only be specified along with user_id or user.
         """
         self._pebble.push(
             str(path),
@@ -2964,9 +2964,9 @@ class Container:
             user_id: User ID (UID) for directory.
             user: Username for directory. User's UID must match user_id if
                 both are specified.
-            group_id: Group ID (GID) for directory.
+            group_id: Group ID (GID) for directory. May only be specified along with user_id or user.
             group: Group name for directory. Group's GID must match group_id
-                if both are specified.
+                if both are specified. May only be specified along with user_id or user.
         """
         self._pebble.make_dir(
             str(path),
