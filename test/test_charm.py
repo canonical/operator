@@ -125,8 +125,44 @@ def test_observer_not_referenced_warning(
     assert 'Reference to ops.Object' in caplog.text
 
 
-def test_empty_action_and_config():
-    meta = ops.CharmMeta.from_yaml('name: my-charm', '', '')
+@pytest.mark.parametrize('empty_yaml', ['', '{}', None])
+def test_empty_action_and_config_from_yaml(empty_yaml: str | None):
+    meta = ops.CharmMeta.from_yaml('name: my-charm', empty_yaml, empty_yaml)
+    assert meta.actions == {}
+    assert meta.config == {}
+    if empty_yaml is not None:
+        meta = ops.CharmMeta.from_yaml('name: my-charm', config=f'options: {empty_yaml}')
+        assert meta.actions == {}
+        assert meta.config == {}
+
+
+@pytest.mark.parametrize('empty_yaml', ['', '{}', None])
+def test_empty_action_and_config_from_charm_root(empty_yaml: str | None):
+    with tempfile.TemporaryDirectory() as d:
+        td = pathlib.Path(d)
+        (td / 'metadata.yaml').write_text('name: my-charm')
+        if empty_yaml is not None:
+            (td / 'actions.yaml').write_text(empty_yaml)
+            (td / 'config.yaml').write_text(empty_yaml)
+        meta = ops.CharmMeta.from_charm_root(td)
+    assert meta.actions == {}
+    assert meta.config == {}
+    with tempfile.TemporaryDirectory() as d:
+        td = pathlib.Path(d)
+        (td / 'metadata.yaml').write_text('name: my-charm')
+        if empty_yaml is not None:
+            (td / 'config.yaml').write_text(f'options:\n  {empty_yaml}')
+        meta = ops.CharmMeta.from_charm_root(td)
+    assert meta.actions == {}
+    assert meta.config == {}
+
+
+@pytest.mark.parametrize('empty_yaml', [{}, None])
+def test_empty_action_and_config(empty_yaml: dict[str, typing.Any] | None):
+    meta = ops.CharmMeta({'name': 'my-charm'}, empty_yaml, empty_yaml)
+    assert meta.actions == {}
+    assert meta.config == {}
+    meta = ops.CharmMeta({'name': 'my-charm'}, config_raw={'options': empty_yaml})
     assert meta.actions == {}
     assert meta.config == {}
 
