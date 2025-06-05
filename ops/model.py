@@ -119,11 +119,7 @@ logger = logging.getLogger(__name__)
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
-_RelationDataClassType = TypeVar('_InterfaceType')
-
-
-class InvalidSchemaError(Exception):
-    """Raised when a config, action parameter, or databag schema does not match the data."""
+_RelationDataClassType = TypeVar('_RelationDataClassType')
 
 
 class Model:
@@ -1755,7 +1751,7 @@ class Relation:
 
         # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast('Application', app)
-        self.data = RelationData(self, our_unit, backend, cache)
+        self.data = RelationData(self, our_unit, backend)
 
         self._remote_model: RemoteModel | None = None
 
@@ -1913,28 +1909,19 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     :attr:`Relation.data`
     """
 
-    def __init__(
-        self,
-        relation: Relation,
-        our_unit: Unit,
-        backend: _ModelBackend,
-        cache: _ModelCache | None = None,
-    ):
+    def __init__(self, relation: Relation, our_unit: Unit, backend: _ModelBackend):
         self.relation = weakref.proxy(relation)
         self._data: dict[Unit | Application, RelationDataContent] = {
-            our_unit: RelationDataContent(self.relation, our_unit, backend, cache),
-            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend, cache),
+            our_unit: RelationDataContent(self.relation, our_unit, backend),
+            our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
         }
         self._data.update({
-            unit: RelationDataContent(self.relation, unit, backend, cache)
-            for unit in self.relation.units
+            unit: RelationDataContent(self.relation, unit, backend) for unit in self.relation.units
         })
         # The relation might be dead so avoid a None key here.
         if self.relation.app is not None:
             self._data.update({
-                self.relation.app: RelationDataContent(
-                    self.relation, self.relation.app, backend, cache
-                ),
+                self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
             })
 
     def __contains__(self, key: Unit | Application):
@@ -1958,17 +1945,10 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
 
-    def __init__(
-        self,
-        relation: Relation,
-        entity: Unit | Application,
-        backend: _ModelBackend,
-        cache: _ModelCache | None = None,
-    ):
+    def __init__(self, relation: Relation, entity: Unit | Application, backend: _ModelBackend):
         self.relation = relation
         self._entity = entity
         self._backend = backend
-        self._cache = cache
         self._is_app: bool = isinstance(entity, Application)
 
     @property
