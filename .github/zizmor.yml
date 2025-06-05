@@ -1,6 +1,7 @@
 rules:
   unpinned-uses:
-    ignore:
     config:
       policies:
-        "*": ref-pin
+        "actions/*": ref-pin
+        "github/*": ref-pin
+        "pypa/*": ref-pin

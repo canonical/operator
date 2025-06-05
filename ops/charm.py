@@ -1580,7 +1580,9 @@ class CharmMeta:
     ):
         raw_: dict[str, Any] = raw or {}
         actions_raw_: dict[str, Any] = actions_raw or {}
-        config_raw_: dict[str, Any] = config_raw or {}
+        # config_raw might be {'options': None} - this is accepted by
+        # charmcraft, even though {'options: {}} would be more correct.
+        options_raw: dict[str, Any] = (config_raw or {}).get('options') or {}
 
         # When running in production, this data is generally loaded from
         # metadata.yaml. However, when running tests, this data is
@@ -1645,7 +1647,7 @@ class CharmMeta:
         # This is predominately for backwards compatibility with Harness. In a
         # real Juju environment this shouldn't be possible, because charmcraft
         # validates the config when packing.
-        for name, config in config_raw_.get('options', {}).items():
+        for name, config in options_raw.items():
             if 'type' not in config:
                 raise RuntimeError(
                     f'Incorrectly formatted config in YAML, option {name} is '
@@ -1658,7 +1660,7 @@ class CharmMeta:
                 default=config.get('default'),
                 description=config.get('description'),
             )
-            for name, config in config_raw_.get('options', {}).items()
+            for name, config in options_raw.items()
         }
         self.containers = {
             name: ContainerMeta(name, container)
@@ -1950,8 +1952,8 @@ class JujuAssumesCondition(enum.Enum):
 class JujuAssumes:
     """Juju model features that are required by the charm.
 
-    See the `Juju docs <https://juju.is/docs/olm/supported-features>`_ for a
-    list of available features.
+    See the `Charmcraft docs <https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#assumes>`_
+    for a list of available features.
     """
 
     features: list[str | JujuAssumes]

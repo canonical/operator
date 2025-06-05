@@ -20,8 +20,8 @@ jobs:
     steps:
       - run: |
            # Work around https://github.com/jnsgruk/concierge/issues/30
-           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io 
-           sudo rm -rf /run/containerd 
+           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+           sudo rm -rf /run/containerd
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
@@ -31,5 +31,5 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb  # v6.1.0
       - run: uvx tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"

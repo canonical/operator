@@ -41,17 +41,17 @@ docs = [
     "sphinxext-opengraph",
 ]
 testing = [
-    "ops-scenario==7.22.0.dev0",
+    "ops-scenario==7.23.0.dev0",
 ]
 tracing = [
-    "ops-tracing==2.22.0.dev0",
+    "ops-tracing==2.23.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
 harness = []
 
 [project.urls]
-"Homepage" = "https://juju.is/docs/sdk"
+"Homepage" = "https://ops.readthedocs.io/en/latest/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
 "Documentation" = "https://ops.readthedocs.io"
@@ -253,6 +253,10 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "RUF003",  # Comment contains ambiguous unicode characters (EN DASH, RIGHT SINGLE QUOTATION MARK)
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
+]
+"examples/*/tests/*" = [
+    # All documentation linting.
+    "D",
 ]
 
 [tool.ruff.lint.pydocstyle]

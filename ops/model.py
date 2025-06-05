@@ -724,7 +724,7 @@ class Unit:
         Some behaviour, such as whether the port is opened externally without
         using "juju expose" and whether the opened ports are per-unit, differs
         between Kubernetes and machine charms. See the
-        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--open-port>`__
+        `Juju documentation <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/open-port/#details>`_
         for more detail.
 
         Use :meth:`set_ports` for a more declarative approach where all of
@@ -752,7 +752,7 @@ class Unit:
         Some behaviour, such as whether the port is closed externally without
         using "juju unexpose", differs between Kubernetes and machine charms.
         See the
-        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--close-port>`__
+        `Juju documentation <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/open-port/#details>`_
         for more detail.
 
         Use :meth:`set_ports` for a more declarative approach where all
@@ -783,7 +783,7 @@ class Unit:
         Some behaviour, such as whether the port is opened or closed externally without
         using Juju's ``expose`` and ``unexpose`` commands, differs between Kubernetes
         and machine charms. See the
-        `Juju documentation <https://juju.is/docs/sdk/hook-tool#heading--networking>`__
+        `Juju documentation <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/open-port/#details>`_
         for more detail.
 
         Use :meth:`open_port` and :meth:`close_port` to manage ports

@@ -1016,7 +1016,7 @@ class Container(_max_posargs(1)):
     notices: Sequence[Notice] = dataclasses.field(default_factory=list)
     """Any Pebble notices that already exist in the container."""
 
-    check_infos: frozenset[CheckInfo] = frozenset()
+    check_infos: Iterable[CheckInfo] = frozenset()
     """All Pebble health checks that have been added to the container."""
 
     def __hash__(self) -> int:
@@ -1849,8 +1849,10 @@ class _EventPath(str):
         instance.suffix, instance.type = suffix, _ = _EventPath._get_suffix_and_type(
             name,
         )
+        # TODO: when we drop Python 3.8, we can change the whole if-else below to
+        # instance.prefix = string.removesuffix(suffix)
         if suffix:
-            instance.prefix, _ = string.rsplit(suffix)
+            instance.prefix, _ = string.rsplit(suffix, maxsplit=1)
         else:
             instance.prefix = string
 

@@ -459,7 +459,7 @@ For reference, [here](https://github.com/IronCore864/my-fancy-database-operator)
 
 ### Troubleshooting and debugging the tests
 
-#### Your charm is missing some configurations/mocks
+#### Your charm is missing some configuration or mocks
 
 Solution to this is to add the missing mocks/patches to the `interface_tester` fixture in `conftest.py`.
 Essentially, you need to make it so that the charm runtime 'thinks' that everything is normal and ready to process and accept the interface you are testing.
