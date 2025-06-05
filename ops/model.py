@@ -119,7 +119,7 @@ logger = logging.getLogger(__name__)
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
-_InterfaceType = TypeVar('_InterfaceType')
+_RelationDataClassType = TypeVar('_InterfaceType')
 
 
 class InvalidSchemaError(Exception):
@@ -1779,39 +1779,81 @@ class Relation:
 
     def load(
         self,
-        cls: type[_InterfaceType],
+        cls: type[_RelationDataClassType],
         app_or_unit: Unit | Application,
         *args: Any,
         decoder: Callable[[Any], Any] | None = None,
+        errors: Literal['raise', 'blocked'] = 'raise',
         **kwargs: Any,
-    ) -> _InterfaceType:
+    ) -> _RelationDataClassType:
         """Load the data for this relation into an instance of a data class.
 
-        The object will be instantiated with the Juju relation data, passed as
-        keyword arguments.
+        The raw Juju relation data is passed to the data class's ``__init__``
+        method as keyword arguments, with:
+
+        * Dashes in names converted to underscores.
+        * Values decoded using the provided decoder function, or json.loads
+          if no decoder is provided.
 
         Any additional positional or keyword arguments will be passed through to
-        the data class.
+        the data class ``__init__``.
 
         Args:
-            cls: A class that can be instantiated with Juju relation data.
+            cls: A class that will accept the Juju relation data as keyword
+                arguments, and raise ``ValueError`` if validation fails.
             app_or_unit: The data to load. This can be either a :class:`Unit`
                 or :class:`Application` instance.
             decoder: An optional callable that will be used to decode each field
-                before loading into the class. If not provided, json.loads will
-                be used.
+                before loading into the class. If not provided,
+                :meth:`json.loads` will be used.
+            errors: what to do if the parameters are invalid. If ``fail``, this
+                will set the action to failed with an appropriate message and
+                then immediately exit. If ``raise``, ``load_params`` will not
+                catch any exceptions, leaving the charm to handle errors.
+            errors: what to do if the relation data is invalid. If ``blocked``,
+                this will set the unit status to blocked with an appropriate
+                message and then exit successfully (this informs Juju that
+                the event was handled and it will not be retried).
+                If ``raise``, ``load`` will not catch any exceptions, leaving
+                the charm to handle errors.
             args: positional arguments to pass through to the data class.
             kwargs: keyword arguments to pass through to the data class.
 
         Returns:
             An instance of the data class with the current relation data values.
+
+        Raises:
+            ValueError: if ``errors`` is set to ``raise`` and instantiating the
+                data class raises a ValueError.
         """
-        data = copy.deepcopy(kwargs)
+        try:
+            fields = _charm._juju_fields(cls)
+        except ValueError:
+            fields = None
+        data: dict[str, Any] = copy.deepcopy(kwargs)
         if decoder is None:
             decoder = json.loads
-        content = {k: decoder(v) for k, v in self.data[app_or_unit].items()}
-        data.update(**content)
-        return cls(*args, **data)
+        for key, value in sorted(self.data[app_or_unit].items()):
+            attr = key.replace('-', '_')
+            value = decoder(value)
+            if fields is None:
+                data[attr] = value
+            else:
+                if attr not in fields:
+                    continue
+                data[fields[attr]] = value
+        try:
+            return cls(*args, **data)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            self._backend.status_set(
+                'blocked',
+                f'Invalid relation data, relation={self}, bag={app_or_unit}: {e}',
+            )
+            from ._main import _Abort
+
+            raise _Abort(0) from e
 
     def save(
         self,
