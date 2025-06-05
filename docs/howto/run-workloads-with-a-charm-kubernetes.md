@@ -242,15 +242,15 @@ To give the charm access to some containers, you need to pass them to the input 
 
 ```python
 state = testing.State(containers={
-    testing.Container(name="foo", can_connect=True),
-    testing.Container(name="bar", can_connect=False),
+    testing.Container(name='foo', can_connect=True),
+    testing.Container(name='bar', can_connect=False),
 })
 ```
 
 In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it
 would give `False`.
 
-### Container filesystem setup
+### Mount files in the container
 
 You can configure a container to have some files in it:
 
@@ -260,7 +260,7 @@ import pathlib
 local_file = pathlib.Path('/path/to/local/real/file.txt')
 
 container = testing.Container(
-    name="foo",
+    name='foo',
     can_connect=True,
     mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file)},
     )
@@ -278,7 +278,9 @@ def _on_start(self, _):
 then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempfile` for
 nicely wrapping data and passing it to the charm via the container.
 
-`container.push` works similarly, so you can write a test like:
+### Check files written in the container
+
+`container.push` works similarly to `container.pull`. To check that the charm has pushed the expected data to the container, write a test like:
 
 ```python
 import tempfile
@@ -290,7 +292,7 @@ class MyCharm(ops.CharmBase):
 
     def _on_pebble_ready(self, _):
         foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
+        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
 
 def test_pebble_push():
     with tempfile.NamedTemporaryFile() as local_file:
@@ -302,16 +304,14 @@ def test_pebble_push():
         state_in = testing.State(containers={container})
         ctx = testing.Context(
             MyCharm,
-            meta={"name": "foo", "containers": {"foo": {}}}
+            meta={'name': 'foo', 'containers': {'foo': {}}}
         )
         ctx.run(
             ctx.on.pebble_ready(container),
             state_in,
         )
-        assert local_file.read().decode() == "TEST"
+        assert local_file.read().decode() == 'TEST'
 ```
-
-### Container filesystem post-mortem
 
 If the charm writes files to a container (to a location you didn't mount as a temporary folder you
 have access to), you will be able to inspect them using `get_filesystem`.
@@ -324,7 +324,7 @@ class MyCharm(ops.CharmBase):
 
     def _on_pebble_ready(self, _):
         foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', "TEST", make_dirs=True)
+        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
 
 
 def test_pebble_push():
@@ -332,7 +332,7 @@ def test_pebble_push():
     state_in = testing.State(containers={container})
     ctx = testing.Context(
         MyCharm,
-        meta={"name": "foo", "containers": {"foo": {}}}
+        meta={'name': 'foo', 'containers': {'foo': {}}}
     )
     
     state_out = ctx.run(ctx.on.start(), state_in)
@@ -340,7 +340,7 @@ def test_pebble_push():
     # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
     container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
     cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
-    assert cfg_file.read_text() == "TEST"
+    assert cfg_file.read_text() == 'TEST'
 ```
 
 ## Control and monitor services in the workload container
@@ -653,17 +653,17 @@ from ops import testing
 def test_http_check_failing():
     ctx = testing.Context(PostgresCharm)
     check_info = testing.CheckInfo(
-        "http-test",
+        'http-test',
         failures=3,
         status=ops.pebble.CheckStatus.DOWN,
-        level=layer.checks["http-test"].level,
-        startup=layer.checks["http-test"].startup,
-        threshold=layer.checks["http-test"].threshold,
+        level=layer.checks['http-test'].level,
+        startup=layer.checks['http-test'].startup,
+        threshold=layer.checks['http-test'].threshold,
     )
     layer = ops.pebble.Layer({
-        "checks": {"http-test": {"override": "replace", "startup": "enabled", "failures": 3}},
+        'checks': {'http-test': {'override': 'replace', 'startup': 'enabled', 'failures': 3}},
     })
-    container = testing.Container("db", check_infos={check_info}, layers={"layer1": layer})
+    container = testing.Container('db', check_infos={check_info}, layers={'layer1': layer})
     state_in = testing.State(containers={container})
 
     state_out = ctx.run(ctx.on.pebble_check_failed(container, info=check_info), state_in)
@@ -977,7 +977,7 @@ class MyCharm(ops.CharmBase):
     def _on_start(self, _):
         foo = self.unit.get_container('foo')
         proc = foo.exec(['ls', '-ll'])
-        proc.stdin.write("...")
+        proc.stdin.write('...')
         stdout, _ = proc.wait_output()
         assert stdout == LS_LL
 
@@ -995,21 +995,21 @@ def test_pebble_exec():
     state_in = testing.State(containers={container})
     ctx = testing.Context(
         MyCharm,
-        meta={"name": "foo", "containers": {"foo": {}}},
+        meta={'name': 'foo', 'containers': {'foo': {}}},
     )
     state_out = ctx.run(
         ctx.on.pebble_ready(container),
         state_in,
     )
     assert ctx.exec_history[container.name][0].command == ['ls', '-ll']
-    assert ctx.exec_history[container.name][0].stdin == "..."
+    assert ctx.exec_history[container.name][0].stdin == '...'
 ```
 
 The framework will attempt to find the right `Exec` object by matching the provided command prefix
 against the command used in the ops `container.exec()` call. For example if the command is
 `['ls', '-ll']` then the searching will be:
 
- 1. an `Exec` with exactly the same as command prefix, `('ls', '-ll')`
+ 1. an `Exec` with exactly the same command prefix and arguments, `('ls', '-ll')`
  2. an `Exec` with the command prefix `('ls', )`
  3. an `Exec` with the command prefix `()`
 

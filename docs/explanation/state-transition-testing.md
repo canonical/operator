@@ -1,13 +1,10 @@
 # State-transition testing
 
-Scenario is a state-transition testing SDK for Ops charms.
+The framework for state-transition testing in Ops was originally developed under the name "Scenario" and released as a Python package called `ops-scenario`. Scenario solved so many issues with the older "Harness" framework that it was adopted as the recommended framework for writing charm unit tests.
+
+This page compares Scenario to Harness and explains how state-transition tests work. For a summary of how to write unit tests, see [](/howto/write-unit-tests-for-a-charm).
 
 ```{note}
-The state-transition testing framework was originally developed under the name
-"Scenario", and the package is found on PyPI as `ops-scenario`. The framework
-solved so many issues with the older "Harness" framework that it was adopted as
-the recommended framework for writing charm unit tests.
-
 In your testing dependencies, add `ops[testing]` rather than `ops-scenario`, and
 this will ensure that an appropriate version of the framework is installed.
 
@@ -16,7 +13,7 @@ namespace, rather than `scenario`. "from ops import testing ... ctx =
 testing.Context" rather than "import scenario ... ctx = scenario.Context".
 ```
 
-Where the Harness enables you to procedurally mock pieces of the state the
+Where the deprecated Harness framework enables you to procedurally mock pieces of the state the
 charm needs to function, state-transition tests allow you to declaratively
 define the state all at once, and use it as a sort of context against which you
 can fire a single event on the charm and execute its logic.
@@ -46,7 +43,7 @@ that:
 
 ## Core concepts
 
-The tests are about running assertions on atomic state transitions treating the
+The tests are about running assertions on atomic state transitions, treating the
 charm being tested like a black box. An initial state goes in, an event occurs
 (say, `'start'`) and a new state comes out. The tests are about validating the
 transition, that is, consistency-checking the delta between the two states, and
@@ -55,7 +52,7 @@ verifying the charm author's expectations.
 Comparing these tests with `Harness` tests:
 
 - Harness exposes an imperative API: the user is expected to call methods on the
-  Harness driving it to the desired state, then verify its validity by calling
+  harness driving it to the desired state, then verify its validity by calling
   charm methods or inspecting the raw data. In contrast, these tests are
   declarative. You fully specify an initial state, an execution context and an
   event, then you run the charm and inspect the results.
@@ -78,8 +75,8 @@ A test consists of three broad steps:
     - declare the input state
     - select an event to fire
 - **Act**:
-    - run the context (that is, obtain the output state, given the input state
-      and the event)
+    - "run" the context - obtain the output state from the given input state
+      and the event
 - **Assert**:
     - verify that the output state (or the delta with the input state) is how
       you expect it to be
@@ -89,7 +86,7 @@ A test consists of three broad steps:
       instance and run assertions on internal APIs and the internal state of the
       charm and `ops`.
 
-The most basic scenario is one in which all is defaulted and barely any data is
+The most basic scenario is one in which all defaults apply and barely any data is
 available. The charm has no config, no relations, no leadership, and its status
 is `unknown`.
 
@@ -131,7 +128,7 @@ class MyCharm(ops.CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    ctx = testing.Context(MyCharm, meta={"name": "foo"})
+    ctx = testing.Context(MyCharm, meta={'name': 'foo'})
     state_out = ctx.run(ctx.on.start(), testing.State(leader=leader))
     assert state_out.unit_status == testing.ActiveStatus('I rule' if leader else 'I am ruled')
 ```
@@ -245,20 +242,20 @@ that you can do delta-based comparison of states without worrying about them
 being mutated by the test framework.
 
 If you want to modify any of these data structures, you will need to either
-reinstantiate it from scratch, or use the dataclasses `replace` api.
+reinstantiate it from scratch, or use the dataclasses `replace` API.
 
 ```python
 import dataclasses
 
-relation = testing.Relation('foo', remote_app_data={"1": "2"})
-# make a copy of relation, but with remote_app_data set to {"3": "4"}
-relation2 = dataclasses.replace(relation, remote_app_data={"3": "4"})
+relation = testing.Relation('foo', remote_app_data={'1': '2'})
+# make a copy of relation, but with remote_app_data set to {'3': '4'}
+relation2 = dataclasses.replace(relation, remote_app_data={'3': '4'})
 ```
 
 Note that this also means that it's important to assert on the objects in the
 *output* state. The input and output state will often have the same objects
 (such as containers or relations), but the content of those objects is likely to
-have changed during the event run. The `State` has 'get_' methods to simplify
+have changed during the event run. The `State` has `get_` methods to simplify
 this, for example: `container_out = state_out.get_container(container_in.name)`.
 
 ## Consistency checks

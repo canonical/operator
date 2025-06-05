@@ -359,7 +359,7 @@ class MyWebserverCharm(ops.CharmBase):
 ## Write tests for your charm
 
 Provide mocked secret content to your charm tests using [](ops.testing.Secret)
-objects. For example::
+objects. For example:
 
 ```python
 state_in = testing.State(
@@ -372,7 +372,7 @@ state_in = testing.State(
 )
 ```
 
-The only mandatory arguments to `Secret` is the `tracked_content` dict: a
+The only mandatory argument to `Secret` is the `tracked_content` dict: a
 `str:str` mapping representing the content of the revision. If there is a
 newer revision of the content than the one the unit that's handling the event is
 tracking, then `latest_content` should also be provided - if it's not, then
@@ -387,8 +387,7 @@ secret. There are three cases:
   can only manage it if we are the leader
 - the secret is owned by this unit, in which case this charm can always manage
   it (leader or not)
-- (default) the secret is not owned by this app nor unit, which means we can't
-  manage it but only view it (this includes user secrets)
+- (default) the secret is not owned by this app nor unit, which means we can only view it (this includes user secrets)
 
 Thus by default, the secret is not owned by **this charm**, but, implicitly, by
 some unknown 'other charm' (or a user), and that other has granted us view
@@ -405,14 +404,14 @@ the secret, or is leader, it will _also_ have manage rights on top of view ones.
 To specify a secret owned by this unit (or app):
 
 ```python
-rel = testing.Relation("web")
+rel = testing.Relation('web')
 state_in = testing.State(
     secrets={
         testing.Secret(
             {'key': 'private'},
             owner='unit',  # or 'app'
             # The secret owner has granted access to the "remote" app over some relation:
-            remote_grants={rel.id: {"remote"}}
+            remote_grants={rel.id: {'remote'}}
         )
     }
 )
@@ -435,7 +434,7 @@ class SecretCharm(ops.CharmBase):
 
 
 ctx = testing.Context(SecretCharm)
-secret = testing.Secret({"password": "xxxxxxxx"}, owner="app")
+secret = testing.Secret({'password': 'xxxxxxxx'}, owner='app')
 old_revision = 42
 state_out = ctx.run(
     ctx.on.secret_remove(secret, revision=old_revision),
@@ -444,4 +443,3 @@ state_out = ctx.run(
 assert ctx.removed_secret_revisions == [old_revision]
 ```
 
-<small>**Contributors:** @ppasotti, @tmihoc, @tony-meyer, @wallyworld </small>

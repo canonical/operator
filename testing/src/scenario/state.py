@@ -460,7 +460,7 @@ class Network(_max_posargs(2)):
     associated with a ``Network``, even if charms have not been integrated over
     that endpoint yet.
 
-    If your charm has a relation `"foo"`, then the charm will be able, at
+    If your charm has a relation ``foo``, then the charm will be able, at
     runtime, to do ``self.model.get_binding("foo").network``. The network you'll
     get by doing so is heavily defaulted and good for most use-cases because the
     charm should typically not be concerned about what IP it gets.
@@ -469,7 +469,7 @@ class Network(_max_posargs(2)):
     passing it to :attr:`State.networks`::
 
         state = State(networks={
-            Network("foo", [BindAddress([Address('192.0.2.1')])]),
+            Network('foo', [BindAddress([Address('192.0.2.1')])]),
         })
     """
 
@@ -750,7 +750,7 @@ class Model(_max_posargs(1)):
     ``Model`` to the state::
 
         ctx = Context(MyCharm)
-        state_in = State(model=Model(name="my-model"))
+        state_in = State(model=Model(name='my-model'))
         state_out = ctx.run(ctx.on.start(), state_in)
     """
 
@@ -769,19 +769,19 @@ class Model(_max_posargs(1)):
     You can set CloudSpec information in the model, for example::
 
         cloud_spec=CloudSpec(
-            type="lxd",
-            endpoint="https://127.0.0.1:8443",
+            type='lxd',
+            endpoint='https://127.0.0.1:8443',
             credential=CloudCredential(
-                auth_type="clientcertificate",
+                auth_type='clientcertificate',
                 attributes={
-                    "client-cert": "foo",
-                    "client-key": "bar",
-                    "server-cert": "baz",
+                    'client-cert': 'foo',
+                    'client-key': 'bar',
+                    'server-cert': 'baz',
                 },
             ),
         )
         state_in = State(
-            model=Model(name="my-vm-model", type="lxd", cloud_spec=cloud_spec),
+            model=Model(name='my-vm-model', type='lxd', cloud_spec=cloud_spec),
         )
 
     The spec will be accessible in the charm via the
@@ -2102,7 +2102,7 @@ class _Event:  # type: ignore
         for keeping track of the deferred event handlers. On the input side, you
         can verify that if the charm triggers with this and that notice in its
         queue (they would be there because they had been deferred in the
-        previous run), then the output state is valid. For example:
+        previous run), then the output state is valid. For example::
 
             class MyCharm(ops.CharmBase):
                 def _on_update_status(self, event: ops.UpdateStatusEvent):

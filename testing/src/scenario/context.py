@@ -470,7 +470,7 @@ class Context(Generic[CharmType]):
                 manager.run()
                 assert manager.charm._some_private_attribute == "bar"
 
-    Note that you can't call `run()` multiple times. The context 'pauses' ops
+    Note that you can't call ``run()`` multiple times. The context 'pauses' ops
     right before emitting the event, but otherwise this is a regular test; you
     can't emit multiple events in a single charm execution.
     """
@@ -549,11 +549,11 @@ class Context(Generic[CharmType]):
 
             assert len(ctx.emitted_events) == 5
             assert [e.handle.kind for e in ctx.emitted_events] == [
-                "update_status",
-                "start",
-                "collect_unit_status",
-                "pre_commit",
-                "commit",
+                'update_status',
+                'start',
+                'collect_unit_status',
+                'pre_commit',
+                'commit',
             ]
     """
     requested_storages: dict[str, int]

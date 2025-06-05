@@ -72,7 +72,7 @@ juju deploy ./my-charm.charm --resource my-resource=/tmp/somefile.txt
 > See first: {ref}`write-unit-tests-for-a-charm`
 
 If your charm requires access to resources, you can make them available to it
-through ``State.resources``. For example, to make a ``foo` resource that is a
+through ``State.resources``. For example, to make a ``foo`` resource that is a
 path to an OCI image available:
 
 ```python
@@ -80,7 +80,7 @@ import pathlib
 
 from ops import testing
 
-ctx = testing.Context(MyCharm, meta={'name': 'julie', "resources": {"foo": {"type": "oci-image"}}})
+ctx = testing.Context(MyCharm, meta={'name': 'julie', 'resources': {'foo': {'type': 'oci-image'}}})
 resource = testing.Resource(name='foo', path='/path/to/resource.tar')
 with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('foo')

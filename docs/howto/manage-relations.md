@@ -286,13 +286,13 @@ in terms of `peers`:
 
 ```python
 relation = testing.PeerRelation(
-    endpoint="peers",
+    endpoint='peers',
     peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
 )
 ```
 
-Be mindful when using `PeerRelation` not to include **"this unit"**'s ID in
-`peers_data` or `peers_ids`. To mock "this unit"'s peer data, set it in
+Be mindful when using `PeerRelation` not to include the current unit's ID in
+`peers_data` or `peers_ids`. To mock the current unit's peer data, set it in
 `local_unit_data` as with other relation types.
 
 To declare a subordinate relation, you should use
@@ -311,12 +311,12 @@ that, `SubordinateRelation`, compared to `Relation`, always talks in terms of
 
 ```python
 relation = testing.SubordinateRelation(
-    endpoint="peers",
-    remote_unit_data={"foo": "bar"},
-    remote_app_name="zookeeper",
+    endpoint='peers',
+    remote_unit_data={'foo': 'bar'},
+    remote_app_name='zookeeper',
     remote_unit_id=42
 )
-relation.remote_unit_name  # "zookeeper/42"
+relation.remote_unit_name  # 'zookeeper/42'
 ```
 
 ### Write integration tests
