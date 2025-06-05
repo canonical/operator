@@ -443,7 +443,7 @@ def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
                 return 0
 
             data = self.databag_class(foo='value')
-            event.relation.save(data, self.app, encoder=encoder)
+            event.relation.save(data, self.app, encoder=encoder)  # type: ignore
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')

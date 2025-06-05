@@ -1778,7 +1778,7 @@ class Relation:
         cls: type[_RelationDataClassType],
         app_or_unit: Unit | Application,
         *args: Any,
-        decoder: Callable[[Any], Any] | None = None,
+        decoder: Callable[[str], Any] | None = None,
         errors: Literal['raise', 'blocked'] = 'raise',
         **kwargs: Any,
     ) -> _RelationDataClassType:
@@ -1856,7 +1856,7 @@ class Relation:
         obj: object,
         app_or_unit: Unit | Application,
         *,
-        encoder: Callable[[Any], Any] | None = None,
+        encoder: Callable[[Any], str] | None = None,
     ):
         """Save the data from the provided data class object to Juju relation data.
 
