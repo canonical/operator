@@ -74,11 +74,17 @@ def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvi
 
 def get_exporter() -> BufferingSpanExporter | None:
     """Get our export from OpenTelemetry SDK."""
+    exporter = None
     try:
+        # opentelemetry-sdk versions xx ~ xx
         exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
     except AttributeError:
-        # The global tracer provider was not configured by us and has a wrong processor.
-        return None
+        pass
+    try:
+        # opentelemetry-sdk versions yy ~ yy
+        exporter = get_tracer_provider()._active_span_processor._batch_processor._exporter
+    except AttributeError:
+        pass
     if not exporter or not isinstance(exporter, BufferingSpanExporter):
         return None
     return exporter
