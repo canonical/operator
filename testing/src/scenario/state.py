@@ -785,7 +785,7 @@ class Model(_max_posargs(1)):
         )
 
     The spec will be accessible in the charm via the
-    :attr:`ops.Model.get_cloud_spec` method.
+    :meth:`ops.Model.get_cloud_spec` method.
     """
 
 
