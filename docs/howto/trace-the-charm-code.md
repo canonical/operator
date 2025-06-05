@@ -5,15 +5,15 @@
 `ops.tracing.Tracing`, allowing you to observe and instrument your charm's
 execution using OpenTelemetry.
 
-Refer to `ops.tracing` reference for the canonical usage example, configuration
-options and API details.
+Refer to the `ops.tracing` reference for the canonical usage example, configuration
+options, and API details.
 
 ## Getting started
 
 To enable basic tracing:
 
-- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency, for example
-- In your `charmcraft.yaml`, declare the tracing and (optionally) ca relations
+- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
+- In your `charmcraft.yaml`, declare the tracing and (optionally) ca relations, for example:
 
 ```yaml
 requires:
@@ -27,7 +27,7 @@ requires:
     optional: true
 ```
 
-- In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object
+- In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object, for example:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -50,6 +50,25 @@ At this point, Ops will trace:
 This provides coarse-grained tracing, focused on the boundaries between the
 charm code and the external processes.
 
+When you deploy your charm, until it is integrated with an app providing the `tracing` relation
+(and optionally the `certificate_transfer` relation), the traces will be buffered in a tracing
+database on the unit. When the charm is successfully integrated with the `tracing` provider,
+the buffered traces and new traces will be sent to the tracing destination. For Kubernetes
+charms, if the container is recreated, any buffered traces will be lost. Ops will buffer traces
+for a reasonable period of time and amount of space.
+
+For example, to send traces to [Grafana Tempo](https://grafana.com/docs/tempo/latest/) from
+a charm named `my-charm`, assuming that
+[Charmed Tempo HA](https://discourse.charmhub.io/t/charmed-tempo-ha/15531) has already been
+deployed:
+
+TODO: what are the actual names for tempo's tracing and certificate_transfer?
+
+```bash
+juju deploy my-charm
+juju integrate my-charm tempo
+```
+
 (custom-spans-and-events)=
 ## Custom spans and events
 
@@ -67,9 +86,39 @@ TODO: why do we need to depend on opentelemetry when ops does? Is it the newer v
   `opentelemetry.trace.get_current_span().add_event(name, attributes)` to create
   a custom OpenTelemetry event.
 
+```{tip}
 Prefer using the OpenTelemetry `start_as_current_span` primitive as a context manager
 over a decorator. While both are supported, the context manager is more ergonomic,
 allows exposing the resulting span, and doesn't pollute exception stack traces.
+```
+
+For example, to add a custom span for the `migrate_db` method in this workload module,
+with an event for each retry:
+
+```python
+import opentelemetry.trace
+
+tracer = opentelemetry.trace.get_tracer(__name__)
+
+class Workload:
+    ...
+    def migrate_db(self):
+        with tracer.start_as_current_span('migrate-db'):
+            for attempt in range(3):
+                try:
+                    subprocess.run('/path/to/migrate.sh', capture_output=True, check=True)
+                except subprocess.CalledProcessError:
+                    opentelemetry.trace.get_current_span().add_event(
+                        'db-migrate-failed',
+                        {'attempt': attempt},
+                    )
+                    time.sleep(10 ** attempt)
+                else:
+                    break
+            else:
+                logger.error('Could not migrate the database')
+            ...
+```
 
 ## Adding tracing to charm libraries
 
@@ -83,7 +132,7 @@ TODO: again, why do we need the dependency when ops has it? We also recommend ag
 - See the [Custom spans and events](custom-spans-and-events) section above to
   create OpenTelemetry spans and events in the key places in your charm library.
 
-## Migrating from charm\_tracing charm library
+## Migrating from the charm\_tracing charm library
 
 - In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
   `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
@@ -91,9 +140,9 @@ TODO: again, why do we need the dependency when ops has it? We also recommend ag
 - In your repository, remove the `charm_tracing` charm library.
 - In your charm code, remove the `@trace_charm` decorator and its helpers: the
   `tracing_endpoint` and `server_cert` properties or methods.
-- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
 - In your `charmcraft.yaml`, take note of the tracing and (optionally) ca relation names.
-- In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object
+- In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object,
+  using the relation names from the previous step
 
 Note that the `charm_tracing` charm library auto-instruments all public functions
 of the decorated charm class. `ops[tracing]` doesn't do that, and you are expected
