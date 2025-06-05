@@ -2105,6 +2105,11 @@ class _Event:  # type: ignore
         previous run), then the output state is valid. For example::
 
             class MyCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.update_status, self._on_update_status)
+                    framework.observe(self.on.start, self._on_start)
+
                 def _on_update_status(self, event: ops.UpdateStatusEvent):
                     event.defer()
 
