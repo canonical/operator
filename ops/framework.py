@@ -489,9 +489,21 @@ class ObjectEvents(Object):
                 event_kinds.append(attr_name)
         return event_kinds
 
-    def events(self) -> dict[str, BoundEvent]:
-        """Return a mapping of event_kinds to bound_events for all available events."""
-        return {event_kind: getattr(self, event_kind) for event_kind in self._event_kinds()}
+    def events(self, *event_type: type[EventBase]) -> dict[str, BoundEvent]:
+        """Return a mapping of event names to BoundEvent instances the framework can observe.
+
+        Args:
+            event_type: An optional tuple of event types to narrow the selection.
+                        If omitted, all events will be returned.
+        """
+        events = {event_kind: getattr(self, event_kind) for event_kind in self._event_kinds()}
+        if event_type:
+            return {
+                event_kind: event
+                for event_kind, event in events.items()
+                if issubclass(event.event_type, event_type)
+            }
+        return events
 
     def __getitem__(self, key: str) -> PrefixedEvents:
         return PrefixedEvents(self, key)
