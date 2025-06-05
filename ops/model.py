@@ -1788,8 +1788,8 @@ class Relation:
         method as keyword arguments, with:
 
         * Dashes in names converted to underscores.
-        * Values decoded using the provided decoder function, or json.loads
-          if no decoder is provided.
+        * Values decoded using the provided decoder function, or
+          :func:`json.loads` if no decoder is provided.
 
         Any additional positional or keyword arguments will be passed through to
         the data class ``__init__``.
@@ -1801,7 +1801,7 @@ class Relation:
                 :class:`Unit` or :class:`Application` instance.
             decoder: An optional callable that will be used to decode each field
                 before loading into the class. If not provided,
-                :meth:`json.loads` will be used.
+                :func:`json.loads` will be used.
             errors: what to do if the parameters are invalid. If ``fail``, this
                 will set the action to failed with an appropriate message and
                 then immediately exit. If ``raise``, ``load_params`` will not
@@ -1865,8 +1865,8 @@ class Relation:
             app_or_unit: The destination in which to save the data to save. This
                 can be either a :class:`Unit` or :class:`Application` instance.
             encoder: An optional callable that will be used to encode each field
-                before passing to Juju. If not provided, json.dumps will be
-                used.
+                before passing to Juju. If not provided, :func:`json.dumps` will
+                be used.
 
         Raises:
             ValueError: if the encoder does not return a string.
@@ -1874,6 +1874,9 @@ class Relation:
             ModelError: if the charm does not have permission to write to the
                 relation data.
         """
+        # TODO: What about undoing the underscores to dashes? How could we know
+        # when to change? Maybe that just shouldn't happen here and we force
+        # charmers to use aliases?
         if encoder is None:
             encoder = json.dumps
         try:
