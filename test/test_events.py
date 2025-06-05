@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import typing
+
 import pytest
 
 import ops
@@ -22,7 +24,9 @@ from ops import Framework
 from ops.testing import CharmEvents, Context, State
 
 
-def collect_filtered(*event_type, meta: dict | None = None) -> tuple[ops.EventBase, ...]:
+def collect_filtered(
+    *event_type: type[ops.EventBase], meta: dict[str, typing.Any] | None = None
+) -> tuple[ops.EventBase, ...]:
     ctx = Context(ops.CharmBase, meta={'name': 'ben', **(meta or {})})
     with ctx(ctx.on.update_status(), State()) as mgr:
         return tuple(e.event_type for e in mgr.charm.on.events(*event_type).values())  # type: ignore
@@ -50,7 +54,7 @@ def test_filtering_secret():
 @pytest.mark.parametrize(
     'evt_type', (ops.StartEvent, ops.UpgradeCharmEvent, ops.SecretExpiredEvent)
 )
-def test_filtering_single(evt_type):
+def test_filtering_single(evt_type: type[ops.EventBase]):
     assert set(collect_filtered(evt_type)) == {evt_type}
 
 
@@ -64,7 +68,9 @@ def test_filtering_single(evt_type):
         ((ops.SecretExpiredEvent,), CharmEvents.update_status(), False),
     ),
 )
-def test_filtered_observer(filter_arg, event_to_emit, expect_run):
+def test_filtered_observer(
+    filter_arg: tuple[type[ops.EventBase]], event_to_emit: typing.Any, expect_run: bool
+):
     class MyCharm(ops.CharmBase):
         run = False
 
@@ -73,7 +79,7 @@ def test_filtered_observer(filter_arg, event_to_emit, expect_run):
             for e in self.on.events(*filter_arg).values():
                 framework.observe(e, self._on_event)
 
-        def _on_event(self, _):
+        def _on_event(self, _: ops.EventBase):
             MyCharm.run = True
 
     ctx = Context(MyCharm, meta={'name': 'ben'})
