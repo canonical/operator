@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import pathlib
 from typing import TYPE_CHECKING
 
@@ -75,18 +76,18 @@ def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvi
 def get_exporter() -> BufferingSpanExporter | None:
     """Get our export from OpenTelemetry SDK."""
     exporter = None
-    try:
-        # opentelemetry-sdk versions xx ~ xx
+
+    # opentelemetry-sdk < 1.34.0
+    with contextlib.suppress(AttributeError):
         exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
-    except AttributeError:
-        pass
-    try:
-        # opentelemetry-sdk versions yy ~ yy
-        exporter = get_tracer_provider()._active_span_processor._batch_processor._exporter
-    except AttributeError:
-        pass
+
+    # opentelemetry-sdk >= 1.34.0
+    with contextlib.suppress(AttributeError):
+        exporter = get_tracer_provider()._active_span_processor._batch_processor._exporter  # type: ignore
+
     if not exporter or not isinstance(exporter, BufferingSpanExporter):
         return None
+
     return exporter
 
 
