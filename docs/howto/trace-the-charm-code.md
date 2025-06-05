@@ -8,14 +8,6 @@ execution using OpenTelemetry.
 Refer to `ops.tracing` reference for the canonical usage example, configuration
 options and API details.
 
-This guide covers:
-- [Adding tracing to your charm](#getting-started-tracing-a-charm)
-- [Creating custom spans and events](#custom-spans-and-events)
-- [Adding tracing to charm libraries](#adding-tracing-to-charm-libraries)
-- [Migrating from the `charm_tracing` charm library](#migrating-from-charm_tracing-charm-library)
-- [How and when to use the lower-level API](#lower-level-api)
-
-(getting-started-tracing-a-charm)=
 ## Getting started
 
 To enable basic tracing:
