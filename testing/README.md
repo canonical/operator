@@ -1,7 +1,7 @@
 # ops-scenario, the unit testing framework for ops charms
 
-ops-scenario is a Python library that provides state-transition testing for
-[ops](https://ops.readthedocs.io) charms. These tests are higher level than
+`ops-scenario` is a Python library that provides state-transition testing for
+[Ops](https://ops.readthedocs.io) charms. These tests are higher level than
 typical unit tests, but run at similar speeds and are the recommended approach
 for testing charms within requiring a full [Juju](https://juju.is) installation.
 
@@ -11,8 +11,7 @@ then asserting on the (simulated) output Juju state.
 
 ## Writing tests
 
-A simple test that verifies that the unit ends with an active status after the
-`start` event, with a very minimal initial state looks like:
+Here's a test that verifies that a unit is active after the `start` event, with a very minimal initial state:
 
 ```python
 from ops import testing
@@ -94,8 +93,8 @@ package.
 
 ## Documentation
 
- * Work through our ['Write your first Kubernetes charm' tutorial](https://ops.readthedocs.io/en/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html#write-unit-tests-for-your-charm), following the instructions for adding
-   unit tests at the end of each chapter, to get started..
+ * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://ops.readthedocs.io/en/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html#write-unit-tests-for-your-charm), following the instructions for adding
+   unit tests at the end of each chapter.
  * When you need to write a test that involves specific ops functionality,
    refer to our [how-to guides](https://ops.readthedocs.io/en/latest/howto/index.html)
    which all conclude with examples of tests of the ops functionality.
@@ -124,7 +123,7 @@ constructive feedback.
 
 ## Contributing and developing
 
-Anyone can contribute to ops, including `ops-scenario`. It's best to start by
+Anyone can contribute to ops and `ops-scenario`. It's best to start by
 [opening an issue](https://github.com/canonical/operator/issues) with a clear
 description of the problem or feature request, but you can also
 [open a pull request](https://github.com/canonical/operator/pulls) directly.
