@@ -5,35 +5,63 @@
 `ops.tracing.Tracing`, allowing you to observe and instrument your charm's
 execution using OpenTelemetry.
 
-Refer to `ops.tracing` reference for the canonical usage example, ocnfiguration
+Refer to `ops.tracing` reference for the canonical usage example, configuration
 options and API details.
 
 This guide covers:
-- Adding tracing to your charm
-- Creating custom spans and events
-- Adding tracing to charm libraries
-- Migrating from the `charm_tracing` charm library
-- How and when to use the lower-level API
+- [Adding tracing to your charm](#getting-started-tracing-a-charm)
+- [Creating custom spans and events](#custom-spans-and-events)
+- [Adding tracing to charm libraries](#adding-tracing-to-charm-libraries)
+- [Migrating from the `charm_tracing` charm library](#migrating-from-charm_tracing-charm-library)
+- [How and when to use the lower-level API](#lower-level-api)
 
+(getting-started-tracing-a-charm)=
 ## Getting started
 
 To enable basic tracing:
 
-- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` dependency
+- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency, for example
 - In your `charmcraft.yaml`, declare the tracing and (optionally) ca relations
+
+```yaml
+requires:
+  charm-tracing:
+    interface: tracing
+    limit: 1
+    optional: true
+  receive-ca-cert:
+    interface: certificate_transfer
+    limit: 1
+    optional: true
+```
+
 - In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object
 
-At this point, the Ops library will be traced:
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.tracing = ops.tracing.Tracing(
+            self,
+            tracing_relation_name='charm-tracing',
+            ca_relation_name='receive-ca-cert',
+        )
+        ...
+```
+
+At this point, Ops will trace:
 - The `ops.main()` call
-- The events that the Ops library emits
-- The hook tools called by the charm code
-- The Pebble API access by the charm code
+- Events that Ops emits, including all the Juju events
+- Hook tools called by the charm code
+- Pebble API access by the charm code
 
 This provides coarse-grained tracing, focused on the boundaries between the
 charm code and the external processes.
 
 (custom-spans-and-events)=
 ## Custom spans and events
+
+TODO: why do we need to depend on opentelemetry when ops does? Is it the newer version? If so why not just have ops depend on that?
 
 - In your charm's `pyproject.toml` or `requirements.txt`, add
   `opentelemetry-api ~= 1.30.0` dependency.
@@ -53,6 +81,8 @@ allows exposing the resulting span, and doesn't pollute exception stack traces.
 
 ## Adding tracing to charm libraries
 
+TODO: again, why do we need the dependency when ops has it? We also recommend against any libs with PYDEPS so this seems bad.
+
 - In your charm library's PYDEPS, add `opentelemetry-api ~= 1.30.0`.
 - At the top of your charm library, `import opentelemetry.trace`.
 - After the imports in your charm library, create the tracer object as
@@ -67,9 +97,9 @@ allows exposing the resulting span, and doesn't pollute exception stack traces.
   `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
   `opentelemetry-semantic-conventions` and add `ops[tracing]` instead.
 - In your repository, remove the `charm_tracing` charm library.
-- In your charm code, remove `@trace_charm` decorator and its helpers: the 
+- In your charm code, remove the `@trace_charm` decorator and its helpers: the
   `tracing_endpoint` and `server_cert` properties or methods.
-- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` dependency
+- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
 - In your `charmcraft.yaml`, take note of the tracing and (optionally) ca relation names.
 - In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object
 
