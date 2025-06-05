@@ -1797,8 +1797,8 @@ class Relation:
         Args:
             cls: A class that will accept the Juju relation data as keyword
                 arguments, and raise ``ValueError`` if validation fails.
-            app_or_unit: The data to load. This can be either a :class:`Unit`
-                or :class:`Application` instance.
+            app_or_unit: The source of the data to load. This can be either a
+                :class:`Unit` or :class:`Application` instance.
             decoder: An optional callable that will be used to decode each field
                 before loading into the class. If not provided,
                 :meth:`json.loads` will be used.
@@ -1855,35 +1855,45 @@ class Relation:
         self,
         obj: object,
         app_or_unit: Unit | Application,
+        *,
         encoder: Callable[[Any], Any] | None = None,
     ):
-        """Save the data for the provided class to Juju relation data.
+        """Save the data from the provided data class object to Juju relation data.
 
         Args:
             obj: an object with attributes to save to the relation data.
-            app_or_unit: The data to load. This can be either a :class:`Unit`
-                or :class:`Application` instance.
+            app_or_unit: The destination in which to save the data to save. This
+                can be either a :class:`Unit` or :class:`Application` instance.
             encoder: An optional callable that will be used to encode each field
                 before passing to Juju. If not provided, json.dumps will be
                 used.
+
+        Raises:
+            ValueError: if the encoder does not return a string.
+            RelationNotFoundError: if the relation does not exist.
+            ModelError: if the charm does not have permission to write to the
+                relation data.
         """
         if encoder is None:
             encoder = json.dumps
-        if hasattr(obj, '__dataclass_fields__'):
-            # A standard library dataclass or Pydantic dataclass.
-            fields = (field.name for field in dataclasses.fields(obj))  # type: ignore
-            values = dataclasses.asdict(obj)  # type: ignore
+        try:
+            fields = _charm._juju_fields(obj.__class__)
+        except ValueError:
+            fields = None
+        else:
+            # We need the dictionary in reverse order: attribute name to field name.
+            fields = {v: k for k, v in fields.items()}
+
+        if dataclasses.is_dataclass(obj):
+            assert not isinstance(obj, type)
+            values = dataclasses.asdict(obj)
         elif hasattr(obj, 'model_fields'):
             # A Pydantic model.
-            fields = obj.model_fields  # type: ignore
             values = obj.model_dump()  # type: ignore
         else:
-            # We're not sure, so do a best guess.
-            fields = [attr for attr in dir(obj) if not attr.startswith('_') and not callable(attr)]
-            fields.extend(obj.__annotations__)
             values = {field: getattr(obj, field) for field in fields}
         data: dict[str, str] = {}
-        for field in fields:  # type: ignore
+        for field in sorted(fields):
             assert isinstance(field, str)
             value = encoder(values[field])
             if not isinstance(field, str):
@@ -1891,7 +1901,7 @@ class Relation:
                     f'The value for "{field}" must be a string, not {type(field).__name__}'
                 )
             data[field] = value
-        self._backend.update_relation_data(self.id, app_or_unit, data)
+        self.data[app_or_unit].update(data)
 
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
