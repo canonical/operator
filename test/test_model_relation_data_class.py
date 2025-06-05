@@ -39,9 +39,18 @@ class Nested:
 
 class DatabagProtocol(Protocol):
     foo: str
-    baz: list[str] | None
+    baz: list[str]
     bar: int
-    quux: Nested | None
+    quux: Nested
+
+    def __init__(
+        self,
+        *,
+        foo: str,
+        baz: list[str] = [],  # noqa: B006
+        bar: int = 0,
+        quux: Nested = Nested(),  # noqa: B008
+    ): ...
 
 
 class MyDatabag:
@@ -72,7 +81,7 @@ class MyDatabag:
 
 class BaseTestCharm(ops.CharmBase):
     @property
-    def databag_class(self) -> type[object]:
+    def databag_class(self) -> type[DatabagProtocol]:
         raise NotImplementedError('databag_class must be set in the subclass')
 
     @property
@@ -103,7 +112,7 @@ nested_decode = functools.partial(json.loads, object_hook=json_nested_hook)
 
 class MyCharm(BaseTestCharm):
     @property
-    def databag_class(self) -> type[object]:
+    def databag_class(self) -> type[DatabagProtocol]:
         return MyDatabag
 
     @property
@@ -118,7 +127,7 @@ class MyCharm(BaseTestCharm):
 @dataclasses.dataclass
 class MyDataclassDatabag:
     foo: str
-    baz: list[str] = dataclasses.field(default_factory=list)  # type: ignore
+    baz: list[str] = dataclasses.field(default_factory=list)
     bar: int = dataclasses.field(default=0)
     quux: Nested = dataclasses.field(default_factory=Nested)
 
@@ -138,7 +147,7 @@ class MyDataclassDatabag:
 
 class MyDataclassCharm(BaseTestCharm):
     @property
-    def databag_class(self) -> type[object]:
+    def databag_class(self) -> type[DatabagProtocol]:
         return MyDataclassDatabag
 
 
@@ -158,7 +167,7 @@ if pydantic:
 
     class MyPydanticDataclassCharm(BaseTestCharm):
         @property
-        def databag_class(self) -> type[object]:
+        def databag_class(self) -> type[DatabagProtocol]:
             return MyPydanticDataclassDatabag
 
     class MyPydanticDatabag(pydantic.BaseModel):
@@ -172,7 +181,7 @@ if pydantic:
 
     class MyPydanticBaseModelCharm(BaseTestCharm):
         @property
-        def databag_class(self) -> type[object]:
+        def databag_class(self) -> type[DatabagProtocol]:
             return MyPydanticDatabag
 
     _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
@@ -187,7 +196,6 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, event.app, decoder=self.decoder)
-            data = cast('DatabagProtocol', data)
             self.newfoo = len(data.foo)
             assert data.baz is not None
             self.newbaz = [*data.baz, 'new']
@@ -206,7 +214,7 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
     assert obj.foo == 'value'
     assert obj.bar == 1
     assert obj.baz == ['a', 'b']
-    assert obj.quux.sub == 28
+    assert obj.quux is not None and obj.quux.sub == 28
 
 
 @pytest.mark.parametrize(
@@ -222,7 +230,7 @@ def test_relation_load_fail(
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            kwargs = {'decoder': self.decoder}
+            kwargs: dict[str, Any] = {'decoder': self.decoder}
             if errors is not None:
                 kwargs['errors'] = errors
             event.relation.load(self.databag_class, event.app, **kwargs)
@@ -235,6 +243,11 @@ def test_relation_load_fail(
     with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
     assert isinstance(exc_info.value.__cause__, raised)
+
+
+class _AliasProtocol(Protocol):
+    foo_bar: int
+    other: str
 
 
 class _Alias:  # noqa: B903
@@ -284,6 +297,7 @@ def test_relation_load_custom_naming_pattern(
     with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
         mgr.run()
         obj = mgr.charm.data
+    obj = cast('_AliasProtocol', obj)
     assert obj.foo_bar == json.loads(relation_data.get('fooBar', '42'))
     assert obj.other == 'baz'
 
@@ -346,15 +360,15 @@ def test_relation_save_simple(charm_class: type[BaseTestCharm]):
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            event.relation.save(self.data, self.app, encoder=self.encoder)
+            data = self.databag_class(
+                foo='other-value', bar=28, baz=['x', 'y'], quux=Nested(sub=8)
+            )
+            event.relation.save(data, self.app, encoder=self.encoder)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with ctx(ctx.on.relation_changed(rel_in), state_in) as mgr:
-        data_class = mgr.charm.databag_class
-        mgr.charm.data = data_class(foo='other-value', bar=28, baz=['x', 'y'], quux=Nested(sub=8))
-        state_out = mgr.run()
+    state_out = ctx.run(ctx.on.relation_changed(rel_in), state_in)
     rel_out = state_out.get_relation(rel_in.id)
     assert rel_out.local_app_data == {
         'foo': json.dumps('other-value'),
@@ -372,16 +386,14 @@ def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            event.relation.save(self.data, event.app, encoder=self.encoder)
+            data = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
+            event.relation.save(data, event.app, encoder=self.encoder)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with ctx(ctx.on.relation_changed(rel_in), state_in) as mgr:
-        data_class = mgr.charm.databag_class
-        mgr.charm.data = data_class(foo='value', bar=1, baz=['a', 'b'])
-        with pytest.raises(ops.RelationDataAccessError):
-            mgr.run()
+    with pytest.raises(ops.RelationDataAccessError):
+        ctx.run(ctx.on.relation_changed(rel_in), state_in)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
@@ -393,9 +405,9 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             self.data = event.relation.load(self.databag_class, self.app)
-            self.data = cast('DatabagProtocol', self.data)
             self.data.foo = self.data.foo + '1'
             self.data.bar = self.data.bar + 1
+            assert self.data.baz is not None
             self.data.baz.append('new')
             if self.data.quux is not None:
                 self.data.quux.sub += 1
@@ -511,7 +523,6 @@ def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, self.app, decoder=self.decoder)
-            data = cast('DatabagProtocol', data)
             data.foo = data.foo + '1'
             event.relation.save(data, self.app, encoder=self.encoder)
 
