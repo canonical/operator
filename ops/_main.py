@@ -377,7 +377,7 @@ class _Manager:
             # In a RelationDeparted event, the unit is not included in the Juju
             # `relation-list` output, but the charm still has access to the remote
             # relation data. To provide the charm with a mechanism for getting
-            # access to that data, we include the remote unit in the set of units.
+            # access to that data, we include the remote unit in Relation.units.
             # In other relation events (such as RelationChanged) the unit will
             # already be in the set via `relation-list` - adding it via this extra
             # mechanism will not change the final set, and is simpler than only
