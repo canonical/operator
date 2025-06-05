@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import pathlib
 from typing import TYPE_CHECKING
 
@@ -78,12 +77,16 @@ def get_exporter() -> BufferingSpanExporter | None:
     exporter = None
 
     # opentelemetry-sdk < 1.34.0
-    with contextlib.suppress(AttributeError):
+    try:
         exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
+    except AttributeError:
+        pass
 
     # opentelemetry-sdk >= 1.34.0
-    with contextlib.suppress(AttributeError):
+    try:
         exporter = get_tracer_provider()._active_span_processor._batch_processor._exporter  # type: ignore
+    except AttributeError:
+        pass
 
     if not exporter or not isinstance(exporter, BufferingSpanExporter):
         return None

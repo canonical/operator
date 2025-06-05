@@ -104,6 +104,8 @@ ignore = [
     "D213",
     # we don't add a blank line after Args: in a function docstring
     "D413",
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
 ]
 
 [tool.ruff.lint.per-file-ignores]
