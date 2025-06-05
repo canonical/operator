@@ -19,8 +19,9 @@ This hopefully ensures that you can see the trace data for your "install" and "s
 
 ### Data format
 
-The data is stored and sent to the OpenTelemetry collector in the [OLTP 1.5.0 JSON format]
-(https://opentelemetry.io/docs/specs/otlp/) (aka protobuf JSON representation with OTLP gotchas).
+The data is stored and sent to the OpenTelemetry collector in the
+[OLTP 1.5.0 JSON format](https://opentelemetry.io/docs/specs/otlp/)
+(protobuf JSON representation with OTLP gotchas).
 
 ### Backwards and forwards compatibility
 
