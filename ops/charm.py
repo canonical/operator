@@ -1451,12 +1451,8 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
     """
     # Dataclasses:
     juju_to_arg: dict[str, str] = {}
-    try:
-        fields = dataclasses.fields(cls)  # type: ignore
-    except TypeError:
-        pass
-    else:
-        for field in fields:
+    if dataclasses.is_dataclass(cls):
+        for field in dataclasses.fields(cls):
             alias = field.metadata.get('alias', field.name)
             # If this a Pydantic dataclass, then it handles the alias.
             # Using pydantic.dataclasses.is_pydantic_dataclass() would be
