@@ -28,8 +28,8 @@ except ImportError:
     pydantic = None
 
 import ops
-import ops.charm as _charm
 from ops import testing
+from ops._main import _Abort
 
 
 @dataclasses.dataclass
@@ -44,32 +44,21 @@ class DatabagProtocol(Protocol):
     quux: Nested | None
 
 
-class MyDatabag(ops.RelationDataBase):
-    # These need to be class attributes to be picked up and sent to Juju.
-    foo: str
-    baz: list[str] | None = None
-    bar: int = 0
-    quux: Nested | None = None
-
+class MyDatabag:
     def __init__(
         self, foo: str, baz: list[str] | None = None, bar: int = 0, quux: Nested | None = None
     ):
-        if isinstance(foo, str):
-            self.foo = foo
-        else:
-            raise ValueError('foo must be a string')
+        assert isinstance(foo, str)
+        self.foo = foo
         if isinstance(baz, list):
-            if not all(isinstance(i, str) for i in baz):
-                raise ValueError('baz must be a list of strings')
+            assert all(isinstance(i, str) for i in baz)
             self.baz = baz
-        elif baz is None:
-            self.baz = []
         else:
-            raise ValueError('baz must be a list')
+            assert baz is None
+            self.baz = []
         if not isinstance(bar, int) or bar < 0:
             raise ValueError('bar must be a zero or positive int')
-        else:
-            self.bar = bar
+        self.bar = bar
         if quux is None:
             self.quux = Nested()
         else:
@@ -82,16 +71,8 @@ class MyDatabag(ops.RelationDataBase):
 
 
 class BaseTestCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        framework.observe(self.on.install, self._on_install)
-        framework.observe(self.on.config_changed, self._on_config_changed)
-        framework.observe(self.on.update_status, self._on_update_status)
-        framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-        framework.observe(self.on['db'].relation_joined, self._on_relation_joined)
-
     @property
-    def databag_class(self) -> type[ops.RelationDataBase]:
+    def databag_class(self) -> type[object]:
         raise NotImplementedError('databag_class must be set in the subclass')
 
     @property
@@ -101,63 +82,6 @@ class BaseTestCharm(ops.CharmBase):
     @property
     def decoder(self) -> Callable[..., Any] | None:
         return None
-
-    def _on_install(self, _: ops.InstallEvent):
-        rel = self.model.get_relation('db')
-        assert rel is not None
-        self.data1 = rel.load(
-            self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
-        )
-        rel = self.model.get_relation('db')
-        assert rel is not None
-        self.data2 = rel.load(
-            self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
-        )
-
-    def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        rel = self.model.get_relation('db')
-        assert rel is not None
-        classic = rel.data[self.app]
-        modern = rel.load(self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder)
-        modern = cast('DatabagProtocol', modern)
-        classic['foo'] = json.dumps('one')
-        assert modern.foo == json.dumps('one')
-        modern.foo = 'two'
-        assert classic['foo'] == 'two'
-        # Also check that if we get a fresh RelationDataContent it's still the
-        # expected value.
-        classic2 = rel.data[self.app]
-        assert classic2['foo'] == 'two'
-
-    def _on_update_status(self, event: ops.UpdateStatusEvent):
-        rel = self.model.get_relation('db')
-        assert rel is not None
-        data = rel.load(self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder)
-        data = cast('DatabagProtocol', data)
-        data.bar = -42
-
-    def _on_relation_changed(self, event: ops.RelationChangedEvent):
-        data = event.relation.load(
-            self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
-        )
-        data = cast('DatabagProtocol', data)
-        self.newfoo = len(data.foo)
-        assert data.baz is not None
-        self.newbaz = [*data.baz, 'new']
-        self.newbar = data.bar + 1
-        assert data.quux is not None
-        self.newquux = Nested(sub=data.quux.sub + 1)
-        self.data = data
-
-    def _on_relation_joined(self, event: ops.RelationJoinedEvent):
-        data = event.relation.load(
-            self.databag_class, self.app, encoder=self.encoder, decoder=self.decoder
-        )
-        data = cast('DatabagProtocol', data)
-        data.foo = 'newfoo'
-        data.baz = ['new']
-        data.bar = 42
-        data.quux = Nested(sub=25)
 
 
 class NestedEncoder(json.JSONEncoder):
@@ -179,7 +103,7 @@ nested_decode = functools.partial(json.loads, object_hook=json_nested_hook)
 
 class MyCharm(BaseTestCharm):
     @property
-    def databag_class(self) -> type[ops.RelationDataBase]:
+    def databag_class(self) -> type[object]:
         return MyDatabag
 
     @property
@@ -192,20 +116,18 @@ class MyCharm(BaseTestCharm):
 
 
 @dataclasses.dataclass
-class MyDataclassDatabag(ops.RelationDataBase):
+class MyDataclassDatabag:
     foo: str
-    baz: list[str] = dataclasses.field(default_factory=list)
+    baz: list[str] = dataclasses.field(default_factory=list)  # type: ignore
     bar: int = dataclasses.field(default=0)
     quux: Nested = dataclasses.field(default_factory=Nested)
 
     def __post_init__(self):
-        if not isinstance(self.foo, str):
-            raise ValueError('foo must be a string')
-        if not isinstance(self.baz, list):
-            raise ValueError('baz must be a list')
-        if not all(isinstance(i, str) for i in self.baz):
-            raise ValueError('baz must be a list of strings')
-        if not isinstance(self.bar, int) or self.bar < 0:
+        assert isinstance(self.foo, str)
+        assert isinstance(self.baz, list)
+        assert all(isinstance(i, str) for i in self.baz)
+        assert isinstance(self.bar, int)
+        if self.bar < 0:
             raise ValueError('bar must be a zero or positive int')
 
     def __setattr__(self, key: str, value: Any):
@@ -216,7 +138,7 @@ class MyDataclassDatabag(ops.RelationDataBase):
 
 class MyDataclassCharm(BaseTestCharm):
     @property
-    def databag_class(self) -> type[ops.RelationDataBase]:
+    def databag_class(self) -> type[object]:
         return MyDataclassDatabag
 
 
@@ -225,34 +147,21 @@ _test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
 if pydantic:
 
     @pydantic.dataclasses.dataclass
-    class MyPydanticDataclassDatabag(ops.RelationDataBase):
+    class MyPydanticDataclassDatabag:
         foo: str
         baz: list[str] = pydantic.Field(default_factory=list)
-        bar: int = pydantic.Field(default=0)
+        bar: int = pydantic.Field(default=0, ge=0)
         quux: Nested = pydantic.Field(default_factory=Nested)
 
-        def __post_init__(self):
-            if not isinstance(self.foo, str):
-                raise ValueError('foo must be a string')
-            if not isinstance(self.baz, list):
-                raise ValueError('baz must be a list')
-            if not all(isinstance(i, str) for i in self.baz):
-                raise ValueError('baz must be a list of strings')
-            if not isinstance(self.bar, int) or self.bar < 0:
-                raise ValueError('bar must be a zero or positive int')
-
-        # TODO: This should be done pydantic-style.
-        def __setattr__(self, key: str, value: Any):
-            if key == 'bar' and (not isinstance(value, int) or value < 0):
-                raise ValueError('bar must be a zero or positive int')
-            super().__setattr__(key, value)
+        class Config:
+            validate_assignment = True
 
     class MyPydanticDataclassCharm(BaseTestCharm):
         @property
-        def databag_class(self) -> type[ops.RelationDataBase]:
+        def databag_class(self) -> type[object]:
             return MyPydanticDataclassDatabag
 
-    class MyPydanticDatabag(pydantic.BaseModel, ops.RelationDataBase):
+    class MyPydanticDatabag(pydantic.BaseModel):
         foo: str
         baz: list[str] = pydantic.Field(default_factory=list)
         bar: int = pydantic.Field(default=0, ge=0)
@@ -263,211 +172,328 @@ if pydantic:
 
     class MyPydanticBaseModelCharm(BaseTestCharm):
         @property
-        def databag_class(self) -> type[ops.RelationDataBase]:
+        def databag_class(self) -> type[object]:
             return MyPydanticDatabag
 
     _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_simple(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    harness = testing.Harness(
-        charm_class, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
+def test_relation_load_simple(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            data = event.relation.load(self.databag_class, event.app, decoder=self.decoder)
+            data = cast('DatabagProtocol', data)
+            self.newfoo = len(data.foo)
+            assert data.baz is not None
+            self.newbaz = [*data.baz, 'new']
+            self.newbar = data.bar + 1
+            assert data.quux is not None
+            self.newquux = Nested(sub=data.quux.sub + 1)
+            self.data = data
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    harness.charm.on['db'].relation_changed.emit(
-        harness.model.get_relation('db'), harness.model.app
-    )
-    rel = harness.model.get_relation('db')
-    assert rel is not None
-    obj = rel._cache._databag_obj_cache[rel_id, harness.model.app][0]
+    rel = testing.Relation('db', remote_app_data=data)
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
     assert obj.foo == 'value'
     assert obj.bar == 1
     assert obj.baz == ['a', 'b']
     assert obj.quux.sub == 28
 
 
+@pytest.mark.parametrize(
+    'errors,raised', [('raise', ValueError), ('blocked', _Abort), (None, ValueError)]
+)
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_bad_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    harness = testing.Harness(
-        charm_class, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': json.dumps('value'), 'bar': json.dumps('bar'), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    with pytest.raises(ops.InvalidSchemaError):
-        harness.charm.on['db'].relation_changed.emit(
-            harness.model.get_relation('db'), harness.model.app
-        )
-    assert isinstance(harness.model.unit.status, ops.WaitingStatus)
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_bad_set(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    harness = testing.Harness(
-        charm_class, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    with pytest.raises(ValueError):
-        harness.charm.on.update_status.emit()
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_good_set(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    harness = testing.Harness(
-        charm_class, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    rel = harness.model.get_relation('db', rel_id)
-    assert rel is not None
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    harness.charm.on['db'].relation_joined.emit(rel, harness.model.app)
-    # Check that it's in the databag object.
-    obj = rel._cache._databag_obj_cache[rel_id, harness.model.app][0]
-    assert obj.foo == 'newfoo'
-    assert obj.bar == 42
-    assert obj.baz == ['new']
-    assert obj.quux.sub == 25
-    # Check that it's going to Juju. We go directly to the raw data to avoid
-    # hitting the bypass that would take us to the object instead. We also have
-    # to manually trigger the send because Harness doesn't use _Manager.
-    _charm._send_databag_to_juju(harness.charm)
-    data = harness._backend._relation_data_raw[rel_id]['foo']
-    assert data['foo'] == json.dumps('newfoo')
-    assert data['bar'] == json.dumps(42)
-    assert data['baz'] == json.dumps(['new'])
-    assert data['quux'] == json.dumps({'sub': 25})
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_mix_modern_and_classic(
-    charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
+def test_relation_load_fail(
+    errors: str | None, raised: type[Exception], charm_class: type[BaseTestCharm]
 ):
-    harness = testing.Harness(
-        charm_class, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    rel = harness.model.get_relation('db', rel_id)
-    assert rel is not None
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    harness.charm.on.config_changed.emit()
-    # We have to manually trigger the send because Harness doesn't use _Manager.
-    _charm._send_databag_to_juju(harness.charm)
-    data = harness._backend._relation_data_raw[rel_id]['foo']
-    assert data['foo'] == json.dumps('two')
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_single_object(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    harness = testing.Harness(
-        charm_class, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    rel = harness.model.get_relation('db', rel_id)
-    assert rel is not None
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    harness.charm.on.install.emit()
-    assert harness.charm.data1 is harness.charm.data2  # type: ignore
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_single_object_different_databag(
-    charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
-):
-    @dataclasses.dataclass
-    class OtherDatabag(ops.RelationDataBase):
-        foo: str = 'foo'
-
-    class BadCharmClass(charm_class):
-        def _on_install(self, _: ops.InstallEvent):
-            rel = self.model.get_relation('db')
-            assert rel is not None
-            self.data1 = rel.load(self.databag_class, self.app)  # type: ignore
-            rel = self.model.get_relation('db')
-            assert rel is not None
-            self.data2 = rel.load(OtherDatabag, self.app)
-
-    harness = testing.Harness(
-        BadCharmClass, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
-    rel_id = harness.add_relation('db', 'db')
-    rel = harness.model.get_relation('db', rel_id)
-    assert rel is not None
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    with pytest.raises(TypeError):
-        harness.charm.on.install.emit()
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_no_encode(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    class NoEncodeCharm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            data = event.relation.load(  # type: ignore
-                self.databag_class,  # type: ignore
-                self.app,
-                encoder=lambda x: x,
-                decoder=lambda x: x,
-            )
+            kwargs = {'decoder': self.decoder}
+            if errors is not None:
+                kwargs['errors'] = errors
+            event.relation.load(self.databag_class, event.app, **kwargs)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    # 'bar' should be an int, not a string.
+    data = {'foo': json.dumps('value'), 'bar': json.dumps('bar'), 'baz': json.dumps(['a', 'b'])}
+    rel = testing.Relation('db', remote_app_data=data)
+    state_in = testing.State(leader=True, relations={rel})
+    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+        ctx.run(ctx.on.relation_changed(rel), state_in)
+    assert isinstance(exc_info.value.__cause__, raised)
+
+
+class _Alias:  # noqa: B903
+    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+        self.foo_bar = fooBar
+        self.other = other
+
+
+@dataclasses.dataclass()
+class _DataclassesAlias:
+    foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+    other: str = 'baz'
+
+
+_alias_data_classes: list[type[object]] = [_Alias, _DataclassesAlias]
+
+if pydantic is not None:
+
+    @pydantic.dataclasses.dataclass(init=False)
+    class _PydanticDataclassesAlias:
+        foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+        other: str = pydantic.Field(default='baz')
+
+    class _PydanticBaseModelAlias(pydantic.BaseModel):
+        foo_bar: int = pydantic.Field(42, alias='fooBar')
+        other: str = pydantic.Field('baz')
+
+    _alias_data_classes.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
+
+
+@pytest.mark.parametrize('relation_data', [{}, {'fooBar': '24'}])
+@pytest.mark.parametrize('data_class', _alias_data_classes)
+def test_relation_load_custom_naming_pattern(
+    relation_data: dict[str, str], data_class: type[object]
+):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(data_class, event.app)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data=relation_data)
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert obj.foo_bar == json.loads(relation_data.get('fooBar', '42'))
+    assert obj.other == 'baz'
+
+
+def test_relation_load_extra_args():
+    @dataclasses.dataclass
+    class Data:
+        a: int
+        b: float
+        c: str
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, 10, c='foo')
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'b': '3.14'})
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert isinstance(obj, Data)
+    assert obj.a == 10
+    assert obj.b == 3.14
+    assert obj.c == 'foo'
+
+
+def test_relation_load_dash_to_underscore():
+    @dataclasses.dataclass
+    class Data:
+        a_b: int
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'a-b': '3.14'})
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert isinstance(obj, Data)
+    assert obj.a_b == 3.14
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_relation_save_simple(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            event.relation.save(self.data, self.app, encoder=self.encoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel_in = testing.Relation('db')
+    state_in = testing.State(leader=True, relations={rel_in})
+    with ctx(ctx.on.relation_changed(rel_in), state_in) as mgr:
+        data_class = mgr.charm.databag_class
+        mgr.charm.data = data_class(foo='other-value', bar=28, baz=['x', 'y'], quux=Nested(sub=8))
+        state_out = mgr.run()
+    rel_out = state_out.get_relation(rel_in.id)
+    assert rel_out.local_app_data == {
+        'foo': json.dumps('other-value'),
+        'bar': json.dumps(28),
+        'baz': json.dumps(['x', 'y']),
+        'quux': json.dumps({'sub': 8}),
+    }
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            event.relation.save(self.data, event.app, encoder=self.encoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel_in = testing.Relation('db')
+    state_in = testing.State(leader=True, relations={rel_in})
+    with ctx(ctx.on.relation_changed(rel_in), state_in) as mgr:
+        data_class = mgr.charm.databag_class
+        mgr.charm.data = data_class(foo='value', bar=1, baz=['a', 'b'])
+        with pytest.raises(ops.RelationDataAccessError):
+            mgr.run()
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(self.databag_class, self.app)
+            self.data = cast('DatabagProtocol', self.data)
+            self.data.foo = self.data.foo + '1'
+            self.data.bar = self.data.bar + 1
+            self.data.baz.append('new')
+            if self.data.quux is not None:
+                self.data.quux.sub += 1
+            event.relation.save(self.data, self.app, encoder=self.encoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    data = {'foo': json.dumps('value'), 'bar': json.dumps(1), 'baz': json.dumps(['a', 'b'])}
+    rel_in = testing.Relation('db', local_app_data=data)
+    state_in = testing.State(leader=True, relations={rel_in})
+    with ctx(ctx.on.relation_changed(rel_in), state_in) as mgr:
+        data_class = mgr.charm.databag_class
+        mgr.charm.data = data_class(foo='value', bar=1, baz=['a', 'b'])
+        state_out = mgr.run()
+    rel_out = state_out.get_relation(rel_in.id)
+    assert rel_out.local_app_data == {
+        'foo': json.dumps('value1'),
+        'bar': json.dumps(2),
+        'baz': json.dumps(['a', 'b', 'new']),
+        'quux': json.dumps({'sub': 29}),
+    }
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            def encoder(_: Any) -> int:
+                # This is invalid: Juju only accepts strings.
+                return 0
+
+            data = self.databag_class(foo='value')
+            event.relation.save(data, self.app, encoder=encoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel_in = testing.Relation('db')
+    state_in = testing.State(leader=True, relations={rel_in})
+    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+        ctx.run(ctx.on.relation_changed(rel_in), state_in)
+    assert isinstance(exc_info.value.__cause__, ops.RelationDataTypeError)
+
+
+class _OneString:  # noqa: B903
+    def __init__(self, foo: str):
+        self.foo = foo
+
+
+@dataclasses.dataclass()
+class _DataclassesOneString:
+    foo: str
+
+
+_one_string_data_classes: list[type[object]] = [_OneString, _DataclassesOneString]
+
+if pydantic is not None:
+
+    @pydantic.dataclasses.dataclass()
+    class _PydanticDataclassesOneString:
+        foo: str
+
+    class _PydanticBaseModelOneString(pydantic.BaseModel):
+        foo: str = pydantic.Field()
+
+    _one_string_data_classes.extend([_PydanticDataclassesOneString, _PydanticBaseModelOneString])
+
+
+@pytest.mark.parametrize('data_class', _one_string_data_classes)
+def test_relation_save_no_encode(data_class: type[BaseTestCharm]):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            data = event.relation.load(data_class, self.app, decoder=lambda x: x)
             data = cast('DatabagProtocol', data)
             data.foo = data.foo + '1'
+            event.relation.save(data, self.app, encoder=lambda x: x)
 
-    harness = testing.Harness(
-        NoEncodeCharm, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': 'value'}
-    rel_id = harness.add_relation('db', 'db')
-    rel = harness.model.get_relation('db', rel_id)
-    assert rel is not None
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    harness.charm.on['db'].relation_changed.emit(
-        harness.model.get_relation('db'), harness.model.app
-    )
-    rel = harness.model.get_relation('db')
-    assert rel is not None
-    obj = rel._cache._databag_obj_cache[rel_id, harness.model.app][0]
-    assert obj.foo == 'value1'
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel_in = testing.Relation('db', local_app_data={'foo': 'value'})
+    state_in = testing.State(leader=True, relations={rel_in})
+    state_out = ctx.run(ctx.on.relation_changed(rel_in), state_in)
+    rel_out = state_out.get_relation(rel_in.id)
+    assert rel_out.local_app_data['foo'] == 'value1'
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    class AlternateEncodeCharm(charm_class):
+def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
         @staticmethod
         def custom_encode(data: Any) -> Any:
             if hasattr(data, 'upper'):
                 return data.upper()
-            return data
+            return str(data)
 
         @staticmethod
         def custom_decode(data: Any) -> Any:
@@ -484,43 +510,20 @@ def test_databag_custom_encode(charm_class: type[ops.CharmBase], request: pytest
             return self.custom_decode
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            data = event.relation.load(  # type: ignore
-                self.databag_class,  # type: ignore
-                self.app,
-                encoder=self.encoder,
-                decoder=self.decoder,
-            )
+            data = event.relation.load(self.databag_class, self.app, decoder=self.decoder)
             data = cast('DatabagProtocol', data)
             data.foo = data.foo + '1'
+            event.relation.save(data, self.app, encoder=self.encoder)
 
-    harness = testing.Harness(
-        AlternateEncodeCharm, meta="""name: foo\nrequires:\n  db:\n    interface: db-int"""
-    )
-    request.addfinalizer(harness.cleanup)
-    data = {'foo': 'value'}
-    rel_id = harness.add_relation('db', 'db')
-    rel = harness.model.get_relation('db', rel_id)
-    assert rel is not None
-    harness.set_leader(True)
-    harness.begin()
-    harness.update_relation_data(rel_id, 'foo', data)
-    harness.charm.on['db'].relation_changed.emit(
-        harness.model.get_relation('db'), harness.model.app
-    )
-    rel = harness.model.get_relation('db')
-    assert rel is not None
-    obj = rel._cache._databag_obj_cache[rel_id, harness.model.app][0]
-    assert obj.foo == 'eulav1'
-    # We have to manually trigger the send because Harness doesn't use _Manager.
-    _charm._send_databag_to_juju(harness.charm)
-    data = harness._backend._relation_data_raw[rel_id]['foo']
-    assert data['foo'] == 'EULAV1'
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel_in = testing.Relation('db', local_app_data={'foo': 'value'})
+    state_in = testing.State(leader=True, relations={rel_in})
+    state_out = ctx.run(ctx.on.relation_changed(rel_in), state_in)
+    rel_out = state_out.get_relation(rel_in.id)
+    assert rel_out.local_app_data['foo'] == 'EULAV1'
 
 
 # TODO: pydantic model with pydantic types that need to serialise down to a string
-# TODO: Add back some Scenario tests.
-# TODO: Add a test that verifies that the order of dictionary keys does not change
-# on read then write (this would trigger relation-changed unnecessarily).
 # TODO: add a test that has the common Pydantic types: AnyHttpUrl or HttpUrl,
 # IPvAnyAddress (ipaddress.IPv4Address|ipaddress.IPv6Address) for non-Pydantic, IPvAnyNetwork.
 # TODO: add a test that uses enums.
