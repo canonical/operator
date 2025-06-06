@@ -72,10 +72,6 @@ juju integrate my-charm tempo
 (custom-spans-and-events)=
 ## Custom spans and events
 
-TODO: why do we need to depend on opentelemetry when ops does? Is it the newer version? If so why not just have ops depend on that?
-
-- In your charm's `pyproject.toml` or `requirements.txt`, add
-  `opentelemetry-api ~= 1.30.0` dependency.
 - At the top of your charm file, `import opentelemetry.trace`.
 - After the imports in your charm file, create the tracer object as
   `tracer = opentelemetry.trace.get_tracer(name)` where the name
@@ -122,9 +118,6 @@ class Workload:
 
 ## Adding tracing to charm libraries
 
-TODO: again, why do we need the dependency when ops has it? We also recommend against any libs with PYDEPS so this seems bad.
-
-- In your charm library's PYDEPS, add `opentelemetry-api ~= 1.30.0`.
 - At the top of your charm library, `import opentelemetry.trace`.
 - After the imports in your charm library, create the tracer object as
   `tracer = opentelemetry.trace.get_tracer(name)` where the name could be your
