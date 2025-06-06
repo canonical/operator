@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
-          persist-credentials: false
+          persist-credentials: true
 
       - uses: ./.github/actions/update-charm-pins
         with:

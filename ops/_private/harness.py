@@ -438,7 +438,8 @@ class Harness(Generic[CharmType]):
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
-        self._charm = TestCharm(self._framework)  # type: ignore
+        with self.framework._event_context('__init__'):
+            self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
         """Fire the same hooks that Juju would fire at startup.
@@ -2281,12 +2282,7 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
         # has the expected type.
         option = self._spec.get('options', {}).get(key)
         if not option:
-            raise RuntimeError(
-                f'Unknown config option {key}; '
-                'not declared in `config.yaml`.'
-                'Check https://juju.is/docs/sdk/config for the '
-                'spec.'
-            )
+            raise RuntimeError(f'Unknown config option {key}; not declared in `config.yaml`.')
 
         declared_type = option.get('type')
         if not declared_type:
@@ -2313,20 +2309,6 @@ class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
     def __setitem__(self, key: Any, value: Any):
         # if a charm attempts to config[foo] = bar:
         raise TypeError("'ConfigData' object does not support item assignment")
-
-
-class _TestingRelationDataContents(Dict[str, str]):
-    def __setitem__(self, key: str, value: str):
-        if not isinstance(key, str):
-            raise model.RelationDataError(f'relation data keys must be strings, not {type(key)}')
-        if not isinstance(value, str):
-            raise model.RelationDataError(
-                f'relation data values must be strings, not {type(value)}'
-            )
-        super().__setitem__(key, value)
-
-    def copy(self):
-        return _TestingRelationDataContents(super().copy())
 
 
 @dataclasses.dataclass
@@ -2493,13 +2475,6 @@ class _TestingModelBackend:
     def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
-
-        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
-            relation_id
-        ):
-            raise RuntimeError(
-                'remote-side relation data cannot be accessed during a relation-broken event'
-            )
 
         if relation_id not in self._relation_data_raw:
             raise RelationNotFoundError(relation_id)
@@ -2863,7 +2838,7 @@ class _TestingModelBackend:
         # https://discourse.charmhub.io/t/secret-access-permissions/12627
         # For user secrets the secret owner is the model, that is,
         # when `secret.owner_name == self.model.uuid`, only model admins have
-        # manage permissions: https://juju.is/docs/juju/secret.
+        # manage permissions: https://documentation.ubuntu.com/juju/3.6/reference/secret/.
 
         unit_secret = secret.owner_name == self.unit_name
         app_secret = secret.owner_name == self.app_name
