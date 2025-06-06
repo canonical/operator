@@ -1,104 +1,65 @@
-# Contributing
+We welcome contributions to Ops!
 
-This document explains the processes and practices recommended for contributing enhancements to Ops.
+Before developing enhancements, please consider [opening an issue](https://github.com/canonical/operator/issues) explaining your use case. If you would like to chat with us about your use cases or proposed implementation, you can reach us at [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
 
-- Generally, before developing enhancements, you should consider [opening an issue](https://github.com/canonical/operator/issues) explaining your use case.
+For detailed technical information about the development of Ops, see [HACKING.md](./HACKING.md).
 
-- If you would like to chat with us about your use cases or proposed implementation, you can reach us at [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
-
-- All enhancements require review before being merged. Code review typically examines:
-  - Code quality
-  - Test coverage
-  - User experience
-
-- When evaluating design decisions, we optimize for the following personas, in descending order of priority:
-  - Charm authors and maintainers
-  - Contributors to the Ops codebase
-  - Juju developers
-
-- Please help us out in ensuring easy to review branches by rebasing your pull request branch onto the `main` branch. This also avoids merge commits and creates a linear Git commit history.
-
-## Notable design decisions
-
-### ops-scenario
-
-- The `State` object is immutable from the perspective of the test writer. At the moment there is some hackery here and there (`object.__setattr__`...) to bypass the read-only dataclass for when the charm code mutates the state; at some point it would be nice to refactor the code to make that unnecessary.
-
-- At the moment the mocking operates at the level of `ops.ModelBackend`-mediated hook tool calls. `ModelBackend` would `Popen` hook tool calls, but `Scenario` patches the methods that would call `Popen`, which is therefore never called. Instead, values are returned according to the `State`. We could consider allowing to operate in increasing levels of stricter confinement:
-  - Actually generate hook tool scripts that read/write from/to `State`, making patching `ModelBackend` unnecessary.
-  - On top of that, run the whole simulation in a container.
-
-## Developing
-
-See [HACKING.md](./HACKING.md).
-
-# Contributing
+# Pull requests
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
-For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_,
-as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html)
-is automatically generated from Python docstrings.
+Pull requests should have a short title that follows the [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
 
-For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
+- chore
+- ci
+- docs
+- feat
+- fix
+- perf
+- refactor
+- revert
+- test
+
+Some examples:
+
+- feat: add the ability to observe change-updated events
+- fix!: correct the type hinting for config data
+- docs: clarify how to use mounts in ops.testing.Container
+- ci: adjust the workflow that publishes ops-scenario
+
+We consider Ops too small a project to use scopes, so we don't use them.
+
+Note that the commit messages to the PR's branch do not need to follow the conventional commit format, as these will be squashed into a single commit to `main` using the PR title as the commit message.
+
+Please help us out in ensuring easy to review branches by rebasing your pull request branch onto the `main` branch. This also avoids merge commits and creates a linear Git commit history.
+
+# Tests
 
 Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://ops.readthedocs.io/en/latest/reference/ops-testing.html) instead of legacy [ops.testing.Harness](https://ops.readthedocs.io/en/latest/reference/ops-testing-harness.html) tests.
 
 Tests should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
 
-Pull requests should have a short title that follows the
-[conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
+# Coding style
 
-* chore
-* ci
-* docs
-* feat
-* fix
-* perf
-* refactor
-* revert
-* test
+We follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_, as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
 
-Some examples:
+For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
-* feat: add the ability to observe change-updated events
-* fix!: correct the type hinting for config data
-* docs: clarify how to use mounts in ops.testing.Container
-* ci: adjust the workflow that publishes ops-scenario
+# Documentation
 
-Note that the commit messages to the PR's branch do not need to follow the
-conventional commit format, as these will be squashed into a single commit to `main`
-using the PR title as the commit message.
-
-We consider Ops too small a project to use scopes, so we don't use them.
-
-## Copyright
-
-The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt).
-New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)).
-The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
-
-# Contributing documentation
-
-The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
-are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/)
-for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
+The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/) for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
 
 To contribute docs:
 
 1. Fork this repo and edit the relevant source files:
-   * Tutorials - [`/docs/tutorial`](./docs/tutorial)
-   * How-to guides - [`/docs/howto`](./docs/howto)
-   * Reference - Automatically generated from Python docstrings
-   * Explanation - [`/docs/explanation`](./docs/explanation)
-2. [Build the documentation locally](#how-to-build-the-documentation-locally),
-   to check that everything looks right
+    - Tutorials - [`/docs/tutorial`](./docs/tutorial)
+    - How-to guides - [`/docs/howto`](./docs/howto)
+    - Reference - Automatically generated from Python docstrings
+    - Explanation - [`/docs/explanation`](./docs/explanation)
+2. [Build the documentation locally](#how-to-build-the-documentation-locally), to check that everything looks right
 3. [Propose your changes using a pull request](#contributing)
 
-When you create the pull request, GitHub automatically builds a preview of the docs.
-To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of
-the pull request page, then click **Details**. You can use the preview to double check
-that everything looks right.
+When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
 
 ## How to write great documentation
 
@@ -108,6 +69,7 @@ that everything looks right.
 - Avoid background context unless it's essential for the reader to understand.
 
 Recommended tone:
+
 - Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
 - Use "we" to include the reader in what you're explaining.
 - Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
@@ -129,22 +91,15 @@ tox -e docs-live
 
 ## How to document version dependencies
 
-We don't publish separate documentation for separate versions of ops.
-The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
-are always for the in-development (main branch) of ops, and do not include
-any notes indicating changes or additions across ops versions.
-We encourage all charmers to promptly upgrade to the latest version of ops,
-and to refer to the release notes and changelog for learning about changes.
+We don't publish separate documentation for separate versions of ops. The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are always for the in-development (main branch) of ops, and do not include any notes indicating changes or additions across ops versions. We encourage all charmers to promptly upgrade to the latest version of ops, and to refer to the release notes and changelog for learning about changes.
 
 We do note when features behave differently when using different versions of Juju.
 
 In docstrings:
 
-* Use `.. jujuadded:: x.y` to indicate that the feature is only available
-  when using version x.y (or higher) of Juju.
-* Use `..jujuchanged:: x.y` when the feature's behaviour _in ops_ changes.
-* Use `..jujuremoved:: x.y` when the feature will be available in ops
-  but not in that version (or later) of Juju.
+- Use `.. jujuadded:: x.y` to indicate that the feature is only available when using version x.y (or higher) of Juju.
+- Use `..jujuchanged:: x.y` when the feature's behaviour _in ops_ changes.
+- Use `..jujuremoved:: x.y` when the feature will be available in ops but not in that version (or later) of Juju.
 
 Similar directives also work in MyST Markdown. For example:
 
@@ -155,3 +110,21 @@ Summary
 ````
 
 Unmarked features are assumed to work and be available in the current LTS version of Juju.
+
+# Copyright
+
+The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt). New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)). The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
+
+# Reviews
+
+All enhancements require review before being merged. Code review typically examines:
+
+- Code quality
+- Test coverage
+- User experience
+
+When evaluating design decisions, we optimize for the following personas, in descending order of priority:
+
+- Charm authors and maintainers
+- Contributors to the Ops codebase
+- Juju developers
