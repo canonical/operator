@@ -163,6 +163,25 @@ def test_backup_action():
     assert 'snapshot-size' in ctx.action_results
 ```
 
+If the charm code calls `event.fail()` to indicate that the action has failed,
+an `ActionFailed` exception will be raised. This avoids having to include
+success checks in every test where the action is successful.
+
+```python
+def test_backup_action_failed():
+    ctx = testing.Context(MyCharm)
+
+    with pytest.raises(ops.ActionFailed) as exc_info:
+        ctx.run(ctx.on.action('do_backup'), State())
+    assert exc_info.value.message == 'sorry, couldn't do the backup'
+    # The state is also available if that's required:
+    assert exc_info.value.state.get_container(...)
+
+    # You can still assert action results and logs that occurred as well as the failure:
+    assert ctx.action_logs == ['baz', 'qux']
+    assert ctx.action_results == {'foo': 'bar'}
+```
+
 > See more: [](ops.testing.Context.action_logs), [](ops.testing.Context.action_results), [](ops.testing.ActionFailed)
 
 

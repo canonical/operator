@@ -454,7 +454,24 @@ class BindAddress(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Network(_max_posargs(2)):
-    """A Juju network space."""
+    """A Juju network space.
+
+    Simplifying the Juju "spaces" model, each relation endpoint of the charm is
+    associated with a ``Network``, even if charms have not been integrated over
+    that endpoint yet.
+
+    If your charm has a relation ``foo``, then the charm will be able, at
+    runtime, to do ``self.model.get_binding("foo").network``. The network you'll
+    get by doing so is heavily defaulted and good for most use-cases because the
+    charm should typically not be concerned about what IP it gets.
+
+    If you want to, you can override any of these networks with a custom one by
+    passing it to :attr:`State.networks`::
+
+        state = State(networks={
+            Network('foo', [BindAddress([Address('192.0.2.1')])]),
+        })
+    """
 
     binding_name: str
     """The name of the network space."""
@@ -504,7 +521,16 @@ def _next_relation_id(*, update: bool = True):
 
 @dataclasses.dataclass(frozen=True)
 class RelationBase(_max_posargs(2)):
-    """Base class for the various types of relation."""
+    """Base class for the various types of relation.
+
+    The only mandatory argument to `Relation` (and other relation types) is
+    `endpoint`. The `interface` will be derived from the charm's metadata. When
+    fully defaulted, there are no remote units, the remote application is
+    called ``remote``, only has a single unit ``remote/0``, and nobody has
+    written any data to the databags yet (other than the keys that Juju adds to
+    all databags). That is typically the state of a relation when the first unit
+    joins it.
+    """
 
     endpoint: str
     """Relation endpoint name. Must match some endpoint name defined in the metadata."""
@@ -717,7 +743,16 @@ def _random_model_name():
 
 @dataclasses.dataclass(frozen=True)
 class Model(_max_posargs(1)):
-    """The Juju model in which the charm is deployed."""
+    """The Juju model in which the charm is deployed.
+
+    Charms don't usually need to be aware of the model in which they are
+    deployed, but if you need to set the model name or UUID, you can provide a
+    ``Model`` to the state::
+
+        ctx = Context(MyCharm)
+        state_in = State(model=Model(name='my-model'))
+        state_out = ctx.run(ctx.on.start(), state_in)
+    """
 
     name: str = dataclasses.field(default_factory=_random_model_name)
     """The name of the model."""
@@ -729,7 +764,29 @@ class Model(_max_posargs(1)):
     """The type of Juju model."""
 
     cloud_spec: CloudSpec | None = None
-    """Cloud specification information (metadata) including credentials."""
+    """Cloud specification information (metadata) including credentials.
+
+    You can set CloudSpec information in the model, for example::
+
+        cloud_spec=CloudSpec(
+            type='lxd',
+            endpoint='https://127.0.0.1:8443',
+            credential=CloudCredential(
+                auth_type='clientcertificate',
+                attributes={
+                    'client-cert': 'foo',
+                    'client-key': 'bar',
+                    'server-cert': 'baz',
+                },
+            ),
+        )
+        state_in = State(
+            model=Model(name='my-vm-model', type='lxd', cloud_spec=cloud_spec),
+        )
+
+    The spec will be accessible in the charm via the
+    :meth:`self.model.get_cloud_spec() <ops.Model.get_cloud_spec>` method.
+    """
 
 
 _CHANGE_IDS = 0
@@ -1426,7 +1483,15 @@ class Storage(_max_posargs(1)):
 
 @dataclasses.dataclass(frozen=True)
 class Resource(_max_posargs(0)):
-    """Represents a resource made available to the charm."""
+    """Represents a resource made available to the charm.
+
+    From the perspective of a 'real' deployed charm, if your charm _has_
+    resources defined in its metadata, they _must_ be made available to the
+    charm. That is a Juju-enforced constraint: you can't deploy a charm without
+    attaching all resources it needs to it. However, when testing, this
+    constraint is unnecessarily strict since a charm will only notice that a
+    resource is not available when it explicitly asks for it.
+    """
 
     name: str
     """The name of the resource, as found in the charm metadata."""
@@ -2031,7 +2096,37 @@ class _Event:  # type: ignore
         return self._path.type is not _EventType.CUSTOM
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
-        """Construct a DeferredEvent from this Event."""
+        """Construct a deferred event from this event.
+
+        The framework simulates the ops notice queue. The queue is responsible
+        for keeping track of the deferred event handlers. On the input side, you
+        can verify that if the charm triggers with this and that notice in its
+        queue (they would be there because they had been deferred in the
+        previous run), then the output state is valid. For example::
+
+            class MyCharm(ops.CharmBase):
+                def __init__(self, framework: ops.Framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.update_status, self._on_update_status)
+                    framework.observe(self.on.start, self._on_start)
+
+                def _on_update_status(self, event: ops.UpdateStatusEvent):
+                    event.defer()
+
+                def _on_start(self, event: ops.StartEvent):
+                    event.defer()
+
+            def test_start_on_deferred_update_status():
+                ctx = Context(MyCharm)
+                state_in = State(
+                    deferred=[
+                        ctx.on.update_status().deferred(handler=MyCharm._on_update_status)
+                    ]
+                )
+                state_out = ctx.run(ctx.on.start(), state_in)
+                assert len(state_out.deferred) == 2
+                assert state_out.deferred[1].name == 'start'
+        """
         handler_repr = repr(handler)
         handler_re = re.compile(r'<function (.*) at .*>')
         match = handler_re.match(handler_repr)
