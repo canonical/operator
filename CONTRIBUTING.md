@@ -43,8 +43,6 @@ Tests should go in the test module corresponding to the code. For example, a fea
 
 We follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_, as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
 
-For more advice about contributing documentation, see [Contributing documentation](#documentation).
-
 # Documentation
 
 The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/) for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
