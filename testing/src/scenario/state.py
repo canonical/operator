@@ -1687,6 +1687,92 @@ class State(_max_posargs(0)):
             r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
         )
 
+    @classmethod
+    def from_context(
+        cls,
+        ctx: Context[CharmType],
+        **kwargs: Any,
+    ) -> State:
+        """Create a State from the charm context.
+
+        The initial data is loaded from the metadata in the context:
+
+        * `config` is loaded from the metadata's `config` field
+        * `relations` are loaded from the metadata's `requires`, `provides`, and `peers` fields
+        * `containers` are loaded from the metadata's `containers` field, and
+          are created with `can_connect=True`
+        * `storages` are loaded from the metadata's `storage` field
+        * `stored_states` are added if found as class attributes of the charm
+
+        This simulates a Juju state where all the related charms have been
+        integrated, and all the containers have been created, but no data has
+        been added to the relations or stored states.
+
+        Any additional keyword arguments will be passed to the State __init__,
+        for example::
+
+            state_in = State.from_context(
+                ctx,
+                leader=True,
+                unit_status=testing.ActiveStatus(),
+            )
+
+        Items that are found in the metadata and are also in the passed
+        arguments will be merged, with the passed values taking precedence.
+        """
+        meta = ctx.charm_spec.meta
+        config = ctx.charm_spec.config
+        generated_config = kwargs.pop('config', {})
+        if config:
+            options = config.get('options', {})
+            for option, details in options.items():
+                if option not in generated_config and 'default' in details:
+                    generated_config[option] = details['default']
+        relations = kwargs.pop('relations', set())
+        containers = kwargs.pop('containers', set())
+        storages = kwargs.pop('storage', set())
+        if meta:
+            for relation_type in ('requires', 'provides', 'peers'):
+                for endpoint, details in meta.get(relation_type, {}).items():
+                    if any(rel for rel in relations if rel.endpoint == endpoint):
+                        continue
+                    if relation_type == 'peers':
+                        relation_class = PeerRelation
+                    elif details.get('scope') == 'container':
+                        relation_class = SubordinateRelation
+                    else:
+                        relation_class = Relation
+                    relations.add(relation_class(endpoint, details['interface']))
+            for container_name in meta.get('containers', {}):
+                if any(c for c in containers if c.name == container_name):
+                    continue
+                containers.add(Container(name=container_name, can_connect=True))
+            for storage_name in meta.get('storage', {}):
+                if any(s for s in storages if s.name == storage_name):
+                    continue
+                storages.add(Storage(name=storage_name))
+        stored_states = kwargs.pop('stored_states', set())
+        for attr in dir(ctx.charm_spec.charm_type):
+            value = getattr(ctx.charm_spec.charm_type, attr)
+            if isinstance(value, ops.StoredState):
+                if any(
+                    ss
+                    for ss in stored_states
+                    if ss.name == attr and ss.owner_path == ctx.charm_spec.charm_type.handle_kind
+                ):
+                    continue
+                stored_states.add(
+                    StoredState(attr, owner_path=ctx.charm_spec.charm_type.handle_kind)
+                )
+        return cls(
+            config=generated_config,
+            relations=relations,
+            containers=containers,
+            storages=storages,
+            stored_states=stored_states,
+            **kwargs,
+        )
+
 
 def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     # Check whether this dict has the expected mandatory metadata fields according to the
