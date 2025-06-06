@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import pathlib
 import tempfile
@@ -23,8 +24,15 @@ from pathlib import Path
 import pytest
 import yaml
 
+try:
+    import pydantic
+    import pydantic.dataclasses
+except ImportError:
+    pydantic = None
+
 import ops
 import ops.charm
+from ops import testing
 from ops.model import ModelError, StatusName
 
 from .test_helpers import FakeScript, create_framework
@@ -1289,3 +1297,335 @@ def test_meta_charm_user_default():
 name: my-charm
 """)
     assert meta.charm_user == 'root'
+
+
+class _ConfigProtocol(typing.Protocol):
+    @property
+    def my_bool(self) -> bool | None: ...
+    @property
+    def my_int(self) -> int: ...
+    @property
+    def my_float(self) -> float: ...
+    @property
+    def my_str(self) -> str: ...
+    @property
+    def my_secret(self) -> ops.Secret | None: ...
+
+
+class MyConfig:
+    my_bool: bool | None = None
+    my_int: int = 42
+    my_float: float = 3.14
+    my_str: str = 'foo'
+    my_secret: ops.Secret | None = None
+
+    def __init__(
+        self,
+        *,
+        my_bool: bool | int | float | str | None = None,
+        my_int: bool | int | float | str = 42,
+        my_float: bool | int | float | str = 3.14,
+        my_str: bool | int | float | str = 'foo',
+        my_secret: ops.Secret | None = None,
+    ):
+        super().__init__()
+        # Juju takes care of making sure the types are correct, so this
+        # is only to help the Python type checking understand that.
+        if my_bool is not None:
+            assert isinstance(my_bool, bool)
+        self.my_bool = my_bool
+        assert isinstance(my_float, float)
+        self.my_float = my_float
+        assert isinstance(my_int, int)
+        if my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+        self.my_int = my_int
+        assert isinstance(my_str, str)
+        self.my_str = my_str
+        if my_secret is not None:
+            assert isinstance(my_secret, ops.Secret)
+            self.my_secret = my_secret
+
+
+class BaseTestCharm(ops.CharmBase):
+    _config_errors: typing.Literal['blocked', 'raise'] | None = None
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        if self._config_errors:
+            self.typed_config = self.load_config(self.config_class, errors=self._config_errors)
+        else:
+            self.typed_config = self.load_config(self.config_class)
+        # These should not have any type errors.
+        new_float = self.typed_config.my_float + 2006.8
+        new_int = self.typed_config.my_int + 1979
+        new_str = self.typed_config.my_str + 'bar'
+        if self.typed_config.my_secret is not None:
+            label = self.typed_config.my_secret.label
+        else:
+            label = 'no secret'
+        # 'Use' the values to avoid unused variable errors.
+        self.data = f'{new_float=}, {new_int=}, {new_str=}, {label=}'
+
+    @property
+    def config_class(self) -> type[_ConfigProtocol]:
+        raise NotImplementedError
+
+
+class MyCharm(BaseTestCharm):
+    @property
+    def config_class(self) -> type[_ConfigProtocol]:
+        return MyConfig
+
+
+# Note that we would really like to have kw_only=True here as well, but that's
+# not available in Python 3.8.
+@dataclasses.dataclass(frozen=True)
+class MyDataclassConfig:
+    my_bool: bool | None = None
+    my_int: int = 42
+    my_float: float = 3.14
+    my_str: str = 'foo'
+    my_secret: ops.Secret | None = None
+
+    def __post_init__(self):
+        if self.my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+
+
+class MyDataclassCharm(BaseTestCharm):
+    @property
+    def config_class(self) -> type[_ConfigProtocol]:
+        return MyDataclassConfig
+
+
+_test_classes: list[type[BaseTestCharm]] = [MyCharm, MyDataclassCharm]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True, config={'arbitrary_types_allowed': True})
+    class MyPydanticDataclassConfig:
+        my_bool: bool | None = pydantic.Field(None)
+        my_int: int = pydantic.Field(42)
+        my_float: float = pydantic.Field(3.14)
+        my_str: str = pydantic.Field('foo')
+        my_secret: ops.Secret | None = pydantic.Field(None)
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+    class MyPydanticDataclassCharm(BaseTestCharm):
+        @property
+        def config_class(self) -> type[_ConfigProtocol]:
+            return MyPydanticDataclassConfig
+
+    class MyPydanticBaseModelConfig(pydantic.BaseModel):
+        my_bool: bool | None = pydantic.Field(None)
+        my_int: int = pydantic.Field(42)
+        my_float: float = pydantic.Field(3.14)
+        my_str: str = pydantic.Field('foo')
+        my_secret: ops.Secret | None = pydantic.Field(None)
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+        class Config:
+            arbitrary_types_allowed = True
+            frozen = True
+
+    class MyPydanticBaseModelCharm(BaseTestCharm):
+        @property
+        def config_class(self) -> type[_ConfigProtocol]:
+            return MyPydanticBaseModelConfig
+
+    _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
+
+
+_config = """
+options:
+    my-bool:
+        type: boolean
+    my-int:
+        type: int
+        default: 42
+    my-float:
+        type: float
+        default: 3.14
+    my-str:
+        type: string
+        default: foo
+    my-secret:
+        type: secret
+"""
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_config_init(charm_class: type[BaseTestCharm], request: pytest.FixtureRequest):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert typed_config.my_bool is None
+    assert typed_config.my_float == 3.14
+    assert isinstance(typed_config.my_float, float)
+    assert typed_config.my_int == 42
+    assert isinstance(typed_config.my_int, int)
+    assert typed_config.my_str == 'foo'
+    assert isinstance(typed_config.my_str, str)
+    assert typed_config.my_secret is None
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({
+        'my-bool': True,
+        'my-float': 2.71,
+        'my-int': 24,
+        'my-str': 'bar',
+    })
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = typing.cast('_ConfigProtocol', typed_config)
+    assert typed_config.my_bool is True
+    assert typed_config.my_float == 2.71
+    assert typed_config.my_int == 24
+    assert typed_config.my_str == 'bar'
+    assert typed_config.my_secret is None
+
+
+@pytest.mark.parametrize(
+    'errors,exc',
+    (('raise', ValueError), ('blocked', ops._main._Abort), (None, ValueError)),
+)
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_config_with_error_blocked(
+    charm_class: type[ops.CharmBase],
+    errors: typing.Literal['blocked', 'raise'] | None,
+    exc: type[Exception],
+    request: pytest.FixtureRequest,
+):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    charm_class._config_errors = errors  # type: ignore
+    request.addfinalizer(lambda: setattr(charm_class, '_config_errors', None))
+    harness.update_config({
+        'my-int': -1,
+    })
+    with pytest.raises(exc):
+        harness.begin()
+    if errors == 'blocked':
+        status_dict = harness._backend.status_get()
+        assert status_dict['status'] == 'blocked'
+        assert 'my_int must be zero or positive' in status_dict['message']
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    content = {'password': 'admin'}
+    secret_id = harness.add_user_secret(content)
+    harness.grant_secret(secret_id, harness.model.app.name)
+    harness.update_config({
+        'my-secret': secret_id,
+    })
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = typing.cast('_ConfigProtocol', typed_config)
+    secret = typed_config.my_secret
+    assert secret is not None
+    assert secret.id == secret_id
+    assert secret.get_content() == content
+
+
+def test_config_extra_args(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Config:
+        a: int
+        b: float
+        c: str
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config, 10, c='foo')
+
+    schema = """
+options:
+    b:
+        type: float
+"""
+    harness = testing.Harness(Charm, config=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'b': 3.14})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert isinstance(typed_config, Config)
+    assert typed_config.a == 10
+    assert typed_config.b == 3.14
+    assert typed_config.c == 'foo'
+
+
+class SmallConfig:
+    x: int
+
+    # Note that for plain classes we do not try to determine the fields
+    # and instead get all arguments.
+    def __init__(self, x: int, **_):
+        self.x = x
+
+
+@dataclasses.dataclass(frozen=True)
+class SmallDataclassConfig:
+    x: int
+
+
+_small_configs: list[type[object]] = [SmallConfig, SmallDataclassConfig]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class SmallPydanticDataclassConfig:
+        x: int
+
+    class SmallPydanticBaseModelConfig(pydantic.BaseModel):
+        x: int = pydantic.Field()
+
+    _small_configs.extend((SmallPydanticDataclassConfig, SmallPydanticBaseModelConfig))
+
+
+@pytest.mark.parametrize('config_class', _small_configs)
+def test_config_partial_init(config_class: type[object], request: pytest.FixtureRequest):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(config_class)
+
+    # Harness needs to know about *all* the options, even though the charm does not.
+    schema = """
+options:
+    x:
+        type: int
+    y:
+        type: string
+        description: An int not used in the class
+"""
+    harness = testing.Harness(Charm, config=schema)
+    request.addfinalizer(harness.cleanup)
+    # The raw config contains more fields than the class requires.
+    harness.update_config({'x': 42, 'y': 'foo'})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert isinstance(typed_config, config_class)
+    assert typed_config.x == 42  # type: ignore
+    assert not hasattr(typed_config, 'y')
