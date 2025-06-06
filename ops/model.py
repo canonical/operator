@@ -56,6 +56,7 @@ from typing import (
     TypeVar,
     Union,
     get_args,
+    get_type_hints,
 )
 
 from . import charm as _charm
@@ -1830,14 +1831,13 @@ class Relation:
         if decoder is None:
             decoder = json.loads
         for key, value in sorted(self.data[app_or_unit].items()):
-            attr = key.replace('-', '_')
             value = decoder(value)
             if fields is None:
-                data[attr] = value
+                data[key] = value
             else:
-                if attr not in fields:
+                if key not in fields:
                     continue
-                data[fields[attr]] = value
+                data[fields[key]] = value
         try:
             return cls(*args, **data)
         except ValueError as e:
@@ -1874,36 +1874,40 @@ class Relation:
             ModelError: if the charm does not have permission to write to the
                 relation data.
         """
-        # TODO: What about undoing the underscores to dashes? How could we know
-        # when to change? Maybe that just shouldn't happen here and we force
-        # charmers to use aliases?
         if encoder is None:
             encoder = json.dumps
-        try:
-            fields = _charm._juju_fields(obj.__class__)
-        except ValueError:
-            fields = None
-        else:
-            # We need the dictionary in reverse order: attribute name to field name.
-            fields = {v: k for k, v in fields.items()}
 
+        # Determine the fields, which become the Juju keys, and the values for
+        # each field.
+        fields: dict[str, str] = {}  # Class attribute name: Juju key.
         if dataclasses.is_dataclass(obj):
             assert not isinstance(obj, type)
+            for field in dataclasses.fields(obj):
+                alias = field.metadata.get('alias', field.name)
+                fields[field.name] = alias
             values = dataclasses.asdict(obj)
-        elif hasattr(obj, 'model_fields'):
-            # A Pydantic model.
-            values = obj.model_dump()  # type: ignore
+        elif hasattr(obj.__class__, 'model_fields'):
+            # Pydantic models:
+            for name, field in obj.__class__.model_fields.items():  # type: ignore
+                # Pydantic takes care of the alias.
+                fields[field.alias or name] = field.alias or name  # type: ignore
+            values = obj.model_dump(mode='json', by_alias=True, exclude_defaults=False)  # type: ignore
         else:
+            # If we could not otherwise determine the fields for the class,
+            # store all the fields that have type annotations. If a charm needs
+            # a more specific set of fields, then it should use a dataclass or
+            # Pydantic model instead.
+            fields = {k: k for k in get_type_hints(obj.__class__)}
             values = {field: getattr(obj, field) for field in fields}
+
+        # Encode each value, and then pass it over to Juju.
         data: dict[str, str] = {}
-        for field in sorted(fields):
-            assert isinstance(field, str)
-            value = encoder(values[field])
+        for attr, field in sorted(fields.items()):
             if not isinstance(field, str):
                 raise ValueError(
                     f'The value for "{field}" must be a string, not {type(field).__name__}'
                 )
-            data[field] = value
+            data[field] = encoder(values[attr])
         self.data[app_or_unit].update(data)
 
 
