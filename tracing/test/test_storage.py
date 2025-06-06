@@ -39,7 +39,7 @@ def test_https_tracing_destination(
     state = ops.testing.State(relations={https_relation, ca_relation})
     ctx.run(ctx.on.relation_changed([https_relation, ca_relation][relation_to_poke]), state)
 
-    exporter = _backend.get_exporter()
+    exporter = _backend._exporter
     assert exporter
     assert exporter.buffer.load_destination() == Destination(
         'https://tls.example/v1/traces',
