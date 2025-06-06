@@ -39,15 +39,10 @@ actions:
     additionalProperties: false
 ```
 
-### Observe the action event and define an event handler
-
-In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the action event associated with your action and pair that with an event handler. For example:
-
-```
-framework.observe(self.on['snapshot'].action, self._on_snapshot_action)
-```
-
-Also in the `src/charm.py file`, create a class for each action that defines the schema of the action parameters. For example:
+In the `src/charm.py` file of the charm, add a class that mirrors the
+configuration from `charmcraft.yaml`. This lets your static type checker and
+IDE know what Python type the parameters should be, and provides a place to do
+additional validation. Using the example from above:
 
 ```python
 class CompressionKind(enum.Enum):
@@ -69,6 +64,14 @@ class SnapshotAction(pydantic.BaseModel):
         default_factory=Compression,
         description="The type of compression to use.",
     )
+```
+
+### Observe the action event and define an event handler
+
+In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the action event associated with your action and pair that with an event handler. For example:
+
+```
+framework.observe(self.on['snapshot'].action, self._on_snapshot_action)
 ```
 
 Now, in the body of the charm definition, define the action event handler. For example:
