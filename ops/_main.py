@@ -469,6 +469,15 @@ class _Manager:
             self._emit()
             self._commit()
             self._close()
+        except _model._InvalidSchemaError as e:
+            # Optionally set an action failure message.
+            if e.action_failure:
+                self._model_backend.action_fail(e.action_failure)
+            # We exit with a zero exit code because we don't want Juju to go into
+            # error status (for config we have set a status ourselves) and we
+            # don't want to automatically retry (the Juju user must correct the
+            # data to match the schema).
+            raise _Abort(0) from e
         finally:
             self.framework.close()
 
