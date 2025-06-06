@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import ipaddress
 import json
+import urllib.parse
 from typing import Any, Callable, Protocol, cast
 
 import pytest
@@ -54,6 +56,11 @@ class DatabagProtocol(Protocol):
 
 
 class MyDatabag:
+    foo: str
+    baz: list[str]
+    bar: int
+    quux: Nested
+
     def __init__(
         self, foo: str, baz: list[str] | None = None, bar: int = 0, quux: Nested | None = None
     ):
@@ -80,17 +87,19 @@ class MyDatabag:
 
 
 class BaseTestCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+    def _on_relation_changed(self, _: ops.RelationChangedEvent) -> None:
+        raise NotImplementedError('databag class must implement this')
+
     @property
     def databag_class(self) -> type[DatabagProtocol]:
         raise NotImplementedError('databag_class must be set in the subclass')
 
-    @property
-    def encoder(self) -> Callable[..., Any] | None:
-        return None
-
-    @property
-    def decoder(self) -> Callable[..., Any] | None:
-        return None
+    encoder: Callable[[Any], str] | None = None
+    decoder: Callable[[str], Any] | None = None
 
 
 class NestedEncoder(json.JSONEncoder):
@@ -115,13 +124,8 @@ class MyCharm(BaseTestCharm):
     def databag_class(self) -> type[DatabagProtocol]:
         return MyDatabag
 
-    @property
-    def encoder(self) -> Callable[..., Any] | None:
-        return nested_encode
-
-    @property
-    def decoder(self) -> Callable[..., Any] | None:
-        return nested_decode
+    encoder: Callable[[Any], str] | None = nested_encode
+    decoder: Callable[[str], Any] | None = nested_decode
 
 
 @dataclasses.dataclass
@@ -162,8 +166,7 @@ if pydantic:
         bar: int = pydantic.Field(default=0, ge=0)
         quux: Nested = pydantic.Field(default_factory=Nested)
 
-        class Config:
-            validate_assignment = True
+        model_config = pydantic.ConfigDict(validate_assignment=True)
 
     class MyPydanticDataclassCharm(BaseTestCharm):
         @property
@@ -176,8 +179,7 @@ if pydantic:
         bar: int = pydantic.Field(default=0, ge=0)
         quux: Nested = pydantic.Field(default_factory=Nested)
 
-        class Config:
-            validate_assignment = True
+        model_config = pydantic.ConfigDict(validate_assignment=True)
 
     class MyPydanticBaseModelCharm(BaseTestCharm):
         @property
@@ -190,10 +192,6 @@ if pydantic:
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_load_simple(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, event.app, decoder=self.decoder)
             self.newfoo = len(data.foo)
@@ -225,10 +223,6 @@ def test_relation_load_fail(
     errors: str | None, raised: type[Exception], charm_class: type[BaseTestCharm]
 ):
     class Charm(charm_class):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             kwargs: dict[str, Any] = {'decoder': self.decoder}
             if errors is not None:
@@ -251,12 +245,23 @@ class _AliasProtocol(Protocol):
 
 
 class _Alias:  # noqa: B903
+    other: str
+
     def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
         self.foo_bar = fooBar
         self.other = other
 
+    # This is pretty quirky, but we need `fooBar` to be in the type annotations
+    # and we need it to return the value of `foo_bar` to correctly save back to
+    # Juju. Other than being ugly to look at, this means that the class offers
+    # `.fooBar` as well as `.foo_bar`. In practice, the expectation is that
+    # charms that need aliases like this should use dataclasses or pydantic.
+    # We have this here so that we can still have the standard set of four
+    # classes being tested.
+    fooBar: int = property(lambda self: self.foo_bar)  # type: ignore  # noqa: N815
 
-@dataclasses.dataclass()
+
+@dataclasses.dataclass
 class _DataclassesAlias:
     foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
     other: str = 'baz'
@@ -266,7 +271,7 @@ _alias_data_classes: list[type[object]] = [_Alias, _DataclassesAlias]
 
 if pydantic is not None:
 
-    @pydantic.dataclasses.dataclass(init=False)
+    @pydantic.dataclasses.dataclass
     class _PydanticDataclassesAlias:
         foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
         other: str = pydantic.Field(default='baz')
@@ -281,7 +286,7 @@ if pydantic is not None:
 @pytest.mark.parametrize('relation_data', [{}, {'fooBar': '24'}])
 @pytest.mark.parametrize('data_class', _alias_data_classes)
 def test_relation_load_custom_naming_pattern(
-    relation_data: dict[str, str], data_class: type[object]
+    relation_data: dict[str, str], data_class: type[_AliasProtocol]
 ):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -297,9 +302,34 @@ def test_relation_load_custom_naming_pattern(
     with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
         mgr.run()
         obj = mgr.charm.data
-    obj = cast('_AliasProtocol', obj)
     assert obj.foo_bar == json.loads(relation_data.get('fooBar', '42'))
     assert obj.other == 'baz'
+
+
+@pytest.mark.parametrize('data_class', _alias_data_classes)
+def test_relation_save_custom_naming_pattern(data_class: type[_AliasProtocol]):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            data = event.relation.load(data_class, event.app)
+            data.foo_bar = 24
+            data.other = 'foo'
+            event.relation.save(data, self.app)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation(
+        'db', remote_app_data={'fooBar': json.dumps('42'), 'other': json.dumps('baz')}
+    )
+    state_in = testing.State(leader=True, relations={rel})
+    state_out = ctx.run(ctx.on.relation_changed(rel), state_in)
+    data = state_out.get_relation(rel.id).local_app_data
+    assert data == {
+        'fooBar': json.dumps(24),
+        'other': json.dumps('foo'),
+    }
 
 
 def test_relation_load_extra_args():
@@ -329,36 +359,9 @@ def test_relation_load_extra_args():
     assert obj.c == 'foo'
 
 
-def test_relation_load_dash_to_underscore():
-    @dataclasses.dataclass
-    class Data:
-        a_b: int
-
-    class Charm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
-        def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            self.data = event.relation.load(Data, event.app)
-
-    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
-    rel = testing.Relation('db', remote_app_data={'a-b': '3.14'})
-    state_in = testing.State(leader=True, relations={rel})
-    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
-        mgr.run()
-        obj = mgr.charm.data
-    assert isinstance(obj, Data)
-    assert obj.a_b == 3.14
-
-
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_simple(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(
                 foo='other-value', bar=28, baz=['x', 'y'], quux=Nested(sub=8)
@@ -381,10 +384,6 @@ def test_relation_save_simple(charm_class: type[BaseTestCharm]):
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
             event.relation.save(data, event.app, encoder=self.encoder)
@@ -392,17 +391,14 @@ def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with pytest.raises(ops.RelationDataAccessError):
+    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
+    assert isinstance(exc_info.value.__cause__, ops.RelationDataAccessError)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             self.data = event.relation.load(self.databag_class, self.app)
             self.data.foo = self.data.foo + '1'
@@ -433,10 +429,6 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             def encoder(_: Any) -> int:
                 # This is invalid: Juju only accepts strings.
@@ -453,12 +445,20 @@ def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
     assert isinstance(exc_info.value.__cause__, ops.RelationDataTypeError)
 
 
+class _OneStringProtocol(Protocol):
+    foo: str
+
+    def __init__(self, foo: str): ...
+
+
 class _OneString:  # noqa: B903
+    foo: str
+
     def __init__(self, foo: str):
         self.foo = foo
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass
 class _DataclassesOneString:
     foo: str
 
@@ -478,7 +478,7 @@ if pydantic is not None:
 
 
 @pytest.mark.parametrize('data_class', _one_string_data_classes)
-def test_relation_save_no_encode(data_class: type[BaseTestCharm]):
+def test_relation_save_no_encode(data_class: type[_OneStringProtocol]):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -500,31 +500,21 @@ def test_relation_save_no_encode(data_class: type[BaseTestCharm]):
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
+    def custom_encode(data: Any) -> str:
+        if hasattr(data, 'upper'):
+            return data.upper()
+        return str(data)
+
+    def custom_decode(data: str) -> Any:
+        if hasattr(data, '__getitem__'):
+            return data[::-1]
+        return data
+
     class Charm(charm_class):
-        @staticmethod
-        def custom_encode(data: Any) -> Any:
-            if hasattr(data, 'upper'):
-                return data.upper()
-            return str(data)
-
-        @staticmethod
-        def custom_decode(data: Any) -> Any:
-            if hasattr(data, '__getitem__'):
-                return data[::-1]
-            return data
-
-        @property
-        def encoder(self) -> Callable[..., Any] | None:
-            return self.custom_encode
-
-        @property
-        def decoder(self) -> Callable[..., Any] | None:
-            return self.custom_decode
-
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            data = event.relation.load(self.databag_class, self.app, decoder=self.decoder)
+            data = event.relation.load(self.databag_class, self.app, decoder=custom_decode)
             data.foo = data.foo + '1'
-            event.relation.save(data, self.app, encoder=self.encoder)
+            event.relation.save(data, self.app, encoder=custom_encode)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db', local_app_data={'foo': 'value'})
@@ -534,9 +524,191 @@ def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
     assert rel_out.local_app_data['foo'] == 'EULAV1'
 
 
-# TODO: pydantic model with pydantic types that need to serialise down to a string
-# TODO: add a test that has the common Pydantic types: AnyHttpUrl or HttpUrl,
-# IPvAnyAddress (ipaddress.IPv4Address|ipaddress.IPv6Address) for non-Pydantic, IPvAnyNetwork.
+class CommonTypesProtocol(Protocol):
+    url: str
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str
+    network: ipaddress.IPv4Network | ipaddress.IPv6Network | str
+
+    def __init__(
+        self,
+        *,
+        url: str,
+        ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
+        network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
+    ): ...
+
+
+class BaseTestCharmCommonTypes(ops.CharmBase):
+    @property
+    def databag_class(self) -> type[CommonTypesProtocol]:
+        raise NotImplementedError('databag_class must be set in the subclass')
+
+    encoder: Callable[[Any], str] | None = None
+    decoder: Callable[[Any], str] | None = None
+
+
+class CommonTypes(BaseTestCharmCommonTypes):
+    @property
+    def databag_class(self):
+        class Data:
+            url: str
+            ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+            network: ipaddress.IPv4Network | ipaddress.IPv6Network
+
+            def __init__(
+                self,
+                *,
+                url: str,
+                ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
+                network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
+            ):
+                if not self._validate_url(url):
+                    raise ValueError(f'Invalid URL: {url}')
+                self.url = url
+                if isinstance(ip, str):
+                    self.ip = ipaddress.ip_address(ip)
+                else:
+                    self.ip = ip
+                if isinstance(network, str):
+                    self.network = ipaddress.ip_network(network)
+                else:
+                    self.network = network
+
+            @staticmethod
+            def _validate_url(url: str):
+                parsed_url = urllib.parse.urlparse(url)
+                return bool(parsed_url.scheme and parsed_url.netloc)
+
+            def __setattr__(self, key: str, value: Any):
+                if key == 'url' and not self._validate_url(value):
+                    raise ValueError(f'Invalid URL: {value}')
+                if key == 'ip' and not isinstance(
+                    value, (ipaddress.IPv4Address, ipaddress.IPv6Address)
+                ):
+                    raise ValueError(f'Invalid IP address: {value}')
+                if key == 'network' and not isinstance(
+                    value, (ipaddress.IPv4Network, ipaddress.IPv6Network)
+                ):
+                    raise ValueError(f'Invalid network: {value}')
+                super().__setattr__(key, value)
+
+        return Data
+
+    @staticmethod
+    def _str_encoder(x: Any) -> str:
+        return json.dumps(str(x))
+
+    encoder: Callable[[Any], str] | None = _str_encoder
+
+
+class IPJSONEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(
+            obj,
+            (
+                ipaddress.IPv4Address,
+                ipaddress.IPv6Address,
+                ipaddress.IPv4Network,
+                ipaddress.IPv6Network,
+            ),
+        ):
+            return str(obj)
+        return super().default(obj)
+
+
+@staticmethod
+def json_ip_hook(dct: dict[str, Any]) -> dict[str, Any]:
+    for key, value in dct.items():
+        try:
+            if '/' in value:
+                dct[key] = ipaddress.ip_network(value, strict=False)
+            else:
+                dct[key] = ipaddress.ip_address(value)
+        except ValueError:  # noqa: PERF203
+            pass
+    return dct
+
+
+json_ip_encode = functools.partial(json.dumps, cls=IPJSONEncoder)
+json_ip_decode = functools.partial(json.loads, object_hook=json_ip_hook)
+
+
+class CommonTypesDataclasses(BaseTestCharmCommonTypes):
+    @property
+    def databag_class(self):
+        @dataclasses.dataclass
+        class Data:
+            url: str
+            ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+            network: ipaddress.IPv4Network | ipaddress.IPv6Network
+
+        return Data
+
+    encoder: Callable[[Any], str] | None = json_ip_encode
+    decoder: Callable[[str], Any] | None = json_ip_decode
+
+
+_common_types_classes: list[type[ops.CharmBase]] = [CommonTypes, CommonTypesDataclasses]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass
+    class _DataPydanticDataclass:
+        url: pydantic.AnyHttpUrl  # type: ignore
+        ip: pydantic.IPvAnyAddress  # type: ignore
+        network: pydantic.IPvAnyNetwork  # type: ignore
+
+    class CommonTypesPydanticDataclass(BaseTestCharmCommonTypes):
+        @property
+        def databag_class(self):
+            return _DataPydanticDataclass
+
+        encoder: Callable[[Any], str] | None = json_ip_encode
+
+    class _DataBaseModel(pydantic.BaseModel):
+        url: pydantic.AnyHttpUrl  # type: ignore
+        ip: pydantic.IPvAnyAddress  # type: ignore
+        network: pydantic.IPvAnyNetwork  # type: ignore
+
+    class CommonTypesPydantic(BaseTestCharmCommonTypes):
+        @property
+        def databag_class(self):
+            return _DataBaseModel
+
+    _common_types_classes.extend([CommonTypesPydanticDataclass, CommonTypesPydantic])
+
+
+@pytest.mark.parametrize('charm_class', _common_types_classes)
+def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
+    class Charm(charm_class):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            data: CommonTypesProtocol = event.relation.load(
+                self.databag_class, event.app, decoder=self.decoder
+            )
+            data.url = 'https://new.example.com'
+            data.ip = ipaddress.ip_address('127.0.0.3')
+            data.network = ipaddress.ip_network('127.0.2.0/24')
+            event.relation.save(data, self.app, encoder=self.encoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    data_in = {
+        'url': json.dumps('https://example.com'),
+        'ip': json.dumps('127.0.0.2'),
+        'network': json.dumps('127.0.1.0/24'),
+    }
+    rel_in = testing.Relation('db', remote_app_data=data_in)
+    state_in = testing.State(leader=True, relations={rel_in})
+    state_out = ctx.run(ctx.on.relation_changed(rel_in), state_in)
+    rel_out = state_out.get_relation(rel_in.id)
+    assert rel_out.local_app_data['url'] == json.dumps('https://new.example.com')
+    assert rel_out.local_app_data['ip'] == json.dumps('127.0.0.3')
+    assert rel_out.local_app_data['network'] == json.dumps('127.0.2.0/24')
+
+
 # TODO: add a test that uses enums.
 # TODO: add a test that validates a combination of fields.
 # TODO: add in support for Scenario automatically JSON'ing the relation content.
