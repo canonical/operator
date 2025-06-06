@@ -57,7 +57,7 @@ To contribute docs:
     - Reference - Automatically generated from Python docstrings
     - Explanation - [`/docs/explanation`](./docs/explanation)
 2. [Build the documentation locally](#how-to-build-the-documentation-locally), to check that everything looks right
-3. [Propose your changes using a pull request](#contributing)
+3. [Propose your changes using a pull request](#pull-requests)
 
 When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
 
